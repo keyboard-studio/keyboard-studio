@@ -11,6 +11,8 @@ describe("initial values", () => {
     expect(s.trailShowSuperseded).toBe(false);
     expect(s.paneSplitPct).toEqual({ survey: 45, compare: 40, output: 40 });
     expect(s.oskMode).toEqual({ survey: "desktop", compare: "desktop" });
+    expect(s.oskVisible).toEqual({ survey: true, compare: true });
+    expect(s.surveyPaneView).toBe("questions");
     expect(s.scrollTop).toEqual({});
     expect(s.compareSelection).toBeNull();
   });
@@ -19,7 +21,9 @@ describe("initial values", () => {
     // A `persist`-wrapped store exposes `.persist`; this one must not, or the
     // Q9 lifetime (survives a tab switch, dies on reload) would be wrong in
     // the direction that needs explicit clearing code.
-    expect((useViewStateStore as unknown as { persist?: unknown }).persist).toBeUndefined();
+    expect(
+      (useViewStateStore as unknown as { persist?: unknown }).persist,
+    ).toBeUndefined();
   });
 });
 
@@ -32,7 +36,9 @@ describe("slot writes", () => {
   it("toggles a trail stage on and back off", () => {
     const { toggleTrailStage } = useViewStateStore.getState();
     toggleTrailStage("characters");
-    expect([...useViewStateStore.getState().trailCollapsedSteps]).toEqual(["characters"]);
+    expect([...useViewStateStore.getState().trailCollapsedSteps]).toEqual([
+      "characters",
+    ]);
     useViewStateStore.getState().toggleTrailStage("characters");
     expect([...useViewStateStore.getState().trailCollapsedSteps]).toEqual([]);
   });
@@ -52,6 +58,24 @@ describe("slot writes", () => {
       survey: "desktop",
       compare: "touch",
     });
+  });
+
+  it("keeps per-surface OSK visibility independent (mobile adaptation #1853)", () => {
+    useViewStateStore.getState().setOskVisible("survey", false);
+    expect(useViewStateStore.getState().oskVisible).toEqual({
+      survey: false,
+      compare: true,
+    });
+    useViewStateStore.getState().setOskVisible("survey", true);
+    expect(useViewStateStore.getState().oskVisible).toEqual({
+      survey: true,
+      compare: true,
+    });
+  });
+
+  it("sets the narrow survey pane view", () => {
+    useViewStateStore.getState().setSurveyPaneView("preview");
+    expect(useViewStateStore.getState().surveyPaneView).toBe("preview");
   });
 });
 
@@ -84,7 +108,9 @@ describe("scrollTop keying", () => {
     });
     // Adding a pane must not shift an existing pane's restored offset.
     useViewStateStore.getState().setScrollTop("trail-list", 8);
-    expect(useViewStateStore.getState().scrollTop["survey-questions"]).toBe(120);
+    expect(useViewStateStore.getState().scrollTop["survey-questions"]).toBe(
+      120,
+    );
   });
 });
 
@@ -96,6 +122,8 @@ describe("reset (FR-052)", () => {
     s.setTrailShowSuperseded(true);
     s.setPaneSplitPct("compare", 70);
     s.setOskMode("survey", "tablet");
+    s.setOskVisible("survey", false);
+    s.setSurveyPaneView("preview");
     s.setScrollTop("trail-list", 300);
     s.setCompareSelection({
       baseKeyboard: { id: "kb", displayName: "KB" } as never,
@@ -110,6 +138,8 @@ describe("reset (FR-052)", () => {
     expect(after.trailShowSuperseded).toBe(false);
     expect(after.paneSplitPct).toEqual({ survey: 45, compare: 40, output: 40 });
     expect(after.oskMode).toEqual({ survey: "desktop", compare: "desktop" });
+    expect(after.oskVisible).toEqual({ survey: true, compare: true });
+    expect(after.surveyPaneView).toBe("questions");
     expect(after.scrollTop).toEqual({});
     expect(after.compareSelection).toBeNull();
   });

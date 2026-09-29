@@ -2,9 +2,14 @@
 // drives postMessage commands from the parent state, surfaces incoming
 // text + ready/error events back up via useOskChannel.
 //
-// The iframe is mounted unconditionally (even before a keyboard is picked)
-// so KMW's init() runs once and stays warm. Hiding & re-creating the iframe
-// would reset KMW context on every selection — expensive.
+// The iframe mounts whenever this component renders — including before a
+// keyboard is picked — so KMW's init() runs and stays warm while the preview
+// is visible. The parent unmounts this component when the author hides the
+// preview via the OSK visibility switch (mobile adaptation #1853,
+// principle 9): unmounting destroys the iframe and unloads KeymanWeb,
+// freeing the library's memory. Showing the preview remounts here and the
+// normal init path (iframe onLoad → SET_STRINGS → SET_KEYBOARD on engine
+// ready) runs again cleanly — no warm-state assumptions survive the unmount.
 
 import { useCallback, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -64,8 +69,14 @@ export function OSKFrame({
     id: "osk.frame.status.ready",
     message: "Ready — pick a keyboard",
   });
-  const stringsRef = useRef({ placeholder: placeholderText, statusReady: statusReadyText });
-  stringsRef.current = { placeholder: placeholderText, statusReady: statusReadyText };
+  const stringsRef = useRef({
+    placeholder: placeholderText,
+    statusReady: statusReadyText,
+  });
+  stringsRef.current = {
+    placeholder: placeholderText,
+    statusReady: statusReadyText,
+  };
 
   const sendStrings = useCallback(() => {
     send({ type: "SET_STRINGS", strings: stringsRef.current });
@@ -98,16 +109,24 @@ export function OSKFrame({
     // needs the language tag the compiled .js registers under — otherwise it
     // errors with "Cannot find the <id> keyboard for English".
     const activeBcp47 =
-      (identity?.bcp47 && identity.bcp47.trim() !== "" ? identity.bcp47 : undefined) ??
-      baseKeyboard.languages?.[0];
+      (identity?.bcp47 && identity.bcp47.trim() !== ""
+        ? identity.bcp47
+        : undefined) ?? baseKeyboard.languages?.[0];
     send({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
       keyboardId: activeKeyboardId,
-      ...(activeBcp47 !== undefined && activeBcp47 !== "" ? { bcp47: activeBcp47 } : {}),
-      ...(stage.fontFaceUrl !== undefined ? { fontFaceUrl: stage.fontFaceUrl } : {}),
-      ...(stage.fontFaceFamily !== undefined ? { fontFaceFamily: stage.fontFaceFamily } : {}),
-      ...(stage.keyboardCssUrls !== undefined && stage.keyboardCssUrls.length > 0
+      ...(activeBcp47 !== undefined && activeBcp47 !== ""
+        ? { bcp47: activeBcp47 }
+        : {}),
+      ...(stage.fontFaceUrl !== undefined
+        ? { fontFaceUrl: stage.fontFaceUrl }
+        : {}),
+      ...(stage.fontFaceFamily !== undefined
+        ? { fontFaceFamily: stage.fontFaceFamily }
+        : {}),
+      ...(stage.keyboardCssUrls !== undefined &&
+      stage.keyboardCssUrls.length > 0
         ? { keyboardCssUrls: stage.keyboardCssUrls }
         : {}),
     });
@@ -138,7 +157,10 @@ export function OSKFrame({
         ref={iframeRef}
         src="/osk-frame.html"
         onLoad={sendStrings}
-        title={t({ id: "osk.frame.title", message: "On-screen keyboard preview" })}
+        title={t({
+          id: "osk.frame.title",
+          message: "On-screen keyboard preview",
+        })}
         // allow-same-origin is load-bearing for the frame's postMessage
         // origin check (osk-frame.js compares event.origin against its own
         // window.location.origin) and for KMW's relative .js fetches in dev.

@@ -81,8 +81,9 @@ import {
   type OnInstantiateCallback,
 } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
-import { OSKFrame } from "./components/OSKFrame.tsx";
-import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
+import { PaneViewSwitch } from "./components/PaneViewSwitch.tsx";
+import type { OskMode } from "./components/OskModeToggle.tsx";
+import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
@@ -126,7 +127,6 @@ import {
   serverMetaToDraftMeta,
 } from "./lib/serverDraftStore.ts";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
-import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import {
   useBasePreviewStatusStore,
   type BasePreviewStatus,
@@ -135,6 +135,7 @@ import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useAccountedForGate } from "./hooks/useAccountedForGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
+import { useIsNarrow } from "./hooks/useViewport.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
@@ -510,6 +511,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     [setSurveyOskMode],
   );
   const setPaneSplitPct = useViewStateStore((s) => s.setPaneSplitPct);
+  // Mobile adaptation (#1853, Phase 2): narrow-viewport pane selection and
+  // author-controlled OSK visibility (principle 9). Both are session-scoped
+  // view state — they survive a route unmount and die on reload (Q9), and
+  // neither can reach a compile or validator run (FR-053).
+  const surveyPaneView = useViewStateStore((s) => s.surveyPaneView);
+  const setSurveyPaneView = useViewStateStore((s) => s.setSurveyPaneView);
+  const surveyOskVisible = useViewStateStore((s) => s.oskVisible.survey);
+  const setOskVisible = useViewStateStore((s) => s.setOskVisible);
+  const setSurveyOskVisible = useCallback(
+    (visible: boolean) => setOskVisible("survey", visible),
+    [setOskVisible],
+  );
+  const isNarrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } = useResizablePanes({
     minPct: SURVEY_LEFT_MIN_PCT,
     maxPct: SURVEY_LEFT_MAX_PCT,
@@ -1396,6 +1410,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
+  // Mobile adaptation (#1853, Phase 2): under 479px the panes stack behind a
+  // Questions | Preview switch instead of sitting side-by-side. The visible
+  // pane fills the column; the drag handle is hidden (no split to drag).
+  // Desktop keeps the resizable row layout untouched.
+  const narrowStackedPaneStyle: CSSProperties = {
+    flexBasis: "auto",
+    flexGrow: 1,
+    flexShrink: 1,
+    width: "100%",
+  };
+  const previewPaneStyle: CSSProperties = {
+    flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
+    flexGrow: 1,
+    flexShrink: 0,
+  };
+
   // Full-screen steps (carve/mechanisms/touch/touch_seed_source) bypass the
   // two-pane layout. StepHost returns the full-screen container; SurveyView
   // renders it directly. This reproduces the pre-Stage-5 early-return pattern
@@ -1408,201 +1438,140 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return stepHost;
   }
 
+  // Narrow-viewport pane visibility: the switch above picks one pane; desktop
+  // shows both side-by-side.
+  const showQuestionsPane = !isNarrow || surveyPaneView === "questions";
+  const showPreviewPane = !isNarrow || surveyPaneView === "preview";
+
   return (
     <div
       ref={containerRef}
       style={{
         display: "flex",
-        flexDirection: "row",
+        flexDirection: isNarrow ? "column" : "row",
         height: "100%",
         width: "100%",
         background: "var(--bg)",
         overflow: "hidden",
       }}
     >
+      {isNarrow && (
+        <PaneViewSwitch value={surveyPaneView} onChange={setSurveyPaneView} />
+      )}
       {/* Left pane: survey questions (StepHost renders pane content) */}
-      <SurveyQuestionsPane label="Survey questions" style={questionsPaneStyle}>
-        {cloudResume !== null && (
-          <ResumeDraftBanner
-            meta={cloudResume}
-            onResume={handleResumeDraft}
-            onDiscard={handleDiscardDraft}
-          />
-        )}
-        {
-          // Always mounted, so content inserted later is announced (a live
-          // region inserted together with its content often is not); it only
-          // takes up space when it has something to say.
-          // Rendered flush on "var(--bg)" — the same token the container above
-          // paints and the one CharacterMapPane's own root implicitly sits on
-          // (it sets no background of its own, so it shows through to the
-          // container's var(--bg) too). Pinned explicitly here rather than left
-          // to accidental non-override, so a future change to questionsPaneStyle's
-          // background doesn't silently drag this along. No border/card fill/
-          // padding-as-box — this is text on the character-map surface, not a
-          // card. The context-tolerance notice (spec 078) shares this live
-          // region rather than adding an announcer of its own (FR-014).
-          <div
-            role="status"
-            aria-live="polite"
-            style={
-              globalWarnings.length > 0 || showContextTolerance
-                ? {
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    marginBottom: 12,
-                    background: "var(--bg)",
-                  }
-                : undefined
-            }
-          >
-            {globalWarnings.map((f, i) => (
-              <div
-                key={`${f.code}-${i}`}
-                style={{ display: "flex", flexDirection: "column", gap: 2 }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 13,
-                    lineHeight: 1.5,
-                    color: TEXT_MAIN,
-                  }}
+      {showQuestionsPane && (
+        <SurveyQuestionsPane
+          label="Survey questions"
+          style={
+            isNarrow
+              ? { ...questionsPaneStyle, ...narrowStackedPaneStyle }
+              : questionsPaneStyle
+          }
+        >
+          {cloudResume !== null && (
+            <ResumeDraftBanner
+              meta={cloudResume}
+              onResume={handleResumeDraft}
+              onDiscard={handleDiscardDraft}
+            />
+          )}
+          {
+            // Always mounted, so content inserted later is announced (a live
+            // region inserted together with its content often is not); it only
+            // takes up space when it has something to say.
+            // Rendered flush on "var(--bg)" — the same token the container above
+            // paints and the one CharacterMapPane's own root implicitly sits on
+            // (it sets no background of its own, so it shows through to the
+            // container's var(--bg) too). Pinned explicitly here rather than left
+            // to accidental non-override, so a future change to questionsPaneStyle's
+            // background doesn't silently drag this along. No border/card fill/
+            // padding-as-box — this is text on the character-map surface, not a
+            // card. The context-tolerance notice (spec 078) shares this live
+            // region rather than adding an announcer of its own (FR-014).
+            <div
+              role="status"
+              aria-live="polite"
+              style={
+                globalWarnings.length > 0 || showContextTolerance
+                  ? {
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      marginBottom: 12,
+                      background: "var(--bg)",
+                    }
+                  : undefined
+              }
+            >
+              {globalWarnings.map((f, i) => (
+                <div
+                  key={`${f.code}-${i}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
                 >
-                  <span aria-hidden="true">⚠</span>{" "}
-                  <Trans id="common.warningLabel">Warning:</Trans> {f.message}
-                </p>
-                {f.hint !== undefined && (
                   <p
                     style={{
                       margin: 0,
-                      fontSize: 12,
+                      fontSize: 13,
                       lineHeight: 1.5,
-                      color: TEXT_DIM,
+                      color: TEXT_MAIN,
                     }}
                   >
-                    {f.hint}
+                    <span aria-hidden="true">⚠</span>{" "}
+                    <Trans id="common.warningLabel">Warning:</Trans> {f.message}
                   </p>
-                )}
-              </div>
-            ))}
-            {showContextTolerance && (
-              <ContextToleranceNotice
-                state={contextTolerance}
-                applyNotes={contextToleranceApplyNotes}
-              />
-            )}
-          </div>
-        }
-        {globalNonWarnings.length > 0 && (
-          <LintSummary findings={globalNonWarnings} />
-        )}
-        {stepHost}
-      </SurveyQuestionsPane>
+                  {f.hint !== undefined && (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                        color: TEXT_DIM,
+                      }}
+                    >
+                      {f.hint}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {showContextTolerance && (
+                <ContextToleranceNotice
+                  state={contextTolerance}
+                  applyNotes={contextToleranceApplyNotes}
+                />
+              )}
+            </div>
+          }
+          {globalNonWarnings.length > 0 && (
+            <LintSummary findings={globalNonWarnings} />
+          )}
+          {stepHost}
+        </SurveyQuestionsPane>
+      )}
 
-      {/* Drag handle */}
-      <ResizeHandle onPointerDown={onPointerDown} />
+      {/* Drag handle — desktop only; on narrow viewports there is no split
+          to drag (one pane fills the column behind the Questions | Preview
+          switch). */}
+      {!isNarrow && <ResizeHandle onPointerDown={onPointerDown} />}
 
       {/* Right pane: live OSK preview, OR (Phase B build-list only) the
           interactive character map — see activeRightPane/showCharacterMap
           above. The mechanism gallery and every other full-screen step render
           their own preview and are unaffected (they never reach this branch:
           activeStepIsFullScreen returns early above). */}
-      <section
-        aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
-        style={{
-          flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
-          flexGrow: 1,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          minHeight: 0,
-          overflow: "auto",
-          padding: 24,
-          boxSizing: "border-box",
-          color: TEXT_MAIN,
-          fontFamily: FONT,
-        }}
-      >
-        {showCharacterMap ? (
-          <CharacterMapPane
-            scope={activeStepId === "punctuation" ? "punctuation" : "alphabet"}
-          />
-        ) : localBase === null ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              gap: 12,
-              color: "var(--app-text-subtle)",
-              fontSize: 14,
-              textAlign: "center",
-            }}
-          >
-            {/* Decorative icon stand-in: aria-hidden (conveys nothing the next
-                line doesn't).
-                The previous version inherited its color and dimmed it with
-                opacity: 0.6. That opacity was tuned against the ORIGINAL
-                literal color-on-background pair, and the comment here flagged
-                that it needed re-verifying once both sides became tokens —
-                which epic #533 did. The axe gate in e2e/boot-smoke.spec.ts then
-                failed it as a serious color-contrast violation.
-                Fixed by naming the color outright and dropping the opacity:
-                stacking a dim on top of a color is the one thing the design
-                system forbids, because the two multiply into an unreadable
-                value. --app-text-muted clears AA on both themes on its own. */}
-            <span
-              aria-hidden="true"
-              style={{
-                fontSize: 32,
-                fontFamily: "var(--app-font-mono)",
-                color: "var(--app-text-muted)",
-              }}
-            >
-              [kb]
-            </span>
-            <span>
-              <Trans id="preview.empty.hint">
-                Choose a base keyboard in the wizard to see a live preview here.
-              </Trans>
-            </span>
-          </div>
-        ) : (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "1.1rem",
-                  color: "var(--app-accent-text)",
-                }}
-              >
-                {localBase.displayName}
-              </h2>
-              <OskModeToggle value={oskMode} onChange={setOskMode} />
-            </div>
-            <OSKFrame
-              baseKeyboard={localBase}
-              oskMode={oskMode}
-              stage={artifactStage}
-              retry={retry}
-            />
-          </>
-        )}
-      </section>
+      {showPreviewPane && (
+        <SurveyPreviewPane
+          localBase={localBase}
+          oskMode={oskMode}
+          onOskModeChange={setOskMode}
+          oskVisible={surveyOskVisible}
+          onOskVisibleChange={setSurveyOskVisible}
+          stage={artifactStage}
+          retry={retry}
+          showCharacterMap={showCharacterMap}
+          activeStepId={activeStepId}
+          style={isNarrow ? narrowStackedPaneStyle : previewPaneStyle}
+        />
+      )}
     </div>
   );
 }

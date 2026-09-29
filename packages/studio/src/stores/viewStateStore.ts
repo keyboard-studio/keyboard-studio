@@ -35,6 +35,15 @@ export type SplitSurface = "survey" | "compare" | "output";
 export type OskSurface = "survey" | "compare";
 
 /**
+ * Which pane the narrow-viewport survey layout shows (mobile adaptation
+ * #1853, Phase 2). On viewports under 479px the two panes can't sit
+ * side-by-side, so a segmented Questions | Preview switch picks one.
+ * Session-persisted like every other slot here (a device preference, in the
+ * spirit of `lib/theme.ts`'s doctrine — the issue's open question 4).
+ */
+export type SurveyPaneView = "questions" | "preview";
+
+/**
  * A keyboard loaded on the Compare tab for inspection (data-model.md
  * CompareSession). It carries NO reference to the working copy and is never
  * serialized — see the Compare isolation contract (FR-021).
@@ -62,6 +71,11 @@ const INITIAL_OSK_MODE: Record<OskSurface, OskMode> = {
   compare: "desktop",
 };
 
+const INITIAL_OSK_VISIBLE: Record<OskSurface, boolean> = {
+  survey: true,
+  compare: true,
+};
+
 export interface ViewState {
   /** Flow Map: which section tab is open. Replaces DashboardView's useState. */
   flowMapSection: FlowMapSection;
@@ -73,6 +87,19 @@ export interface ViewState {
   paneSplitPct: Readonly<Record<SplitSurface, number>>;
   /** OSK desktop/touch/tablet choice per surface. */
   oskMode: Readonly<Record<OskSurface, OskMode>>;
+  /**
+   * Whether the KeymanWeb OSK preview is mounted per surface (mobile
+   * adaptation #1853, principle 9). The author hides it to reclaim workspace
+   * for configuration; hiding unmounts the OSK iframe (unloading KeymanWeb),
+   * showing remounts it through the normal init path. Presentation-only —
+   * the preview never feeds a compile or validator (FR-053).
+   */
+  oskVisible: Readonly<Record<OskSurface, boolean>>;
+  /**
+   * Narrow-viewport survey pane selection. Read only when `useIsNarrow()` is
+   * true; the desktop side-by-side layout ignores it.
+   */
+  surveyPaneView: SurveyPaneView;
   /**
    * Scroll offsets keyed by a STABLE pane identifier — never an array index,
    * so adding a pane cannot silently re-target a restored offset.
@@ -87,6 +114,8 @@ export interface ViewState {
   setTrailShowSuperseded: (show: boolean) => void;
   setPaneSplitPct: (surface: SplitSurface, pct: number) => void;
   setOskMode: (surface: OskSurface, mode: OskMode) => void;
+  setOskVisible: (surface: OskSurface, visible: boolean) => void;
+  setSurveyPaneView: (view: SurveyPaneView) => void;
   setScrollTop: (paneId: string, top: number) => void;
   setCompareSelection: (session: CompareSession | null) => void;
 
@@ -102,6 +131,8 @@ type ViewStateData = Omit<
   | "setTrailShowSuperseded"
   | "setPaneSplitPct"
   | "setOskMode"
+  | "setOskVisible"
+  | "setSurveyPaneView"
   | "setScrollTop"
   | "setCompareSelection"
   | "reset"
@@ -118,6 +149,8 @@ const INITIAL_STATE: ViewStateData = {
   trailShowSuperseded: false,
   paneSplitPct: INITIAL_SPLIT_PCT,
   oskMode: INITIAL_OSK_MODE,
+  oskVisible: INITIAL_OSK_VISIBLE,
+  surveyPaneView: "questions",
   scrollTop: {},
   compareSelection: null,
 };
@@ -141,13 +174,21 @@ export const useViewStateStore = create<ViewState>((set, get) => ({
   setPaneSplitPct: (surface, pct) =>
     set({ paneSplitPct: { ...get().paneSplitPct, [surface]: pct } }),
 
-  setOskMode: (surface, mode) => set({ oskMode: { ...get().oskMode, [surface]: mode } }),
+  setOskMode: (surface, mode) =>
+    set({ oskMode: { ...get().oskMode, [surface]: mode } }),
 
-  setScrollTop: (paneId, top) => set({ scrollTop: { ...get().scrollTop, [paneId]: top } }),
+  setOskVisible: (surface, visible) =>
+    set({ oskVisible: { ...get().oskVisible, [surface]: visible } }),
+
+  setSurveyPaneView: (surveyPaneView) => set({ surveyPaneView }),
+
+  setScrollTop: (paneId, top) =>
+    set({ scrollTop: { ...get().scrollTop, [paneId]: top } }),
 
   setCompareSelection: (compareSelection) => set({ compareSelection }),
 
-  reset: () => set({ ...INITIAL_STATE, trailCollapsedSteps: new Set<string>() }),
+  reset: () =>
+    set({ ...INITIAL_STATE, trailCollapsedSteps: new Set<string>() }),
 }));
 
 /**
