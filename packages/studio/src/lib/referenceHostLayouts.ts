@@ -382,9 +382,11 @@ export type LayoutFamilyAnswer = "qwerty" | "qwertz" | "azerty" | "non-roman";
  * Versioned region→layout mapping (REGION_LAYOUT_MAPPING_VERSION).
  * Keyed by bcp47 region subtag (uppercased). Approximations are marked:
  * - CH (Swiss German QWERTZ differs slightly from German QWERTZ)
- * - CA → US: Canadian English typists overwhelmingly use the US layout;
- *   the distinct French-Canadian (CSA) layout is not modelled (see header:
- *   additive later, never a silent redesign).
+ * - CA → US: Canadian ENGLISH typists overwhelmingly use the US layout.
+ *   French-Canadian typists use the distinct CSA layout, which is NOT in the
+ *   reference set — so fr-CA gets no region answer (falls back to all five
+ *   hosts) rather than a wrong US answer. CSA is additive later, never a
+ *   silent redesign (see header).
  */
 const REGION_TO_HOST: Record<string, HostLayoutId> = {
   US: "us",
@@ -406,6 +408,11 @@ function regionOf(tag: string): string | undefined {
     if (part && /^[A-Za-z]{2}$/.test(part)) return part.toUpperCase();
   }
   return undefined;
+}
+
+/** The language subtag (first component) of a bcp47 tag, lowercased. */
+function languageOf(tag: string): string {
+  return (tag.split("-")[0] ?? "").toLowerCase();
 }
 
 export function likelyHostLayouts(
@@ -432,6 +439,10 @@ export function likelyHostLayouts(
   const seen = new Set<HostLayoutId>();
   for (const tag of bcp47) {
     const region = regionOf(tag);
+    // fr-CA: French-Canadian typists use CSA, not US — and CSA is not in the
+    // reference set, so no region answer (falls back to all five below)
+    // rather than a wrong US answer.
+    if (region === "CA" && languageOf(tag) === "fr") continue;
     const host = region ? REGION_TO_HOST[region] : undefined;
     if (host) seen.add(host);
   }

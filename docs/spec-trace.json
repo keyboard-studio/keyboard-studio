@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-26",
+  "lastUpdated": "2026-09-29",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -669,7 +669,7 @@
     },
     "specs/051-carve-orthography-trim": {
       "title": "Feature Specification: Carve gallery trim proposals compare produced characters to the orthography (with cased-letter pairing)",
-      "hash": "sha256:d2b1e9b6669470b3",
+      "hash": "sha256:3ec356e8d55b705d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -886,6 +886,14 @@
     "specs/081-footer-step-nav": {
       "title": "Feature Specification: Survey progress buttons live in the footer",
       "hash": "sha256:63147ac7ca822373",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/076-rule-behaviours": {
+      "title": "Feature Specification: Rule behaviours — managing reorder, blocking, and context rules as intents",
+      "hash": "sha256:d28edfd4197ab548",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

@@ -112,6 +112,10 @@ describe('likelyHostLayouts resolution order (FR-023 / A3.1)', () => {
     expect(likelyHostLayouts(['en-US'])).toEqual(['us']);
   });
 
+  it('fr-CA gets no region answer: CSA is not in the reference set, so it falls back to all five rather than a wrong US', () => {
+    expect(likelyHostLayouts(['fr-CA'])).toEqual([...REFERENCE_HOST_IDS]);
+  });
+
   it('no signal → all five reference hosts', () => {
     expect(likelyHostLayouts([])).toEqual(['us', 'us-intl', 'azerty', 'qwertz', 'uk']);
     expect(likelyHostLayouts([], undefined)).toEqual([...REFERENCE_HOST_IDS]);

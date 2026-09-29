@@ -1,6 +1,6 @@
 {
  "workflow": "speckit",
- "specName": "Rule behaviours — managing reorder, blocking, and context rules as intents",
+ "specName": "Rule behaviours \u2014 managing reorder, blocking, and context rules as intents",
  "branch": "km/issue-1802-spec",
  "currentStep": "implement",
  "status": "implementing",
@@ -46,7 +46,7 @@
    "kind": "complete",
    "by": "ai",
    "at": "2026-09-28T23:05:00Z",
-   "note": "Baseline green: pnpm -r build OK; engine suite 3299 passed (2 environmental failures fixed: fetch-sldr data missing, wasmLoader 30s timeout on slow VM passes at 120s). Studio suite cannot run wholesale on the 7GB VM (OOM-killed at collection by 27 files importing the 500KB+ langtags generated index; pre-existing environmental limitation). The exclusion rerun was killed by a daemon restart; not re-run because this change set touches no studio files — engine (3299) and contracts (803) suites are the meaningful verification and are green."
+   "note": "Baseline green: pnpm -r build OK; engine suite 3299 passed (2 environmental failures fixed: fetch-sldr data missing, wasmLoader 30s timeout on slow VM passes at 120s). Studio suite cannot run wholesale on the 7GB VM (OOM-killed at collection by 27 files importing the 500KB+ langtags generated index; pre-existing environmental limitation). The exclusion rerun was killed by a daemon restart; not re-run because this change set touches no studio files \u2014 engine (3299) and contracts (803) suites are the meaningful verification and are green."
   },
   {
    "step": "implement",
@@ -166,7 +166,7 @@
    "kind": "complete",
    "by": "ai",
    "at": "2026-09-29T00:10:00Z",
-   "note": "Shared deriveCarvedIr pipeline (carvePipeline.ts): suppression runs FIRST on pre-carve IR (task text order reversed — T013 constraint), then slot removals, then filter skips ownedByBehaviour; wired into applyCarveToVfs and editorMutate/projectWorkingCopyVfs; 5-test parity suite byte-identical; pattern-apply 1059 green."
+   "note": "Shared deriveCarvedIr pipeline (carvePipeline.ts): suppression runs FIRST on pre-carve IR (task text order reversed \u2014 T013 constraint), then slot removals, then filter skips ownedByBehaviour; wired into applyCarveToVfs and editorMutate/projectWorkingCopyVfs; 5-test parity suite byte-identical; pattern-apply 1059 green."
   },
   {
    "step": "implement",
@@ -199,6 +199,14 @@
    "by": "ai",
    "at": "2026-09-29T00:45:00Z",
    "detail": "T019 expanded host-consequence row + T020 touch keep-inert override; tasks.md updated"
+  },
+  {
+   "step": "implement",
+   "substep": "T021",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-29T00:55:00Z",
+   "note": "Layer B shadowing audit: emitted KMN from pre-carve vs carved IR through the live kmcmplib WASM oracle, diffed KM_HINT_UNREACHABLE_RULE findings across 10 probe scenarios \u2014 0 new unreachable findings from the carve in all cases (slot guard, bare-key/text/deadkey rewrites, loud, derived arming, redundant guard, duplicate-LHS pin). No synthesis fix needed. Permanent gate: pattern-apply/carveShadowingAudit.test.ts (8 tests); pattern-apply suite 48 files / 1071 tests green."
   }
  ],
  "coverage": {

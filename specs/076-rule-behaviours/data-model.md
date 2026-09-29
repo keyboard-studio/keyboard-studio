@@ -19,7 +19,11 @@ interface CarveDisposition {
     | "closed-keyboard-card"          // card accepted → block
     | "closed-keyboard-card-declined" // card declined (sparse Latin) → allow-host
     | "bulk-default"                  // card not yet answered; FR-005 proposal rule
-    | "author-override";              // per-row flip in the gallery
+    | "author-override"               // per-row flip in the gallery
+    | "deadkey-requirement";          // deadkey-context carve: ruling forbids
+                                      // host fallback, so pre-fill is block
+                                      // regardless of the bulk default; the
+                                      // gallery offers no Allow for these rows
 }
 ```
 

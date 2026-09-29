@@ -288,6 +288,13 @@ interface RecommendedGroupCardProps {
    * preview matches what the store's pre-fill writes.
    */
   sparseLatinOverlay: boolean;
+  /**
+   * Rule nodeIds whose rules carry deadkey context. The ruling forbids host
+   * fallback for deadkey carves ("deadkey carves never fall through"), so
+   * rows touching these combos offer no Allow option (see DispositionControl)
+   * and pre-fill to `block` with `deadkey-requirement` provenance.
+   */
+  deadkeyComboIds: ReadonlySet<string>;
 }
 
 /**
@@ -302,7 +309,7 @@ interface RecommendedGroupCardProps {
 function RecommendedGroupCard({
   testId, toggleAllTestId, regionAriaLabel, topBorderColor, chipBackground, chipColor, heading, body,
   rows, cellsByCh, isItemDeleted, onToggleRow, onBulkToggle, discardAllLabel, restoreAllLabel,
-  selectedCh, onSelectCh, collapsible, destructiveBulkButton, sparseLatinOverlay,
+  selectedCh, onSelectCh, collapsible, destructiveBulkButton, sparseLatinOverlay, deadkeyComboIds,
 }: RecommendedGroupCardProps) {
   if (rows.length === 0) return null;
   const allDiscarded = rows.every((r) => isRowDiscarded(r, isItemDeleted));
@@ -431,7 +438,7 @@ function RecommendedGroupCard({
                   {/* 076 FR-022 (T016): per-row allow/block disposition, always
                       visible — never silent. Structurally separate from the
                       gallery-level layout_family question (T025) above. */}
-                  <DispositionControl comboIds={recommendedRowIds(row)} sparseLatinOverlay={sparseLatinOverlay} />
+                  <DispositionControl comboIds={recommendedRowIds(row)} sparseLatinOverlay={sparseLatinOverlay} deadkeyComboIds={deadkeyComboIds} />
                 </div>
               );
             })}
@@ -472,30 +479,48 @@ function RecommendedGroupCard({
  */
 export { DISPOSITION_COPY } from "./carveDispositionCopy.ts";
 
-function DispositionControl({ comboIds, sparseLatinOverlay }: { comboIds: string[]; sparseLatinOverlay: boolean }) {
+function DispositionControl({ comboIds, sparseLatinOverlay, deadkeyComboIds }: { comboIds: string[]; sparseLatinOverlay: boolean; deadkeyComboIds: ReadonlySet<string> }) {
   const carveDispositions = useWorkingCopyStore((s) => s.carveDispositions);
   const closedKeyboardCard = useWorkingCopyStore((s) => s.closedKeyboardCard);
   const setCarveDisposition = useWorkingCopyStore((s) => s.setCarveDisposition);
 
+  // Ruling (A1–A3): deadkey carves never fall through. A row whose carved
+  // combinations include a deadkey-context rule offers NO Allow option — the
+  // choice is not the author's to make, and the control says so plainly
+  // rather than silently coercing. The engine enforces the same rule as a
+  // backstop for stale/external metadata (see carveSuppression.ts).
+  const deadkeyLocked = comboIds.some((id) => deadkeyComboIds.has(id));
+
   // The same bulk default the store's pre-fill writes — used as the display
   // fallback before pre-fill lands (first render) and for genuinely new
   // combos, so the preview never disagrees with the stored value.
+  // Deadkey-locked rows always resolve to block (matching the pre-fill's
+  // `deadkey-requirement` provenance).
   const bulkDefault = useMemo(
-    () => bulkDispositionDefault(closedKeyboardCard, sparseLatinOverlay),
-    [closedKeyboardCard, sparseLatinOverlay],
+    () => deadkeyLocked
+      ? { disposition: "block", provenance: "deadkey-requirement" } as const
+      : bulkDispositionDefault(closedKeyboardCard, sparseLatinOverlay),
+    [closedKeyboardCard, sparseLatinOverlay, deadkeyLocked],
   );
 
   const records = comboIds.map((id) => carveDispositions.find((d) => d.comboId === id));
   const values = records.map((r) => r?.disposition);
   const unanimous = values.length > 0 && values.every((v) => v !== undefined && v === values[0]);
-  const value: CarveDispositionValue = unanimous
-    ? (values[0] as CarveDispositionValue)
-    : bulkDefault.disposition;
-  const provenance: CarveDispositionProvenance = unanimous
-    ? (records[0] as { provenance: CarveDispositionProvenance }).provenance
-    : bulkDefault.provenance;
+  const value: CarveDispositionValue = deadkeyLocked
+    ? "block"
+    : unanimous
+      ? (values[0] as CarveDispositionValue)
+      : bulkDefault.disposition;
+  const provenance: CarveDispositionProvenance = deadkeyLocked
+    ? "deadkey-requirement"
+    : unanimous
+      ? (records[0] as { provenance: CarveDispositionProvenance }).provenance
+      : bulkDefault.provenance;
 
   const flip = (next: CarveDispositionValue) => {
+    // Deadkey-locked rows cannot be flipped to allow-host — the Allow button
+    // is disabled, but guard anyway (e.g. keyboard activation).
+    if (deadkeyLocked && next === "allow-host") return;
     // Clicking the already-selected option is a no-op: it must not rewrite
     // provenance to author-override when nothing changed.
     if (unanimous && next === value) return;
@@ -519,17 +544,25 @@ function DispositionControl({ comboIds, sparseLatinOverlay }: { comboIds: string
       <div style={{ display: 'flex', gap: 4 }} role="group" aria-label={DISPOSITION_COPY.prompt}>
         {(['allow-host', 'block'] as const).map((v) => {
           const selected = value === v;
+          // Deadkey-locked rows: Allow is not offered at all (ruling: deadkey
+          // carves never fall through). Rendered visibly disabled with the
+          // reason, never silently hidden.
+          const disabled = deadkeyLocked && v === 'allow-host';
           const label = v === 'allow-host' ? DISPOSITION_COPY.allowLabel : DISPOSITION_COPY.blockLabel;
           return (
             <button
               key={v}
               type="button"
               aria-pressed={selected}
+              aria-disabled={disabled}
+              disabled={disabled}
+              title={disabled ? DISPOSITION_COPY.deadkeyNote : undefined}
               onClick={() => flip(v)}
               className="ks-focus-ring"
               style={{
-                flex: 1, font: '600 11px var(--app-font)', cursor: 'pointer',
+                flex: 1, font: '600 11px var(--app-font)', cursor: disabled ? 'not-allowed' : 'pointer',
                 padding: '4px 6px', borderRadius: 6,
+                opacity: disabled ? 0.45 : 1,
                 // --app-text-on-accent pairs with --app-accent by design (that
                 // token exists for this pairing); both flip per theme together.
                 color: selected ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
@@ -545,6 +578,11 @@ function DispositionControl({ comboIds, sparseLatinOverlay }: { comboIds: string
       <div style={{ fontSize: 10, lineHeight: 1.35, color: 'var(--app-text-subtle)' }}>
         {risk}
       </div>
+      {deadkeyLocked && (
+        <div style={{ fontSize: 10, lineHeight: 1.35, color: 'var(--app-text-subtle)' }}>
+          {DISPOSITION_COPY.deadkeyNote}
+        </div>
+      )}
       <div style={{ fontSize: 9.5, fontStyle: 'italic', color: 'var(--app-text-subtle)' }}>
         {DISPOSITION_COPY.provenanceLabel[provenance]}
       </div>
@@ -669,6 +707,19 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // pre-fill — the target script is the only signal the gallery can read at
   // carve time (see isSparseLatinOverlayTarget's doc).
   const sparseLatinOverlay = isSparseLatinOverlayTarget(identityBcp47);
+  // Ruling (A1–A3): deadkey carves never fall through — rule nodeIds whose
+  // rules carry deadkey context. Rows touching these combos offer no Allow
+  // option and pre-fill to `block` with `deadkey-requirement` provenance.
+  const deadkeyComboIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!ir) return ids;
+    for (const group of ir.groups ?? []) {
+      for (const rule of group.rules ?? []) {
+        if (rule.context?.some((el) => el.kind === "deadkey")) ids.add(rule.nodeId);
+      }
+    }
+    return ids;
+  }, [ir]);
   const prefillCarveDispositions = useWorkingCopyStore((s) => s.prefillCarveDispositions);
   const closedKeyboardCard = useWorkingCopyStore((s) => s.closedKeyboardCard);
   const recommendedComboIds = useMemo(() => recommended.flatMap(recommendedRowIds), [recommended]);
@@ -679,8 +730,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // re-prompting (FR-022: recompile never re-prompts).
   useEffect(() => {
     if (recommendedComboIds.length === 0) return;
-    prefillCarveDispositions(recommendedComboIds, { sparseLatinOverlay });
-  }, [recommendedComboIds, sparseLatinOverlay, closedKeyboardCard, prefillCarveDispositions]);
+    prefillCarveDispositions(recommendedComboIds, { sparseLatinOverlay, deadkeyComboIds });
+  }, [recommendedComboIds, sparseLatinOverlay, deadkeyComboIds, closedKeyboardCard, prefillCarveDispositions]);
 
   // "...for a {descriptor} keyboard" — descriptor is the display name +
   // "-only" when available (e.g. "Russian-only"), else the neutral
@@ -1211,6 +1262,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 onSelectCh={setSelectedCh}
                 destructiveBulkButton
                 sparseLatinOverlay={sparseLatinOverlay}
+                deadkeyComboIds={deadkeyComboIds}
               />
               <RecommendedGroupCard
                 testId="carve-v2-optional-latin-group"
@@ -1235,6 +1287,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 onSelectCh={setSelectedCh}
                 collapsible={{ open: latinOpen, onToggleOpen: () => setLatinOpen((v) => !v) }}
                 sparseLatinOverlay={sparseLatinOverlay}
+                deadkeyComboIds={deadkeyComboIds}
               />
           </>
 

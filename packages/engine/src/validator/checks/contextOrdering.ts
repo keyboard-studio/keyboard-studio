@@ -259,6 +259,42 @@ export function checkContextOrdering(source: string): LintFinding[] {
       });
     }
 
+    // --- 076 FR-014/FR-020: `nul` as the whole output verb must not sit on a
+    // text-bearing-context rule. `> nul` deletes the matched context; the
+    // suppression compiler emits `> context` for text-bearing LHS
+    // (suppressionVerb), so `> nul` here is either a generator bug or a
+    // hand-written context swallower — FR-009 declares it a compiler error
+    // for the blocking behaviour kinds. Bare-key (`+ [K_X] > nul`) and
+    // deadkey-only (`dk(x) + [K_X] > nul`) are the valid suppression shapes
+    // and are NOT flagged, so valid compiler output never trips this.
+    // (The `!hasTextOutput` guard keeps `> "x" nul` reporting exactly once,
+    // under KM_ERROR_NUL_WITH_TEXT_OUTPUT above.)
+    const outIsBareNulVerb = /^\s*nul(\s+beep)?\s*$/i.test(outBlanked);
+    if (outIsBareNulVerb && !hasTextOutput && ctx && nulOutMatch) {
+      const ctxStripped = stripGuardTokens(ctx);
+      CONTENT_TOKEN_RE.lastIndex = 0;
+      let tok: RegExpExecArray | null;
+      let textBearingCtx = false;
+      while ((tok = CONTENT_TOKEN_RE.exec(ctxStripped)) !== null) {
+        const t = tok[0].toLowerCase();
+        // dk(...)/deadkey(...) are NOT text: re-emitting would re-arm the
+        // deadkey, which is why the compiler's deadkey-only shape keeps `nul`.
+        if (!t.startsWith("dk(") && !t.startsWith("deadkey(")) {
+          textBearingCtx = true;
+          break;
+        }
+      }
+      if (textBearingCtx) {
+        findings.push({
+          code: "KM_ERROR_NUL_ON_TEXT_CONTEXT",
+          severity: "error",
+          layer: "A",
+          message: `"nul" (suppress output) deletes the matched context; a rule whose context carries text must re-emit it with \`context\`, not \`nul\``,
+          location: { file: "", line: lineIdx + 1, column: outStart + nulOutMatch.index + 1 },
+        });
+      }
+    }
+
     if (!ctx) continue;
 
     // --- Rule 3: no virtual keys [K_X] in context ---

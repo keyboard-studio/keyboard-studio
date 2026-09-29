@@ -865,10 +865,14 @@ export interface WorkingCopyState {
    * @param opts.sparseLatinOverlay the FR-005 proposal input: true when the
    *   keyboard is a sparse Latin overlay, false for a non-Latin script base.
    *   Only consulted while the card is unanswered.
+   * @param opts.deadkeyComboIds rule nodeIds whose rules carry deadkey
+   *   context. The ruling forbids host fallback for deadkey carves ("deadkey
+   *   carves never fall through"), so these pre-fill to `block` with
+   *   provenance `deadkey-requirement` regardless of the bulk default.
    */
   prefillCarveDispositions: (
     comboIds: string[],
-    opts: { sparseLatinOverlay: boolean },
+    opts: { sparseLatinOverlay: boolean; deadkeyComboIds?: ReadonlySet<string> },
   ) => void;
   /**
    * Per-row override (carve gallery): set one combo's disposition. Provenance
@@ -1688,7 +1692,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setClosedKeyboardCard: (decision) =>
     set({ closedKeyboardCard: decision }),
 
-  prefillCarveDispositions: (comboIds, { sparseLatinOverlay }) => {
+  prefillCarveDispositions: (comboIds, { sparseLatinOverlay, deadkeyComboIds }) => {
     if (comboIds.length === 0) return;
     const { closedKeyboardCard, carveDispositions } = get();
     const existing = new Set(carveDispositions.map((d) => d.comboId));
@@ -1700,7 +1704,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set({
       carveDispositions: [
         ...carveDispositions,
-        ...fresh.map((comboId): CarveDisposition => ({ comboId, disposition, provenance })),
+        ...fresh.map((comboId): CarveDisposition => {
+          // Deadkey carves never fall through (ruling A1–A3): force `block`
+          // regardless of the bulk default, with honest provenance.
+          if (deadkeyComboIds?.has(comboId)) {
+            return { comboId, disposition: "block", provenance: "deadkey-requirement" };
+          }
+          return { comboId, disposition, provenance };
+        }),
       ],
     });
   },

@@ -455,6 +455,23 @@ describe("compileCarveSuppression — dispositions (FR-019)", () => {
     expect(result.restorations[0]!.originalRule!.nodeId).toBe("r2");
   });
 
+  it("allow-host on a deadkey-context rule coerces to suppression: deadkey carves never fall through", () => {
+    // Ruling (A1–A3, spec §4.2.1): removing an allow-host deadkey-context rule
+    // would pass the keystroke to the host layout while leaving the deadkey
+    // armed — the exact leak carving closes. The gallery never offers Allow
+    // for these rows, so this input means stale/external metadata; the
+    // compiler suppresses instead of emitting a fall-through.
+    const ir = testIr([deadkeyContextRule("r5")]);
+    const result: SuppressionResult = compileCarveSuppression(ir, [allowDisposition("r5")]);
+
+    const rule = findRule(result.ir, "r5");
+    expect(rule).toBeDefined();
+    expect(rule!.output).toEqual([{ kind: "nul" }]);
+    expect(rule!.ownedByBehaviour).toBe("carve-suppression");
+    expect(result.restorations).toHaveLength(1);
+    expect(result.restorations[0]!.kind).toBe("rewritten");
+  });
+
   it("mixed dispositions: block rewrites, allow-host removes, others untouched", () => {
     const ir = testIr([bareKeyRule("r1"), textContextRule("r2"), deadkeyContextRule("r5")]);
     const result: SuppressionResult = compileCarveSuppression(ir, [

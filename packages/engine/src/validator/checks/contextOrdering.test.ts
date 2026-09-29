@@ -345,4 +345,61 @@ describe("checkContextOrdering", () => {
     const findings = checkContextOrdering('+ [K_A] > "x" nul c trailing note');
     expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
   });
+
+  // -----------------------------------------------------------------------
+  // 076 FR-014/FR-020 — `nul` as the whole output verb must not sit on a
+  // text-bearing-context rule (`> nul` deletes the matched context).
+  // -----------------------------------------------------------------------
+
+  // Failing cases — KM_ERROR_NUL_ON_TEXT_CONTEXT
+  it("rejects nul output on a quoted-text context rule", () => {
+    const findings = checkContextOrdering('"x" + [K_A] > nul');
+    const hit = findings.find((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT");
+    expect(hit).toBeDefined();
+    expect(hit?.severity).toBe("error");
+    expect(hit?.layer).toBe("A");
+  });
+
+  it("rejects nul beep output on a text-context rule", () => {
+    const findings = checkContextOrdering('"x" + [K_A] > nul beep');
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toBe(true);
+  });
+
+  it("rejects nul output on an any() context rule", () => {
+    const findings = checkContextOrdering("any(s) + [K_A] > nul");
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toBe(true);
+  });
+
+  it("rejects nul output on a mixed text-plus-deadkey context rule", () => {
+    const findings = checkContextOrdering('"x" dk(acute) + [K_A] > nul');
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toBe(true);
+  });
+
+  it("reports the finding at the nul token with an accurate column", () => {
+    // `"x" + [K_A] > nul`: the `>` is at index 12, output starts at 13, and
+    // `nul` starts at output offset 1 → column 13 + 1 + 1 = 15.
+    const findings = checkContextOrdering('"x" + [K_A] > nul');
+    const hit = findings.find((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT");
+    expect(hit?.location).toMatchObject({ line: 1, column: 15 });
+  });
+
+  // Passing cases — the valid suppression shapes (must never trip this check)
+  it("accepts nul on a bare-key rule (valid carve-suppression output)", () => {
+    expect(checkContextOrdering("+ [K_A] > nul")).toEqual([]);
+  });
+
+  it("accepts nul on a deadkey-only context rule (valid carve-suppression output)", () => {
+    expect(checkContextOrdering("dk(acute) + [K_A] > nul")).toEqual([]);
+  });
+
+  it("accepts nul beep on a deadkey-only context rule (loud suppression)", () => {
+    expect(checkContextOrdering("dk(acute) + [K_A] > nul beep")).toEqual([]);
+  });
+
+  it("reports text-output contradictions exactly once (no double flag)", () => {
+    // `> "x" nul` is KM_ERROR_NUL_WITH_TEXT_OUTPUT, not this check.
+    const findings = checkContextOrdering('+ [K_A] > "x" nul');
+    expect(findings.filter((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toHaveLength(0);
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
 });

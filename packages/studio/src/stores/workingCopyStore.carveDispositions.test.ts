@@ -127,6 +127,21 @@ describe("prefillCarveDispositions", () => {
     ]);
   });
 
+  it("forces block with deadkey-requirement provenance for deadkey-context combos", () => {
+    // Ruling (A1–A3): deadkey carves never fall through — even when the bulk
+    // default is allow-host (declined card / sparse Latin overlay), deadkey
+    // rows pre-fill to block with honest provenance.
+    store().setClosedKeyboardCard("declined");
+    store().prefillCarveDispositions(["n1", "n2"], {
+      sparseLatinOverlay: true,
+      deadkeyComboIds: new Set(["n2"]),
+    });
+    expect(store().carveDispositions).toEqual([
+      { comboId: "n1", disposition: "allow-host", provenance: "closed-keyboard-card-declined" },
+      { comboId: "n2", disposition: "block", provenance: "deadkey-requirement" },
+    ]);
+  });
+
   it("empty comboIds is a no-op", () => {
     store().setClosedKeyboardCard("accepted");
     store().prefillCarveDispositions([], { sparseLatinOverlay: false });

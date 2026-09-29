@@ -33,7 +33,14 @@ export type CarveDispositionProvenance =
   /** The card is not yet answered; pre-fill follows the FR-005 proposal rule. */
   | "bulk-default"
   /** The author flipped this row in the carve gallery; the value is theirs. */
-  | "author-override";
+  | "author-override"
+  /**
+   * The row is a deadkey-context carve — the ruling forbids host fallback for
+   * deadkey carves ("deadkey carves never fall through"), so pre-fill is
+   * `block` regardless of the bulk default. The gallery offers no Allow
+   * option for these rows.
+   */
+  | "deadkey-requirement";
 
 /** Per carved combination, the author's allow/block choice. */
 export interface CarveDisposition {

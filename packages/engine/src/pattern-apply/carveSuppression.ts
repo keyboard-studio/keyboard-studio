@@ -330,7 +330,14 @@ export function compileCarveSuppression(
     const at = group.rules.findIndex((r) => r.nodeId === comboId);
     if (at === -1) continue;
 
-    if (disposition.disposition === "allow-host") {
+    // Ruling (A1–A3, spec §4.2.1): deadkey carves NEVER fall through. Removing
+    // an allow-host deadkey-context rule would pass the keystroke to the host
+    // layout while leaving the deadkey armed — the exact leak carving closes.
+    // The gallery never offers Allow for these rows (see DispositionControl),
+    // so reaching this branch means stale/external metadata; coerce to the
+    // block path rather than emitting a fall-through.
+    const deadkeyContext = loc.rule.context.some((el) => el.kind === "deadkey");
+    if (disposition.disposition === "allow-host" && !deadkeyContext) {
       // Scenario 6: the combination falls through to the host layout —
       // no suppression rule emitted, but the removal is recorded for un-carve.
       group.rules.splice(at, 1);

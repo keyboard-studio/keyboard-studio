@@ -23,5 +23,13 @@ export const DISPOSITION_COPY = {
     'closed-keyboard-card-declined': 'from closed-keyboard card',
     'bulk-default': 'bulk default',
     'author-override': 'your override',
+    'deadkey-requirement': 'deadkey always suppresses',
   } as Record<CarveDispositionProvenance, string>,
+  /**
+   * Shown in place of the Allow option for rows whose carved combinations
+   * carry deadkey context. The ruling forbids host fallback for deadkey
+   * carves ("deadkey carves never fall through") — removing the rule would
+   * pass the keystroke to the host layout while leaving the deadkey armed.
+   */
+  deadkeyNote: 'Deadkey combinations always suppress — allowing host fallback would leave the deadkey armed.',
 };

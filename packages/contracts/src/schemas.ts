@@ -116,6 +116,7 @@ export const CarveDispositionProvenanceSchema = z.enum([
   "closed-keyboard-card-declined",
   "bulk-default",
   "author-override",
+  "deadkey-requirement",
 ]);
 
 export const CarveDispositionSchema = z.object({
