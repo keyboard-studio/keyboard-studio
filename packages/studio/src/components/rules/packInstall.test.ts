@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { KeyboardIR, RulePack } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
 import {
   applyPackInstall,
   applyPackUninstall,
@@ -83,6 +84,7 @@ function workingRules() {
 
 beforeEach(() => {
   seedIr();
+  useGuardIntentStore.getState().resetForTest();
 });
 
 describe("packInstall studio seam", () => {
@@ -136,5 +138,21 @@ describe("packInstall studio seam", () => {
   it("throws when there is no working IR", () => {
     useWorkingCopyStore.getState().clearIR();
     expect(() => applyPackInstall(makePack())).toThrow(RulePackInstallError);
+  });
+
+  it("signals guard intent when the installed pack contains block behaviours (FR-020)", () => {
+    expect(useGuardIntentStore.getState().blockBundleInstalled).toBe(false);
+    applyPackInstall(makePack());
+    expect(useGuardIntentStore.getState().blockBundleInstalled).toBe(true);
+  });
+
+  it("does not signal guard intent when the pack has no block behaviours", () => {
+    const pack = makePack();
+    applyPackInstall({
+      ...pack,
+      id: "no-block-pack",
+      behaviours: pack.behaviours.map((b) => ({ ...b, kind: "authored" as const })),
+    });
+    expect(useGuardIntentStore.getState().blockBundleInstalled).toBe(false);
   });
 });

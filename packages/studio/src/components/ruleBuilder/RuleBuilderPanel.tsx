@@ -48,6 +48,7 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
 } from "../../ui/theme.ts";
+import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
 
 /* RuleFamily is imported from "@keyboard-studio/engine/kmAssist" above. */
 
@@ -394,6 +395,9 @@ export function RuleBuilderPanel({
         ? prev.filter(id => !memberIds.includes(id))
         : [...new Set([...prev, ...memberIds])],
     );
+    // FR-020 intent signal: the author selected rules in this guard family —
+    // guard suggestions for the family may now surface.
+    useGuardIntentStore.getState().noteFamilyEdited(group.family.id);
   };
 
   const toggleExpanded = (familyId: string) => {

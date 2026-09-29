@@ -9,6 +9,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import type { IRRule, KeyboardIR } from "@keyboard-studio/contracts";
 import { MissingGuardCard } from "./MissingGuardCard.tsx";
 import type { MissingGuardGroup } from "./guardAnalysis.ts";
+import { groupRules } from "./ruleFamilies.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import {
   missingGuardGroupKey,
@@ -106,5 +107,19 @@ describe("MissingGuardCard", () => {
         .getState()
         .dismissedMissingGroups.has(missingGuardGroupKey(GROUP)),
     ).toBe(true);
+  });
+
+  it("Add all signals both guard intents — bundle installed and family edited", () => {
+    render(<MissingGuardCard group={GROUP} />);
+    fireEvent.click(screen.getByTestId("missing-guard-add-all-diablock::Diacritic blocking"));
+    const intent = useGuardIntentStore.getState();
+    expect(intent.blockBundleInstalled).toBe(true);
+    // The synthesized rules join the diablock guard family; that family was
+    // edited.
+    const ir = useWorkingCopyStore.getState().ir!;
+    const family = groupRules(ir.groups.flatMap((g) => g.rules)).find(
+      (f) => f.guardStore === "diablock",
+    )!;
+    expect(intent.editedFamilyIds.has(family.id)).toBe(true);
   });
 });

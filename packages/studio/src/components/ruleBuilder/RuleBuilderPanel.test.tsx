@@ -8,6 +8,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { validateRulePack } from "@keyboard-studio/contracts";
 import type { IRRule } from "@keyboard-studio/contracts";
 import { RuleBuilderPanel, formatRuleSummary, type RuleFamily } from "./RuleBuilderPanel.tsx";
+import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
 
 function vkeyRule(nodeId: string, name: string, modifiers: string[] = []): IRRule {
   return {
@@ -91,6 +92,7 @@ async function completeNameAndProof(recordDemo: ReturnType<typeof vi.fn>) {
 
 afterEach(() => {
   cleanup();
+  useGuardIntentStore.getState().resetForTest();
 });
 
 describe("formatRuleSummary", () => {
@@ -189,6 +191,19 @@ describe("RuleBuilderPanel family selection (FR-018)", () => {
     expect(screen.getByText("any(diablock) + [RALT K_C] > context")).toBeTruthy();
     expect(screen.queryByText("Diacritic blocking (hardware)")).toBeNull();
     expect(screen.getAllByRole("checkbox")).toHaveLength(4);
+  });
+
+  it("toggling a family signals guard intent — the family was edited (FR-020)", () => {
+    renderPanel();
+    expect(useGuardIntentStore.getState().editedFamilyIds.size).toBe(0);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /Bundle all 2 rules in “Diacritic blocking \(hardware\)”/,
+      }),
+    );
+    expect(useGuardIntentStore.getState().editedFamilyIds.has("diacritic-blocking-hardware")).toBe(true);
+    // The signal does not name the other family.
+    expect(useGuardIntentStore.getState().editedFamilyIds.has("diacritic-blocking-touch")).toBe(false);
   });
 });
 

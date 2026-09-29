@@ -14,6 +14,7 @@ import { groupRules } from "./ruleFamilies.ts";
 import {
   synthesizeMissingGuardRules,
   targetGroupForSynthesis,
+  familyForGuardStore,
 } from "./guardRuleSynthesis.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import {
@@ -47,8 +48,12 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
       ),
     });
     // Installing synthesized guard rules is the block-bundle install the
-    // intent store tracks (gates re-analysis of the same group).
-    useGuardIntentStore.getState().noteBlockBundleInstalled();
+    // intent store tracks (gates re-analysis of the same group) — and it is
+    // creating rules in the guard family, the second FR-020 intent signal.
+    const intent = useGuardIntentStore.getState();
+    intent.noteBlockBundleInstalled();
+    const family = familyForGuardStore(ir, families, group.store);
+    if (family !== undefined) intent.noteFamilyEdited(family.id);
     setAddedCount(synthesized.length);
     setSkippedCount(skipped);
   };

@@ -24,6 +24,7 @@ import {
 } from "@keyboard-studio/engine/rulePacks";
 import type { RulePack } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
 
 /**
  * Install a rule pack into the working IR.
@@ -39,6 +40,12 @@ export function applyPackInstall(pack: RulePack): InstallPackResult {
   }
   const result = installPack(ir, pack);
   setWorkingIR(result.ir);
+  // FR-020 intent signal: installing a bundle with block behaviours is the
+  // "installs a block-behaviour bundle" signal — guard suggestions for the
+  // touched families may now surface.
+  if (pack.behaviours.some((b) => b.kind === "block")) {
+    useGuardIntentStore.getState().noteBlockBundleInstalled();
+  }
   return result;
 }
 
