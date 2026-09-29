@@ -8,7 +8,7 @@
 // never a verdict), with the honesty caption "best guess, not sight."
 
 import type { CSSProperties } from "react";
-import type { ReferenceHostsResult } from "./referenceHostsStub.ts";
+import type { ReferenceHostsResult } from "../../lib/referenceHosts/index.ts";
 import {
   BG_CARD,
   BORDER,

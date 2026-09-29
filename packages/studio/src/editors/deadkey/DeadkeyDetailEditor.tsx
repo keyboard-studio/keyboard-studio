@@ -25,6 +25,8 @@ import {
   resolveKeyPickerSelection,
   resolvedVkeyOf,
 } from "../../lib/charInput.ts";
+import { HostDisclosure } from "./HostDisclosure.tsx";
+import { referenceHosts } from "../../lib/referenceHosts/index.ts";
 import {
   BG_CARD,
   BORDER,
@@ -230,6 +232,17 @@ export function DeadkeyDetailEditor({
     info.outputStore !== null;
 
   const clearError = () => setSectionError(null);
+
+  // Host-layout disclosure for the retarget picker (1802 A1–A3, spec 083):
+  // the same per-host consequence rows the define flow shows, so moving the
+  // trigger is an informed choice, not a blind one.
+  const retargetHosts = useMemo(() => {
+    const resolution = resolveKeyPickerSelection(retargetKey, retargetCustomChar);
+    const vkey = resolvedVkeyOf(resolution);
+    const label =
+      retargetKey === "" ? "(no new trigger chosen)" : (vkey ?? retargetCustomChar);
+    return referenceHosts({ key: label, modifiers: [] });
+  }, [retargetKey, retargetCustomChar]);
 
   // -- Pairs ---------------------------------------------------------------
   const handleAddPair = () => {
@@ -792,6 +805,7 @@ export function DeadkeyDetailEditor({
         <div style={metaStyle}>
           The id stays {id !== null ? `dk(${hex4(id)})` : "as-is"} — only the trigger key moves.
         </div>
+        <HostDisclosure hosts={retargetHosts} />
       </div>
 
       {/* Delete */}

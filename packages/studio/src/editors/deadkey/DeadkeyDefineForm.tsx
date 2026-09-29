@@ -33,7 +33,7 @@ import { DEADKEY_OPTIONS, TRIGGER_KEY_CHARS } from "./deadkeyTriggerOptions.ts";
 import { commitDeadkeyResult, hex4 } from "./deadkeyWrite.ts";
 import { DeadkeyConflictDialog, type DeadkeyConflictChoice } from "./DeadkeyConflictDialog.tsx";
 import { HostDisclosure } from "./HostDisclosure.tsx";
-import { referenceHostsStub } from "./referenceHostsStub.ts";
+import { referenceHosts } from "../../lib/referenceHosts/index.ts";
 
 const fieldStyle: CSSProperties = {
   margin: "0 0 14px",
@@ -203,7 +203,7 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
 
   const hosts = useMemo(
     () =>
-      referenceHostsStub({
+      referenceHosts({
         key: resolvedVkey ?? triggerLabel,
         modifiers: [],
       }),
