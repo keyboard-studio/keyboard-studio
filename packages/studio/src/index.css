@@ -8,8 +8,17 @@
 @import "./styles/geometry.css";
 @import "./styles/legacy.css";
 
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--ui); }
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui);
+}
 
 /* Shared control conventions (issue #536) ---------------------------------
  * .ks-control      — single-line inputs/selects are sized to --control-h.
@@ -36,7 +45,19 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 
 @media (pointer: coarse) {
   .ks-hit-target {
-    min-height: 44px;
+    min-height: var(--app-touch-target);
+  }
+}
+
+/* .ks-switch-thumb — the sliding knob inside ui/Switch. A class (not an inline
+ * style) because the reduced-motion override cannot be expressed inline. */
+.ks-switch-thumb {
+  transition: transform 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ks-switch-thumb {
+    transition: none;
   }
 }
 
@@ -60,6 +81,28 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 @media (max-width: 479px) {
   .ks-studio-footer-project {
     display: none;
+  }
+}
+
+/* Narrow-viewport layout utilities (mobile adaptation) --------------------
+ * .ks-mobile-stack    — a flex row that becomes a column at/below 479px
+ *                       (BREAKPOINTS.mobileMax in ui/breakpoints.ts — CSS
+ *                       cannot import TS, so the value is restated here and
+ *                       cited; keep the two in sync).
+ * .ks-mobile-scroll-x — contained horizontal scroll at/below 479px, for
+ *                       tables/code that keep their intrinsic width instead
+ *                       of reflowing.
+ * Additive only, following the .ks-hit-target precedent: these supplement a
+ * component's own inline styles, never fight them — an element whose
+ * flex-direction (or overflow) is pinned inline must branch in TS via
+ * useViewport()/useIsNarrow() instead. No !important anywhere here. */
+@media (max-width: 479px) {
+  .ks-mobile-stack {
+    flex-direction: column;
+  }
+  .ks-mobile-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
