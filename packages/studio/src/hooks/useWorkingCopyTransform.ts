@@ -38,6 +38,10 @@
 //
 // Memoization key:
 //   - deletedNodeIds: serialized as a sorted join of the node ID strings.
+//   - disabledFamilyIds (spec 082 FR-018): the disabled families' member
+//     rule nodeIds, serialized as a sorted join (`disabledKey`); merged into
+//     the projection's deletion set so "Disable group" excludes the family's
+//     rules from the compiled artifact.
 //   - assignments: serialized as a compact key string (same as GalleryPreviewWithPatterns).
 //   - identity.displayName: string or undefined.
 //   - touchLayoutJson: the store's field, OR (when `liveLayoutOverride` is
@@ -69,6 +73,7 @@ import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
+import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 
 /** Stable empty default for `liveLayoutOverride.keyEditOps` when the option
  * (or the whole override) is omitted — avoids allocating a fresh empty array
@@ -227,6 +232,13 @@ export function useWorkingCopyTransform(
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
+  // spec 082 FR-018 "Disable group": the carve working IR plus the disabled
+  // family ids. Disabled families' member rules are merged into the
+  // projection's deletion set below, so disabling a family excludes its
+  // rules from the compiled artifact (demo pane + download alike) without
+  // an IR mutation — the toggle stays O(1) and reversible.
+  const workingIr = useWorkingCopyStore((s) => s.ir);
+  const disabledFamilyIds = useWorkingCopyStore((s) => s.disabledFamilyIds);
   const identity = useWorkingCopyStore((s) => s.identity);
   // Assignments: physical only (touch is projected via touchLayoutJson below).
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -278,6 +290,16 @@ export function useWorkingCopyTransform(
       [...deletedTouchKeyIds].sort().join("|"),
     [deletedNodeIds, deletedItemIds, deletedTouchKeyIds],
   );
+
+  // Disabled rule-family member IDs (spec 082 FR-018). Computed from the
+  // working IR via the pure `disabledFamilyRuleIds` helper; the sorted-join
+  // `disabledKey` below is the primitive-stable memo key for the outer
+  // transform (same discipline as `deletedKey` — never the raw Set).
+  const disabledRuleIds = useMemo(
+    () => disabledFamilyRuleIds(workingIr, disabledFamilyIds),
+    [workingIr, disabledFamilyIds],
+  );
+  const disabledKey = useMemo(() => [...disabledRuleIds].sort().join("|"), [disabledRuleIds]);
 
   // Assignments key — compact string (scope:target:patternId/slotValues per assignment).
   const assignmentsKey = useMemo(
@@ -378,13 +400,22 @@ export function useWorkingCopyTransform(
           ? identityKeyboardId
           : undefined;
 
+      // spec 082 FR-018: merge disabled families' member rules into the
+      // deletion set. When nothing is disabled this passes the store's set
+      // through untouched, preserving the byte-identical no-op invariant for
+      // unedited working copies (the common path in the early-survey stages).
+      const effectiveDeletedItemIds =
+        disabledRuleIds.size === 0
+          ? deletedItemIds
+          : new Set([...deletedItemIds, ...disabledRuleIds]);
+
       const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
         ...(targetKeyboardId ? { targetKeyboardId } : {}),
         baseIr,
         deletedNodeIds,
-        deletedItemIds,
+        deletedItemIds: effectiveDeletedItemIds,
         deletedTouchKeyIds,
         keyEditOps,
         assignments: effectiveAssignments,
@@ -407,6 +438,7 @@ export function useWorkingCopyTransform(
     storeBaseKeyboardId,
     storeBaseDisplayName,
     deletedKey,
+    disabledKey,
     assignmentsKey,
     identityDisplayName,
     identityKeyboardId,
