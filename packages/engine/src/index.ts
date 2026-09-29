@@ -470,6 +470,7 @@ export {
   proposeAttachments,
   deriveCaseCounterparts,
 } from "./marks/attachment-proposals.js";
+export type { ProposeAttachmentsOptions } from "./marks/attachment-proposals.js";
 export type {
   AttachmentProposal,
   ProposedAttachmentState,
