@@ -37,6 +37,10 @@
     "§8",
     "specs/051-carve-orthography-trim"
   ],
+  "deadkeys": [
+    "§8",
+    "specs/083-deadkey-lifecycle"
+  ],
   "mechanisms": [
     "§8",
     "specs/007-strategy-selection"
