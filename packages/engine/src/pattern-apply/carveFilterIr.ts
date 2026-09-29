@@ -20,8 +20,13 @@
 // group header remains unless the group's own nodeId is in deletedNodeIds).
 // A surviving group keeps its original object reference when none of its rules
 // were deleted (structural sharing), matching applyCarveToVfs's prior behavior.
+//
+// Header: passes through, except the derived FR-004 entry-point flags
+// (`entryPoints.newContext` / `postKeystroke`), which parse() derives from the
+// presence of the reserved groups. Deleting `group(NewContext)` must clear the
+// flag, or this IR disagrees with a re-parse of the carveViaSplice text.
 
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { IRGroup, IRHeader, KeyboardIR } from "@keyboard-studio/contracts";
 import { resolveCarveCascade } from "./carveCascade.js";
 
 /**
@@ -29,7 +34,8 @@ import { resolveCarveCascade } from "./carveCascade.js";
  *
  * Removes whole nodes (`deletedNodeIds`) from `stores`, `groups` (and rules
  * within surviving groups), and `raw`, plus comments anchored to any removed
- * node. `header` passes through untouched. `baseIr` is never mutated.
+ * node. `header` passes through, except that the derived entry-point flags
+ * are reconciled with the surviving groups. `baseIr` is never mutated.
  *
  * The "what does this deletion set actually touch" resolution (including the
  * group→rules cascade) is shared with the text-splice carve path via
@@ -78,19 +84,22 @@ export function carveFilterIr(
     }),
   );
 
+  // Filter deleted groups; within surviving groups, filter deleted rules.
+  const groups = baseIr.groups
+    .filter((g) => !cascade.deletedGroupIds.has(g.nodeId))
+    .map((g) => {
+      const filteredRules = g.rules.filter((r) => !deletedRuleIds.has(r.nodeId));
+      // Only allocate a new group object when rules actually changed.
+      if (filteredRules.length === g.rules.length) return g;
+      return { ...g, rules: filteredRules };
+    });
+
   return {
     ...baseIr,
+    header: reconcileEntryPoints(baseIr.header, groups),
     // Filter deleted stores.
     stores: baseIr.stores.filter((s) => !cascade.deletedStoreIds.has(s.nodeId)),
-    // Filter deleted groups; within surviving groups, filter deleted rules.
-    groups: baseIr.groups
-      .filter((g) => !cascade.deletedGroupIds.has(g.nodeId))
-      .map((g) => {
-        const filteredRules = g.rules.filter((r) => !deletedRuleIds.has(r.nodeId));
-        // Only allocate a new group object when rules actually changed.
-        if (filteredRules.length === g.rules.length) return g;
-        return { ...g, rules: filteredRules };
-      }),
+    groups,
     // Raw fragments: filter out any deleted fragment nodes (including those
     // cascaded from their owning group); survivors are preserved so emit()'s
     // position-faithful path can interleave them.
@@ -101,4 +110,28 @@ export function carveFilterIr(
     // path in lockstep with carveViaSplice's comment handling.
     comments: baseIr.comments.filter((c) => !deletedCommentIds.has(c.nodeId)),
   };
+}
+
+/**
+ * Clear the derived reserved-group entry-point flags whose group no longer
+ * exists, mirroring how parse() derives them. `main` is sourced from the
+ * `begin` directive, not from a group, so it passes through. Returns the
+ * original header object when nothing changes.
+ */
+function reconcileEntryPoints(header: IRHeader, groups: readonly IRGroup[]): IRHeader {
+  const ep = header.entryPoints;
+  if (ep === undefined) return header;
+  const names = new Set(groups.map((g) => g.name.toLowerCase()));
+  const dropNewContext = ep.newContext === true && !names.has("newcontext");
+  const dropPostKeystroke = ep.postKeystroke === true && !names.has("postkeystroke");
+  if (!dropNewContext && !dropPostKeystroke) return header;
+
+  const { newContext, postKeystroke, ...rest } = ep;
+  const next: NonNullable<IRHeader["entryPoints"]> = {
+    ...rest,
+    ...(newContext === true && !dropNewContext ? { newContext } : {}),
+    ...(postKeystroke === true && !dropPostKeystroke ? { postKeystroke } : {}),
+  };
+  const { entryPoints: _dropped, ...headerRest } = header;
+  return Object.keys(next).length > 0 ? { ...headerRest, entryPoints: next } : headerRest;
 }
