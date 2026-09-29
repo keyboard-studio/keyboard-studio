@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Keyboard output picture",
+  "branch": "084-keyboard-output-picture",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-29T05:28:27.215Z"
+    }
+  ],
+  "telemetryInstanceId": "d0e85391-6c3f-4560-bd61-fabebc125b0f"
+}
