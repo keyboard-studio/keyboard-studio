@@ -6,6 +6,9 @@ export type { SubstituteResult } from "./substitute.js";
 
 export { applyAssignments, resolveRenderableMechanisms } from "./applyAssignments.js";
 export type { ApplyAssignmentsResult } from "./applyAssignments.js";
+// DeadkeyConflict is defined in ../deadkey-lifecycle (spec 083 Phase 2) and
+// re-exported here for proximity: ApplyAssignmentsResult.conflicts uses it.
+export type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 
 export { buildSessionProducedSet } from "./sessionProducedSet.js";
 

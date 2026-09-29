@@ -552,6 +552,24 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "deadkeys": {
+          // Spec 083: the Deadkeys step sits between carve and mechanisms.
+          // No modular flow and no fixture action-summary shape in this
+          // harness's corpus — see module header. In the live survey the
+          // step's completion records deadkey editorial decisions to the
+          // working copy; these fixtures carry none, so the replay advances
+          // with no side effects (the same no-op-advance convention as the
+          // marks/punctuation/invisibles/convenience group above). Consult
+          // the real STEPS_WITH_APPLY_COMPLETION set rather than
+          // hand-asserting membership — "deadkeys" is absent there (like
+          // convenience), so no applyStepCompletion call fires.
+          if (STEPS_WITH_APPLY_COMPLETION.has("deadkeys")) {
+            applyStepCompletion("deadkeys", undefined, deps);
+          }
+          result = undefined;
+          break;
+        }
+
         case "mechanisms": {
           collectEditorActionEvents(group, "mechanism_edit");
           // FR-015: no per-key decomposition — record an empty assignment set.

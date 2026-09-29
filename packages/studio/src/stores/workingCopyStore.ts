@@ -27,6 +27,7 @@ import type {
   BaseDocumentationProfile } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport, renameTouchKey, deriveFacets } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay, KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
+import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import type { ContextVariantsResult, ToleranceClassification } from "@keyboard-studio/engine/context-tolerance";
 import {
   mergePhaseResults,
@@ -612,6 +613,18 @@ export interface WorkingCopyState {
    */
   keyEditOverlay: KeyEditOverlay;
   /**
+   * The ordered log of committed deadkey lifecycle mutations (spec 083).
+   * Order is semantic, mirroring the key-edit overlay: replay resolves each
+   * operation against the IR state the prior operations produced, so a keyed
+   * snapshot cannot substitute for this. Holds no reference to the IR it was
+   * authored against. Cleared on reset and on a new instantiation.
+   *
+   * Round-trips verbatim through the draft snapshot alongside the working
+   * IR (same as keyEditOverlay): dropping the log while restoring the IR
+   * would silently lose deadkey edits across a reload.
+   */
+  deadkeyOverlay: DeadkeyOverlay;
+  /**
    * The touch step's mode selector — `"character"` (the per-character
    * assignment walk) or `"key"` (the key-grid editor). A view toggle, not a
    * fork (FR-036b): switching modes never clears the other mode's
@@ -852,6 +865,19 @@ export interface WorkingCopyState {
    * `undoDelete`) never leaves an orphaned undo entry pointing at a removed op.
    */
   undoKeyEdit: () => void;
+  /**
+   * Commit a deadkey lifecycle mutation: appends `op` to
+   * `deadkeyOverlay.ops`, in commit order. The caller is the Deadkeys step
+   * component that just committed the same mutation to the working IR via
+   * setWorkingIR — this call is its sibling, not something setWorkingIR
+   * performs on the caller's behalf (same discipline as commitKeyEdit).
+   *
+   * Deliberately NOT on the shared undoStack: deadkey lifecycle edits are
+   * immediate F-10 commits (define/rename/delete/retarget/pairs), and
+   * undoing them is out of scope for spec 083. The overlay is append-only
+   * within a session; reset/instantiation clears it.
+   */
+  commitDeadkeyOp: (op: DeadkeyOperation) => void;
   /**
    * The complete key-rename reference fix-up (spec 063 T091;
    * key-id-policy.md §4; touch-key-rule-join.md §6.1's final bullet). ONE
@@ -1275,7 +1301,7 @@ export type WorkingCopyData = Omit<
   | "setContextTolerance"
   | "setContextToleranceOverlay"
   | "setAxisFills"
-  | "commitKeyEdit" | "undoKeyEdit" | "commitTouchKeyRename" | "setTouchEditorMode"
+  | "commitKeyEdit" | "undoKeyEdit" | "commitDeadkeyOp" | "commitTouchKeyRename" | "setTouchEditorMode"
 >;
 
 const INITIAL_STATE: WorkingCopyData = {
@@ -1321,6 +1347,7 @@ const INITIAL_STATE: WorkingCopyData = {
   // key edit overlay + touch editor mode (spec 063) — empty log, character
   // walk default (FR-036)
   keyEditOverlay: { ops: [] },
+  deadkeyOverlay: { ops: [] },
   touchEditorMode: "character",
   // staleness slice (US3) — default empty ("fresh", FR-019)
   staleSteps: new Set<string>(),
@@ -1507,6 +1534,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       carveChars: new Set(),
       undoStack: [],
       keyEditOverlay: { ops: [] },
+      deadkeyOverlay: { ops: [] },
     }),
 
   restoreAll: () => get().keepAll(),
@@ -1665,6 +1693,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       };
     }),
 
+  // Deadkey lifecycle overlay (spec 083) — append-only within a session.
+  // The Deadkeys step calls this as a sibling of its setWorkingIR commit.
+  commitDeadkeyOp: (op) =>
+    set((s) => ({
+      deadkeyOverlay: { ops: [...s.deadkeyOverlay.ops, op] },
+    })),
+
   // The T091 complete rename fix-up — see the interface doc comment for the
   // full contract. Reads/writes via `get()` rather than a single `set()`
   // reducer because it composes THREE existing seams (setWorkingIR,
@@ -1778,6 +1813,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // path can bleed the ops array across resets — same discipline as the
       // Set/Map re-creations above.
       keyEditOverlay: { ops: [] },
+      deadkeyOverlay: { ops: [] },
       touchEditorMode: "character",
       staleSteps: new Set<string>(),
       // instantiationMode is null in INITIAL_STATE; explicit for clarity.
@@ -1857,6 +1893,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Fresh instance, not carried from any preceding working copy — see
       // reset()'s identical comment.
       keyEditOverlay: { ops: [] },
+      deadkeyOverlay: { ops: [] },
       touchEditorMode: "character",
       staleSteps: new Set<string>(),
       // A new working copy has no default-fill provenance yet (#890) — the
@@ -1929,6 +1966,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Fresh instance, not carried from any preceding working copy — see
       // reset()'s identical comment.
       keyEditOverlay: { ops: [] },
+      deadkeyOverlay: { ops: [] },
       touchEditorMode: "character",
       staleSteps: new Set<string>(),
       // A new working copy has no default-fill provenance yet (#890) — the

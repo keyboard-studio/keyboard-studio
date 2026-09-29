@@ -59,6 +59,7 @@ export type StepId =
   | "invisibles"
   | "convenience"
   | "carve"
+  | "deadkeys"
   | "mechanisms"
   | "touch_seed_source"
   | "touch"
@@ -111,7 +112,7 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "D",
     label: msg({ id: "phaseStepper.phase.d", message: "Discard" }),
-    stepIds: ["carve"],
+    stepIds: ["carve", "deadkeys"],
   },
   {
     letter: "E",

@@ -58,6 +58,7 @@ import type {
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
 import type { KeyEditOverlay } from "@keyboard-studio/engine";
+import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 
@@ -116,6 +117,11 @@ export type WorkingCopySnapshot = Omit<
   | "removalCapabilities"
   | "session"
   | "keyEditOverlay"
+  // spec 083: the deadkey lifecycle overlay round-trips verbatim with the
+  // working IR it was authored against (same as keyEditOverlay above) —
+  // dropping the log while restoring the IR would silently lose deadkey
+  // edits across a reload.
+  | "deadkeyOverlay"
   | "touchEditorMode"
   // Recomputed after every preview compile (spec 078); never stored.
   | "contextTolerance"
@@ -153,6 +159,14 @@ export type WorkingCopySnapshot = Omit<
    * would throw away every author's in-progress keyboard).
    */
   keyEditOverlay?: KeyEditOverlay;
+  /**
+   * Optional (spec 083): same tolerant-read idiom as `keyEditOverlay` —
+   * a snapshot written before this field existed has no key, which reads
+   * as "no deadkey edits committed". `DRAFT_VERSION` deliberately does NOT
+   * bump (VR-1 discards a version-mismatched draft rather than migrating
+   * it, so a bump would throw away every author's in-progress keyboard).
+   */
+  deadkeyOverlay?: DeadkeyOverlay;
   /** Optional for the same reason as `keyEditOverlay` above — see its comment. */
   touchEditorMode?: TouchEditorMode;
   /**
@@ -348,6 +362,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // is the tolerant half: it falls back when a pre-058 snapshot has neither
     // key at all (R10.3).
     keyEditOverlay: s.keyEditOverlay,
+    deadkeyOverlay: s.deadkeyOverlay,
     touchEditorMode: s.touchEditorMode,
     contextToleranceOverlay: s.contextToleranceOverlay,
     phaseAnswersByStep: s.phaseAnswersByStep,
@@ -432,6 +447,9 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // R10.3): an absent value must not clobber the store defaults with
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
     keyEditOverlay: snapshot.keyEditOverlay ?? { ops: [] },
+    // spec 083: tolerant read, same idiom as keyEditOverlay above — a
+    // pre-083 snapshot has no key, which reads as "no deadkey edits".
+    deadkeyOverlay: snapshot.deadkeyOverlay ?? { ops: [] },
     touchEditorMode: snapshot.touchEditorMode ?? "character",
     contextToleranceOverlay: snapshot.contextToleranceOverlay ?? null,
     // spec 079 D-4: absent on a pre-079 snapshot. `{}` is safe — the store

@@ -71,6 +71,7 @@
 import type { KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
+import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
   applyCarveToVfs,
   applyCarveKeycapRemovalsToVfs,
@@ -97,6 +98,7 @@ import { applyCarveMutate, applyAddGalleryMutate, unionAggregatedCarveIds } from
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
+import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
 const EMPTY_DELETION_SET: ReadonlySet<string> = new Set<string>();
@@ -177,6 +179,15 @@ export interface ProjectWorkingCopyVfsInput {
    * there is no key-edit overlay yet.
    */
   keyEditOps?: readonly KeyEditOperation[];
+  /**
+   * The committed deadkey lifecycle overlay (spec 083): every define /
+   * rename / delete / retarget / pair / name-token mutation the Deadkeys
+   * step committed to the working IR, in commit order. Replayed at step
+   * 1.8 (via `applyDeadkeyOpsToVfs`) so working-IR deadkey edits reach the
+   * projected VFS — the working IR itself is never emitted into artifacts.
+   * Omit or pass an empty array when no deadkey edits were committed.
+   */
+  deadkeyOps?: readonly DeadkeyOperation[];
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
@@ -300,6 +311,7 @@ export function projectWorkingCopyVfs(
     carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
     keyEditOps = [],
+    deadkeyOps = [],
     assignments,
     getPattern,
     identity,
@@ -522,6 +534,35 @@ export function projectWorkingCopyVfs(
           `[project-working-copy] key edit rule projection skipped: ${msg}`,
         );
       }
+    }
+  }
+
+  // Step 1.8: Deadkey lifecycle overlay projection (spec 083). Replays the
+  // committed DeadkeyOperation[] log (define/rename/delete/retarget, pair
+  // edits, name tokens, merge/repoint/repair, named-deadkey ops) onto the
+  // projected .kmn via applyDeadkeyOpsToVfs. The working IR (`store.ir`,
+  // written by `setWorkingIR`) is NEVER emitted into the artifact — this
+  // replay is the only path a Deadkeys-step edit reaches the preview or
+  // the zip through.
+  //
+  // ORDER IS LOAD-BEARING: this runs BEFORE step 2 (assignments), not
+  // after. The ops were authored and validated against the working IR,
+  // which never contains assignment overlays — replaying here keeps the
+  // replay base closest to the editor's validation context. S-02
+  // assignment ids are allocated to avoid working-IR ids
+  // (MechanismGallery's allocateS02DeadkeyId seam note), so the assignment
+  // layer then composes on top without id collision. An op whose
+  // preconditions no longer hold is skipped with a warning inside
+  // applyDeadkeyOpsToVfs — never a silent no-op, never a corrupt .kmn.
+  if (deadkeyOps.length > 0) {
+    try {
+      const deadkeyResult = applyDeadkeyOpsToVfs(vfs, keyboardId, deadkeyOps);
+      warnings.push(...deadkeyResult.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `[project-working-copy] deadkey overlay projection skipped: ${msg}`,
+      );
     }
   }
 

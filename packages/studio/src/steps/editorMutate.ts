@@ -231,3 +231,28 @@ export function applyAddGalleryMutate(
   const patch = buildAddGalleryPatch(assignedIr);
   return applyMutatePatch(baseIr, patch, ADD_GALLERY_WRITES);
 }
+
+// ---------------------------------------------------------------------------
+// Deadkey lifecycle editors (spec 083) — T-phase 3
+// ---------------------------------------------------------------------------
+
+/**
+ * The deadkey-lifecycle write surface — the IR arrays a deadkey define /
+ * rename / retarget / delete / pair-edit may rewrite.
+ *
+ * The engine's deadkey-lifecycle mutations (packages/engine) touch only
+ * rules (trigger, fan-out, escape) and the two fan-out stores; the author
+ * name rides the trigger rule's `trailingComment`, which lives inside
+ * `groups[]` as well. Named deadkeys (id null, pre-FR-004) live as opaque
+ * `raw[]` fragments — their delete/retarget rewrites those fragments, so
+ * `raw[]` is in scope too. `header`, `comments`, and `touchLayout` are
+ * never touched, so a patch reaching them fails the M3 containment check.
+ *
+ * Mirrors ADD_GALLERY_WRITES (same arrays — deadkeys are IR entities,
+ * not session answers).
+ */
+export const DEADKEY_WRITES: readonly IRPath[] = [
+  irPath("groups", ARRAY_INDEX),
+  irPath("stores", ARRAY_INDEX),
+  irPath("raw", ARRAY_INDEX),
+];

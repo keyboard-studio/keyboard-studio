@@ -701,3 +701,21 @@ export {
   scriptExtensionsOf,
 } from "./facets/index.js";
 export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";
+
+// Deadkey lifecycle mutations (spec 083, issue #1849 — Phase 2): IR-to-IR
+// define / rename / delete / retarget with explicit (never silent) conflicts.
+export {
+  defineDeadkey,
+  renameDeadkey,
+  deleteDeadkey,
+  retargetDeadkey,
+} from "./deadkey-lifecycle/index.js";
+export type {
+  DeadkeyConflict,
+  DeadkeyConflictKind,
+  DeadkeyMutationResult,
+  DefineDeadkeyOptions,
+  DeleteDeadkeyOptions,
+  RenameDeadkeyOptions,
+  RetargetDeadkeyOptions,
+} from "./deadkey-lifecycle/index.js";
