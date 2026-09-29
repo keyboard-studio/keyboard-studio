@@ -112,6 +112,26 @@ describe("DeadkeyDetailEditor", () => {
     expect(listDeadkeys(withPair).find((d) => d.id === 0x3000)?.pairCount).toBe(2);
   });
 
+  it("imported-but-recognized deadkeys keep pair editing (only unrecognized shapes lose it)", () => {
+    // Raw KMN with a full trigger + fan-out cluster and no studio marker:
+    // origin "imported", both stores recognized.
+    const ir = parseIr(
+      `+ [K_COLON] > dk(3000)\n` +
+        `store(deadkey_3000_base) 'a'\n` +
+        `store(deadkey_3000_out) 'á'\n` +
+        `dk(3000) + any(deadkey_3000_base) > index(deadkey_3000_out, 2)\n`,
+    );
+    const info = listDeadkeys(ir).find((d) => d.id === 0x3000);
+    expect(info?.origin).toBe("imported");
+    expect(info?.baseStore).not.toBeNull();
+    renderEditor(ir);
+    // Pairs stay editable; the unrecognized-shape note is absent.
+    expect(screen.getByRole("button", { name: "Add pair" })).toBeTruthy();
+    expect(
+      screen.queryByText("rule shape not recognized — pair editing unavailable"),
+    ).toBeNull();
+  });
+
   it("renames the numeric id and follows to the new id", () => {
     const { onCommitIr, onRenamed } = renderEditor(definedIr());
     fireEvent.change(screen.getByLabelText(/New numeric id/), { target: { value: "3001" } });
