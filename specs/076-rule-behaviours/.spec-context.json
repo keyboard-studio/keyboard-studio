@@ -1,288 +1,289 @@
 {
- "workflow": "speckit",
- "specName": "Rule behaviours \u2014 managing reorder, blocking, and context rules as intents",
- "branch": "km/issue-1802-spec",
- "currentStep": "implement",
- "status": "implementing",
- "history": [
-  {
-   "step": "plan",
-   "substep": null,
-   "kind": "start",
-   "by": "extension",
-   "at": "2026-09-28T21:17:43.426Z"
+  "workflow": "speckit",
+  "specName": "Rule behaviours — managing reorder, blocking, and context rules as intents",
+  "branch": "km/issue-1802-spec",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-28T21:17:43.426Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T21:19:50.884Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T21:19:52.068Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-28T21:19:52.666Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-28T21:25:40.964Z"
+    },
+    {
+      "step": "implement",
+      "substep": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:05:00Z",
+      "note": "Baseline green: pnpm -r build OK; engine suite 3299 passed (2 environmental failures fixed: fetch-sldr data missing, wasmLoader 30s timeout on slow VM passes at 120s). Studio suite cannot run wholesale on the 7GB VM (OOM-killed at collection by 27 files importing the 500KB+ langtags generated index; pre-existing environmental limitation). The exclusion rerun was killed by a daemon restart; not re-run because this change set touches no studio files — engine (3299) and contracts (803) suites are the meaningful verification and are green."
+    },
+    {
+      "step": "implement",
+      "substep": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T22:25:00Z",
+      "note": "CarveDisposition type + zod schema + package export; contracts suite 35 files / 803 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T22:28:00Z",
+      "note": "ownedByBehaviour additive optional on IRRule; zod .refine enforces mutual exclusivity with ownedByPattern; contracts suite green."
+    },
+    {
+      "step": "implement",
+      "substep": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T22:52:00Z",
+      "note": "Typed nul/context/context(N) parsing in parse.ts; degenerate offsets go opaque; 19 tests; codec suite 246 passed."
+    },
+    {
+      "step": "implement",
+      "substep": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:02:00Z",
+      "note": "entryPoints {main,newContext,postKeystroke} on IRHeader; begin entry-group captured (first-wins); NewContext/PostKeystroke parsed readonly; emit reuses modelled entry; 15 tests in entrypoints.test.ts; canonical nul/context emit confirmed."
+    },
+    {
+      "step": "implement",
+      "substep": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:03:00Z",
+      "note": "Layer A check #8 emits KM_ERROR_NUL_WITH_TEXT_OUTPUT for nul + text-bearing output; 17 tests; validator suite 371 green. Follow-up: FR-014 LHS variant and store-interior nul padding deferred to T009-T012."
+    },
+    {
+      "step": "implement",
+      "substep": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:07:00Z",
+      "note": "7 FR-004 round-trip tests (typed forms, loud forms, two-entry-group); ownedByBehaviour excluded from round-trip comparison like ownedByPattern, documented + pinned."
+    },
+    {
+      "step": "implement",
+      "substep": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:13:00Z",
+      "note": "30 failing TDD tests for compileCarveSuppression; contract specifies signatures, verb table, ownership, un-carve inverse."
+    },
+    {
+      "step": "implement",
+      "substep": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:19:00Z",
+      "note": "referenceHostLayouts.ts: 5 hosts, key+modifier lookup, likelyHostLayouts per FR-023/A3.1 order; 17 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:19:00Z",
+      "note": "compileCarveSuppression: 30/30 T008 tests pass; pattern-apply suite 1037 green. Open: allow-host deadkey semantics need ruling (currently removes; block rewrites)."
+    },
+    {
+      "step": "implement",
+      "substep": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:20:00Z",
+      "note": "recognizer lifts ownedByBehaviour rules as behaviour-owned via marker-only guards + recognizePatterns backstop; 6 tests; suites green."
+    },
+    {
+      "step": "implement",
+      "substep": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:22:00Z",
+      "note": "carveDispositions in workingCopyStore with provenance pre-fill, no-overwrite recompile, prune on un-carve; 27 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:27:00Z",
+      "note": "layout_family surfaced in carve gallery; persisted via survey answer store; wired to likelyHostLayouts; 20 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T23:36:00Z",
+      "note": "swallowSet.ts isInSwallowSet: allow-host false, behaviour-owned covered false, else true; 13 tests; pattern-apply 1059 green."
+    },
+    {
+      "step": "implement",
+      "substep": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T00:10:00Z",
+      "note": "compileSlotGuards: reads selector char from pre-removal IR, guard ahead of paired any()/index() rule, idempotent, allow-host slot no-op; 12 tests; composition constraint for T015."
+    },
+    {
+      "step": "implement",
+      "substep": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T00:10:00Z",
+      "note": "Shared deriveCarvedIr pipeline (carvePipeline.ts): suppression runs FIRST on pre-carve IR (task text order reversed — T013 constraint), then slot removals, then filter skips ownedByBehaviour; wired into applyCarveToVfs and editorMutate/projectWorkingCopyVfs; 5-test parity suite byte-identical; pattern-apply 1059 green."
+    },
+    {
+      "step": "implement",
+      "substep": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T00:10:00Z",
+      "note": "Per-row DispositionControl in CarveGalleryV2 (both cards): visible Allow/Block, prompt, per-option risk, provenance label; pre-fill useEffect; in-place author-override flip; retired slogan absent; 6 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T00:10:00Z",
+      "note": "ReviewRemovedKeys dialog: every carved combo with disposition + per-likely-host consequence table, HOST_GUESS_CAPTION, A2 verdict line + prompt; read-only; wired into gallery status strip; 18 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T00:10:00Z",
+      "note": "CarveHostSelector component (mount-ready; test pane itself does not exist yet): likely hosts + Blocked entry, lookupHostOutput per combo, caption; KeymanWeb loud-Block flash as marked stub (no simulation path in studio); 9 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": "wave-4",
+      "kind": "wave-complete",
+      "by": "ai",
+      "at": "2026-09-29T00:45:00Z",
+      "detail": "T019 expanded host-consequence row + T020 touch keep-inert override; tasks.md updated"
+    },
+    {
+      "step": "implement",
+      "substep": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T00:55:00Z",
+      "note": "Layer B shadowing audit: emitted KMN from pre-carve vs carved IR through the live kmcmplib WASM oracle, diffed KM_HINT_UNREACHABLE_RULE findings across 10 probe scenarios — 0 new unreachable findings from the carve in all cases (slot guard, bare-key/text/deadkey rewrites, loud, derived arming, redundant guard, duplicate-LHS pin). No synthesis fix needed. Permanent gate: pattern-apply/carveShadowingAudit.test.ts (8 tests); pattern-apply suite 48 files / 1071 tests green."
+    }
+  ],
+  "coverage": {
+    "FR-004": {
+      "title": "Codec types nul/context/context(N) and models begin entry points",
+      "tasks": [
+        "T002",
+        "T005",
+        "T006"
+      ]
+    },
+    "FR-005-amendment": {
+      "title": "swallowUndefined skip-set: carved combos minus allow-host and suppression-covered",
+      "tasks": [
+        "T014"
+      ]
+    },
+    "FR-019": {
+      "title": "Every carved combination carries a disposition via the two-tier choice",
+      "tasks": [
+        "T009",
+        "T010",
+        "T016",
+        "T015"
+      ]
+    },
+    "FR-020": {
+      "title": "Shape-driven suppression verb table; loud rides A6; no per-carve loudness",
+      "tasks": [
+        "T008",
+        "T009"
+      ]
+    },
+    "FR-021": {
+      "title": "Suppression rules carry ownedByBehaviour; un-carve restores; import lifts as behaviour-owned",
+      "tasks": [
+        "T003",
+        "T009",
+        "T012",
+        "T013",
+        "T015"
+      ]
+    },
+    "FR-022": {
+      "title": "Dispositions persist as carve-decision metadata; recompile never re-prompts",
+      "tasks": [
+        "T004",
+        "T010",
+        "T016"
+      ]
+    },
+    "FR-023": {
+      "title": "Studio demonstrates alternatives with two-sided tradeoff copy; host selector; review panel",
+      "tasks": [
+        "T011",
+        "T017",
+        "T018",
+        "T019",
+        "T020",
+        "T015",
+        "T016"
+      ]
+    },
+    "SC-008": {
+      "title": "End-to-end carve suppression success criterion",
+      "tasks": [
+        "T008",
+        "T022",
+        "T023"
+      ]
+    }
   },
-  {
-   "step": "tasks",
-   "substep": "generate",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T21:19:50.884Z"
+  "step_summaries": {
+    "tasks": {
+      "summary": "24 tasks in 4 phases: Setup, Foundational (codec+types), US6 engine+studio, Polish",
+      "key_finding": "Behaviours-step test pane and touch strip do not exist yet; their tasks anchor to the 076 studio phase location"
+    }
   },
-  {
-   "step": "tasks",
-   "substep": null,
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T21:19:52.068Z"
-  },
-  {
-   "step": "tasks",
-   "substep": null,
-   "kind": "start",
-   "by": "extension",
-   "at": "2026-09-28T21:19:52.666Z"
-  },
-  {
-   "step": "implement",
-   "substep": null,
-   "kind": "start",
-   "by": "extension",
-   "at": "2026-09-28T21:25:40.964Z"
-  },
-  {
-   "step": "implement",
-   "substep": "T001",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:05:00Z",
-   "note": "Baseline green: pnpm -r build OK; engine suite 3299 passed (2 environmental failures fixed: fetch-sldr data missing, wasmLoader 30s timeout on slow VM passes at 120s). Studio suite cannot run wholesale on the 7GB VM (OOM-killed at collection by 27 files importing the 500KB+ langtags generated index; pre-existing environmental limitation). The exclusion rerun was killed by a daemon restart; not re-run because this change set touches no studio files \u2014 engine (3299) and contracts (803) suites are the meaningful verification and are green."
-  },
-  {
-   "step": "implement",
-   "substep": "T004",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T22:25:00Z",
-   "note": "CarveDisposition type + zod schema + package export; contracts suite 35 files / 803 tests green."
-  },
-  {
-   "step": "implement",
-   "substep": "T003",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T22:28:00Z",
-   "note": "ownedByBehaviour additive optional on IRRule; zod .refine enforces mutual exclusivity with ownedByPattern; contracts suite green."
-  },
-  {
-   "step": "implement",
-   "substep": "T002",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T22:52:00Z",
-   "note": "Typed nul/context/context(N) parsing in parse.ts; degenerate offsets go opaque; 19 tests; codec suite 246 passed."
-  },
-  {
-   "step": "implement",
-   "substep": "T005",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:02:00Z",
-   "note": "entryPoints {main,newContext,postKeystroke} on IRHeader; begin entry-group captured (first-wins); NewContext/PostKeystroke parsed readonly; emit reuses modelled entry; 15 tests in entrypoints.test.ts; canonical nul/context emit confirmed."
-  },
-  {
-   "step": "implement",
-   "substep": "T007",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:03:00Z",
-   "note": "Layer A check #8 emits KM_ERROR_NUL_WITH_TEXT_OUTPUT for nul + text-bearing output; 17 tests; validator suite 371 green. Follow-up: FR-014 LHS variant and store-interior nul padding deferred to T009-T012."
-  },
-  {
-   "step": "implement",
-   "substep": "T006",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:07:00Z",
-   "note": "7 FR-004 round-trip tests (typed forms, loud forms, two-entry-group); ownedByBehaviour excluded from round-trip comparison like ownedByPattern, documented + pinned."
-  },
-  {
-   "step": "implement",
-   "substep": "T008",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:13:00Z",
-   "note": "30 failing TDD tests for compileCarveSuppression; contract specifies signatures, verb table, ownership, un-carve inverse."
-  },
-  {
-   "step": "implement",
-   "substep": "T011",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:19:00Z",
-   "note": "referenceHostLayouts.ts: 5 hosts, key+modifier lookup, likelyHostLayouts per FR-023/A3.1 order; 17 tests green."
-  },
-  {
-   "step": "implement",
-   "substep": "T009",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:19:00Z",
-   "note": "compileCarveSuppression: 30/30 T008 tests pass; pattern-apply suite 1037 green. Open: allow-host deadkey semantics need ruling (currently removes; block rewrites)."
-  },
-  {
-   "step": "implement",
-   "substep": "T012",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:20:00Z",
-   "note": "recognizer lifts ownedByBehaviour rules as behaviour-owned via marker-only guards + recognizePatterns backstop; 6 tests; suites green."
-  },
-  {
-   "step": "implement",
-   "substep": "T010",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:22:00Z",
-   "note": "carveDispositions in workingCopyStore with provenance pre-fill, no-overwrite recompile, prune on un-carve; 27 tests green."
-  },
-  {
-   "step": "implement",
-   "substep": "T025",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:27:00Z",
-   "note": "layout_family surfaced in carve gallery; persisted via survey answer store; wired to likelyHostLayouts; 20 tests green."
-  },
-  {
-   "step": "implement",
-   "substep": "T014",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-28T23:36:00Z",
-   "note": "swallowSet.ts isInSwallowSet: allow-host false, behaviour-owned covered false, else true; 13 tests; pattern-apply 1059 green."
-  },
-  {
-   "step": "implement",
-   "substep": "T013",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-29T00:10:00Z",
-   "note": "compileSlotGuards: reads selector char from pre-removal IR, guard ahead of paired any()/index() rule, idempotent, allow-host slot no-op; 12 tests; composition constraint for T015."
-  },
-  {
-   "step": "implement",
-   "substep": "T015",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-29T00:10:00Z",
-   "note": "Shared deriveCarvedIr pipeline (carvePipeline.ts): suppression runs FIRST on pre-carve IR (task text order reversed \u2014 T013 constraint), then slot removals, then filter skips ownedByBehaviour; wired into applyCarveToVfs and editorMutate/projectWorkingCopyVfs; 5-test parity suite byte-identical; pattern-apply 1059 green."
-  },
-  {
-   "step": "implement",
-   "substep": "T016",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-29T00:10:00Z",
-   "note": "Per-row DispositionControl in CarveGalleryV2 (both cards): visible Allow/Block, prompt, per-option risk, provenance label; pre-fill useEffect; in-place author-override flip; retired slogan absent; 6 tests green."
-  },
-  {
-   "step": "implement",
-   "substep": "T017",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-29T00:10:00Z",
-   "note": "ReviewRemovedKeys dialog: every carved combo with disposition + per-likely-host consequence table, HOST_GUESS_CAPTION, A2 verdict line + prompt; read-only; wired into gallery status strip; 18 tests green."
-  },
-  {
-   "step": "implement",
-   "substep": "T018",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-29T00:10:00Z",
-   "note": "CarveHostSelector component (mount-ready; test pane itself does not exist yet): likely hosts + Blocked entry, lookupHostOutput per combo, caption; KeymanWeb loud-Block flash as marked stub (no simulation path in studio); 9 tests green."
-  },
-  {
-   "step": "implement",
-   "substep": "wave-4",
-   "kind": "wave-complete",
-   "by": "ai",
-   "at": "2026-09-29T00:45:00Z",
-   "detail": "T019 expanded host-consequence row + T020 touch keep-inert override; tasks.md updated"
-  },
-  {
-   "step": "implement",
-   "substep": "T021",
-   "kind": "complete",
-   "by": "ai",
-   "at": "2026-09-29T00:55:00Z",
-   "note": "Layer B shadowing audit: emitted KMN from pre-carve vs carved IR through the live kmcmplib WASM oracle, diffed KM_HINT_UNREACHABLE_RULE findings across 10 probe scenarios \u2014 0 new unreachable findings from the carve in all cases (slot guard, bare-key/text/deadkey rewrites, loud, derived arming, redundant guard, duplicate-LHS pin). No synthesis fix needed. Permanent gate: pattern-apply/carveShadowingAudit.test.ts (8 tests); pattern-apply suite 48 files / 1071 tests green."
-  }
- ],
- "coverage": {
-  "FR-004": {
-   "title": "Codec types nul/context/context(N) and models begin entry points",
-   "tasks": [
-    "T002",
-    "T005",
-    "T006"
-   ]
-  },
-  "FR-005-amendment": {
-   "title": "swallowUndefined skip-set: carved combos minus allow-host and suppression-covered",
-   "tasks": [
-    "T014"
-   ]
-  },
-  "FR-019": {
-   "title": "Every carved combination carries a disposition via the two-tier choice",
-   "tasks": [
-    "T009",
-    "T010",
-    "T016",
-    "T015"
-   ]
-  },
-  "FR-020": {
-   "title": "Shape-driven suppression verb table; loud rides A6; no per-carve loudness",
-   "tasks": [
-    "T008",
-    "T009"
-   ]
-  },
-  "FR-021": {
-   "title": "Suppression rules carry ownedByBehaviour; un-carve restores; import lifts as behaviour-owned",
-   "tasks": [
-    "T003",
-    "T009",
-    "T012",
-    "T013",
-    "T015"
-   ]
-  },
-  "FR-022": {
-   "title": "Dispositions persist as carve-decision metadata; recompile never re-prompts",
-   "tasks": [
-    "T004",
-    "T010",
-    "T016"
-   ]
-  },
-  "FR-023": {
-   "title": "Studio demonstrates alternatives with two-sided tradeoff copy; host selector; review panel",
-   "tasks": [
-    "T011",
-    "T017",
-    "T018",
-    "T019",
-    "T020",
-    "T015",
-    "T016"
-   ]
-  },
-  "SC-008": {
-   "title": "End-to-end carve suppression success criterion",
-   "tasks": [
-    "T008",
-    "T022",
-    "T023"
-   ]
-  }
- },
- "step_summaries": {
-  "tasks": {
-   "summary": "24 tasks in 4 phases: Setup, Foundational (codec+types), US6 engine+studio, Polish",
-   "key_finding": "Behaviours-step test pane and touch strip do not exist yet; their tasks anchor to the 076 studio phase location"
-  }
- }
+  "telemetryInstanceId": "c33cb141-c05b-4e76-83b1-fad401b38310"
 }
