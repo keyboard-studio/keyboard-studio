@@ -154,7 +154,8 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 - **No signal:** there is no `layout_family` answer and no language tag. The likely set is the reference set (076 FR-023), and the UI says it is a guess.
 - **Families conflict:** the likely base keyboards include AZERTY and QWERTY in similar weight. The picture reports both families and points to a separate AZERTY variant (FR-001e), instead of producing one keyboard whose letters are wrong for half the typists.
 - **Non-Latin languages:** the likely set is still Latin base keyboards. Region inference for non-Latin languages is an open question on PR #1854 and out of scope here; this spec consumes whatever set the resolver returns.
-- **Touch:** touch layouts have no base keyboard layer. Touch output comes only from the touch layout, and the picture does not apply to it.
+- **On-screen touch:** the on-screen touch layout has no base keyboard layer. Its output comes only from the touch layout, and the picture does not apply to it.
+- **Physical keyboard on a touch device:** a physical keyboard attached to a phone or tablet (often over Bluetooth) behaves like a desktop. Your keyboard's desktop rules handle it, and every combo they leave undefined falls through to the device's hardware keyboard layout. The picture applies, with the mobile OS's hardware layout as the base keyboard (FR-016).
 - **The starting point changes:** in Track 2, a new released version is picked up. The newly-opened versus already-leaking split is recomputed.
 
 ## Requirements *(mandatory)*
@@ -188,7 +189,7 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 - **FR-013**: The closed-keyboard behaviour (`swallowUndefined`, 076 FR-005) MUST take its combo list from the handling set, minus combos the author set to `allow-host`.
 - **FR-014**: The test pane MUST produce the selected base keyboard's output for undefined combos, instead of a fixed US layout.
 - **FR-015**: The spec 040 fall-through facets MUST use the likely base keyboards instead of a single fixed US layout.
-- **FR-016**: The picture MUST NOT be offered for touch layouts. Touch has no base keyboard layer.
+- **FR-016**: The picture MUST NOT be offered for the on-screen touch layout, which has no base keyboard layer. It MUST apply wherever your keyboard's desktop rules run over a physical keyboard, including a physical keyboard attached to a touch device (Android, iOS), where the device's hardware keyboard layout is the base keyboard. In v1 the Windows base keyboard data stands in for those hardware layouts, and the UI MUST say so.
 - **FR-017**: Base keyboard data MUST describe Windows only in v1, and the UI MUST say so ("on Windows"). Base keyboard data MUST remain generated from the Keyman basic keyboards (`scripts/codegen-host-layouts.mjs`), never hand-edited, with the existing staleness test.
 - **FR-018**: All user-facing text and spec prose for this feature MUST use the Terminology table above. The copied keyboard MUST NOT be called the base keyboard.
 - **FR-019**: The feature MUST NOT add a survey step. It reuses the existing `layout_family` question (constitution principle IX). If planning finds a new confirmation surface is needed, the plan MUST add it as a manifest entry.
@@ -217,6 +218,7 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 ## Assumptions
 
 - The desktop platform in v1 is Windows. On macOS and Linux, Keyman is believed to pass unhandled keystrokes to the OS layout too, but those layouts carry more AltGr characters, and their behaviour has not been verified. Supporting them is an open research question for a later version, not part of this spec.
+- Physical keyboards attached to touch devices behave like desktop: Keyman on Android and iOS runs the desktop rules for them, and unhandled keystrokes fall through to the device's hardware keyboard layout. This is believed, not verified per platform, and the hardware layouts Android and iOS offer are not yet in the base keyboard data. Planning confirms both.
 - KeymanWeb only approximates a base keyboard, since the browser reports its own key events. The picture describes desktop Keyman, and the web test pane uses the selected base keyboard's table as a stand-in.
 - The five reference base keyboards (US, US-International, French AZERTY, German QWERTZ, UK English) cover the three Roman-script families. Non-Roman base keyboards are added the same way, by adding their Keyman basic keyboards (for example `basic_kbda1`, `basic_kbda2`, `basic_kbda3` for Arabic) to the codegen. Which ones join v1 is decided in planning. Arabic is the motivating case, for Ajami.
 - Already-leaking combos are handled mainly through the closed-keyboard behaviour (076 FR-005), and newly opened combos through per-combo carve dispositions (076 FR-022). This spec feeds both. It does not change how either asks the author.
