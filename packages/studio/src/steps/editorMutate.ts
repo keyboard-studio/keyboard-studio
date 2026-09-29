@@ -19,7 +19,7 @@
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 import type { CarveDisposition } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { carveFilterIr, applyStoreSlotRemovals, parseSlotId, deriveCarvedIr } from "@keyboard-studio/engine";
+import { parseSlotId, deriveCarvedIr } from "@keyboard-studio/engine";
 import { applyMutatePatch } from "./mutateApply.ts";
 
 /**

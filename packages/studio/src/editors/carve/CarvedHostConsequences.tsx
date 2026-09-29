@@ -23,7 +23,7 @@
 // for the selected carved combination; mount-ready for any other surface
 // that has a CarvedCombo.
 
-import type { CarvedCombo } from "./ReviewRemovedKeys.tsx";
+import type { CarvedCombo } from "./carvedCombo.ts";
 import {
   DEADKEY,
   HOST_GUESS_CAPTION,

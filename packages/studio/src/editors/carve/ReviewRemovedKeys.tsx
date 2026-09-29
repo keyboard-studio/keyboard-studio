@@ -35,7 +35,6 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type {
   CarveDisposition,
   CarveDispositionProvenance,
-  CarveDispositionValue,
 } from "@keyboard-studio/contracts";
 import { parseSlotId } from "@keyboard-studio/engine";
 import {
@@ -46,29 +45,16 @@ import { useLikelyHostLayouts } from "../../lib/layoutFamily.ts";
 import type { HostLayoutRef } from "../../lib/layoutFamily.ts";
 // T019: the host-outcome lookup is shared with CarvedHostConsequences (the
 // expanded row) — one implementation of "what would this host produce",
-// never duplicated. (type-only import back: CarvedHostConsequences imports
-// only `type { CarvedCombo }` from this module, so there is no runtime
-// cycle.)
+// never duplicated. The shared CarvedCombo row type lives in ./carvedCombo.ts
+// so the two modules never import each other.
 import { hostOutcomeText } from "./CarvedHostConsequences.tsx";
+import type { CarvedCombo } from "./carvedCombo.ts";
 
 // ---------------------------------------------------------------------------
 // Carved-combo resolution: comboId -> display row
 // ---------------------------------------------------------------------------
 
-/** One row of the review panel: a carved combination with its decision. */
-export interface CarvedCombo {
-  comboId: string;
-  /** Human label, e.g. "RALT + 4" or 'store "dkt003b" slot 1 — ‘É’'. */
-  label: string;
-  /** Keyman K_ vkey id for lookupHostOutput; undefined when no key resolves. */
-  key: string | undefined;
-  /** Raw IR modifier tokens, e.g. ["RALT"]. */
-  modifiers: string[];
-  disposition: CarveDispositionValue;
-  provenance: CarveDispositionProvenance;
-  /** True for <storeNodeId>#<index> combos (no direct key of their own). */
-  isStoreSlot: boolean;
-}
+export type { CarvedCombo } from "./carvedCombo.ts";
 
 /** Provenance -> author-facing label (informational; does not affect compilation). */
 export const PROVENANCE_LABELS: Record<CarveDispositionProvenance, string> = {
