@@ -104,6 +104,14 @@ import {
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import {
+  useRulesDemoArtifactStore,
+  makeIdleRulesDemoArtifact,
+  makeLoadingRulesDemoArtifact,
+  makeReadyRulesDemoArtifact,
+  makeErrorRulesDemoArtifact,
+  type RulesDemoArtifact,
+} from "./stores/rulesDemoArtifactStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useAccountedForGate } from "./hooks/useAccountedForGate.ts";
@@ -1473,6 +1481,46 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   useEffect(() => {
     setBasePreviewStatus(previewStatus);
   }, [previewStatus, setBasePreviewStatus]);
+
+  // ---------------------------------------------------------------------------
+  // rulesDemoArtifactStore projection — the Track A demo pane's view of the
+  // compile artifact (spec 082, FR-001/FR-004).
+  //
+  // A pure projection of `artifactStage`, same store-bridge pattern as
+  // basePreviewStatusStore above: the rules step cannot prop-drill through
+  // StepHost's generic EditorStepProps, and it MUST NOT mount its own
+  // useKeyboardArtifact (that would be a second compile cycle) or its own
+  // debounce timer (SC-006 forbids it). The DemoPane is a pure READER:
+  // typing re-runs the cheap synchronous simulator against the published
+  // bytes, never a compile.
+  // ---------------------------------------------------------------------------
+  const rulesDemoArtifact: RulesDemoArtifact = useMemo(() => {
+    switch (artifactStage.kind) {
+      case "ready":
+        return makeReadyRulesDemoArtifact(
+          artifactStage.jsBlobUrl,
+          artifactStage.keyboardId,
+          artifactStage.compileResult.diagnostics,
+        );
+      case "error":
+        return makeErrorRulesDemoArtifact(
+          artifactStage.step,
+          artifactStage.message,
+          artifactStage.compileResult?.diagnostics ?? [],
+        );
+      case "fetching":
+      case "vfs-loading":
+      case "compiling":
+        return makeLoadingRulesDemoArtifact();
+      default:
+        return makeIdleRulesDemoArtifact();
+    }
+  }, [artifactStage]);
+
+  const setRulesDemoArtifact = useRulesDemoArtifactStore((s) => s.setArtifact);
+  useEffect(() => {
+    setRulesDemoArtifact(rulesDemoArtifact);
+  }, [rulesDemoArtifact, setRulesDemoArtifact]);
 
   // ---------------------------------------------------------------------------
   // Render: StepHost drives all survey step rendering (spec 028 Stage 5, T012).

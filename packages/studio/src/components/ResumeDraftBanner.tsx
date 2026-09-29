@@ -32,6 +32,7 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   invisibles: "invisible characters",
   convenience: "convenience letters",
   carve: "carve",
+  rules: "rules",
   mechanisms: "mechanisms",
   touch_seed_source: "touch starting point",
   touch: "touch layout",

@@ -16,6 +16,7 @@ export const STEP_ORDER: readonly string[] = [
   "invisibles",
   "convenience",
   "carve",
+  "rules",
   "mechanisms",
   "touch_seed_source",
   "touch",

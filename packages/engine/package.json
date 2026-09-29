@@ -36,6 +36,10 @@
       "types": "./dist/kmAssist/index.d.ts",
       "import": "./dist/kmAssist/index.js"
     },
+    "./rulePacks": {
+      "types": "./dist/rulePacks/index.d.ts",
+      "import": "./dist/rulePacks/index.js"
+    },
     "./data/placement-priors.json": "./data/placement-priors.json"
   },
   "files": [

@@ -102,6 +102,13 @@
      8.27:1 against navy's brighter --app-success override below, so one
      value covers both themes. */
   --app-text-on-success:  var(--sil-black);
+
+  /* Rule-kind badge for "reorder" rules (spec 082, kmAssist KmRuleView): the
+     fifth kind hue, after accent blue / warning orange / danger red /
+     success green. Violet-dark, not the old #7a4fd0, so small badge text
+     clears AA on the light surfaces:
+       --sil-violet-dark #6B2169 on white -> 10.26:1  (passes, with headroom) */
+  --app-reorder-text:    var(--sil-violet-dark);
 }
 
 /* Navy theme override. Selector matches the static class+attribute the
@@ -176,4 +183,9 @@
   --app-success-text:     var(--sil-green-60);
   --app-success-border:   rgba(63, 185, 80, 0.42);
   --app-success-bg:       rgba(63, 185, 80, 0.12);
+
+  /* --sil-violet-40 (not -60): -60 only reaches 4.15:1 on the lighter
+     --app-surface-2, while -40 clears 4.5:1 on both navy surfaces
+     (7.11:1 on --app-surface, 6.12:1 on --app-surface-2). */
+  --app-reorder-text:    var(--sil-violet-40);
 }

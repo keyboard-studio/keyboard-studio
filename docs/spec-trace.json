@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-26",
+  "lastUpdated": "2026-09-29",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -886,6 +886,14 @@
     "specs/081-footer-step-nav": {
       "title": "Feature Specification: Survey progress buttons live in the footer",
       "hash": "sha256:63147ac7ca822373",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/082-rule-access-tracks": {
+      "title": "Feature Specification: Rule access tracks — unlocking Keyman rules for non-programmers",
+      "hash": "sha256:fd5b520df9e8d775",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

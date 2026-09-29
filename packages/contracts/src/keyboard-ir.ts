@@ -266,6 +266,13 @@ export interface IRStore {
   /** True for system/compiler-directive stores (&NAME, &COPYRIGHT, etc.). */
   isSystem: boolean;
   /**
+   * Ownership marker for stores synthesized by a rule-pack install
+   * (spec 082 FR-015; sibling of {@link IRRule.ownedByBehaviour}). Format
+   * `"<packId>/<behaviourId>"`. Lets uninstall remove exactly the stores the
+   * install added, never a pre-existing same-named store.
+   */
+  ownedByBehaviour?: string;
+  /**
    * Set when the source line carried a `$keyman[web|only]:` prefix.
    * Preserved structurally so the codec can round-trip per-target stores.
    */
@@ -283,6 +290,14 @@ export interface IRStore {
    * but preserved on emit. Mirrors IRRule.trailingComment.
    */
   trailingComment?: string;
+  /**
+   * Marker for stores synthesized by the rules survey step (spec 082 pack
+   * install). Set when the store is minted into the working IR; never by the
+   * codec parser. The VFS projection splices marked stores absent from the
+   * base IR into the projected artifact alongside the marked rules that
+   * reference them. Sibling of {@link IRRule.rulesStepAdded}.
+   */
+  rulesStepAdded?: true;
 }
 
 /** A KMN group (begin / group ... using keys). */
@@ -311,6 +326,15 @@ export interface IRRule {
   /** ID of the Pattern that owns this node; set by the pattern recognizer. */
   ownedByPattern?: string;
   /**
+   * Ownership marker for rules compiled from a rule-pack behaviour
+   * (spec 082 FR-015; 076 FR-002). Format `"<packId>/<behaviourId>"`, e.g.
+   * `"cameroon-diacritic-blocking/cameroon_diacritic_blocking"`; set by
+   * rule-pack install (`packages/engine/src/rulePacks/install.ts`), never by
+   * the codec parser. Lets a rule be recompiled, removed, and displayed by
+   * owner. Mutually exclusive with {@link ownedByPattern} on one rule.
+   */
+  ownedByBehaviour?: string;
+  /**
    * Set for group-transition rules of the form `match > use(g)` or
    * `nomatch > use(g)`. Preserved structurally so the codec can round-trip
    * the leading keyword — emit-without-this-field produces a bare `>`,
@@ -330,6 +354,18 @@ export interface IRRule {
    * Absent for in-memory (scaffolded/synthesized) rules.
    */
   sourceLine?: number;
+  /**
+   * Marker for rules added by the rules survey step (spec 082: pack install,
+   * guard synthesis, Narrow exceptions). Set by the studio/engine when the
+   * rule is minted into the working IR; never by the codec parser. The VFS
+   * projection (`projectWorkingCopyVfs`, via `deriveRuleAdditions`) splices
+   * marked rules that are absent from the base IR into the projected
+   * artifact in working-IR order, so they take effect in the preview and
+   * download. Rules minted by other flows (context-tolerance replay, touch
+   * rule synthesis) deliberately do NOT carry this marker — they reach the
+   * artifact through their own projection paths.
+   */
+  rulesStepAdded?: true;
 }
 
 /** A KMN comment node. */

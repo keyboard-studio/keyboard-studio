@@ -5,20 +5,23 @@
 // This component is deliberately PRESENTATIONAL and READ-ONLY: it takes the
 // highlighted spans and explanation as props and offers no editing
 // affordances (no inputs, no contentEditable, no write-back path). Editable
-// mode arrives behind the playground gates (spec 082 FR-012), not here.
+// mode arrives behind the playground gates (spec 082 FR-025), not here.
 //
 // Also exports the rule-list filter contract the rules step consumes:
 // RuleFilter { showPlainOutput } — plain key→output rules are hidden by
-// default (DEFAULT_RULE_FILTER), per spec 082 FR-010/FR-011.
+// default (DEFAULT_RULE_FILTER), per spec 082 FR-023.
 
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { RuleKind, TokenSpan } from "@keyboard-studio/engine/kmAssist";
 import {
+  ACCENT,
   BG_CARD,
+  BG_INSET,
   CARD_BORDER,
   ERROR_TEXT,
   FONT_MONO,
+  REORDER_TEXT,
   TEXT_DIM,
   TEXT_MAIN,
   WARNING,
@@ -34,7 +37,7 @@ export interface RuleFilter {
   showPlainOutput: boolean;
 }
 
-/** Default filter: plain-output rules hidden (spec 082 FR-010/FR-011). */
+/** Default filter: plain-output rules hidden (spec 082 FR-023). */
 export const DEFAULT_RULE_FILTER: RuleFilter = { showPlainOutput: false };
 
 /** True when a rule of this kind passes the filter. */
@@ -70,15 +73,15 @@ const KIND_LABEL: Record<RuleKind, string> = {
 
 const KIND_BADGE_COLOR: Record<RuleKind, string> = {
   "plain-output": TEXT_DIM,
-  context: "#2f6fed",
-  blocking: "#b3541e",
-  reorder: "#7a4fd0",
+  context: ACCENT,
+  blocking: WARNING,
+  reorder: REORDER_TEXT,
   opaque: WARNING,
 };
 
 const SPAN_COLOR: Record<TokenSpan["kind"], string | undefined> = {
-  "store-ref": "#2f6fed",
-  key: "#b3541e",
+  "store-ref": ACCENT,
+  key: WARNING,
   operator: TEXT_DIM,
   output: undefined,
   comment: TEXT_DIM,
@@ -150,7 +153,7 @@ export function KmRuleView({
           margin: 0,
           padding: 8,
           overflowX: "auto",
-          background: "rgba(0,0,0,0.04)",
+          background: BG_INSET,
           borderRadius: 4,
           color: TEXT_MAIN,
           fontFamily: FONT_MONO,

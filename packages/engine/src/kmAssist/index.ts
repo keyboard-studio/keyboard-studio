@@ -3,7 +3,7 @@
  *
  * Rule classifier, KMN highlighter, plain-language explainer, and inventory
  * summary over IR-owned rules. READ-ONLY ONLY: no editing affordances live
- * here; editable mode arrives behind the playground gates (FR-012).
+ * here; editable mode arrives behind the playground gates (FR-025).
  */
 export type { RuleKind } from "./classify.js";
 export {
@@ -21,7 +21,7 @@ export type { SpanKind, TokenSpan } from "./highlight.js";
 export { highlightRule } from "./highlight.js";
 export { explainFragment, explainRule } from "./explain.js";
 export type { RuleFamily } from "./group.js";
-export { groupRules } from "./group.js";
+export { familyOfRule, groupRules } from "./group.js";
 export type { RuleInventory } from "./inventory.js";
 export { summarizeInventory } from "./inventory.js";
 // --- spec 082 FR-019/FR-020/FR-022 additions (append-only) ---

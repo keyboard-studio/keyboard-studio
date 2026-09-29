@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
 import {
   snapshotWorkingCopyToSession,
   rehydrateWorkingCopyFromSession,
@@ -864,6 +865,52 @@ describe("persistWorkingCopy", () => {
       );
       expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();
       expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
+    });
+
+    // spec 082 FR-020/FR-022: Keep/dismiss dispositions are durable — the
+    // author is never re-asked after a draft resume.
+    it("round-trips guard-intent dispositions through snapshot/rehydrate", () => {
+      instantiate();
+      useGuardIntentStore.getState().keepOverBroadGuard("guard-node-1");
+      useGuardIntentStore.getState().dismissMissingGroup("diablock::Diacritic blocking");
+      useGuardIntentStore.getState().noteGuardNarrowed("You block the acute key after 'e' — intentional?", "exception-rule-1");
+      snapshotWorkingCopyToSession();
+
+      useWorkingCopyStore.getState().reset();
+      useGuardIntentStore.getState().reset();
+      expect(useGuardIntentStore.getState().keptGuardRuleIds.size).toBe(0);
+
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const intent = useGuardIntentStore.getState();
+      expect(intent.keptGuardRuleIds.has("guard-node-1")).toBe(true);
+      expect(intent.dismissedMissingGroups.has("diablock::Diacritic blocking")).toBe(true);
+      // FR-022: the narrowed disposition is durable too.
+      expect(
+        intent.narrowedGuardQuestions.has("You block the acute key after 'e' — intentional?"),
+      ).toBe(true);
+      // The transient narrow-undo stack is NOT persisted — undo only covers
+      // the current session's narrows.
+      expect(intent.narrowUndoStack).toEqual([]);
+    });
+
+    it("tolerates a snapshot written before guard-intent persistence existed", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.keptGuardRuleIds;
+      delete legacy.dismissedMissingGroups;
+      delete legacy.narrowedGuardQuestions;
+      sessionStorage.setItem(
+        "ks.working-copy.draft",
+        JSON.stringify(legacy),
+      );
+      useWorkingCopyStore.getState().reset();
+      useGuardIntentStore.getState().reset();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const intent = useGuardIntentStore.getState();
+      expect(intent.keptGuardRuleIds.size).toBe(0);
+      expect(intent.dismissedMissingGroups.size).toBe(0);
+      expect(intent.narrowedGuardQuestions.size).toBe(0);
     });
   });
 });
