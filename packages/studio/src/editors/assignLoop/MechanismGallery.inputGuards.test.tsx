@@ -10,7 +10,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, act } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import { MechanismGallery } from "./MechanismGallery.tsx";
+import { MechanismGallery, resolveS02DeadkeyIdentity, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
@@ -166,10 +166,12 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
 });
 
 describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => {
-  it("a custom trigger character maps to its vkey, and deadkeyName/accentChar never fall back to 'dead0'", async () => {
+  it("a custom trigger character maps to its vkey, and deadkeyName is an allocated numeric id (never 'dead0')", async () => {
     // "a" is not one of the 4 built-in DEADKEY_OPTIONS trigger keys, so this
-    // exercises the custom-trigger path exclusively — deadkeyNameFor(triggerKey)
-    // would otherwise return the "dead0" fallback for an unrecognised key id.
+    // exercises the custom-trigger path exclusively. Spec 083: the id is no
+    // longer derived from the trigger character's codepoint — it is freshly
+    // allocated via allocateDeadkeyId (studio ids start above 0x2FFF), while
+    // accentChar keeps the old convention (the trigger's literal character).
     seedInventory(["ā"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -189,9 +191,56 @@ describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => 
       .session.assignments.filter((a) => a.modality === "physical");
     const slotValues = assignments[0]?.mechanisms[0]?.slotValues;
     expect(slotValues?.["triggerKey"]).toBe("K_A");
-    expect(slotValues?.["deadkeyName"]).toBe("0061");
+    const deadkeyName = slotValues?.["deadkeyName"];
+    expect(typeof deadkeyName).toBe("string");
+    expect(deadkeyName).toMatch(/^[0-9a-f]{4}$/);
+    expect(deadkeyName).not.toBe("dead0");
+    expect(parseInt(deadkeyName as string, 16)).toBeGreaterThan(0x2fff);
     expect(slotValues?.["accentChar"]).toBe("a");
-    expect(slotValues?.["deadkeyName"]).not.toBe("dead0");
+  });
+
+  it("two S-02 mints in one session get distinct ids (session reservation)", () => {
+    // The working IR does not carry this session's phase-C assignments, so
+    // the seam reserves ids already minted in sessionAssignments — otherwise
+    // a second mint would re-mint the same allocateDeadkeyId(workingIr) value.
+    const first = resolveS02DeadkeyIdentity({
+      triggerKey: "K_COLON",
+      triggerResolution: { kind: "key", vkey: "K_COLON" },
+      workingIr: null,
+      sessionAssignments: [],
+    });
+    expect(first.deadkeyName).toBe("3000");
+    expect(first.accentChar).toBe(";");
+
+    const second = resolveS02DeadkeyIdentity({
+      triggerKey: "K_LBRKT",
+      triggerResolution: { kind: "key", vkey: "K_LBRKT" },
+      workingIr: null,
+      sessionAssignments: [
+        {
+          scope: "individual",
+          target: "ā",
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_DEADKEY,
+              strategyId: "S-02",
+              slotValues: {
+                triggerKey: "K_COLON",
+                deadkeyName: first.deadkeyName,
+                baseLetters: "a",
+                accentedForms: "ā",
+                accentChar: ";",
+              },
+            },
+          ],
+          source: "user",
+        },
+      ],
+    });
+    expect(second.deadkeyName).toBe("3001");
+    expect(second.deadkeyName).not.toBe(first.deadkeyName);
+    expect(second.accentChar).toBe("[");
   });
 });
 
