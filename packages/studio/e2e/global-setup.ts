@@ -11,7 +11,13 @@
 import type { FullConfig } from "playwright/test";
 
 async function globalSetup(config: FullConfig): Promise<void> {
-  const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:5273";
+  // Multi-project (issue 1853, Phase 6): resolve baseURL from the first
+  // project that defines one, falling back to the localhost default. The
+  // desktop and mobile projects share the same webServer, so any project's
+  // baseURL works — but don't assume projects[0] is the desktop lane.
+  const baseURL =
+    config.projects.map((p) => p.use.baseURL).find((u) => u !== undefined) ??
+    "http://localhost:5273";
   const url = `${baseURL}/local-kbd-api/list`;
   const started = Date.now();
   const res = await fetch(url);
