@@ -99,6 +99,8 @@ function fmtOutputElement(el: OutputElement): string {
     case "char":    return fmtCodepoint(el.value);
     case "deadkey": return fmtDk(el.id);
     case "beep":    return "beep";
+    case "nul":     return "nul";
+    case "context": return el.offset === 0 ? "context" : `context(${el.offset})`;
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
     case "outs":    return `outs(${el.storeRef})`;
     case "useGroup": return `use(${el.groupName})`;
@@ -689,9 +691,12 @@ export function emit(ir: KeyboardIR): string {
     }
   }
 
-  // begin directive.
-  const entryGroup = ir.groups.find(g => !g.readonly);
-  const entryName = entryGroup?.name ?? "main";
+  // begin directive — FR-004: reuse the modelled entry group so a keyboard
+  // with more than one entry group round-trips without the emitter
+  // rebuilding a single entry from the first non-readonly group.
+  const entryName = ir.header.entryPoints?.main
+    ?? ir.groups.find(g => !g.readonly)?.name
+    ?? "main";
   lines.push("");
   lines.push(`begin ${ir.header.encoding ?? "Unicode"} > use(${entryName})`);
 

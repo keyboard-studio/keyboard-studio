@@ -51,6 +51,20 @@ export type OutputElement =
   | { kind: "char"; value: string }
   | { kind: "deadkey"; id: number }
   | { kind: "beep" }
+  /**
+   * The `nul` keyword — the rule produces nothing (suppression). Typed per
+   * 076 FR-004 so the suppression compiler and Layer A check #8 can
+   * distinguish "output nothing" from literal text structurally.
+   */
+  | { kind: "nul" }
+  /**
+   * A context reference in output position: the bare `context` keyword
+   * re-emits the whole matched context, `context(N)` the Nth character of the
+   * matched context (1-based). Typed per 076 FR-004. The bare keyword is
+   * represented as `offset: 0` — offset 0 never arises from `context(0)`,
+   * which the codec rejects (malformed), so the two are unambiguous.
+   */
+  | { kind: "context"; offset: number }
   | { kind: "index"; storeRef: string; offset: number }
   | { kind: "outs"; storeRef: string }
   /** `use(groupName)` group transition in output position — a control-flow
@@ -247,6 +261,26 @@ export interface IRHeader {
    * ANSI keyboards at import time without altering the stores array.
    */
   encoding?: "Unicode" | "ANSI";
+  /**
+   * The set of `begin` entry points, modelled for fidelity (spec 076 FR-004).
+   * `main` is the group named in the `begin <encoding> > use(<group>)`
+   * directive — the parser keeps it (first directive wins, mirroring
+   * `encoding`) so the emitter reuses it instead of rebuilding a single
+   * entry from the first non-readonly group. `newContext` / `postKeystroke`
+   * record the presence of the reserved entry groups. Together with
+   * {@link IRHeader.encoding} this is the full entry-point set.
+   * `NewContext` and `PostKeystroke` groups are `readonly` and MUST NOT be
+   * used as reorder hooks — they are modelled for fidelity only.
+   * Absent when the keyboard was constructed in-memory (scaffolded).
+   */
+  entryPoints?: {
+    /** Group named in `begin <encoding> > use(<group>)`. */
+    main?: string;
+    /** The source declared a `group(NewContext)` entry group. */
+    newContext?: boolean;
+    /** The source declared a `group(PostKeystroke)` entry group. */
+    postKeystroke?: boolean;
+  };
 }
 
 /** A single KMN store declaration. */
@@ -310,6 +344,15 @@ export interface IRRule {
   trailingComment?: string;
   /** ID of the Pattern that owns this node; set by the pattern recognizer. */
   ownedByPattern?: string;
+  /**
+   * ID of the Behaviour that owns this node (e.g. "carve-suppression"); set by
+   * the behaviour compiler. Additive sibling of {@link ownedByPattern}: a
+   * discriminated union would be a breaking IR change. Mutually exclusive with
+   * `ownedByPattern` on one rule — see IRRuleOwnershipSchema (spec 076 FR-002).
+   * A plain string (not a union) so future behaviours reuse the marker without
+   * a contract change.
+   */
+  ownedByBehaviour?: string;
   /**
    * Set for group-transition rules of the form `match > use(g)` or
    * `nomatch > use(g)`. Preserved structurally so the codec can round-trip

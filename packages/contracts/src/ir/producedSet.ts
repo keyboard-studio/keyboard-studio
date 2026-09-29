@@ -214,6 +214,18 @@ export function collectFromElements(
         flushRun(run, collector, includeSpace);
         break;
 
+      case "nul":
+        // Suppression marker — produces nothing. Flush buffered run.
+        flushRun(run, collector, includeSpace);
+        break;
+
+      case "context":
+        // Output-position context reference (bare `context` or `context(N)`):
+        // reproduces matched-context content, which cannot be determined
+        // statically. Flush and skip, like an opaque fragment.
+        flushRun(run, collector, includeSpace);
+        break;
+
       case "useGroup":
         // Group transition — control flow, not a glyph. Flush buffered run.
         flushRun(run, collector, includeSpace);

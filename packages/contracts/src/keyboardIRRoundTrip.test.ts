@@ -285,6 +285,49 @@ describe("assertSemanticEquivalence", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // ownedByBehaviour is NOT semantic — same exclusion as ownedByPattern
+  // (spec 076 FR-002, decided in T006): behaviour-compiler metadata, not
+  // keyboard logic; the codec neither parses nor emits it.
+  // ---------------------------------------------------------------------------
+
+  it("ignores ownedByBehaviour differences on rules", () => {
+    const ruleA: IRRule = {
+      nodeId: "r#1",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "char", value: "a" }],
+      ownedByBehaviour: "carve-suppression",
+    };
+    const ruleB: IRRule = {
+      nodeId: "r#1",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "char", value: "a" }],
+    };
+    const irA = makeTestIR([makeGroup([ruleA])]);
+    const irB = makeTestIR([makeGroup([ruleB])]);
+    const result = assertSemanticEquivalence(irA, irB);
+    expect(result.equivalent).toBe(true);
+  });
+
+  it("ignores ownedByPattern vs ownedByBehaviour (mutually exclusive markers)", () => {
+    const ruleA: IRRule = {
+      nodeId: "r#1",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "char", value: "a" }],
+      ownedByPattern: "some-pattern",
+    };
+    const ruleB: IRRule = {
+      nodeId: "r#1",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "char", value: "a" }],
+      ownedByBehaviour: "carve-suppression",
+    };
+    const irA = makeTestIR([makeGroup([ruleA])]);
+    const irB = makeTestIR([makeGroup([ruleB])]);
+    const result = assertSemanticEquivalence(irA, irB);
+    expect(result.equivalent).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
   // Group order IS semantic — reordering groups must produce a difference
   // ---------------------------------------------------------------------------
 

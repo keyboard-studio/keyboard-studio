@@ -58,6 +58,7 @@ export function irGroup(input: IRGroupInput = {}): IRGroup {
 export interface IRRuleExtras {
   trailingComment?: IRRule["trailingComment"] | undefined;
   ownedByPattern?: IRRule["ownedByPattern"] | undefined;
+  ownedByBehaviour?: IRRule["ownedByBehaviour"] | undefined;
   matchKind?: IRRule["matchKind"] | undefined;
   targetSelector?: IRRule["targetSelector"] | undefined;
   sourceLine?: IRRule["sourceLine"] | undefined;
@@ -75,6 +76,7 @@ function toOutput(output: RuleOutputInput): OutputElement[] {
 function withRuleExtras(rule: IRRule, extras: IRRuleExtras): IRRule {
   if (extras.trailingComment !== undefined) rule.trailingComment = extras.trailingComment;
   if (extras.ownedByPattern !== undefined) rule.ownedByPattern = extras.ownedByPattern;
+  if (extras.ownedByBehaviour !== undefined) rule.ownedByBehaviour = extras.ownedByBehaviour;
   if (extras.matchKind !== undefined) rule.matchKind = extras.matchKind;
   if (extras.targetSelector !== undefined) rule.targetSelector = extras.targetSelector;
   if (extras.sourceLine !== undefined) rule.sourceLine = extras.sourceLine;

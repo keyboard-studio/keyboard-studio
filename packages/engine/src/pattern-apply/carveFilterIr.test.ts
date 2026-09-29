@@ -110,6 +110,25 @@ describe("carveFilterIr", () => {
     expect(out.comments.map((c) => c.nodeId)).toEqual(["c0"]);
   });
 
+  it("clears a derived entry-point flag when its reserved group is deleted", () => {
+    const base = makeIR({
+      groups: [
+        irGroup({ nodeId: "g0", name: "main", rules: [makeRule("r0")] }),
+        irGroup({ nodeId: "g1", name: "NewContext", rules: [makeRule("r1")] }),
+        irGroup({ nodeId: "g2", name: "PostKeystroke", rules: [makeRule("r2")] }),
+      ],
+    });
+    const ir: KeyboardIR = {
+      ...base,
+      header: { ...base.header, entryPoints: { main: "main", newContext: true, postKeystroke: true } },
+    };
+    const out = carveFilterIr(ir, new Set(["g1"]));
+    // Mirrors parse(): the flags are derived from the groups that exist.
+    expect(out.header.entryPoints).toEqual({ main: "main", postKeystroke: true });
+    // No reserved group deleted -> the header object passes through as-is.
+    expect(carveFilterIr(ir, new Set(["r0"])).header).toBe(ir.header);
+  });
+
   it("never mutates baseIr", () => {
     const ir = makeIR({
       groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0"), makeRule("r1")] })],

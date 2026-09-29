@@ -335,6 +335,17 @@ the uppercase is now trimmed too.
 - Any new Unicode-block or Phase-C mechanism-not-enabled proposal signal (the deferred TODO(#525)
   signals); this feature is only about correcting the produced-vs-input comparison and its feedback.
 
+## Compatibility with 076 swallowUndefined recompute
+
+Carve steps (proposals, trims, and per-carve allow/block dispositions) MUST stay compatible with the
+076 `swallowUndefined` recompute: carved combinations are undefined keys by construction and enter
+the swallow set on recompile. Per-carve dispositions set to Allow host, and combinations already
+covered by carve-suppression-owned rules (`ownedByBehaviour` naming the carve-suppression
+behaviour), are the compiler's skip-set — no double emission, no shadowing surprises. Dispositions
+persist as carve-decision metadata on the carve overlay and are read, never re-asked, at recompile;
+un-carving removes the metadata and restores the originals. See 076 User Story 6 and FR-019–FR-023
+for the full decision (issue #1802).
+
 ## Review notes / open questions
 
 - **OQ-1 (FR-003b, "no other producer").** Confirm the producer-count test should range over the whole

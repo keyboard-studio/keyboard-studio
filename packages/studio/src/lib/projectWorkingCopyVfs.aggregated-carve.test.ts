@@ -15,9 +15,10 @@
 //   carveChars={"ä","ö"} with an EMPTY incremental union (each per-character
 //   pass sees a partially-tainted literal whose kept char is stranded, so it
 //   nominates nothing — the "blocked" classification). The projection must
-//   still drop the rule from the .kmn AND blank its "äö" keycaps in .kvks and
-//   the touch layout. Without the aggregated union, nothing would happen at
-//   all (hasCarveEdit would be false).
+//   still drop the rule from the .kmn, blank its "äö" keycap in .kvks, and
+//   REMOVE its key from the touch layout (076 FR-023, T020: removal is the
+//   touch default, not blanking). Without the aggregated union, nothing
+//   would happen at all (hasCarveEdit would be false).
 // AC#2 (§7): carving a character whose touch key was ALSO explicitly deleted
 //   via deletedTouchKeyIds resolves to a single coherent outcome — the step
 //   1.5 carve cascade neutralizes the key, the step 1.6 explicit deletion
@@ -28,7 +29,11 @@
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { charStore, irGroup, makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import {
+  charStore,
+  irGroup,
+  makeTestIR,
+} from "@keyboard-studio/contracts/fixtures";
 import type { IRRule } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
@@ -88,7 +93,11 @@ const LITERAL_TOUCH_LAYOUT = JSON.stringify({
 function makeLiteralVfs(keyboardId: string) {
   return createVirtualFS([
     { path: `source/${keyboardId}.kmn`, content: LITERAL_KMN, isBinary: false },
-    { path: `source/${keyboardId}.kvks`, content: LITERAL_KVKS, isBinary: false },
+    {
+      path: `source/${keyboardId}.kvks`,
+      content: LITERAL_KVKS,
+      isBinary: false,
+    },
     {
       path: `source/${keyboardId}.keyman-touch-layout`,
       content: LITERAL_TOUCH_LAYOUT,
@@ -165,7 +174,11 @@ const FANOUT_TOUCH_LAYOUT = JSON.stringify({
 function makeFanOutVfs(keyboardId: string) {
   return createVirtualFS([
     { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
-    { path: `source/${keyboardId}.kvks`, content: FANOUT_KVKS, isBinary: false },
+    {
+      path: `source/${keyboardId}.kvks`,
+      content: FANOUT_KVKS,
+      isBinary: false,
+    },
     {
       path: `source/${keyboardId}.keyman-touch-layout`,
       content: FANOUT_TOUCH_LAYOUT,
@@ -174,9 +187,15 @@ function makeFanOutVfs(keyboardId: string) {
   ]);
 }
 
-function touchKeys(vfs: ReturnType<typeof createVirtualFS>, keyboardId: string) {
-  const raw = vfs.get(`source/${keyboardId}.keyman-touch-layout`)?.content as string;
-  return JSON.parse(raw).tablet.layer[0].row[0].key as Array<Record<string, unknown>>;
+function touchKeys(
+  vfs: ReturnType<typeof createVirtualFS>,
+  keyboardId: string,
+) {
+  const raw = vfs.get(`source/${keyboardId}.keyman-touch-layout`)
+    ?.content as string;
+  return JSON.parse(raw).tablet.layer[0].row[0].key as Array<
+    Record<string, unknown>
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +203,7 @@ function touchKeys(vfs: ReturnType<typeof createVirtualFS>, keyboardId: string) 
 // ---------------------------------------------------------------------------
 
 describe("projectWorkingCopyVfs — issue #1809 ruling §1 + §11 aggregated carve", () => {
-  it("AC#1: an aggregated-only whole-rule nomination drops the .kmn rule AND blanks its keycaps in .kvks and the touch layout", () => {
+  it("AC#1: an aggregated-only whole-rule nomination drops the .kmn rule, blanks its .kvks keycap, AND removes its key from the touch layout", () => {
     const { ir } = parseKmn(LITERAL_KMN, "test_kb");
     const irBefore = structuredClone(ir);
     const vfs = makeLiteralVfs("test_kb");
@@ -217,13 +236,11 @@ describe("projectWorkingCopyVfs — issue #1809 ruling §1 + §11 aggregated car
     expect(kvks).toContain('<key vkey="K_Q"></key>');
     expect(kvks).toContain('<key vkey="K_A">a</key>');
 
-    // .keyman-touch-layout: the carved output is deleted and the id
-    // neutralized to an inert T_carved_* id; the sibling key is untouched.
+    // .keyman-touch-layout: the carved key is REMOVED by default (076 FR-023,
+    // T020) — no neutralized stub remains; the sibling key is untouched.
     const keys = touchKeys(vfs, "test_kb");
-    const carved = keys.find((k) => k["id"] === "T_carved_K_Q");
-    expect(carved).toBeDefined();
-    expect(carved!["text"]).toBe("");
-    expect(carved!["output"]).toBeUndefined();
+    expect(keys.some((k) => k["id"] === "K_Q")).toBe(false);
+    expect(keys.some((k) => k["id"] === "T_carved_K_Q")).toBe(false);
     expect(keys.find((k) => k["id"] === "K_A")).toMatchObject({ text: "a" });
 
     // baseIr is never mutated by the projection.
@@ -279,15 +296,14 @@ describe("projectWorkingCopyVfs — issue #1809 §7 carve/explicit-touch-deletio
     const kvks = vfs.get("source/test_kb.kvks")?.content as string;
     expect(kvks).toContain('<key vkey="K_E"></key>');
 
-    // Touch layout: the carved U_00E9 main key is neutralized by the carve
-    // cascade (id → T_carved_*, output deleted, text blanked); the longpress
-    // entry is gone exactly once — the step-1.6 explicit deletion resolved
-    // to nothing after the cascade removed it (idempotent, no error).
+    // Touch layout: the carved U_00E9 main key is REMOVED by the carve
+    // cascade (076 FR-023, T020 — removal is the touch default, not
+    // blanking); the longpress entry is gone exactly once — the step-1.6
+    // explicit deletion resolved to nothing after the cascade removed it
+    // (idempotent, no error).
     const keys = touchKeys(vfs, "test_kb");
-    const carvedMain = keys.find((k) => k["id"] === "T_carved_00E9");
-    expect(carvedMain).toBeDefined();
-    expect(carvedMain!["text"]).toBe("");
-    expect(carvedMain!["output"]).toBeUndefined();
+    expect(keys.some((k) => k["id"] === "U_00E9")).toBe(false);
+    expect(keys.some((k) => k["id"] === "T_carved_00E9")).toBe(false);
     const kA = keys.find((k) => k["id"] === "K_A");
     expect(kA).toBeDefined();
     expect(kA!["sk"]).toBeUndefined();
@@ -316,8 +332,9 @@ describe("projectWorkingCopyVfs — issue #1809 §7 carve/explicit-touch-deletio
     expect(warnings).toHaveLength(0);
 
     const keys = touchKeys(vfs, "test_kb");
-    // The carve cascade still neutralized the é key...
-    expect(keys.find((k) => k["id"] === "T_carved_00E9")).toBeDefined();
+    // The carve cascade REMOVED the é key (076 FR-023, T020 default)...
+    expect(keys.some((k) => k["id"] === "U_00E9")).toBe(false);
+    expect(keys.some((k) => k["id"] === "T_carved_00E9")).toBe(false);
     // ...and the independent explicit deletion still neutralized K_A
     // (neutralizeId("K_A") === "T_touchdel_K_A"), with its text/output gone.
     const neutralizedA = keys.find((k) => k["id"] === "T_touchdel_K_A");
