@@ -29,6 +29,7 @@ Originally adapted from the flexlibs2 LEX crew (May 2026); rebuilt for keyboard-
 | `km-author` | keymanapp/keyman parity — voice, conventions, vocabulary | Upstream-parity review |
 | `km-doc` | Documentation maintenance (docs/, module docstrings) | Doc updates synced to code |
 | `/km-archivist` | Git/GitHub manager + historical record | Commits, PRs, releases, history reports |
+| `km-retire` | Spec retirement: merged + tasks-complete `specs/NNN-slug/` -> one-page AS-BUILT.md, full docs `git mv`'d to `specs/_archive/` | AS-BUILT.md / contracts.md + staged review worktree |
 | `km-synthesis` | Aggregates specialist reports into a unified verdict | Synthesis report |
 
 ## When to invoke each
@@ -47,6 +48,7 @@ Originally adapted from the flexlibs2 LEX crew (May 2026); rebuilt for keyboard-
 - **`km-author`** — review against keymanapp/keyman upstream conventions: commit/issue style (`<prefix>(<area>): <description>`), .kmn idioms (`any(store)`, `RALT` not `ALT`), Keyman vocabulary ("touch layout" not "mobile keyboard"), `packages/contracts` API stability (§17).
 - **`km-doc`** — documentation drift, module docstrings, `docs/` consistency with code.
 - **`/km-archivist`** — committing, opening PRs, cutting releases, investigating git history, keeping CHANGELOG / migration guides honest.
+- **`km-retire`** — after a feature's PR has merged and its `tasks.md` is fully checked on `main`: writes `specs/NNN-slug/AS-BUILT.md` (under 6K chars, checked against the code), `git mv`s spec/plan/tasks/research/etc. to `specs/_archive/NNN-slug/`, and adds the CLAUDE.md "don't read the archive" rule. Refuses if either gate fails; never retires extracted monolith sections (005/007/008) without explicit authorization. Works in its own worktree (`km/retire-NNN-slug`), never touches your checkout, never commits — hands the staged result to `/km-archivist`.
 - **`km-synthesis`** — end of a review cycle, when multiple specialists have reported and need to be reconciled.
 - **`/km-lead`** — anything requiring multi-agent coordination.
 
@@ -103,6 +105,9 @@ Output / scaffolder change:
 
 History / commit investigation (standalone):
   /km-archivist  (no review cycle needed)
+
+Spec retirement (standalone, after merge):
+  km-retire (gates -> AS-BUILT -> git mv to specs/_archive/) -> human review -> /km-archivist (commit + PR)
 ```
 
 `/km-archivist` is the only crew member that runs `git commit` / `gh pr create`. All other agents read and review but never touch git directly.
@@ -111,7 +116,7 @@ History / commit investigation (standalone):
 
 ## Project-specific seats vs. generic crew
 
-Generic seats (apply to any TypeScript project): `/km-lead`, `km-programmer`, `km-verification`, `km-qc`, `km-simplify`, `km-doc`, `/km-archivist`, `km-synthesis`.
+Generic seats (apply to any TypeScript project): `/km-lead`, `km-programmer`, `km-verification`, `km-qc`, `km-simplify`, `km-doc`, `/km-archivist`, `km-synthesis`, `km-retire`.
 
 keyboard-studio-specific seats: `km-frontend`, `km-testing`, `km-keyman`, `km-domain`, `km-strategy`, `km-validator`, `km-output`, `km-author` (the last one is generic in shape but speaks specifically for keymanapp/keyman).
 
