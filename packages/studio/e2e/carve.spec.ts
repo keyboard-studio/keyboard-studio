@@ -224,6 +224,9 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
 
     await page.getByTestId("carve-continue").click();
 
+    // Spec 082: the rules step sits between carve and mechanisms.
+    await page.getByTestId("rules-continue").click();
+
     // ---------------------------------------------------------------------
     // Remaining spine steps: mechanisms, touch, help. (No separate sequences
     // step — see the note above the describe block.)
@@ -351,6 +354,9 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       .not.toEqual(expect.arrayContaining(TARGET_RULE_IDS));
 
     await page.getByTestId("carve-continue").click();
+
+    // Spec 082: the rules step sits between carve and mechanisms.
+    await page.getByTestId("rules-continue").click();
 
     await confirmMechanismsEmpty(page);
     await driveTouchGallery(page);

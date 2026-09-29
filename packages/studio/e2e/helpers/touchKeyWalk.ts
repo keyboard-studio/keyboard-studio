@@ -51,6 +51,8 @@ async function driveIdentityLite(page: Page): Promise<void> {
 async function skipCarve(page: Page): Promise<void> {
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
   await page.getByTestId("carve-continue").click();
+  // Spec 082: the rules step sits between carve and mechanisms.
+  await page.getByTestId("rules-continue").click();
 }
 
 /**

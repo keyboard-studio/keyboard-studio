@@ -264,6 +264,8 @@ async function carveCharacters(
   await expect(survivorGlyph).toHaveAttribute("aria-pressed", "false");
 
   await page.getByTestId("carve-continue").click();
+  // Spec 082: the rules step sits between carve and mechanisms.
+  await page.getByTestId("rules-continue").click();
 }
 
 /**

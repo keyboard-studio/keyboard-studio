@@ -244,6 +244,9 @@ async function finishGalleryWork(page: Page, fx: WalkFixture = FIXTURE): Promise
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
   if (fx.charToCarve !== undefined) await carveCharacter(page, fx.charToCarve);
   await page.getByTestId("carve-continue").click();
+  // Spec 082: the rules step sits between carve and mechanisms — accept it
+  // as-is (no bundle installs in the e2e walk) and continue.
+  await page.getByTestId("rules-continue").click();
   await driveMechanismsGallery(
     page,
     fx.placement !== undefined ? { placements: { [fx.charToAdd]: fx.placement } } : {},

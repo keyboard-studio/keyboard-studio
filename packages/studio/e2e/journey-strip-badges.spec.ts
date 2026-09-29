@@ -148,6 +148,8 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // buildOneCharacterList stops on carve; accept it with nothing discarded.
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("carve-continue").click();
+    // Spec 082: the rules step sits between carve and mechanisms.
+    await page.getByTestId("rules-continue").click();
     // "é" on basic_kbdfr is a real new character to place (unlike carve.spec's
     // marks-free "᙮" fixture, which empty-diffs) — drive whatever the gallery
     // actually presents rather than assuming the empty-diff exit.
@@ -279,6 +281,8 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await buildOneCharacterList(page, "é");
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("carve-continue").click();
+    // Spec 082: the rules step sits between carve and mechanisms.
+    await page.getByTestId("rules-continue").click();
 
     const mechanismsMark = footer(page).locator('button[aria-label^="Mechanisms"]');
     await expect(mechanismsMark).toHaveCount(1, { timeout: 15_000 });
