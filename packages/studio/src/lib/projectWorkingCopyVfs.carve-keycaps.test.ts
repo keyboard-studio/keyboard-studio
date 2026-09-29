@@ -19,6 +19,10 @@
 //       producing rule from the desktop `.kmn` layout AND blanks its `.kvks`
 //       desktop-OSK keycap, while a declared-alphabet character's rule and
 //       keycap are left fully intact.
+// #1803: A GROUP-level carve removes the group's rules from the `.kmn` AND
+//       blanks their `.kvks` keycaps on every modifier layer (the .kmn-side
+//       cascade applied to keycap derivation); the kept group's keycaps and
+//       the layer structure survive.
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -290,5 +294,76 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     const kvks = vfs.get("source/test_kb.kvks")?.content as string;
     expect(kvks).toContain('<key vkey="K_Q"></key>');
     expect(kvks).toContain('<key vkey="K_A">a</key>');
+  });
+});
+
+describe("projectWorkingCopyVfs — group-level carve keycaps (#1803)", () => {
+  const GROUP_KMN = [
+    "store(&VERSION) '10.0'",
+    "begin Unicode > use(main)",
+    "",
+    "group(main) using keys",
+    "+ [K_A] > 'a'",
+    "",
+    "group(extra) using keys",
+    "+ [K_Q] > 'q'",
+    "+ [SHIFT K_Q] > 'Q'",
+    "+ [K_W] > 'w'",
+    "",
+  ].join("\n");
+
+  const GROUP_KVKS = `<visualkeyboard>
+<header><version>10.0</version></header>
+<encoding name="unicode" fontname="Arial">
+<layer shift="">
+<key vkey="K_A">a</key>
+<key vkey="K_Q">q</key>
+<key vkey="K_W">w</key>
+</layer>
+<layer shift="S">
+<key vkey="K_Q">Q</key>
+</layer>
+</encoding>
+</visualkeyboard>`;
+
+  it("a group-level carve removes the group's rules from the .kmn AND blanks their keycaps on every .kvks layer", () => {
+    const { ir } = parseKmn(GROUP_KMN, "test_kb");
+    const extraGroup = ir.groups.find((g) => g.name === "extra");
+    if (extraGroup === undefined) throw new Error("fixture group 'extra' not found");
+    const vfs = createVirtualFS([
+      { path: "source/test_kb.kmn", content: GROUP_KMN, isBinary: false },
+      { path: "source/test_kb.kvks", content: GROUP_KVKS, isBinary: false },
+    ]);
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set([extraGroup.nodeId]),
+      deletedItemIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings).toHaveLength(0);
+
+    // Desktop layout (.kmn): the whole group is gone.
+    const kmn = vfs.get("source/test_kb.kmn")?.content as string;
+    expect(kmn).not.toContain("[K_Q]");
+    expect(kmn).not.toContain("[K_W]");
+    expect(kmn).toContain("[K_A]");
+
+    // OSK (.kvks): the carved group's keycaps are blanked on EVERY layer —
+    // the .kvks must match the .kmn it ships with — while the kept group's
+    // keycap survives and the layer structure is untouched.
+    const kvks = vfs.get("source/test_kb.kvks")?.content as string;
+    expect(kvks).toContain('<key vkey="K_A">a</key>');
+    expect(kvks).toContain('<key vkey="K_Q"></key>');
+    expect(kvks).toContain('<key vkey="K_W"></key>');
+    expect(kvks).not.toContain(">q</key>");
+    expect(kvks).not.toContain(">Q</key>");
+    expect(kvks).not.toContain(">w</key>");
+    expect(kvks.match(/<layer\b/g)).toHaveLength(2);
   });
 });

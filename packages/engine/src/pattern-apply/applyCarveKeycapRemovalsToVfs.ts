@@ -16,6 +16,7 @@ import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import { parseSlotId, makeSlotId } from "./slotId.js";
 import { classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
+import { resolveCarveCascade } from "./carveCascade.js";
 import { readVfsText, resolveOskAssetPaths, xmlUnescape } from "./oskAssetShared.js";
 import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 import { isPlusSeparator } from "../shared/rule-shape.js";
@@ -29,9 +30,14 @@ export interface CarveKeycapRemovalInput {
   /** Slot ids `"<storeNodeId>#<i>"` already validated against `baseIr.stores`. */
   slotIds: ReadonlySet<string>;
   /**
-   * Whole-node deletion ids. Only RULE nodeIds contribute characters here;
-   * group/store/fragment ids are inert (structural deletions carry no single
-   * character intent) but harmlessly accepted.
+   * Whole-node deletion ids (rule, group, store, fragment nodeIds — the same
+   * id space the .kmn side consumes). Rule ids contribute their all-char
+   * output directly; GROUP ids cascade to their rules via resolveCarveCascade
+   * (the same cascade carveFilterIr/carveViaSplice apply to the .kmn, #1803) —
+   * a group-level carve must blank its rules' keycaps on every layer, exactly
+   * as the .kmn loses the rules. Store/fragment ids carry no single-character
+   * intent (raw fragments are opaque; deleting a store just drops its
+   * declaration) and are inert here.
    */
   wholeNodeIds: ReadonlySet<string>;
   /**
@@ -97,6 +103,13 @@ export function collectCarvedKeycapTexts(
   // --- Candidates ---
   const candidates = new Set<string>();
 
+  // Resolve the carve cascade the same way the .kmn side does
+  // (carveFilterIr/carveViaSplice via resolveCarveCascade): a deleted GROUP
+  // deletes its rules, so a group-level carve contributes its rules'
+  // characters here. Without this the .kmn loses the group's rules while the
+  // .kvks keeps their keycaps (#1803).
+  const cascade = resolveCarveCascade(baseIr, wholeNodeIds);
+
   for (const slotId of slotIds) {
     const parsed = parseSlotId(slotId);
     if (parsed === null) continue;
@@ -109,7 +122,7 @@ export function collectCarvedKeycapTexts(
 
   for (const group of baseIr.groups) {
     for (const rule of group.rules) {
-      if (!wholeNodeIds.has(rule.nodeId)) continue;
+      if (!cascade.deletedRuleIds.has(rule.nodeId)) continue;
       const outEls = rule.output as { kind: string; value?: string }[];
       const charVals = outEls.filter((el) => el.kind === "char").map((el) => el.value ?? "");
       if (charVals.length > 0 && charVals.length === outEls.length) {
@@ -124,14 +137,16 @@ export function collectCarvedKeycapTexts(
   // Producers that survive the carve: rules (and their groups) not deleted,
   // plus char slots not carved on stores those surviving rules still emit
   // through index()/outs(). Input-only stores (any()/notany() matchers) are
-  // NOT producers and never count as survivors.
+  // NOT producers and never count as survivors. The deleted sets here are the
+  // same cascade the .kmn side applies, so a group-level carve never leaves
+  // its own deleted rules counted as survivors.
   const survivors = new Set<string>();
   const outputStoreNames = new Set<string>();
 
   for (const group of baseIr.groups) {
-    if (wholeNodeIds.has(group.nodeId)) continue;
+    if (cascade.deletedGroupIds.has(group.nodeId)) continue;
     for (const rule of group.rules) {
-      if (wholeNodeIds.has(rule.nodeId)) continue;
+      if (cascade.deletedRuleIds.has(rule.nodeId)) continue;
       const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
 
       const charVals = outEls.filter((el) => el.kind === "char").map((el) => el.value ?? "");
@@ -161,7 +176,7 @@ export function collectCarvedKeycapTexts(
 
   for (const name of outputStoreNames) {
     const store = storeByName.get(name);
-    if (store === undefined || wholeNodeIds.has(store.nodeId)) continue;
+    if (store === undefined || cascade.deletedStoreIds.has(store.nodeId)) continue;
     // A blocked store's slots are never actually edited — every char it
     // holds keeps being produced, carved slot ids notwithstanding.
     const blocked = isBlockedStore(store);
