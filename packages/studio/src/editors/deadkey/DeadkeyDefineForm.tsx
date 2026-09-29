@@ -362,7 +362,7 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
       </h2>
 
       <div style={fieldStyle}>
-        <label style={labelStyle}>Trigger key</label>
+        <span style={labelStyle}>Trigger key</span>
         <KeyPickerField
           value={triggerKey}
           onChange={setTriggerKey}

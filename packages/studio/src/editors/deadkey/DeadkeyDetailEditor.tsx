@@ -48,7 +48,6 @@ import {
   findTriggerRules,
   deleteNamedDeadkey,
   retargetNamedDeadkey,
-  namedDeadkeyFragments,
 } from "./deadkeyWrite.ts";
 import {
   DeadkeyConflictDialog,
@@ -99,13 +98,6 @@ const btnStyle: CSSProperties = {
   fontSize: 12,
   color: TEXT_MAIN,
   fontFamily: FONT,
-};
-
-const primaryBtnStyle: CSSProperties = {
-  ...btnStyle,
-  background: "var(--app-accent)",
-  color: "var(--app-text-on-accent)",
-  border: "none",
 };
 
 const dangerBtnStyle: CSSProperties = {
@@ -218,6 +210,18 @@ export function DeadkeyDetailEditor({
   const [sectionError, setSectionError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
 
+  // Host-layout disclosure for the retarget picker (1802 A1–A3, spec 083):
+  // the same per-host consequence rows the define flow shows, so moving the
+  // trigger is an informed choice, not a blind one. (Above the
+  // info-undefined early return — hooks cannot run after it.)
+  const retargetHosts = useMemo(() => {
+    const resolution = resolveKeyPickerSelection(retargetKey, retargetCustomChar);
+    const vkey = resolvedVkeyOf(resolution);
+    const label =
+      retargetKey === "" ? "(no new trigger chosen)" : (vkey ?? retargetCustomChar);
+    return referenceHosts({ key: label, modifiers: [] });
+  }, [retargetKey, retargetCustomChar]);
+
   if (info === undefined) {
     return (
       <div style={sectionStyle}>
@@ -245,17 +249,6 @@ export function DeadkeyDetailEditor({
     info.outputStore !== null;
 
   const clearError = () => setSectionError(null);
-
-  // Host-layout disclosure for the retarget picker (1802 A1–A3, spec 083):
-  // the same per-host consequence rows the define flow shows, so moving the
-  // trigger is an informed choice, not a blind one.
-  const retargetHosts = useMemo(() => {
-    const resolution = resolveKeyPickerSelection(retargetKey, retargetCustomChar);
-    const vkey = resolvedVkeyOf(resolution);
-    const label =
-      retargetKey === "" ? "(no new trigger chosen)" : (vkey ?? retargetCustomChar);
-    return referenceHosts({ key: label, modifiers: [] });
-  }, [retargetKey, retargetCustomChar]);
 
   // -- Pairs ---------------------------------------------------------------
   const handleAddPair = () => {
