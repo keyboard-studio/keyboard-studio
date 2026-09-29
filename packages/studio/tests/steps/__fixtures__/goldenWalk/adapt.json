@@ -99,6 +99,15 @@
     "navigateTo": []
   },
   {
+    "stepId": "rules",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
     "stepId": "mechanisms",
     "applyStepCompletion": [
       "mechanisms"
