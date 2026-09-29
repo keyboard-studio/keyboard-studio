@@ -260,6 +260,12 @@ export function useWorkingCopyTransform(
   // array" contract for keyEditOps.
   const keyEditOps = liveLayoutOverride?.keyEditOps ?? EMPTY_KEY_EDIT_OPS;
 
+  // Deadkey lifecycle overlay (spec 083) — the committed op log, read
+  // straight from the store (deadkey edits are immediate F-10 commits, not
+  // in-progress gallery state, so there is no live-layout distinction to
+  // draw here — unlike keyEditOps above).
+  const deadkeyOps = useWorkingCopyStore((s) => s.deadkeyOverlay.ops);
+
   // Derive the current physical assignments from phaseResults.
   const sessionAssignments = useMemo(
     () => physicalAssignmentsOf(phaseResults),
@@ -302,6 +308,12 @@ export function useWorkingCopyTransform(
   // conservative than strictly necessary) equality check, and the overlay is
   // always small.
   const keyEditOpsKey = useMemo(() => JSON.stringify(keyEditOps), [keyEditOps]);
+
+  // Deadkey overlay key (spec 083) — same primitive-stable discipline as
+  // keyEditOpsKey above: the JSON string goes into the dep array, never the
+  // raw array. Committed ops are append-only and never mutated in place, so
+  // JSON.stringify is a correct equality check, and the log is small.
+  const deadkeyOpsKey = useMemo(() => JSON.stringify(deadkeyOps), [deadkeyOps]);
 
   // Identity display name + Track-1 rename id + bcp47.
   // identityKeyboardId triggers projectWorkingCopyVfs step 4 (rewrites
@@ -387,6 +399,7 @@ export function useWorkingCopyTransform(
         deletedItemIds,
         deletedTouchKeyIds,
         keyEditOps,
+        deadkeyOps,
         assignments: effectiveAssignments,
         getPattern: (id) => patternMap?.get(id),
         identity: identityArg,
@@ -415,6 +428,7 @@ export function useWorkingCopyTransform(
     patternMap,
     touchLayoutJson,
     keyEditOpsKey,
+    deadkeyOpsKey,
     contextToleranceOverlay,
   ]);
 }

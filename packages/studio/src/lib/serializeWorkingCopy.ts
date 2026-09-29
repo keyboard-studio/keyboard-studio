@@ -432,6 +432,9 @@ export async function projectWorkingCopyForOutput(
     identity: identityForProjection,
     touchLayoutJson,
     welcomeFolderFiles,
+    // spec 083: the committed deadkey lifecycle overlay, replayed at step
+    // 1.8 so the download carries the same deadkey edits the preview does.
+    deadkeyOps: state.deadkeyOverlay.ops,
     // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
     // fallback above sets identityForProjection.displayName to this same value,
     // so they compare equal and the base's &NAME store is left byte-identical.

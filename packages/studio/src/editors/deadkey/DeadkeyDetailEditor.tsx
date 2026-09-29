@@ -54,6 +54,8 @@ import {
   DeadkeyConflictDialog,
   type DeadkeyConflictChoice,
 } from "./DeadkeyConflictDialog.tsx";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import type { DeadkeyOperation } from "../../lib/deadkeyOps.ts";
 
 const sectionStyle: CSSProperties = {
   background: BG_CARD,
@@ -195,6 +197,17 @@ export function DeadkeyDetailEditor({
     [ir, deadkeyId, deadkeyName],
   );
 
+  // Deadkey overlay recording (spec 083 step 1.8): every IR commit here is
+  // paired with the DeadkeyOperation(s) that produced it, so
+  // projectWorkingCopyVfs can replay the edits onto the projected VFS —
+  // the working IR itself never reaches artifacts. (Declared here, before
+  // the info-undefined early return below — hooks cannot run after it.)
+  const recordDeadkeyOp = useWorkingCopyStore((s) => s.commitDeadkeyOp);
+  const commitAndRecord = (next: KeyboardIR, ops: DeadkeyOperation[]) => {
+    onCommitIr(next);
+    for (const op of ops) recordDeadkeyOp(op);
+  };
+
   const [newBase, setNewBase] = useState("");
   const [newAccented, setNewAccented] = useState("");
   const [renameIdText, setRenameIdText] = useState("");
@@ -256,7 +269,9 @@ export function DeadkeyDetailEditor({
     }
     try {
       const next = withAddedDeadkeyPair(ir, info.baseStore, info.outputStore, newBase, newAccented);
-      onCommitIr(commitDeadkeyEdit(ir, next));
+      commitAndRecord(commitDeadkeyEdit(ir, next), [
+        { kind: "add-pair", id, base: newBase, accented: newAccented },
+      ]);
       setNewBase("");
       setNewAccented("");
     } catch (e) {
@@ -269,7 +284,7 @@ export function DeadkeyDetailEditor({
     if (id === null || !info.baseStore || !info.outputStore) return;
     try {
       const next = withRemovedDeadkeyPair(ir, info.baseStore, info.outputStore, index);
-      onCommitIr(commitDeadkeyEdit(ir, next));
+      commitAndRecord(commitDeadkeyEdit(ir, next), [{ kind: "remove-pair", id, index }]);
     } catch (e) {
       setSectionError(e instanceof Error ? e.message : String(e));
     }
@@ -287,7 +302,7 @@ export function DeadkeyDetailEditor({
     const result = renameDeadkey(ir, { from: id, to });
     const committed = commitDeadkeyResult(ir, result);
     if (committed.ok) {
-      onCommitIr(committed.ir);
+      commitAndRecord(committed.ir, [{ kind: "rename", from: id, to }]);
       setRenameIdText("");
       if (to !== id) onRenamed(to);
       return;
@@ -310,7 +325,10 @@ export function DeadkeyDetailEditor({
       if (!committed.ok) {
         return `Delete after merge refused: ${committed.conflicts.map((c) => c.message).join(" ")}`;
       }
-      onCommitIr(committed.ir);
+      commitAndRecord(committed.ir, [
+        { kind: "merge-pairs", fromId: from, toId: to },
+        { kind: "delete", id: from },
+      ]);
       onAdoptExisting(to);
       return null;
     } catch (e) {
@@ -329,7 +347,9 @@ export function DeadkeyDetailEditor({
     }
     try {
       const next = withDeadkeyAuthorName(ir, id, name === "" ? undefined : name);
-      onCommitIr(commitDeadkeyEdit(ir, next));
+      commitAndRecord(commitDeadkeyEdit(ir, next), [
+        { kind: "set-name", id, name: name === "" ? undefined : name },
+      ]);
       setNameText(null);
     } catch (e) {
       setSectionError(e instanceof Error ? e.message : String(e));
@@ -375,7 +395,14 @@ export function DeadkeyDetailEditor({
         resolution.kind === "customOk" ? { char: resolution.char } : { vkey },
       );
       if (result.ok) {
-        onCommitIr(commitDeadkeyEdit(ir, result.ir));
+        commitAndRecord(commitDeadkeyEdit(ir, result.ir), [
+          {
+            kind: "retarget-named",
+            name,
+            newTrigger:
+              resolution.kind === "customOk" ? { char: resolution.char } : { vkey },
+          },
+        ]);
         setRetargetKey("");
         setRetargetCustomChar("");
         return;
@@ -390,7 +417,7 @@ export function DeadkeyDetailEditor({
     const result = retargetDeadkey(ir, { id, newTriggerKey: vkey });
     const committed = commitDeadkeyResult(ir, result);
     if (committed.ok) {
-      onCommitIr(committed.ir);
+      commitAndRecord(committed.ir, [{ kind: "retarget", id, newTriggerKey: vkey }]);
       setRetargetKey("");
       setRetargetCustomChar("");
       return;
@@ -417,7 +444,7 @@ export function DeadkeyDetailEditor({
       }
       const result = deleteNamedDeadkey(ir, name);
       if (result.ok) {
-        onCommitIr(commitDeadkeyEdit(ir, result.ir));
+        commitAndRecord(commitDeadkeyEdit(ir, result.ir), [{ kind: "delete-named", name }]);
         onDeleted();
         return;
       }
@@ -440,7 +467,7 @@ export function DeadkeyDetailEditor({
     const result = deleteDeadkey(ir, { id });
     const committed = commitDeadkeyResult(ir, result);
     if (committed.ok) {
-      onCommitIr(committed.ir);
+      commitAndRecord(committed.ir, [{ kind: "delete", id }]);
       onDeleted();
       return;
     }
@@ -477,6 +504,7 @@ export function DeadkeyDetailEditor({
     // Merge pairs first so nothing is lost when the entity goes away —
     // only when both sides have recognizable stores.
     let working = ir;
+    let merged = false;
     const target = listDeadkeys(ir).find((d) => d.id === to);
     if (
       target?.baseStore && target.outputStore &&
@@ -484,6 +512,7 @@ export function DeadkeyDetailEditor({
     ) {
       try {
         working = withMergedDeadkeyPairs(working, from, to);
+        merged = true;
       } catch (e) {
         setSectionError(e instanceof Error ? e.message : String(e));
         return;
@@ -509,7 +538,11 @@ export function DeadkeyDetailEditor({
       }
       return;
     }
-    onCommitIr(committed.ir);
+    commitAndRecord(committed.ir, [
+      ...(merged ? [{ kind: "merge-pairs" as const, fromId: from, toId: to }] : []),
+      { kind: "repoint", fromId: from, toId: to, referrers },
+      { kind: "delete", id: from },
+    ]);
     setDialog(null);
     onDeleted();
   };

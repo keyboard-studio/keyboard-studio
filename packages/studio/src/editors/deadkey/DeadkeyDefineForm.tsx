@@ -31,6 +31,8 @@ import {
 } from "../../lib/galleryTheme.ts";
 import { DEADKEY_OPTIONS, TRIGGER_KEY_CHARS } from "./deadkeyTriggerOptions.ts";
 import { commitDeadkeyResult, hex4 } from "./deadkeyWrite.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import type { DeadkeyOperation } from "../../lib/deadkeyOps.ts";
 import { DeadkeyConflictDialog, type DeadkeyConflictChoice } from "./DeadkeyConflictDialog.tsx";
 import { HostDisclosure } from "./HostDisclosure.tsx";
 import { referenceHosts } from "../../lib/referenceHosts/index.ts";
@@ -163,6 +165,16 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
   const [formError, setFormError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
 
+  // Deadkey overlay recording (spec 083 step 1.8): every IR commit here is
+  // paired with the DeadkeyOperation that produced it, so
+  // projectWorkingCopyVfs can replay the edit onto the projected VFS — the
+  // working IR itself never reaches artifacts.
+  const recordDeadkeyOp = useWorkingCopyStore((s) => s.commitDeadkeyOp);
+  const commitAndRecord = (next: KeyboardIR, op: DeadkeyOperation) => {
+    onCommitIr(next);
+    recordDeadkeyOp(op);
+  };
+
   // Proposed double-tap accent: the trigger's literal character (suggestion
   // key → its character; custom char → itself). Proposed, not imposed — the
   // author can edit it; a manual edit sticks (accentTouched).
@@ -243,7 +255,13 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
     });
     const committed = commitDeadkeyResult(ir, result);
     if (committed.ok) {
-      onCommitIr(committed.ir);
+      commitAndRecord(committed.ir, {
+        kind: "define",
+        triggerKey: resolvedVkey,
+        id,
+        accentChar,
+        ...(name !== "" ? { authorName: name } : {}),
+      });
       onDefined(id);
       return;
     }

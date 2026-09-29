@@ -26,6 +26,8 @@ import {
   FONT,
 } from "../../lib/galleryTheme.ts";
 import { withRepairedDuplicateTriggerIds, commitDeadkeyEdit, hex4 } from "./deadkeyWrite.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import type { DeadkeyOperation } from "../../lib/deadkeyOps.ts";
 
 const headStyle: CSSProperties = {
   display: "flex",
@@ -191,9 +193,14 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
     [ir],
   );
 
+  // Deadkey overlay recording (spec 083 step 1.8): the duplicate-id repair
+  // is an immediate commit, paired with its op so projection can replay it.
+  const recordDeadkeyOp = useWorkingCopyStore((s) => s.commitDeadkeyOp);
   const repairDuplicates = () => {
     const repaired = withRepairedDuplicateTriggerIds(ir);
     onCommitRepair(commitDeadkeyEdit(ir, repaired));
+    const op: DeadkeyOperation = { kind: "repair-duplicate-ids" };
+    recordDeadkeyOp(op);
   };
 
   return (

@@ -107,13 +107,13 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
   const onCommitIr = useCallback(
     (nextIr: KeyboardIR) => {
       // Lifecycle edits land in the working IR (s.ir) via the overlay-
-      // preserving seam — they are saved immediately (F-10), but they do
-      // NOT yet reach preview/download: projectWorkingCopyVfs builds
-      // artifacts from baseIr + overlays and never reads s.ir (see its
-      // step 1.7b comment). Bridging that gap needs a deadkey overlay pass
-      // in the projection (mirroring the key-edit overlay) or a deadkeyOps
-      // projection input — a design decision, not a narrow fix. Tracked
-      // as a known gap for #1849; do not claim artifact persistence.
+      // preserving seam and are saved immediately (F-10). They reach
+      // preview/download through the deadkey overlay, not the working IR:
+      // each Deadkeys-step commit also appends its DeadkeyOperation to
+      // s.deadkeyOverlay.ops, and projectWorkingCopyVfs replays that log at
+      // step 1.8 (see ./deadkeyOps.ts and the useWorkingCopyTransform /
+      // serializeWorkingCopy wiring). The working IR itself is never
+      // emitted into artifacts.
       setWorkingIR(nextIr);
     },
     [setWorkingIR],
