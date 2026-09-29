@@ -111,6 +111,15 @@
     "navigateTo": []
   },
   {
+    "stepId": "deadkeys",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
     "stepId": "mechanisms",
     "applyStepCompletion": [
       "mechanisms"
