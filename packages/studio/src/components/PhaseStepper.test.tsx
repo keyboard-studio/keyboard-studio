@@ -7,6 +7,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseStepper } from "./PhaseStepper.tsx";
+import { manifest } from "../steps/manifest.ts";
 
 describe("PhaseStepper", () => {
   // No global auto-cleanup is registered (see test-setup.ts) — every
@@ -114,7 +115,14 @@ describe("PhaseStepper compact (narrow viewport)", () => {
     const trigger = screen.getByTestId("phase-stepper-compact");
     expect(trigger.textContent).toContain("Phase C");
     expect(trigger.textContent).toContain("Characters");
-    expect(trigger.textContent).toContain("step 5 of 15");
+    // The total is derived from the manifest, not hardcoded: the survey
+    // grows steps over time (spec 083 inserted "deadkeys" between carve and
+    // mechanisms), and CI runs the merge commit with main.
+    const stepNumber =
+      manifest.findIndex((step) => step.id === "characters") + 1;
+    expect(trigger.textContent).toContain(
+      `step ${stepNumber} of ${manifest.length}`,
+    );
   });
 
   it("keeps the desktop pill row at desktop widths", () => {

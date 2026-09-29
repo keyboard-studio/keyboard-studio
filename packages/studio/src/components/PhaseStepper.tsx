@@ -13,7 +13,7 @@
 //
 // Mobile adaptation (Phase 1): on narrow viewports (< 479px) the six
 // pills don't fit, so the stepper renders a compact single-line button —
-// "Phase C · Characters · step 5 of 15" — that opens the shared Dialog with
+// "Phase C · Characters · step 5 of N" — that opens the shared Dialog with
 // the full pill list in a vertical layout. `aria-current="step"` is preserved
 // on the active pill in both branches; the pills stay display-only (gated by
 // real completion state the survey doesn't expose yet — see below).
@@ -201,7 +201,7 @@ function findActivePhaseIndex(activeStepId: string | null): number {
 /**
  * Position of `activeStepId` on the manifest spine (1-based), or -1 when the
  * id isn't a manifest step. The manifest order is the survey's real step
- * order, so "step 5 of 15" in the compact label always matches what the
+ * order, so "step N of M" in the compact label always matches what the
  * author walks through.
  */
 function findStepNumber(activeStepId: string | null): number {
