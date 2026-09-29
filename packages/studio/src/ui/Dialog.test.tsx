@@ -159,3 +159,39 @@ describe("Dialog — frame", () => {
     expect(document.activeElement?.textContent).toBe("First");
   });
 });
+
+describe("Dialog — fullscreen mode (mobile adaptation issue 1853, Phase 4)", () => {
+  it("fills the viewport with no border or radius when fullscreen", () => {
+    render(
+      <Dialog open onCancel={() => {}} label="Full" testId="full1" fullscreen>
+        <button type="button">Content</button>
+      </Dialog>,
+    );
+    const dialog = screen.getByTestId("full1");
+    expect(dialog.style.width).toBe("100vw");
+    expect(dialog.style.height).toBe("100dvh");
+    expect(dialog.style.borderRadius).toBe("0");
+  });
+
+  it("keeps the centered desktop frame by default", () => {
+    render(
+      <Dialog open onCancel={() => {}} label="Centered" testId="center1">
+        <button type="button">Content</button>
+      </Dialog>,
+    );
+    const dialog = screen.getByTestId("center1");
+    expect(dialog.style.width).not.toBe("100vw");
+    expect(dialog.style.height).not.toBe("100dvh");
+  });
+
+  it("fullscreen keeps the shared close, Escape, and backdrop behavior", () => {
+    const onCancel = vi.fn();
+    render(
+      <Dialog open onCancel={onCancel} label="Full" testId="full2" fullscreen showCloseButton closeLabel="Close it">
+        <button type="button">Content</button>
+      </Dialog>,
+    );
+    fireEvent.click(screen.getByLabelText("Close it"));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+});

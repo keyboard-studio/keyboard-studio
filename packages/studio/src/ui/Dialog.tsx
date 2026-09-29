@@ -63,6 +63,13 @@ export interface DialogProps {
   readonly initialFocus?: "first" | "none";
   /** Backdrop z-index; the dialog sits one above. Default 299 (the key-grid dialogs' value). */
   readonly zIndex?: number;
+  /**
+   * Full-viewport variant for narrow-viewport modals (mobile adaptation
+   * issue 1853, Phase 4 — the sequence builder). The frame fills the
+   * viewport instead of centering; desktop callers leave this off and see
+   * byte-identical frames.
+   */
+  readonly fullscreen?: boolean;
 }
 
 const BACKDROP_BG = "color-mix(in srgb, var(--sil-black) 50%, transparent)";
@@ -82,6 +89,7 @@ export function Dialog({
   closeLabel,
   initialFocus = "first",
   zIndex = 299,
+  fullscreen = false,
 }: DialogProps) {
   const dialogRef = useRef<HTMLFormElement | HTMLDivElement | null>(null);
 
@@ -128,31 +136,54 @@ export function Dialog({
     }
   }
 
-  const frameStyle = {
-    position: "fixed",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    zIndex: zIndex + 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-    padding: 16,
-    // The opt-in close button occupies the frame's top-right corner; give
-    // content room so the first row never slides underneath it.
-    paddingTop: showCloseButton ? 48 : 16,
-    // Both bounds clamp to 92vw: on a phone narrower than `minWidth` px the
-    // CSS min-width would otherwise win over max-width and overflow.
-    minWidth: `min(${minWidth}px, 92vw)`,
-    maxWidth: `min(${maxWidth}px, 92vw)`,
-    maxHeight: "80vh",
-    overflowY: "auto",
-    background: BG_CARD,
-    border: `1px solid ${BORDER}`,
-    borderRadius: 8,
-    fontFamily: FONT,
-    boxShadow: DIALOG_SHADOW,
-  } as const;
+  const frameStyle = fullscreen
+    ? ({
+        position: "fixed",
+        inset: 0,
+        zIndex: zIndex + 1,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        padding: 16,
+        // The opt-in close button occupies the frame's top-right corner; give
+        // content room so the first row never slides underneath it.
+        paddingTop: showCloseButton ? 48 : 16,
+        width: "100vw",
+        // dvh so a phone's collapsing browser chrome doesn't strand content
+        // below the fold.
+        height: "100dvh",
+        overflowY: "auto",
+        background: BG_CARD,
+        border: "none",
+        borderRadius: 0,
+        fontFamily: FONT,
+        boxSizing: "border-box",
+      } as const)
+    : ({
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        zIndex: zIndex + 1,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        padding: 16,
+        // The opt-in close button occupies the frame's top-right corner; give
+        // content room so the first row never slides underneath it.
+        paddingTop: showCloseButton ? 48 : 16,
+        // Both bounds clamp to 92vw: on a phone narrower than `minWidth` px the
+        // CSS min-width would otherwise win over max-width and overflow.
+        minWidth: `min(${minWidth}px, 92vw)`,
+        maxWidth: `min(${maxWidth}px, 92vw)`,
+        maxHeight: "80vh",
+        overflowY: "auto",
+        background: BG_CARD,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 8,
+        fontFamily: FONT,
+        boxShadow: DIALOG_SHADOW,
+      } as const);
 
   const closeButton = showCloseButton ? (
     <button

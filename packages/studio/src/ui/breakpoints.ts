@@ -15,7 +15,13 @@ export const BREAKPOINTS = {
   mobileMax: 479,
   /** Small tablet / large phone: two-pane collapses that need more room. */
   tabletMax: 768,
+  /**
+   * Scarce height: viewports at or below this height get compact vertical
+   * treatment (viewport-relative OSK sizing, side-docked sheets). The
+   * design-level reason is the landscape phone (844×390 class): width is
+   * plentiful so it is NOT narrow, but 390px of height cannot fit a 560px
+   * keyboard plus chrome. 500px clears every common landscape-phone height
+   * with margin.
+   */
+  shortHeightMax: 500,
 } as const;
-
-/** One of the keys of {@link BREAKPOINTS}. */
-export type BreakpointName = keyof typeof BREAKPOINTS;

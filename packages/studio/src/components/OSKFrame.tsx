@@ -14,6 +14,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { BREAKPOINTS } from "../ui/breakpoints.ts";
+import { useViewport } from "../hooks/useViewport.ts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { useOskChannel } from "../hooks/useOskChannel.ts";
@@ -34,6 +36,26 @@ export interface OSKFrameProps {
   onKeyTap?: (keyId: string) => void;
 }
 
+/**
+ * Viewport-relative OSK sizing (mobile adaptation issue 1853, Phase 4).
+ *
+ * The desktop frame is a fixed 560px — untouched. On narrow viewports and
+ * scarce heights (landscape phones) the iframe shrinks to fit the viewport
+ * instead of pushing chrome off-screen: `min(560, max(240, vh - chrome))`.
+ *
+ * `OSK_VIEWPORT_CHROME_PX` reserves room for the chrome the keyboard shares
+ * the viewport with: ~88px in the PreviewSheet (header + content padding),
+ * ~118px in the landscape two-pane (gallery header + bottom tab bar). 120px
+ * covers both with a small margin. It is an estimate, not a measurement —
+ * the 240px floor keeps the keyboard usable when the estimate overshoots on
+ * very short viewports.
+ */
+const OSK_VIEWPORT_CHROME_PX = 120;
+/** Floor so the keyboard never collapses below a usable height. */
+const OSK_MIN_HEIGHT_PX = 240;
+/** The long-standing desktop frame height — unchanged. */
+const OSK_DESKTOP_HEIGHT_PX = 560;
+
 export function OSKFrame({
   baseKeyboard,
   oskMode,
@@ -45,6 +67,19 @@ export function OSKFrame({
   const { t } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useOskChannel(iframeRef, onKeyTap);
+  // Viewport-relative sizing: narrow or scarce-height viewports shrink the
+  // frame to fit instead of overflowing (mockup 6). Measured from the
+  // viewport hook — not CSS dvh — so the value is deterministic in tests and
+  // updates live on rotation. Desktop viewports keep the fixed 560px frame.
+  const viewport = useViewport();
+  const compactHeight =
+    viewport.isNarrow || viewport.height <= BREAKPOINTS.shortHeightMax;
+  const frameHeightPx = compactHeight
+    ? Math.min(
+        OSK_DESKTOP_HEIGHT_PX,
+        Math.max(OSK_MIN_HEIGHT_PX, viewport.height - OSK_VIEWPORT_CHROME_PX),
+      )
+    : OSK_DESKTOP_HEIGHT_PX;
   // Working-copy identity drives the bcp47 language tag passed to KMW's
   // setActiveKeyboard — Track 1 (Copy) supplies the author-chosen language,
   // Track 2 (Adapt) leaves it null and we fall back to the base's first
@@ -146,7 +181,7 @@ export function OSKFrame({
       style={{
         position: "relative",
         width: "100%",
-        minHeight: 380,
+        minHeight: compactHeight ? OSK_MIN_HEIGHT_PX : 380,
         borderRadius: 12,
         overflow: "hidden",
         border: "1px solid var(--app-border)",
@@ -169,7 +204,7 @@ export function OSKFrame({
         sandbox="allow-scripts allow-same-origin"
         style={{
           width: "100%",
-          height: 560,
+          height: frameHeightPx,
           border: "0",
           display: "block",
           // Unified with the app surface (epic #533). Was a one-off near-black

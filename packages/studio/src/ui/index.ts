@@ -27,7 +27,6 @@ export type { BadgeTone } from "./Badge.tsx";
 export type { DialogProps } from "./Dialog.tsx";
 export type { ResponsiveSplitProps } from "./ResponsiveSplit.tsx";
 export type { SwitchProps } from "./Switch.tsx";
-export type { BreakpointName } from "./breakpoints.ts";
 export type { RadioOption } from "./RadioGroup.tsx";
 export type { MultiSelectOption } from "./MultiSelect.tsx";
 export type { SelectMenuOption } from "./SelectMenu.tsx";
