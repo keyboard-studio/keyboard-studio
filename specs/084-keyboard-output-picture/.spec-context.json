@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Keyboard output picture",
   "branch": "084-keyboard-output-picture",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "plan",
+  "status": "planned",
   "history": [
     {
       "step": "specify",
@@ -11,7 +11,74 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-09-29T05:28:27.215Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T06:38:10.917Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T06:40:31.162Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-29T06:40:31.734Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-29T06:41:01.515Z"
     }
   ],
-  "telemetryInstanceId": "d0e85391-6c3f-4560-bd61-fabebc125b0f"
+  "telemetryInstanceId": "d0e85391-6c3f-4560-bd61-fabebc125b0f",
+  "approach": "Move generated Windows base keyboard tables into a contracts subpath with families, key sets and mnemonic associations; add pure engine views (buildDefinedComboMap, computeOutputPicture, computeHandlingSet) that diff the carved IR against the starting point over the likely base keyboards; wrap them in one memoised studio hook outside D3 and feed the selected base keyboard to the KeymanWeb test pane by postMessage.",
+  "decisions": [
+    {
+      "decision": "Base keyboard data moves to @keyboard-studio/contracts/host-layouts (subpath only)",
+      "why": "engine and facet-index need it and engine may not import studio",
+      "rejected": "keep in studio / barrel export"
+    },
+    {
+      "decision": "New buildDefinedComboMap walker keyed on last vkey, all output kinds, AltGr equivalence set, uncertain for context/guards/raw",
+      "why": "buildComboKeyMap drops deadkey/nul/beep rules and uses first vkey, giving false leaks",
+      "rejected": "extend buildComboKeyMap"
+    },
+    {
+      "decision": "Handling set computed as pure engine views wrapped in a memo outside D3",
+      "why": "no diagnostics, so D3 does not govern it; testable against corpus",
+      "rejected": "compute in projectWorkingCopyVfs or inside D3"
+    },
+    {
+      "decision": "Single-value layout_family plus a combine-QWERTY+QWERTZ toggle in the carve step",
+      "why": "only QWERTY and QWERTZ combine; stays inside an existing manifest step",
+      "rejected": "multi-select layout_family / new manifest step"
+    },
+    {
+      "decision": "Market mapping ships empty; union-of-keys fallback",
+      "why": "every entry must cite a source and none exist yet",
+      "rejected": "seed from general knowledge"
+    },
+    {
+      "decision": "Test pane gets SET_BASE_LAYOUT postMessage into osk-frame.js; engine simulate gets optional fallback",
+      "why": "the pane authors use is real KeymanWeb; engine baseLayout option is never read",
+      "rejected": "engine simulator only"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan for spec 084: contracts host-layouts subpath, engine output-picture views, memoised studio hook, test-pane base keyboard; 5 stories phased one per conversation after PR #1854 merges",
+      "key_finding": "The test pane is real KeymanWeb in an iframe and the engine simulator ignores baseLayout, so base keyboard fallback needs a frame message, not a simulator flag"
+    }
+  }
 }
