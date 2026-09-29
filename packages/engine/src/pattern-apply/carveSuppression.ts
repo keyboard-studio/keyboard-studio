@@ -1,4 +1,4 @@
-// Carve-suppression behaviour compiler (spec 076, issue #1802,
+// Carve-suppression behaviour compiler (spec 076,
 // FR-019 / FR-020 / FR-021; ruling §§2–6, 10).
 //
 // Takes the PRE-carve IR (carved rules AND carved store slots still present)
@@ -452,10 +452,11 @@ export function restoreCarveSuppression(
 
     // Then swap rewritten rules back by nodeId (positions never moved).
     for (const restoration of groupRestorations.filter((r) => r.kind === "rewritten")) {
-      if (restoration.originalRule === undefined) continue;
-      const at = rules.findIndex((r) => r.nodeId === restoration.originalRule!.nodeId);
-      if (at !== -1) rules[at] = restoration.originalRule;
-      else rules.splice(Math.min(restoration.index, rules.length), 0, restoration.originalRule);
+      const originalRule = restoration.originalRule;
+      if (originalRule === undefined) continue;
+      const at = rules.findIndex((r) => r.nodeId === originalRule.nodeId);
+      if (at !== -1) rules[at] = originalRule;
+      else rules.splice(Math.min(restoration.index, rules.length), 0, originalRule);
     }
 
     group.rules = rules;

@@ -1,5 +1,5 @@
 // carveDispositionCopy — shared binding copy for the 076 carve
-// allow/block disposition (issue #1802, amendments A1/A2).
+// allow/block disposition (spec 076 amendments A1/A2).
 //
 // A1 required copy — symmetric risk statements, one per option. Each option
 // states its OWN risk; the retired one-sided allow/block slogan (the version

@@ -1,4 +1,4 @@
-// Tests for workingCopyStore's carve-disposition slice (076 FR-022, issue #1802).
+// Tests for workingCopyStore's carve-disposition slice (076 FR-022).
 //
 // Coverage:
 //   1. Initial state: closedKeyboardCard null, carveDispositions empty.

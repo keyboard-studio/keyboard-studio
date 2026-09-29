@@ -1927,7 +1927,7 @@ function targetScriptIsLatin(bcp47: string | null | undefined): boolean {
 }
 
 /**
- * 076 FR-022 / issue #1802 (T016): the `sparseLatinOverlay` input to
+ * 076 FR-022 (T016): the `sparseLatinOverlay` input to
  * `workingCopyStore.prefillCarveDispositions`.
  *
  * The store's contract documents `sparseLatinOverlay` as "true for a sparse

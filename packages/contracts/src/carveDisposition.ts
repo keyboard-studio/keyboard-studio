@@ -1,5 +1,5 @@
 /**
- * The author's per-carved-combination allow/block choice (issue #1802).
+ * The author's per-carved-combination allow/block choice.
  *
  * Lives in the studio working-copy store, never in the IR or the emitted
  * keyboard. One record per carved combination, keyed by `comboId` (the

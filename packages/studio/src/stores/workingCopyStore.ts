@@ -251,7 +251,7 @@ export type InstantiationMode = "new-from-base" | "adapt-existing" | null;
 
 /**
  * The 076 closed-keyboard card's decision (User Story 1, FR-005) — the bulk
- * control for the two-tier allow/block choice (FR-019, issue #1802).
+ * control for the two-tier allow/block choice (FR-019).
  *
  * - `"accepted"`: the author closed the keyboard; undefined keys (and carved
  *   combos, by default) are swallowed rather than falling through to the host
@@ -573,7 +573,7 @@ export interface WorkingCopyState {
    */
   closedKeyboardCard: ClosedKeyboardCardDecision | null;
   /**
-   * Per-carved-combination allow/block dispositions (076 FR-022, issue #1802).
+   * Per-carved-combination allow/block dispositions (076 FR-022).
    * Keyed by `comboId` (the carve-node id: rule nodeId, or
    * `<storeNodeId>#<index>` for slot carves — data-model.md "CarveDisposition").
    *
@@ -1442,7 +1442,7 @@ const INITIAL_STATE: WorkingCopyData = {
   deletedItemIds: new Set(),
   deletedTouchKeyIds: new Set(),
   undoStack: [],
-  // closed-keyboard card + carve dispositions (076 FR-005/FR-022, issue #1802):
+  // closed-keyboard card + carve dispositions (076 FR-005/FR-022):
   // card unanswered, no carve decisions yet
   closedKeyboardCard: null,
   carveDispositions: [],

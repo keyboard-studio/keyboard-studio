@@ -1,5 +1,5 @@
 // Tests for compileCarveSuppression — the carve-suppression behaviour compiler
-// (spec 076, issue #1802, FR-019 / FR-020 / FR-021; ruling §§2–6, 10).
+// (spec 076, FR-019 / FR-020 / FR-021; ruling §§2–6, 10).
 //
 // TDD contract (T008): these tests FAIL until T009 implements
 // `./carveSuppression.js`. They pin the exact contract T009 must satisfy.

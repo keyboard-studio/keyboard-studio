@@ -1,5 +1,5 @@
 // Layer B shadowing audit for carve-suppression synthesis
-// (spec 076, issue #1802, FR-021; task T021).
+// (spec 076, FR-021; task T021).
 //
 // AUDIT METHODOLOGY
 // -----------------

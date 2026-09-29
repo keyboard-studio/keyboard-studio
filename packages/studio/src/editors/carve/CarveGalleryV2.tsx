@@ -450,7 +450,7 @@ function RecommendedGroupCard({
 }
 
 // ---------------------------------------------------------------------------
-// Per-row Allow/Block disposition control (076 FR-022, issue #1802 T016,
+// Per-row Allow/Block disposition control (076 FR-022, T016,
 // amendments A1/A2).
 //
 // Every recommended (carve-candidate) row visibly exposes the allow/block

@@ -1,5 +1,5 @@
 // Stub-enumeration tests for the FR-005 `swallowUndefined` skip-set seam
-// (spec 076, issue #1802, T014).
+// (spec 076, T014).
 //
 // `swallowUndefined` itself is NOT built here — full FR-005 is future work.
 // These tests pin the contract it will consume: for each representative

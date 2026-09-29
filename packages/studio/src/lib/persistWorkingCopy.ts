@@ -339,8 +339,8 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
-    // Closed-keyboard card + carve dispositions (076 FR-005/FR-022, issue
-    // #1802): plain JSON-safe data, straight passthrough like axisFills
+    // Closed-keyboard card + carve dispositions (076 FR-005/FR-022): plain
+    // JSON-safe data, straight passthrough like axisFills
     // above. The read side is the tolerant half: a snapshot written before
     // these fields existed reads as "card unanswered, no decisions".
     closedKeyboardCard: s.closedKeyboardCard,

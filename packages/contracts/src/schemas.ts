@@ -105,7 +105,7 @@ export const RemovalCapabilitySchema = z.enum([
 ]);
 
 // ---------------------------------------------------------------------------
-// CarveDisposition (issue #1802, specs/076-rule-behaviours) — the author's
+// CarveDisposition (specs/076-rule-behaviours) — the author's
 // per-carved-combination allow/block choice, keyed by comboId.
 // ---------------------------------------------------------------------------
 
@@ -953,7 +953,7 @@ type _TestVectorGuard = Expect<AssignableTo<z.infer<typeof TestVectorSchema>, Te
 type _DemoObjectGuard = Expect<AssignableTo<z.infer<typeof DemoObjectSchema>, DemoObject>>;
 type _CriterionGuard = Expect<AssignableTo<z.infer<typeof CriterionSchema>, Criterion>>;
 type _RemovalCapabilityGuard = Expect<AssignableTo<z.infer<typeof RemovalCapabilitySchema>, RemovalCapability>>;
-// CarveDisposition (issue #1802). Provenance is informational but the union is
+// CarveDisposition. Provenance is informational but the union is
 // closed, so pin all three members of the record.
 type _CarveDispositionGuard = Expect<
   AssignableTo<z.infer<typeof CarveDispositionSchema>, CarveDisposition>

@@ -1,5 +1,5 @@
 // E2E: carve allow/block disposition flows (spec 076 FR-005/FR-022/FR-023,
-// issue #1802 amendments A1/A2/A3.1, task T023).
+// spec 076 amendments A1/A2/A3.1, task T023).
 //
 // Two flows through the real survey walk to the v2 carve gallery:
 //   1. Sparse Latin overlay (sil_euro_latin, script Latn): recommended rows

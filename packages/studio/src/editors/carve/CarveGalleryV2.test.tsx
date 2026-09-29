@@ -856,7 +856,7 @@ describe('CarveGalleryV2 — layout_family question (T025)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// T016 — per-row Allow/Block disposition control (076 FR-022, #1802 A1/A2).
+// T016 — per-row Allow/Block disposition control (076 FR-022, A1/A2).
 // Every recommended (carve-candidate) row visibly exposes the choice;
 // pre-fill comes from the store (closed-keyboard card / FR-005 proposal)
 // with provenance; flips write author-override in place.

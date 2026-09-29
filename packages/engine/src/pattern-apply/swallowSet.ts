@@ -1,4 +1,4 @@
-// The FR-005 `swallowUndefined` skip-set seam (spec 076, issue #1802, T014).
+// The FR-005 `swallowUndefined` skip-set seam (spec 076, T014).
 //
 // `swallowUndefined` itself is NOT built here — full FR-005 is future work.
 // This module pins the contract it will consume when it recomputes: which

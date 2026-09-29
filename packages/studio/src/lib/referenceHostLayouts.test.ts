@@ -1,4 +1,4 @@
-// Tests for referenceHostLayouts.ts (spec 076 FR-023, issue #1802 A3/A3.1).
+// Tests for referenceHostLayouts.ts (spec 076 FR-023, A3/A3.1).
 
 import { describe, it, expect } from 'vitest';
 import {

@@ -1,6 +1,6 @@
 /**
  * referenceHostLayouts — reference physical-layout data for host-leak demonstration
- * (spec 076, FR-023; issue #1802 amendments A3/A3.1).
+ * (spec 076, FR-023; amendments A3/A3.1).
  *
  * WHAT THIS IS
  * ------------
@@ -205,9 +205,9 @@ const AZERTY_SHIFT: Record<string, HostCell> = {
   K_HYPHEN: "°", K_EQUAL: "+",
   K_Q: "A", K_W: "Z", K_E: "E", K_R: "R", K_T: "T", K_Y: "Y",
   K_U: "U", K_I: "I", K_O: "O", K_P: "P",
-  K_LBRKT: DEADKEY, K_RBRKT: "*",
+  K_LBRKT: DEADKEY, K_RBRKT: "£",
   K_A: "Q", K_S: "S", K_D: "D", K_F: "F", K_G: "G", K_H: "H",
-  K_J: "J", K_K: "K", K_L: "L", K_COLON: "?", K_QUOTE: "%",
+  K_J: "J", K_K: "K", K_L: "L", K_COLON: "M", K_QUOTE: "%",
   K_Z: "W", K_X: "X", K_C: "C", K_V: "V", K_B: "B", K_N: "N",
   K_M: "?", K_COMMA: ".", K_PERIOD: "/", K_SLASH: "§",
 };
