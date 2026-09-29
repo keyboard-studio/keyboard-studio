@@ -1927,6 +1927,22 @@ function targetScriptIsLatin(bcp47: string | null | undefined): boolean {
 }
 
 /**
+ * 076 FR-022 / issue #1802 (T016): the `sparseLatinOverlay` input to
+ * `workingCopyStore.prefillCarveDispositions`.
+ *
+ * The store's contract documents `sparseLatinOverlay` as "true for a sparse
+ * Latin overlay, false for a non-Latin script base" — at carve time the
+ * only signal the gallery can read is the target script, so this is the
+ * target-script-is-Latin predicate above, exported for the carve gallery's
+ * pre-fill. It fails open to Latin (see `targetScriptIsLatin`): on an
+ * unknown script the FR-005 proposal leans allow-host rather than
+ * spuriously blocking.
+ */
+export function isSparseLatinOverlayTarget(bcp47: string | null | undefined): boolean {
+  return targetScriptIsLatin(bcp47);
+}
+
+/**
  * True iff `ch` is a base ASCII Latin letter surfacing ONLY because of
  * desktop base-layout fall-through (spec 040) on a keyboard whose TARGET
  * script is not Latin — e.g. a Russian (Cyrillic) keyboard whose base layer

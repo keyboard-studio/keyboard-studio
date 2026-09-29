@@ -24,7 +24,7 @@ import { messages as frMessages } from '../../locales/fr/messages.json?lingui';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, PlacementWorklist } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
 import { basicKbdus } from '@keyboard-studio/contracts/fixtures';
-import { CarveGalleryV2 } from './CarveGalleryV2.tsx';
+import { CarveGalleryV2, DISPOSITION_COPY } from './CarveGalleryV2.tsx';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import type { CharContributors } from '@keyboard-studio/engine';
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
@@ -245,7 +245,7 @@ describe('CarveGalleryV2 — removed-characters dropdown', () => {
     fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
     fireEvent.click(screen.getByRole('button', { name: '1 — U+0031' }));
 
-    const trigger = screen.getByRole('button', { name: /removed/i });
+    const trigger = screen.getByRole('button', { name: /^\d+ removed$/i });
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
 
     fireEvent.click(trigger);
@@ -275,7 +275,7 @@ describe('CarveGalleryV2 — removed-characters dropdown', () => {
     fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
     fireEvent.click(screen.getByRole('button', { name: 'C — U+0043' }));
 
-    fireEvent.click(screen.getByRole('button', { name: /removed/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^\d+ removed$/i }));
     fireEvent.click(screen.getByRole('button', { name: /restore all/i }));
 
     expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
@@ -852,5 +852,158 @@ describe('CarveGalleryV2 — layout_family question (T025)', () => {
     // The section is a direct gallery-level band, not nested inside any
     // character row/group card.
     expect(section.closest('[data-testid="carve-gallery"]')).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T016 — per-row Allow/Block disposition control (076 FR-022, #1802 A1/A2).
+// Every recommended (carve-candidate) row visibly exposes the choice;
+// pre-fill comes from the store (closed-keyboard card / FR-005 proposal)
+// with provenance; flips write author-override in place.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — row disposition control (T016)', () => {
+  function injectRows() {
+    neededCharsResult.set(new Set());
+    recommendedRemovalCharsMock.mockReturnValueOnce([
+      makeRow('a', ['r-a']),
+      makeRow('1', ['r-1']),
+    ]);
+  }
+
+  it('renders a visible Allow/Block control on every recommended row', async () => {
+    mockFixtureContributors();
+    injectRows();
+    renderGalleryV2(makeFixtureIR());
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    const controls = within(suggestedGroup).getAllByTestId('carve-disposition-control');
+    expect(controls).toHaveLength(2);
+
+    for (const control of controls) {
+      // Visible without expanding the row: in the DOM, not behind a disclosure.
+      expect(within(control).getByRole('button', { name: 'Allow' })).not.toBeNull();
+      expect(within(control).getByRole('button', { name: 'Block' })).not.toBeNull();
+      // The A1 prompt labels the choice.
+      expect(within(control).getByText('Do your typists expect a character on this key?')).not.toBeNull();
+    }
+  });
+
+  it('pre-fills from the closed-keyboard card with provenance label (spec scenario: card accepted → Block)', async () => {
+    mockFixtureContributors();
+    injectRows();
+    // Instantiate, answer the card, THEN render — so the gallery's pre-fill
+    // effect runs with the card decision in place (mirrors the real flow;
+    // renderGalleryV2 would clear the card via instantiateFromExisting).
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    act(() => {
+      useWorkingCopyStore.getState().setClosedKeyboardCard('accepted');
+    });
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    const controls = within(suggestedGroup).getAllByTestId('carve-disposition-control');
+    expect(controls).toHaveLength(2);
+    for (const control of controls) {
+      expect(within(control).getByRole('button', { name: 'Block' }).getAttribute('aria-pressed')).toBe('true');
+      expect(within(control).getByRole('button', { name: 'Allow' }).getAttribute('aria-pressed')).toBe('false');
+      expect(within(control).getByText('from closed-keyboard card')).not.toBeNull();
+      // The selected option's risk statement is visible.
+      expect(within(control).getByText('Key reliably does nothing, but becomes inaccessible/dead if typists expected a character.')).not.toBeNull();
+    }
+
+    const disps = useWorkingCopyStore.getState().getCarveDispositions(['r-a', 'r-1']);
+    expect(disps).toHaveLength(2);
+    for (const d of disps) {
+      expect(d.disposition).toBe('block');
+      expect(d.provenance).toBe('closed-keyboard-card');
+    }
+  });
+
+  it('pre-fills from the FR-005 proposal with bulk-default provenance when the card is unanswered', async () => {
+    mockFixtureContributors();
+    injectRows();
+    renderGalleryV2(makeFixtureIR());
+
+    const [control] = await screen.findAllByTestId('carve-disposition-control');
+    expect(within(control!).getByText('bulk default')).not.toBeNull();
+
+    const disp = useWorkingCopyStore.getState().getCarveDispositions(['r-a'])[0];
+    expect(disp).toBeDefined();
+    expect(disp.provenance).toBe('bulk-default');
+    // The pressed option matches the stored disposition.
+    const pressedName = disp.disposition === 'block' ? 'Block' : 'Allow';
+    expect(within(control!).getByRole('button', { name: pressedName }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('flipping a row writes author-override provenance and updates the UI immediately; the other row is untouched', async () => {
+    mockFixtureContributors();
+    injectRows();
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    act(() => {
+      useWorkingCopyStore.getState().setClosedKeyboardCard('accepted');
+    });
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    const [firstControl, secondControl] = within(suggestedGroup).getAllByTestId('carve-disposition-control');
+
+    fireEvent.click(within(firstControl!).getByRole('button', { name: 'Allow' }));
+
+    const first = useWorkingCopyStore.getState().getCarveDispositions(['r-a'])[0]!;
+    expect(first.disposition).toBe('allow-host');
+    expect(first.provenance).toBe('author-override');
+    // UI reflects immediately.
+    expect(within(firstControl!).getByRole('button', { name: 'Allow' }).getAttribute('aria-pressed')).toBe('true');
+    expect(within(firstControl!).getByText('your override')).not.toBeNull();
+    expect(within(firstControl!).getByText('Key does something, but output varies by computer.')).not.toBeNull();
+
+    // The other row keeps its pre-filled disposition and provenance.
+    const second = useWorkingCopyStore.getState().getCarveDispositions(['r-1'])[0]!;
+    expect(second.disposition).toBe('block');
+    expect(second.provenance).toBe('closed-keyboard-card');
+    expect(within(secondControl!).getByRole('button', { name: 'Block' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('clicking the already-selected option is a no-op (provenance is not rewritten)', async () => {
+    mockFixtureContributors();
+    injectRows();
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    act(() => {
+      useWorkingCopyStore.getState().setClosedKeyboardCard('accepted');
+    });
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+
+    const [control] = await screen.findAllByTestId('carve-disposition-control');
+    fireEvent.click(within(control!).getByRole('button', { name: 'Block' }));
+
+    const disp = useWorkingCopyStore.getState().getCarveDispositions(['r-a'])[0]!;
+    expect(disp.disposition).toBe('block');
+    expect(disp.provenance).toBe('closed-keyboard-card');
+  });
+
+  it('the retired one-sided slogan appears nowhere in the gallery or the copy block', async () => {
+    mockFixtureContributors();
+    injectRows();
+    renderGalleryV2(makeFixtureIR());
+    await screen.findAllByTestId('carve-disposition-control');
+
+    const rendered = document.body.textContent ?? '';
+    expect(rendered).not.toMatch(/allow means unpredictable/i);
+    expect(rendered).not.toMatch(/block means predictable/i);
+
+    const copyText = [
+      DISPOSITION_COPY.prompt,
+      DISPOSITION_COPY.allowLabel,
+      DISPOSITION_COPY.blockLabel,
+      DISPOSITION_COPY.allowRisk,
+      DISPOSITION_COPY.blockRisk,
+      ...Object.values(DISPOSITION_COPY.provenanceLabel),
+    ].join(' ');
+    expect(copyText).not.toMatch(/allow means unpredictable/i);
+    expect(copyText).not.toMatch(/block means predictable/i);
   });
 });

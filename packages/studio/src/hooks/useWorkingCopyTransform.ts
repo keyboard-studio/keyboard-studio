@@ -227,6 +227,12 @@ export function useWorkingCopyTransform(
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
+  // T015: carve dispositions for the suppression stage (FR-019), read from
+  // the working-copy store. Scoped to the live carve set so stale
+  // dispositions never rewrite uncarved rules; projectWorkingCopyVfs scopes
+  // them again as a backstop. A6 loud/soft (FR-009) has no UI yet — the
+  // suppression stage defaults to soft (loud: false).
+  const getCarveDispositions = useWorkingCopyStore((s) => s.getCarveDispositions);
   const identity = useWorkingCopyStore((s) => s.identity);
   // Assignments: physical only (touch is projected via touchLayoutJson below).
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -303,6 +309,18 @@ export function useWorkingCopyTransform(
   // always small.
   const keyEditOpsKey = useMemo(() => JSON.stringify(keyEditOps), [keyEditOps]);
 
+  // Carve dispositions key (T015, FR-019) — primitive-stable so the main
+  // useMemo doesn't fire on reference churn. The dispositions themselves are
+  // read from the store inside the main useMemo via getCarveDispositions,
+  // scoped to the live carve set.
+  const carveDispositionsKey = useMemo(
+    () =>
+      JSON.stringify(
+        getCarveDispositions([...deletedNodeIds, ...deletedItemIds]),
+      ),
+    [getCarveDispositions, deletedNodeIds, deletedItemIds],
+  );
+
   // Identity display name + Track-1 rename id + bcp47.
   // identityKeyboardId triggers projectWorkingCopyVfs step 4 (rewrites
   // `.kmw-keyboard-<baseId>` selectors and renames siblings) when it differs
@@ -378,6 +396,14 @@ export function useWorkingCopyTransform(
           ? identityKeyboardId
           : undefined;
 
+      // T015: carve dispositions for the suppression stage (FR-019), scoped to
+      // the live carve set. projectWorkingCopyVfs scopes them again as a
+      // backstop. A6 loud/soft (FR-009) has no UI yet — soft (loud: false).
+      const carveDispositions = getCarveDispositions([
+        ...deletedNodeIds,
+        ...deletedItemIds,
+      ]);
+
       const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
         vfs,
         keyboardId,
@@ -386,6 +412,7 @@ export function useWorkingCopyTransform(
         deletedNodeIds,
         deletedItemIds,
         deletedTouchKeyIds,
+        ...(carveDispositions.length > 0 ? { carveDispositions } : {}),
         keyEditOps,
         assignments: effectiveAssignments,
         getPattern: (id) => patternMap?.get(id),
@@ -407,6 +434,7 @@ export function useWorkingCopyTransform(
     storeBaseKeyboardId,
     storeBaseDisplayName,
     deletedKey,
+    carveDispositionsKey,
     assignmentsKey,
     identityDisplayName,
     identityKeyboardId,

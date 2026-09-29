@@ -70,6 +70,7 @@
 
 import type { KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import type { CarveDisposition } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import {
   applyCarveToVfs,
@@ -93,6 +94,7 @@ import {
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
+import type { ApplyCarveToVfsResult } from "@keyboard-studio/engine";
 import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
@@ -150,6 +152,19 @@ export interface ProjectWorkingCopyVfsInput {
   deletedNodeIds: ReadonlySet<string>;
   /** Individual rule nodeIds (and store-slot ids) removed via character-level carving. */
   deletedItemIds?: ReadonlySet<string>;
+  /**
+   * Carve dispositions (T015, FR-019) for the suppression stage. The caller
+   * (useWorkingCopyTransform) reads them from the working-copy store's
+   * `getCarveDispositions`. They are scoped to the live carve set here, so a
+   * stale disposition can never rewrite an uncarved rule. Empty/omitted
+   * degrades to the legacy carve behavior, content-identical.
+   */
+  carveDispositions?: CarveDisposition[];
+  /**
+   * A6 loud/soft for the suppression stage (FR-009). Default false (soft).
+   * Follows the A6 survey answer when it exists.
+   */
+  carveLoud?: boolean;
   /**
    * Individually-deleted pre-existing touch methods (main key / longpress /
    * multitap / flick), addressed by the `touchKeyAddress.ts` scheme. Applied
@@ -289,6 +304,8 @@ export function projectWorkingCopyVfs(
     deletedNodeIds,
     deletedItemIds = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
+    carveDispositions = [],
+    carveLoud = false,
     keyEditOps = [],
     assignments,
     getPattern,
@@ -338,17 +355,32 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // 1a: Replace output-store slots with nul fillers (store-slot deletion path).
-  const removalResult = applyStoreSlotRemovals(baseIr, slotIds);
-  warnings.push(...removalResult.warnings);
+  // T015 — scope dispositions to the live carve set. The store persists
+  // dispositions per combination; prune-on-uncarve (T010) keeps them fresh,
+  // but this scope is the backstop: a stale disposition must never rewrite
+  // an uncarved rule.
+  const carveIdSet = new Set([...deletedNodeIds, ...deletedItemIds]);
+  const activeDispositions = carveDispositions.filter((d) =>
+    carveIdSet.has(d.comboId),
+  );
+  const hasSuppression = activeDispositions.length > 0;
 
-  // 1b: Whole-node deletions + VFS re-emit.
-  //     irRewritten: true when any slots were targeted — the nul-modified IR must
-  //     be written into the VFS even if no whole-node deletions are present, and
-  //     its node positions no longer match the .kmn text, so text-splice is off.
-  //     When all slot ids are rejected by the transform's guards, irRewritten
-  //     still triggers a (harmless, idempotent) re-emit of the unmodified IR.
-  const carveIr = removalResult.ir; // equals baseIr when slotIds was empty
+  // 1a/1b: Whole-node deletions + store-slot removals + VFS re-emit.
+  //
+  // T015 carve pipeline (suppression → slot removals → filter, carvePipeline.ts
+  // in the engine). When dispositions are present (hasSuppression), the
+  // pipeline derives the carved IR from the PRE-carve baseIr — the T013
+  // constraint: guard selector chars are read from the pre-removal stores and
+  // are unrecoverable after slot removal. The pipeline runs either inside
+  // applyCarveToVfs (carvePipeline opts, flag-off path) or through the mutate
+  // seam (applyCarveMutate, flag-on path); both derive byte-identical IRs.
+  //
+  // Without dispositions, the legacy derivation is preserved exactly:
+  // slot-item nul-rewrites first (applyStoreSlotRemovals), then whole-node
+  // deletions inside applyCarveToVfs — content-identical to pre-T015 behavior.
+  //
+  // The slot partition above is kept for the no-suppression legacy path and
+  // for the keycap cascade (step 1.5), which is driven off baseIr.
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
 
   // spec-014 T016c — carve IR-projection via the single mutate() write seam.
@@ -359,7 +391,7 @@ export function projectWorkingCopyVfs(
   // the emit step only serializes — the seam, not applyCarveToVfs's internal
   // filter, is the canonical IR producer (M6/SC-001).
   //
-  // The patch is built from baseIr (never the slot-rewritten carveIr) so it is a
+  // The patch is built from baseIr (never a slot-rewritten IR) so it is a
   // pure function of the overlay (idempotent + reversible). The entry-group
   // safety gate is preserved: when the deletion set would remove the entry group
   // we DEFER to the legacy applyCarveToVfs call, which warns and skips the
@@ -375,9 +407,18 @@ export function projectWorkingCopyVfs(
   // match this exactly so an unedited working copy stays byte-identical.
   const hasCarveEdit = allWholeNodeIds.size > 0 || slotIds.size > 0;
 
-  let carveResult: { warnings: string[] };
+  let carveResult: ApplyCarveToVfsResult;
+  // The post-carve IR, for the add-gallery mutate derivation (step 2) — only
+  // used as the mutate base, never re-emitted.
+  let carveIr: KeyboardIR;
   if (isMutateSeamEnabled() && !entryGroupDeleted && hasCarveEdit) {
-    const seamIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds);
+    // Seam path (T015): applyCarveMutate runs the shared pipeline
+    // (suppression → slot removals → filter) from the pre-carve baseIr.
+    const seamIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds, {
+      dispositions: activeDispositions,
+      loud: carveLoud,
+    });
+    carveIr = seamIr;
     // The seam already filtered every node; hand it to emit with an empty
     // deletion set. irRewritten:true because there IS an edit (matching the
     // legacy emit-when-edited behavior) and the seam IR is already filtered,
@@ -385,7 +426,31 @@ export function projectWorkingCopyVfs(
     carveResult = applyCarveToVfs(vfs, keyboardId, seamIr, EMPTY_DELETION_SET, {
       irRewritten: true,
     });
+  } else if (!entryGroupDeleted && hasCarveEdit && hasSuppression) {
+    // T015 legacy (flag-off) path with suppression: the shared pipeline runs
+    // inside applyCarveToVfs on the PRE-carve baseIr. Do NOT pre-apply slot
+    // removals here (T013 constraint — guard selector chars come from the
+    // pre-removal stores).
+    carveResult = applyCarveToVfs(vfs, keyboardId, baseIr, deletedNodeIds, {
+      carvePipeline: {
+        deletedItemIds,
+        dispositions: activeDispositions,
+        loud: carveLoud,
+      },
+    });
+    carveIr = carveResult.derivedIr ?? baseIr;
   } else {
+    // Legacy path without suppression — unchanged pre-T015 behavior:
+    // slot-item nul-rewrites first, then whole-node deletions inside
+    // applyCarveToVfs (filter+emit or text-splice).
+    //     irRewritten: true when any slots were targeted — the nul-modified IR must
+    //     be written into the VFS even if no whole-node deletions are present, and
+    //     its node positions no longer match the .kmn text, so text-splice is off.
+    //     When all slot ids are rejected by the transform's guards, irRewritten
+    //     still triggers a (harmless, idempotent) re-emit of the unmodified IR.
+    const removalResult = applyStoreSlotRemovals(baseIr, slotIds);
+    warnings.push(...removalResult.warnings);
+    carveIr = removalResult.ir; // equals baseIr when slotIds was empty
     carveResult = applyCarveToVfs(vfs, keyboardId, carveIr, allWholeNodeIds, {
       irRewritten: slotIds.size > 0,
     });

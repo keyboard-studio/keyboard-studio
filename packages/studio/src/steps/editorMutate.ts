@@ -17,8 +17,9 @@
 // IR, ensuring idempotency and reversibility.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
+import type { CarveDisposition } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { carveFilterIr, applyStoreSlotRemovals, parseSlotId } from "@keyboard-studio/engine";
+import { carveFilterIr, applyStoreSlotRemovals, parseSlotId, deriveCarvedIr } from "@keyboard-studio/engine";
 import { applyMutatePatch } from "./mutateApply.ts";
 
 /**
@@ -57,10 +58,27 @@ function partitionItemIds(
 }
 
 /**
+ * Options for the carve mutate path (T015): the suppression stage inputs.
+ * When `dispositions` is non-empty, the shared engine pipeline
+ * (suppression → slot removals → filter) derives the carve arrays; otherwise
+ * the legacy slot-removals → filter derivation runs, content-identical.
+ */
+export interface CarveMutateOptions {
+  /** Per-combination dispositions for the suppression stage (FR-019). */
+  dispositions?: CarveDisposition[];
+  /** A6 loud/soft for the suppression stage. Default false (soft). */
+  loud?: boolean;
+}
+
+/**
  * Build the carve patch (the carve-affected IR arrays) from `baseIr` and the
- * current carve overlay. Slot-item nul-rewrites are applied first
- * (applyStoreSlotRemovals), then whole-node deletions (carveFilterIr); the
- * result's carve arrays become the patch.
+ * current carve overlay.
+ *
+ * T015: when dispositions are provided, the shared engine pipeline
+ * (deriveCarvedIr: suppression → slot removals → whole-node filter) derives
+ * the arrays — byte-identical to the applyCarveToVfs pipeline path. Without
+ * dispositions, the legacy derivation runs: slot-item nul-rewrites
+ * (applyStoreSlotRemovals) first, then whole-node deletions (carveFilterIr).
  *
  * Always derived from `baseIr` so the patch is a pure function of the overlay
  * (idempotent + reversible). Returns `{}` (the empty, no-op patch) when there
@@ -70,21 +88,34 @@ export function buildCarvePatch(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
+  opts?: CarveMutateOptions,
 ): Partial<KeyboardIR> {
   const { slotIds, wholeNodeItemIds } = partitionItemIds(baseIr, deletedItemIds);
+  const dispositions = opts?.dispositions ?? [];
 
-  if (deletedNodeIds.size === 0 && slotIds.size === 0 && wholeNodeItemIds.size === 0) {
+  if (
+    deletedNodeIds.size === 0 &&
+    slotIds.size === 0 &&
+    wholeNodeItemIds.size === 0 &&
+    dispositions.length === 0
+  ) {
     return {};
   }
 
-  const slotIr = applyStoreSlotRemovals(baseIr, slotIds).ir;
-  const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
-  const filtered = carveFilterIr(slotIr, allWholeNodeIds);
+  // T015: the shared pipeline. With empty dispositions the suppression stage
+  // is a structural no-op and the result is content-identical to the legacy
+  // derivation below.
+  const { ir: carved } = deriveCarvedIr(baseIr, {
+    deletedNodeIds,
+    deletedItemIds,
+    dispositions,
+    ...(opts?.loud === true ? { loud: true as const } : {}),
+  });
 
   return {
-    groups: filtered.groups,
-    stores: filtered.stores,
-    raw: filtered.raw,
+    groups: carved.groups,
+    stores: carved.stores,
+    raw: carved.raw,
   };
 }
 
@@ -99,14 +130,16 @@ export function buildCarvePatch(
  * @param baseIr          The source-of-truth carve IR. Never mutated.
  * @param deletedNodeIds  Whole-node carve deletions (group/rule/store/raw nodeIds).
  * @param deletedItemIds  Glyph-level carve item ids (store slots + bare node ids).
+ * @param opts            Optional suppression inputs (T015: dispositions + loud).
  * @returns A fresh KeyboardIR with carve deletions applied.
  */
 export function applyCarveMutate(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
+  opts?: CarveMutateOptions,
 ): KeyboardIR {
-  const patch = buildCarvePatch(baseIr, deletedNodeIds, deletedItemIds);
+  const patch = buildCarvePatch(baseIr, deletedNodeIds, deletedItemIds, opts);
   return applyMutatePatch(baseIr, patch, CARVE_WRITES);
 }
 

@@ -151,6 +151,46 @@
    "by": "ai",
    "at": "2026-09-28T23:36:00Z",
    "note": "swallowSet.ts isInSwallowSet: allow-host false, behaviour-owned covered false, else true; 13 tests; pattern-apply 1059 green."
+  },
+  {
+   "step": "implement",
+   "substep": "T013",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-29T00:10:00Z",
+   "note": "compileSlotGuards: reads selector char from pre-removal IR, guard ahead of paired any()/index() rule, idempotent, allow-host slot no-op; 12 tests; composition constraint for T015."
+  },
+  {
+   "step": "implement",
+   "substep": "T015",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-29T00:10:00Z",
+   "note": "Shared deriveCarvedIr pipeline (carvePipeline.ts): suppression runs FIRST on pre-carve IR (task text order reversed \u2014 T013 constraint), then slot removals, then filter skips ownedByBehaviour; wired into applyCarveToVfs and editorMutate/projectWorkingCopyVfs; 5-test parity suite byte-identical; pattern-apply 1059 green."
+  },
+  {
+   "step": "implement",
+   "substep": "T016",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-29T00:10:00Z",
+   "note": "Per-row DispositionControl in CarveGalleryV2 (both cards): visible Allow/Block, prompt, per-option risk, provenance label; pre-fill useEffect; in-place author-override flip; retired slogan absent; 6 tests green."
+  },
+  {
+   "step": "implement",
+   "substep": "T017",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-29T00:10:00Z",
+   "note": "ReviewRemovedKeys dialog: every carved combo with disposition + per-likely-host consequence table, HOST_GUESS_CAPTION, A2 verdict line + prompt; read-only; wired into gallery status strip; 18 tests green."
+  },
+  {
+   "step": "implement",
+   "substep": "T018",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-29T00:10:00Z",
+   "note": "CarveHostSelector component (mount-ready; test pane itself does not exist yet): likely hosts + Blocked entry, lookupHostOutput per combo, caption; KeymanWeb loud-Block flash as marked stub (no simulation path in studio); 9 tests green."
   }
  ],
  "coverage": {
@@ -173,7 +213,8 @@
    "tasks": [
     "T009",
     "T010",
-    "T016"
+    "T016",
+    "T015"
    ]
   },
   "FR-020": {
@@ -189,14 +230,16 @@
     "T003",
     "T009",
     "T012",
-    "T013"
+    "T013",
+    "T015"
    ]
   },
   "FR-022": {
    "title": "Dispositions persist as carve-decision metadata; recompile never re-prompts",
    "tasks": [
     "T004",
-    "T010"
+    "T010",
+    "T016"
    ]
   },
   "FR-023": {
@@ -206,7 +249,9 @@
     "T017",
     "T018",
     "T019",
-    "T020"
+    "T020",
+    "T015",
+    "T016"
    ]
   },
   "SC-008": {

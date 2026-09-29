@@ -50,6 +50,34 @@ export function carveFilterIr(
   deletedNodeIds: ReadonlySet<string>,
 ): KeyboardIR {
   const cascade = resolveCarveCascade(baseIr, deletedNodeIds);
+
+  // FR-021 (T015): suppression-owned rules are never carve targets. A block
+  // disposition rewrites the rule in place, and the carve deletion set still
+  // names its nodeId (it WAS carved) — but the filter must not undo the
+  // compiler's rewrite. The ownedByBehaviour stamp is the signal; allow-host
+  // removals are already gone from the IR, so the filter simply finds nothing
+  // for them (no double-removal). Group-level deletion still drops the whole
+  // group (a stronger, explicit operation); the skip below only shields rules
+  // in surviving groups.
+  const ownedRuleIds = new Set<string>();
+  for (const g of baseIr.groups) {
+    for (const r of g.rules) {
+      if (r.ownedByBehaviour !== undefined) ownedRuleIds.add(r.nodeId);
+    }
+  }
+  const deletedRuleIds = new Set(
+    [...cascade.deletedRuleIds].filter((id) => !ownedRuleIds.has(id)),
+  );
+  // Comments anchored to a kept (owned) rule survive with it — the cascade
+  // dropped them because the rule's nodeId was in the deletion set.
+  const deletedCommentIds = new Set(
+    [...cascade.deletedCommentIds].filter((commentId) => {
+      const comment = baseIr.comments.find((c) => c.nodeId === commentId);
+      const anchorNodeId = comment?.anchorRef?.nodeId;
+      return anchorNodeId === undefined || !ownedRuleIds.has(anchorNodeId);
+    }),
+  );
+
   return {
     ...baseIr,
     // Filter deleted stores.
@@ -58,7 +86,7 @@ export function carveFilterIr(
     groups: baseIr.groups
       .filter((g) => !cascade.deletedGroupIds.has(g.nodeId))
       .map((g) => {
-        const filteredRules = g.rules.filter((r) => !cascade.deletedRuleIds.has(r.nodeId));
+        const filteredRules = g.rules.filter((r) => !deletedRuleIds.has(r.nodeId));
         // Only allocate a new group object when rules actually changed.
         if (filteredRules.length === g.rules.length) return g;
         return { ...g, rules: filteredRules };
@@ -71,6 +99,6 @@ export function carveFilterIr(
     // emit() dropped them only by accident (it never looks up a filtered-out
     // rule's nodeId); filtering here makes the drop deliberate and keeps this
     // path in lockstep with carveViaSplice's comment handling.
-    comments: baseIr.comments.filter((c) => !cascade.deletedCommentIds.has(c.nodeId)),
+    comments: baseIr.comments.filter((c) => !deletedCommentIds.has(c.nodeId)),
   };
 }
