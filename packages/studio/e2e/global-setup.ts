@@ -11,7 +11,7 @@
 import type { FullConfig } from "playwright/test";
 
 async function globalSetup(config: FullConfig): Promise<void> {
-  // Multi-project (issue 1853, Phase 6): resolve baseURL from the first
+  // Multi-project (mobile adaptation, Phase 6): resolve baseURL from the first
   // project that defines one, falling back to the localhost default. The
   // desktop and mobile projects share the same webServer, so any project's
   // baseURL works — but don't assume projects[0] is the desktop lane.

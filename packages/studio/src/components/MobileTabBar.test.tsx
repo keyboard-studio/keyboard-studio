@@ -1,4 +1,4 @@
-// MobileTabBar tests (mobile adaptation #1853, Phase 1).
+// MobileTabBar tests (mobile adaptation, Phase 1).
 //
 // The bar self-gates on `useIsNarrow()`: null on desktop viewports, the tab
 // row on narrow ones. Viewport width is stubbed per-test via

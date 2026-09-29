@@ -1,4 +1,4 @@
-// Narrow-viewport sequence builder tests (mobile adaptation #1853, Phase 4).
+// Narrow-viewport sequence builder tests (mobile adaptation, Phase 4).
 //
 // On narrow viewports the S-03 "Type a sequence" method does NOT swap the
 // right pane (there is no side-by-side pane — the preview lives in the

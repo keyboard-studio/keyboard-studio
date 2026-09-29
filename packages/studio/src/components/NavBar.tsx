@@ -2,7 +2,7 @@
 // right-zone controls (unfinished-gallery indicator, locale/theme switchers,
 // account control, survey reset).
 //
-// Extracted from StudioShell.tsx (mobile adaptation #1853, Phase 1) so the
+// Extracted from StudioShell.tsx (mobile adaptation, Phase 1) so the
 // slim narrow-viewport variant is independently testable. The narrow branch
 // (< 479px) hides the center tab row — route navigation moves to
 // MobileTabBar at the bottom — and collapses the right zone into a single
@@ -64,7 +64,7 @@ export function NavBar({
 }: NavBarProps) {
   const { i18n: activeI18n, t } = useLingui();
   const startOver = useStartOverStore((s) => s.handler);
-  // Mobile adaptation (#1853, Phase 1): on narrow viewports the bar slims
+  // Mobile adaptation (Phase 1): on narrow viewports the bar slims
   // to brand + a single overflow disclosure. The center tab row moves to
   // MobileTabBar (bottom, thumb zone); the right-zone controls move into
   // the overflow panel below. Desktop rendering is untouched.
@@ -147,7 +147,7 @@ export function NavBar({
           <Trans id="nav.wordmark">Keyboard Studio</Trans>
         </span>
         {/* Narrow viewports hide the keyboard indicator — the slim bar keeps
-            brand + overflow only (#1853 Phase 1). */}
+            brand + overflow only (mobile adaptation, Phase 1). */}
         {!isNarrow && active !== "welcome" && <CurrentKeyboardIndicator />}
       </div>
 
@@ -216,7 +216,7 @@ export function NavBar({
           last so it can't crowd the controls beside it; it renders only
           while a survey is mounted (startOverStore publishes the handler
           from SurveyView, which exists on the #survey route alone).
-          Narrow viewports (#1853 Phase 1): the whole zone collapses into a
+          Narrow viewports (mobile adaptation, Phase 1): the whole zone collapses into a
           single 44px "more options" disclosure. The panel stacks the same
           controls vertically — same set, same order, same welcome gates —
           so nothing is lost, only re-homed. */}

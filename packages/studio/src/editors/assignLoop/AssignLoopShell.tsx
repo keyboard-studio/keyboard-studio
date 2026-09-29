@@ -13,7 +13,7 @@
 // the touch-only counter/description nodes. Neither gallery's outer
 // flex/border/padding shell differs — that part is fully owned here.
 //
-// Narrow viewports (mobile adaptation issue 1853, Phase 4): the two-pane row
+// Narrow viewports (mobile adaptation, Phase 4): the two-pane row
 // becomes a stack — the assign card (leftContent) takes the full width and
 // the live preview (rightContent) moves into a toggleable PreviewSheet
 // (bottom sheet in portrait, side dock in landscape). Opening the sheet

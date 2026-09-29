@@ -1466,7 +1466,7 @@ export function MechanismGallery({
   worklist,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
-  // Narrow-viewport branch (mobile adaptation issue 1853, Phase 4): the
+  // Narrow-viewport branch (mobile adaptation, Phase 4): the
   // assign-loop panes stack with the preview in a sheet, and the S-03
   // sequence builder becomes a fullscreen modal instead of swapping the
   // right pane. Desktop rendering is untouched.
@@ -4930,7 +4930,7 @@ export function MechanismGallery({
   // sequence builder (swapped via the display:none wrapper below — the
   // iframe stays mounted so KMW stays warm). On narrow viewports the shell
   // moves this node into the PreviewSheet, and the sequence builder becomes
-  // a fullscreen modal instead (mobile adaptation issue 1853, Phase 4).
+  // a fullscreen modal instead (mobile adaptation, Phase 4).
   const previewContent = (
     <div
       data-testid="mechanism-preview-wrapper"

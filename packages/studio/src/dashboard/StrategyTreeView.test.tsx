@@ -1,4 +1,4 @@
-// StrategyTreeView narrow-viewport test (mobile adaptation #1853, Phase 5).
+// StrategyTreeView narrow-viewport test (mobile adaptation, Phase 5).
 //
 // The rule cards use flexWrap so they stack on narrow viewports. This test
 // verifies no element exceeds the 390px viewport width.

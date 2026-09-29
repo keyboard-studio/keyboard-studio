@@ -704,7 +704,7 @@ describe("TouchSeedSourcePanel — leave and return (spec 079 FR-051, T029)", ()
 });
 
 // ---------------------------------------------------------------------------
-// Narrow viewport (mobile adaptation issue 1853, Phase 4): the choice cards
+// Narrow viewport (mobile adaptation, Phase 4): the choice cards
 // stack full-width and the live OSK preview moves behind a "Show touch
 // preview" trigger into a PreviewSheet — opening the sheet mounts the OSK
 // (mocked here), closing it unmounts the OSK (unloading KeymanWeb).

@@ -1,5 +1,5 @@
 // PreviewSheet — the narrow-viewport home of the live KeymanWeb OSK preview
-// (mobile adaptation issue 1853, Phase 4).
+// (mobile adaptation, Phase 4).
 //
 // On a phone there is no room for the assign loop's side-by-side preview
 // pane, so the preview becomes a toggleable sheet: a drag-up bottom sheet in
@@ -16,23 +16,21 @@
 // and postMessage channel are untouched.
 //
 // This is a distinct pattern from the centered `ui/Dialog` modal, so it is
-// its own component — but it reuses the same accessibility shape (backdrop,
-// Escape, focus trap, focus-on-open, 44px close control) and the same
-// `--app-*` tokens. z-index sits below Dialog's (299/300) so a fullscreen
+// its own component — but the accessibility shape (Escape, focus trap,
+// focus-on-open) is shared via `hooks/useModalFocus.ts`, and it uses the
+// same `--app-*` tokens. z-index sits below Dialog's (299/300) so a fullscreen
 // modal (e.g. the narrow sequence builder) can cover an open sheet.
 
 import {
-  useEffect,
   useRef,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useViewport } from "../hooks/useViewport.ts";
+import { useModalFocus } from "../hooks/useModalFocus.ts";
 import { BREAKPOINTS } from "../ui/breakpoints.ts";
-import { FOCUSABLE_SELECTOR } from "../lib/focusableSelector.ts";
 import { BG_CARD, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 
 export interface PreviewSheetProps {
@@ -87,47 +85,17 @@ export function PreviewSheet({
     message: "Close preview",
   });
 
-  // Focus into the sheet on open — the APG dialog pattern's "opening moves
-  // focus into it". The sheet mounts fresh on every open (early `return
-  // null` below), so this effect runs exactly once per open. Prefer the
-  // close button: it is always present and always actionable.
-  useEffect(() => {
-    if (!open) return;
-    (closeRef.current ??
-      sheetRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
-      null
-    )?.focus();
-    // Runs once per mount, which is once per open (open is the only dep).
-  }, [open]);
-
-  // Escape dismisses from anywhere in the sheet.
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onOpenChange(false);
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onOpenChange]);
+  // Focus trap, Escape, focus-on-open — the shared modal accessibility shape
+  // (hooks/useModalFocus.ts), also used by ui/Dialog. The close button is
+  // always present and always actionable, so it takes focus on open.
+  const handleKeyDownTrap = useModalFocus({
+    open,
+    containerRef: sheetRef,
+    onEscape: () => onOpenChange(false),
+    preferredFocusRef: closeRef,
+  });
 
   if (!open) return null;
-
-  function handleKeyDownTrap(e: ReactKeyboardEvent<HTMLDivElement>): void {
-    if (e.key !== "Tab" || sheetRef.current === null) return;
-    const focusable = Array.from(
-      sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-    );
-    if (focusable.length === 0) return;
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
 
   // Drag-to-dismiss on the header. Portrait: drag down; landscape dock:
   // drag right. Only the primary pointer, and never when the gesture starts

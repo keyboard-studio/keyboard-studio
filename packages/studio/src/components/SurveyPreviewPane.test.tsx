@@ -1,4 +1,4 @@
-// SurveyPreviewPane tests (mobile adaptation #1853, Phase 2).
+// SurveyPreviewPane tests (mobile adaptation, Phase 2).
 //
 // The principle-9 proof: hiding the OSK via the visibility switch must
 // unmount the OSK iframe (unloading KeymanWeb), and showing it must remount

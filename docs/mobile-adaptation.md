@@ -1,4 +1,4 @@
-# Mobile adaptation guidance (issue 1853)
+# Mobile adaptation guidance
 
 This is the standing guidance for any agent (human or AI) changing studio UI.
 Mobile is a **layout extension, not a reskin**: preserve desktop behavior and
@@ -53,7 +53,7 @@ import { BREAKPOINTS } from "../ui/breakpoints.ts";
   isCoarsePointer }`. Use when you need height or orientation (e.g. side-dock
   sheets in short landscape).
 
-## Binding constraints (from issue 1853)
+## Binding constraints
 
 - **KeymanWeb stays.** The typing keyboard is the existing KeymanWeb engine +
   OSK iframe on every viewport. Change host layout/lifecycle only — never the

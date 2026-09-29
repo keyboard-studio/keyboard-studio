@@ -1,4 +1,4 @@
-// OskVisibilitySwitch tests (mobile adaptation #1853, Phase 2).
+// OskVisibilitySwitch tests (mobile adaptation, Phase 2).
 //
 // A thin wrapper over the shared Phase-0 Switch primitive carrying the
 // principle-9 label copy. The proof that hiding unmounts the OSK iframe

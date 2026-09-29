@@ -64,7 +64,7 @@ export function FacetTransformPanel({
   const { transitionId, preview } = proposal;
   const { facetId, fromValue, toValue } = transitionId;
   const impactClass = proposal.transformImpactClass;
-  // Mobile adaptation (issue 1853, Phase 5): the diff tables can exceed 390px
+  // Mobile adaptation (Phase 5): the diff tables can exceed 390px
   // with long before/after values — narrow viewports get a horizontal scroll
   // wrapper rather than a clipped table. Desktop renders the bare table.
   const narrow = useIsNarrow();

@@ -1,4 +1,4 @@
-// PreviewSheet tests (mobile adaptation #1853, Phase 4).
+// PreviewSheet tests (mobile adaptation, Phase 4).
 //
 // The sheet is the narrow-viewport home of the live OSK preview. Contract:
 //   - renders nothing while closed — children unmount (principle 9: closing

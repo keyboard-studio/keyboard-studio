@@ -1,4 +1,4 @@
-// FacetTransformPanel narrow-viewport tests (mobile adaptation #1853, Phase 5).
+// FacetTransformPanel narrow-viewport tests (mobile adaptation, Phase 5).
 //
 // The diff tables can exceed 390px with long before/after values: narrow
 // viewports wrap them in a horizontal scroll container. Desktop renders the

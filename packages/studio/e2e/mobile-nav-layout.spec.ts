@@ -1,6 +1,6 @@
 // Mobile nav layout — verifies the narrow-viewport shell geometry on Pixel 7.
 //
-// Mobile adaptation (issue 1853, Phase 6). Runs on the `mobile` project only
+// Mobile adaptation (Phase 6). Runs on the `mobile` project only
 // (Pixel 7: 412×915 CSS px, touch, mobile). Asserts the mobile/touch premises
 // first, then checks:
 // - route/tab geometry (MobileTabBar visible at bottom, desktop tab row hidden)

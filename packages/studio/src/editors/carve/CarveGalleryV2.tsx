@@ -430,13 +430,13 @@ function RecommendedGroupCard({
 /**
  * "How it's typed" block for a character cell — shared by the desktop
  * details rail and the narrow-viewport details card (mobile adaptation
- * issue 1853, Phase 3). Extracted verbatim from the rail's former inline IIFE so
+ * Phase 3). Extracted verbatim from the rail's former inline IIFE so
  * both surfaces render identical content: the hover-driven detail text now
  * lives here, reachable by tap on narrow. `showLabel` lets the card's own
  * disclosure button carry the label instead of rendering it twice.
  */
 function HowItsTyped({ cell, showLabel = true }: { cell: CharacterCell; showLabel?: boolean }) {
-// TOTAL FLOOR (#1399 follow-on): a producer is renderable
+// TOTAL FLOOR: a producer is renderable
 // only when it has faithful STEPS or a resolvable
 // TRIGGER-KEY FLOOR (CharProducer.triggerFloor, computed
 // by charProducers). A producer with neither is dropped
@@ -501,7 +501,7 @@ if (ways.length === 0) {
 
 // Single-line (unchanged feel) unless there's more than one
 // renderable producer OR the one producer carries a
-// condition to explain (#1399) — a plain unconditional
+// condition to explain — a plain unconditional
 // single producer stays exactly as before, no "1 way"
 // label clutter.
 const showList = ways.length > 1 || (ways.length === 1 && ways[0]?.condition !== undefined);
@@ -537,7 +537,7 @@ return (
 }
 
 /**
- * Narrow-viewport character-details card (mobile adaptation, issue 1853 Phase 3).
+ * Narrow-viewport character-details card (mobile adaptation, Phase 3).
  * Replaces the 290px details rail under 479px: a collapsible card pinned
  * above the chip grid showing the selected character, Keep/Carve actions,
  * and an expandable "How it's typed" section — the hover-driven detail text
@@ -841,7 +841,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // lower-priority than the primary suggested-to-discard card above it.
   const [latinOpen, setLatinOpen] = useState(false);
 
-  // --- Narrow details-card state (mobile adaptation, issue 1853 Phase 3) ---
+  // --- Narrow details-card state (mobile adaptation, Phase 3) ---
   const isNarrow = useIsNarrow();
   /** Characters the author has explicitly kept or carved this session (NFC-normalized). */
   const [decidedChs, setDecidedChs] = useState<ReadonlySet<string>>(() => new Set());
@@ -903,7 +903,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     else cascadeRestore(restoreIds);
   }, [cascadeDelete, cascadeRestore]);
 
-  // --- Narrow details-card decision plumbing (mobile adaptation, issue 1853 Phase 3) ---
+  // --- Narrow details-card decision plumbing (mobile adaptation, Phase 3) ---
   // The card's Keep/Carve buttons need an EXPLICIT direction (not a toggle),
   // and every toggle path records the author's disposition so the card can
   // collapse by default once one exists.
@@ -1157,7 +1157,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       </div>
 
       {/* Two-panel body — narrow viewports stack the details card above the
-          grid (mobile adaptation, issue 1853 Phase 3); desktop keeps the rail. */}
+          grid (mobile adaptation, Phase 3); desktop keeps the rail. */}
       <div style={{ flex: 1, display: 'flex', flexDirection: isNarrow ? 'column' : 'row', minHeight: 0 }}>
         {isNarrow ? (
           <CarveDetailsCard

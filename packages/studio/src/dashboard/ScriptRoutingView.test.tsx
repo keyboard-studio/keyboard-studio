@@ -1,4 +1,4 @@
-// ScriptRoutingView narrow-viewport tests (mobile adaptation #1853, Phase 5).
+// ScriptRoutingView narrow-viewport tests (mobile adaptation, Phase 5).
 //
 // The 4-column table is too dense for 390px: narrow viewports render each
 // row as a stacked card instead. Desktop keeps the table unchanged.

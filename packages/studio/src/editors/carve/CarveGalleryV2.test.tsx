@@ -831,7 +831,7 @@ describe('CarveGalleryV2 — footer nav (spec 081)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 3 (mobile adaptation #1853) — narrow-viewport details card replaces
+// Phase 3 (mobile adaptation) — narrow-viewport details card replaces
 // the 290px rail. Viewport width is stubbed per-test via `window.innerWidth`
 // (the geometry path needs no matchMedia stub — see useViewport.ts's
 // fallback) and restored to desktop afterwards. A real tap is focus+click:
@@ -864,7 +864,7 @@ function tapCell(cell: HTMLElement): void {
   fireEvent.click(cell);
 }
 
-describe('CarveGalleryV2 — narrow details card (mobile #1853 Phase 3)', () => {
+describe('CarveGalleryV2 — narrow details card (mobile, Phase 3)', () => {
   afterEach(() => {
     setViewportWidth(DESKTOP_WIDTH);
   });

@@ -26,7 +26,7 @@ const TRACK_PAD = 3;
  * keyboard-operable (Space/Enter) and announced correctly by screen readers;
  * carries the shared `.ks-focus-ring`. The button itself is at least
  * `var(--app-touch-target)` tall, so the whole labeled control — not just the
- * 48px track — is the coarse-pointer hit area (#1853 principle 9: the OSK
+ * 48px track — is the coarse-pointer hit area (mobile adaptation principle 9: the OSK
  * show/hide control must be a proper modern switch, not a text button).
  *
  * All colors come from the shared `--app-*` tokens, so the switch follows the

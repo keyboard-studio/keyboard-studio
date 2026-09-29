@@ -1,4 +1,4 @@
-// AssignLoopShell narrow-viewport tests (mobile adaptation #1853, Phase 4).
+// AssignLoopShell narrow-viewport tests (mobile adaptation, Phase 4).
 //
 // Contract:
 //   - desktop: the two-pane row renders leftContent + rightContent inline;

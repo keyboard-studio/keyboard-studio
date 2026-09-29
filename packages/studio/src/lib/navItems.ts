@@ -1,6 +1,6 @@
 // Shared nav-item table for the studio's top-level navigation.
 //
-// Moved out of StudioShell.tsx (mobile adaptation #1853, Phase 1): the new
+// Moved out of StudioShell.tsx (mobile adaptation, Phase 1): the new
 // MobileTabBar renders the same items at the bottom of narrow viewports, and
 // importing them from StudioShell would create a StudioShell ↔
 // MobileTabBar module cycle (forbidden by depcruise). Both NavBar (in

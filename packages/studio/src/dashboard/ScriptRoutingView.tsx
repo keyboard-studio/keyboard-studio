@@ -36,7 +36,7 @@ interface ScriptRoutingViewProps {
 
 export function ScriptRoutingView({ identityLiteRaw }: ScriptRoutingViewProps) {
   const rows: ScriptRoutingRow[] = buildScriptRouting(identityLiteRaw);
-  // Mobile adaptation (issue 1853, Phase 5): the 4-column table is too dense
+  // Mobile adaptation (Phase 5): the 4-column table is too dense
   // for 390px — narrow viewports render each row as a stacked card instead.
   // Desktop keeps the table unchanged.
   const narrow = useIsNarrow();

@@ -160,7 +160,7 @@ describe("Dialog — frame", () => {
   });
 });
 
-describe("Dialog — fullscreen mode (mobile adaptation issue 1853, Phase 4)", () => {
+describe("Dialog — fullscreen mode (mobile adaptation, Phase 4)", () => {
   it("fills the viewport with no border or radius when fullscreen", () => {
     render(
       <Dialog open onCancel={() => {}} label="Full" testId="full1" fullscreen>

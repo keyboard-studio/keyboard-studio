@@ -11,7 +11,7 @@
 // Display mapping is `steps/phases.ts`'s fixed PHASES table — six phases,
 // A-F, never re-derived here (see that file's header for why).
 //
-// Mobile adaptation (#1853, Phase 1): on narrow viewports (< 479px) the six
+// Mobile adaptation (Phase 1): on narrow viewports (< 479px) the six
 // pills don't fit, so the stepper renders a compact single-line button —
 // "Phase C · Characters · step 5 of 15" — that opens the shared Dialog with
 // the full pill list in a vertical layout. `aria-current="step"` is preserved

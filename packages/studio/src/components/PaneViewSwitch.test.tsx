@@ -1,4 +1,4 @@
-// PaneViewSwitch tests (mobile adaptation #1853, Phase 2).
+// PaneViewSwitch tests (mobile adaptation, Phase 2).
 //
 // The switch self-gates on `useIsNarrow()`: null on desktop viewports, the
 // Questions | Preview segmented control on narrow ones. Viewport width is

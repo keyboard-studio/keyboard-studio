@@ -1,7 +1,7 @@
 // SurveyPreviewPane — the survey's right pane: live OSK preview (or, for the
 // Phase B build-list only, the interactive character map).
 //
-// Extracted from StudioShell's SurveyView (mobile adaptation #1853, Phase 2)
+// Extracted from StudioShell's SurveyView (mobile adaptation, Phase 2)
 // so the OSK show/hide switch is independently testable — in particular the
 // proof that hiding the preview unmounts the OSK iframe.
 //

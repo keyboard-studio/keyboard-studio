@@ -59,7 +59,7 @@ export default defineConfig({
       ]
     : "list",
   globalSetup: "./e2e/global-setup.ts",
-  // Mobile adaptation (issue 1853, Phase 6): two projects.
+  // Mobile adaptation (Phase 6): two projects.
   //
   // - `desktop`: Desktop Chrome. No viewport override — Playwright's default
   //   1280×720 stands, so existing desktop specs keep their viewport
@@ -70,7 +70,9 @@ export default defineConfig({
   //
   // Run one lane at a time: `npx playwright test --project=desktop` or
   // `--project=mobile`. CI runs the desktop lane (existing specs) as before;
-  // the mobile lane is added as a separate non-blocking step.
+  // the mobile lane is planned as a separate non-blocking step — the ci.yml
+  // lane split is deferred (needs workflow scope), so mobile specs stay
+  // manual/local for now.
   projects: [
     {
       name: "desktop",

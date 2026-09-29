@@ -1,4 +1,4 @@
-// NavBar tests (mobile adaptation #1853, Phase 1).
+// NavBar tests (mobile adaptation, Phase 1).
 //
 // Covers the slim narrow-viewport variant: center tab links hidden (route
 // navigation moves to MobileTabBar), the keyboard indicator hidden, and the

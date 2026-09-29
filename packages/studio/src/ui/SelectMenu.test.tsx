@@ -680,7 +680,7 @@ describe("SelectMenu", () => {
   });
 });
 
-describe("SelectMenu — 390px viewport (mobile adaptation issue 1853, Phase 5)", () => {
+describe("SelectMenu — 390px viewport (mobile adaptation, Phase 5)", () => {
   function setViewport(width: number, height: number): void {
     Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
     Object.defineProperty(window, "innerHeight", { value: height, configurable: true });

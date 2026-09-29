@@ -1,4 +1,4 @@
-// KeyGridCell coarse-pointer tests (mobile adaptation #1853, Phase 4).
+// KeyGridCell coarse-pointer tests (mobile adaptation, Phase 4).
 //
 // On touch there is no hover, so the hover-revealed (+) / ⋯ wedges need tap
 // equivalents — driven by the POINTER (`useIsCoarsePointer`), never by the
@@ -326,5 +326,54 @@ describe("KeyGridCell — coarse-pointer long-press", () => {
     fireEvent.click(el);
 
     expect(onSelectCell).not.toHaveBeenCalled();
+  });
+
+  it("unmounting mid-hold clears the timer — no menu opens for a stale cell", () => {
+    const { handlers, el } = renderSelectedCell();
+
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    // The cell unmounts before the 500ms threshold (e.g. the grid
+    // re-rendered under the finger). The pending callback must not fire
+    // for the unmounted cell.
+    cleanup();
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(handlers.onOpenCommandMenu).not.toHaveBeenCalled();
+  });
+
+  it("a long-press whose release never clicks does not swallow the next tap", () => {
+    const { handlers, el } = renderSelectedCell();
+
+    // First gesture: long-press fires the menu, but the release produces
+    // no click (gesture interrupted) — suppressClick stays set.
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(handlers.onOpenCommandMenu).toHaveBeenCalledTimes(1);
+
+    // Second gesture: a fresh pointerdown clears the stale flag, so the
+    // tap reaches the cell and toggles the wedge reveal.
+    fireEvent.pointerDown(el, {
+      pointerId: 2,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    fireEvent.click(el);
+
+    expect(screen.getByTestId(ADD_WEDGE)).not.toBeNull();
   });
 });

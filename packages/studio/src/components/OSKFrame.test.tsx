@@ -1,4 +1,4 @@
-// OSKFrame viewport-relative sizing tests (mobile adaptation #1853, Phase 4).
+// OSKFrame viewport-relative sizing tests (mobile adaptation, Phase 4).
 //
 // Contract:
 //   - desktop (1280×800): the iframe keeps the long-standing 560px frame;

@@ -77,7 +77,13 @@
 // `draggable` — adding one before the operation union admits a width change
 // would be an affordance that silently does nothing.
 
-import { useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { isSpacerKeyClass, type TouchKeyFinding } from "@keyboard-studio/contracts";
@@ -150,7 +156,7 @@ const WEDGE_ADD = "add";
 const WEDGE_MENU = "menu";
 
 /**
- * Coarse-pointer touch equivalents (mobile adaptation issue 1853, Phase 4).
+ * Coarse-pointer touch equivalents (mobile adaptation, Phase 4).
  * There is no hover on a touchscreen, so the hover-revealed `(+)`/`⋯`
  * wedges are unreachable without a tap path — and tap/long-press already
  * work at the DOM level (click), so no gesture rewrite is needed, only
@@ -225,7 +231,7 @@ export function KeyGridCell({
   // KeyGrid — only one cell is hovered at a time, and keeping it here means a
   // hover never re-renders the other 299 mounted cells.
   const [isHovered, setIsHovered] = useState(false);
-  // Coarse-pointer wedge reveal (issue 1853, Phase 4): no hover on touch, so
+  // Coarse-pointer wedge reveal (mobile adaptation, Phase 4): no hover on touch, so
   // tapping an already-selected cell toggles the wedges instead. Local for
   // the same reason as isHovered.
   const coarse = useIsCoarsePointer();
@@ -237,6 +243,17 @@ export function KeyGridCell({
   const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
   const lastLongPressAt = useRef(0);
+  // The long-press timer outlives its gesture but must not outlive the
+  // cell: if the cell unmounts mid-hold, the pending callback would fire
+  // `setTouchRevealed` / `onOpenCommandMenu` for a stale, unmounted cell.
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current !== null) {
+        window.clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    };
+  }, []);
   const isBlank = isSpacerKeyClass(cell.sp);
   const finding = worstSeverity(cell.findings);
   const hasAnnotations =
@@ -380,7 +397,7 @@ export function KeyGridCell({
    * spans". A click anywhere that is NOT a wedge selects, which keeps the
    * cell's primary action exactly what it was before T111.
    *
-   * Coarse pointer (issue 1853, Phase 4): a tap on the already-selected cell
+   * Coarse pointer (mobile adaptation, Phase 4): a tap on the already-selected cell
    * toggles the wedge reveal instead of re-selecting — the tap equivalent of
    * hover. A tap on an unselected cell selects (and hides any reveal, so a
    * fresh selection never inherits another cell's wedge state — each cell
@@ -436,6 +453,11 @@ export function KeyGridCell({
   function handlePointerDown(event: ReactPointerEvent<HTMLButtonElement>): void {
     if (!coarse || !event.isPrimary) return;
     clearLongPressTimer();
+    // A long-press whose release never produced a click (pointer captured
+    // elsewhere, gesture interrupted) would leave `suppressClick` set and
+    // swallow the NEXT tap. A fresh pointerdown is a fresh gesture: the
+    // stale flag is by definition from a gesture whose click never arrived.
+    suppressClick.current = false;
     const origin = { x: event.clientX, y: event.clientY };
     longPressOrigin.current = origin;
     longPressTimer.current = window.setTimeout(() => {
@@ -607,7 +629,7 @@ export function KeyGridCell({
       {/* T111's hover wedges (FR-021) — decorative, aria-hidden hit regions,
       NOT nested buttons (see the module doc, "Why the wedges are aria-hidden
       spans"). Rendered while hovered, or — on coarse pointers, where there is
-      no hover — while the tap-reveal is on (issue 1853, Phase 4); only when
+      no hover — while the tap-reveal is on (mobile adaptation, Phase 4); only when
       the matching callback exists, so a cell at rest looks exactly as it did
       before T111 and an inert wedge is never shown. `visibility` rather than
       conditional mounting would keep them in the layout; conditional mounting

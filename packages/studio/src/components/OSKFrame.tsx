@@ -5,8 +5,8 @@
 // The iframe mounts whenever this component renders — including before a
 // keyboard is picked — so KMW's init() runs and stays warm while the preview
 // is visible. The parent unmounts this component when the author hides the
-// preview via the OSK visibility switch (mobile adaptation #1853,
-// principle 9): unmounting destroys the iframe and unloads KeymanWeb,
+// preview via the OSK visibility switch (mobile adaptation, principle 9):
+// unmounting destroys the iframe and unloads KeymanWeb,
 // freeing the library's memory. Showing the preview remounts here and the
 // normal init path (iframe onLoad → SET_STRINGS → SET_KEYBOARD on engine
 // ready) runs again cleanly — no warm-state assumptions survive the unmount.
@@ -37,7 +37,7 @@ export interface OSKFrameProps {
 }
 
 /**
- * Viewport-relative OSK sizing (mobile adaptation issue 1853, Phase 4).
+ * Viewport-relative OSK sizing (mobile adaptation, Phase 4).
  *
  * The desktop frame is a fixed 560px — untouched. On narrow viewports and
  * scarce heights (landscape phones) the iframe shrinks to fit the viewport

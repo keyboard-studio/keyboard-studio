@@ -1,5 +1,5 @@
 // MobileTabBar — bottom tab bar for narrow viewports (mobile adaptation
-// #1853, Phase 1).
+// mobile adaptation, Phase 1).
 //
 // Renders the same NAV_ITEMS as the desktop NavBar (Studio · Compare ·
 // Output · Decisions, plus the dev-gated Flow Map) as a 64px bottom bar when

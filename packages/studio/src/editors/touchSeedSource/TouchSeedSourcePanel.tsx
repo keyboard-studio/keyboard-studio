@@ -380,7 +380,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
   });
 
   // ---------------------------------------------------------------------------
-  // Narrow-viewport layout (mobile adaptation issue 1853, Phase 4): the seed
+  // Narrow-viewport layout (mobile adaptation, Phase 4): the seed
   // cards stack full-width and the live preview moves into a PreviewSheet —
   // opening it mounts the OSK iframe, dismissing it unmounts the iframe
   // (principle 9). At tablet widths the existing ≤768px collapse (choices

@@ -60,7 +60,7 @@ describe("slot writes", () => {
     });
   });
 
-  it("keeps per-surface OSK visibility independent (mobile adaptation #1853)", () => {
+  it("keeps per-surface OSK visibility independent (mobile adaptation)", () => {
     useViewStateStore.getState().setOskVisible("survey", false);
     expect(useViewStateStore.getState().oskVisible).toEqual({
       survey: false,

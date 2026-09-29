@@ -24,14 +24,12 @@
 // The caller owns the invoker and restores focus to it (the key-grid
 // dialogs' existing convention).
 import {
-  useEffect,
   useRef,
   type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 import { BG_CARD, BORDER, FONT, TEXT_DIM } from "./theme.ts";
-import { FOCUSABLE_SELECTOR } from "../lib/focusableSelector.ts";
+import { useModalFocus } from "../hooks/useModalFocus.ts";
 
 export interface DialogProps {
   /** Nothing renders while `false`. */
@@ -65,7 +63,7 @@ export interface DialogProps {
   readonly zIndex?: number;
   /**
    * Full-viewport variant for narrow-viewport modals (mobile adaptation
-   * issue 1853, Phase 4 — the sequence builder). The frame fills the
+   * Phase 4 — the sequence builder). The frame fills the
    * viewport instead of centering; desktop callers leave this off and see
    * byte-identical frames.
    */
@@ -92,49 +90,16 @@ export function Dialog({
   fullscreen = false,
 }: DialogProps) {
   const dialogRef = useRef<HTMLFormElement | HTMLDivElement | null>(null);
-
-  // Focus into the dialog on open — the APG dialog pattern's "opening a
-  // dialog moves focus into it" (docs/accessibility.md rule 4). The dialog
-  // mounts fresh on every open (early `return null` below), so this effect
-  // runs exactly once per open.
-  useEffect(() => {
-    if (!open || initialFocus === "none") return;
-    const el = dialogRef.current;
-    if (el === null) return;
-    el.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per mount, which is once per open.
-  }, [open]);
-
-  // Escape closes from anywhere in the dialog (APG dialog pattern).
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onCancel]);
+  // Focus trap, Escape, focus-on-open — the shared modal accessibility shape
+  // (hooks/useModalFocus.ts), also used by PreviewSheet.
+  const handleKeyDownTrap = useModalFocus({
+    open,
+    containerRef: dialogRef,
+    onEscape: onCancel,
+    moveFocusOnOpen: initialFocus !== "none",
+  });
 
   if (!open) return null;
-
-  function handleKeyDownTrap(
-    e: ReactKeyboardEvent<HTMLFormElement | HTMLDivElement>,
-  ): void {
-    if (e.key !== "Tab" || dialogRef.current === null) return;
-    const focusable = Array.from(
-      dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-    );
-    if (focusable.length === 0) return;
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
 
   const frameStyle = fullscreen
     ? ({

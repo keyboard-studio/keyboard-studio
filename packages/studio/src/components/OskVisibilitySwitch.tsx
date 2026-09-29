@@ -1,5 +1,5 @@
 // OskVisibilitySwitch — author-controlled OSK visibility (mobile adaptation
-// #1853, principle 9).
+// mobile adaptation, principle 9).
 //
 // Wherever the KeymanWeb OSK is shown, this switch lets the author hide it
 // to reclaim workspace for configuration. Hiding unmounts the OSK iframe

@@ -36,7 +36,7 @@ export type OskSurface = "survey" | "compare";
 
 /**
  * Which pane the narrow-viewport survey layout shows (mobile adaptation
- * #1853, Phase 2). On viewports under 479px the two panes can't sit
+ * mobile adaptation, Phase 2). On viewports under 479px the two panes can't sit
  * side-by-side, so a segmented Questions | Preview switch picks one.
  * Session-persisted like every other slot here (a device preference, in the
  * spirit of `lib/theme.ts`'s doctrine — the issue's open question 4).
@@ -89,7 +89,7 @@ export interface ViewState {
   oskMode: Readonly<Record<OskSurface, OskMode>>;
   /**
    * Whether the KeymanWeb OSK preview is mounted per surface (mobile
-   * adaptation #1853, principle 9). The author hides it to reclaim workspace
+   * adaptation mobile adaptation, principle 9). The author hides it to reclaim workspace
    * for configuration; hiding unmounts the OSK iframe (unloading KeymanWeb),
    * showing remounts it through the normal init path. Presentation-only —
    * the preview never feeds a compile or validator (FR-053).

@@ -511,7 +511,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     [setSurveyOskMode],
   );
   const setPaneSplitPct = useViewStateStore((s) => s.setPaneSplitPct);
-  // Mobile adaptation (#1853, Phase 2): narrow-viewport pane selection and
+  // Mobile adaptation (Phase 2): narrow-viewport pane selection and
   // author-controlled OSK visibility (principle 9). Both are session-scoped
   // view state — they survive a route unmount and die on reload (Q9), and
   // neither can reach a compile or validator run (FR-053).
@@ -1410,7 +1410,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
-  // Mobile adaptation (#1853, Phase 2): under 479px the panes stack behind a
+  // Mobile adaptation (Phase 2): under 479px the panes stack behind a
   // Questions | Preview switch instead of sitting side-by-side. The visible
   // pane fills the column; the drag handle is hidden (no split to drag).
   // Desktop keeps the resizable row layout untouched.
@@ -1894,7 +1894,7 @@ export function StudioShell() {
   //
   // The blocked-Output explanation is shared by the top NavBar and the
   // narrow-viewport MobileTabBar so the two bars can never disagree about
-  // the gate (#1853 Phase 1).
+  // the gate (mobile adaptation, Phase 1).
   const outputBlockedTitle = t({
     id: "studio.nav.outputBlocked.title",
     message: "Finish every inventory character before you can access Output",
@@ -1933,7 +1933,7 @@ export function StudioShell() {
           project yet (Q6). A route-by-route conditional here would be a second
           place to keep that rule, and the two would drift. */}
       <StudioFooter />
-      {/* Mobile adaptation (#1853 Phase 1): bottom tab bar on narrow
+      {/* Mobile adaptation (Phase 1): bottom tab bar on narrow
           viewports. It self-gates on `useIsNarrow()` and returns null on
           desktop, so desktop layout is untouched. Rendered below the footer
           so it sits at the very bottom edge, in the thumb zone. */}

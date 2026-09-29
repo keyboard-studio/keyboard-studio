@@ -1,5 +1,5 @@
 // PaneViewSwitch — narrow-viewport Questions | Preview segmented control
-// (mobile adaptation #1853, Phase 2).
+// (mobile adaptation, Phase 2).
 //
 // Under 479px the survey's two panes can't sit side-by-side, so this switch
 // picks which one fills the viewport. It renders only when `useIsNarrow()`

@@ -1,6 +1,6 @@
 // Mobile authoring walk — a short end-to-end pass on Pixel 7.
 //
-// Mobile adaptation (issue 1853, Phase 6). Runs on the `mobile` project only.
+// Mobile adaptation (Phase 6). Runs on the `mobile` project only.
 // Covers:
 // - a short authoring walk (open the survey, answer, reach a gallery)
 // - OSK mount/unmount lifecycle (PreviewSheet show/hide unmounts the iframe)
@@ -49,7 +49,7 @@ test("OSK PreviewSheet mounts and unmounts the iframe", async ({ page }) => {
 
   // Navigate to a surface with the assign-loop PreviewSheet trigger.
   // The "Show keyboard preview" button opens the sheet; closing it must
-  // unmount the OSK iframe (author-controlled visibility, issue 1853).
+  // unmount the OSK iframe (author-controlled visibility).
   const showPreview = page.getByRole("button", { name: /show keyboard preview/i });
 
   if (await showPreview.isVisible().catch(() => false)) {
