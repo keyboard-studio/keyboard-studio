@@ -46,7 +46,7 @@ export function buildNarrowException(
   const output: OutputElement[] = [
     { kind: "raw", text: guard.blockedChar + guard.markChar },
   ];
-  return { nodeId: crypto.randomUUID(), context, output };
+  return { nodeId: crypto.randomUUID(), context, output, rulesStepAdded: true };
 }
 
 /** Locate the guard rule's group and index in the working IR. */

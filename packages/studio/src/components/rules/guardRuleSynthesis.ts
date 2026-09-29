@@ -81,6 +81,7 @@ function cloneWithKey(template: IRRule, entry: MissingGuardEntry): IRRule | null
     context,
     output: template.output.map((el) => ({ ...el })),
     trailingComment: "added from guard suggestion",
+    rulesStepAdded: true,
   };
 }
 

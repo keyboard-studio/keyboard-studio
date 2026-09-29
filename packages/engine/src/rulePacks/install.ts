@@ -162,6 +162,7 @@ function synthesizeGuardStore(
     items,
     isSystem: false,
     ownedByBehaviour: ownershipOf(packId, behaviour.id),
+    rulesStepAdded: true,
   };
 }
 
@@ -225,7 +226,7 @@ export function installPack(ir: KeyboardIR, pack: RulePack): InstallPackResult {
     }
     for (const rule of parseBehaviourRules(validPack.id, behaviour)) {
       const nodeId = mintNodeId("rule");
-      newRules.push({ ...rule, nodeId, ownedByBehaviour: ownership });
+      newRules.push({ ...rule, nodeId, ownedByBehaviour: ownership, rulesStepAdded: true });
       installedRuleNodeIds.push(nodeId);
     }
   }

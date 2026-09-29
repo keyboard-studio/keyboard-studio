@@ -21,6 +21,11 @@
 //      .kmn (rule half) — see projectWorkingCopyVfs.ts's own step comments.
 //      Sourced from the caller's `liveLayoutOverride.keyEditOps` (below) —
 //      omitted entirely (empty array) when no override is supplied.
+//   1.8 Rules-step additions (spec 082) — the working IR's `rulesStepAdded`
+//      rules/stores (pack install, guard synthesis, Narrow) are spliced into
+//      the carve-filtered IR in working-IR order before the .kmn re-emit, so
+//      they take effect in the preview. Derived from the working IR vs the
+//      base IR; no-op when the rules step added nothing.
 //   2. Assignments — applyAssignmentsToVfs on the carved .kmn. If no patternMap
 //      is provided (SurveyView path), this step is skipped (no assignments
 //      to apply until Phase C completes).
@@ -74,6 +79,10 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
+import {
+  deriveRuleAdditions,
+  ruleAdditionsKey as ruleAdditionsMemoKey,
+} from "../lib/ruleAdditions.ts";
 
 /** Stable empty default for `liveLayoutOverride.keyEditOps` when the option
  * (or the whole override) is omitted — avoids allocating a fresh empty array
@@ -301,6 +310,25 @@ export function useWorkingCopyTransform(
   );
   const disabledKey = useMemo(() => [...disabledRuleIds].sort().join("|"), [disabledRuleIds]);
 
+  // spec 082: rules-step rule additions (pack install, guard synthesis,
+  // Narrow). Derived from the working IR vs the base IR via the pure
+  // `deriveRuleAdditions` helper; `ruleAdditionsKey` is the primitive-stable
+  // memo key for the outer transform (same discipline as `disabledKey` —
+  // never the raw derived object). Feeds the existing 300 ms compile cycle:
+  // installing a pack or synthesizing/narrowing a guard changes the key,
+  // which re-runs the transform and recompiles the preview — no new timer.
+  const derivedRuleAdditions = useMemo(
+    () => (baseIr === null ? null : deriveRuleAdditions(workingIr, baseIr)),
+    [workingIr, baseIr],
+  );
+  const ruleAdditionsKey = useMemo(
+    () =>
+      derivedRuleAdditions === null
+        ? ""
+        : ruleAdditionsMemoKey(derivedRuleAdditions),
+    [derivedRuleAdditions],
+  );
+
   // Assignments key — compact string (scope:target:patternId/slotValues per assignment).
   const assignmentsKey = useMemo(
     () =>
@@ -424,6 +452,11 @@ export function useWorkingCopyTransform(
         ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
         ...(storeBaseDisplayName !== null ? { baseDisplayName: storeBaseDisplayName } : {}),
         contextToleranceOverlay,
+        // spec 082: project the rules step's working-IR additions (pack
+        // install, guard synthesis, Narrow). Null only while baseIr is null,
+        // which already returned null above — the conditional spread keeps
+        // TS's narrowing honest.
+        ...(derivedRuleAdditions !== null ? { ruleAdditions: derivedRuleAdditions } : {}),
       });
 
       return {
@@ -439,6 +472,7 @@ export function useWorkingCopyTransform(
     storeBaseDisplayName,
     deletedKey,
     disabledKey,
+    ruleAdditionsKey,
     assignmentsKey,
     identityDisplayName,
     identityKeyboardId,
