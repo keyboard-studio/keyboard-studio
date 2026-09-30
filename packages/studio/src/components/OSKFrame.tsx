@@ -34,6 +34,14 @@ export interface OSKFrameProps {
   onTextChange?: (text: string) => void;
   /** Called when the user taps a key on the rendered OSK. keyId is the KMW key identifier (e.g. "K_A"). */
   onKeyTap?: (keyId: string) => void;
+  /**
+   * Put the caret in the type-here textarea once the first keyboard is
+   * active, so the author can type straight away. For previews the author
+   * explicitly opened (a PreviewSheet); an always-visible pane must not
+   * steal focus from the survey. Fires once per mount — later reloads
+   * (every edit recompiles) leave focus where the author put it.
+   */
+  autoFocus?: boolean;
 }
 
 /**
@@ -63,6 +71,7 @@ export function OSKFrame({
   retry,
   onTextChange,
   onKeyTap,
+  autoFocus = false,
 }: OSKFrameProps) {
   const { t } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -90,7 +99,7 @@ export function OSKFrame({
   // and the booleans are primitives. Depending on the object directly
   // re-fires these effects every render and spams the iframe with
   // duplicate SET_KEYBOARD messages.
-  const { send, engineReady, textValue } = channel;
+  const { send, engineReady, textValue, keyboardActivations } = channel;
   const contentHeight = channel.contentHeight ?? null;
   // Once the frame reports its natural height (CONTENT_HEIGHT), size the
   // iframe to it so the whole keyboard shows — a fixed estimate cropped the
@@ -184,6 +193,18 @@ export function OSKFrame({
     if (!engineReady) return;
     send({ type: "SET_OSK_MODE", mode: oskMode });
   }, [oskMode, engineReady, send]);
+
+  // autoFocus: on the first activation only. Focusing the iframe element
+  // hands the page's focus to the frame; FOCUS_TARGET then picks the
+  // textarea inside it (a focus() call inside a frame that is not itself
+  // focused does not move the page's focus).
+  const autoFocusedRef = useRef(false);
+  useEffect(() => {
+    if (!autoFocus || autoFocusedRef.current || keyboardActivations === 0) return;
+    autoFocusedRef.current = true;
+    iframeRef.current?.focus({ preventScroll: true });
+    send({ type: "FOCUS_TARGET" });
+  }, [autoFocus, keyboardActivations, send]);
 
   if (baseKeyboard !== null && isExcludedScript(baseKeyboard.script)) {
     return <UnsupportedScriptStub script={baseKeyboard.script} />;

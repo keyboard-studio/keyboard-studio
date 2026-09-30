@@ -10,6 +10,8 @@ export interface OskChannelResult {
   textValue: string;
   /** Frame document's natural height (CONTENT_HEIGHT), or null until reported. */
   contentHeight: number | null;
+  /** KEYBOARD_ACTIVE count: 0 until the first keyboard is typeable. */
+  keyboardActivations: number;
 }
 
 /**
@@ -30,6 +32,7 @@ export function useOskChannel(
   const [engineError, setEngineError] = useState<string | null>(null);
   const [textValue, setTextValue] = useState("");
   const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const [keyboardActivations, setKeyboardActivations] = useState(0);
 
   // Keep the iframe ref stable in the listener closure without re-registering.
   const iframeRefRef = useRef(iframeRef);
@@ -58,6 +61,9 @@ export function useOskChannel(
         case "ENGINE_ERROR":
           setEngineError(event.data.message);
           break;
+        case "KEYBOARD_ACTIVE":
+          setKeyboardActivations((n) => n + 1);
+          break;
         case "TEXT_UPDATED":
           setTextValue(event.data.value);
           break;
@@ -85,5 +91,13 @@ export function useOskChannel(
     frame.contentWindow.postMessage(cmd, window.location.origin);
   }, []);
 
-  return { send, lastEvent, engineReady, engineError, textValue, contentHeight };
+  return {
+    send,
+    lastEvent,
+    engineReady,
+    engineError,
+    textValue,
+    contentHeight,
+    keyboardActivations,
+  };
 }

@@ -6,8 +6,10 @@
 //   host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, bcp47?, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
 //   host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" | "tablet" }
 //   host -> frame: { type: "SET_STRINGS",   strings: { placeholder?, statusReady? } }
+//   host -> frame: { type: "FOCUS_TARGET" }
 //   frame -> host: { type: "ENGINE_READY" }
 //   frame -> host: { type: "ENGINE_ERROR", message }
+//   frame -> host: { type: "KEYBOARD_ACTIVE" }
 //   frame -> host: { type: "TEXT_UPDATED", value }
 //   frame -> host: { type: "KEY_TAPPED", keyId }
 //   frame -> host: { type: "CONTENT_HEIGHT", height }
@@ -401,6 +403,7 @@
         setStatus("active: " + keyboardId);
         setOsk();
         try { oskTarget.focus(); } catch (_) {}
+        post({ type: "KEYBOARD_ACTIVE" });
       })
       .catch(function (err) {
         if (myToken !== loadToken) return;        // a superseded load's failure (e.g. a blob the host already revoked) — ignore
@@ -536,6 +539,11 @@
           if (!activeIdle) setStatus(statusReadyText);
         }
       }
+      return;
+    }
+
+    if (msg.type === "FOCUS_TARGET") {
+      try { oskTarget.focus({ preventScroll: true }); } catch (_) {}
       return;
     }
 

@@ -48,7 +48,8 @@ export function GalleryPreviewPane({
   // Narrow viewports render this pane in AssignLoopShell's flush PreviewSheet:
   // the keyboard spans the sheet edge to edge, so the text blocks carry their
   // own 12px side inset (the SurveyPreviewPane `compact` convention).
-  const inset = useIsNarrow() ? "0 12px" : 0;
+  const narrow = useIsNarrow();
+  const inset = narrow ? "0 12px" : 0;
 
   const applyWarnings =
     stage.kind === "ready" && stage.scaffoldWarnings.length > 0
@@ -220,6 +221,8 @@ export function GalleryPreviewPane({
           stage={stage}
           retry={retry}
           {...(onKeyTap !== undefined ? { onKeyTap } : {})}
+          // Narrow = the PreviewSheet the author just opened.
+          autoFocus={narrow}
         />
       </div>
 

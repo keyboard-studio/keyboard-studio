@@ -140,6 +140,8 @@ export function SurveyPreviewPane({
             oskMode={oskMode}
             stage={stage}
             retry={retry}
+            // Compact = the narrow PreviewSheet the author just opened.
+            autoFocus={compact}
           />
         </>
       )}
