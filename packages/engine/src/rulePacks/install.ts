@@ -21,9 +21,11 @@
 // the rule texts are the executable content. The one structured synthesis
 // install DOES perform is the guard store: when a behaviour names
 // `parameters.guardStore` with a `guardedContextChars` list and the target
-// IR has no store by that name, install synthesizes the store from the
-// structured chars (also `ownedByBehaviour`-stamped, so uninstall removes
-// exactly what install added — never a pre-existing same-named store).
+// IR has no identical store by that name, install synthesizes the store from
+// the structured chars — under a fresh name, with the rules repointed, when
+// the name is already taken by different content (also
+// `ownedByBehaviour`-stamped, so uninstall removes exactly what install
+// added — never a pre-existing same-named store).
 //
 // All functions are pure: they return a new KeyboardIR and never mutate
 // the input.
@@ -136,34 +138,91 @@ function parseBehaviourRules(
   });
 }
 
+/** A guard store to add, plus the name the behaviour's rules must reference. */
+interface GuardStorePlan {
+  /** Store to add to the IR, or null when an identical store already exists. */
+  store: KeyboardIR["stores"][number] | null;
+  /** Name the pack's rules use for the store (`parameters.guardStore`). */
+  requestedName: string;
+  /** Name the installed rules must reference — differs on a name collision. */
+  resolvedName: string;
+}
+
+/** Concatenated char content of a store, or null when it holds non-char items. */
+function storeCharText(store: KeyboardIR["stores"][number]): string | null {
+  let text = "";
+  for (const item of store.items) {
+    if (item.kind !== "char") return null;
+    text += item.value;
+  }
+  return text;
+}
+
 /**
- * Synthesize a guard store from a behaviour's structured parameters when the
- * target IR lacks it. Returns null when the store already exists (install
- * must never shadow or duplicate a pre-existing store) or when the
- * parameters do not describe one.
+ * Resolve a behaviour's guard store from its structured parameters. Stores
+ * are matched by name against the target IR plus the stores this install has
+ * already planned (two behaviours of one pack may share a guard store):
+ *
+ *   - no store of that name → synthesize it under the requested name;
+ *   - a store of that name with the same characters in the same order →
+ *     reuse it, synthesizing nothing;
+ *   - a store of that name with different content → the name belongs to
+ *     something else, so synthesize the pack's store under a fresh
+ *     `<name>_<n>` and have the caller point the rules at it. Reusing the
+ *     foreign store would silently wire the guards to the wrong characters;
+ *     overwriting it would break whatever rules already read it.
+ *
+ * Returns null when the parameters do not describe a guard store.
  */
-function synthesizeGuardStore(
-  ir: KeyboardIR,
+function planGuardStore(
+  existing: readonly KeyboardIR["stores"][number][],
   packId: string,
   behaviour: BehaviourRecord,
   mintNodeId: (kind: "store") => string,
-): KeyboardIR["stores"][number] | null {
+): GuardStorePlan | null {
   const name = behaviour.parameters["guardStore"];
   const chars = behaviour.parameters["guardedContextChars"];
   if (typeof name !== "string" || name === "" || !Array.isArray(chars)) return null;
-  if (ir.stores.some((s) => s.name === name)) return null;
   const items = chars
     .filter((c): c is string => typeof c === "string" && c !== "")
     .map((c) => ({ kind: "char" as const, value: c }));
   if (items.length === 0) return null;
+  const wanted = items.map((i) => i.value).join("");
+
+  const sameName = existing.find((s) => s.name === name);
+  if (sameName !== undefined && storeCharText(sameName) === wanted) {
+    return { store: null, requestedName: name, resolvedName: name };
+  }
+  let resolvedName = name;
+  if (sameName !== undefined) {
+    const taken = new Set(existing.map((s) => s.name));
+    let n = 2;
+    while (taken.has(`${name}_${n}`)) n += 1;
+    resolvedName = `${name}_${n}`;
+  }
   return {
-    nodeId: mintNodeId("store"),
-    name,
-    items,
-    isSystem: false,
-    ownedByBehaviour: ownershipOf(packId, behaviour.id),
-    rulesStepAdded: true,
+    store: {
+      nodeId: mintNodeId("store"),
+      name: resolvedName,
+      items,
+      isSystem: false,
+      ownedByBehaviour: ownershipOf(packId, behaviour.id),
+      rulesStepAdded: true,
+    },
+    requestedName: name,
+    resolvedName,
   };
+}
+
+/** Repoint every store reference in a rule from one store name to another. */
+function renameStoreRefs(
+  rule: KeyboardIR["groups"][number]["rules"][number],
+  from: string,
+  to: string,
+): KeyboardIR["groups"][number]["rules"][number] {
+  const swap = <E extends { kind: string }>(el: E): E =>
+    "storeRef" in el && el.storeRef === from ? { ...el, storeRef: to } : el;
+  return { ...rule, context: rule.context.map(swap), output: rule.output.map(swap) };
 }
 
 /**
@@ -217,14 +276,18 @@ export function installPack(ir: KeyboardIR, pack: RulePack): InstallPackResult {
 
   for (const behaviour of validPack.behaviours) {
     const ownership = ownershipOf(validPack.id, behaviour.id);
-    const store = synthesizeGuardStore(ir, validPack.id, behaviour, (k) =>
+    const plan = planGuardStore([...ir.stores, ...newStores], validPack.id, behaviour, (k) =>
       mintNodeId(k),
     );
-    if (store !== null) {
-      newStores.push(store);
-      installedStoreNodeIds.push(store.nodeId);
+    if (plan?.store) {
+      newStores.push(plan.store);
+      installedStoreNodeIds.push(plan.store.nodeId);
     }
-    for (const rule of parseBehaviourRules(validPack.id, behaviour)) {
+    for (const parsed of parseBehaviourRules(validPack.id, behaviour)) {
+      const rule =
+        plan !== null && plan.resolvedName !== plan.requestedName
+          ? renameStoreRefs(parsed, plan.requestedName, plan.resolvedName)
+          : parsed;
       const nodeId = mintNodeId("rule");
       newRules.push({ ...rule, nodeId, ownedByBehaviour: ownership, rulesStepAdded: true });
       installedRuleNodeIds.push(nodeId);

@@ -177,6 +177,43 @@ describe("installPack (FR-015: through the spine)", () => {
     expect(() => installPack(loadFixtureIr(), badRulePack)).toThrow(RulePackInstallError);
   });
 
+  it("namespaces the guard store when the target's same-named store holds other characters", () => {
+    const pack = loadPack();
+    const fixture = loadFixtureIr();
+    const foreignDiablock: KeyboardIR = {
+      ...fixture,
+      stores: fixture.stores.map((s) =>
+        s.name === "diablock" ? { ...s, items: [{ kind: "char", value: "x" }] } : s,
+      ),
+    };
+
+    const result = installPack(foreignDiablock, pack);
+
+    // The target's own diablock is left exactly as it was.
+    const original = result.ir.stores.find((s) => s.name === "diablock");
+    expect(original!.items).toEqual([{ kind: "char", value: "x" }]);
+    expect(original!.ownedByBehaviour).toBeUndefined();
+    // The pack's store lands under a fresh name, owned by the install.
+    expect(result.installedStoreNodeIds).toHaveLength(1);
+    const synthesized = result.ir.stores.find((s) => s.name === "diablock_2");
+    expect(synthesized?.ownedByBehaviour).toBe(
+      "cameroon-diacritic-blocking/cameroon_diacritic_blocking",
+    );
+    // Every installed rule reads the synthesized store, none the foreign one.
+    const installed = new Set(result.installedRuleNodeIds);
+    const refs = mainGroup(result.ir)
+      .rules.filter((r) => installed.has(r.nodeId))
+      .flatMap((r) => [...r.context, ...r.output])
+      .flatMap((el) => ("storeRef" in el ? [el.storeRef] : []));
+    expect(refs.length).toBeGreaterThan(0);
+    expect(new Set(refs)).toEqual(new Set(["diablock_2"]));
+    expect(emit(result.ir)).toContain("any(diablock_2)");
+
+    // Uninstall removes only what install added.
+    const { ir: after } = uninstallPack(result.ir, pack.id);
+    expect(after.stores.map((s) => s.name)).toEqual(foreignDiablock.stores.map((s) => s.name));
+  });
+
   it("refuses a readonly main group instead of minting a second group(main)", () => {
     const pack = loadPack();
     const fixture = loadFixtureIr();
