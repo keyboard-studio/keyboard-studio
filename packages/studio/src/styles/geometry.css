@@ -44,6 +44,10 @@
   --app-motion-duration-reduced: 120ms;
   /* CSS analogue of the critically damped default spring. */
   --app-motion-ease-ui: cubic-bezier(0.33, 1, 0.68, 1);
+
+  /* Frosted-chrome blur radius for the translucent bars (index.css). A token
+     so the reduced-transparency override drops it in one place. */
+  --app-chrome-blur: 20px;
 }
 
 @media (prefers-reduced-motion: reduce) {

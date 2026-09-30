@@ -15,6 +15,12 @@
   --app-surface:          #FFFFFF;
   --app-surface-2:        #F8FAFB;
   --app-overlay:          #FFFFFF;
+  /* Frosted-chrome surface: the translucent material for the persistent
+     floating bars (top nav, journey footer). Built on --app-surface so it
+     tracks the theme with no per-theme override — page content shows through
+     softly under backdrop blur. Legibility comes from the blur plus the fill,
+     never from stacking chrome on chrome. */
+  --app-chrome-surface:   color-mix(in srgb, var(--app-surface) 72%, transparent);
   --app-border:           #E3E7EB;
   --app-border-strong:    #CFD6DC;
   --app-text:             #18242E;

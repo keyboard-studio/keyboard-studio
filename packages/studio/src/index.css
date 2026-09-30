@@ -90,17 +90,228 @@ body {
   }
 }
 
+/* Translucent chrome (frosted-glass bars) ------------------------------------
+ * The studio's persistent bars — the desktop top navigation
+ * (.ks-chrome-bar-top) and the journey footer (.ks-studio-footer) — are
+ * translucent layers, not opaque strips: a semi-transparent surface fill
+ * plus backdrop blur, with page content scrolling underneath each bar. The
+ * hard hairline dividers are replaced by a scroll-edge fade: a short
+ * gradient band where the bar meets the content, so scrolling content
+ * visibly softens into the bar instead of hitting a line. The fade is part
+ * of the bar itself, so it appears only where floating chrome overlaps
+ * content.
+ *
+ * The frost is painted on ::before/::after, NEVER on the bar element: a
+ * backdrop-filter on the element would make it a containing block for
+ * fixed-position descendants, and both bars own viewport-fixed layers (the
+ * contents sheet inside the footer; the account popover backdrop inside
+ * the nav).
+ *
+ * z-index 100: above in-pane widgets (picker popups and the like sit at
+ * 50 or below), below popovers (199/200), sheets (240/241) and dialogs
+ * (299). When a sheet or dialog opens, its scrim covers the chrome —
+ * translucent surfaces never stack on each other.
+ */
+
 /* Studio footer frame (spec 081 FR-020 / FR-020a). A fixed height, never
  * content-driven: 40 px under a fine pointer, and 52 px under a coarse one so a
  * nav button's 44 px `.ks-hit-target` fits without growing the strip. A class
- * rather than an inline style because the pointer query cannot be inline. */
+ * rather than an inline style because the pointer query cannot be inline.
+ *
+ * The bar overlaps the content above it by exactly its own height: it stays
+ * in normal flow (the shell's column math is untouched) while pane content
+ * scrolls beneath the frosted layer. */
 .ks-studio-footer {
-  height: 40px;
+  --studio-footer-h: 40px;
+  height: var(--studio-footer-h);
+  margin-top: calc(-1 * var(--studio-footer-h));
+  position: relative;
+  z-index: 100;
+  background: var(--app-chrome-surface);
+  /* `visible`: the scroll-edge fade (::before) hangs above the bar. The old
+   * overflow: hidden (FR-047, no horizontal page overflow) is not needed
+   * here — the shell root already clips horizontally, and the dot row keeps
+   * its own horizontal scroll. */
+  overflow: visible;
+}
+
+/* Frost layer for the footer — kept off the element itself (see the header
+ * comment above). */
+.ks-studio-footer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
+  backdrop-filter: blur(var(--app-chrome-blur));
+  pointer-events: none;
+}
+
+/* Scroll-edge fade: the 24 px band above the footer where content softens
+ * into the bar. Taps fall through to the content beneath. */
+.ks-studio-footer::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--app-chrome-surface)
+  );
+  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
+  backdrop-filter: blur(var(--app-chrome-blur));
+  pointer-events: none;
 }
 
 @media (pointer: coarse) {
   .ks-studio-footer {
-    height: 52px;
+    --studio-footer-h: 52px;
+  }
+}
+
+/* Desktop top bar: the same frosted treatment, fading downward into the
+ * content. The narrow bar keeps its opaque look — NavBar applies this class
+ * on desktop only. */
+.ks-chrome-bar-top {
+  position: relative;
+  z-index: 100;
+  background: var(--app-chrome-surface);
+  /* Content scrolls under the bar — unless the phase stepper sits directly
+   * below it (desktop survey route): the stepper is opaque chrome, and
+   * floating frost over chrome would stack two bars. There the nav stays in
+   * flow and the fade below it reads as a soft shadow. */
+  margin-bottom: calc(-1 * var(--topbar-h));
+}
+.ks-chrome-bar-top:has(+ [data-testid="phase-stepper"]) {
+  margin-bottom: 0;
+}
+/* Frost layer (see the header comment for why this is a pseudo-element). */
+.ks-chrome-bar-top::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
+  backdrop-filter: blur(var(--app-chrome-blur));
+  pointer-events: none;
+}
+/* Scroll-edge fade below the bar. */
+.ks-chrome-bar-top::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(to top, transparent, var(--app-chrome-surface));
+  -webkit-backdrop-filter: blur(var(--app-chrome-blur));
+  backdrop-filter: blur(var(--app-chrome-blur));
+  pointer-events: none;
+}
+
+/* Frosted chrome follows the platform transparency preference: drop the blur
+ * and raise the surface toward solid, mirroring the reduced-motion
+ * precedent (declarative, token-driven). */
+@media (prefers-reduced-transparency: reduce) {
+  .ks-studio-footer,
+  .ks-chrome-bar-top {
+    background: var(--app-surface);
+  }
+  .ks-studio-footer::after,
+  .ks-studio-footer::before,
+  .ks-chrome-bar-top::before,
+  .ks-chrome-bar-top::after {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .ks-studio-footer::before {
+    background: linear-gradient(to bottom, transparent, var(--app-surface));
+  }
+  .ks-chrome-bar-top::after {
+    background: linear-gradient(to top, transparent, var(--app-surface));
+  }
+}
+
+/* High-contrast preference: near-solid bars with a defined edge instead of
+ * a soft fade — the fade's low-contrast gradient would muddy the boundary. */
+@media (prefers-contrast: more) {
+  .ks-studio-footer,
+  .ks-chrome-bar-top {
+    background: var(--app-surface);
+  }
+  .ks-studio-footer {
+    border-top: 1px solid var(--app-border-strong);
+  }
+  .ks-chrome-bar-top {
+    border-bottom: 1px solid var(--app-border-strong);
+  }
+  .ks-studio-footer::before,
+  .ks-studio-footer::after,
+  .ks-chrome-bar-top::before,
+  .ks-chrome-bar-top::after {
+    display: none;
+  }
+}
+
+/* Journey contents sheet: enter/exit anchored at the trigger ----------------
+ * The sheet reads as emerging from the Contents button that opened it: the
+ * trigger point arrives as --jc-origin-x/y (px, in the sheet's own box —
+ * see JourneyContents.tsx) and both the enter and the exit run from that
+ * transform-origin, the exit reversing the enter path symmetrically.
+ * Durations ride the shared motion tokens, so reduced-motion degrades them
+ * to zero declaratively. */
+[data-testid="journey-contents-sheet"] {
+  transform-origin: var(--jc-origin-x, 100%) var(--jc-origin-y, 100%);
+  animation: jc-sheet-enter var(--app-motion-response) var(--app-motion-ease-ui);
+}
+[data-testid="journey-contents-sheet-backdrop"] {
+  animation: jc-backdrop-enter var(--app-motion-response)
+    var(--app-motion-ease-ui);
+}
+.jc-sheet-exit [data-testid="journey-contents-sheet"] {
+  animation: jc-sheet-exit var(--app-motion-response) var(--app-motion-ease-ui);
+}
+.jc-sheet-exit [data-testid="journey-contents-sheet-backdrop"] {
+  animation: jc-backdrop-exit var(--app-motion-response)
+    var(--app-motion-ease-ui);
+}
+@keyframes jc-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes jc-sheet-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+}
+@keyframes jc-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes jc-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

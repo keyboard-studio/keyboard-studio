@@ -1,6 +1,13 @@
 // JourneyContents — the narrow-viewport table of contents sheet, and its store.
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { screen, cleanup, fireEvent, within, act } from "@testing-library/react";
+import {
+  screen,
+  cleanup,
+  fireEvent,
+  within,
+  act,
+  waitFor,
+} from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { JourneyContents } from "./JourneyContents.tsx";
 import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
@@ -40,18 +47,33 @@ const CHAR_Q2 = dot("characters", {
   label: "Second question",
   location: { route: "survey", step: "characters", question: "q_two" },
 });
-const MARKS = dot("marks", { kind: "upcoming", fill: "none", label: "Marks Section" });
+const MARKS = dot("marks", {
+  kind: "upcoming",
+  fill: "none",
+  label: "Marks Section",
+});
 
 const DOTS = [IDENTITY, CHAR_Q1, CHAR_Q2, MARKS];
 
 beforeEach(() => {
-  useJourneyContentsStore.setState({ available: false, open: false });
+  useJourneyContentsStore.setState({
+    available: false,
+    open: false,
+    origin: null,
+  });
 });
 afterEach(cleanup);
 
-function renderSheet(onActivate = vi.fn(() => true), statusMessage: string | null = null) {
+function renderSheet(
+  onActivate = vi.fn(() => true),
+  statusMessage: string | null = null,
+) {
   render(
-    <JourneyContents dots={DOTS} onActivate={onActivate} statusMessage={statusMessage} />,
+    <JourneyContents
+      dots={DOTS}
+      onActivate={onActivate}
+      statusMessage={statusMessage}
+    />,
   );
   return onActivate;
 }
@@ -73,6 +95,29 @@ describe("journeyContentsStore", () => {
       available: true,
       open: true,
     });
+  });
+
+  it("setOpen records the trigger origin", () => {
+    useJourneyContentsStore.getState().setOpen(true, { x: 10, y: 20 });
+    expect(useJourneyContentsStore.getState()).toMatchObject({
+      open: true,
+      origin: { x: 10, y: 20 },
+    });
+  });
+
+  it("closing keeps the origin so the exit can retrace the enter path", () => {
+    useJourneyContentsStore.setState({ open: true, origin: { x: 10, y: 20 } });
+    useJourneyContentsStore.getState().setOpen(false);
+    expect(useJourneyContentsStore.getState()).toMatchObject({
+      open: false,
+      origin: { x: 10, y: 20 },
+    });
+  });
+
+  it("opening without an origin keeps the previous one", () => {
+    useJourneyContentsStore.setState({ origin: { x: 1, y: 2 } });
+    useJourneyContentsStore.getState().setOpen(true);
+    expect(useJourneyContentsStore.getState().origin).toEqual({ x: 1, y: 2 });
   });
 });
 
@@ -117,32 +162,48 @@ describe("JourneyContents", () => {
     expect(items[3]).toBe("Second question");
     expect(items[4]).toBe("Marks Section");
     // Headings are not buttons.
-    expect(screen.getByTestId("journey-contents-list").children[1]!.querySelector("button")).toBeNull();
+    expect(
+      screen
+        .getByTestId("journey-contents-list")
+        .children[1]!.querySelector("button"),
+    ).toBeNull();
   });
 
   it("marks the current row with aria-current=step and does not call onActivate for it", () => {
     useJourneyContentsStore.setState({ open: true });
     const onActivate = renderSheet();
-    const current = screen.getByRole("button", { name: /First question — you are here/ });
+    const current = screen.getByRole("button", {
+      name: /First question — you are here/,
+    });
     expect(current.getAttribute("aria-current")).toBe("step");
     fireEvent.click(current);
     expect(onActivate).not.toHaveBeenCalled();
     expect(useJourneyContentsStore.getState().open).toBe(true);
   });
 
-  it("activating a non-current row calls onActivate and closes when it returns true", () => {
+  it("activating a non-current row calls onActivate and closes when it returns true", async () => {
     useJourneyContentsStore.setState({ open: true });
     const onActivate = renderSheet(vi.fn(() => true));
-    fireEvent.click(screen.getByRole("button", { name: /Identity Section — completed/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Identity Section — completed/ }),
+    );
     expect(onActivate).toHaveBeenCalledTimes(1);
     expect(onActivate).toHaveBeenCalledWith(IDENTITY);
     expect(useJourneyContentsStore.getState().open).toBe(false);
-    expect(screen.queryByTestId("journey-contents-sheet")).toBeNull();
+    // The close is staged: the sheet stays mounted on the exit path for one
+    // motion beat, then unmounts.
+    expect(screen.getByTestId("journey-contents-sheet")).not.toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByTestId("journey-contents-sheet")).toBeNull(),
+    );
   });
 
   it("stays open, showing the status message, when onActivate returns false", () => {
     useJourneyContentsStore.setState({ open: true });
-    const onActivate = renderSheet(vi.fn(() => false), "Not yet reached");
+    const onActivate = renderSheet(
+      vi.fn(() => false),
+      "Not yet reached",
+    );
     fireEvent.click(screen.getByRole("button", { name: /Marks Section/ }));
     expect(onActivate).toHaveBeenCalledWith(MARKS);
     expect(useJourneyContentsStore.getState().open).toBe(true);
@@ -155,5 +216,57 @@ describe("JourneyContents", () => {
     renderSheet();
     fireEvent.click(screen.getByTestId("journey-contents-sheet-close"));
     expect(useJourneyContentsStore.getState().open).toBe(false);
+  });
+
+  it("anchors the enter animation at the stored trigger point", () => {
+    // jsdom measures every element at 0,0, so the sheet-box translation of
+    // the stored viewport point is the point itself.
+    useJourneyContentsStore.setState({
+      open: true,
+      origin: { x: 350, y: 700 },
+    });
+    renderSheet();
+    const originWrap = screen.getByTestId("journey-contents-origin");
+    expect(originWrap.style.getPropertyValue("--jc-origin-x")).toBe("350px");
+    expect(originWrap.style.getPropertyValue("--jc-origin-y")).toBe("700px");
+  });
+
+  it("without a stored trigger the sheet falls back to its default origin", () => {
+    useJourneyContentsStore.setState({ open: true, origin: null });
+    renderSheet();
+    const originWrap = screen.getByTestId("journey-contents-origin");
+    expect(originWrap.style.getPropertyValue("--jc-origin-x")).toBe("");
+    expect(originWrap.style.getPropertyValue("--jc-origin-y")).toBe("");
+  });
+
+  it("plays the exit from the same origin before unmounting", async () => {
+    useJourneyContentsStore.setState({
+      open: true,
+      origin: { x: 350, y: 700 },
+    });
+    renderSheet();
+    act(() => useJourneyContentsStore.getState().setOpen(false));
+    const originWrap = screen.getByTestId("journey-contents-origin");
+    // Still mounted, now on the exit path, anchored where the enter began.
+    expect(originWrap.className).toContain("jc-sheet-exit");
+    expect(originWrap.style.getPropertyValue("--jc-origin-x")).toBe("350px");
+    expect(screen.getByTestId("journey-contents-sheet")).not.toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByTestId("journey-contents-sheet")).toBeNull(),
+    );
+  });
+
+  it("reopening during the exit cancels it", async () => {
+    useJourneyContentsStore.setState({ open: true });
+    renderSheet();
+    act(() => useJourneyContentsStore.getState().setOpen(false));
+    expect(screen.getByTestId("journey-contents-origin").className).toContain(
+      "jc-sheet-exit",
+    );
+    act(() => useJourneyContentsStore.getState().setOpen(true));
+    expect(
+      screen.getByTestId("journey-contents-origin").className,
+    ).not.toContain("jc-sheet-exit");
+    expect(screen.getByTestId("journey-contents-sheet")).not.toBeNull();
   });
 });

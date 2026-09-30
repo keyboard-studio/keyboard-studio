@@ -97,6 +97,11 @@ export function NavBar({
         activeI18n,
         msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
       )}
+      // Translucent chrome on desktop (.ks-chrome-bar-top, index.css):
+      // a frosted layer with page content scrolling underneath, fading into
+      // the content below through a scroll-edge fade instead of a hairline.
+      // The narrow bar keeps its opaque look.
+      className={isNarrow ? undefined : "ks-chrome-bar-top"}
       // WRAPS RATHER THAN OVERLAPS. The bar is one row of --topbar-h whenever
       // its three zones fit side by side. When they don't (a ~1280px laptop
       // viewport with every right-zone control showing, 1024px, a long
@@ -118,8 +123,6 @@ export function NavBar({
         columnGap: 4,
         rowGap: 0,
         padding: "0 16px",
-        background: "var(--app-surface)",
-        borderBottom: "1px solid var(--app-border)",
         boxSizing: "border-box",
       }}
     >
@@ -358,9 +361,15 @@ export function NavBar({
                   type="button"
                   className="ks-focus-ring"
                   aria-haspopup="dialog"
-                  onClick={() => {
+                  onClick={(e) => {
                     setOverflowOpen(false);
-                    openContents(true);
+                    // Hand the sheet the trigger point so its enter/exit
+                    // animation anchors at the menu item that opened it.
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    openContents(true, {
+                      x: rect.left + rect.width / 2,
+                      y: rect.top,
+                    });
                   }}
                   data-testid="nav-journey-contents"
                   style={{

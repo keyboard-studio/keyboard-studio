@@ -810,12 +810,12 @@ describe("StudioFooter — narrow viewport contents button", () => {
   }
 
   beforeEach(() => {
-    useJourneyContentsStore.setState({ available: false, open: false });
+    useJourneyContentsStore.setState({ available: false, open: false, origin: null });
   });
 
   afterEach(() => {
     setWidth(originalWidth);
-    useJourneyContentsStore.setState({ available: false, open: false });
+    useJourneyContentsStore.setState({ available: false, open: false, origin: null });
   });
 
   it("desktop: keeps the dot row and shows no Contents button", () => {
@@ -846,6 +846,19 @@ describe("StudioFooter — narrow viewport contents button", () => {
     expect(current).toBeDefined();
     expect(current!.getAttribute("aria-label")).toMatch(/you are here/i);
     expect((current!.textContent ?? "").length).toBeGreaterThan(0);
+  });
+
+  it("narrow: the Contents button hands its trigger point to the sheet", () => {
+    setWidth(390);
+    render(<StudioFooter />);
+    fireEvent.click(screen.getByTestId("journey-contents-open"));
+    expect(useJourneyContentsStore.getState().open).toBe(true);
+    // The sheet anchors its enter/exit at this point; jsdom measures the
+    // button at 0,0, so only the shape is asserted here.
+    const origin = useJourneyContentsStore.getState().origin;
+    expect(origin).not.toBeNull();
+    expect(typeof origin!.x).toBe("number");
+    expect(typeof origin!.y).toBe("number");
   });
 
   it("narrow: activating a reached row in the sheet jumps and closes the sheet", () => {
