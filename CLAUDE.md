@@ -26,8 +26,9 @@ opening the whole file spends the tokens the search just saved. Output is byte-c
 
 **Retired specs.** `specs/_archive/**` holds the full working docs of shipped features. Don't
 Read them by default: start from `specs/NNN-slug/AS-BUILT.md` (or `contracts.md`); the code is
-the truth. `spec-search` still indexes the archive -- skip `specs/_archive/` hits unless the task
-is explicitly historical, and scope Grep to exclude it.
+the truth. `spec-search` skips the archive unless `--scope specs/_archive/...` names it, and the
+root `.ignore` keeps ripgrep (Grep/Glob) out of it; search it explicitly only when the task is
+historical.
 
 For keyboards specifically, [docs/keyboard-index.md](docs/keyboard-index.md) is the phonebook —
 see below.
