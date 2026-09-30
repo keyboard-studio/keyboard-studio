@@ -644,13 +644,17 @@ async function createMissingIssues(drifted, token, owner, repo, existing) {
 
 const DOCS_DIR = path.join(REPO_ROOT, 'docs');
 const ROOT_DOCS = ['spec.md', 'README.md'];
+// Retired feature docs (moved here by km-retire; specs/<feature>/AS-BUILT.md
+// is the live summary). Skipped unless --scope names the archive explicitly.
+const ARCHIVE_DIR = path.join(SPECS_DIR, '_archive');
 
-function walkMarkdown(dir, out) {
+function walkMarkdown(dir, out, skip = null) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) walkMarkdown(p, out);
+    if (skip && p === skip) continue;
+    if (e.isDirectory()) walkMarkdown(p, out, skip);
     else if (e.name.endsWith('.md')) out.push(p);
   }
   return out;
@@ -662,10 +666,11 @@ function relId(abs) {
   return path.relative(REPO_ROOT, abs).split(path.sep).join('/');
 }
 
-function collectCorpusFiles() {
+function collectCorpusFiles(scope = null) {
+  const includeArchive = !!scope && scope.replace(/\\/g, '/').startsWith('specs/_archive');
   const abs = [
     ...ROOT_DOCS.map(f => path.join(REPO_ROOT, f)).filter(f => fs.existsSync(f)),
-    ...walkMarkdown(SPECS_DIR, []),
+    ...walkMarkdown(SPECS_DIR, [], includeArchive ? null : ARCHIVE_DIR),
     ...walkMarkdown(DOCS_DIR, [])
   ];
   return abs
@@ -739,7 +744,7 @@ function search(args) {
     process.exit(1);
   }
 
-  const corpus = engine.buildCorpus(collectCorpusFiles());
+  const corpus = engine.buildCorpus(collectCorpusFiles(opts.scope));
   const result = engine.search(corpus, query, { limit, scope: opts.scope });
 
   if (result.hits.length === 0) {

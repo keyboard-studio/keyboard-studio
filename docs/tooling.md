@@ -466,3 +466,6 @@ pnpm run spec-search "layer A validity" --json
 - `--budget` is a hard cap on printed bytes (default 2048, minimum 256), enforced by dropping
   trailing hits; the header reports actual-of-budget every run. `CLAUDE.md` is excluded from the
   corpus — it is already in context, so a hit there would spend budget on text you can see.
+- `specs/_archive/**` (retired feature docs) is skipped unless `--scope` starts with
+  `specs/_archive`, so shipped specs' working docs don't crowd out live ones. The root `.ignore`
+  does the same for ripgrep-based search.
