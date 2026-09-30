@@ -339,7 +339,11 @@ export function SequenceBuilderPanel({
         display: "flex",
         flexDirection: "column",
         gap: 16,
-        height: "100%",
+        // minHeight, not height: content taller than the pane must grow the
+        // box so the scroll container's bottom padding lands after the Apply
+        // button (clearing the journey footer) instead of the button
+        // overflowing a fixed-height box and staying under the bar.
+        minHeight: "100%",
         boxSizing: "border-box",
       }}
     >

@@ -1,4 +1,26 @@
-import type { IRStore } from "@keyboard-studio/contracts";
+import type { IRStore, IRRule } from "@keyboard-studio/contracts";
+
+/**
+ * FR-021: a rule carrying `ownedByBehaviour` is behaviour-owned. Behaviour-owned
+ * rules are never pattern candidates — the marker ALONE determines behaviour
+ * ownership (no shape heuristics). Every pattern matcher skips them alongside
+ * the `ownedByPattern` claimed-guard, so a behaviour-owned rule can never gain
+ * an `ownedByPattern` stamp (FR-002 mutual exclusivity) and is never treated as
+ * author content or as a carve target by recognition.
+ *
+ * Both-markers conflict (invalid per FR-002, rejected by the zod schema at
+ * validation boundaries): if a rule somehow carries both markers in memory,
+ * the behaviour marker wins candidacy deterministically — the rule is skipped
+ * by pattern matchers and keeps its `ownedByBehaviour` stamp. The pre-existing
+ * `assertOwnershipConsistency` invariant in index.ts remains authoritative for
+ * the `ownedByPattern` stamp itself: a both-marked rule whose pattern stamp
+ * dangles (no such pattern in `ir.recognizedPatterns`) throws exactly as any
+ * dangling-stamp rule would. Recognition stays honest rather than silently
+ * laundering an inconsistent stamp.
+ */
+export function isBehaviourOwned(rule: IRRule): boolean {
+  return rule.ownedByBehaviour !== undefined;
+}
 
 /**
  * Convert a JS string to "U+XXXX" or "U+XXXX U+YYYY" (multi-codepoint) form.

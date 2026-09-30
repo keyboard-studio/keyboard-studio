@@ -61,6 +61,7 @@ import type { KeyEditOverlay } from "@keyboard-studio/engine";
 import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
+import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
 
 // ---------------------------------------------------------------------------
 // Key
@@ -92,7 +93,7 @@ export interface SerializedEntry {
  * The base type is narrowed by serialization overrides:
  *   - `baseVfs` (a VirtualFS instance) → `baseVfsEntries` (Base64-encoded plain array)
  *   - `deletedNodeIds` / `deletedItemIds` / `deletedTouchKeyIds` / `staleSteps`
- *     (Set<string>) → `string[]`
+ *     / `disabledFamilyIds` (Set<string>) → `string[]`
  * and two derived fields are dropped entirely (`removalCapabilities`, `session`)
  * because they are re-derived on rehydration, never stored.
  *
@@ -128,6 +129,10 @@ export type WorkingCopySnapshot = Omit<
   | "contextToleranceOverlay"
   | "baseWelcomeImages"
   | "phaseAnswersByStep"
+  | "disabledFamilyIds"
+  | "keptGuardRuleIds"
+  | "dismissedMissingGroups"
+  | "narrowedGuardQuestions"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
@@ -136,6 +141,21 @@ export type WorkingCopySnapshot = Omit<
   /** Issue #1809: the aggregated-R carve character set, serialized. Absent in pre-change drafts; restores as empty. */
   carveChars: string[];
   staleSteps: string[];
+  /** spec 082 FR-018: disabled rule families (Set<string>) → string[]. */
+  disabledFamilyIds: string[];
+  /**
+   * spec 082 FR-020/FR-022: durable guard-intent dispositions (Set<string>) →
+   * string[]. Keep on an over-broad question and dismissals of missing-guard
+   * groups survive draft resume so the author is never re-asked.
+   */
+  keptGuardRuleIds: string[];
+  dismissedMissingGroups: string[];
+  /**
+   * spec 082 FR-022: over-broad-guard questions the author Narrowed
+   * (Set<string>) → string[]. Survives draft resume so a narrowed question
+   * is never re-asked.
+   */
+  narrowedGuardQuestions: string[];
   /**
    * Optional (spec 080 US2): the base's welcome-folder images, Base64-encoded
    * through the same `serializeEntry` path as binary VFS entries. Absent from
@@ -345,6 +365,12 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
     deletedTouchKeyIds: [...s.deletedTouchKeyIds],
+    disabledFamilyIds: [...s.disabledFamilyIds],
+    // spec 082 FR-020/FR-022: the guard-intent store is separate from the
+    // working-copy store, so the snapshot reads it explicitly.
+    keptGuardRuleIds: [...useGuardIntentStore.getState().keptGuardRuleIds],
+    dismissedMissingGroups: [...useGuardIntentStore.getState().dismissedMissingGroups],
+    narrowedGuardQuestions: [...useGuardIntentStore.getState().narrowedGuardQuestions],
     carveChars: [...s.carveChars],
     undoStack: s.undoStack,
     phaseResults: s.phaseResults,
@@ -357,6 +383,15 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
+    // Closed-keyboard card + carve dispositions (076 FR-005/FR-022): plain
+    // JSON-safe data, straight passthrough like axisFills
+    // above. The read side is the tolerant half: a snapshot written before
+    // these fields existed reads as "card unanswered, no decisions".
+    closedKeyboardCard: s.closedKeyboardCard,
+    carveDispositions: s.carveDispositions,
+    // 076 FR-023 T020 keep-inert overrides: plain JSON-safe string array,
+    // same passthrough + tolerant-read idiom as the dispositions above.
+    carveTouchKeepInert: s.carveTouchKeepInert,
     // Both fields are plain JSON-safe data (spec 063 T058) — straight
     // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
     // is the tolerant half: it falls back when a pre-058 snapshot has neither
@@ -427,6 +462,7 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // Tolerate snapshots saved before this field existed (dev-branch drafts):
     // an absent value must not clobber the store default with undefined.
     deletedTouchKeyIds: new Set(snapshot.deletedTouchKeyIds ?? []),
+    disabledFamilyIds: new Set(snapshot.disabledFamilyIds ?? []),
     // Issue #1809: tolerate snapshots saved before carveChars existed.
     carveChars: new Set(snapshot.carveChars ?? []),
     undoStack: snapshot.undoStack,
@@ -443,6 +479,12 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
     axisFills: snapshot.axisFills,
+    // Tolerate snapshots saved before these fields existed (076 FR-022):
+    // an absent value must not clobber the store defaults with undefined —
+    // same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
+    closedKeyboardCard: snapshot.closedKeyboardCard ?? null,
+    carveDispositions: snapshot.carveDispositions ?? [],
+    carveTouchKeepInert: snapshot.carveTouchKeepInert ?? [],
     // Tolerate snapshots saved before these fields existed (spec 063 T058 /
     // R10.3): an absent value must not clobber the store defaults with
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
@@ -539,6 +581,14 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     // into the ONE working-copy store (Article III — restore never
     // constructs a second working copy).
     useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
+    // spec 082 FR-020/FR-022: guard-intent dispositions live in their own
+    // store; restore them alongside. Tolerate pre-082 snapshots (absent →
+    // empty, never re-ask nothing).
+    useGuardIntentStore.setState({
+      keptGuardRuleIds: new Set(snapshot.keptGuardRuleIds ?? []),
+      dismissedMissingGroups: new Set(snapshot.dismissedMissingGroups ?? []),
+      narrowedGuardQuestions: new Set(snapshot.narrowedGuardQuestions ?? []),
+    });
 
     return true;
   } catch {

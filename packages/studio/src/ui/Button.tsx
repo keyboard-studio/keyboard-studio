@@ -108,7 +108,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled}
-      className={mergeClassNames("ks-focus-ring ks-hit-target", className)}
+      className={mergeClassNames("ks-focus-ring ks-hit-target ks-press", className)}
       style={{ ...baseStyle, ...style }}
       {...rest}
     >

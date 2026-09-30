@@ -49,10 +49,10 @@ name → code confirmation) and resolved three implementation choices:
   to be quietly fixed later. Rationale: the 3-letter code is the SIL/Ethnologue
   convention the target authors already recognize, and the confirmation step means
   the author reviews and accepts it regardless of which form is shown. Consequence
-  accepted as part of that choice: the assembled tag is e.g. `hau-Latn` rather than
-  the canonical `ha-Latn`. Canonicalization, if ever wanted, is deferred to
-  tag-assembly time under Layer-A validation — it is not a defect in this seed
-  step.
+  accepted as part of that choice: Q3 displays `hau`, but the assembled tag is
+  canonicalized at tag-assembly time (FR-011) to the registered 2-letter subtag
+  (`ha`, `ha-Arab`) via `canonicalLanguageSubtag` in `targetBcp47.ts`. Implemented:
+  a code with no 2-letter form, or no langtags record, passes through unchanged.
 - Q: Is the separate region step kept now that the picker shows region inline? →
   A: **Kept as a conditional refinement.** It fires only when the picked language's
   code has more than one region variant (same code, different regional orthography),
@@ -165,7 +165,7 @@ After the names, the author is shown the standard language code that was resolve
 - **FR-009**: The identity questions MUST appear in the order: English name → (region, only when ambiguous) → own-language name(s) → language-code confirmation.
   > **Shipped differently** — see [Implementation Status](#implementation-status). The live order is `il_language_code` (Q1, searchable by English name) → `il_language_region` (conditional) → `il_language_english` (seeded confirmation) → `il_language_autonym` (seeded multi-choice).
 - **FR-010**: Values that were pre-filled from the database MUST be marked as suggestions/provenance so the author can see they were proposed (and are editable), consistent with the existing defaults-provenance treatment.
-- **FR-011**: The finished keyboard's language tag MUST be assembled from the confirmed language code, resolved script, and selected region.
+- **FR-011**: The finished keyboard's language tag MUST be assembled from the confirmed language code, resolved script, and selected region. The language subtag MUST be canonicalized to its registered shortest ISO 639 form (implemented; unmatched codes pass through unchanged).
 - **FR-012**: The curated language database used MUST be the version already pinned and fetched by the project's build (SIL langtags at the pinned commit); this feature MUST NOT introduce a second or live-fetched source.
 - **FR-013**: The English-name autocomplete MUST be free-text-with-suggestions: it offers matching langtags languages as the author types, but a typed value that matches no entry MUST be accepted (the author keeps their name; downstream defaults simply do not populate). A strict pick-from-list is explicitly rejected because target minority languages are often absent from langtags.
 - **FR-014**: The region question MUST fire only when the entered English name resolves to more than one langtags entry differing by region; it MUST present the candidate regions as country names (`regionname`); selecting one MUST resolve to that region's entry (determining Q2's local-name choices and the BCP47 region subtag); and if the author skips or leaves it unanswered, the flow MUST fall back to the primary/default entry rather than blocking. (Script differences are handled by the separate script step, not here.)

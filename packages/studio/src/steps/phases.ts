@@ -50,6 +50,7 @@ import { manifest } from "./manifest.ts";
 
 export type StepId =
   | "identity"
+  | "layout"
   | "choose_base"
   | "track"
   | "project_name"
@@ -60,6 +61,7 @@ export type StepId =
   | "convenience"
   | "carve"
   | "deadkeys"
+  | "rules"
   | "mechanisms"
   | "touch_seed_source"
   | "touch"
@@ -88,7 +90,7 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "A",
     label: msg({ id: "phaseStepper.phase.a", message: "Survey" }),
-    stepIds: ["identity"],
+    stepIds: ["identity", "layout"],
   },
   {
     letter: "B",
@@ -117,7 +119,10 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "E",
     label: msg({ id: "phaseStepper.phase.e", message: "Enable" }),
-    stepIds: ["mechanisms", "touch_seed_source", "touch"],
+    // rules (spec 082): the before/after rule demo + rule list/builder sits
+    // between carve and mechanisms — it shows what the working copy's rules
+    // do before the author assigns mechanisms.
+    stepIds: ["rules", "mechanisms", "touch_seed_source", "touch"],
   },
   {
     letter: "F",

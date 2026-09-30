@@ -8,6 +8,7 @@ export * from "./attribution";
 export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";
+export * from "./carveDisposition";
 export * from "./compileResult";
 export * from "./confirmedAlphabet";
 export * from "./copyright";
@@ -29,6 +30,9 @@ export * from "./lintFinding";
 export * from "./pattern";
 export * from "./patternMatch";
 export * from "./removalCapability";
+// Versioned rule-pack schema for spec 082 Track B (rule builder): packs are
+// Behaviour records with structured parameters + provenance, never raw .kmn.
+export * from "./rulePack";
 export * from "./placementMap";
 export * from "./placementStrategy";
 export * from "./provenance";

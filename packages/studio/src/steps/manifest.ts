@@ -6,7 +6,7 @@
 // "map == runtime by construction" (FR-010).
 //
 // SPINE ORDER (FR-012, M2):
-//   Identity → choose base → Track → [project_name (spine:false)] →
+//   Identity → layout → choose base → Track → [project_name (spine:false)] →
 //   Characters (Phase A/B questions) → Marks → Punctuation → Invisibles →
 //   Convenience → Carve → Mechanisms → [lock: "physical"] →
 //   touch_seed_source (spine:false) → touch →
@@ -33,11 +33,13 @@ import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
 import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
 import {
   identityStep,
+  layoutStep,
   chooseBaseStep,
   trackStep,
   projectNameStep,
   carveStep,
   deadkeysStep,
+  rulesStep,
   mechanismsStep,
   touchSeedSourceStep,
   touchStep,
@@ -96,7 +98,7 @@ const charactersStep: Step = {
 // Manifest: the ordered Step[] (FR-008, FR-012)
 //
 // Rules encoded here:
-//   M2 — spine order: Identity → choose_base → track → Characters → Marks →
+//   M2 — spine order: Identity → layout → choose_base → track → Characters → Marks →
 //         Punctuation → Invisibles → Convenience → Carve → Mechanisms → (lock physical) →
 //         touch → (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
@@ -107,6 +109,12 @@ const charactersStep: Step = {
 export const manifest: readonly Step[] = [
   // --- Identity panel ---
   identityStep,
+
+  // --- Community keyboard layout (spec 076 A4) ---
+  // Right after Identity, before any base or carve work: which Windows layout
+  // the community's typists use. Proposed from the identity language tag and
+  // confirmed by the author; feeds the FR-023 likely-host resolution.
+  layoutStep,
 
   // --- Base selection (base picker only) ---
   chooseBaseStep,
@@ -236,6 +244,11 @@ export const manifest: readonly Step[] = [
   // (Phase C), which consumes deadkeys via the accented-char flow.
   deadkeysStep,
 
+  // --- Rules (Phase E: before/after rule demo + rule list/builder) ---
+  // Placement: after deadkeys — the demo pane + rule builder show what the
+  // working copy's rules do before the author assigns mechanisms.
+  rulesStep,
+
   // --- Mechanisms (Phase C: physical key assignment) ---
   // The reducer fires lockDesktop() when this step completes (R1).
   {
@@ -280,8 +293,8 @@ export function validateManifestShape(): void {
 
   // M2 — spine order.
   const expectedSpine = [
-    "identity", "choose_base", "track", "characters",
-    "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch", "help", "package",
+    "identity", "layout", "choose_base", "track", "characters",
+    "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];
@@ -325,20 +338,22 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, deadkeys, mechanisms, touch, touch_seed_source} must
-  // declare layout:"full"; all others must be "pane" or omit layout. A
+  // EXACTLY {carve, deadkeys, rules, mechanisms, touch, touch_seed_source}
+  // must declare layout:"full"; all others must be "pane" or omit layout. A
   // mismatched layout would silently change the chrome. touch_seed_source
   // joined this set in the P0 fix for the panel's inline live OSK preview
   // (spec 035 R4b follow-up) — without full-screen, StudioShell's persistent
   // right-pane OSKFrame co-mounted alongside the panel's own OSK.
   // deadkeys joined as a full-screen tabbed editor like carve (spec 083) —
   // its own Back/Continue nav renders inside.
-  const FULL_LAYOUT_IDS = new Set(["carve", "deadkeys", "mechanisms", "touch", "touch_seed_source"]);
+  // rules joined in spec 082: the demo pane + rule builder need the full
+  // width, same as the carve and mechanisms galleries it sits between.
+  const FULL_LAYOUT_IDS = new Set(["carve", "deadkeys", "rules", "mechanisms", "touch", "touch_seed_source"]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/mechanisms/touch/touch_seed_source may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/touch/touch_seed_source may be full-screen (spec 024 Stage 0)`,
         );
       }
     }

@@ -10,6 +10,7 @@ Part I). The "After 079" column is the target this feature must reach.
 | Step id | Today | Evidence | Declaration after 079 | After 079 |
 |---|---|---|---|---|
 | identity | non-compliant: survives leaving, not reload (D-5) | F-5 | `answer-store` | compliant |
+| layout | new step (spec 076 A4); every pick saved per question | spec 076 A4 | `answer-store` | compliant |
 | choose_base | believed compliant (working copy) | spec Assumptions | `working-copy` | compliant — revisit test `StepHost.test.tsx` "an unmount/remount at choose_base with the same evidence leaves baseKeyboard/baseIr unchanged" |
 | track | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | project_name | non-compliant (D-5) | F-5 | `answer-store` | compliant |
@@ -20,6 +21,7 @@ Part I). The "After 079" column is the target this feature must reach.
 | convenience | non-compliant: component state (D-2); skips on unknown evidence (#1796) | F-2 | `answer-store` | compliant |
 | carve | believed compliant (working copy); misreads a skipped convenience step | F-2 | `working-copy` | compliant — revisit test `CarveGalleryV2.test.tsx` "a discarded character survives an unmount/remount of the gallery with the same working copy"; the skipped-convenience misread is covered by the R-09 regression test (T052) |
 | deadkeys | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
+| rules | compliant: the demo pane is a read-only view of the compiled working copy (spec 082 Track A); the step records no answers — Continue carries `undefined` like the galleries | F-10 | `working-copy` | compliant |
 | mechanisms | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
 | touch_seed_source | believed compliant (session slot `touchSeedSource`) | agent sweep | `working-copy` | compliant — revisit test `TouchSeedSourcePanel.test.tsx` "a NON-default recorded choice survives an unmount/remount with the same evidence" |
 | touch | compliant: every action saved immediately | F-10 | `working-copy` | compliant |

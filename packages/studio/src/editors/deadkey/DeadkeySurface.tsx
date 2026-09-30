@@ -13,19 +13,16 @@
 // otherwise.
 
 import { useCallback, useState, type CSSProperties } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { KeyboardIR, DeadkeyInfo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { BG_PAGE, TEXT_MAIN, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
+import { TEXT_MAIN, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
+import { FullStepPage } from "../../components/FullStepPage.tsx";
+import { phaseHeading, leadParagraph } from "../../survey/surveyStyles.ts";
 import { DeadkeyInventory } from "./DeadkeyInventory.tsx";
 import { DeadkeyDefineForm } from "./DeadkeyDefineForm.tsx";
 import { DeadkeyDetailEditor } from "./DeadkeyDetailEditor.tsx";
-
-const pageStyle: CSSProperties = {
-  background: BG_PAGE,
-  minHeight: "100%",
-  padding: "16px 20px",
-  fontFamily: FONT,
-};
 
 const tabsStyle: CSSProperties = {
   display: "flex",
@@ -70,37 +67,31 @@ export interface DeadkeySurfaceProps {
   onBack?: () => void;
 }
 
-const navStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  marginTop: 16,
-  paddingTop: 12,
-  borderTop: "1px solid var(--app-border)",
-};
-
-const navBtnStyle: CSSProperties = {
-  background: "transparent",
-  border: "1px solid var(--app-border)",
-  borderRadius: 8,
-  padding: "8px 16px",
-  cursor: "pointer",
-  fontSize: 13,
-  color: TEXT_MAIN,
-  fontFamily: FONT,
-};
-
-const navPrimaryStyle: CSSProperties = {
-  ...navBtnStyle,
-  background: "var(--app-accent)",
-  color: "var(--app-text-on-accent)",
-  border: "none",
-};
-
 export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const setWorkingIR = useWorkingCopyStore((s) => s.setWorkingIR);
   const [mode, setMode] = useState<Mode>({ tab: "inventory" });
+  const { t } = useLingui();
+
+  // Spec 081: Back / Continue live in the footer, not the step body. Published
+  // before the early return so the no-working-copy state keeps them too.
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.deadkey.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "deadkeys-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "editor.deadkey.continueButton", message: "Continue →" }),
+      onClick: onComplete,
+      testId: "deadkeys-continue",
+    },
+  });
 
   const workingIr: KeyboardIR | null = ir ?? baseIr ?? null;
 
@@ -123,13 +114,28 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
     setMode({ tab: "edit", id: info.id, ...(info.name !== undefined ? { name: info.name } : {}) });
   }, []);
 
+  const heading = (
+    <>
+      <h2 style={phaseHeading}>
+        <Trans id="deadkey.step.heading">Deadkeys</Trans>
+      </h2>
+      <p style={leadParagraph}>
+        <Trans id="deadkey.step.lede">
+          A deadkey types nothing by itself — it changes what the next key produces. Review the
+          deadkeys this keyboard already has, fix the ones that need repair, or define new ones.
+        </Trans>
+      </p>
+    </>
+  );
+
   if (workingIr === null) {
     return (
-      <div style={pageStyle}>
+      <FullStepPage testId="deadkey-step">
+        {heading}
         <div style={emptyStyle}>
           Choose a base keyboard first — deadkeys are defined against the working copy.
         </div>
-      </div>
+      </FullStepPage>
     );
   }
 
@@ -139,7 +145,8 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
   ];
 
   return (
-    <div style={pageStyle}>
+    <FullStepPage testId="deadkey-step">
+      {heading}
       <div style={tabsStyle} role="tablist" aria-label="Deadkey lifecycle">
         {tabs.map((t) => (
           <button
@@ -190,19 +197,6 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
           onClose={() => setMode({ tab: "inventory" })}
         />
       )}
-
-      <div style={navStyle}>
-        <span>
-          {onBack !== undefined && (
-            <button type="button" style={navBtnStyle} onClick={onBack}>
-              ← Back
-            </button>
-          )}
-        </span>
-        <button type="button" style={navPrimaryStyle} onClick={onComplete} data-testid="deadkeys-continue">
-          Continue →
-        </button>
-      </div>
-    </div>
+    </FullStepPage>
   );
 }

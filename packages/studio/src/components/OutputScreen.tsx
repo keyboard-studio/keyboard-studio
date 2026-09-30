@@ -38,7 +38,9 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
+import { useIsNarrow } from "../hooks/useViewport.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
+import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
@@ -86,8 +88,12 @@ const KMP_DIAGNOSTIC_LIMIT = 5;
 
 export function OutputScreen() {
   const { t } = useLingui();
+  // The identity-warning "go to" button smooth-scrolls to the keyboard id
+  // field; reduced motion takes the instant jump instead.
+  const reducedMotion = usePrefersReducedMotion();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
+  const narrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
 
@@ -277,23 +283,10 @@ export function OutputScreen() {
   const kmpActionable = canDownload && !buildingKmp && !downloading && !touchStale;
   const zipActionable = canDownload && !downloading && !buildingKmp && !touchStale;
 
-  return (
-    <div
-      ref={containerRef}
-      data-testid="output-screen-root"
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        height: "100%",
-        width: "100%",
-        background: "var(--app-bg)",
-        color: "var(--app-text)",
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-        overflow: "hidden",
-      }}
-    >
-      {/* Left pane: shipping details once instantiated, else the cold-arrival
-          picker — see the module comment. */}
+  // Left pane (desktop) / collapsed disclosure after the Output pane (narrow).
+  // Shipping details once instantiated, else the cold-arrival picker — see
+  // the module comment.
+  const detailsPane = (
       <PickerPane
         artifact={artifact}
         variant={instantiated ? "shipping" : "full"}
@@ -309,6 +302,7 @@ export function OutputScreen() {
             <Trans id="output.changeBase.label">Change base keyboard</Trans>
           </button>
         }
+        narrow={narrow}
         leftPct={leftPct}
         dividerWidth={DIVIDER_WIDTH}
         pickerSlot={
@@ -329,29 +323,66 @@ export function OutputScreen() {
           ) : null
         }
       />
+  );
+
+  return (
+    <div
+      ref={containerRef}
+      data-testid="output-screen-root"
+      style={{
+        display: "flex",
+        // Narrow: ONE scrolling column, Output first (see the JSX order below).
+        flexDirection: narrow ? "column" : "row",
+        height: "100%",
+        width: "100%",
+        background: "var(--app-bg)",
+        color: "var(--app-text)",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        overflow: narrow ? "auto" : "hidden",
+      }}
+    >
+      {narrow ? null : detailsPane}
 
       {/* Drag handle */}
-      <ResizeHandle onPointerDown={onPointerDown} />
+      {narrow ? null : <ResizeHandle onPointerDown={onPointerDown} />}
 
       {/* Right pane: download + submit controls */}
       <section
         aria-label={t({ id: "output.pane.label", message: "Output pane" })}
-        style={{
-          flexBasis: `calc(${rightPct}% - ${DIVIDER_WIDTH / 2}px)`,
-          flexGrow: 1,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          minHeight: 0,
-          overflow: "auto",
-          padding: 24,
-          boxSizing: "border-box",
-        }}
+        style={
+          narrow
+            ? {
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                padding: 16,
+                boxSizing: "border-box",
+                flexShrink: 0,
+              }
+            : {
+                flexBasis: `calc(${rightPct}% - ${DIVIDER_WIDTH / 2}px)`,
+                flexGrow: 1,
+                flexShrink: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                minHeight: 0,
+                overflow: "auto",
+                padding: 24,
+                boxSizing: "border-box",
+              }
+        }
       >
-        <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
-          <Trans id="output.heading">Output</Trans>
-        </h2>
+        {/* Narrow: Output leads the page, so it carries the page's h1. */}
+        {narrow ? (
+          <h1 style={{ margin: 0, fontSize: "1.3rem", color: "var(--app-accent-text)" }}>
+            <Trans id="output.heading">Output</Trans>
+          </h1>
+        ) : (
+          <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
+            <Trans id="output.heading">Output</Trans>
+          </h2>
+        )}
         {baseKeyboard !== null && (
           <>
             {/* PRIMARY download: the installable package. A user double-clicks
@@ -692,7 +723,10 @@ export function OutputScreen() {
                   })}
                   onClick={() => {
                     const el = document.getElementById("identity-keyboard-id");
-                    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    el?.scrollIntoView({
+                      behavior: reducedMotion ? "auto" : "smooth",
+                      block: "center",
+                    });
                     (el as HTMLInputElement | null)?.focus();
                   }}
                   style={{
@@ -750,6 +784,8 @@ export function OutputScreen() {
           </>
         )}
       </section>
+
+      {narrow ? detailsPane : null}
     </div>
   );
 }

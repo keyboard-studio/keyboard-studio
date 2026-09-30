@@ -64,8 +64,8 @@ one persistent working copy.
   the extension mechanism for new flows; existing flows keep their
   `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
   → [docs/workflow-model.md §7](workflow-model.md#7-survey-wrapper-architecture-spec-029-stage-6--flowstephost-convergence) ·
-  [`specs/028-qu-generic-step-host/`](../specs/028-qu-generic-step-host/spec.md) ·
-  [`specs/029-qu-flowstephost-convergence/`](../specs/029-qu-flowstephost-convergence/spec.md) ·
+  [`specs/028-qu-generic-step-host/`](../specs/028-qu-generic-step-host/AS-BUILT.md) ·
+  [`specs/029-qu-flowstephost-convergence/`](../specs/029-qu-flowstephost-convergence/AS-BUILT.md) ·
   code [`packages/studio/src/components/StepHost.tsx`](../packages/studio/src/components/StepHost.tsx),
   [`survey/FlowStepHost.tsx`](../packages/studio/src/survey/FlowStepHost.tsx)
 
@@ -86,13 +86,13 @@ one persistent working copy.
   a route change — which unmounts and remounts it — silently restarted the
   walk while the working-copy store beside it kept every answer. Position was
   modelled as component lifetime; content was not.
-  → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/spec.md)
+  → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/AS-BUILT.md)
 
 - **Phase-B spine steps between `characters` and `carve`.** Four survey steps
   sit on the manifest spine after the alphabet is confirmed and before the carve
   gallery, in this order: `marks` (spec 071, computed S0 gate), `punctuation`,
   `invisibles`, `convenience` (spec 051, computed gate). Since
-  [specs/075](../specs/075-punctuation-defaults/spec.md) the punctuation step
+  [specs/075](../specs/075-punctuation-defaults/AS-BUILT.md) the punctuation step
   starts from a *proposed* list — the locale's CLDR/SLDR punctuation tier plus
   the punctuation the base keyboard already produces (`buildPunctuationProposal`
   in [`packages/engine/src/character-discovery/punctuationProposal.ts`](../packages/engine/src/character-discovery/punctuationProposal.ts),
@@ -175,7 +175,7 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
 ## Exemplar sourcing — one offline path
 
 Which characters a language actually needs is answered in exactly one place
-([specs/044](../specs/044-cldr-sldr-exemplars/spec.md) FR-015):
+([specs/044](../specs/_archive/044-cldr-sldr-exemplars/spec.md) FR-015):
 `sourceExemplars(bcp47)` in
 [`packages/engine/src/character-discovery/exemplarSource.ts`](../packages/engine/src/character-discovery/exemplarSource.ts).
 Its three consumers — `buildCharacterMap` (the Phase B picker), `suggestMissing`
@@ -214,7 +214,7 @@ not a number maintained by hand here.)
 | Codec / KeyboardIR spine | spec §5a | `packages/engine/src/codec/` |
 | Working-copy spine | spec §8 / [specs/008](../specs/008-data-flow/spec.md) · [workflow-model.md](workflow-model.md) | engine working-copy + `packages/contracts/src/ir/` |
 | Data flow / survey | [specs/008](../specs/008-data-flow/spec.md) | `packages/engine/src/{character-discovery,inventory,loader}/`, `packages/studio/src/survey/` |
-| Exemplar sourcing | [specs/044](../specs/044-cldr-sldr-exemplars/spec.md) | `packages/engine/src/character-discovery/{exemplarSource,exemplarIndex,exemplarTypes}.ts` + `generated/exemplars.generated.json` |
+| Exemplar sourcing | [specs/044](../specs/044-cldr-sldr-exemplars/AS-BUILT.md) | `packages/engine/src/character-discovery/{exemplarSource,exemplarIndex,exemplarTypes}.ts` + `generated/exemplars.generated.json` |
 | Three-group routing | spec §9 | engine routing + `packages/studio` gallery scoping |
 | Strategy selection | [specs/007](../specs/007-strategy-selection/spec.md) | `packages/engine/src/strategy-selector/`, `recognizer/` |
 | Pattern schema (contract) | [specs/005](../specs/005-pattern-schema/spec.md) | `packages/contracts/src/pattern.ts` (+ zod `schemas.ts`) |

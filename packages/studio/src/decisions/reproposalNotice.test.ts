@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { WorkItem } from "../steps/workToDo.ts";
-import { affectedStepNames } from "./reproposalNotice.ts";
+import { affectedStepNames, noticeableWorkItems } from "./reproposalNotice.ts";
 
 function reproposed(stepId: string, screenId: string): WorkItem {
   return {
@@ -44,5 +44,23 @@ describe("affectedStepNames — catalog labels only, never a raw step id", () =>
 
   it("an empty delta names nothing (never throws)", () => {
     expect(affectedStepNames([])).toBe("");
+  });
+});
+
+describe("noticeableWorkItems — only steps the author had reached before the Next", () => {
+  const unassignedMechanisms: WorkItem = { kind: "unassigned", stepId: "mechanisms", count: 2 };
+
+  it("drops work in a step not yet reached (first arrival at the mechanism gallery)", () => {
+    const visitedAtClick = ["identity", "characters", "marks", "carve"];
+    expect(noticeableWorkItems([unassignedMechanisms], visitedAtClick)).toEqual([]);
+  });
+
+  it("keeps work in steps already reached", () => {
+    const item = reproposed("marks", "ms_series_s1");
+    const visitedAtClick = ["identity", "characters", "marks", "carve", "mechanisms"];
+    expect(noticeableWorkItems([item, unassignedMechanisms], visitedAtClick)).toEqual([
+      item,
+      unassignedMechanisms,
+    ]);
   });
 });

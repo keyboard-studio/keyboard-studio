@@ -68,8 +68,13 @@
 // The function mutates `vfs` in-place. Callers that need the original VFS
 // preserved must clone it before calling (e.g. createVirtualFS(baseVfs.entries())).
 
-import type { KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
+import type {
+  KeyboardIR,
+  Pattern,
+  VirtualFS,
+} from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import type { CarveDisposition } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
@@ -94,10 +99,21 @@ import {
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
-import { applyCarveMutate, applyAddGalleryMutate, unionAggregatedCarveIds } from "../steps/editorMutate.ts";
+import type { ApplyCarveToVfsResult } from "@keyboard-studio/engine";
+import {
+  applyCarveMutate,
+  applyAddGalleryMutate,
+  unionAggregatedCarveIds,
+} from "../steps/editorMutate.ts";
+
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
+import {
+  spliceRuleAdditions,
+  hasRuleAdditions,
+  type DerivedRuleAdditions,
+} from "./ruleAdditions.ts";
 import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
@@ -153,6 +169,28 @@ export interface ProjectWorkingCopyVfsInput {
   /** Individual rule nodeIds (and store-slot ids) removed via character-level carving. */
   deletedItemIds?: ReadonlySet<string>;
   /**
+  /**
+   * Carve dispositions (T015, FR-019) for the suppression stage. The caller
+   * (useWorkingCopyTransform) reads them from the working-copy store's
+   * `getCarveDispositions`. They are scoped to the live carve set here, so a
+   * stale disposition can never rewrite an uncarved rule. Empty/omitted
+   * degrades to the legacy carve behavior, content-identical.
+   */
+  carveDispositions?: CarveDisposition[];
+  /**
+   * A6 loud/soft for the suppression stage (FR-009). Default false (soft).
+   * Follows the A6 survey answer when it exists.
+   */
+  carveLoud?: boolean;
+  /**
+   * Touch-layout keep-inert overrides, 076 FR-023 (T020): carved NFC
+   * characters to keep — visibly inert, "does nothing" — in the touch
+   * layout instead of removed. Threaded to the step-1.5 keycap projection
+   * as keepInertTouchChars. Omit or pass an empty set for the default
+   * ("removed from the touch layout").
+   */
+  carveTouchKeepInert?: ReadonlySet<string>;
+  /**
    * Issue #1809, ruling §1: the aggregated carved character set (NFC-normalized).
    * The projection runs ONE aggregated-R pass (`collectTaintedContributors`) and
    * unions it over `deletedItemIds`, because the per-character union is not
@@ -161,6 +199,7 @@ export interface ProjectWorkingCopyVfsInput {
    * was carved via the gallery.
    */
   carveChars?: ReadonlySet<string>;
+
   /**
    * Individually-deleted pre-existing touch methods (main key / longpress /
    * multitap / flick), addressed by the `touchKeyAddress.ts` scheme. Applied
@@ -231,6 +270,18 @@ export interface ProjectWorkingCopyVfsInput {
    * replayed by step 2.7. Absent or `null` when no fix is applied.
    */
   contextToleranceOverlay?: ContextToleranceOverlay | null;
+  /**
+   * The rules survey step's additions (spec 082: pack install, guard
+   * synthesis, Narrow exceptions), pre-derived by the caller with
+   * `deriveRuleAdditions(workingIr, baseIr)`. Spliced into the
+   * carve-filtered IR in working-IR order by step 1.8 before the `.kmn`
+   * re-emit, so the additions take effect in the preview and download.
+   *
+   * Optional. When omitted (or empty), the projection stays byte-identical
+   * to the no-additions path — the additions only ever widen the emitted
+   * `.kmn`, never rewrite the no-edit fast path.
+   */
+  ruleAdditions?: DerivedRuleAdditions;
 }
 
 /**
@@ -310,6 +361,9 @@ export function projectWorkingCopyVfs(
     deletedItemIds = new Set<string>(),
     carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
+    carveDispositions = [],
+    carveLoud = false,
+    carveTouchKeepInert,
     keyEditOps = [],
     deadkeyOps = [],
     assignments,
@@ -318,6 +372,7 @@ export function projectWorkingCopyVfs(
     touchLayoutJson,
     baseDisplayName,
     contextToleranceOverlay = null,
+    ruleAdditions,
   } = input;
 
   const warnings: string[] = [];
@@ -352,7 +407,11 @@ export function projectWorkingCopyVfs(
   // Union the aggregated pass over the incremental per-character union before
   // partitioning, so the .kmn slot pruning, the whole-node filter, and the
   // keycap projection below all consume the same pruned result (§11).
-  const effectiveItemIds = unionAggregatedCarveIds(baseIr, deletedItemIds, carveChars);
+  const effectiveItemIds = unionAggregatedCarveIds(
+    baseIr,
+    deletedItemIds,
+    carveChars,
+  );
 
   const slotIds = new Set<string>();
   const wholeNodeItemIds = new Set<string>();
@@ -366,19 +425,33 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // 1a: Replace output-store slots with nul fillers (store-slot deletion path).
-  //     Carve-scoped `notany()` hygiene (issue #1809, ruling §3): tainted chars
-  //     are pruned from `notany()` stores instead of blocking.
-  const removalResult = applyStoreSlotRemovals(baseIr, slotIds, { carveNotAnyHygiene: true });
-  warnings.push(...removalResult.warnings);
+  // T015 — scope dispositions to the live carve set. The store persists
+  // dispositions per combination; prune-on-uncarve (T010) keeps them fresh,
+  // but this scope is the backstop: a stale disposition must never rewrite
+  // an uncarved rule. Scoped to the #1809 §1 union (effectiveItemIds), the
+  // same id set the slot partition above consumed.
+  const carveIdSet = new Set([...deletedNodeIds, ...effectiveItemIds]);
+  const activeDispositions = carveDispositions.filter((d) =>
+    carveIdSet.has(d.comboId),
+  );
+  const hasSuppression = activeDispositions.length > 0;
 
-  // 1b: Whole-node deletions + VFS re-emit.
-  //     irRewritten: true when any slots were targeted — the nul-modified IR must
-  //     be written into the VFS even if no whole-node deletions are present, and
-  //     its node positions no longer match the .kmn text, so text-splice is off.
-  //     When all slot ids are rejected by the transform's guards, irRewritten
-  //     still triggers a (harmless, idempotent) re-emit of the unmodified IR.
-  const carveIr = removalResult.ir; // equals baseIr when slotIds was empty
+  // 1a/1b: Whole-node deletions + store-slot removals + VFS re-emit.
+  //
+  // T015 carve pipeline (suppression → slot removals → filter, carvePipeline.ts
+  // in the engine). When dispositions are present (hasSuppression), the
+  // pipeline derives the carved IR from the PRE-carve baseIr — the T013
+  // constraint: guard selector chars are read from the pre-removal stores and
+  // are unrecoverable after slot removal. The pipeline runs either inside
+  // applyCarveToVfs (carvePipeline opts, flag-off path) or through the mutate
+  // seam (applyCarveMutate, flag-on path); both derive byte-identical IRs.
+  //
+  // Without dispositions, the legacy derivation is preserved exactly:
+  // slot-item nul-rewrites first (applyStoreSlotRemovals), then whole-node
+  // deletions inside applyCarveToVfs — content-identical to pre-T015 behavior.
+  //
+  // The slot partition above is kept for the no-suppression legacy path and
+  // for the keycap cascade (step 1.5), which is driven off baseIr.
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
 
   // spec-014 T016c — carve IR-projection via the single mutate() write seam.
@@ -389,7 +462,7 @@ export function projectWorkingCopyVfs(
   // the emit step only serializes — the seam, not applyCarveToVfs's internal
   // filter, is the canonical IR producer (M6/SC-001).
   //
-  // The patch is built from baseIr (never the slot-rewritten carveIr) so it is a
+  // The patch is built from baseIr (never a slot-rewritten IR) so it is a
   // pure function of the overlay (idempotent + reversible). The entry-group
   // safety gate is preserved: when the deletion set would remove the entry group
   // we DEFER to the legacy applyCarveToVfs call, which warns and skips the
@@ -405,37 +478,125 @@ export function projectWorkingCopyVfs(
   // match this exactly so an unedited working copy stays byte-identical.
   const hasCarveEdit = allWholeNodeIds.size > 0 || slotIds.size > 0;
 
-  let carveResult: { warnings: string[] };
-  if (isMutateSeamEnabled() && !entryGroupDeleted && hasCarveEdit) {
-    // effectiveItemIds already carries the §1 aggregated union; buildCarvePatch
-    // would union it again idempotently, so pass the plain default here.
-    const seamIr = applyCarveMutate(baseIr, deletedNodeIds, effectiveItemIds);
+  // Step 1.8 (spec 082): working-IR rule additions. The rules survey step
+  // (pack install, guard synthesis, Narrow) writes its additions through
+  // `setWorkingIR`, but this projection builds from the base IR plus
+  // replayable overlays — so the additions are spliced into the
+  // carve-filtered IR in working-IR order before emit. `deriveRuleAdditions`
+  // collected them (marked `rulesStepAdded`, absent from the base IR); the
+  // splice walks each group's working order so a Narrow exception stays
+  // immediately BEFORE its guard (first-match semantics), and skips any
+  // added rule the deletion set filtered out (carve deletions and
+  // disabled-family members are never resurrected). Context-tolerance and
+  // touch-synthesis rules carry no marker and are unaffected — they reach
+  // the artifact through their own projection paths. With no additions the
+  // splice is the identity and the emit gate below is unchanged, so the
+  // no-additions path stays byte-identical.
+  const additions = ruleAdditions;
+  const additionsPresent = additions !== undefined && hasRuleAdditions(additions);
+  const hasProjectionEdit = hasCarveEdit || additionsPresent;
+
+  let carveResult: ApplyCarveToVfsResult;
+  // The post-carve IR, for the add-gallery mutate derivation (step 2) — only
+  // used as the mutate base, never re-emitted.
+  let carveIr: KeyboardIR;
+  if (isMutateSeamEnabled() && !entryGroupDeleted && hasProjectionEdit) {
+    // Seam path (T015): applyCarveMutate runs the shared pipeline
+    // (suppression → slot removals → filter) from the pre-carve baseIr.
+    // effectiveItemIds already carries the #1809 §1 aggregated union, so
+    // carveChars takes the plain default (buildCarvePatch would union it
+    // again idempotently).
+    const seamIr = applyCarveMutate(
+      baseIr,
+      deletedNodeIds,
+      effectiveItemIds,
+      undefined,
+      {
+        dispositions: activeDispositions,
+        loud: carveLoud,
+      },
+    );
+    carveIr = seamIr;
     // The seam already filtered every node; hand it to emit with an empty
     // deletion set. irRewritten:true because there IS an edit (matching the
     // legacy emit-when-edited behavior) and the seam IR is already filtered,
     // not the parsed original; an unedited copy never reaches here.
-    carveResult = applyCarveToVfs(vfs, keyboardId, seamIr, EMPTY_DELETION_SET, {
+    const mergedSeamIr =
+      additions !== undefined
+        ? spliceRuleAdditions(seamIr, additions, allWholeNodeIds)
+        : seamIr;
+    carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
       irRewritten: true,
     });
+  } else if (!entryGroupDeleted && hasCarveEdit && hasSuppression) {
+    // T015 legacy (flag-off) path with suppression: the shared pipeline runs
+    // inside applyCarveToVfs on the PRE-carve baseIr. Do NOT pre-apply slot
+    // removals here (T013 constraint — guard selector chars come from the
+    // pre-removal stores).
+    carveResult = applyCarveToVfs(vfs, keyboardId, baseIr, deletedNodeIds, {
+      carvePipeline: {
+        // #1809 §1: the pipeline must see the aggregated union, not the raw
+        // incremental set.
+        deletedItemIds: effectiveItemIds,
+        dispositions: activeDispositions,
+        loud: carveLoud,
+      },
+    });
+    carveIr = carveResult.derivedIr ?? baseIr;
   } else {
-    carveResult = applyCarveToVfs(vfs, keyboardId, carveIr, allWholeNodeIds, {
-      irRewritten: slotIds.size > 0,
+    // Legacy path without suppression — unchanged pre-T015 behavior:
+    // slot-item nul-rewrites first, then whole-node deletions inside
+    // applyCarveToVfs (filter+emit or text-splice).
+    //     irRewritten: true when any slots were targeted — the nul-modified IR must
+    //     be written into the VFS even if no whole-node deletions are present, and
+    //     its node positions no longer match the .kmn text, so text-splice is off.
+    //     When all slot ids are rejected by the transform's guards, irRewritten
+    //     still triggers a (harmless, idempotent) re-emit of the unmodified IR.
+    // Carve-scoped `notany()` hygiene (issue #1809, ruling §3).
+    const removalResult = applyStoreSlotRemovals(baseIr, slotIds, {
+      carveNotAnyHygiene: true,
+    });
+    warnings.push(...removalResult.warnings);
+    carveIr = removalResult.ir; // equals baseIr when slotIds was empty
+    // spec 082: splice the rules step's additions into the carve-filtered IR
+    // (in working-IR order; carve-deleted and disabled-family rules are never
+    // resurrected — spliceRuleAdditions skips anything in allWholeNodeIds).
+    // With no additions the splice is the identity and this path is
+    // byte-identical to pre-082.
+    const mergedCarveIr =
+      additions !== undefined
+        ? spliceRuleAdditions(carveIr, additions, allWholeNodeIds)
+        : carveIr;
+    carveResult = applyCarveToVfs(vfs, keyboardId, mergedCarveIr, allWholeNodeIds, {
+      irRewritten: slotIds.size > 0 || additionsPresent,
     });
   }
   warnings.push(...carveResult.warnings);
 
-  // Step 1.5: Carve keycap projection — blank carved characters off the .kvks /
-  // .keyman-touch-layout keycaps IN PLACE (layer/row/key structure is never
-  // dropped), so the live preview's visual keyboard keeps its full layout with
-  // just the carved caps blank. Runs before Step 3.5 so a subsequent assignment
-  // label re-populates a blanked keycap, and before Step 4 so paths resolve
-  // against the pre-rename source/<keyboardId>.* filenames.
+  // Step 1.5: Carve keycap projection — blank carved characters off the .kvks
+  // keycaps IN PLACE (layer/row/key structure is never dropped), so the live
+  // preview's visual keyboard keeps its full layout with just the carved caps
+  // blank; on the .keyman-touch-layout a carved main key is REMOVED by
+  // default (076 FR-023, T020) unless listed in carveTouchKeepInert, in which
+  // case it is kept visibly inert ("does nothing"). Runs before Step 3.5 so a
+  // subsequent assignment label re-populates a blanked keycap, and before
+  // Step 4 so paths resolve against the pre-rename source/<keyboardId>.* filenames.
   if (hasCarveEdit) {
     try {
-      const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(vfs, keyboardId, baseIr, {
-        slotIds,
-        wholeNodeIds: allWholeNodeIds,
-      });
+      const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(
+        vfs,
+        keyboardId,
+        baseIr,
+        {
+          slotIds,
+          wholeNodeIds: allWholeNodeIds,
+          // exactOptionalPropertyTypes: only pass the seam when non-empty —
+          // an explicit undefined is not assignable to the optional field.
+          ...(carveTouchKeepInert !== undefined && carveTouchKeepInert.size > 0
+            ? { keepInertTouchChars: carveTouchKeepInert }
+            : {}),
+        },
+      );
       warnings.push(...keycapRemovalResult.warnings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -569,7 +730,9 @@ export function projectWorkingCopyVfs(
   // Step 2: Assignments projection — inject mechanism pattern fragments.
   // Physical-only: touch assignments are handled by a separate gallery.
   // Skipped when there are no physical assignments.
-  const physicalAssignments = assignments.filter((a) => a.modality === "physical");
+  const physicalAssignments = assignments.filter(
+    (a) => a.modality === "physical",
+  );
   if (physicalAssignments.length > 0) {
     const assignResult = applyAssignmentsToVfs(
       vfs,
@@ -645,7 +808,10 @@ export function projectWorkingCopyVfs(
         typeof kmnEntryForPropagation.content === "string"
       ) {
         try {
-          const freshIr = parseKmn(kmnEntryForPropagation.content, keyboardId).ir;
+          const freshIr = parseKmn(
+            kmnEntryForPropagation.content,
+            keyboardId,
+          ).ir;
           const propagateResult = propagateDesktopLayersToTouch(
             touchEntry.content,
             freshIr,
@@ -671,18 +837,28 @@ export function projectWorkingCopyVfs(
   // anchors reflect the keyboard as the author left it), before identity and
   // the id rename (so the path still resolves under the pre-rename id).
   // A batch whose anchor is gone is skipped with a warning, never misplaced.
-  if (contextToleranceOverlay !== null && contextToleranceOverlay.batches.length > 0) {
+  if (
+    contextToleranceOverlay !== null &&
+    contextToleranceOverlay.batches.length > 0
+  ) {
     const kmnPathForTolerance = `source/${keyboardId}.kmn`;
     const kmnTextForTolerance = readVfsText(vfs, kmnPathForTolerance);
     if (kmnTextForTolerance !== undefined) {
       try {
         const parsedForTolerance = parseKmn(kmnTextForTolerance, keyboardId).ir;
-        const replay = applyContextToleranceOverlay(parsedForTolerance, contextToleranceOverlay);
+        const replay = applyContextToleranceOverlay(
+          parsedForTolerance,
+          contextToleranceOverlay,
+        );
         vfs.set(kmnPathForTolerance, emitKmn(replay.ir), false);
-        warnings.push(...replay.warnings.map((w) => `[project-working-copy] ${w}`));
+        warnings.push(
+          ...replay.warnings.map((w) => `[project-working-copy] ${w}`),
+        );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        warnings.push(`[project-working-copy] context-tolerance projection skipped: ${msg}`);
+        warnings.push(
+          `[project-working-copy] context-tolerance projection skipped: ${msg}`,
+        );
       }
     }
   }
@@ -706,11 +882,16 @@ export function projectWorkingCopyVfs(
   // through, so they cannot disagree about whether the name changed.
   if (identity !== null) {
     const baseName = baseDisplayName ?? baseIr.header.name;
-    const identityArg: { name?: string; copyright?: string; version?: string } = {};
-    if (identity.displayName !== undefined && identity.displayName !== baseName) {
+    const identityArg: { name?: string; copyright?: string; version?: string } =
+      {};
+    if (
+      identity.displayName !== undefined &&
+      identity.displayName !== baseName
+    ) {
       identityArg.name = identity.displayName;
     }
-    if (identity.copyright !== undefined) identityArg.copyright = identity.copyright;
+    if (identity.copyright !== undefined)
+      identityArg.copyright = identity.copyright;
     if (identity.version !== undefined) identityArg.version = identity.version;
 
     if (Object.keys(identityArg).length > 0) {
@@ -733,11 +914,17 @@ export function projectWorkingCopyVfs(
   // renames source/<keyboardId>.* siblings — patched assets are carried along).
   if (physicalAssignments.length > 0) {
     try {
-      const keycapResult = applyKeycapLabelsToVfs(vfs, keyboardId, physicalAssignments);
+      const keycapResult = applyKeycapLabelsToVfs(
+        vfs,
+        keyboardId,
+        physicalAssignments,
+      );
       warnings.push(...keycapResult.warnings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      warnings.push(`[project-working-copy] keycap label projection skipped: ${msg}`);
+      warnings.push(
+        `[project-working-copy] keycap label projection skipped: ${msg}`,
+      );
     }
   }
 
@@ -807,10 +994,7 @@ export function projectWorkingCopyVfs(
   // id via the result so callers that compile/re-read from the VFS after this
   // function returns know to use `targetKeyboardId`, not `keyboardId`.
   let effectiveKeyboardId: string | undefined;
-  if (
-    targetKeyboardId !== undefined &&
-    targetKeyboardId !== keyboardId
-  ) {
+  if (targetKeyboardId !== undefined && targetKeyboardId !== keyboardId) {
     effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
     const kmnText = readVfsText(vfs, kmnPath);
@@ -828,12 +1012,15 @@ export function projectWorkingCopyVfs(
           identity?.version ?? (parsed.ir.header.version?.trim() || undefined);
         resetIdentity(parsed.ir, {
           keyboardId: targetKeyboardId,
-          displayName: identity?.displayName ?? parsed.ir.header.name ?? targetKeyboardId,
+          displayName:
+            identity?.displayName ?? parsed.ir.header.name ?? targetKeyboardId,
           ...(identity?.bcp47 !== undefined && identity.bcp47 !== ""
             ? { bcp47: [identity.bcp47] }
             : {}),
           ...(copyVersion !== undefined ? { version: copyVersion } : {}),
-          ...(identity?.copyright !== undefined ? { copyright: identity.copyright } : {}),
+          ...(identity?.copyright !== undefined
+            ? { copyright: identity.copyright }
+            : {}),
         });
         vfs.set(kmnPath, emitKmn(parsed.ir), false);
       } catch (err: unknown) {

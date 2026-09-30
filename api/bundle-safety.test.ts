@@ -46,7 +46,6 @@ const FUNCTION_ENTRIES = [
   "api/drafts/index.ts",
   "api/drafts/content.ts",
   "api/submit/managed-pr.ts",
-  "api/submit/managed-pr-selftest.ts",
   "api/report/crash.ts",
   "api/report/crash-retract.ts",
 ];

@@ -13,6 +13,15 @@
     "navigateTo": []
   },
   {
+    "stepId": "layout",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
@@ -112,6 +121,15 @@
   },
   {
     "stepId": "deadkeys",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "rules",
     "applyStepCompletion": [],
     "storeMutations": [
       "advance"

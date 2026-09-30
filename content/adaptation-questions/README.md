@@ -1,6 +1,6 @@
 # Adaptation questions catalog
 
-Content-owned data set for spec [038-adaptation-questions](../../specs/038-adaptation-questions/spec.md).
+Content-owned data set for spec [038-adaptation-questions](../../specs/038-adaptation-questions/AS-BUILT.md).
 One YAML record per question under `content/adaptation-questions/`, mirroring the
 `content/facets/` convention. A plain-node lint
 ([utilities/adaptation-catalog-lint](../../utilities/adaptation-catalog-lint/index.js),

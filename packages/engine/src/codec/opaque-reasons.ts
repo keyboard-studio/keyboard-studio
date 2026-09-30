@@ -10,6 +10,10 @@ export const OPAQUE_REASONS = {
   OPTION_STORE_DIRECTIVE: "option-store-directive",
   IF_OPTION_STORE: "if-option-store",
   CALL_RETURN: "call-return",
+  // An indexed `context(N)` reference the typed IR cannot model: N greater
+  // than one in context position used to land here, but 076 FR-004 types that
+  // case, so this now covers only degenerate offsets — `context(0)` anywhere,
+  // and `context(1)` in context position (N must be > 1 there).
   INDEXED_CONTEXT: "indexed-context",
   OUTS_EXPANSION: "outs-expansion",
   SMP_LITERAL: "smp-literal",

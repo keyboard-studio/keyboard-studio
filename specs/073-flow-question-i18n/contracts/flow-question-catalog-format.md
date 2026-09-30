@@ -35,7 +35,7 @@ Scope: only questions registered in a **live** phase sub-registry (`phaseARegist
 
 ## Fifth field: `audit_label` (added by spec 055, optional)
 
-[specs/055-legible-decision-trail](../../055-legible-decision-trail/spec.md) adds a fifth field, `audit_label` (`content.flowQuestion.<questionId>.audit_label`), authored only where `prompt` reads badly as a decision-trail headline — most questions need none. Full contract, including the extraction/lint/resolution mechanics and the ordering obligation (the parity-lint change must land before the first authored value), lives in [specs/055-legible-decision-trail/contracts/catalog-audit-label.contract.md](../../055-legible-decision-trail/contracts/catalog-audit-label.contract.md).
+[specs/055-legible-decision-trail](../../055-legible-decision-trail/AS-BUILT.md) adds a fifth field, `audit_label` (`content.flowQuestion.<questionId>.audit_label`), authored only where `prompt` reads badly as a decision-trail headline — most questions need none. Full contract, including the extraction/lint/resolution mechanics and the ordering obligation (the parity-lint change must land before the first authored value), lives in [specs/055-legible-decision-trail/contracts/catalog-audit-label.contract.md](../../055-legible-decision-trail/contracts/catalog-audit-label.contract.md).
 
 **Ownership split** (spec §12 / Constitution Article VI, applied to this one field):
 

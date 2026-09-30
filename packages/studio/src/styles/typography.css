@@ -20,3 +20,45 @@
 
   --app-display:    'Playfair Display', Georgia, serif;
 }
+
+/* ---- Type-scale tokens -------------------------------------------------
+ * Hierarchy is carried by the SET of weight + size + leading + tracking,
+ * never by size alone. Tracking follows the legibility curve: slightly
+ * negative on large display sizes, near zero at body sizes, slightly
+ * positive on small text; leading tightens as size grows and loosens again
+ * on small text.
+ *
+ * Each --app-type-* token is a CSS `font` shorthand value
+ * (weight size/leading family). Apply it through the `font` property and
+ * pair it with the matching --app-tracking-* token in `letter-spacing`.
+ * The shorthand references --app-font, so Source Sans 3 stays the single
+ * source of truth for the UI face; these tokens add the tracking/leading
+ * discipline, they do not change faces.
+ */
+:root {
+  /* Display — hero and empty-state titles, the largest in-app text. */
+  --app-type-display:     700 28px/1.15 var(--app-font);
+  --app-tracking-display: -0.02em;
+
+  /* Title — dialog and app-bar titles. */
+  --app-type-title:       700 20px/1.25 var(--app-font);
+  --app-tracking-title:   -0.015em;
+
+  /* Headline — card and section headings at 16px. */
+  --app-type-headline:     600 16px/1.3 var(--app-font);
+  --app-tracking-headline: -0.008em;
+
+  /* Subhead — 14px headings that need the stronger 700 weight, kept
+   * distinct from the 600-weight label treatment below. */
+  --app-type-subhead:     700 14px/1.4 var(--app-font);
+  --app-tracking-subhead: 0em;
+
+  /* Label — small titles, sheet labels, list headers. */
+  --app-type-label:       600 14px/1.4 var(--app-font);
+  --app-tracking-label:   0em;
+
+  /* Caption — micro labels and eyebrow text; the slightly positive
+   * tracking keeps small sizes legible. */
+  --app-type-caption:     600 12px/1.45 var(--app-font);
+  --app-tracking-caption: 0.01em;
+}

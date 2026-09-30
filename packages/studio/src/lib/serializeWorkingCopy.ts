@@ -24,6 +24,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
+import { deriveRuleAdditions } from "./ruleAdditions.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import {
@@ -442,6 +443,10 @@ export async function projectWorkingCopyForOutput(
     baseDisplayName: baseKeyboard.displayName,
     // spec 078: the same applied context-tolerance fix the preview replays.
     contextToleranceOverlay: contextToleranceOverlay?.overlay ?? null,
+    // spec 082: the same rules-step additions the preview projects — the
+    // download must contain exactly what the OSK compiled (pack install,
+    // guard synthesis, Narrow).
+    ruleAdditions: deriveRuleAdditions(workingIr, baseIr),
   });
 
   // The projector's own report of what id the VFS actually ended up under is
@@ -531,7 +536,7 @@ export async function projectWorkingCopyForOutput(
   for (const chart of charts) {
     clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
   }
-  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText), false);
+  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText, baseWelcomeHtmText), false);
 
   // spec 079 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
   // production from the author's proposal decision — a confirmed or edited

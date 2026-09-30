@@ -15,7 +15,15 @@ export { buildSessionProducedSet } from "./sessionProducedSet.js";
 export { applyAssignmentsToVfs } from "./applyAssignmentsToVfs.js";
 
 export { applyCarveToVfs } from "./applyCarveToVfs.js";
-export type { ApplyCarveToVfsOpts } from "./applyCarveToVfs.js";
+export type { ApplyCarveToVfsOpts, ApplyCarveToVfsResult, CarvePipelineOpts } from "./applyCarveToVfs.js";
+export {
+  deriveCarvedIr,
+  partitionCarveItemIds,
+} from "./carvePipeline.js";
+export type {
+  CarvePipelineInput,
+  CarvePipelineResult,
+} from "./carvePipeline.js";
 
 export { carveFilterIr } from "./carveFilterIr.js";
 
@@ -347,3 +355,16 @@ export type {
   SetLayerSwitchSpFix,
 } from "./touchKeyDiagnostics.js";
 
+export {
+  compileCarveSuppression,
+  restoreCarveSuppression,
+  CARVE_SUPPRESSION_OWNER,
+  slotGuardNodeIdPrefix,
+} from "./carveSuppression.js";
+export type {
+  SuppressionRestoration,
+  CompileCarveSuppressionOptions,
+  CompileCarveSuppressionResult,
+} from "./carveSuppression.js";
+export { isInSwallowSet } from "./swallowSet.js";
+export type { SwallowCombo } from "./swallowSet.js";

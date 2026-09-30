@@ -12,7 +12,7 @@
 
 This spec **implements** the following and does not restate them. They win on conflict, except where this spec explicitly amends them (see [Amendments](#amendments-to-existing-specs)).
 
-- [specs/057-bulletproof-navigation/](../057-bulletproof-navigation/spec.md) section E:
+- [specs/057-bulletproof-navigation/](../_archive/057-bulletproof-navigation/spec.md) section E:
   - 057 FR-040: the footer is narrow, present from the first question onward, and MUST NOT materially reduce the walk's vertical space.
   - 057 FR-043: every dot is a real, focusable, named control.
   - 057 FR-047: overflow degrades legibly, every mark stays reachable, and the current position stays visible.

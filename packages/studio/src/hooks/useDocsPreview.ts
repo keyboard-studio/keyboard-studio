@@ -58,7 +58,7 @@ export function useDocsPreview(): DocsPreview {
       readmeMd: renderReadmeMd(input, baseReadmeMdText),
       readmeHtm: renderReadmeHtm(input),
       welcomeHtm: renderWelcomeHtm(input, baseWelcomeHtmText),
-      helpPhp: renderHelpPhp(input, baseHelpPhpText),
+      helpPhp: renderHelpPhp(input, baseHelpPhpText, baseWelcomeHtmText),
     };
   }, [helpDocs, identity, baseKeyboard, baseIr, baseWelcomeHtmText, baseHelpPhpText, baseReadmeMdText]);
 }

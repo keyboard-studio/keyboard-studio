@@ -110,7 +110,7 @@
 // purely to answer "if this key's occurrence is gone, is the id orphaned",
 // and nothing produced here is ever written anywhere.
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import {
@@ -135,9 +135,14 @@ import {
   type KeyIdRejectionReason,
   type ValidateKeyIdResult,
 } from "@keyboard-studio/engine";
-import { Button, Checkbox, Notice, TextField } from "../../../ui/index.ts";
-import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
-import { FOCUSABLE_SELECTOR } from "../../../lib/focusableSelector.ts";
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  Notice,
+  TextField,
+} from "../../../ui/index.ts";
+import { TEXT_DIM, TEXT_MAIN } from "../../../lib/galleryTheme.ts";
 import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
 
 // ---------------------------------------------------------------------------
@@ -182,25 +187,45 @@ function collectLayerScopeIds(
       // Occurrence-aware so `excludeAddress` — a grid cell's address, which may
       // carry one — excludes the key being renamed and not merely the first key
       // that happens to share its id.
-      if (touchKeyAddress(platformId, layerId, k.id, nextOccurrence(k.id)) === excludeAddress) continue;
-      out.push({ id: k.id, ...(k.layer !== undefined ? { layer: k.layer } : {}) });
+      if (
+        touchKeyAddress(platformId, layerId, k.id, nextOccurrence(k.id)) ===
+        excludeAddress
+      )
+        continue;
+      out.push({
+        id: k.id,
+        ...(k.layer !== undefined ? { layer: k.layer } : {}),
+      });
     }
   }
   return out;
 }
 
 /** Every top-level key id across the WHOLE layout, excluding `excludeAddress`. */
-function collectAllTopLevelIds(layout: TouchLayoutIR, excludeAddress: string): ExistingKeyIdInScope[] {
+function collectAllTopLevelIds(
+  layout: TouchLayoutIR,
+  excludeAddress: string,
+): ExistingKeyIdInScope[] {
   const out: ExistingKeyIdInScope[] = [];
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
       const nextOccurrence = createKeyOccurrenceCounter();
       for (const row of layer.rows) {
         for (const k of row.keys) {
-          if (touchKeyAddress(platform.id, layer.id, k.id, nextOccurrence(k.id)) === excludeAddress) {
+          if (
+            touchKeyAddress(
+              platform.id,
+              layer.id,
+              k.id,
+              nextOccurrence(k.id),
+            ) === excludeAddress
+          ) {
             continue;
           }
-          out.push({ id: k.id, ...(k.layer !== undefined ? { layer: k.layer } : {}) });
+          out.push({
+            id: k.id,
+            ...(k.layer !== undefined ? { layer: k.layer } : {}),
+          });
         }
       }
     }
@@ -224,11 +249,18 @@ export function validateRenameCandidate(
   const parts = parseTouchKeyAddress(targetAddress);
   if (parts === undefined) return { valid: false, reason: "malformed" };
 
-  const sameLayerIds = collectLayerScopeIds(layout, parts.platform, parts.layerId, targetAddress);
+  const sameLayerIds = collectLayerScopeIds(
+    layout,
+    parts.platform,
+    parts.layerId,
+    targetAddress,
+  );
   const sameLayerResult = validateCandidateKeyId(id, {
     minting: true,
     existingIdsInScope: sameLayerIds,
-    ...(candidateLayerOverride !== undefined ? { layerOverride: candidateLayerOverride } : {}),
+    ...(candidateLayerOverride !== undefined
+      ? { layerOverride: candidateLayerOverride }
+      : {}),
   });
   if (!sameLayerResult.valid) return sameLayerResult;
 
@@ -237,8 +269,14 @@ export function validateRenameCandidate(
   // idiom the check above already cleared; leaving it in this second scope
   // would let validateCandidateKeyId's exact-match branch fire a spurious
   // "duplicate-in-layer" here and mask a genuine global case collision.
-  const globalCaseCandidates = collectAllTopLevelIds(layout, targetAddress).filter((e) => e.id !== id);
-  return validateCandidateKeyId(id, { minting: true, existingIdsInScope: globalCaseCandidates });
+  const globalCaseCandidates = collectAllTopLevelIds(
+    layout,
+    targetAddress,
+  ).filter((e) => e.id !== id);
+  return validateCandidateKeyId(id, {
+    minting: true,
+    existingIdsInScope: globalCaseCandidates,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +293,8 @@ export function validateRenameCandidate(
 function collectIdOccurrencesInKey(key: TouchKeyIR): string[] {
   const ids = [key.id];
   for (const sub of key.sk ?? []) ids.push(...collectIdOccurrencesInKey(sub));
-  for (const sub of key.multitap ?? []) ids.push(...collectIdOccurrencesInKey(sub));
+  for (const sub of key.multitap ?? [])
+    ids.push(...collectIdOccurrencesInKey(sub));
   for (const sub of Object.values(key.flick ?? {})) {
     if (sub !== undefined) ids.push(...collectIdOccurrencesInKey(sub));
   }
@@ -293,8 +332,12 @@ export function computeRenameImpact(
       for (const row of layer.rows) {
         for (const topKey of row.keys) {
           const isTargetKey =
-            touchKeyAddress(platform.id, layer.id, topKey.id, nextOccurrence(topKey.id)) ===
-            targetAddress;
+            touchKeyAddress(
+              platform.id,
+              layer.id,
+              topKey.id,
+              nextOccurrence(topKey.id),
+            ) === targetAddress;
           for (const id of collectIdOccurrencesInKey(topKey)) {
             if (normalizeTouchKeyId(id) !== targetNorm) continue;
             // Exclude exactly the top-level key being renamed itself; a
@@ -338,7 +381,10 @@ export function computeRenameImpact(
  * not a new limitation. Never mutates `layout`; returns a fresh object only
  * when a match is found, the layout reference unchanged otherwise.
  */
-function withKeyIdVacatedAtAddress(layout: TouchLayoutIR, targetAddress: string): TouchLayoutIR {
+function withKeyIdVacatedAtAddress(
+  layout: TouchLayoutIR,
+  targetAddress: string,
+): TouchLayoutIR {
   const parts = parseTouchKeyAddress(targetAddress);
   if (parts === undefined) return layout;
   let found = false;
@@ -398,7 +444,10 @@ export interface RenameDialogOrphanCleanup {
 // ---------------------------------------------------------------------------
 
 /** `Omit<..., "seq">` of the engine's own `RenameKeyOp` — never hand-duplicated, so this cannot drift from the real operation shape `commitKeyEdit` expects (mirrors AssignPanel.tsx's `AssignPanelSetOp` alias). */
-export type RenameDialogRenameOp = Omit<Extract<KeyEditOperation, { kind: "rename" }>, "seq">;
+export type RenameDialogRenameOp = Omit<
+  Extract<KeyEditOperation, { kind: "rename" }>,
+  "seq"
+>;
 
 export interface RenameDialogConfirmResult {
   /**
@@ -429,7 +478,9 @@ export interface RenameDialogConfirmResult {
 // Localized rejection-reason sentences (FR-044/FR-051)
 // ---------------------------------------------------------------------------
 
-function useRejectionReasonText(): (result: Extract<ValidateKeyIdResult, { valid: false }>) => string {
+function useRejectionReasonText(): (
+  result: Extract<ValidateKeyIdResult, { valid: false }>,
+) => string {
   const { t } = useLingui();
   return (result) => {
     const reason: KeyIdRejectionReason = result.reason;
@@ -442,17 +493,20 @@ function useRejectionReasonText(): (result: Extract<ValidateKeyIdResult, { valid
       case "unicode-out-of-range":
         return t({
           id: "editor.assignLoop.keyGrid.renameDialog.reason.unicodeOutOfRange",
-          message: "That code point is outside Keyman's valid range for a U_ id.",
+          message:
+            "That code point is outside Keyman's valid range for a U_ id.",
         });
       case "unicode-unpadded":
         return t({
           id: "editor.assignLoop.keyGrid.renameDialog.reason.unicodeUnpadded",
-          message: "A U_ id needs at least four hex digits, zero-padded — for example U_0041.",
+          message:
+            "A U_ id needs at least four hex digits, zero-padded — for example U_0041.",
         });
       case "reserved-prefix":
         return t({
           id: "editor.assignLoop.keyGrid.renameDialog.reason.reservedPrefix",
-          message: "That id is reserved for the studio's own internal placeholders.",
+          message:
+            "That id is reserved for the studio's own internal placeholders.",
         });
       case "reserved-sentinel":
         return t({
@@ -529,39 +583,20 @@ export function RenameDialog({
   const { t } = useLingui();
   const uid = useId();
   const rejectionReasonText = useRejectionReasonText();
-  const dialogRef = useRef<HTMLFormElement>(null);
 
   const [idInput, setIdInput] = useState("");
   // Default "remove" (T083's own policy for generated rules) — reset on
   // every open/target change alongside the id field, below.
   const [removeGeneratedChecked, setRemoveGeneratedChecked] = useState(true);
 
-  // Pre-fill (never blank) whenever the dialog opens or the target changes,
-  // and move focus into the field — the APG dialog pattern's "opening a
-  // dialog moves focus into it" (docs/accessibility.md rule 4).
-  //
-  // `TextField` (ui/TextField.tsx) is a plain function component, not
-  // `forwardRef` — no existing call site in this package attaches a ref to
-  // it (checked before writing this), so rather than being the first to
-  // widen that primitive's contract, focus is acquired by DOM query
-  // scoped to `dialogRef`, mirroring AccountControl.tsx's own identical
-  // "focus the first focusable element in the panel" idiom.
+  // Pre-fill (never blank) whenever the dialog opens or the target changes.
+  // Focus-into-dialog on open is owned by the shared Dialog primitive (APG
+  // dialog pattern) — the id field is the dialog's first focusable element.
   useEffect(() => {
     if (!open || selectedCell === null) return;
     setIdInput(computeProposedRenameId(selectedCell));
     setRemoveGeneratedChecked(true);
-    dialogRef.current?.querySelector<HTMLInputElement>('[data-testid="rename-dialog-field"]')?.focus();
   }, [open, selectedCell]);
-
-  // Escape closes from anywhere in the dialog (APG dialog pattern).
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onCancel]);
 
   const candidateLayerOverride = useMemo(() => {
     if (selectedCell === null) return undefined;
@@ -575,12 +610,22 @@ export function RenameDialog({
 
   const validation: ValidateKeyIdResult | undefined = useMemo(() => {
     if (selectedCell === null || isUnchanged) return undefined;
-    return validateRenameCandidate(trimmedId, layout, selectedCell.address, candidateLayerOverride);
+    return validateRenameCandidate(
+      trimmedId,
+      layout,
+      selectedCell.address,
+      candidateLayerOverride,
+    );
   }, [selectedCell, isUnchanged, trimmedId, layout, candidateLayerOverride]);
 
   const impact = useMemo(() => {
     if (selectedCell === null) return undefined;
-    return computeRenameImpact(layout, ruleIndex, selectedCell.address, selectedCell.id);
+    return computeRenameImpact(
+      layout,
+      ruleIndex,
+      selectedCell.address,
+      selectedCell.id,
+    );
   }, [selectedCell, layout, ruleIndex]);
 
   // T092: independent of what `toId` is — this asks only "if THIS key's
@@ -588,43 +633,39 @@ export function RenameDialog({
   // that id" (see the module doc's "T092" section).
   const orphanPlan = useMemo(() => {
     if (selectedCell === null) return undefined;
-    return buildOrphanCleanupPlan(ir, layout, ruleIndex, selectedCell.address, selectedCell.id);
+    return buildOrphanCleanupPlan(
+      ir,
+      layout,
+      ruleIndex,
+      selectedCell.address,
+      selectedCell.id,
+    );
   }, [selectedCell, ir, layout, ruleIndex]);
 
   const hasOrphanConcern =
     orphanPlan !== undefined &&
     !orphanPlan.stillPresentElsewhere &&
-    (orphanPlan.generatedRuleNodeIds.length > 0 || orphanPlan.handWrittenRuleNodeIds.length > 0);
+    (orphanPlan.generatedRuleNodeIds.length > 0 ||
+      orphanPlan.handWrittenRuleNodeIds.length > 0);
 
-  const canConfirm = selectedCell !== null && !isUnchanged && validation?.valid === true;
-
-  function handleKeyDownTrap(e: ReactKeyboardEvent<HTMLFormElement>): void {
-    if (e.key !== "Tab" || dialogRef.current === null) return;
-    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-    if (focusable.length === 0) return;
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
+  const canConfirm =
+    selectedCell !== null && !isUnchanged && validation?.valid === true;
 
   function handleSubmit(e: FormEvent): void {
     e.preventDefault();
     if (!canConfirm || selectedCell === null || impact === undefined) return;
 
-    const orphanCleanup: RenameDialogOrphanCleanup | undefined = hasOrphanConcern && orphanPlan !== undefined
-      ? {
-          generatedRuleNodeIds: orphanPlan.generatedRuleNodeIds,
-          handWrittenRuleNodeIds: orphanPlan.handWrittenRuleNodeIds,
-          removeGenerated: removeGeneratedChecked,
-          ...(orphanPlan.warning !== undefined ? { warning: orphanPlan.warning } : {}),
-        }
-      : undefined;
+    const orphanCleanup: RenameDialogOrphanCleanup | undefined =
+      hasOrphanConcern && orphanPlan !== undefined
+        ? {
+            generatedRuleNodeIds: orphanPlan.generatedRuleNodeIds,
+            handWrittenRuleNodeIds: orphanPlan.handWrittenRuleNodeIds,
+            removeGenerated: removeGeneratedChecked,
+            ...(orphanPlan.warning !== undefined
+              ? { warning: orphanPlan.warning }
+              : {}),
+          }
+        : undefined;
 
     onConfirm({
       op: { address: selectedCell.address, kind: "rename", toId: trimmedId },
@@ -651,181 +692,199 @@ export function RenameDialog({
       impact.otherPlatformOccurrences > 0 ||
       impact.ruleOccurrences > 0);
 
+  // The modal frame (backdrop, centering, focus trap, Escape, width clamp)
+  // is the shared ui/Dialog primitive — this component owns only content
+  // and its open/target state machine.
   return (
-    <>
-      {/* Fixed transparent backdrop — click outside to cancel (mirrors AccountControl.tsx's own convention). */}
+    <Dialog
+      open={open}
+      onCancel={onCancel}
+      label={dialogLabel}
+      testId="rename-dialog"
+      minWidth={320}
+      maxWidth={480}
+      onSubmit={handleSubmit}
+    >
       <div
-        style={{ position: "fixed", inset: 0, background: "color-mix(in srgb, var(--sil-black) 50%, transparent)", zIndex: 299 }}
-        onClick={onCancel}
-        aria-hidden="true"
-      />
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the ARIA APG modal DIALOG pattern (https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) requires the container itself to trap Tab focus via onKeyDown; jsx-a11y's interactive-role allowlist does not include "dialog" (it is a window/structure role, not a widget role), so this fires regardless of the explicit role — the same "focusable-but-not-a-natively-interactive-role" carve-out KeyInspector.tsx already documents for its own onKeyDown handler. */}
-      <form
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={dialogLabel}
-        data-testid="rename-dialog"
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDownTrap}
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          zIndex: 300,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          padding: 16,
-          minWidth: 320,
-          maxWidth: 480,
-          background: BG_CARD,
-          border: `1px solid ${BORDER}`,
-          borderRadius: 8,
-          fontFamily: FONT,
-          boxShadow: "0 8px 24px color-mix(in srgb, var(--sil-black) 50%, transparent)",
-        }}
+        style={{ fontSize: 13, color: TEXT_MAIN }}
+        data-testid="rename-dialog-target"
       >
-        <div style={{ fontSize: 13, color: TEXT_MAIN }} data-testid="rename-dialog-target">
-          {t({
-            id: "editor.assignLoop.keyGrid.renameDialog.targetLabel",
-            message: `Renaming ${{ id: selectedCell.id }}`,
-          })}
-        </div>
+        {t({
+          id: "editor.assignLoop.keyGrid.renameDialog.targetLabel",
+          message: `Renaming ${{ id: selectedCell.id }}`,
+        })}
+      </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label htmlFor={`${uid}-id-field`} style={{ fontSize: 11, color: TEXT_DIM }}>
-            <Trans id="editor.assignLoop.keyGrid.renameDialog.fieldLabel">New key id</Trans>
-          </label>
-          <TextField
-            id={`${uid}-id-field`}
-            mono
-            value={idInput}
-            onChange={(e) => setIdInput(e.target.value)}
-            error={validation?.valid === false}
-            aria-invalid={validation?.valid === false}
-            aria-describedby={validation?.valid === false ? `${uid}-id-error` : undefined}
-            data-testid="rename-dialog-field"
-          />
-          {isUnchanged && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }} data-testid="rename-dialog-unchanged">
-              {t({
-                id: "editor.assignLoop.keyGrid.renameDialog.reason.unchanged",
-                message: "That's already this key's id.",
-              })}
-            </span>
-          )}
-          {validation?.valid === false && (
-            <span
-              id={`${uid}-id-error`}
-              role="alert"
-              data-testid="rename-dialog-field-error"
-              style={{ fontSize: 11, color: TEXT_DIM }}
-            >
-              {rejectionReasonText(validation)}
-            </span>
-          )}
-        </div>
-
-        {impact !== undefined && (
-          <Notice tone="info">
-            <span data-testid="rename-dialog-impact">
-              {hasImpact
-                ? [
-                    impact.sameLayerOccurrences > 0 &&
-                      t({
-                        id: "editor.assignLoop.keyGrid.renameDialog.impact.sameLayer",
-                        message: plural(impact.sameLayerOccurrences, {
-                          one: "# other occurrence on this layer",
-                          other: "# other occurrences on this layer",
-                        }),
-                      }),
-                    impact.otherLayerOccurrences > 0 &&
-                      t({
-                        id: "editor.assignLoop.keyGrid.renameDialog.impact.otherLayers",
-                        message: plural(impact.otherLayerOccurrences, {
-                          one: "# other layer",
-                          other: "# other layers",
-                        }),
-                      }),
-                    impact.otherPlatformOccurrences > 0 &&
-                      t({
-                        id: "editor.assignLoop.keyGrid.renameDialog.impact.otherPlatforms",
-                        message: plural(impact.otherPlatformOccurrences, {
-                          one: "# other platform",
-                          other: "# other platforms",
-                        }),
-                      }),
-                    impact.ruleOccurrences > 0 &&
-                      t({
-                        id: "editor.assignLoop.keyGrid.renameDialog.impact.rules",
-                        message: plural(impact.ruleOccurrences, {
-                          one: "# rule in the .kmn",
-                          other: "# rules in the .kmn",
-                        }),
-                      }),
-                  ]
-                    .filter((part): part is string => typeof part === "string")
-                    .join(" · ")
-                : t({
-                    id: "editor.assignLoop.keyGrid.renameDialog.impact.none",
-                    message: "This id appears nowhere else in the layout or the .kmn.",
-                  })}
-            </span>
-          </Notice>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label
+          htmlFor={`${uid}-id-field`}
+          style={{ fontSize: 11, color: TEXT_DIM }}
+        >
+          <Trans id="editor.assignLoop.keyGrid.renameDialog.fieldLabel">
+            New key id
+          </Trans>
+        </label>
+        <TextField
+          id={`${uid}-id-field`}
+          mono
+          value={idInput}
+          onChange={(e) => setIdInput(e.target.value)}
+          error={validation?.valid === false}
+          aria-invalid={validation?.valid === false}
+          aria-describedby={
+            validation?.valid === false ? `${uid}-id-error` : undefined
+          }
+          data-testid="rename-dialog-field"
+        />
+        {isUnchanged && (
+          <span
+            style={{ fontSize: 11, color: TEXT_DIM }}
+            data-testid="rename-dialog-unchanged"
+          >
+            {t({
+              id: "editor.assignLoop.keyGrid.renameDialog.reason.unchanged",
+              message: "That's already this key's id.",
+            })}
+          </span>
         )}
+        {validation?.valid === false && (
+          <span
+            id={`${uid}-id-error`}
+            role="alert"
+            data-testid="rename-dialog-field-error"
+            style={{ fontSize: 11, color: TEXT_DIM }}
+          >
+            {rejectionReasonText(validation)}
+          </span>
+        )}
+      </div>
 
-        {hasOrphanConcern && orphanPlan !== undefined && (
-          <Notice tone="warn">
-            <div data-testid="rename-dialog-orphan" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {orphanPlan.generatedRuleNodeIds.length > 0 && (
-                <>
-                  <span data-testid="rename-dialog-orphan-generated">
-                    {t({
-                      id: "editor.assignLoop.keyGrid.renameDialog.orphan.generated",
-                      message: plural(orphanPlan.generatedRuleNodeIds.length, {
-                        one: "This id would then be carried by no key. # rule the studio generated would have nothing left to bind to.",
-                        other: "This id would then be carried by no key. # rules the studio generated would have nothing left to bind to.",
+      {impact !== undefined && (
+        <Notice tone="info">
+          <span data-testid="rename-dialog-impact">
+            {hasImpact
+              ? [
+                  impact.sameLayerOccurrences > 0 &&
+                    t({
+                      id: "editor.assignLoop.keyGrid.renameDialog.impact.sameLayer",
+                      message: plural(impact.sameLayerOccurrences, {
+                        one: "# other occurrence on this layer",
+                        other: "# other occurrences on this layer",
                       }),
-                    })}
-                  </span>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                    <Checkbox
-                      checked={removeGeneratedChecked}
-                      onChange={(e) => setRemoveGeneratedChecked(e.target.checked)}
-                      data-testid="rename-dialog-orphan-remove-checkbox"
-                    />
-                    <Trans id="editor.assignLoop.keyGrid.renameDialog.orphan.removeCheckbox">
-                      Remove them
-                    </Trans>
-                  </label>
-                </>
-              )}
-              {orphanPlan.handWrittenRuleNodeIds.length > 0 && (
-                <span data-testid="rename-dialog-orphan-handwritten">
+                    }),
+                  impact.otherLayerOccurrences > 0 &&
+                    t({
+                      id: "editor.assignLoop.keyGrid.renameDialog.impact.otherLayers",
+                      message: plural(impact.otherLayerOccurrences, {
+                        one: "# other layer",
+                        other: "# other layers",
+                      }),
+                    }),
+                  impact.otherPlatformOccurrences > 0 &&
+                    t({
+                      id: "editor.assignLoop.keyGrid.renameDialog.impact.otherPlatforms",
+                      message: plural(impact.otherPlatformOccurrences, {
+                        one: "# other platform",
+                        other: "# other platforms",
+                      }),
+                    }),
+                  impact.ruleOccurrences > 0 &&
+                    t({
+                      id: "editor.assignLoop.keyGrid.renameDialog.impact.rules",
+                      message: plural(impact.ruleOccurrences, {
+                        one: "# rule in the .kmn",
+                        other: "# rules in the .kmn",
+                      }),
+                    }),
+                ]
+                  .filter((part): part is string => typeof part === "string")
+                  .join(" · ")
+              : t({
+                  id: "editor.assignLoop.keyGrid.renameDialog.impact.none",
+                  message:
+                    "This id appears nowhere else in the layout or the .kmn.",
+                })}
+          </span>
+        </Notice>
+      )}
+
+      {hasOrphanConcern && orphanPlan !== undefined && (
+        <Notice tone="warn">
+          <div
+            data-testid="rename-dialog-orphan"
+            style={{ display: "flex", flexDirection: "column", gap: 6 }}
+          >
+            {orphanPlan.generatedRuleNodeIds.length > 0 && (
+              <>
+                <span data-testid="rename-dialog-orphan-generated">
                   {t({
-                    id: "editor.assignLoop.keyGrid.renameDialog.orphan.handWritten",
-                    message: plural(orphanPlan.handWrittenRuleNodeIds.length, {
-                      one: "# hand-written or imported rule would still reference this id — left in place for the diagnostics to report.",
-                      other: "# hand-written or imported rules would still reference this id — left in place for the diagnostics to report.",
+                    id: "editor.assignLoop.keyGrid.renameDialog.orphan.generated",
+                    message: plural(orphanPlan.generatedRuleNodeIds.length, {
+                      one: "This id would then be carried by no key. # rule the studio generated would have nothing left to bind to.",
+                      other:
+                        "This id would then be carried by no key. # rules the studio generated would have nothing left to bind to.",
                     }),
                   })}
                 </span>
-              )}
-            </div>
-          </Notice>
-        )}
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                  }}
+                >
+                  <Checkbox
+                    checked={removeGeneratedChecked}
+                    onChange={(e) =>
+                      setRemoveGeneratedChecked(e.target.checked)
+                    }
+                    data-testid="rename-dialog-orphan-remove-checkbox"
+                  />
+                  <Trans id="editor.assignLoop.keyGrid.renameDialog.orphan.removeCheckbox">
+                    Remove them
+                  </Trans>
+                </label>
+              </>
+            )}
+            {orphanPlan.handWrittenRuleNodeIds.length > 0 && (
+              <span data-testid="rename-dialog-orphan-handwritten">
+                {t({
+                  id: "editor.assignLoop.keyGrid.renameDialog.orphan.handWritten",
+                  message: plural(orphanPlan.handWrittenRuleNodeIds.length, {
+                    one: "# hand-written or imported rule would still reference this id — left in place for the diagnostics to report.",
+                    other:
+                      "# hand-written or imported rules would still reference this id — left in place for the diagnostics to report.",
+                  }),
+                })}
+              </span>
+            )}
+          </div>
+        </Notice>
+      )}
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <Button type="button" variant="secondary" onClick={onCancel} data-testid="rename-dialog-cancel">
-            <Trans id="editor.assignLoop.keyGrid.renameDialog.cancel">Cancel</Trans>
-          </Button>
-          <Button type="submit" variant="primary" disabled={!canConfirm} data-testid="rename-dialog-confirm">
-            <Trans id="editor.assignLoop.keyGrid.renameDialog.confirm">Rename</Trans>
-          </Button>
-        </div>
-      </form>
-    </>
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          data-testid="rename-dialog-cancel"
+        >
+          <Trans id="editor.assignLoop.keyGrid.renameDialog.cancel">
+            Cancel
+          </Trans>
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!canConfirm}
+          data-testid="rename-dialog-confirm"
+        >
+          <Trans id="editor.assignLoop.keyGrid.renameDialog.confirm">
+            Rename
+          </Trans>
+        </Button>
+      </div>
+    </Dialog>
   );
 }

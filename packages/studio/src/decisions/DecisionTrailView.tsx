@@ -315,6 +315,8 @@ export function DecisionTrailView({
     switch (stepId) {
       case "identity":
         return t({ id: "trail.stage.name.identity", message: "Keyboard identity" });
+      case "layout":
+        return t({ id: "trail.stage.name.layout", message: "Community keyboard layout" });
       case "choose_base":
         return t({ id: "trail.stage.name.chooseBase", message: "Choosing a base keyboard" });
       case "track":

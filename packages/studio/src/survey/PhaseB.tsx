@@ -876,6 +876,24 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const removeChar = usePhaseBDraftStore((s) => s.remove);
   const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
 
+  // Defaults-first (spec 3c): the build list can be reached without passing
+  // the intro chooser (a restored position, a progress-dot jump). If it opens
+  // EMPTY while a sourced exemplar alphabet exists and the author never
+  // declined it, apply the exemplar set, exactly as accepting the chooser's
+  // pre-selected option would. Once per mount; seedFromProposal is
+  // idempotent and never re-proposes a character the author removed.
+  const { inventory: exemplarInventory } = useSourcedExemplars(context.bcp47_tag);
+  const exemplarDeclined = usePhaseBDraftStore((s) => s.exemplarMethodDeclined);
+  const seedExemplars = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const autoSeededRef = useRef(false);
+  useEffect(() => {
+    if (autoSeededRef.current || exemplarInventory === null) return;
+    autoSeededRef.current = true;
+    if (chars.length === 0 && !exemplarDeclined) {
+      seedExemplars(exemplarInventory, context.bcp47_tag);
+    }
+  }, [exemplarInventory, chars.length, exemplarDeclined, seedExemplars, context.bcp47_tag]);
+
   // spec 079 US3 T059/T080: carried-over additions that landed outside the
   // new script after a shape change, flagged until reconfirmed. Same
   // derivation `hooks/useWorkToDo.ts` reads for the journey-strip badge
@@ -1531,16 +1549,19 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   // pre-selected option — unless the author already declined it for this
   // working copy, in which case the decision is not re-asserted (FR-016a).
   const offerExemplars = inventory !== null;
-  const [selected, setSelected] = useState<IntroChoice>("build-list");
-  // The offer resolves asynchronously, so the pre-selection is applied once the
-  // lookup settles rather than at first render. Only ever moves the selection
-  // off the initial default — never overrides a choice the author has made.
-  const [autoSelected, setAutoSelected] = useState(false);
-  useEffect(() => {
-    if (loading || autoSelected) return;
-    setAutoSelected(true);
-    if (offerExemplars && !declinedBefore) setSelected("exemplars");
-  }, [loading, autoSelected, offerExemplars, declinedBefore]);
+  // The offer resolves asynchronously, so until the author picks something
+  // the selection is DERIVED: the exemplar option whenever an offer exists
+  // and was not declined, else "build-list". Deriving (rather than latching
+  // once on the first settled lookup) means a late-arriving or re-resolved
+  // offer still becomes the default. An explicit author choice always wins.
+  const [authorChoice, setAuthorChoice] = useState<IntroChoice | null>(null);
+  const defaultChoice: IntroChoice =
+    !loading && offerExemplars && !declinedBefore ? "exemplars" : "build-list";
+  const selected: IntroChoice =
+    authorChoice === "exemplars" && !offerExemplars
+      ? "build-list"
+      : (authorChoice ?? defaultChoice);
+  const setSelected = setAuthorChoice;
 
   const languageName =
     context["language_name"] ?? context["detected_group"] ?? t({ id: "survey.phaseB.intro.genericLanguage", message: "your language" });

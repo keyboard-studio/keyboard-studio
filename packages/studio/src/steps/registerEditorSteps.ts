@@ -37,7 +37,12 @@ import {
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
 } from "../editors/adapters/flowStepOptions.tsx";
+import { LayoutStep } from "../survey/layout/LayoutStep.tsx";
 import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
+import { rulesStep } from "./rulesStep.ts";
+
+/** Re-exported for the manifest (spec 082 Track A). */
+export { rulesStep };
 
 // ---------------------------------------------------------------------------
 // Helper for common step structure
@@ -73,6 +78,20 @@ export const identityStep: EditorStep = step({
   component: IdentityLiteAdapter,
   flowRefs: ["identity_lite"],
   specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
+  persistence: "answer-store",
+});
+
+/**
+ * Layout step (spec 076 A4): the community-layout question, right after
+ * Identity. Proposes a Windows layout from the identity language tag; the
+ * author confirms or searches all layouts. Answers persist per question in the
+ * answer store; no IR writes.
+ */
+export const layoutStep: EditorStep = step({
+  id: "layout",
+  title: "Keyboard Layout",
+  component: LayoutStep,
+  specRef: ["specs/076-rule-behaviours"],
   persistence: "answer-store",
 });
 
@@ -298,6 +317,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   projectNameStep,
   carveStep,
   deadkeysStep,
+  rulesStep,
   mechanismsStep,
   touchSeedSourceStep,
   touchStep,

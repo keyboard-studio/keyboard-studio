@@ -140,6 +140,49 @@ describe("Button — click behavior", () => {
   });
 });
 
+describe("Button — press feedback", () => {
+  it.each([
+    ["primary", "primary"],
+    ["secondary", undefined],
+    ["back", "back"],
+  ] as const)("applies the ks-press utility class on the %s variant", (_label, variant) => {
+    const { container } = render(
+      <Button {...(variant !== undefined ? { variant } : {})}>Go</Button>,
+    );
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    expect(btn.className.split(" ")).toContain("ks-press");
+  });
+
+  it("applies ks-press on the compact size too (footer nav cluster)", () => {
+    const { container } = render(
+      <Button variant="primary" size="compact">
+        Next
+      </Button>,
+    );
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    expect(btn.className.split(" ")).toContain("ks-press");
+  });
+
+  it("keeps the shared ks-* utilities and the caller className together", () => {
+    const { container } = render(<Button className="my-btn">Click</Button>);
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    const classes = btn.className.split(" ");
+    expect(classes).toEqual(
+      expect.arrayContaining(["ks-focus-ring", "ks-hit-target", "ks-press", "my-btn"]),
+    );
+  });
+
+  it("keeps ks-press when disabled (native disabled suppresses :active anyway)", () => {
+    const { container } = render(
+      <Button variant="primary" disabled>
+        Go
+      </Button>,
+    );
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    expect(btn.className.split(" ")).toContain("ks-press");
+  });
+});
+
 describe("Button — accessible label", () => {
   it("button text is accessible by role", () => {
     render(<Button variant="primary">Confirm</Button>);

@@ -125,7 +125,6 @@ import {
 } from "../../survey/placementSeeds.ts";
 import {
   KEY_OPTIONS,
-  ALL_PICKABLE_KEYS,
   CUSTOM_KEY_OPTION_VALUE,
 } from "../../lib/keyOptions.ts";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
@@ -160,6 +159,8 @@ import type { StepNavSpec } from "../../stores/stepNavStore.ts";
 import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
+import { useIsNarrow } from "../../hooks/useViewport.ts";
+import { Dialog } from "../../ui/Dialog.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
@@ -212,12 +213,11 @@ import {
   isSequenceAssignmentForChar,
 } from "./patternIds.ts";
 // S-02 deadkey trigger suggestions + id allocation seam (spec 083):
-// DEADKEY_OPTIONS / VALID_DEADKEY_TRIGGER_KEYS / TRIGGER_KEY_CHARS are the
+// DEADKEY_OPTIONS / TRIGGER_KEY_CHARS are the
 // shared card suggestions (the Deadkeys step's define form reuses them);
 // allocateDeadkeyId is the single numeric-id source for S-02 mints.
 import {
   DEADKEY_OPTIONS,
-  VALID_DEADKEY_TRIGGER_KEYS,
   TRIGGER_KEY_CHARS,
 } from "../deadkey/deadkeyTriggerOptions.ts";
 import { allocateDeadkeyId } from "@keyboard-studio/contracts";
@@ -582,14 +582,12 @@ interface GalleryPreviewWithPatternsProps {
   selectedBaseKeyboard: BaseKeyboard;
   stage: Stage;
   retry: () => void;
-  onKeyTap?: (keyId: string) => void;
 }
 
 function GalleryPreviewWithPatterns({
   selectedBaseKeyboard,
   stage,
   retry,
-  onKeyTap,
 }: GalleryPreviewWithPatternsProps) {
   const { t } = useLingui();
   return (
@@ -597,7 +595,6 @@ function GalleryPreviewWithPatterns({
       baseKeyboard={selectedBaseKeyboard}
       stage={stage}
       retry={retry}
-      {...(onKeyTap !== undefined ? { onKeyTap } : {})}
       defaultOskMode="desktop"
       heading={t({
         id: "editor.assignLoop.preview.heading",
@@ -774,7 +771,7 @@ interface MethodChooserProps {
   onApply: () => void;
 }
 
-// DEADKEY_OPTIONS / VALID_DEADKEY_TRIGGER_KEYS now live in
+// DEADKEY_OPTIONS now lives in
 // ../deadkey/deadkeyTriggerOptions.ts (shared with the Deadkeys step's
 // define form, spec 083) — the card suggestions must not drift between the
 // two surfaces.
@@ -1552,6 +1549,11 @@ export function MechanismGallery({
   worklist,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
+  // Narrow-viewport branch (mobile adaptation, Phase 4): the
+  // assign-loop panes stack with the preview in a sheet, and the S-03
+  // sequence builder becomes a fullscreen modal instead of swapping the
+  // right pane. Desktop rendering is untouched.
+  const narrow = useIsNarrow();
   // Id for the "Done is blocked" hint (spec 081) — referenced by the footer's
   // forward button via aria-describedby only while the hint is mounted.
   const unaccountedHintId = useId();
@@ -3713,7 +3715,7 @@ export function MechanismGallery({
   //
   // Auto-unlock (mechanism-gallery-progression friction removal): this is no
   // longer wired to an explicit "Unlock to edit" button click. Every edit
-  // entry point below (handleKeyTap, Apply, Mark for later, suggestion
+  // entry point below (Apply, Mark for later, suggestion
   // accept/remove, existing-method/sequence removal) calls this FIRST,
   // guarded on `locked`, so the very first interaction with a completed
   // gallery both unlocks it and performs the edit in one action — the lock
@@ -3743,27 +3745,6 @@ export function MechanismGallery({
       );
     }
   }, [unlockDesktop, markStale, touchLayoutJson, t]);
-
-  const handleKeyTap = useCallback(
-    (keyId: string) => {
-      if (locked) handleUnlock();
-      if (method === "swap" && ALL_PICKABLE_KEYS.has(keyId)) {
-        setSelectedSwapKey(keyId);
-        // Tapping a real key sets the picker to that key; clear the paired
-        // custom-char text so re-opening "Enter my own character..." starts
-        // clean instead of re-showing stale (possibly invalid) text.
-        setSelectedSwapKeyCustomChar("");
-      } else if (
-        method === "deadkey" &&
-        VALID_DEADKEY_TRIGGER_KEYS.has(keyId)
-      ) {
-        setTriggerKey(keyId);
-        setTriggerKeyCustomChar("");
-      }
-      // method === "sequence" or unrecognised key: ignore
-    },
-    [method, locked, handleUnlock],
-  );
 
   // ---------------------------------------------------------------------------
   // Shared styles
@@ -4097,7 +4078,7 @@ export function MechanismGallery({
           removal) — the desktop layout still locks on Mechanisms completion
           (lockDesktop() fires via reducer R1, unchanged), but editing it no
           longer requires an explicit "Unlock to edit" click first: every edit
-          entry point (handleKeyTap, Apply, Mark for later, suggestion
+          entry point (Apply, Mark for later, suggestion
           accept, existing-method/sequence removal) auto-unlocks via
           handleUnlock on first use. This informational line replaces the old
           blocking role="alert" banner+button with a quiet, always-visible
@@ -4999,6 +4980,52 @@ export function MechanismGallery({
   // Two-pane layout
   // ---------------------------------------------------------------------------
 
+  // The live preview pane. On desktop this shares the right pane with the
+  // sequence builder (swapped via the display:none wrapper below — the
+  // iframe stays mounted so KMW stays warm). On narrow viewports the shell
+  // moves this node into the PreviewSheet, and the sequence builder becomes
+  // a fullscreen modal instead (mobile adaptation, Phase 4).
+  const previewContent = (
+    <div
+      data-testid="mechanism-preview-wrapper"
+      style={{
+        display:
+          !narrow && method === "sequence" && currentChar !== null
+            ? "none"
+            : "contents",
+      }}
+    >
+      {!loading && loadError === null ? (
+        <GalleryPreviewWithPatterns
+          selectedBaseKeyboard={selectedBaseKeyboard}
+          stage={artifactStage}
+          retry={artifactRetry}
+        />
+      ) : loading ? (
+        <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+          <Trans id="editor.assignLoop.loadingPatterns">
+            Loading patterns...
+          </Trans>
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const sequencePanel =
+    method === "sequence" && currentChar !== null ? (
+      <SequenceBuilderPanel
+        char={currentChar}
+        sessionAssignments={sessionAssignments}
+        recordAssignments={recordAssignments}
+        onApplied={handleSequenceApplied}
+        onCancel={resetMethodState}
+      />
+    ) : null;
+  // Fullscreen modal on narrow viewports (the sheet hosts the preview, so
+  // the builder needs its own surface); the desktop right-pane swap below
+  // is untouched.
+  const showSequenceModal = narrow && sequencePanel !== null;
+
   return (
     <>
       {/* Back / forward render in the footer (spec 081). */}
@@ -5033,43 +5060,33 @@ export function MechanismGallery({
           // the WASM/KMW-backed iframe on every method toggle — exactly the
           // "expensive"/unsafe reinit its own doc comment warns against. Always
           // render it; only the wrapping div's `display` changes.
-          <>
-            <div
-              data-testid="mechanism-preview-wrapper"
-              style={{
-                display:
-                  method === "sequence" && currentChar !== null
-                    ? "none"
-                    : "contents",
-              }}
-            >
-              {!loading && loadError === null ? (
-                <GalleryPreviewWithPatterns
-                  selectedBaseKeyboard={selectedBaseKeyboard}
-                  stage={artifactStage}
-                  retry={artifactRetry}
-                  onKeyTap={handleKeyTap}
-                />
-              ) : loading ? (
-                <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-                  <Trans id="editor.assignLoop.loadingPatterns">
-                    Loading patterns...
-                  </Trans>
-                </p>
-              ) : null}
-            </div>
-            {method === "sequence" && currentChar !== null && (
-              <SequenceBuilderPanel
-                char={currentChar}
-                sessionAssignments={sessionAssignments}
-                recordAssignments={recordAssignments}
-                onApplied={handleSequenceApplied}
-                onCancel={resetMethodState}
-              />
-            )}
-          </>
+          //
+          // On narrow viewports `previewContent` is the whole right pane —
+          // the shell moves it into the PreviewSheet and the sequence
+          // builder renders as a fullscreen modal (showSequenceModal) instead
+          // of swapping the pane.
+          narrow ? previewContent : <>{previewContent}{sequencePanel}</>
         }
       />
+      {showSequenceModal && (
+        <Dialog
+          open
+          onCancel={resetMethodState}
+          label={t({
+            id: "editor.assignLoop.sequenceModalLabel",
+            message: "Build a key sequence",
+          })}
+          testId="sequence-builder-modal"
+          fullscreen
+          showCloseButton
+          closeLabel={t({
+            id: "editor.assignLoop.sequenceModalClose",
+            message: "Close sequence builder",
+          })}
+        >
+          {sequencePanel}
+        </Dialog>
+      )}
     </>
   );
 }

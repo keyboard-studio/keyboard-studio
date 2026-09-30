@@ -5,7 +5,7 @@ date: 2026-08-06
 
 # The touch key grid renders row slack the way KeymanWeb does — by stretching the last key
 
-> **This decision reverses part of a shipped one.** [specs/063-touch-key-editor](../../specs/063-touch-key-editor/spec.md)
+> **This decision reverses part of a shipped one.** [specs/063-touch-key-editor](../../specs/_archive/063-touch-key-editor/spec.md)
 > FR-039 chose to draw row slack as a hatch rather than absorb it. This ADR records why
 > the follow-up (issue #1530) takes the opposite path, and what replaces the hatch. The
 > follow-up spec is the authoritative execution; this records the *why*.

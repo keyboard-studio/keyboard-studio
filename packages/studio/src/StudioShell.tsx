@@ -14,14 +14,36 @@
 //                         SignUpPanel (no interactive OSK)
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+} from "react";
 import { SurveyQuestionsPane } from "./components/SurveyQuestionsPane.tsx";
+import { DocumentationFindingsSummary } from "./components/DocumentationFindingsSummary.tsx";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
-import type { BaseKeyboard, DecisionEntry, Pattern, VirtualFS, KeyboardIR, RemovalCapability } from "@keyboard-studio/contracts";
+import type {
+  BaseKeyboard,
+  DecisionEntry,
+  Pattern,
+  VirtualFS,
+  KeyboardIR,
+  RemovalCapability,
+} from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
-import { shouldEmitTouchLayout, resolveTouchSeedSource } from "./lib/touchEmission.ts";
-import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
+import {
+  shouldEmitTouchLayout,
+  resolveTouchSeedSource,
+} from "./lib/touchEmission.ts";
+import {
+  useWorkingCopyStore,
+  bindManifest,
+} from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import {
@@ -41,17 +63,33 @@ import {
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { navigateTo, type RouteId } from "./lib/navigate.ts";
+import { SHOW_FLOWMAP } from "./lib/navItems.ts";
 import { parseLocation } from "./lib/location.ts";
-import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
-import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
+import {
+  liveResolveContext,
+  setPendingWelcomeLocation,
+} from "./lib/jumpToLocation.ts";
+import {
+  readPaneSplitPct,
+  useViewStateStore,
+} from "./stores/viewStateStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useStepNavStore } from "./stores/stepNavStore.ts";
 import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
-import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
+import {
+  useKeyboardArtifact,
+  type OnInstantiateCallback,
+} from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
-import { OSKFrame } from "./components/OSKFrame.tsx";
-import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
+import { PreviewSheet } from "./components/PreviewSheet.tsx";
+import {
+  PreviewButton,
+  FOOTER_CLEARANCE,
+  PREVIEW_BUTTON_CLEARANCE,
+} from "./components/PreviewButton.tsx";
+import type { OskMode } from "./components/OskModeToggle.tsx";
+import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
@@ -68,19 +106,12 @@ import { runCompleteness } from "./dashboard/completeness.ts";
 import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
-import type { MessageDescriptor } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { resolveMessage } from "./lib/i18nResolve.ts";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
-import { CurrentKeyboardIndicator } from "./components/CurrentKeyboardIndicator.tsx";
-import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
-import { ThemeSwitcher } from "./components/ThemeSwitcher.tsx";
+import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
-import { UnfinishedGalleryIndicator } from "./components/UnfinishedGalleryIndicator.tsx";
-import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { validatePhaseMap } from "./steps/phases.ts";
@@ -94,7 +125,6 @@ import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
-import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
 import {
   loadServerDraftMeta,
   loadServerDraftContent,
@@ -102,31 +132,45 @@ import {
   serverMetaToDraftMeta,
 } from "./lib/serverDraftStore.ts";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
-import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import {
+  useRulesDemoArtifactStore,
+  makeIdleRulesDemoArtifact,
+  makeLoadingRulesDemoArtifact,
+  makeReadyRulesDemoArtifact,
+  makeErrorRulesDemoArtifact,
+  type RulesDemoArtifact,
+} from "./stores/rulesDemoArtifactStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useAccountedForGate } from "./hooks/useAccountedForGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
+import { useIsNarrow } from "./hooks/useViewport.ts";
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
 // (stores/ → steps/manifest.ts → steps/registerEditorSteps.ts → editors/ → stores/).
 bindManifest(manifest);
 
-// The Flow Map is a developer aid. It shows automatically in `vite dev`; in
-// hosted builds (Vercel previews, future production) it is gated by
-// VITE_SHOW_FLOWMAP=1 so the kill switch lives in env config, not code.
-const SHOW_FLOWMAP =
-  import.meta.env.DEV || import.meta.env.VITE_SHOW_FLOWMAP === "1";
+// The Flow Map is a developer aid — SHOW_FLOWMAP lives in lib/navItems.ts
+// (shared with the NAV_ITEMS table) so the kill switch lives in env config,
+// not code, in exactly one place.
 
 const VALID_ROUTES = new Set<RouteId>(
   // "trail" is NOT filtered: the decision trail is a production surface (spec 053
   // FR-017), unlike the flow map beside it. The filter below is only ever about
   // `flowmap`.
-  (["welcome", "survey", "preview", "output", "flowmap", "trail", "profile"] as const).filter(
-    (r) => r !== "flowmap" || SHOW_FLOWMAP,
-  ),
+  (
+    [
+      "welcome",
+      "survey",
+      "preview",
+      "output",
+      "flowmap",
+      "trail",
+      "profile",
+    ] as const
+  ).filter((r) => r !== "flowmap" || SHOW_FLOWMAP),
 );
 
 function isRouteId(v: string): v is RouteId {
@@ -198,217 +242,9 @@ function useRoute(): RouteId {
     const handler = () => setRoute(hashToRoute());
     window.addEventListener("hashchange", handler);
     return () => window.removeEventListener("hashchange", handler);
-  }, []);  // empty deps: register once on mount; handler captures hashToRoute by closure
+  }, []); // empty deps: register once on mount; handler captures hashToRoute by closure
 
   return route;
-}
-
-// ---------------------------------------------------------------------------
-// NavBar
-// ---------------------------------------------------------------------------
-
-interface NavItem {
-  id: RouteId;
-  /**
-   * Lazy `msg` descriptor — NAV_ITEMS is built at module scope where no
-   * useLingui() binding exists, so labels are resolved per-render via
-   * resolveMessage(i18n, ...) inside NavBar (the same pattern MechanismGallery
-   * uses for its module-scope option tables).
-   */
-  label: MessageDescriptor;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { id: "survey", label: msg({ id: "nav.studio", message: "Studio" }) },
-  // Spec 057 FR-020: a NEW message id, not a re-worded one. The tab's
-  // purpose changed — it is a read-only comparison surface now, not a
-  // preview of the author's own keyboard — so an existing translation of
-  // "Preview" is not a translation of this.
-  { id: "preview", label: msg({ id: "nav.compare", message: "Compare" }) },
-  { id: "output", label: msg({ id: "nav.output", message: "Output" }) },
-  // Spec 053 FR-017: unconditional, alongside Output and Preview rather than
-  // beside the dev-gated Flow Map below.
-  { id: "trail", label: msg({ id: "nav.decisionTrail", message: "Decisions" }) },
-  ...(SHOW_FLOWMAP
-    ? [{ id: "flowmap" as const, label: msg({ id: "nav.flowMap", message: "Flow Map" }) }]
-    : []),
-];
-
-interface NavBarProps {
-  active: RouteId;
-  /**
-   * P0 fix UX signal (not the authoritative enforcement — that lives in
-   * OutputScreen/usePreviewArtifact's canDownload gate, which is reachable
-   * regardless of how #output was navigated to). Dims the Output tab and
-   * marks it aria-disabled with an explanatory title so the block is obvious
-   * BEFORE the click, not just after landing on a disabled download button.
-   */
-  outputBlocked?: boolean;
-  /** Tooltip / aria explanation shown while outputBlocked is true. */
-  outputBlockedTitle?: string;
-  /**
-   * Persistent self-serve "go finish unreviewed defaults" indicator (see
-   * components/UnfinishedGalleryIndicator.tsx) — computed once in
-   * StudioShell from `useAccountedForGate()`, which layers the author's
-   * per-surface "mark for later review" state on top of the same
-   * `useInventoryCoverageGate()` result that feeds `outputBlocked` above, so
-   * the two signals can never disagree about what is actually unimplemented.
-   * 0 hides the corresponding half of the indicator.
-   */
-  unfinishedDesktopCount: number;
-  unfinishedTouchCount: number;
-  /** Routes back to the named gallery and switches to the #survey route. */
-  onNavigateToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
-}
-
-function NavBar({
-  active,
-  outputBlocked = false,
-  outputBlockedTitle,
-  unfinishedDesktopCount,
-  unfinishedTouchCount,
-  onNavigateToUnfinishedGallery,
-}: NavBarProps) {
-  const { i18n: activeI18n } = useLingui();
-  const startOver = useStartOverStore((s) => s.handler);
-  return (
-    <nav
-      aria-label={resolveMessage(
-        activeI18n,
-        msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
-      )}
-      // WRAPS RATHER THAN OVERLAPS. The bar is one row of --topbar-h whenever
-      // its three zones fit side by side. When they don't (a ~1280px laptop
-      // viewport with every right-zone control showing, 1024px, a long
-      // translation), `flexWrap` moves the zone that no longer fits onto a
-      // second row instead of letting one zone paint over the next. Before
-      // this, the left zone's `minWidth: 0` let its content spill across the
-      // tab row, and the current-keyboard selector sat on top of — and
-      // swallowed clicks meant for — the Studio tab. Wrapping follows DOM
-      // order, so focus order still matches visual reading order (2.4.3),
-      // and `minHeight` (not `height`) lets the shell's flex column give
-      // the second row its space (StudioShell's root is a column flexbox
-      // with this bar `flexShrink: 0`, so nothing below assumes 52px).
-      style={{
-        minHeight: "var(--topbar-h)",
-        flexShrink: 0,
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "center",
-        columnGap: 4,
-        rowGap: 0,
-        padding: "0 16px",
-        background: "var(--app-surface)",
-        borderBottom: "1px solid var(--app-border)",
-        boxSizing: "border-box",
-      }}
-    >
-      {/* Left zone — brand mark, then the current-keyboard indicator (same
-          welcome gate as AccountControl/UnfinishedGalleryIndicator — nothing
-          to name before a keyboard exists). flex: 1 1 0 balances the right
-          zone so the center zone (the tab list) sits optically centered.
-          NO `minWidth: 0` here on purpose: the zone's automatic minimum is
-          its min-content width (wordmark + the indicator at its SHRUNK
-          width — see CurrentKeyboardIndicator's SELECT_MIN_WIDTH), and that
-          floor is what makes the bar wrap instead of overflowing into the
-          tabs. `minHeight` keeps a wrapped second row from collapsing
-          against the bar's bottom border. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 9, flex: "1 1 0", minHeight: 44 }}>
-        <span
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            letterSpacing: "-0.01em",
-            color: "var(--app-text)",
-            fontFamily: "var(--app-font)",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          }}
-        >
-          {/* Wrapped like every other occurrence of the product name
-              (welcome.title, profile.accountKind.signedIn) — translators
-              decide whether it transliterates, we don't decide for them. */}
-          <Trans id="nav.wordmark">Keyboard Studio</Trans>
-        </span>
-        {active !== "welcome" && <CurrentKeyboardIndicator />}
-      </div>
-
-      {/* Center zone — tab links. flex: 0 0 auto — sized to its content, not
-          stretched, which is what keeps it centered between the two flex:1
-          side zones rather than left- or right-anchored. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto" }}>
-        {NAV_ITEMS.map(({ id, label }) => {
-          const isActive = id === active;
-          const isBlocked = id === "output" && outputBlocked;
-          return (
-            <a
-              key={id}
-              href={`#${id}`}
-              aria-current={isActive ? "page" : undefined}
-              aria-disabled={isBlocked ? "true" : undefined}
-              title={isBlocked ? outputBlockedTitle : undefined}
-              style={{
-                padding: "4px 12px",
-                fontSize: 14,
-                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-                textDecoration: "none",
-                // Blocked state signals via COLOR ALONE (var(--app-text-disabled),
-                // itself a reduced-alpha token) — it must not also stack an
-                // `opacity` on top, which double-dims and can drop the state
-                // below contrast requirements the token was already tuned for.
-                color: isBlocked
-                  ? "var(--app-text-disabled)"
-                  : isActive
-                    ? "var(--app-accent-text)"
-                    : "var(--app-text)",
-                borderBottom: isActive
-                  ? "2px solid var(--app-accent)"
-                  : "2px solid transparent",
-                lineHeight: "40px",
-                whiteSpace: "nowrap",
-                transition: "color 120ms ease, border-bottom-color 120ms ease",
-              }}
-            >
-              {resolveMessage(activeI18n, label)}
-            </a>
-          );
-        })}
-      </div>
-
-      {/* Right zone — unfinished-gallery return indicator (hidden on welcome,
-          same as the account control — nothing to return to before a keyboard
-          exists) + locale switcher + theme switcher (all routes) + account
-          control (hidden on welcome) + survey reset in the far corner.
-          flex: 1 1 0 mirrors the left zone's width so the center zone stays
-          centered; justify-content: flex-end keeps these controls pinned to
-          the right edge within that zone. The reset is last so it can't crowd
-          the controls beside it; it renders only while a survey is mounted
-          (startOverStore publishes the handler from SurveyView, which exists
-          on the #survey route alone). */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 12,
-          flex: "1 1 0",
-          minHeight: 44,
-        }}
-      >
-        {active !== "welcome" && (
-          <UnfinishedGalleryIndicator
-            desktopCount={unfinishedDesktopCount}
-            touchCount={unfinishedTouchCount}
-            onNavigate={onNavigateToUnfinishedGallery}
-          />
-        )}
-        <LocaleSwitcher />
-        <ThemeSwitcher />
-        {active !== "welcome" && <AccountControl />}
-        {startOver !== null && <SurveyResetButton onReset={startOver} />}
-      </div>
-    </nav>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -526,7 +362,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   useEffect(() => {
     githubTokenRef.current = githubToken;
   }, [githubToken]);
-  const currentAccessToken = (): string | null => githubTokenRef.current?.accessToken ?? null;
+  const currentAccessToken = (): string | null =>
+    githubTokenRef.current?.accessToken ?? null;
 
   // Derive whether the active step declares layout:"full" (load-bearing per Stage 5,
   // FR-002, R4). SurveyView uses this to skip the two-pane shell for full-screen steps.
@@ -650,7 +487,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // predicate itself is scoped to pre-instantiation progress only; see
       // its doc comment in draftPersistence.ts).
       const wc = useWorkingCopyStore.getState();
-      if ((wc.instantiationMode !== null && wc.ir !== null) || hasMeaningfulProgress()) return;
+      if (
+        (wc.instantiationMode !== null && wc.ir !== null) ||
+        hasMeaningfulProgress()
+      )
+        return;
       // Freshness comparison (F5), not blanket suppression: a local restore
       // this boot can be STALER than a genuinely newer cloud draft (a
       // cross-device save discovered on this boot) — so this offer is
@@ -680,12 +521,23 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     [setSurveyOskMode],
   );
   const setPaneSplitPct = useViewStateStore((s) => s.setPaneSplitPct);
+  // Narrow viewports: the preview lives in a PreviewSheet opened from a
+  // floating PreviewButton (the same pattern the assign-loop galleries use),
+  // so the questions and the journey footer are always on screen. The OSK
+  // is mounted only while the sheet is open (principle 9).
+  const [previewSheetOpen, setPreviewSheetOpen] = useState(false);
+  const { t } = useLingui();
+  const isNarrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } = useResizablePanes({
     minPct: SURVEY_LEFT_MIN_PCT,
     maxPct: SURVEY_LEFT_MAX_PCT,
     // Clamped on READ, so a split stored under a different layout can never
     // produce an unusable pane here.
-    initPct: readPaneSplitPct("survey", SURVEY_LEFT_MIN_PCT, SURVEY_LEFT_MAX_PCT),
+    initPct: readPaneSplitPct(
+      "survey",
+      SURVEY_LEFT_MIN_PCT,
+      SURVEY_LEFT_MAX_PCT,
+    ),
     onChange: (pct) => setPaneSplitPct("survey", pct),
   });
 
@@ -702,9 +554,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const clearStale = useWorkingCopyStore((s) => s.clearStale);
   const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
-  const instantiateFromExisting = useWorkingCopyStore((s) => s.instantiateFromExisting);
+  const instantiateFromExisting = useWorkingCopyStore(
+    (s) => s.instantiateFromExisting,
+  );
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
-  const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
+  const setValidatorFindings = useWorkingCopyStore(
+    (s) => s.setValidatorFindings,
+  );
 
   // ---------------------------------------------------------------------------
   // P1 fix (double-instantiation guard) + F1 fix (id-aware re-instantiation).
@@ -818,7 +674,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (autosaveTeardownRef.current !== null) return;
-    const restoredProjectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    const restoredProjectKey = deriveProjectKeyFromWorkingCopy(
+      useWorkingCopyStore.getState(),
+    );
     if (restoredProjectKey !== null) {
       instantiatedForBaseIdRef.current =
         useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
@@ -856,7 +714,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
    * to trace into a different module to see why it holds.
    */
   const promotePendingAutosave = useCallback(() => {
-    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    const projectKey = deriveProjectKeyFromWorkingCopy(
+      useWorkingCopyStore.getState(),
+    );
     if (projectKey === null) return;
     autosaveTeardownRef.current?.();
     autosaveTeardownRef.current = installDraftAutosave(projectKey);
@@ -928,7 +788,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         onScreenRecorded: (stepId, screenId, entryIds, hash) => {
           const answers = useSurveyAnswerStore.getState();
           answers.markScreenRecorded(stepId, screenId, hash);
-          for (const entryId of entryIds) answers.setRecordedScreen(entryId, screenId);
+          for (const entryId of entryIds)
+            answers.setRecordedScreen(entryId, screenId);
         },
         getLastRecordedHash: (stepId, screenId) =>
           useSurveyAnswerStore.getState().steps[stepId]?.lastRecorded[screenId],
@@ -962,7 +823,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // calls the real buildTouchLayoutJson — so reducer.ts (steps/, which
       // may not import lib/) stays a thin pass-through.
       buildTouchLayoutJson: (baseIrArg, assignments, opts) => {
-        const seedSource = resolveTouchSeedSource(opts.seedSource, opts.baseTouchJson !== undefined);
+        const seedSource = resolveTouchSeedSource(
+          opts.seedSource,
+          opts.baseTouchJson !== undefined,
+        );
         const hasRealEdits = assignments.length > 0;
         if (!shouldEmitTouchLayout(seedSource, opts.mods, hasRealEdits)) {
           return { json: null, warnings: [] };
@@ -971,7 +835,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           // Reseed discards the shipped layout (R10) — never pass baseTouchJson
           // through on that path, even though buildTouchLayoutJson's own Case A
           // branch condition would ignore it anyway.
-          ...(seedSource !== "reseed-from-desktop" && opts.baseTouchJson !== undefined
+          ...(seedSource !== "reseed-from-desktop" &&
+          opts.baseTouchJson !== undefined
             ? { baseTouchJson: opts.baseTouchJson }
             : {}),
           mods: opts.mods,
@@ -1002,7 +867,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       recordQuestionAnswers: recordDecision.recordQuestionAnswers,
     }),
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource, recordDecision],
+    [
+      lockDesktop,
+      clearStale,
+      setTouchLayoutJson,
+      instantiateFromBase,
+      instantiateFromExisting,
+      setTouchSeedSource,
+      recordDecision,
+    ],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always
@@ -1034,7 +907,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const doCommit = useCallback(
     (
       base: BaseKeyboard,
-      { vfs, ir, removalCapabilities }: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
+      {
+        vfs,
+        ir,
+        removalCapabilities,
+      }: {
+        vfs: VirtualFS;
+        ir: KeyboardIR | null;
+        removalCapabilities: Map<string, RemovalCapability>;
+      },
     ) => {
       if (instantiatedForBaseIdRef.current === base.id) return;
       instantiatedForBaseIdRef.current = base.id;
@@ -1095,7 +976,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       const track = useSurveySessionStore.getState().selectedTrack;
       applyStepCompletion(
         "choose_base",
-        { base, vfs, ir, removalCapabilities, track: track ?? null, skipRebaseConfirm: true },
+        {
+          base,
+          vfs,
+          ir,
+          removalCapabilities,
+          track: track ?? null,
+          skipRebaseConfirm: true,
+        },
         reducerDepsRef.current,
       );
 
@@ -1142,9 +1030,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // the author clicks "Choose this keyboard" (`baseConfirmed` flips true).
   // This is what makes previewing several bases side-effect-free.
   // ---------------------------------------------------------------------------
-  const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
-    pendingArtifactRef.current = { base, vfs, ir, removalCapabilities };
-  }, []);
+  const onInstantiate = useCallback<OnInstantiateCallback>(
+    (base, { vfs, ir, removalCapabilities }) => {
+      pendingArtifactRef.current = { base, vfs, ir, removalCapabilities };
+    },
+    [],
+  );
 
   // Subscribed so the effect below re-checks whenever the author confirms.
   const baseConfirmed = useSurveySessionStore((s) => s.baseConfirmed);
@@ -1152,10 +1043,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Pattern map for the working-copy transform — needed from Phase F onwards so
   // mechanism assignments are projected into the OSK preview.
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const sessionAssignments = useMemo(() => physicalAssignmentsOf(phaseResults), [phaseResults]);
-  const [surveyPatternMap, setSurveyPatternMap] = useState<Map<string, Pattern>>(new Map());
+  const sessionAssignments = useMemo(
+    () => physicalAssignmentsOf(phaseResults),
+    [phaseResults],
+  );
+  const [surveyPatternMap, setSurveyPatternMap] = useState<
+    Map<string, Pattern>
+  >(new Map());
   useEffect(() => {
-    const ids = new Set(sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)));
+    const ids = new Set(
+      sessionAssignments.flatMap((a) => a.mechanisms.map((m) => m.patternId)),
+    );
     if (ids.size === 0) return;
     const svc = getPatternLibraryService();
     Promise.all([...ids].map((id) => svc.getById(id)))
@@ -1191,15 +1089,25 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // spec 078: only this main-walk preview runs the context-tolerance analysis,
   // and only behind the flag; every other useKeyboardArtifact caller is unchanged.
   const contextToleranceEnabled = isContextToleranceEnabled();
-  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate, {
-    analyseContextTolerance: contextToleranceEnabled,
-  });
+  const { stage: artifactStage, retry } = useKeyboardArtifact(
+    localBase,
+    scaffoldSpec,
+    workingCopyTransform,
+    onInstantiate,
+    {
+      analyseContextTolerance: contextToleranceEnabled,
+    },
+  );
   const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
   // never by the marks step; its stale/refused outcomes feed the notice.
-  const contextToleranceApplyNotes = useContextToleranceApply(contextToleranceEnabled);
+  const contextToleranceApplyNotes = useContextToleranceApply(
+    contextToleranceEnabled,
+  );
   const showContextTolerance =
-    contextToleranceEnabled && contextTolerance.status !== "idle" && contextTolerance.status !== "analysing";
+    contextToleranceEnabled &&
+    contextTolerance.status !== "idle" &&
+    contextTolerance.status !== "analysing";
 
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
@@ -1234,7 +1142,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localBase;
     if (art && lb && art.base.id === lb.id) {
-      doCommit(art.base, { vfs: art.vfs, ir: art.ir, removalCapabilities: art.removalCapabilities });
+      doCommit(art.base, {
+        vfs: art.vfs,
+        ir: art.ir,
+        removalCapabilities: art.removalCapabilities,
+      });
     }
     // else: compile still in flight for this base — onInstantiate will fill
     // pendingArtifactRef and the "ready" artifactStage transition below will
@@ -1273,7 +1185,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   useEffect(() => {
     setValidatorFindings(findings);
   }, [findings, setValidatorFindings]);
-  const globalFindings = useMemo(() => selectUnmappedFindings(findings), [findings]);
+  const globalFindings = useMemo(
+    () => selectUnmappedFindings(findings),
+    [findings],
+  );
   // Warning-severity global findings render as a bare advisory line above the step content
   // — no card background/border/code-badge/hint-button/location chrome; see
   // the survey-pane render below. Non-warning severities keep the existing
@@ -1281,6 +1196,29 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const globalWarnings = useMemo(
     () => globalFindings.filter((f) => f.severity === "warning"),
     [globalFindings],
+  );
+  // Documentation (Layer C) findings are warning-only by the Layer C
+  // ceiling, so they all land in globalWarnings — but full-weight blocks
+  // above the step content pushed the current question down, and the block
+  // render never consulted origin, so upstream findings (inherited from the
+  // base keyboard) rendered at full weight. Collapse the doc-sourced
+  // subset into one collapsed-by-default summary row instead; everything
+  // else keeps the existing full-block render untouched. Identity survives
+  // the findings pipeline — the findings array is built with spread and
+  // selectUnmappedFindings is an Array.filter, both of which preserve
+  // element references — so a Set over documentationFindings identifies
+  // exactly the doc-sourced warnings.
+  const documentationFindingSet = useMemo(
+    () => new Set(documentationFindings),
+    [documentationFindings],
+  );
+  const docGlobalWarnings = useMemo(
+    () => globalWarnings.filter((f) => documentationFindingSet.has(f)),
+    [globalWarnings, documentationFindingSet],
+  );
+  const authoredGlobalWarnings = useMemo(
+    () => globalWarnings.filter((f) => !documentationFindingSet.has(f)),
+    [globalWarnings, documentationFindingSet],
   );
   const globalNonWarnings = useMemo(
     () => globalFindings.filter((f) => f.severity !== "warning"),
@@ -1351,7 +1289,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // this is the server-side counterpart.
     if (startOverProjectKey !== null) {
       const accessToken = currentAccessToken();
-      if (accessToken !== null) void clearServerDraft(accessToken, startOverProjectKey);
+      if (accessToken !== null)
+        void clearServerDraft(accessToken, startOverProjectKey);
     }
     setCloudResume(null);
   }
@@ -1404,7 +1343,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     const draftId = resolveActiveProjectKey() ?? PENDING_PROJECT_KEY;
     void loadServerDraftContent(accessToken, draftId).then((draft) => {
       if (draft !== null && applyRemoteDraft(draft)) {
-        instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+        instantiatedForBaseIdRef.current =
+          useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
         setActiveProjectKey(draftId);
         // F6 fix: promote the pending durable-draft autosave to this
         // now-restored real project — instantiatedForBaseIdRef above is set
@@ -1439,7 +1379,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     flexDirection: "column",
     minHeight: 0,
     overflowY: "auto",
-    padding: 24,
+    // The journey footer overlaps the bottom of the pane; the extra bottom
+    // padding lets the last control scroll out from under it.
+    padding: `24px 24px calc(24px + ${FOOTER_CLEARANCE})`,
     boxSizing: "border-box",
     color: TEXT_MAIN,
     fontFamily: FONT,
@@ -1475,6 +1417,46 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [previewStatus, setBasePreviewStatus]);
 
   // ---------------------------------------------------------------------------
+  // rulesDemoArtifactStore projection — the Track A demo pane's view of the
+  // compile artifact (spec 082, FR-001/FR-004).
+  //
+  // A pure projection of `artifactStage`, same store-bridge pattern as
+  // basePreviewStatusStore above: the rules step cannot prop-drill through
+  // StepHost's generic EditorStepProps, and it MUST NOT mount its own
+  // useKeyboardArtifact (that would be a second compile cycle) or its own
+  // debounce timer (SC-006 forbids it). The DemoPane is a pure READER:
+  // typing re-runs the cheap synchronous simulator against the published
+  // bytes, never a compile.
+  // ---------------------------------------------------------------------------
+  const rulesDemoArtifact: RulesDemoArtifact = useMemo(() => {
+    switch (artifactStage.kind) {
+      case "ready":
+        return makeReadyRulesDemoArtifact(
+          artifactStage.jsBlobUrl,
+          artifactStage.keyboardId,
+          artifactStage.compileResult.diagnostics,
+        );
+      case "error":
+        return makeErrorRulesDemoArtifact(
+          artifactStage.step,
+          artifactStage.message,
+          artifactStage.compileResult?.diagnostics ?? [],
+        );
+      case "fetching":
+      case "vfs-loading":
+      case "compiling":
+        return makeLoadingRulesDemoArtifact();
+      default:
+        return makeIdleRulesDemoArtifact();
+    }
+  }, [artifactStage]);
+
+  const setRulesDemoArtifact = useRulesDemoArtifactStore((s) => s.setArtifact);
+  useEffect(() => {
+    setRulesDemoArtifact(rulesDemoArtifact);
+  }, [rulesDemoArtifact, setRulesDemoArtifact]);
+
+  // ---------------------------------------------------------------------------
   // Render: StepHost drives all survey step rendering (spec 028 Stage 5, T012).
   //
   // StepHost reads activeStepId from surveySessionStore, resolves the manifest
@@ -1497,6 +1479,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
+  // Mobile adaptation (Phase 2): under 479px the panes stack behind a
+  // Questions | Preview switch instead of sitting side-by-side. The visible
+  // pane fills the column; the drag handle is hidden (no split to drag).
+  // Desktop keeps the resizable row layout untouched.
+  const narrowStackedPaneStyle: CSSProperties = {
+    flexBasis: "auto",
+    flexGrow: 1,
+    flexShrink: 1,
+    width: "100%",
+  };
+  const previewPaneStyle: CSSProperties = {
+    flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
+    flexGrow: 1,
+    flexShrink: 0,
+  };
+
   // Full-screen steps (carve/mechanisms/touch/touch_seed_source) bypass the
   // two-pane layout. StepHost returns the full-screen container; SurveyView
   // renders it directly. This reproduces the pre-Stage-5 early-return pattern
@@ -1509,12 +1507,47 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return stepHost;
   }
 
+  // Narrow viewports: one column of questions. The right pane's content
+  // (OSK or character map) opens in a sheet, and only when there is
+  // something to show — no base keyboard yet and no character map means no
+  // trigger at all.
+  const hasPreviewContent = showCharacterMap || localBase !== null;
+  // The sheet never reopens by itself: when its content goes away (a step
+  // without a preview), forget that it was open.
+  if (previewSheetOpen && (!isNarrow || !hasPreviewContent)) {
+    setPreviewSheetOpen(false);
+  }
+  const previewPane = (
+    <SurveyPreviewPane
+      localBase={localBase}
+      oskMode={oskMode}
+      onOskModeChange={setOskMode}
+      stage={artifactStage}
+      retry={retry}
+      showCharacterMap={showCharacterMap}
+      activeStepId={activeStepId}
+      compact={isNarrow}
+      {...(isNarrow ? {} : { style: previewPaneStyle })}
+    />
+  );
+  const previewButtonLabel = showCharacterMap
+    ? t({ id: "previewButton.characterMap.label", message: "Character map" })
+    : t({ id: "previewButton.label", message: "Preview" });
+  const previewButtonAriaLabel = showCharacterMap
+    ? t({ id: "previewButton.characterMap.ariaLabel", message: "Show character map" })
+    : t({ id: "assignLoopShell.showPreview", message: "Show keyboard preview" });
+  const previewSheetLabel = showCharacterMap
+    ? t({ id: "previewButton.characterMap.sheetLabel", message: "Character map" })
+    : t({ id: "assignLoopShell.previewSheetLabel", message: "Keyboard preview" });
+
   return (
     <div
       ref={containerRef}
       style={{
+        // Anchors the narrow-viewport floating PreviewButton.
+        position: "relative",
         display: "flex",
-        flexDirection: "row",
+        flexDirection: isNarrow ? "column" : "row",
         height: "100%",
         width: "100%",
         background: "var(--bg)",
@@ -1522,154 +1555,142 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       }}
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
-      <SurveyQuestionsPane label="Survey questions" style={questionsPaneStyle}>
-        {cloudResume !== null && (
-          <ResumeDraftBanner
-            meta={cloudResume}
-            onResume={handleResumeDraft}
-            onDiscard={handleDiscardDraft}
-          />
-        )}
-        {
-          // Always mounted, so content inserted later is announced (a live
-          // region inserted together with its content often is not); it only
-          // takes up space when it has something to say.
-          // Rendered flush on "var(--bg)" — the same token the container above
-          // paints and the one CharacterMapPane's own root implicitly sits on
-          // (it sets no background of its own, so it shows through to the
-          // container's var(--bg) too). Pinned explicitly here rather than left
-          // to accidental non-override, so a future change to questionsPaneStyle's
-          // background doesn't silently drag this along. No border/card fill/
-          // padding-as-box — this is text on the character-map surface, not a
-          // card. The context-tolerance notice (spec 078) shares this live
-          // region rather than adding an announcer of its own (FR-014).
-          <div
-            role="status"
-            aria-live="polite"
-            style={
-              globalWarnings.length > 0 || showContextTolerance
-                ? { display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, background: "var(--bg)" }
-                : undefined
-            }
-          >
-            {globalWarnings.map((f, i) => (
-              <div key={`${f.code}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: TEXT_MAIN }}>
-                  <span aria-hidden="true">⚠</span>{" "}
-                  <Trans id="common.warningLabel">Warning:</Trans> {f.message}
-                </p>
-                {f.hint !== undefined && (
-                  <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>
-                    {f.hint}
+      {
+        <SurveyQuestionsPane
+          label="Survey questions"
+          style={
+            isNarrow
+              ? {
+                  ...questionsPaneStyle,
+                  ...narrowStackedPaneStyle,
+                  // Tighter gutters on a phone; extra bottom room so the last
+                  // line scrolls clear of the floating preview button.
+                  padding: hasPreviewContent
+                    ? `16px 16px ${PREVIEW_BUTTON_CLEARANCE}`
+                    : `16px 16px calc(16px + ${FOOTER_CLEARANCE})`,
+                }
+              : questionsPaneStyle
+          }
+        >
+          {cloudResume !== null && (
+            <ResumeDraftBanner
+              meta={cloudResume}
+              onResume={handleResumeDraft}
+              onDiscard={handleDiscardDraft}
+            />
+          )}
+          {
+            // Always mounted, so content inserted later is announced (a live
+            // region inserted together with its content often is not); it only
+            // takes up space when it has something to say.
+            // Rendered flush on "var(--bg)" — the same token the container above
+            // paints and the one CharacterMapPane's own root implicitly sits on
+            // (it sets no background of its own, so it shows through to the
+            // container's var(--bg) too). Pinned explicitly here rather than left
+            // to accidental non-override, so a future change to questionsPaneStyle's
+            // background doesn't silently drag this along. No border/card fill/
+            // padding-as-box — this is text on the character-map surface, not a
+            // card. The context-tolerance notice (spec 078) shares this live
+            // region rather than adding an announcer of its own (FR-014).
+            <div
+              role="status"
+              aria-live="polite"
+              style={
+                authoredGlobalWarnings.length > 0 ||
+                docGlobalWarnings.length > 0 ||
+                showContextTolerance
+                  ? {
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      marginBottom: 12,
+                      background: "var(--bg)",
+                    }
+                  : undefined
+              }
+            >
+              {authoredGlobalWarnings.map((f, i) => (
+                <div
+                  key={`${f.code}-${i}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      color: TEXT_MAIN,
+                    }}
+                  >
+                    <span aria-hidden="true">⚠</span>{" "}
+                    <Trans id="common.warningLabel">Warning:</Trans> {f.message}
                   </p>
-                )}
-              </div>
-            ))}
-            {showContextTolerance && (
-              <ContextToleranceNotice state={contextTolerance} applyNotes={contextToleranceApplyNotes} />
-            )}
-          </div>
-        }
-        {globalNonWarnings.length > 0 && (
-          <LintSummary findings={globalNonWarnings} />
-        )}
-        {stepHost}
-      </SurveyQuestionsPane>
+                  {f.hint !== undefined && (
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                        color: TEXT_DIM,
+                      }}
+                    >
+                      {f.hint}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {docGlobalWarnings.length > 0 && (
+                <DocumentationFindingsSummary findings={docGlobalWarnings} />
+              )}
+              {showContextTolerance && (
+                <ContextToleranceNotice
+                  state={contextTolerance}
+                  applyNotes={contextToleranceApplyNotes}
+                />
+              )}
+            </div>
+          }
+          {globalNonWarnings.length > 0 && (
+            <LintSummary findings={globalNonWarnings} />
+          )}
+          {stepHost}
+        </SurveyQuestionsPane>
+      }
 
-      {/* Drag handle */}
-      <ResizeHandle onPointerDown={onPointerDown} />
+      {/* Drag handle — desktop only; on narrow viewports there is no split
+          to drag (one pane fills the column behind the Questions | Preview
+          switch). */}
+      {!isNarrow && <ResizeHandle onPointerDown={onPointerDown} />}
 
       {/* Right pane: live OSK preview, OR (Phase B build-list only) the
           interactive character map — see activeRightPane/showCharacterMap
           above. The mechanism gallery and every other full-screen step render
           their own preview and are unaffected (they never reach this branch:
           activeStepIsFullScreen returns early above). */}
-      <section
-        aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
-        style={{
-          flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
-          flexGrow: 1,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          minHeight: 0,
-          overflow: "auto",
-          padding: 24,
-          boxSizing: "border-box",
-          color: TEXT_MAIN,
-          fontFamily: FONT,
-        }}
-      >
-        {showCharacterMap ? (
-          <CharacterMapPane scope={activeStepId === "punctuation" ? "punctuation" : "alphabet"} />
-        ) : localBase === null ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              gap: 12,
-              color: "var(--app-text-subtle)",
-              fontSize: 14,
-              textAlign: "center",
-            }}
+      {!isNarrow && previewPane}
+      {isNarrow && hasPreviewContent && (
+        <>
+          <PreviewButton
+            label={previewButtonLabel}
+            ariaLabel={previewButtonAriaLabel}
+            icon={showCharacterMap ? "grid" : "keyboard"}
+            onClick={() => setPreviewSheetOpen(true)}
+            testId="survey-show-preview"
+          />
+          <PreviewSheet
+            open={previewSheetOpen}
+            onOpenChange={setPreviewSheetOpen}
+            label={previewSheetLabel}
+            testId="survey-preview-sheet"
+            flush
           >
-            {/* Decorative icon stand-in: aria-hidden (conveys nothing the next
-                line doesn't).
-                The previous version inherited its color and dimmed it with
-                opacity: 0.6. That opacity was tuned against the ORIGINAL
-                literal color-on-background pair, and the comment here flagged
-                that it needed re-verifying once both sides became tokens —
-                which epic #533 did. The axe gate in e2e/boot-smoke.spec.ts then
-                failed it as a serious color-contrast violation.
-                Fixed by naming the color outright and dropping the opacity:
-                stacking a dim on top of a color is the one thing the design
-                system forbids, because the two multiply into an unreadable
-                value. --app-text-muted clears AA on both themes on its own. */}
-            <span
-              aria-hidden="true"
-              style={{ fontSize: 32, fontFamily: "var(--app-font-mono)", color: "var(--app-text-muted)" }}
-            >
-              [kb]
-            </span>
-            <span>
-              <Trans id="preview.empty.hint">
-                Choose a base keyboard in the wizard to see a live preview here.
-              </Trans>
-            </span>
-          </div>
-        ) : (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
-                {localBase.displayName}
-              </h2>
-              <OskModeToggle value={oskMode} onChange={setOskMode} />
-            </div>
-            <OSKFrame
-              baseKeyboard={localBase}
-              oskMode={oskMode}
-              stage={artifactStage}
-              retry={retry}
-            />
-          </>
-        )}
-      </section>
+            {previewPane}
+          </PreviewSheet>
+        </>
+      )}
     </div>
   );
 }
-
 
 // ---------------------------------------------------------------------------
 // StudioShell — top-level layout: nav bar + route content
@@ -1677,6 +1698,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
 export function StudioShell() {
   const route = useRoute();
+  const isNarrow = useIsNarrow();
   const { t } = useLingui();
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
@@ -1772,7 +1794,9 @@ export function StudioShell() {
   const unfinishedTouchCount = accountedForGateResult.blockedOnTouch
     ? accountedForGateResult.unaccountedTouch.length
     : 0;
-  const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
+  const sessionBackToUnfinishedGallery = useSurveySessionStore(
+    (s) => s.backToUnfinishedGallery,
+  );
   // A BACK action (backToUnfinishedGallery), not the forward-push `advance` —
   // mirrors OutputScreen.tsx's handleGoToGallery / PhaseFGate.tsx's
   // handleGoBack exactly (see backToUnfinishedGallery's own docstring for the
@@ -1799,7 +1823,9 @@ export function StudioShell() {
   const trailCollapsedSteps = useViewStateStore((s) => s.trailCollapsedSteps);
   const toggleTrailStage = useViewStateStore((s) => s.toggleTrailStage);
   const trailShowSuperseded = useViewStateStore((s) => s.trailShowSuperseded);
-  const setTrailShowSuperseded = useViewStateStore((s) => s.setTrailShowSuperseded);
+  const setTrailShowSuperseded = useViewStateStore(
+    (s) => s.setTrailShowSuperseded,
+  );
 
   // ---------------------------------------------------------------------------
   // Decision trail (spec 053 US1). Same arrangement as completenessReport above:
@@ -1820,7 +1846,8 @@ export function StudioShell() {
   const trailAnswerSteps = useSurveyAnswerStore((s) => s.steps);
   const trailStepStatuses = useMemo(() => {
     const out: Record<string, (typeof trailAnswerSteps)[string]["status"]> = {};
-    for (const [stepId, step] of Object.entries(trailAnswerSteps)) out[stepId] = step.status;
+    for (const [stepId, step] of Object.entries(trailAnswerSteps))
+      out[stepId] = step.status;
     return out;
   }, [trailAnswerSteps]);
   const impactDeps = useMemo(
@@ -1829,7 +1856,8 @@ export function StudioShell() {
       isDesktopLocked: () => useWorkingCopyStore.getState().desktopLocked,
       // The touch lock's observable is a built touch layout — the same signal
       // runCompleteness reads above, rather than a second notion of "locked".
-      isTouchLocked: () => useWorkingCopyStore.getState().touchLayoutJson !== null,
+      isTouchLocked: () =>
+        useWorkingCopyStore.getState().touchLayoutJson !== null,
     }),
     [],
   );
@@ -1873,7 +1901,10 @@ export function StudioShell() {
   // FR-024's identity rather than an empty-set decoration that renders the same.
   // ---------------------------------------------------------------------------
   const pathOverlay = useMemo(
-    () => (decisionRecord.keyboardId === null ? undefined : buildPathOverlay(decisionRecord)),
+    () =>
+      decisionRecord.keyboardId === null
+        ? undefined
+        : buildPathOverlay(decisionRecord),
     [decisionRecord],
   );
   // FR-026: the alternative at ONE inspected node. `resolveImpact` is reused with an
@@ -1905,7 +1936,10 @@ export function StudioShell() {
       break;
     case "survey":
       content = (
-        <SurveyView key={projectSwitchGeneration} baseKeyboard={selectedBaseKeyboard} />
+        <SurveyView
+          key={projectSwitchGeneration}
+          baseKeyboard={selectedBaseKeyboard}
+        />
       );
       break;
     case "preview":
@@ -1974,12 +2008,24 @@ export function StudioShell() {
   // and a component cannot consume a context it renders: that combination
   // returned a null context and blanked the app in production builds, where
   // Lingui's dev-only invariant is stripped. See AppRoot.tsx.
+  //
+  // The blocked-Output explanation is shared by the desktop tab row and the
+  // narrow-viewport menu (both inside NavBar), so they can never disagree.
+  const outputBlockedTitle = t({
+    id: "studio.nav.outputBlocked.title",
+    message: "Finish every inventory character before you can access Output",
+  });
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
+        // dvh, not vh: on mobile browsers 100vh includes the area behind the
+        // URL bar, which pushed the journey footer (Back / Next + progress
+        // dots) below the visible screen. `height: 100vh` stays as the
+        // fallback for engines without dvh.
         height: "100vh",
+        maxHeight: "100dvh",
         width: "100vw",
         overflow: "hidden",
         background: "var(--bg)",
@@ -1988,13 +2034,17 @@ export function StudioShell() {
       <NavBar
         active={route}
         outputBlocked={outputNavBlocked}
-        outputBlockedTitle={t({
-          id: "studio.nav.outputBlocked.title",
-          message: "Finish every inventory character before you can access Output",
-        })}
+        outputBlockedTitle={outputBlockedTitle}
         unfinishedDesktopCount={unfinishedDesktopCount}
         unfinishedTouchCount={unfinishedTouchCount}
         onNavigateToUnfinishedGallery={handleNavigateToUnfinishedGallery}
+        {...(isNarrow && route === "survey"
+          ? {
+              narrowCenter: (
+                <PhaseStepper activeStepId={surveyActiveStepId} inline />
+              ),
+            }
+          : {})}
       />
       {/* Phase stepper — survey route only. Phases (A-F) map to
           the manifest steps the survey walks (steps/phases.ts); they are
@@ -2002,7 +2052,11 @@ export function StudioShell() {
           a route gate, not an always-mounted component that happens to
           render nothing elsewhere (unlike StudioFooter below, which decides
           for itself). */}
-      {route === "survey" && <PhaseStepper activeStepId={surveyActiveStepId} />}
+      {/* Narrow viewports fold the compact stepper into the NavBar row
+          (narrowCenter above) rather than spending a second row on it. */}
+      {route === "survey" && !isNarrow && (
+        <PhaseStepper activeStepId={surveyActiveStepId} />
+      )}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns

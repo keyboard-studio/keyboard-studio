@@ -5,7 +5,7 @@
 // fallbacks that must NOT reach for the base keyboard's values (FR-007, SC-002).
 
 import { describe, it, expect } from "vitest";
-import { buildKpsContent, buildLanguageElement } from "./build.js";
+import { buildKpsContent, buildLanguageElement, parseTargetTokens } from "./build.js";
 
 /** A `.kmn` with web targets and a visual keyboard, so `<Files>` is fully populated. */
 const KMN = [
@@ -252,5 +252,24 @@ describe("buildKpsContent — the welcome folder (spec 080 FR-002, FR-006)", () 
     expect(buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN, "1.0", files)).toBe(
       buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN, "1.0", files),
     );
+  });
+});
+
+describe("parseTargetTokens", () => {
+  it("reads a single-quoted TARGETS store, lowercased", () => {
+    expect(parseTargetTokens("store(&TARGETS) 'Windows MacOSX web'")).toEqual(["windows", "macosx", "web"]);
+  });
+
+  it("reads a double-quoted TARGETS store (basic_kbdfr writes `store(&Targets) \"any\"`)", () => {
+    expect(parseTargetTokens('store(&Targets) "any"')).toEqual(["any"]);
+  });
+
+  it("returns [] when there is no TARGETS store", () => {
+    expect(parseTargetTokens("store(&NAME) 'X'")).toEqual([]);
+  });
+
+  it("lists the .js for a double-quoted web target", () => {
+    const kmn = KMN.replace("store(&TARGETS) 'any'", 'store(&TARGETS) "any"');
+    expect(buildKpsContent("bm_test", { displayName: "Bambara" }, kmn)).toContain("bm_test.js");
   });
 });

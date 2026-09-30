@@ -8,7 +8,7 @@
 // the offer's presence, absence and content are all exercised deterministically.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, cleanup, waitFor, act } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB } from "./PhaseB.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -18,9 +18,12 @@ import {
 } from "../stores/phaseBDraftStore.ts";
 import type { SourcedInventory } from "../lib/services.ts";
 
-const { getSourcedExemplars } = vi.hoisted(() => {
+const { getSourcedExemplars, lookupGate } = vi.hoisted(() => {
   let _inventory: SourcedInventory | null = null;
   return {
+    // When `promise` is set, the lookup does not settle until it resolves —
+    // lets a test drive a LATE-arriving inventory.
+    lookupGate: { promise: null as Promise<void> | null },
     getSourcedExemplars: {
       get: () => _inventory,
       set: (v: SourcedInventory | null) => {
@@ -36,7 +39,10 @@ const { getSourcedExemplars } = vi.hoisted(() => {
 vi.mock("../lib/services.ts", async () => ({
   USE_REAL: false,
   suggestMissingChars: async () => null,
-  sourcedExemplars: async (_bcp47: string) => getSourcedExemplars.get(),
+  sourcedExemplars: async (_bcp47: string) => {
+    if (lookupGate.promise !== null) await lookupGate.promise;
+    return getSourcedExemplars.get();
+  },
   charactersInTier: (await import("@keyboard-studio/engine")).charactersInTier,
 }));
 
@@ -95,6 +101,7 @@ async function acceptExemplarsAndContinue(): Promise<void> {
 }
 
 beforeEach(() => {
+  lookupGate.promise = null;
   getSourcedExemplars.set(null);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
   resetPhaseBDraftDecisions();
@@ -590,5 +597,135 @@ describe("loanword letters section", () => {
     await acceptExemplarsAndContinue();
     await screen.findByTestId("phase-b-heading");
     expect(screen.queryByTestId("alphabet-loanwords")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Defaults-first: IntroChooser default is derived, BuildListView self-seeds
+// ---------------------------------------------------------------------------
+
+describe("IntroChooser default selection (defaults-first)", () => {
+  it("preselects the exemplar option even when the lookup resolves late", async () => {
+    let release!: () => void;
+    lookupGate.promise = new Promise<void>((r) => {
+      release = r;
+    });
+    getSourcedExemplars.set(inventory(["a", "ŋ"]));
+    renderPhaseB();
+
+    // Before the lookup settles there is no offer and build-list is the default.
+    await waitFor(() => expect(screen.getByTestId("phase-b-intro-next")).toBeTruthy());
+    expect(document.querySelector("#discovery_method-exemplars")).toBeNull();
+    expect(
+      document.querySelector<HTMLInputElement>("#discovery_method-build-list")?.checked,
+    ).toBe(true);
+
+    await act(async () => release());
+    const radio = await waitFor(() => {
+      const el = document.querySelector<HTMLInputElement>("#discovery_method-exemplars");
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    await waitFor(() => expect(radio.checked).toBe(true));
+    expect(
+      document.querySelector<HTMLInputElement>("#discovery_method-build-list")?.checked,
+    ).toBe(false);
+  });
+
+  it("an explicit author choice made before the offer arrives wins over the late default", async () => {
+    let release!: () => void;
+    lookupGate.promise = new Promise<void>((r) => {
+      release = r;
+    });
+    getSourcedExemplars.set(inventory(["a", "ŋ"]));
+    renderPhaseB();
+    await waitFor(() => expect(screen.getByTestId("phase-b-intro-next")).toBeTruthy());
+
+    fireEvent.click(document.querySelector("#discovery_method-manual") as HTMLInputElement);
+    await act(async () => release());
+    await waitFor(() =>
+      expect(document.querySelector("#discovery_method-exemplars")).not.toBeNull(),
+    );
+    expect(
+      document.querySelector<HTMLInputElement>("#discovery_method-manual")?.checked,
+    ).toBe(true);
+    expect(
+      document.querySelector<HTMLInputElement>("#discovery_method-exemplars")?.checked,
+    ).toBe(false);
+  });
+
+  it("an explicit choice of build-list after the offer arrives is kept", async () => {
+    getSourcedExemplars.set(inventory(["a", "ŋ"]));
+    renderPhaseB();
+    const radio = await exemplarRadio();
+    await waitFor(() => expect(radio!.checked).toBe(true));
+    fireEvent.click(document.querySelector("#discovery_method-build-list") as HTMLInputElement);
+    expect(radio!.checked).toBe(false);
+    expect(
+      document.querySelector<HTMLInputElement>("#discovery_method-build-list")?.checked,
+    ).toBe(true);
+  });
+});
+
+describe("BuildListView auto-seed (defaults-first)", () => {
+  /** Land on page 2 directly, as a restored position / progress-dot jump would. */
+  function renderBuildList(): void {
+    useSurveySessionStore.getState().setDiscoveryMethod("build-list");
+    renderPhaseB();
+  }
+
+  it("seeds the exemplar set once when it opens empty, undeclined, with an inventory", async () => {
+    getSourcedExemplars.set(inventory(["a", "ŋ"]));
+    renderBuildList();
+    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("ŋ"));
+    const s = usePhaseBDraftStore.getState();
+    expect(s.provenance["ŋ"]).toBe("cldr");
+    expect(s.exemplarMethodDeclined).toBe(false);
+  });
+
+  it("seeds only once per mount: a character the author then removes is not re-proposed", async () => {
+    getSourcedExemplars.set(inventory(["a", "ŋ"]));
+    renderBuildList();
+    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("ŋ"));
+    act(() => usePhaseBDraftStore.getState().remove("ŋ"));
+    // Give any (incorrect) re-seeding effect a chance to run.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("ŋ");
+  });
+
+  it("does not seed when the exemplar method was declined", async () => {
+    getSourcedExemplars.set(inventory(["a", "ŋ"]));
+    usePhaseBDraftStore.getState().declineExemplarMethod();
+    renderBuildList();
+    await waitFor(() => expect(screen.getByTestId("phase-b-heading")).toBeTruthy());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+
+  it("does not seed when the alphabet already has characters", async () => {
+    getSourcedExemplars.set(inventory(["a", "ŋ"]));
+    usePhaseBDraftStore.getState().add("q");
+    renderBuildList();
+    await waitFor(() => expect(screen.getByTestId("phase-b-heading")).toBeTruthy());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const chars = usePhaseBDraftStore.getState().chars;
+    expect(chars).toContain("q");
+    expect(chars).not.toContain("ŋ");
+  });
+
+  it("does not seed when there is no exemplar inventory", async () => {
+    getSourcedExemplars.set(null);
+    renderBuildList();
+    await waitFor(() => expect(screen.getByTestId("phase-b-heading")).toBeTruthy());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
   });
 });

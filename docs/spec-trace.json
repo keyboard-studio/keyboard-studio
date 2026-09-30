@@ -48,11 +48,7 @@
         "packages/contracts/src/patternLibrary.ts",
         "packages/contracts/src/fixtures/patterns.ts"
       ],
-      "decisions": [
-        "D1",
-        "D4",
-        "D5"
-      ],
+      "decisions": ["D1", "D4", "D5"],
       "notes": "EXTRACTED to specs/005-pattern-schema/spec.md; spec.md body is a stub pointer (tracked hash is the stub). Day-1 contract locked. Pattern + PatternMatch + PatternLibrary interfaces all present and tested.",
       "extractedTo": "specs/005-pattern-schema/spec.md"
     },
@@ -66,11 +62,7 @@
         "packages/contracts/src/provenance.ts",
         "packages/contracts/src/fixtures/provenance.ts"
       ],
-      "decisions": [
-        "D7",
-        "D8",
-        "D9"
-      ],
+      "decisions": ["D7", "D8", "D9"],
       "notes": "KeyboardIR types present (2026-06-08 amendment). Engine parse/emit not yet built."
     },
     "§6": {
@@ -91,10 +83,7 @@
         "packages/contracts/src/surveyPhaseResult.ts",
         "packages/contracts/src/assignmentMap.ts"
       ],
-      "decisions": [
-        "D1",
-        "D2"
-      ],
+      "decisions": ["D1", "D2"],
       "notes": "EXTRACTED to specs/007-strategy-selection/spec.md; spec.md body is a stub pointer (tracked hash is the stub). A1-A7 axis types + strategy catalog types present. Decision tree engine (§7.2) + S-01..S-12 selectors not yet built. v1.1.1 added §7.6 (corpus placement priors — seeder in utilities/kbgen, not yet a contracts type). v1.2.0 added §7.7 (scoped assignment map) — assignmentMap.ts implements the typed contract; SurveyPhaseResult.assignments? additive field already landed ahead of spec text.",
       "extractedTo": "specs/007-strategy-selection/spec.md"
     },
@@ -108,9 +97,7 @@
         "packages/contracts/src/ir/producedSet.ts",
         "packages/contracts/src/surveySession.ts"
       ],
-      "decisions": [
-        "D9"
-      ],
+      "decisions": ["D9"],
       "notes": "EXTRACTED to specs/008-data-flow/spec.md; spec.md body is a stub pointer (tracked hash is the stub). CharacterDiscovery + LinguistInventory types exist. Survey-to-pattern pipeline not yet wired. v1.1.1 added placement proposals (Phase B). v1.2.0/v1.3.0 added two-track working-copy spine (instantiateFromBase / instantiateFromExisting) — producedSet.ts and surveySession.ts implement those contracts. Engine pipeline not yet built.",
       "extractedTo": "specs/008-data-flow/spec.md"
     },
@@ -123,9 +110,7 @@
         "packages/studio/src/dashboard/buildScriptRouting.ts",
         "packages/studio/src/survey/questions/a/script_family.ts"
       ],
-      "decisions": [
-        "D5"
-      ],
+      "decisions": ["D5"],
       "notes": "Script-derived routing now exists: scriptAxes.routingGroupOf maps the chosen target script to a routing group, dashboard/buildScriptRouting builds the routing view, and the script-family question modules drive Phase A routing. Gallery wiring (supported / CJK+Ethiopic stub / legacy galleries) not yet fully built, so status is partial. D5 governs CJK/Ethiopic out-of-scope stub. v1.2.0 added language/script decoupling — routing follows the chosen target script (BCP47 subtag from identity-lite), not the language's default script. v1.3.0 added Phase A CJK/Ethiopic detection gate detail."
     },
     "§10": {
@@ -139,9 +124,7 @@
         "packages/contracts/src/compileResult.ts",
         "packages/contracts/src/compiler.ts"
       ],
-      "decisions": [
-        "D3"
-      ],
+      "decisions": ["D3"],
       "notes": "All three-layer interfaces typed. Layer A 9 TS-portable checks + 5 WASM-only not yet implemented. D3 governs 300ms debounce."
     },
     "§11": {
@@ -153,9 +136,7 @@
         "packages/contracts/src/criteria.ts",
         "packages/contracts/src/criteriaData.ts"
       ],
-      "decisions": [
-        "D4"
-      ],
+      "decisions": ["D4"],
       "notes": "Day-1 criteria catalog fully typed as Criterion[] with 148 entries (133 repo-hygiene + 12 DISCUS + 3 added post-v1.0: 1 from §7.7a KM_LINT_INVENTORY_UNCOVERED split, 2 import-output criteria). Loadable via ALL_CRITERIA / '/criteria' subpath. D4 governs the four-band enforcement model. Previously §11 was 'Virtual FS' — that content is now a subsection of §12."
     },
     "§12": {
@@ -169,10 +150,7 @@
         "packages/contracts/src/keyboardIdentity.ts",
         "packages/engine/src/output/index.ts"
       ],
-      "decisions": [
-        "D6",
-        "D9"
-      ],
+      "decisions": ["D6", "D9"],
       "notes": "VirtualFS + OutputService + Scaffolder interfaces typed. ZIP and sidecar serialisation built in engine/src/output/; GitHub OAuth fork+PR built in engine/src/output/github.ts; buildImportAttributionBlock in engine/src/output/import-attribution.ts. D6 governs desktop-first scope; D9 covers IR-as-canonical-source for emit. v1.3.0 added working-copy spine (VirtualFS as persistent live edit target, Track 1/Track 2 instantiation, re-projected layers). Virtual FS content previously tracked as standalone §11 now lives here as a subsection."
     },
     "§13": {
@@ -188,17 +166,7 @@
       "hash": "sha256:183257f058a98735",
       "status": "reference",
       "implements": [],
-      "decisions": [
-        "D1",
-        "D2",
-        "D3",
-        "D4",
-        "D5",
-        "D6",
-        "D7",
-        "D8",
-        "D9"
-      ],
+      "decisions": ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9"],
       "notes": "Decision ledger. Drift here means a decision was re-opened or a new one added."
     },
     "§15": {
@@ -214,10 +182,7 @@
       "hash": "sha256:bdb006c9f3d7383b",
       "status": "reference",
       "implements": [],
-      "decisions": [
-        "D5",
-        "D6"
-      ],
+      "decisions": ["D5", "D6"],
       "notes": "Scope boundary definition. Drift here means v1 scope silently expanded."
     },
     "§17": {
@@ -669,7 +634,7 @@
     },
     "specs/051-carve-orthography-trim": {
       "title": "Feature Specification: Carve gallery trim proposals compare produced characters to the orthography (with cased-letter pairing)",
-      "hash": "sha256:d2b1e9b6669470b3",
+      "hash": "sha256:3ec356e8d55b705d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -893,7 +858,7 @@
     },
     "specs/076-rule-behaviours": {
       "title": "Feature Specification: Rule behaviours — managing reorder, blocking, and context rules as intents",
-      "hash": "sha256:a33729157882b79b",
+      "hash": "sha256:0fe3879e0ea7c171",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -907,9 +872,17 @@
       "decisions": [],
       "notes": ""
     },
+    "specs/082-rule-access-tracks": {
+      "title": "Feature Specification: Rule access tracks — unlocking Keyman rules for non-programmers",
+      "hash": "sha256:fd5b520df9e8d775",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
     "specs/083-deadkey-lifecycle": {
       "title": "Feature Specification: Deadkey lifecycle — defining, managing, renaming, and deleting deadkeys",
-      "hash": "sha256:d9654a1bec0844b3",
+      "hash": "sha256:9b07f85501551e19",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

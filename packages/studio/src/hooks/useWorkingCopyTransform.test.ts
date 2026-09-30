@@ -26,6 +26,27 @@ import type { Pattern } from "@keyboard-studio/contracts";
 // module docstring's sibling test file, projectWorkingCopyVfs.test.ts, avoids
 // by reimplementing touchKeyAddress locally rather than importing it).
 import type { KeyEditOperation } from "@keyboard-studio/engine";
+import { groupRules } from "../components/rules/ruleFamilies.ts";
+
+// ---------------------------------------------------------------------------
+// Spy on projectWorkingCopyVfs's input (delegating to the real implementation
+// so the existing projection-step tests above keep exercising it).
+// ---------------------------------------------------------------------------
+
+const { projectWorkingCopyVfsCalls } = vi.hoisted(() => ({
+  projectWorkingCopyVfsCalls: [] as unknown[],
+}));
+
+vi.mock("../lib/projectWorkingCopyVfs.ts", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../lib/projectWorkingCopyVfs.ts")>();
+  type Input = Parameters<typeof original.projectWorkingCopyVfs>[0];
+  const wrapped = (input: Input) => {
+    projectWorkingCopyVfsCalls.push(input);
+    return original.projectWorkingCopyVfs(input);
+  };
+  return { ...original, projectWorkingCopyVfs: wrapped };
+});
 
 // ---------------------------------------------------------------------------
 // Spies on the three projection functions
@@ -660,5 +681,95 @@ describe("useWorkingCopyTransform — liveLayoutOverride does not bypass existin
       }),
     );
     expect(result.current).toBeNull();
+  });
+});
+
+
+describe("useWorkingCopyTransform — disabled families (spec 082 FR-018)", () => {
+  function guardRule(nodeId: string, vkey: string) {
+    return {
+      nodeId,
+      context: [
+        { kind: "any", storeRef: "diablock" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: vkey, modifiers: [] },
+      ],
+      output: [{ kind: "raw", text: "context" }],
+    };
+  }
+
+  function seedBaseWithGuardFamily() {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs,
+      ir: makeTestIR({
+        groups: [
+          {
+            nodeId: "g1",
+            name: "main",
+            usingKeys: true,
+            readonly: false,
+            rules: [guardRule("guard-1", "K_C"), guardRule("guard-2", "K_E")],
+          },
+        ],
+      }),
+    });
+  }
+
+  function familyIdOf(memberNodeId: string): string {
+    const ir = useWorkingCopyStore.getState().ir!;
+    const family = groupRules(ir.groups.flatMap((g) => g.rules)).find((f) =>
+      f.memberIds.includes(memberNodeId),
+    );
+    if (!family) throw new Error(`no family for ${memberNodeId}`);
+    return family.id;
+  }
+
+  function lastDeletedItemIds(): Set<string> {
+    const input = projectWorkingCopyVfsCalls.at(-1)! as {
+      deletedItemIds: Set<string>;
+    };
+    return input.deletedItemIds;
+  }
+
+  function freshVfs() {
+    return createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+  }
+
+  it("passes the store's deletion set through untouched when nothing is disabled", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBaseWithGuardFamily();
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    result.current!(freshVfs(), "basic_kbdus");
+    expect(lastDeletedItemIds().size).toBe(0);
+  });
+
+  it("merges disabled family member ids into deletedItemIds; re-enable removes them", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBaseWithGuardFamily();
+    const familyId = familyIdOf("guard-1");
+    expect(familyIdOf("guard-2")).toBe(familyId);
+
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const before = result.current;
+
+    act(() => {
+      useWorkingCopyStore.getState().toggleFamilyDisabled(familyId);
+    });
+    // The transform reference must change so the next compile picks it up.
+    expect(result.current).not.toBe(before);
+
+    result.current!(freshVfs(), "basic_kbdus");
+    expect([...lastDeletedItemIds()].sort()).toEqual(["guard-1", "guard-2"]);
+
+    act(() => {
+      useWorkingCopyStore.getState().toggleFamilyDisabled(familyId);
+    });
+    result.current!(freshVfs(), "basic_kbdus");
+    expect(lastDeletedItemIds().size).toBe(0);
   });
 });

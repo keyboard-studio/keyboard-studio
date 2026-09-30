@@ -468,6 +468,15 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "layout": {
+          // Spec 076 A4: the community-layout question. Its pick lives in the
+          // answer store and feeds only the host-leak demonstration; the
+          // corpus fixtures record no answer for it, so the replay passes
+          // straight through.
+          result = undefined;
+          break;
+        }
+
         case "choose_base": {
           const answers = answerMapFromGroup(group, "choose_base");
           const baseId = requireStringAnswer(answers, "base_keyboard_id", "choose_base");
@@ -566,6 +575,17 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           if (STEPS_WITH_APPLY_COMPLETION.has("deadkeys")) {
             applyStepCompletion("deadkeys", undefined, deps);
           }
+          result = undefined;
+          break;
+        }
+
+        case "rules": {
+          // Read-only view over the working copy (spec 082 Track A): the
+          // demo pane simulates against the compiled artifact and the rule
+          // builder owns its own answers, so replaying the step is a
+          // pass-through — nothing to collect, nothing to apply. "rules"
+          // is absent from STEPS_WITH_APPLY_COMPLETION, mirroring the live
+          // completion path which fires no apply effect for this step.
           result = undefined;
           break;
         }

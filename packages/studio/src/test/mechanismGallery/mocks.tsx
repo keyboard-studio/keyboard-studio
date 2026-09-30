@@ -160,20 +160,9 @@ export function withMockedEngine<
 // components/OSKFrame.tsx — no iframe / KMW environment needed.
 // ---------------------------------------------------------------------------
 
-export const OSKFrame = ({
-  stage,
-  onKeyTap,
-}: {
-  stage: Stage;
-  onKeyTap?: (keyId: string) => void;
-}) => (
+export const OSKFrame = ({ stage }: { stage: Stage }) => (
   <div data-testid="osk-frame" data-stage={stage.kind}>
     osk-frame-mock
-    {onKeyTap !== undefined && (
-      <button type="button" onClick={() => onKeyTap("K_E")}>
-        tap-K_E
-      </button>
-    )}
   </div>
 );
 

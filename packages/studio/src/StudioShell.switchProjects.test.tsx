@@ -289,9 +289,18 @@ describe("StudioShell — switching between two DISTINCT projects must not destr
  * itself), so it always STARTS with "Keyboard" whichever project is
  * currently active — the prefix match keeps this query stable across the
  * switch the in-place tests perform (A->B and, in the mirror test, B->A).
+ *
+ * The layout spine step (spec 076 A4) also adds a footer progress dot named
+ * "Keyboard layout — …", which matches the same prefix — so the query takes
+ * the listbox control, never a progress dot.
  */
 function switchViaTopBarDropdown(targetProjectLabel: string): void {
-  const trigger = screen.getByRole("button", { name: /^Keyboard\b/ });
+  const trigger = screen
+    .getAllByRole("button", { name: /^Keyboard\b/ })
+    .find((button) => button.getAttribute("aria-haspopup") === "listbox");
+  if (trigger === undefined) {
+    throw new Error("top-bar keyboard switcher trigger not found");
+  }
   fireEvent.click(trigger);
   const targetOption = screen.getByRole("option", { name: targetProjectLabel });
   fireEvent.click(targetOption);

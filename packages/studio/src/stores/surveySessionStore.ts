@@ -96,12 +96,14 @@ export type DiscoveryMethod = "manual" | "build-list";
 
 export type ActiveStepId =
   | "identity"
+  | "layout"
   | "choose_base"
   | "track"
   | "project_name"
   | "characters"
   | "carve"
   | "deadkeys"
+  | "rules"
   | "marks"
   | "punctuation"
   | "invisibles"

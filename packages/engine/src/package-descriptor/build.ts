@@ -105,8 +105,10 @@ export interface PackageDescriptorIdentity {
  * from what `.kps` actually declares.
  */
 export function parseTargetTokens(kmnText: string): string[] {
-  const targetsMatch = /store\s*\(\s*&TARGETS\s*\)\s*'([^']*)'/i.exec(kmnText);
-  return (targetsMatch?.[1] ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
+  // .kmn strings take either quote; about a fifth of the corpus writes
+  // `store(&TARGETS) "any"`.
+  const targetsMatch = /store\s*\(\s*&TARGETS\s*\)\s*(?:'([^']*)'|"([^"]*)")/i.exec(kmnText);
+  return (targetsMatch?.[1] ?? targetsMatch?.[2] ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
 }
 
 /**

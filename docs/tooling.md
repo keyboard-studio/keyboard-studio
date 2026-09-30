@@ -153,6 +153,14 @@ build artifacts you should regenerate rather than hand-edit:
   `parseUnicodeSet`, imported from source under Node type stripping (importing the compiled
   module would be circular).
 
+Not in the prebuild chain: `pnpm run codegen-host-layouts` derives the studio's reference
+host-layout tables (spec 076 FR-023) from the Keyman basic keyboards in `../keyboards/release/basic`
+(Windows US, US-International, French, German, UK) into
+`packages/studio/src/lib/generated/hostLayouts.generated.json`. The output is **committed**,
+because Vercel builds have no corpus. `referenceHostLayouts.codegen.test.ts` re-derives it
+wherever the corpus is present and fails when it is stale; re-run the script after a corpus
+bump that touches one of those keyboards.
+
 Not in the prebuild chain: `pnpm run check-exemplar-staleness` **reports** — never applies —
 when either pin has fallen behind upstream, so a stale pin can't silently change the index under
 a review. `node scripts/gen-exemplar-baseline.mjs` regenerates the pre-feature regression-floor
@@ -308,7 +316,7 @@ Live and passing:
 - [tab-roundtrip.spec.ts](../packages/studio/e2e/tab-roundtrip.spec.ts) and
   [compare-isolation.spec.ts](../packages/studio/e2e/compare-isolation.spec.ts) — spec 057's two
   gating specs, written and recorded RED against the pre-fix tree before the fix landed
-  ([evidence](../specs/057-bulletproof-navigation/evidence/gating-red.md))
+  ([evidence](../specs/_archive/057-bulletproof-navigation/evidence/gating-red.md))
 - [decision-deeplink.spec.ts](../packages/studio/e2e/decision-deeplink.spec.ts) and
   [footer-progress.spec.ts](../packages/studio/e2e/footer-progress.spec.ts)
 - [convenience-loanwords.spec.ts](../packages/studio/e2e/convenience-loanwords.spec.ts) — Bafut
@@ -458,3 +466,6 @@ pnpm run spec-search "layer A validity" --json
 - `--budget` is a hard cap on printed bytes (default 2048, minimum 256), enforced by dropping
   trailing hits; the header reports actual-of-budget every run. `CLAUDE.md` is excluded from the
   corpus — it is already in context, so a hit there would spend budget on text you can see.
+- `specs/_archive/**` (retired feature docs) is skipped unless `--scope` starts with
+  `specs/_archive`, so shipped specs' working docs don't crowd out live ones. The root `.ignore`
+  does the same for ripgrep-based search.

@@ -2,14 +2,16 @@
 // mental-model confirmation is asked once per CLASS, not once per mark. Two
 // signals, per the spec's Key Entities: how similarly the marks attach across
 // base letters (attachment-set similarity over the attested stacks) and their
-// shared linguistic function (approximated by canonical combining class —
-// above-marks vs below-marks vs attached/other — the only function signal
-// derivable from Unicode data alone; finer splits like "quality accents" vs
-// "tone marks" are calibration work, spec assumption "thresholds calibrated
-// later"). A designer can still split an individual mark out of its class's
-// answer downstream (the MentalModelDecision override map).
+// shared linguistic function (canonical combining class from the pinned Unicode
+// table — above-marks vs below-marks vs per-class fixed-position marks
+// (Arabic) vs other — the only function signal derivable from Unicode data
+// alone; finer splits like "quality accents" vs "tone marks" are calibration
+// work, spec assumption "thresholds calibrated later"). A designer can still
+// split an individual mark out of its class's answer downstream (the
+// MentalModelDecision override map).
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
+import { getCCC } from "@keyboard-studio/contracts/unicode";
 
 export interface MarkClass {
   /** Stable within a session (deterministic from the alphabet). */
@@ -27,53 +29,63 @@ export interface MarkClass {
  */
 export const ATTACHMENT_SIMILARITY_THRESHOLD = 0.5;
 
-/** Function bucket approximated from where the mark sits relative to the base. */
-type FunctionBucket = "above" | "below" | "other";
+/** Function bucket from the mark's canonical combining class (pinned Unicode table). */
+type FunctionBucket = "above" | "below" | "other" | `fixed-${number}`;
 
-const BUCKET_LABEL: Record<FunctionBucket, string> = {
-  above: "Marks above the letter",
-  below: "Marks below the letter",
-  other: "Other marks",
-};
+/**
+ * Canonical combining classes that render above the base (UAX #44 semantics):
+ * 230 Above, 232 Above right, 234 Double above, 228 Above left,
+ * 214 Above attached, 216 Above right attached.
+ */
+const ABOVE_CCC = new Set([214, 216, 228, 230, 232, 234]);
+
+/**
+ * Canonical combining classes that render below the base: 220 Below,
+ * 218 Below left, 222 Below right, 233 Double below, 202 Below attached,
+ * 200 Below left attached, 240 iota subscript (written below the base vowel).
+ * UAX #44 defines no attached-below-right class.
+ */
+const BELOW_CCC = new Set([200, 202, 218, 220, 222, 233, 240]);
+
+/** First and last Arabic fixed-position canonical combining classes (UAX #44). */
+const ARABIC_FIXED_CCC_MIN = 27;
+const ARABIC_FIXED_CCC_MAX = 35;
+
+function bucketLabel(bucket: FunctionBucket): string {
+  if (bucket === "above") return "Marks above the letter";
+  if (bucket === "below") return "Marks below the letter";
+  if (bucket === "other") return "Other marks";
+  // `fixed-<ccc>`: each Arabic fixed-position class is its own bucket.
+  return `Fixed-position marks (position class ${bucket.slice("fixed-".length)})`;
+}
 
 function bucketOf(mark: string): FunctionBucket {
-  // ccc isn't exposed to JS; the standard combining ranges give a serviceable
-  // approximation: U+0300–0315 + common above marks are rendered above,
-  // U+0316–0333 + friends below. Anything unclassified lands in "other".
+  // Canonical combining class from the pinned Unicode table (spec 082,
+  // FR-021) — the single authoritative source; new hand-rolled codepoint
+  // ranges are forbidden. This retires the v1 gap documented here before:
+  // the old hand-rolled 0x0300–0x036F-style ranges approximated above/below
+  // and got some wrong (U+035C "COMBINING DOUBLE BREVE BELOW", ccc 233, was
+  // bucketed "above"), and every Arabic harakat merged into "other"
+  // regardless of position.
   //
-  // v1 SCOPE: the above/below split is calibrated for alphabetic scripts
-  // using the Combining Diacritical Marks blocks (Latin/Cyrillic/Greek-style
-  // orthographies). Marks from other systems — Arabic harakat, Hebrew niqqud,
-  // Thai/Lao/Khmer vowel and tone signs, Indic matras/anusvara — all fall
-  // into the single "other" bucket, where classing relies on attachment
-  // similarity alone and may merge functionally distinct marks. This is a
-  // documented v1 gap (same posture as the EuroLatin/IPA gaps in spec.md
-  // §7.5). The intended fix is a pinned UnicodeData ccc join (like the
-  // DerivedAge.txt join in display-difficulty): ccc gives above (230), below
-  // (220), and per-mark fixed-position classes for Arabic (27–35), which
-  // dissolves the harakat merge problem without hand-rolled ranges.
+  // 230 → above, 220 (and its positional family) → below. Arabic
+  // fixed-position classes 27–35 each get their own bucket so marks sharing
+  // attachment sets still split by position (fatha ≠ kasra ≠ shadda),
+  // dissolving the harakat merge problem without hand-rolled ranges.
+  //
+  // Remaining approximation, unchanged from v1: Hebrew fixed-position classes
+  // (10–26), Thai/Lao/Tibetan fixed classes, overlays (1), nuktas (7), kana
+  // voicing (8), and viramas (9) still land in "other", where classing relies
+  // on attachment similarity alone.
   const cp = mark.codePointAt(0);
   if (cp === undefined) return "other";
-  if (
-    (cp >= 0x0300 && cp <= 0x0315) ||
-    (cp >= 0x033d && cp <= 0x0344) ||
-    cp === 0x0342 ||
-    (cp >= 0x0350 && cp <= 0x0357) ||
-    (cp >= 0x035b && cp <= 0x035c) ||
-    (cp >= 0x0483 && cp <= 0x0487) ||
-    (cp >= 0x1dc0 && cp <= 0x1dcf)
-  ) {
-    return "above";
+  const ccc = getCCC(cp);
+  if (ccc === undefined) return "other"; // unassigned codepoint: not a real mark
+  if (ccc >= ARABIC_FIXED_CCC_MIN && ccc <= ARABIC_FIXED_CCC_MAX) {
+    return `fixed-${ccc}`;
   }
-  if (
-    (cp >= 0x0316 && cp <= 0x0333) ||
-    (cp >= 0x0339 && cp <= 0x033c) ||
-    (cp >= 0x0345 && cp <= 0x0345) ||
-    (cp >= 0x0347 && cp <= 0x034e) ||
-    (cp >= 0x0358 && cp <= 0x035a)
-  ) {
-    return "below";
-  }
+  if (ABOVE_CCC.has(ccc)) return "above";
+  if (BELOW_CCC.has(ccc)) return "below";
   return "other";
 }
 
@@ -141,10 +153,10 @@ export function groupMarkClasses(alphabet: ConfirmedAlphabet): MarkClass[] {
       }
     }
     clusters.forEach((cluster, i) => {
+      const label = bucketLabel(bucket);
       classes.push({
         id: `${bucket}-${i + 1}`,
-        label:
-          clusters.length === 1 ? BUCKET_LABEL[bucket] : `${BUCKET_LABEL[bucket]} (group ${i + 1})`,
+        label: clusters.length === 1 ? label : `${label} (group ${i + 1})`,
         marks: cluster,
       });
     });

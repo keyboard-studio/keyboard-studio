@@ -1,10 +1,10 @@
 // Unit tests for useOskChannel — postMessage bridge hook.
 //
 // Coverage:
-//   1. KEY_TAPPED message from the expected iframe contentWindow invokes onKeyTap.
-//   2. Repeated taps of the same keyId each fire onKeyTap (not de-duplicated).
-//   3. KEY_TAPPED from a DIFFERENT source (not the iframe's contentWindow) is ignored.
-//   4. TEXT_UPDATED still updates textValue when onKeyTap is provided.
+//   1. KEYBOARD_ACTIVE from the expected iframe contentWindow is counted.
+//   2. Repeated activations are each counted (every recompile re-activates).
+//   3. Events from a DIFFERENT source (not the iframe's contentWindow) are ignored.
+//   4. TEXT_UPDATED updates textValue.
 //
 // NOTE: The security guard in useOskChannel requires event.source === frame.contentWindow.
 // We achieve this by creating a real iframe element in the document, grabbing its
@@ -61,14 +61,11 @@ afterEach(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("useOskChannel — onKeyTap callback", () => {
-  it("invokes onKeyTap when a KEY_TAPPED message arrives from the iframe contentWindow", async () => {
+describe("useOskChannel — KEYBOARD_ACTIVE", () => {
+  it("counts a KEYBOARD_ACTIVE message from the iframe contentWindow", async () => {
     const { ref, frame } = makeIframeRef();
-    const onKeyTap = vi.fn();
-
-    const { result } = renderHook(() => useOskChannel(ref, onKeyTap));
-    // Ensure hook mounted.
-    expect(result.current.engineReady).toBe(false);
+    const { result } = renderHook(() => useOskChannel(ref));
+    expect(result.current.keyboardActivations).toBe(0);
 
     const frameWindow = frame.contentWindow;
     if (!frameWindow) {
@@ -77,37 +74,54 @@ describe("useOskChannel — onKeyTap callback", () => {
     }
 
     await act(async () => {
-      dispatchFromSource(frameWindow, { type: "KEY_TAPPED", keyId: "K_A" });
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
     });
 
-    expect(onKeyTap).toHaveBeenCalledTimes(1);
-    expect(onKeyTap).toHaveBeenCalledWith("K_A");
+    expect(result.current.keyboardActivations).toBe(1);
   });
 
-  it("fires onKeyTap for each repeated tap of the same keyId", async () => {
+  it("counts each repeated activation", async () => {
     const { ref, frame } = makeIframeRef();
-    const onKeyTap = vi.fn();
-
-    renderHook(() => useOskChannel(ref, onKeyTap));
+    const { result } = renderHook(() => useOskChannel(ref));
 
     const frameWindow = frame.contentWindow;
     if (!frameWindow) return;
 
     await act(async () => {
-      dispatchFromSource(frameWindow, { type: "KEY_TAPPED", keyId: "K_A" });
-      dispatchFromSource(frameWindow, { type: "KEY_TAPPED", keyId: "K_A" });
-      dispatchFromSource(frameWindow, { type: "KEY_TAPPED", keyId: "K_A" });
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
     });
 
-    // Each tap fires onKeyTap — no de-duplication
-    expect(onKeyTap).toHaveBeenCalledTimes(3);
+    expect(result.current.keyboardActivations).toBe(3);
   });
 
-  it("ignores KEY_TAPPED from a window that is not the iframe contentWindow", async () => {
+  it("clears a stale engineError when a later KEYBOARD_ACTIVE arrives", async () => {
     const { ref, frame } = makeIframeRef();
-    const onKeyTap = vi.fn();
+    const { result } = renderHook(() => useOskChannel(ref));
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
 
-    renderHook(() => useOskChannel(ref, onKeyTap));
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "KMW: load failed" });
+    });
+    expect(result.current.engineError).toBe("KMW: load failed");
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+    });
+    expect(result.current.engineError).toBeNull();
+
+    // A genuine failure of the latest keyboard still surfaces.
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "KMW: second failure" });
+    });
+    expect(result.current.engineError).toBe("KMW: second failure");
+  });
+
+  it("ignores events from a window that is not the iframe contentWindow", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
 
     const frameWindow = frame.contentWindow;
     if (!frameWindow) return;
@@ -115,19 +129,119 @@ describe("useOskChannel — onKeyTap callback", () => {
     // Dispatch from `window` (the top-level window) instead of `frameWindow`.
     // The security guard should reject it.
     await act(async () => {
-      dispatchFromSource(window, { type: "KEY_TAPPED", keyId: "K_A" });
+      dispatchFromSource(window, { type: "KEYBOARD_ACTIVE" });
+      dispatchFromSource(window, { type: "TEXT_UPDATED", value: "spoofed" });
     });
 
-    expect(onKeyTap).not.toHaveBeenCalled();
+    expect(result.current.keyboardActivations).toBe(0);
+    expect(result.current.textValue).toBe("");
   });
 });
 
-describe("useOskChannel — TEXT_UPDATED coexists with onKeyTap", () => {
-  it("updates textValue for TEXT_UPDATED even when onKeyTap is provided", async () => {
+describe("useOskChannel — engineError lifecycle (#1905)", () => {
+  it("sets engineError on ENGINE_ERROR", async () => {
     const { ref, frame } = makeIframeRef();
-    const onKeyTap = vi.fn();
+    const { result } = renderHook(() => useOskChannel(ref));
 
-    const { result } = renderHook(() => useOskChannel(ref, onKeyTap));
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, {
+        type: "ENGINE_ERROR",
+        message: "keyboard load failed for 'Keyboard_x'",
+      });
+    });
+
+    expect(result.current.engineError).toBe("keyboard load failed for 'Keyboard_x'");
+  });
+
+  it("clears a stale engineError when the final keyboard activates", async () => {
+    // The reported bug: a superseded load's failure (e.g. a recompile whose
+    // blob was revoked before KMW's script tag fetched it) left the red
+    // banner up forever, even though the final keyboard activated fine.
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, {
+        type: "ENGINE_ERROR",
+        message: "keyboard load failed for 'Keyboard_sil_cameroon_qwerty'",
+      });
+    });
+    expect(result.current.engineError).not.toBeNull();
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+    });
+
+    expect(result.current.engineError).toBeNull();
+    expect(result.current.keyboardActivations).toBe(1);
+  });
+
+  it("keeps the error when the latest keyboard genuinely fails to load", async () => {
+    // A genuine failure posts ENGINE_ERROR with no following KEYBOARD_ACTIVE —
+    // the banner must stay up.
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, {
+        type: "ENGINE_ERROR",
+        message: "keyboard load failed for 'Keyboard_broken'",
+      });
+    });
+
+    expect(result.current.engineError).toBe("keyboard load failed for 'Keyboard_broken'");
+    expect(result.current.keyboardActivations).toBe(0);
+  });
+
+  it("a later genuine failure re-surfaces the error after an activation cleared it", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "stale" });
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+    });
+    expect(result.current.engineError).toBeNull();
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "genuine" });
+    });
+    expect(result.current.engineError).toBe("genuine");
+  });
+
+  it("ENGINE_READY still clears a previous engineError", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "boom" });
+      dispatchFromSource(frameWindow, { type: "ENGINE_READY" });
+    });
+
+    expect(result.current.engineError).toBeNull();
+    expect(result.current.engineReady).toBe(true);
+  });
+});
+
+describe("useOskChannel — TEXT_UPDATED", () => {
+  it("updates textValue", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
 
     const frameWindow = frame.contentWindow;
     if (!frameWindow) return;
@@ -137,8 +251,6 @@ describe("useOskChannel — TEXT_UPDATED coexists with onKeyTap", () => {
     });
 
     expect(result.current.textValue).toBe("hello");
-    // onKeyTap not called for TEXT_UPDATED
-    expect(onKeyTap).not.toHaveBeenCalled();
   });
 });
 

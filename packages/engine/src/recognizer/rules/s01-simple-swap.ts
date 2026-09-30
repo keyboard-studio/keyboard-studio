@@ -2,7 +2,7 @@ import type { KeyboardIR, IRRule, Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef } from "../node-refs.js";
-import { toUPlus, formatVKeyModifiers } from "../utils.js";
+import { toUPlus, formatVKeyModifiers, isBehaviourOwned } from "../utils.js";
 
 // Format one rule line for the keystrokeCharacterMap slot.
 // e.g. + [SHIFT K_Q] > U+0190  or  + [K_Q] > U+025B
@@ -77,7 +77,9 @@ export const s01Recognizer: RecognizerRule = {
         // chip). NB: this is an independent guard from the identical one in
         // interpreter.ts (findS01Clusters, etc.) — that path serves the
         // generated rules; neither guard implies the other is covered.
-        if (r.ownedByPattern !== undefined) return false;
+        // FR-021: behaviour-owned rules are never pattern candidates (the
+        // marker alone determines behaviour ownership — no shape heuristics).
+        if (r.ownedByPattern !== undefined || isBehaviourOwned(r)) return false;
         return isS01(r, group.name);
       });
       if (matchingRules.length === 0) continue;

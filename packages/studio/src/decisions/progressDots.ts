@@ -168,6 +168,7 @@ export interface ProgressDotsInput {
 
 const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   identity: msg({ id: "footer.stage.identity", message: "Identity" }),
+  layout: msg({ id: "footer.stage.layout", message: "Keyboard layout" }),
   choose_base: msg({ id: "footer.stage.chooseBase", message: "Choose base keyboard" }),
   track: msg({ id: "footer.stage.track", message: "Copy or adapt" }),
   project_name: msg({ id: "footer.stage.projectName", message: "Project name" }),

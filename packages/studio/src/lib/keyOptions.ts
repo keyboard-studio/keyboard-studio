@@ -30,22 +30,11 @@ export const KEY_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "K_BKQUOTE", label: "K_BKQUOTE (`)" },
 ];
 
-// O(1) membership set — all non-empty KEY_OPTIONS values.
-// Used in both galleries for tap-to-select routing (a key tapped in the OSK
-// preview is validated against this set before wiring to a host-key picker).
-// Not specific to any one mechanism — it is the full pickable-key set.
-export const ALL_PICKABLE_KEYS: ReadonlySet<string> = new Set(
-  KEY_OPTIONS.filter((o) => o.value !== "").map((o) => o.value),
-);
-
-// Use-case-named alias for TouchGallery host-key validation (identical set).
-export const VALID_HOST_KEYS: ReadonlySet<string> = ALL_PICKABLE_KEYS;
-
 // ---------------------------------------------------------------------------
 // "Enter my own character..." custom option — appended to every key-picker
 // dropdown in MechanismGallery and TouchGallery (see KeyPickerField.tsx). The
-// sentinel value is never a real vkey id, so it can never collide with
-// ALL_PICKABLE_KEYS / VALID_HOST_KEYS membership checks.
+// sentinel value is never a real vkey id, so it can never collide with a
+// KEY_OPTIONS value.
 // ---------------------------------------------------------------------------
 
 export const CUSTOM_KEY_OPTION_VALUE = "__custom__";

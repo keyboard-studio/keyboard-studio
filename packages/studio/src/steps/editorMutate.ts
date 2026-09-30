@@ -17,8 +17,14 @@
 // IR, ensuring idempotency and reversibility.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
+import type { CarveDisposition } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { carveFilterIr, applyStoreSlotRemovals, parseSlotId, collectTaintedContributors } from "@keyboard-studio/engine";
+import {
+  parseSlotId,
+  deriveCarvedIr,
+  collectTaintedContributors,
+} from "@keyboard-studio/engine";
+
 import { applyMutatePatch } from "./mutateApply.ts";
 
 /** Shared empty carved-character set for the `carveChars` default parameter. */
@@ -54,9 +60,26 @@ function partitionItemIds(
   const wholeNodeItemIds = new Set<string>();
   for (const id of deletedItemIds) {
     const parsed = parseSlotId(id);
-    (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId) ? slotIds : wholeNodeItemIds).add(id);
+    (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId)
+      ? slotIds
+      : wholeNodeItemIds
+    ).add(id);
   }
   return { slotIds, wholeNodeItemIds };
+}
+
+/**
+/**
+ * Options for the carve mutate path (T015): the suppression stage inputs.
+ * When `dispositions` is non-empty, the shared engine pipeline
+ * (suppression → slot removals → filter) derives the carve arrays; otherwise
+ * the legacy slot-removals → filter derivation runs, content-identical.
+ */
+export interface CarveMutateOptions {
+  /** Per-combination dispositions for the suppression stage (FR-019). */
+  dispositions?: CarveDisposition[];
+  /** A6 loud/soft for the suppression stage. Default false (soft). */
+  loud?: boolean;
 }
 
 /**
@@ -82,14 +105,22 @@ export function unionAggregatedCarveIds(
 ): Set<string> {
   if (carveChars.size === 0) return new Set(deletedItemIds);
   const aggregated = collectTaintedContributors(baseIr, carveChars);
-  return new Set([...deletedItemIds, ...aggregated.storeSlotIds, ...aggregated.ruleNodeIds]);
+  return new Set([
+    ...deletedItemIds,
+    ...aggregated.storeSlotIds,
+    ...aggregated.ruleNodeIds,
+  ]);
 }
 
 /**
  * Build the carve patch (the carve-affected IR arrays) from `baseIr` and the
- * current carve overlay. Slot-item nul-rewrites are applied first
- * (applyStoreSlotRemovals), then whole-node deletions (carveFilterIr); the
- * result's carve arrays become the patch.
+ * current carve overlay.
+ *
+ * T015: when dispositions are provided, the shared engine pipeline
+ * (deriveCarvedIr: suppression → slot removals → whole-node filter) derives
+ * the arrays — byte-identical to the applyCarveToVfs pipeline path. Without
+ * dispositions, the legacy derivation runs: slot-item nul-rewrites
+ * (applyStoreSlotRemovals) first, then whole-node deletions (carveFilterIr).
  *
  * Always derived from `baseIr` so the patch is a pure function of the overlay
  * (idempotent + reversible). Returns `{}` (the empty, no-op patch) when there
@@ -104,22 +135,44 @@ export function buildCarvePatch(
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
   carveChars: ReadonlySet<string> = EMPTY_CARVE_CHARS,
+  opts?: CarveMutateOptions,
 ): Partial<KeyboardIR> {
-  const effectiveItemIds = unionAggregatedCarveIds(baseIr, deletedItemIds, carveChars);
-  const { slotIds, wholeNodeItemIds } = partitionItemIds(baseIr, effectiveItemIds);
+  const effectiveItemIds = unionAggregatedCarveIds(
+    baseIr,
+    deletedItemIds,
+    carveChars,
+  );
+  const { slotIds, wholeNodeItemIds } = partitionItemIds(
+    baseIr,
+    effectiveItemIds,
+  );
+  const dispositions = opts?.dispositions ?? [];
 
-  if (deletedNodeIds.size === 0 && slotIds.size === 0 && wholeNodeItemIds.size === 0) {
+  if (
+    deletedNodeIds.size === 0 &&
+    slotIds.size === 0 &&
+    wholeNodeItemIds.size === 0 &&
+    dispositions.length === 0
+  ) {
     return {};
   }
 
-  const slotIr = applyStoreSlotRemovals(baseIr, slotIds, { carveNotAnyHygiene: true }).ir;
-  const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
-  const filtered = carveFilterIr(slotIr, allWholeNodeIds);
+  // T015: the shared pipeline. With empty dispositions the suppression stage
+  // is a structural no-op and the result is content-identical to the legacy
+  // derivation below. deletedItemIds carries the #1809 §1 aggregated union
+  // (effectiveItemIds) so the pipeline and the legacy derivation consume the
+  // same pruned result.
+  const { ir: carved } = deriveCarvedIr(baseIr, {
+    deletedNodeIds,
+    deletedItemIds: effectiveItemIds,
+    dispositions,
+    ...(opts?.loud === true ? { loud: true as const } : {}),
+  });
 
   return {
-    groups: filtered.groups,
-    stores: filtered.stores,
-    raw: filtered.raw,
+    groups: carved.groups,
+    stores: carved.stores,
+    raw: carved.raw,
   };
 }
 
@@ -134,8 +187,10 @@ export function buildCarvePatch(
  * @param baseIr          The source-of-truth carve IR. Never mutated.
  * @param deletedNodeIds  Whole-node carve deletions (group/rule/store/raw nodeIds).
  * @param deletedItemIds  Glyph-level carve item ids (store slots + bare node ids).
+ * @param opts            Optional suppression inputs (T015: dispositions + loud).
  * @param carveChars      Issue #1809, ruling §1: the aggregated carved character
  *                        set; unioned over `deletedItemIds` (see buildCarvePatch).
+
  * @returns A fresh KeyboardIR with carve deletions applied.
  */
 export function applyCarveMutate(
@@ -143,8 +198,16 @@ export function applyCarveMutate(
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
   carveChars: ReadonlySet<string> = EMPTY_CARVE_CHARS,
+  opts?: CarveMutateOptions,
 ): KeyboardIR {
-  const patch = buildCarvePatch(baseIr, deletedNodeIds, deletedItemIds, carveChars);
+  const patch = buildCarvePatch(
+    baseIr,
+    deletedNodeIds,
+    deletedItemIds,
+    carveChars,
+    opts,
+  );
+
   return applyMutatePatch(baseIr, patch, CARVE_WRITES);
 }
 
@@ -206,7 +269,9 @@ export const ADD_GALLERY_WRITES: readonly IRPath[] = [
  * Build the add-gallery patch: the physical-assignment IR arrays (`groups`,
  * `stores`) from the assignment-injected IR.
  */
-export function buildAddGalleryPatch(assignedIr: KeyboardIR): Partial<KeyboardIR> {
+export function buildAddGalleryPatch(
+  assignedIr: KeyboardIR,
+): Partial<KeyboardIR> {
   return {
     groups: assignedIr.groups,
     stores: assignedIr.stores,

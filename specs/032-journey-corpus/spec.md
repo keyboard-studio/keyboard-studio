@@ -8,7 +8,7 @@
 
 **Input**: Make realistic user workflows (including backtracking) into tracked, executable test artifacts; surface unsupported routing gaps as fixture diffs. The survey routing engine is already pure and heavily unit-tested (evalCondition, resolveNext, advanceThrough in packages/studio/src/survey/SurveyRunner.tsx); the journeys are end-to-end replays of that engine, coupled with a manifest edge-coverage gate that reports which survey steps and branch edges are exercised by zero journeys.
 
-**Governing scope**: This feature implements the journey-corpus harness as described above and cites [docs/workflow-model.md](../../docs/workflow-model.md) (working-copy spine), [specs/012-step-model-manifest/spec.md](../012-step-model-manifest/spec.md) (step manifest architecture), and [spec.md §8 Data Flow](../../spec.md) (the routing loop). It does not re-derive that scope. Gallery decomposition (carve, mechanisms, touch loops) remains deferred pending spec #9 (loop primitive).
+**Governing scope**: This feature implements the journey-corpus harness as described above and cites [docs/workflow-model.md](../../docs/workflow-model.md) (working-copy spine), [specs/012-step-model-manifest/spec.md](../_archive/012-step-model-manifest/spec.md) (step manifest architecture), and [spec.md §8 Data Flow](../../spec.md) (the routing loop). It does not re-derive that scope. Gallery decomposition (carve, mechanisms, touch loops) remains deferred pending spec #9 (loop primitive).
 
 ---
 
