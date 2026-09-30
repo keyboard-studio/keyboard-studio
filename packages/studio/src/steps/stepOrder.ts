@@ -7,6 +7,7 @@
 
 export const STEP_ORDER: readonly string[] = [
   "identity",
+  "layout",
   "choose_base",
   "track",
   "project_name",

@@ -100,9 +100,14 @@ const confirmRebaseToSpy = confirmRebaseTo as ReturnType<typeof vi.fn>;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Drive the wizard from "identity" to "base" (click survey-advance). */
+/**
+ * Drive the wizard from "identity" to "base": identity -> layout (spec 076 A4,
+ * the real community-layout step; its suggestion is preselected, so confirming
+ * is one click) -> choose_base.
+ */
 function advanceToBase() {
   fireEvent.click(screen.getByTestId("survey-advance"));
+  fireEvent.click(screen.getByTestId("layout-continue"));
 }
 
 /**
@@ -965,6 +970,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
     // L1 progress: survey-advance gives hasMeaningfulProgress() a true reading
     // (identityResult !== null / activeStepId !== "identity").
     fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("layout-continue")); // spec 076 A4 layout step
 
     // Seed a REAL pending-slot record (as the mount-time autosave's own
     // debounced write would eventually do) so its removal below is an
@@ -1033,6 +1039,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
     });
 
     fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("layout-continue")); // spec 076 A4 layout step
     saveDraft(PENDING_PROJECT_KEY);
     expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
 
@@ -1114,7 +1121,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
 
     const stored = localStorage.getItem(draftKey(PENDING_PROJECT_KEY));
     expect(stored).not.toBeNull();
-    expect((JSON.parse(stored!) as DurableDraft).traversal.activeStepId).toBe("choose_base");
+    expect((JSON.parse(stored!) as DurableDraft).traversal.activeStepId).toBe("layout");
   });
 });
 
@@ -1506,13 +1513,14 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → mechanisms → touch → help → package (M2, spec 071/075, spec 083)", () => {
+  it("manifest spine order is: identity → layout → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → mechanisms → touch → help → package (M2, spec 071/075, spec 083)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
       .map((s) => s.id);
     expect(spineIds).toEqual([
       "identity",
+      "layout",
       "choose_base",
       "track",
       "characters",
@@ -1568,8 +1576,13 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     // identity (manifest step)
     expect(screen.getByTestId("stage-identity")).toBeTruthy();
 
-    // → choose_base (manifest step: base picker only)
+    // → layout (manifest step, spec 076 A4: the community-layout question)
     fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("layout-step")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+
+    // → choose_base (manifest step: base picker only)
+    fireEvent.click(screen.getByTestId("layout-continue"));
     expect(screen.getByTestId("stage-base")).toBeTruthy();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
 

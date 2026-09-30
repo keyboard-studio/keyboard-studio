@@ -71,7 +71,8 @@ import { SurveyView } from "./StudioShell.tsx";
 // ---------------------------------------------------------------------------
 
 function advanceToCharactersStep(): void {
-  fireEvent.click(screen.getByTestId("survey-advance")); // identity -> base
+  fireEvent.click(screen.getByTestId("survey-advance")); // identity -> layout
+  fireEvent.click(screen.getByTestId("layout-continue")); // confirm layout -> base
   fireEvent.click(screen.getByTestId("base-preview")); // preview (separate click)
   fireEvent.click(screen.getByTestId("base-confirm")); // commit -> track
   fireEvent.click(screen.getByTestId("track-adapt")); // track -> characters (prefill substage)
@@ -151,6 +152,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
     // for the track step is "preview" (default), so showCharacterMap must stay
     // false even though discoveryMethod is already "build-list".
     fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("layout-continue"));
     fireEvent.click(screen.getByTestId("base-preview"));
     fireEvent.click(screen.getByTestId("base-confirm"));
     act(() => {

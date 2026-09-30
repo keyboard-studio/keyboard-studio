@@ -10,6 +10,7 @@ Part I). The "After 079" column is the target this feature must reach.
 | Step id | Today | Evidence | Declaration after 079 | After 079 |
 |---|---|---|---|---|
 | identity | non-compliant: survives leaving, not reload (D-5) | F-5 | `answer-store` | compliant |
+| layout | new step (spec 076 A4); every pick saved per question | spec 076 A4 | `answer-store` | compliant |
 | choose_base | believed compliant (working copy) | spec Assumptions | `working-copy` | compliant — revisit test `StepHost.test.tsx` "an unmount/remount at choose_base with the same evidence leaves baseKeyboard/baseIr unchanged" |
 | track | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | project_name | non-compliant (D-5) | F-5 | `answer-store` | compliant |

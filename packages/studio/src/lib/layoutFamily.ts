@@ -27,6 +27,8 @@ import {
   likelyHostLayouts as t011LikelyHostLayouts,
 } from "./referenceHostLayouts.ts";
 import type { HostLayoutId, LayoutFamilyAnswer } from "./referenceHostLayouts.ts";
+import { windowsLayoutById } from "./windowsLayouts.ts";
+import type { WindowsLayout } from "./windowsLayouts.ts";
 
 /** The four values the existing layout_family question offers (unchanged). */
 export type LayoutFamilyValue = LayoutFamilyAnswer;
@@ -45,9 +47,61 @@ function firstString(value: unknown): string | undefined {
   return undefined;
 }
 
-function readFromSteps(steps: Record<StepId, StepAnswers>): LayoutFamilyValue | undefined {
+/**
+ * The community-layout step (spec 076 A4) stores the picked Windows layout's
+ * catalog id ("basic_kbdfr") under this answer, on the same "layout" step as
+ * the legacy 4-value `layout_family` answer. The pick is the richer signal
+ * (it names an exact layout, from which family and reference host derive), so
+ * it wins; a stored legacy family answer keeps working when no pick exists.
+ */
+export const HOST_LAYOUT_ANSWER_ID = "host_layout";
+
+function readPickFromSteps(steps: Record<StepId, StepAnswers>): WindowsLayout | undefined {
+  return windowsLayoutById(firstString(steps[LAYOUT_FAMILY_STEP_ID]?.answers[HOST_LAYOUT_ANSWER_ID]?.value));
+}
+
+function readLegacyFamily(steps: Record<StepId, StepAnswers>): LayoutFamilyValue | undefined {
   const raw = firstString(steps[LAYOUT_FAMILY_STEP_ID]?.answers[LAYOUT_FAMILY_ANSWER_ID]?.value);
   return isLayoutFamilyValue(raw) ? raw : undefined;
+}
+
+function pickFamily(pick: WindowsLayout | undefined): LayoutFamilyValue | undefined {
+  return pick !== undefined && pick.family !== "other" ? pick.family : undefined;
+}
+
+/** Effective family: the pick's derived family, else the legacy stored answer. */
+function readFromSteps(steps: Record<StepId, StepAnswers>): LayoutFamilyValue | undefined {
+  return pickFamily(readPickFromSteps(steps)) ?? readLegacyFamily(steps);
+}
+
+/** The Windows layout the author picked on the layout step, if any. */
+export function getPickedWindowsLayout(): WindowsLayout | undefined {
+  return readPickFromSteps(useSurveyAnswerStore.getState().steps);
+}
+
+/** Reactive read of the picked layout id (undefined until the author confirms one). */
+export function usePickedWindowsLayout(): WindowsLayout | undefined {
+  return useSurveyAnswerStore((s) => readPickFromSteps(s.steps));
+}
+
+/**
+ * Persist the picked layout id immediately (per-question persistence). Origin
+ * "proposed" when the author confirmed the studio's suggestion unchanged,
+ * "overturned" when they chose a different layout than it suggested.
+ */
+export function savePickedWindowsLayout(
+  layoutId: string,
+  origin: "proposed" | "confirmed" | "overturned" = "confirmed",
+  screenId = "layout",
+): void {
+  useSurveyAnswerStore.getState().saveAnswer(LAYOUT_FAMILY_STEP_ID, HOST_LAYOUT_ANSWER_ID, {
+    value: layoutId,
+    answerType: "select",
+    origin,
+    stage: "draft",
+    evidenceKey: null,
+    screenId,
+  });
 }
 
 /** The stored layout_family answer, if the author has given one. */
@@ -156,7 +210,16 @@ export function resolveLikelyHostLayouts(opts: {
   layoutFamily: LayoutFamilyValue | undefined;
   bcp47: string[];
   deps?: LikelyHostDeps;
+  /**
+   * Reference host id of the layout the author picked on the layout step, when
+   * the pick IS one of the five reference hosts: the exact answer, ahead of
+   * any family or language-tag inference (spec 076 A4).
+   */
+  pickedHost?: HostLayoutId | undefined;
 }): LikelyHostResolution {
+  if (opts.pickedHost !== undefined) {
+    return { hosts: toRefs([opts.pickedHost]), source: "layout-family" };
+  }
   const deps = opts.deps ?? likelyHostDepsOverride;
   if (deps === undefined) return resolveWithT011(opts.layoutFamily, opts.bcp47);
 
@@ -208,8 +271,15 @@ function resolveWithT011(
  */
 export function useLikelyHostLayouts(bcp47: string | undefined): LikelyHostResolution {
   const layoutFamily = useLayoutFamilyAnswer();
+  const pick = usePickedWindowsLayout();
+  const pickedHost = pick?.host;
   return useMemo(
-    () => resolveLikelyHostLayouts({ layoutFamily, bcp47: bcp47 === undefined ? [] : [bcp47] }),
-    [layoutFamily, bcp47],
+    () =>
+      resolveLikelyHostLayouts({
+        layoutFamily,
+        bcp47: bcp47 === undefined ? [] : [bcp47],
+        pickedHost,
+      }),
+    [layoutFamily, pickedHost, bcp47],
   );
 }

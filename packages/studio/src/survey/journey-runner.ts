@@ -468,6 +468,15 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "layout": {
+          // Spec 076 A4: the community-layout question. Its pick lives in the
+          // answer store and feeds only the host-leak demonstration; the
+          // corpus fixtures record no answer for it, so the replay passes
+          // straight through.
+          result = undefined;
+          break;
+        }
+
         case "choose_base": {
           const answers = answerMapFromGroup(group, "choose_base");
           const baseId = requireStringAnswer(answers, "base_keyboard_id", "choose_base");

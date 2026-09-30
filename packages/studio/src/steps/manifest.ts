@@ -6,7 +6,7 @@
 // "map == runtime by construction" (FR-010).
 //
 // SPINE ORDER (FR-012, M2):
-//   Identity → choose base → Track → [project_name (spine:false)] →
+//   Identity → layout → choose base → Track → [project_name (spine:false)] →
 //   Characters (Phase A/B questions) → Marks → Punctuation → Invisibles →
 //   Convenience → Carve → Mechanisms → [lock: "physical"] →
 //   touch_seed_source (spine:false) → touch →
@@ -33,6 +33,7 @@ import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
 import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
 import {
   identityStep,
+  layoutStep,
   chooseBaseStep,
   trackStep,
   projectNameStep,
@@ -96,7 +97,7 @@ const charactersStep: Step = {
 // Manifest: the ordered Step[] (FR-008, FR-012)
 //
 // Rules encoded here:
-//   M2 — spine order: Identity → choose_base → track → Characters → Marks →
+//   M2 — spine order: Identity → layout → choose_base → track → Characters → Marks →
 //         Punctuation → Invisibles → Convenience → Carve → Mechanisms → (lock physical) →
 //         touch → (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
@@ -107,6 +108,12 @@ const charactersStep: Step = {
 export const manifest: readonly Step[] = [
   // --- Identity panel ---
   identityStep,
+
+  // --- Community keyboard layout (spec 076 A4) ---
+  // Right after Identity, before any base or carve work: which Windows layout
+  // the community's typists use. Proposed from the identity language tag and
+  // confirmed by the author; feeds the FR-023 likely-host resolution.
+  layoutStep,
 
   // --- Base selection (base picker only) ---
   chooseBaseStep,
@@ -280,7 +287,7 @@ export function validateManifestShape(): void {
 
   // M2 — spine order.
   const expectedSpine = [
-    "identity", "choose_base", "track", "characters",
+    "identity", "layout", "choose_base", "track", "characters",
     "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {

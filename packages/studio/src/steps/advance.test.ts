@@ -20,7 +20,7 @@ import { manifest, validateManifestShape } from "./manifest.ts";
 // ---------------------------------------------------------------------------
 
 type WalkStep =
-  | "identity" | "choose_base" | "track" | "project_name" | "characters"
+  | "identity" | "layout" | "choose_base" | "track" | "project_name" | "characters"
   | "carve" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
@@ -74,8 +74,12 @@ describe("manifestIndexOf", () => {
 // ---------------------------------------------------------------------------
 
 describe("nextSpineStepAfter", () => {
-  it("identity → choose_base", () => {
-    expect(nextSpineStepAfter("identity")).toBe("choose_base");
+  it("identity → layout (spec 076 A4: the community-layout step)", () => {
+    expect(nextSpineStepAfter("identity")).toBe("layout");
+  });
+
+  it("layout → choose_base", () => {
+    expect(nextSpineStepAfter("layout")).toBe("choose_base");
   });
 
   it("choose_base → track", () => {
@@ -143,7 +147,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     // Spec 035 R4/R12: with no recorded fork choice (copyCtx.touchSeedSource === null),
     // mechanisms routes through the off-spine touch_seed_source fork before touch.
     expect(sequence).toEqual([
-      "identity", "choose_base", "track", "project_name", "characters",
+      "identity", "layout", "choose_base", "track", "project_name", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
@@ -153,7 +157,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-2 adapt track: same spine but project_name is skipped", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "choose_base", "track", "characters",
+      "identity", "layout", "choose_base", "track", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     expect(sequence).not.toContain("project_name");
@@ -211,7 +215,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   it("spine ids (spine !== false) are in the locked order", () => {
     const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
-      "identity", "choose_base", "track", "characters",
+      "identity", "layout", "choose_base", "track", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch", "help", "package",
     ]);
   });
@@ -222,9 +226,9 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
 // ---------------------------------------------------------------------------
 
 describe("advance: identity", () => {
-  it("supported → choose_base", () => {
+  it("supported → layout", () => {
     const { next, navigate } = advance("identity", undefined, copyCtx);
-    expect(next).toBe("choose_base");
+    expect(next).toBe("layout");
     expect(navigate).toBeUndefined();
   });
 
@@ -242,6 +246,13 @@ describe("advance: identity", () => {
 // ---------------------------------------------------------------------------
 // advance — choose_base step
 // ---------------------------------------------------------------------------
+
+describe("advance: layout", () => {
+  it("→ choose_base (spine next after layout)", () => {
+    const { next } = advance("layout", undefined, copyCtx);
+    expect(next).toBe("choose_base");
+  });
+});
 
 describe("advance: choose_base", () => {
   it("→ track (spine next after choose_base)", () => {

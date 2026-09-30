@@ -93,6 +93,7 @@ describe("M5 — all step ids are unique", () => {
 
 const EXPECTED_SPINE_ORDER = [
   "identity",
+  "layout",
   "choose_base",
   "track",
   "characters",
@@ -123,6 +124,13 @@ describe("M2 — spine order matches FR-012", () => {
     const spine = spineSteps(manifest);
     const last = spine[spine.length - 1];
     expect(last?.id).toBe("package");
+  });
+
+  it("'layout' sits right after 'identity' and before 'choose_base' (spec 076 A4)", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "identity", "layout");
+    assertStepOrder(spine, "layout", "choose_base");
+    expect(spine[1]?.id).toBe("layout");
   });
 
   it("'track' is a spine step between 'choose_base' and 'characters'", () => {

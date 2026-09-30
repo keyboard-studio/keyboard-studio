@@ -267,11 +267,17 @@ export async function driveIdentityLite(
   await surveyAdvance(page).click();
 
   // Q8: Copyright holder — optional, TERMINAL (`next: null`); left blank
-  // (D1 defaults it to the author name). This hands off to the base picker.
+  // (D1 defaults it to the author name). This hands off to the layout step.
   await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
-  // Robustness check for the phase boundary: identity-lite hands off
+  // Community-layout step (spec 076 A4): sits between identity and the base
+  // picker. Confirm the studio's suggested Windows layout (the default,
+  // "Yes, use this layout") — the e2e walks never override the proposal.
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 15_000 });
+  await page.getByTestId("layout-continue").click();
+
+  // Robustness check for the phase boundary: the layout step hands off
   // to the base keyboard picker. Wait on that landmark rather than trusting
   // the question count above. BaseResolution.tsx renders its root with
   // data-testid="base-picker" (the visible field inside is a "Search
