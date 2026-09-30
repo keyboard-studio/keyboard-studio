@@ -41,6 +41,14 @@ export interface PreviewButtonProps {
 const BUTTON_OFFSET = "calc(12px + var(--studio-footer-h, 0px))";
 
 /**
+ * The height of the journey footer that overlaps the bottom of every content
+ * column (0 when no footer is mounted). A scroll container that ends at the
+ * footer adds this to its bottom padding, so its last control can scroll out
+ * from under the bar and still take a click.
+ */
+export const FOOTER_CLEARANCE = "var(--studio-footer-h, 0px)";
+
+/**
  * Bottom padding a scroll container needs so its last line can scroll clear
  * of the floating button and the footer beneath it (button height + offset +
  * a little air).

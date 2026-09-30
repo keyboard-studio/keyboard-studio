@@ -84,6 +84,7 @@ import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { PreviewSheet } from "./components/PreviewSheet.tsx";
 import {
   PreviewButton,
+  FOOTER_CLEARANCE,
   PREVIEW_BUTTON_CLEARANCE,
 } from "./components/PreviewButton.tsx";
 import type { OskMode } from "./components/OskModeToggle.tsx";
@@ -1354,7 +1355,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     flexDirection: "column",
     minHeight: 0,
     overflowY: "auto",
-    padding: 24,
+    // The journey footer overlaps the bottom of the pane; the extra bottom
+    // padding lets the last control scroll out from under it.
+    padding: `24px 24px calc(24px + ${FOOTER_CLEARANCE})`,
     boxSizing: "border-box",
     color: TEXT_MAIN,
     fontFamily: FONT,
@@ -1540,7 +1543,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
                   // line scrolls clear of the floating preview button.
                   padding: hasPreviewContent
                     ? `16px 16px ${PREVIEW_BUTTON_CLEARANCE}`
-                    : 16,
+                    : `16px 16px calc(16px + ${FOOTER_CLEARANCE})`,
                 }
               : questionsPaneStyle
           }
