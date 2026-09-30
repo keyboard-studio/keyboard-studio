@@ -24,6 +24,7 @@ import {
   type CSSProperties,
 } from "react";
 import { SurveyQuestionsPane } from "./components/SurveyQuestionsPane.tsx";
+import { DocumentationFindingsSummary } from "./components/DocumentationFindingsSummary.tsx";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type {
@@ -1190,6 +1191,29 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     () => globalFindings.filter((f) => f.severity === "warning"),
     [globalFindings],
   );
+  // Documentation (Layer C) findings are warning-only by the Layer C
+  // ceiling, so they all land in globalWarnings — but full-weight blocks
+  // above the step content pushed the current question down, and the block
+  // render never consulted origin, so upstream findings (inherited from the
+  // base keyboard) rendered at full weight. Collapse the doc-sourced
+  // subset into one collapsed-by-default summary row instead; everything
+  // else keeps the existing full-block render untouched. Identity survives
+  // the findings pipeline — the findings array is built with spread and
+  // selectUnmappedFindings is an Array.filter, both of which preserve
+  // element references — so a Set over documentationFindings identifies
+  // exactly the doc-sourced warnings.
+  const documentationFindingSet = useMemo(
+    () => new Set(documentationFindings),
+    [documentationFindings],
+  );
+  const docGlobalWarnings = useMemo(
+    () => globalWarnings.filter((f) => documentationFindingSet.has(f)),
+    [globalWarnings, documentationFindingSet],
+  );
+  const authoredGlobalWarnings = useMemo(
+    () => globalWarnings.filter((f) => !documentationFindingSet.has(f)),
+    [globalWarnings, documentationFindingSet],
+  );
   const globalNonWarnings = useMemo(
     () => globalFindings.filter((f) => f.severity !== "warning"),
     [globalFindings],
@@ -1524,7 +1548,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
               role="status"
               aria-live="polite"
               style={
-                globalWarnings.length > 0 || showContextTolerance
+                authoredGlobalWarnings.length > 0 ||
+                docGlobalWarnings.length > 0 ||
+                showContextTolerance
                   ? {
                       display: "flex",
                       flexDirection: "column",
@@ -1535,7 +1561,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
                   : undefined
               }
             >
-              {globalWarnings.map((f, i) => (
+              {authoredGlobalWarnings.map((f, i) => (
                 <div
                   key={`${f.code}-${i}`}
                   style={{ display: "flex", flexDirection: "column", gap: 2 }}
@@ -1565,6 +1591,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
                   )}
                 </div>
               ))}
+              {docGlobalWarnings.length > 0 && (
+                <DocumentationFindingsSummary findings={docGlobalWarnings} />
+              )}
               {showContextTolerance && (
                 <ContextToleranceNotice
                   state={contextTolerance}
