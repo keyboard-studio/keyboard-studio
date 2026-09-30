@@ -44,6 +44,16 @@ describe("checkReadmeTargets (5.7 KM_LINT_README_TARGETS_MISMATCH)", () => {
     expect(findings[0]?.message).toContain("missing: macosx, linux, iphone, ipad, androidphone, androidtablet");
   });
 
+  it("passes the generated no-description README stub (platforms from an 'any' TARGETS)", () => {
+    const stub = "# Test\n\n## Supported Platforms\n- any\n";
+    expect(checkReadmeTargets(makeInput(stub, ["any"]))).toEqual([]);
+  });
+
+  it("passes the generated no-description README stub with explicit TARGETS", () => {
+    const stub = "# Test\n\n## Supported Platforms\n- windows\n- web\n";
+    expect(checkReadmeTargets(makeInput(stub, ["windows", "web"]))).toEqual([]);
+  });
+
   it("returns [] when readme-md is absent", () => {
     expect(checkReadmeTargets(makeInput(undefined, ["windows"]))).toEqual([]);
   });
