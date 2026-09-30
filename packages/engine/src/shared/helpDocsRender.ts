@@ -317,8 +317,12 @@ export function renderReadmeMd(
   }
 
   if (description === undefined) {
-    // FR-002 fallback — byte-identical to today's bare scaffolder stub.
-    return `# ${displayName}\n`;
+    // FR-002 fallback — the bare scaffolder stub when there are no platforms;
+    // otherwise the stub plus the Supported Platforms section, so the generated
+    // README always satisfies the README-vs-TARGETS check on its own.
+    if (input.platforms.length === 0) return `# ${displayName}\n`;
+    const platformLines = input.platforms.map((p) => `- ${p}`).join("\n");
+    return `# ${displayName}\n\n## Supported Platforms\n${platformLines}\n`;
   }
 
   return `# ${displayName}\n\n${buildReadmeBody(input, description)}\n`;

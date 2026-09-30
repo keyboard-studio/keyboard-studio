@@ -41,6 +41,15 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
     expect(renderReadmeMd(input)).toBe("# Piaroa\n");
   });
 
+  it("renderReadmeMd appends Supported Platforms to the stub when no description is answered", () => {
+    expect(renderReadmeMd(baseInput({ platforms: ["windows", "web"] }))).toBe(
+      "# Piaroa\n\n## Supported Platforms\n- windows\n- web\n",
+    );
+    expect(renderReadmeMd(baseInput({ platforms: ["any"] }))).toBe(
+      "# Piaroa\n\n## Supported Platforms\n- any\n",
+    );
+  });
+
   it("renderReadmeHtm is byte-identical to today's packageDocs stub when answers is null", () => {
     expect(renderReadmeHtm(baseInput())).toBe(readmeHtm("Piaroa"));
   });
