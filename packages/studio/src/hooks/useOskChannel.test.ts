@@ -96,6 +96,29 @@ describe("useOskChannel — KEYBOARD_ACTIVE", () => {
     expect(result.current.keyboardActivations).toBe(3);
   });
 
+  it("clears a stale engineError when a later KEYBOARD_ACTIVE arrives", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "KMW: load failed" });
+    });
+    expect(result.current.engineError).toBe("KMW: load failed");
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+    });
+    expect(result.current.engineError).toBeNull();
+
+    // A genuine failure of the latest keyboard still surfaces.
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "KMW: second failure" });
+    });
+    expect(result.current.engineError).toBe("KMW: second failure");
+  });
+
   it("ignores events from a window that is not the iframe contentWindow", async () => {
     const { ref, frame } = makeIframeRef();
     const { result } = renderHook(() => useOskChannel(ref));
