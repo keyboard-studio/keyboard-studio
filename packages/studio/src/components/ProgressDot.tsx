@@ -215,7 +215,10 @@ export function ProgressDot({ dot, onActivate, layout = "dot" }: ProgressDotProp
         aria-label={ariaLabel}
         {...(dot.kind === "current" ? { "aria-current": "step" as const } : {})}
         onClick={handleClick}
-        className="ks-focus-ring"
+        // Press feedback rides the shared .ks-press utility (index.css): this
+        // button pins no transform inline, so the class rule applies without
+        // fighting the inline styles.
+        className="ks-focus-ring ks-press"
         style={{
           display: "flex",
           alignItems: "center",
@@ -264,6 +267,10 @@ export function ProgressDot({ dot, onActivate, layout = "dot" }: ProgressDotProp
       title={ariaLabel}
       {...(dot.kind === "current" ? { "aria-current": "step" as const } : {})}
       onClick={handleClick}
+      // Press feedback via the shared .ks-press utility (index.css): no
+      // inline transform here, so the class active scale is additive and
+      // never fights the mark inline styles.
+      className="ks-press"
       style={{
         ...shapeStyle,
         position: "relative",

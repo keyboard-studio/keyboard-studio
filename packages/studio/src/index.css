@@ -49,6 +49,35 @@ body {
   }
 }
 
+/* Press feedback (pointer-down affordance) -----------------------------------
+ * .ks-press — a press-and-release scale cue on pointer-down (`:active` fires
+ *             on pointer-down, not release): the control dips to a 0.97 scale
+ *             over a quick ease-out and springs back just as fast.
+ *             Transform-only and critically damped — no bounce, no overshoot —
+ *             so the press feels instant. Additive like the utilities above:
+ *             it supplements a component's own inline styles, never fights
+ *             them — no `!important`, and none of the components that carry
+ *             it pin `transform` inline, so the class rule always wins cleanly.
+ *             Under `prefers-reduced-motion` the scale is dropped entirely
+ *             and only an opacity change remains. */
+.ks-press {
+  transition: transform 100ms ease-out;
+}
+
+.ks-press:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ks-press {
+    transition: none;
+  }
+  .ks-press:active {
+    transform: none;
+    opacity: 0.72;
+  }
+}
+
 /* .ks-switch-thumb — the sliding knob inside ui/Switch. A class (not an inline
  * style) because the reduced-motion override cannot be expressed inline. */
 .ks-switch-thumb {
