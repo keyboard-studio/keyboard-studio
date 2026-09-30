@@ -455,6 +455,20 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
         return contact !== undefined && contact !== "" ? contact : undefined;
       }
 
+      // Choice questions open with a defensible default so none is left blank.
+      // The author can overturn any of them; blank already meant these values.
+      if (questionId === "pf_more_detail_gate") {
+        return "false";
+      }
+      if (questionId === "pf_doc_language") {
+        const tag = deps.surveyContext["bcp47_tag"];
+        const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
+        return primary === "" || primary === "en" ? "english" : "bilingual";
+      }
+      if (questionId === "pf_history_entry") {
+        return "confirm";
+      }
+
       // pf_credits is deliberately NOT seeded from the copyright holder. Thanking
       // and owning are different things: shipped credits sections routinely
       // acknowledge advisors and contributors who hold no copyright. Pre-filling

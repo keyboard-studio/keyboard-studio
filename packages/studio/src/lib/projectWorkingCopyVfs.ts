@@ -109,6 +109,11 @@ import {
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
+import {
+  spliceRuleAdditions,
+  hasRuleAdditions,
+  type DerivedRuleAdditions,
+} from "./ruleAdditions.ts";
 import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
@@ -265,6 +270,18 @@ export interface ProjectWorkingCopyVfsInput {
    * replayed by step 2.7. Absent or `null` when no fix is applied.
    */
   contextToleranceOverlay?: ContextToleranceOverlay | null;
+  /**
+   * The rules survey step's additions (spec 082: pack install, guard
+   * synthesis, Narrow exceptions), pre-derived by the caller with
+   * `deriveRuleAdditions(workingIr, baseIr)`. Spliced into the
+   * carve-filtered IR in working-IR order by step 1.8 before the `.kmn`
+   * re-emit, so the additions take effect in the preview and download.
+   *
+   * Optional. When omitted (or empty), the projection stays byte-identical
+   * to the no-additions path — the additions only ever widen the emitted
+   * `.kmn`, never rewrite the no-edit fast path.
+   */
+  ruleAdditions?: DerivedRuleAdditions;
 }
 
 /**
@@ -355,6 +372,7 @@ export function projectWorkingCopyVfs(
     touchLayoutJson,
     baseDisplayName,
     contextToleranceOverlay = null,
+    ruleAdditions,
   } = input;
 
   const warnings: string[] = [];
@@ -460,11 +478,29 @@ export function projectWorkingCopyVfs(
   // match this exactly so an unedited working copy stays byte-identical.
   const hasCarveEdit = allWholeNodeIds.size > 0 || slotIds.size > 0;
 
+  // Step 1.8 (spec 082): working-IR rule additions. The rules survey step
+  // (pack install, guard synthesis, Narrow) writes its additions through
+  // `setWorkingIR`, but this projection builds from the base IR plus
+  // replayable overlays — so the additions are spliced into the
+  // carve-filtered IR in working-IR order before emit. `deriveRuleAdditions`
+  // collected them (marked `rulesStepAdded`, absent from the base IR); the
+  // splice walks each group's working order so a Narrow exception stays
+  // immediately BEFORE its guard (first-match semantics), and skips any
+  // added rule the deletion set filtered out (carve deletions and
+  // disabled-family members are never resurrected). Context-tolerance and
+  // touch-synthesis rules carry no marker and are unaffected — they reach
+  // the artifact through their own projection paths. With no additions the
+  // splice is the identity and the emit gate below is unchanged, so the
+  // no-additions path stays byte-identical.
+  const additions = ruleAdditions;
+  const additionsPresent = additions !== undefined && hasRuleAdditions(additions);
+  const hasProjectionEdit = hasCarveEdit || additionsPresent;
+
   let carveResult: ApplyCarveToVfsResult;
   // The post-carve IR, for the add-gallery mutate derivation (step 2) — only
   // used as the mutate base, never re-emitted.
   let carveIr: KeyboardIR;
-  if (isMutateSeamEnabled() && !entryGroupDeleted && hasCarveEdit) {
+  if (isMutateSeamEnabled() && !entryGroupDeleted && hasProjectionEdit) {
     // Seam path (T015): applyCarveMutate runs the shared pipeline
     // (suppression → slot removals → filter) from the pre-carve baseIr.
     // effectiveItemIds already carries the #1809 §1 aggregated union, so
@@ -481,12 +517,15 @@ export function projectWorkingCopyVfs(
       },
     );
     carveIr = seamIr;
-
     // The seam already filtered every node; hand it to emit with an empty
     // deletion set. irRewritten:true because there IS an edit (matching the
     // legacy emit-when-edited behavior) and the seam IR is already filtered,
     // not the parsed original; an unedited copy never reaches here.
-    carveResult = applyCarveToVfs(vfs, keyboardId, seamIr, EMPTY_DELETION_SET, {
+    const mergedSeamIr =
+      additions !== undefined
+        ? spliceRuleAdditions(seamIr, additions, allWholeNodeIds)
+        : seamIr;
+    carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
       irRewritten: true,
     });
   } else if (!entryGroupDeleted && hasCarveEdit && hasSuppression) {
@@ -519,8 +558,17 @@ export function projectWorkingCopyVfs(
     });
     warnings.push(...removalResult.warnings);
     carveIr = removalResult.ir; // equals baseIr when slotIds was empty
-    carveResult = applyCarveToVfs(vfs, keyboardId, carveIr, allWholeNodeIds, {
-      irRewritten: slotIds.size > 0,
+    // spec 082: splice the rules step's additions into the carve-filtered IR
+    // (in working-IR order; carve-deleted and disabled-family rules are never
+    // resurrected — spliceRuleAdditions skips anything in allWholeNodeIds).
+    // With no additions the splice is the identity and this path is
+    // byte-identical to pre-082.
+    const mergedCarveIr =
+      additions !== undefined
+        ? spliceRuleAdditions(carveIr, additions, allWholeNodeIds)
+        : carveIr;
+    carveResult = applyCarveToVfs(vfs, keyboardId, mergedCarveIr, allWholeNodeIds, {
+      irRewritten: slotIds.size > 0 || additionsPresent,
     });
   }
   warnings.push(...carveResult.warnings);

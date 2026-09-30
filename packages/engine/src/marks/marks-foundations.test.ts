@@ -91,15 +91,13 @@ describe("groupMarkClasses (FR-010)", () => {
     expect(groupMarkClasses(a)).toEqual(groupMarkClasses(a));
   });
 
-  // Pins the documented v1 gap (see bucketOf): marks outside the Combining
-  // Diacritical Marks blocks all land in the "other" bucket, so functionally
-  // distinct Arabic harakat with the same attested consonants merge into one
-  // class. When ccc-based bucketing lands, this test should start failing —
-  // update it to assert the per-mark fixed-position split instead.
-  it("v1 gap: same-base non-Latin marks merge into a single 'other' class", () => {
-    const FATHA = "َ";
-    const KASRA = "ِ";
-    const SHADDA = "ّ";
+  // ccc-based bucketing (spec 082, FR-021): Arabic fixed-position classes
+  // 27–35 each get their own bucket, so functionally distinct harakat with
+  // the same attested consonants no longer merge into one "other" class.
+  it("splits Arabic harakat by fixed-position ccc class (v1 gap retired)", () => {
+    const FATHA = "َ"; // U+064E, ccc 30
+    const KASRA = "ِ"; // U+0650, ccc 32
+    const SHADDA = "ّ"; // U+0651, ccc 33
     const a = makeConfirmedAlphabet({
       bases: ["ب", "ت"], // beh, teh
       marks: [FATHA, KASRA, SHADDA],
@@ -113,9 +111,22 @@ describe("groupMarkClasses (FR-010)", () => {
       ],
     });
     const classes = groupMarkClasses(a);
-    expect(classes).toHaveLength(1);
-    expect(classes[0]?.id).toBe("other-1");
-    expect(classes[0]?.marks).toEqual([FATHA, KASRA, SHADDA]);
+    expect(classes).toHaveLength(3);
+    expect(classes.map((c) => c.id)).toEqual(["fixed-30-1", "fixed-32-1", "fixed-33-1"]);
+    expect(classes.map((c) => c.marks)).toEqual([[FATHA], [KASRA], [SHADDA]]);
+    expect(classes[0]?.label).toBe("Fixed-position marks (position class 30)");
+  });
+
+  it("buckets ccc 233 (double breve below) as below — the hand-rolled table got this wrong", () => {
+    const DOUBLE_BREVE_BELOW = "͜"; // U+035C, ccc 233
+    const a = makeConfirmedAlphabet({
+      bases: ["a"],
+      marks: [DOUBLE_BREVE_BELOW],
+      attestedStacks: [{ base: "a", marks: [DOUBLE_BREVE_BELOW] }],
+    });
+    const [markClass] = groupMarkClasses(a);
+    expect(markClass?.id).toBe("below-1");
+    expect(markClass?.label).toBe("Marks below the letter");
   });
 });
 

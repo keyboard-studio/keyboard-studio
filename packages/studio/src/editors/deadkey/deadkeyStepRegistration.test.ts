@@ -14,13 +14,18 @@ import { join } from "node:path";
 import { STEP_ORDER } from "../../steps/stepOrder.ts";
 
 describe("deadkeys step registration", () => {
-  it("sits immediately after carve and before mechanisms", () => {
+  it("sits immediately after carve, with rules between it and mechanisms", () => {
+    // Integrated order (spec 083 + spec 082): carve → deadkeys → rules →
+    // mechanisms. The 083-only order had mechanisms immediately after
+    // deadkeys; the 082 rules step now sits between them.
     const carveIdx = STEP_ORDER.indexOf("carve");
     const deadkeysIdx = STEP_ORDER.indexOf("deadkeys");
+    const rulesIdx = STEP_ORDER.indexOf("rules");
     const mechIdx = STEP_ORDER.indexOf("mechanisms");
     expect(carveIdx).toBeGreaterThanOrEqual(0);
     expect(deadkeysIdx).toBe(carveIdx + 1);
-    expect(mechIdx).toBe(deadkeysIdx + 1);
+    expect(rulesIdx).toBe(deadkeysIdx + 1);
+    expect(mechIdx).toBe(rulesIdx + 1);
   });
 
   it("is not inside the assign loop", () => {

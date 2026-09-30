@@ -410,6 +410,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
  * Drive the full copy-track walk.
  * identity -> layout -> choose_base -> track(copy) -> project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
+ * rules ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
@@ -449,6 +450,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
     { stepId: "carve", testId: "carve-continue" },
     { stepId: "deadkeys", testId: "deadkeys-continue" },
+    { stepId: "rules", testId: "rules-continue" },
     { stepId: "mechanisms", testId: "mechanisms-continue" },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
@@ -460,6 +462,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
  * Drive the full adapt-track walk.
  * identity -> layout -> choose_base -> track(adapt) ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
+ * rules ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
@@ -483,6 +486,7 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
     { stepId: "carve", testId: "carve-continue" },
     { stepId: "deadkeys", testId: "deadkeys-continue" },
+    { stepId: "rules", testId: "rules-continue" },
     { stepId: "mechanisms", testId: "mechanisms-continue" },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },

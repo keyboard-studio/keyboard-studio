@@ -92,6 +92,14 @@ export const BG_PAGE = "var(--app-bg)";
 /** Card surface used by mechanism / touch galleries. */
 export const BG_CARD = "var(--app-surface)";
 
+/**
+ * Inset surface — one tonal step from the card surface, for inset regions
+ * like code blocks that sit inside a card. Light: near-white #F8FAFB;
+ * navy: lightened #27365A. Theme-aware, unlike a fixed rgba() overlay
+ * which is nearly invisible on dark grounds.
+ */
+export const BG_INSET = "var(--app-surface-2)";
+
 /** Default border color used by mechanism / touch galleries. */
 export const BORDER = "var(--app-border)";
 
@@ -150,6 +158,14 @@ export const WARNING = "var(--app-warning-text)";
  * a text `color`.
  */
 export const SUCCESS_ACCENT = "var(--app-success-text)";
+
+/**
+ * Reorder rule-kind accent — the "reorder" badge and any reorder-kind
+ * affordance in the spec-082 rules step (kmAssist KmRuleView). The fifth
+ * kind hue after accent blue / warning orange / danger red / success
+ * green; used as a text `color` and badge `border-color`.
+ */
+export const REORDER_TEXT = "var(--app-reorder-text)";
 
 /**
  * Survey chip glyph accent — the confirmed/checked character-glyph color in

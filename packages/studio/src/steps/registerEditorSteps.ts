@@ -39,6 +39,10 @@ import {
 } from "../editors/adapters/flowStepOptions.tsx";
 import { LayoutStep } from "../survey/layout/LayoutStep.tsx";
 import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
+import { rulesStep } from "./rulesStep.ts";
+
+/** Re-exported for the manifest (spec 082 Track A). */
+export { rulesStep };
 
 // ---------------------------------------------------------------------------
 // Helper for common step structure
@@ -313,6 +317,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   projectNameStep,
   carveStep,
   deadkeysStep,
+  rulesStep,
   mechanismsStep,
   touchSeedSourceStep,
   touchStep,

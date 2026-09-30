@@ -72,7 +72,10 @@ export interface MarksComputedAxes {
  * actually justify.
  *
  * A mark class is the unit here: `groupMarkClasses` already clusters by function
- * bucket first, so a class id's bucket prefix IS its family.
+ * bucket first, so a class id's bucket prefix IS its family. Fixed-position
+ * buckets have ids `fixed-<ccc>-<n>`; they all collapse to the single "fixed"
+ * family here, which is the right coarseness — the harakat are one mark system,
+ * and splitting them by glyph position would false-positive "multi-family".
  *
  * KNOWN LIMITATION (inherited from `mark-classes.ts`'s documented v1
  * approximation, and now load-bearing for the first time — before this module the

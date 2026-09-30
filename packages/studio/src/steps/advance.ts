@@ -35,6 +35,7 @@ type ActiveStepId =
   | "characters"
   | "carve"
   | "deadkeys"
+  | "rules"
   | "marks"
   | "punctuation"
   | "invisibles"
@@ -256,7 +257,13 @@ export function advance(
       // working copy immediately — no reducer side effects, no
       // applyStepCompletion. Absent from STEPS_WITH_APPLY_COMPLETION for
       // that reason (same as convenience).
-      return { next: nextSpineStepAfter("deadkeys") }; // mechanisms
+      return { next: nextSpineStepAfter("deadkeys") }; // rules
+
+    case "rules":
+      // The before/after rule demo (spec 082): a read-only view of the
+      // working copy's compiled rules — no reducer side effects, so absent
+      // from STEPS_WITH_APPLY_COMPLETION (same as convenience above).
+      return { next: nextSpineStepAfter("rules") }; // mechanisms
 
     case "mechanisms":
       // Spec 035 R4/R12: route into the off-spine seed-source fork — but only

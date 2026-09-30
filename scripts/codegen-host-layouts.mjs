@@ -117,9 +117,13 @@ export function buildHostLayouts(keyboardsDir) {
   for (const [host, kb] of Object.entries(HOST_KEYBOARDS)) {
     const path = join(keyboardsDir, "release", "basic", kb, "source", `${kb}.kmn`);
     if (!existsSync(path)) throw new Error(`missing source keyboard: ${path}`);
-    const buf = readFileSync(path);
-    files[kb] = createHash("sha256").update(buf).digest("hex");
-    const layers = parseBasicKeyboard(buf.toString("utf8"), kb);
+    // Hash the LF-normalized text, not the raw bytes: the keyboards corpus
+    // carries no .gitattributes, so a core.autocrlf=true Windows checkout has
+    // CRLF working files while CI (Linux) has LF. The blob content is the
+    // provenance being pinned; the checkout's line endings are not.
+    const text = readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+    files[kb] = createHash("sha256").update(text, "utf8").digest("hex");
+    const layers = parseBasicKeyboard(text, kb);
     hosts[host] = {
       keyboard: kb,
       base: sortObject(layers.base),

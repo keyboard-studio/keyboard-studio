@@ -749,11 +749,10 @@ describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
     expect(seed("pf_credits", { copyright_holder: "SIL Global" })).toBeUndefined();
   });
 
-  it("seeds no other Phase F question", () => {
+  it("seeds no free-text Phase F question", () => {
     for (const id of [
       "pf_welcome_paragraph",
       "pf_usage_tip_1",
-      "pf_more_detail_gate",
       "pf_font_guidance",
       "pf_project_url",
     ]) {
@@ -856,5 +855,46 @@ describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spe
     // The runtime override is applied by SurveyRunner (getRequiredOverride),
     // never by mutating the module's own static definition.
     expect(pfWelcomeParagraphMod.definition.required).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.seeds.getSeedValue — choice questions always open selected
+// ---------------------------------------------------------------------------
+
+describe("phaseFOptions.seeds.getSeedValue (choice defaults)", () => {
+  const seedFor = (id: string, surveyContext = {}): string | string[] | undefined =>
+    phaseFOptions.seeds!.getSeedValue(id, buildDeps({ surveyContext }).deps);
+
+  it("defaults the more-detail gate to No", () => {
+    expect(seedFor("pf_more_detail_gate")).toBe("false");
+  });
+
+  it("defaults the help language to English, or bilingual for a non-English keyboard", () => {
+    expect(seedFor("pf_doc_language")).toBe("english");
+    expect(seedFor("pf_doc_language", { bcp47_tag: "en-Latn" })).toBe("english");
+    expect(seedFor("pf_doc_language", { bcp47_tag: "ha-Latn" })).toBe("bilingual");
+  });
+
+  it("preselects adding the drafted HISTORY entry", () => {
+    expect(seedFor("pf_history_entry")).toBe("confirm");
+  });
+
+  it("seeds every bool/radio question in the Phase F question set with a valid option", () => {
+    const modules = import.meta.glob<{ default: { definition: { id: string; type: string; options?: { value: string }[] } } }>(
+      "../../survey/questions/f/*.ts",
+      { eager: true },
+    );
+    const choice = Object.values(modules)
+      .map((m) => m.default?.definition)
+      .filter((d) => d !== undefined && (d.type === "bool" || d.type === "radio"));
+    expect(choice.length).toBeGreaterThanOrEqual(3);
+    for (const d of choice) {
+      const seed = seedFor(d.id);
+      expect(seed, d.id).toBeDefined();
+      if (d.options !== undefined) {
+        expect(d.options.map((o) => o.value), d.id).toContain(seed);
+      }
+    }
   });
 });

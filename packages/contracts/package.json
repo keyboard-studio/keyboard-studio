@@ -26,6 +26,10 @@
     "./dev-log": {
       "types": "./dist/utils/devLog.d.ts",
       "import": "./dist/utils/devLog.js"
+    },
+    "./unicode": {
+      "types": "./dist/unicode/index.d.ts",
+      "import": "./dist/unicode/index.js"
     }
   },
   "files": [
