@@ -1114,3 +1114,55 @@ describe("range re-collapse on emit (spec 042)", () => {
     expect(storeLine(out, "cef")).toContain("..");
   });
 });
+
+describe("emit — system vs processing store conventions", () => {
+  const kmn = (line: string): string => `store(&VERSION) '10.0'
+store(&TARGETS) 'any'
+${line}
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+  const NAME_OLD = "store(&NAME) 'Bɨfɨ' U+0300 'ɨ'";
+  const NAME_NEW = "store(&NAME) 'Bɨfɨ̀ɨ'";
+  const nameChars = (src: string): string => {
+    const items = parse(kmn(src), "n").ir.stores.find((s) => s.name.toUpperCase() === "NAME")?.items ?? [];
+    return items.map((i) => (i.kind === "char" ? i.value : `<${i.kind}>`)).join("");
+  };
+
+  it("system store keeps combining marks inside a single string literal", () => {
+    const { ir } = parse(kmn(NAME_OLD), "sys");
+    expect(storeLine(emit(ir), "&NAME")).toBe(NAME_NEW);
+  });
+
+  it("system store: the new form parses to the same items as the old form", () => {
+    expect(nameChars(NAME_NEW)).toBe(nameChars(NAME_OLD));
+  });
+
+  it("system store keeps format characters inside the string", () => {
+    const { ir } = parse(kmn("store(&COPYRIGHT) 'a‍b'"), "cf");
+    expect(storeLine(emit(ir), "&COPYRIGHT")).toBe("store(&COPYRIGHT) 'a‍b'");
+  });
+
+  it("system store never gets range re-collapse", () => {
+    const { ir } = parse(kmn("store(&MESSAGE) U+0904 .. U+0914"), "rng");
+    expect(storeLine(emit(ir), "&MESSAGE")).not.toContain("..");
+  });
+
+  it("system store keeps SMP characters as tokens, not inside a string", () => {
+    const { ir } = parse(kmn("store(&NAME) U+11680"), "smp");
+    expect(storeLine(emit(ir), "&NAME")).not.toMatch(/'[^']*\u{11680}[^']*'/u);
+  });
+
+  it("&CasedKeys keeps its token form", () => {
+    const { ir } = parse(kmn("store(&CasedKeys) [K_A] .. [K_Z]"), "ck");
+    expect(storeLine(emit(ir), "&CasedKeys")).toContain("[K_A]");
+  });
+
+  it("processing store spells out format characters and unusual spaces", () => {
+    const { ir } = parse(kmn("store(w) 'a' U+200D 'b' U+00A0 'c' U+202F U+00AD 'd e'"), "proc");
+    expect(storeLine(emit(ir), "w")).toBe(
+      "store(w) 'a' U+200D 'b' U+00A0 'c' U+202F U+00AD 'd e'",
+    );
+  });
+});
