@@ -30,7 +30,7 @@
 //     for `srOnly` / `visually-hidden` / `sr-only` before adding this; the
 //     style object below is the standard WCAG clip technique, defined once
 //     here rather than reaching for a shared class that doesn't exist yet.)
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { resolveMessage } from "../lib/i18nResolve.ts";
@@ -310,6 +310,9 @@ export function PhaseStepper({ activeStepId, inline = false }: PhaseStepperProps
   const { i18n, t } = useLingui();
   const isNarrow = useIsNarrow();
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Anchor for the dialog's enter/exit scale: the summary button that opens
+  // it, so the dialog grows out of its trigger.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const ariaLabel = t({
     id: "phaseStepper.ariaLabel",
@@ -344,6 +347,7 @@ export function PhaseStepper({ activeStepId, inline = false }: PhaseStepperProps
       >
         <button
           type="button"
+          ref={triggerRef}
           style={inline ? INLINE_BUTTON_STYLE : COMPACT_BUTTON_STYLE}
           className="ks-focus-ring"
           aria-expanded={dialogOpen}
@@ -369,6 +373,7 @@ export function PhaseStepper({ activeStepId, inline = false }: PhaseStepperProps
         onCancel={() => setDialogOpen(false)}
         label={ariaLabel}
         testId="phase-stepper-dialog"
+        anchor={triggerRef}
         showCloseButton
         closeLabel={t({
           id: "phaseStepper.compact.close",
