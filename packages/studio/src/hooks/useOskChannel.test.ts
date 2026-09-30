@@ -115,6 +115,106 @@ describe("useOskChannel — KEYBOARD_ACTIVE", () => {
   });
 });
 
+describe("useOskChannel — engineError lifecycle (#1905)", () => {
+  it("sets engineError on ENGINE_ERROR", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, {
+        type: "ENGINE_ERROR",
+        message: "keyboard load failed for 'Keyboard_x'",
+      });
+    });
+
+    expect(result.current.engineError).toBe("keyboard load failed for 'Keyboard_x'");
+  });
+
+  it("clears a stale engineError when the final keyboard activates", async () => {
+    // The reported bug: a superseded load's failure (e.g. a recompile whose
+    // blob was revoked before KMW's script tag fetched it) left the red
+    // banner up forever, even though the final keyboard activated fine.
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, {
+        type: "ENGINE_ERROR",
+        message: "keyboard load failed for 'Keyboard_sil_cameroon_qwerty'",
+      });
+    });
+    expect(result.current.engineError).not.toBeNull();
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+    });
+
+    expect(result.current.engineError).toBeNull();
+    expect(result.current.keyboardActivations).toBe(1);
+  });
+
+  it("keeps the error when the latest keyboard genuinely fails to load", async () => {
+    // A genuine failure posts ENGINE_ERROR with no following KEYBOARD_ACTIVE —
+    // the banner must stay up.
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, {
+        type: "ENGINE_ERROR",
+        message: "keyboard load failed for 'Keyboard_broken'",
+      });
+    });
+
+    expect(result.current.engineError).toBe("keyboard load failed for 'Keyboard_broken'");
+    expect(result.current.keyboardActivations).toBe(0);
+  });
+
+  it("a later genuine failure re-surfaces the error after an activation cleared it", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "stale" });
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+    });
+    expect(result.current.engineError).toBeNull();
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "genuine" });
+    });
+    expect(result.current.engineError).toBe("genuine");
+  });
+
+  it("ENGINE_READY still clears a previous engineError", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "boom" });
+      dispatchFromSource(frameWindow, { type: "ENGINE_READY" });
+    });
+
+    expect(result.current.engineError).toBeNull();
+    expect(result.current.engineReady).toBe(true);
+  });
+});
+
 describe("useOskChannel — TEXT_UPDATED", () => {
   it("updates textValue", async () => {
     const { ref, frame } = makeIframeRef();

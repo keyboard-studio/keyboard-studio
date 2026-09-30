@@ -271,6 +271,20 @@ function withOneTrailingNewline(s: string): string {
   return `${s.replace(/\s+$/, "")}\n`;
 }
 
+/**
+ * The "## Supported Platforms" block rendered from the projected `&TARGETS`
+ * tokens — shared by the description path and the no-description fallback
+ * (#1906: the generator satisfies its own 5.7 readme-targets check even
+ * before the author has written a description). The raw token spellings are
+ * kept (`- any`, `- windows`); `expandPlatforms` resolves them the same way
+ * it resolves the `.kmn` side, so both sides compare equal. Empty when no
+ * platforms are known.
+ */
+function supportedPlatformsLines(platforms: readonly string[]): string[] {
+  if (platforms.length === 0) return [];
+  return ["", "## Supported Platforms", ...platforms.map((p) => `- ${p}`)];
+}
+
 /** The description/Links/Supported-Platforms body `renderReadmeMd` shares between the fresh-title path and the FR-006 base-inheritance path, WITHOUT the `# title` heading. */
 function buildReadmeBody(input: HelpDocsRenderInput, description: string): string {
   const { answers, platforms } = input;
@@ -285,8 +299,7 @@ function buildReadmeBody(input: HelpDocsRenderInput, description: string): strin
   }
 
   if (platforms.length > 0) {
-    lines.push("", "## Supported Platforms");
-    for (const p of platforms) lines.push(`- ${p}`);
+    lines.push(...supportedPlatformsLines(platforms));
   }
 
   return lines.join("\n");
@@ -298,8 +311,8 @@ function buildReadmeBody(input: HelpDocsRenderInput, description: string): strin
  *
  * @param baseReadmeMdText spec 080 FR-006: a fetched base's own `README.md`,
  *   inherited even before the author has answered anything. `null` keeps
- *   today's byte-identical behaviour (the bare `# title` stub, or the
- *   title + description/links/platforms once answered). Non-null: no
+ *   the FR-002 fallback shape (the bare `# title` stub, plus the Supported
+ *   Platforms section whenever projected `&TARGETS` are known). Non-null: no
  *   description yet -> the base text verbatim (one trailing newline); a
  *   description answered -> the base text, one blank line, then the tool's
  *   own sections WITHOUT a second `# title` heading (the base already has one).
@@ -317,8 +330,12 @@ export function renderReadmeMd(
   }
 
   if (description === undefined) {
-    // FR-002 fallback — byte-identical to today's bare scaffolder stub.
-    return `# ${displayName}\n`;
+    // FR-002 fallback — byte-identical to the bare scaffolder stub when no
+    // platforms are known; with projected &TARGETS the Supported Platforms
+    // section is appended so the generated README passes the tool's own 5.7
+    // readme-targets check (#1906).
+    const lines = [`# ${displayName}`, ...supportedPlatformsLines(input.platforms)];
+    return `${lines.join("\n")}\n`;
   }
 
   return `# ${displayName}\n\n${buildReadmeBody(input, description)}\n`;

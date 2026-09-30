@@ -47,4 +47,17 @@ describe("checkReadmeTargets (5.7 KM_LINT_README_TARGETS_MISMATCH)", () => {
   it("returns [] when readme-md is absent", () => {
     expect(checkReadmeTargets(makeInput(undefined, ["windows"]))).toEqual([]);
   });
+
+  it("passes the no-description fallback stub against TARGETS 'any' (#1906)", () => {
+    // This is the exact shape `renderReadmeMd` now emits for a fresh Track 1
+    // copy before the author has written a description: the generator must
+    // satisfy its own check.
+    const stub = "# Test\n\n## Supported Platforms\n- any\n";
+    expect(checkReadmeTargets(makeInput(stub, ["any"]))).toEqual([]);
+  });
+
+  it("passes the no-description fallback stub against explicit TARGETS (#1906)", () => {
+    const stub = "# Test\n\n## Supported Platforms\n- windows\n- web\n";
+    expect(checkReadmeTargets(makeInput(stub, ["windows", "web"]))).toEqual([]);
+  });
 });
