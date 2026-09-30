@@ -28,7 +28,7 @@ import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { PreviewSheet } from "../../components/PreviewSheet.tsx";
 import {
   PreviewButton,
-  PREVIEW_BUTTON_CLEARANCE_PX,
+  PREVIEW_BUTTON_CLEARANCE,
 } from "../../components/PreviewButton.tsx";
 
 /**
@@ -197,7 +197,7 @@ export function AssignLoopShell({
               height: "100%",
               overflowY: "auto",
               boxSizing: "border-box",
-              paddingBottom: PREVIEW_BUTTON_CLEARANCE_PX,
+              paddingBottom: PREVIEW_BUTTON_CLEARANCE,
             }}
           >
             {leftContent}

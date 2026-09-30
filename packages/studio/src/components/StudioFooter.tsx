@@ -350,7 +350,9 @@ export function StudioFooter() {
             type="button"
             // Press feedback via the shared .ks-press utility (index.css): the
             // inline styles pin no transform, so the class stays additive.
-            className="ks-focus-ring ks-press"
+            // `.ks-hit-target`: 44 px under a coarse pointer only. A fixed
+            // 44 px min-height would overflow the 40 px fine-pointer bar.
+            className="ks-focus-ring ks-hit-target ks-press"
             aria-haspopup="dialog"
             // Hand the sheet the trigger point so its enter/exit animation
             // anchors at the button that opened it (see JourneyContents).
@@ -367,8 +369,7 @@ export function StudioFooter() {
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              minHeight: "var(--app-touch-target)",
-              padding: "0 12px",
+              padding: "3px 12px",
               flexShrink: 0,
               border: `1px solid ${CSS_BORDER}`,
               borderRadius: 8,

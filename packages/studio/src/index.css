@@ -121,8 +121,17 @@ body {
  * The bar overlaps the content above it by exactly its own height: it stays
  * in normal flow (the shell's column math is untouched) while pane content
  * scrolls beneath the frosted layer. */
-.ks-studio-footer {
+/* The footer's height, published on :root so content that must clear the
+ * overlapping bar (the narrow floating preview button) can read it. 0 while
+ * no footer is mounted (before the journey starts). */
+:root {
+  --studio-footer-h: 0px;
+}
+:root:has(.ks-studio-footer) {
   --studio-footer-h: 40px;
+}
+
+.ks-studio-footer {
   height: var(--studio-footer-h);
   margin-top: calc(-1 * var(--studio-footer-h));
   position: relative;
@@ -148,7 +157,9 @@ body {
 }
 
 /* Scroll-edge fade: the 24 px band above the footer where content softens
- * into the bar. Taps fall through to the content beneath. */
+ * into the bar. Taps fall through to the content beneath. The blur ramps in
+ * with the tint (mask): a full-strength blur ends in a hard edge 24 px above
+ * the bar, which reads as the bar itself being 24 px taller. */
 .ks-studio-footer::before {
   content: "";
   position: absolute;
@@ -163,11 +174,13 @@ body {
   );
   -webkit-backdrop-filter: blur(var(--app-chrome-blur));
   backdrop-filter: blur(var(--app-chrome-blur));
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black);
+  mask-image: linear-gradient(to bottom, transparent, black);
   pointer-events: none;
 }
 
 @media (pointer: coarse) {
-  .ks-studio-footer {
+  :root:has(.ks-studio-footer) {
     --studio-footer-h: 52px;
   }
 }
