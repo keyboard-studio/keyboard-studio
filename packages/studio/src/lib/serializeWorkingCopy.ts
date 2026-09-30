@@ -531,7 +531,7 @@ export async function projectWorkingCopyForOutput(
   for (const chart of charts) {
     clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
   }
-  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText), false);
+  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText, baseWelcomeHtmText), false);
 
   // spec 079 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
   // production from the author's proposal decision — a confirmed or edited

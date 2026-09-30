@@ -385,6 +385,29 @@ export function renderWelcomeHtm(
 }
 
 /**
+ * The help-page body fragment for a welcome page: its `<style>` blocks (so
+ * inline-CSS parity, criterion 11.10, holds) followed by the content of its
+ * `<body>`, with no document chrome (criterion 11.4 — the help site's
+ * `header.php` owns it). Relative links to sibling `.htm` pages point at their
+ * `.php` twins, the help site's form of the same page.
+ */
+function helpFragmentFromWelcome(welcomeHtml: string): string {
+  const head = /<head\b[^>]*>([\s\S]*?)<\/head>/i.exec(welcomeHtml)?.[1] ?? "";
+  const styles = head.match(/<style\b[^>]*>[\s\S]*?<\/style>/gi) ?? [];
+  const bodyMatch = /<body\b[^>]*>([\s\S]*)<\/body>/i.exec(welcomeHtml);
+  const body = (
+    bodyMatch?.[1] ??
+    welcomeHtml
+      .replace(/<!DOCTYPE[^>]*>/gi, "")
+      .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
+      .replace(/<\/?(?:html|body)\b[^>]*>/gi, "")
+  )
+    .replace(/(\bhref\s*=\s*["'])(?![a-z][a-z0-9+.-]*:|\/\/)([^"'#]*?)\.htm(?=["'#])/gi, "$1$2.php")
+    .trim();
+  return `${[...styles, body].join("\n")}\n`;
+}
+
+/**
  * `source/help/<id>.php` — the online help page. Merges with the base's own help
  * page when one was fetched (FR-013); a base page keeps its own header and is
  * never given a second one. Inherits the base page verbatim even before
@@ -396,12 +419,24 @@ export function renderWelcomeHtm(
  * FR-006) therefore applies to welcome.htm and to inherited help pages that
  * already carry an `<html>` element; a fresh help page has no `<html>` to
  * annotate.
+ *
+ * @param baseWelcomeHtmText the base's own welcome page, for a base that ships
+ *   one but no help page of its own. The help page is then derived from the
+ *   welcome page {@link renderWelcomeHtm} renders from it, so the two carry the
+ *   same body (criterion 11.9) instead of an inherited welcome page beside the
+ *   bare placeholder stub.
  */
 export function renderHelpPhp(
   input: HelpDocsRenderInput,
   baseHelpPhpText: string | null,
+  baseWelcomeHtmText: string | null = null,
 ): string {
   const { answers, displayName, primaryBcp47 } = input;
+  if (baseHelpPhpText === null && baseWelcomeHtmText !== null) {
+    return `${helpSiteHeader(displayName)}${helpFragmentFromWelcome(
+      renderWelcomeHtm(input, baseWelcomeHtmText),
+    )}`;
+  }
   const description = answers !== null ? nonBlank(answers.description) : undefined;
   if (description === undefined) {
     // FR-006: inherit the base help page even before anything is authored.

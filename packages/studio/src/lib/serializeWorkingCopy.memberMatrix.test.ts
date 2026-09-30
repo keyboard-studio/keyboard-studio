@@ -131,8 +131,10 @@ describe.each(INSTANTIATIONS)("SC-001 member matrix — %s", (instantiation) => 
 
       const expectProse = instantiation === "track2-adapt" && baseDocs !== "none";
       expect(welcome.includes(BASE_PROSE), `${instantiation} × ${baseDocs}: base prose inherited?`).toBe(expectProse);
+      // The fixture base ships no help page, so the help page is derived from
+      // the welcome page and carries the same body (criterion 11.9).
       const help = vfs.get(`source/help/${projected!.keyboardId}.php`)!.content as string;
-      expect(help.includes(BASE_PROSE)).toBe(false);
+      expect(help.includes(BASE_PROSE)).toBe(expectProse);
     });
   });
 });
