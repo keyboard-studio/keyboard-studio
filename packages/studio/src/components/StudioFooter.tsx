@@ -66,7 +66,7 @@ import { JourneyContents } from "./JourneyContents.tsx";
 import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
 import { useIsNarrow } from "../hooks/useViewport.ts";
 import { StepNavCluster } from "./StepNavCluster.tsx";
-import { CSS_BORDER, CSS_SURFACE, CSS_TEXT, CSS_TEXT_MUTED } from "../ui/theme.ts";
+import { CSS_BORDER, CSS_TEXT, CSS_TEXT_MUTED } from "../ui/theme.ts";
 
 export function StudioFooter() {
   const { t, i18n } = useLingui();
@@ -297,14 +297,18 @@ export function StudioFooter() {
         // coarse pointer (spec 081 FR-020a), which an inline style cannot say.
         flexShrink: 0,
         padding: "0 12px",
-        background: CSS_SURFACE,
-        borderTop: `1px solid ${CSS_BORDER}`,
+        // Translucent chrome: the frosted surface, blur, scroll-edge fade and
+        // the fixed-height logic all live on `.ks-studio-footer` (index.css)
+        // — the blur and the fade need pointer/media queries no inline style
+        // can express, and the bar overlaps the content above it so the page
+        // scrolls underneath the frosted layer.
         color: CSS_TEXT,
         fontSize: 13,
         // FR-047: no horizontal overflow of the page body — the footer's own
         // box never exceeds its flex parent's width; the SCROLLING happens
-        // inside the dot row below.
-        overflow: "hidden",
+        // inside the dot row below. (The class keeps overflow-y visible so the
+        // scroll-edge fade above the bar can render.)
+        overflowX: "clip",
         width: "100%",
         boxSizing: "border-box",
       }}
@@ -348,7 +352,15 @@ export function StudioFooter() {
             // inline styles pin no transform, so the class stays additive.
             className="ks-focus-ring ks-press"
             aria-haspopup="dialog"
-            onClick={() => setContentsOpen(true)}
+            // Hand the sheet the trigger point so its enter/exit animation
+            // anchors at the button that opened it (see JourneyContents).
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setContentsOpen(true, {
+                x: rect.left + rect.width / 2,
+                y: rect.top,
+              });
+            }}
             data-testid="journey-contents-open"
             style={{
               marginLeft: "auto",
