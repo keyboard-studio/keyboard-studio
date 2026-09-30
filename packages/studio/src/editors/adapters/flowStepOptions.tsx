@@ -13,7 +13,7 @@
 // EditorStepProps-compatible components that register in registerEditorSteps.ts.
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
-import type { SurveyPhaseResult, HelpDocsAnswers } from "@keyboard-studio/contracts";
+import type { DecisionProposalSource, SurveyPhaseResult, HelpDocsAnswers } from "@keyboard-studio/contracts";
 import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
@@ -28,6 +28,7 @@ import {
 } from "../../lib/adaptiveDescription.ts";
 import { deriveHistoryEntryState, applyHistoryEntryAction } from "../../lib/historyEntryState.ts";
 import { identityLanguagePatch } from "../../lib/identityLanguagePatch.ts";
+import { proposeProjectUrl, proposeProvenanceBasis, type PhaseFSeedContext } from "../../lib/phaseFSeeds.ts";
 import { isHistoryEntryAction } from "../../survey/questions/f/pf_history_entry.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 
@@ -299,6 +300,30 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
   };
 }
 
+/** The working-copy slices the Phase F text proposals read (lib/phaseFSeeds.ts). */
+function readPhaseFSeedContext(): PhaseFSeedContext {
+  const state = useWorkingCopyStore.getState();
+  return {
+    instantiationMode: state.instantiationMode,
+    baseKeyboard: state.baseKeyboard,
+    baseVfs: state.baseVfs,
+  };
+}
+
+/**
+ * Where each seeded Phase F question's proposal comes from, for the decision
+ * trail. `pf_more_detail_gate` is absent on purpose: its "No" is a plain
+ * default, not something any data suggested.
+ */
+const PHASE_F_SEED_SOURCES: Readonly<Record<string, DecisionProposalSource>> = {
+  pf_welcome_paragraph: "base",
+  pf_contact_info: "identity",
+  pf_doc_language: "identity",
+  pf_history_entry: "analysis",
+  pf_project_url: "base",
+  pf_provenance_basis: "base",
+};
+
 /**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
  * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`bumpKeyboardVersion`
@@ -469,12 +494,24 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
         return "confirm";
       }
 
+      // Text proposals derived from the starting point (lib/phaseFSeeds.ts).
+      if (questionId === "pf_project_url") {
+        return proposeProjectUrl(readPhaseFSeedContext());
+      }
+      if (questionId === "pf_provenance_basis") {
+        return proposeProvenanceBasis(readPhaseFSeedContext());
+      }
+
       // pf_credits is deliberately NOT seeded from the copyright holder. Thanking
       // and owning are different things: shipped credits sections routinely
       // acknowledge advisors and contributors who hold no copyright. Pre-filling
       // the holder here would produce exactly the duplicated boilerplate the
       // question exists to collect something better than.
       return undefined;
+    },
+
+    getSeedSource(questionId: string): DecisionProposalSource | undefined {
+      return PHASE_F_SEED_SOURCES[questionId];
     },
 
     // spec 079 FR-009: waives pf_welcome_paragraph's static `required: true`

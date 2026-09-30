@@ -273,3 +273,65 @@ describe("SurveyRunner — restore-then-mount (spec 079 US4)", () => {
     expect(useSurveyAnswerStore.getState().steps["identity"]?.answers["q1"]?.value).toBe("alpha");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 4. A pre-filled answer is saved as the studio's proposal until the author
+//    changes it, and keeps that reading across a remount.
+// ---------------------------------------------------------------------------
+
+describe("SurveyRunner — seeded answers save as proposals", () => {
+  beforeEach(() => {
+    useSurveyAnswerStore.getState().reset();
+  });
+
+  function renderSeeded(): void {
+    render(
+      <SurveyRunner
+        flow={FLOW}
+        onComplete={vi.fn()}
+        getSeedValue={(id) => (id === "q2" ? "suggested" : undefined)}
+        getSeedSource={(id) => (id === "q2" ? "identity" : undefined)}
+      />,
+      { withStepNav: true },
+    );
+  }
+
+  const saved = (id: string) => useSurveyAnswerStore.getState().steps["identity"]?.answers[id];
+
+  it("a kept seed is saved as proposed, with the proposal and its source", () => {
+    renderSeeded();
+    type("alpha");
+    next();
+
+    expect(field().value).toBe("suggested");
+    expect(saved("q2")?.origin).toBe("proposed");
+    expect(saved("q2")?.proposal).toEqual({ value: "suggested", source: "identity" });
+    // Never pre-filled: the author's own answer outright.
+    expect(saved("q1")?.origin).toBe("confirmed");
+    expect(saved("q1")?.proposal).toBeUndefined();
+  });
+
+  it("an edited seed is saved as overturned, keeping what was proposed", () => {
+    renderSeeded();
+    type("alpha");
+    next();
+    type("mine");
+
+    expect(saved("q2")?.origin).toBe("overturned");
+    expect(saved("q2")?.proposal).toEqual({ value: "suggested", source: "identity" });
+  });
+
+  it("the proposal survives a remount, so a later edit still reads as overturned", () => {
+    renderSeeded();
+    type("alpha");
+    next();
+
+    cleanup();
+    renderSeeded();
+
+    expect(field().value).toBe("suggested");
+    expect(saved("q2")?.origin).toBe("proposed");
+    type("mine");
+    expect(saved("q2")?.origin).toBe("overturned");
+  });
+});

@@ -27,6 +27,7 @@
 import { create } from "zustand";
 import type { StepWalkMap, StepWalkPositions } from "../lib/stepWalk.ts";
 import { useSurveyAnswerStore } from "./surveyAnswerStore.ts";
+import type { SeedProposal } from "../survey/types.ts";
 
 // ---------------------------------------------------------------------------
 // Equality guard
@@ -126,4 +127,21 @@ export function peekAnswerDraft(stepId: string): AnswerDraft | undefined {
     if (typeof a.value === "string" || Array.isArray(a.value)) out[id] = a.value;
   }
   return Object.keys(out).length === 0 ? undefined : out;
+}
+
+/**
+ * The proposals `stepId`'s saved answers were pre-filled with, as question id ->
+ * proposal, without subscribing. SurveyRunner's initializer reattaches them to a
+ * resumed walk so a kept default still saves as a proposal after a remount.
+ */
+export function peekAnswerProposals(stepId: string): Readonly<Record<string, SeedProposal>> {
+  const answers = useSurveyAnswerStore.getState().steps[stepId]?.answers;
+  const out: Record<string, SeedProposal> = {};
+  if (answers === undefined) return out;
+  for (const [id, a] of Object.entries(answers)) {
+    const p = a.proposal;
+    if (p === undefined || typeof p.value === "boolean") continue;
+    out[id] = p.source !== undefined ? { value: p.value, source: p.source } : { value: p.value };
+  }
+  return out;
 }

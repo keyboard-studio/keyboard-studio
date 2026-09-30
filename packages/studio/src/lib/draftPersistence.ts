@@ -17,7 +17,11 @@
 // never the 300ms validator/WASM-oracle debounce cycle and never a second
 // validation path — see the comment on installDraftAutosave below.
 
-import { AnswerTypeSchema, type DeclaredRole } from "@keyboard-studio/contracts";
+import {
+  AnswerTypeSchema,
+  DecisionProposalSourceSchema,
+  type DeclaredRole,
+} from "@keyboard-studio/contracts";
 import {
   prepareWorkingCopySnapshot,
   snapshotWorkingCopyData,
@@ -939,25 +943,44 @@ function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
   };
 }
 
+function isSavedValue(value: unknown): value is SavedAnswer["value"] {
+  return (
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (Array.isArray(value) && value.every((v) => typeof v === "string"))
+  );
+}
+
+/**
+ * A stored answer's pre-filled proposal, or `undefined` when it is absent or
+ * malformed. Dropping a bad proposal keeps the answer itself: the value is what
+ * the author has, and losing the proposal only loses the "kept the default"
+ * reading of it.
+ */
+function restoreAnswerProposal(raw: unknown): SavedAnswer["proposal"] {
+  if (!isPlainRecord(raw) || !isSavedValue(raw.value)) return undefined;
+  if (raw.source === undefined) return { value: raw.value };
+  const source = DecisionProposalSourceSchema.safeParse(raw.source);
+  return source.success ? { value: raw.value, source: source.data } : undefined;
+}
+
 /** One stored answer, or `null` when any field is malformed — never a guess. */
 function restoreSavedAnswer(raw: unknown): SavedAnswer | null {
   if (!isPlainRecord(raw)) return null;
   const { value, answerType, origin, stage, evidenceKey, screenId, savedAt } = raw;
-  const valueOk =
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (Array.isArray(value) && value.every((v) => typeof v === "string"));
-  if (!valueOk) return null;
+  if (!isSavedValue(value)) return null;
   // Bound to AnswerTypeSchema so a new AnswerType can't silently desync here.
   if (!AnswerTypeSchema.safeParse(answerType).success) return null;
   if (origin !== "proposed" && origin !== "confirmed" && origin !== "overturned") return null;
   if (stage !== "draft" && stage !== "confirmed") return null;
   if (evidenceKey !== null && typeof evidenceKey !== "string") return null;
   if (typeof screenId !== "string") return null;
+  const proposal = restoreAnswerProposal(raw.proposal);
   return {
-    value: value as SavedAnswer["value"],
+    value,
     answerType: answerType as SavedAnswer["answerType"],
     origin,
+    ...(proposal !== undefined ? { proposal } : {}),
     stage,
     evidenceKey,
     screenId,
