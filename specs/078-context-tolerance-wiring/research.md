@@ -1,7 +1,7 @@
 # Research: what spec 062 shipped, and why no author can reach it
 
 Companion to [spec.md](spec.md). This document is the audit that motivated the
-feature: what [062-canonical-context-tolerance](../062-canonical-context-tolerance/spec.md)
+feature: what [062-canonical-context-tolerance](../062-canonical-context-tolerance/AS-BUILT.md)
 specified, what its implementation PR delivered, where the delivered code
 stops short of the running studio, and the defects found afterwards. Everything
 below was verified against `main` on 2026-09-23 unless stated otherwise; file
@@ -32,7 +32,7 @@ automates that advice.
 
 PR #1650, "feat(engine): canonical-equivalence context tolerance (spec 062)",
 merged 2026-08-27, authored by KevinPNG. All 25 tasks in
-[062 tasks.md](../062-canonical-context-tolerance/tasks.md) are checked. The
+[062 tasks.md](../_archive/062-canonical-context-tolerance/tasks.md) are checked. The
 implementation is at the engine, contracts, and lint layers:
 
 - **Simulator seeding.** `simulate()` gained an optional third parameter
@@ -155,7 +155,7 @@ Two candidate homes were considered:
 - **A finding-driven action** ("Fix this" on the diagnostic). Simplest to reach,
   but it is a user-facing survey surface outside the step manifest, which
   Constitution Article IX forbids: every step declares typed inputs and writes.
-- **A step in the mark question series** ([071-marks-question-series](../071-marks-question-series/spec.md)).
+- **A step in the mark question series** ([071-marks-question-series](../071-marks-question-series/AS-BUILT.md)).
   Context tolerance is the mark model's fifth consumer
   ([mark-composition-model.md](../../docs/design-notes/mark-composition-model.md));
   the NFC posture question already asks the author about output form in the

@@ -8,7 +8,7 @@
 > ## Relationship to spec 022 (supersede / absorb)
 >
 > This spec **supersedes and absorbs the demotion mechanics of
-> [spec 022](../022-qu-library-demote/spec.md)** by re-expressing the demoted Phase A as a
+> [spec 022](../022-qu-library-demote/AS-BUILT.md)** by re-expressing the demoted Phase A as a
 > **rendered proposed-flow** rather than leaving it as a flat reserve list. Spec 022's
 > demotion is **already merged to `main`** (commit `ab9505f`, PR #928) and spec 024
 > (PR #965) already carries `phase_a_identity` in `steps/flowSources.ts` with

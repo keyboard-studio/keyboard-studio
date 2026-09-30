@@ -115,7 +115,7 @@ is to include both normal Unicode normalisation forms (NFC and NFD) in the
 context of rules. Make sure that your output always targets a single
 normalisation form."* Sentence one is tolerance; sentence two is uniformity.
 
-Specified in [specs/062-canonical-context-tolerance/](../../specs/062-canonical-context-tolerance/spec.md);
+Specified in [specs/062-canonical-context-tolerance/](../../specs/062-canonical-context-tolerance/AS-BUILT.md);
 the engine-side alternative and the decision on whether to pursue it are in
 [keyman-normalization-campaign.md](keyman-normalization-campaign.md).
 
@@ -263,7 +263,7 @@ select / radio / bool / multi_select / notice.
   additions (cedilla-on-c) is a pre-confirmed summary row, not a question.
   Case pairs derived here (retires `pb_capitals_marks` as a question).
 - **S2 `marks_treatment`** — the heart. *(Superseded the original
-  `marks_mental_model` design in [specs/052-marks-treatment-question](../../specs/052-marks-treatment-question/spec.md);
+  `marks_mental_model` design in [specs/052-marks-treatment-question](../../specs/052-marks-treatment-question/AS-BUILT.md);
   the S3 station below is folded into it.)* **Three independently-settable
   parts, not one mutually-exclusive answer:**
   1. **treatment**, one radio group per proposed class, overridable per mark —

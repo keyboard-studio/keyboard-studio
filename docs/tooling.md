@@ -316,7 +316,7 @@ Live and passing:
 - [tab-roundtrip.spec.ts](../packages/studio/e2e/tab-roundtrip.spec.ts) and
   [compare-isolation.spec.ts](../packages/studio/e2e/compare-isolation.spec.ts) — spec 057's two
   gating specs, written and recorded RED against the pre-fix tree before the fix landed
-  ([evidence](../specs/057-bulletproof-navigation/evidence/gating-red.md))
+  ([evidence](../specs/_archive/057-bulletproof-navigation/evidence/gating-red.md))
 - [decision-deeplink.spec.ts](../packages/studio/e2e/decision-deeplink.spec.ts) and
   [footer-progress.spec.ts](../packages/studio/e2e/footer-progress.spec.ts)
 - [convenience-loanwords.spec.ts](../packages/studio/e2e/convenience-loanwords.spec.ts) — Bafut

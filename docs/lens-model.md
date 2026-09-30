@@ -47,7 +47,7 @@ of them are, literally, axis values: **added-char-count = A1**, **diacritic-mech
 = A4**, **spare-key-budget = A7** (classified in
 [content/keyboard-facets](../content/keyboard-facets) +
 [utilities/facet-index](../utilities/facet-index), see
-[specs/043-base-selection-facets](../specs/043-base-selection-facets/spec.md)).
+[specs/043-base-selection-facets](../specs/043-base-selection-facets/AS-BUILT.md)).
 **Session/input facets** (author, community, environment, orthography, lineage,
 destination, source) describe the *situation* the new keyboard must serve.
 `feedsSessionFacets` is the one-way bridge that pre-seeds session-facet defaults
@@ -207,7 +207,7 @@ takes `DiscoveryAxisVector` and `StrategyId` from `@keyboard-studio/contracts`
 rather than restating them — so the axis→tree path is already referenced, not copied.
 
 **Resolved (2026-08-19) by
-[specs/045-lens-vocabulary-source-of-truth](../specs/045-lens-vocabulary-source-of-truth/spec.md).**
+[specs/045-lens-vocabulary-source-of-truth](../specs/045-lens-vocabulary-source-of-truth/AS-BUILT.md).**
 The narrower hazard was the straggler consumers that declared the same value sets
 *independently* of those contracts types instead of deriving from them:
 

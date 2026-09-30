@@ -7,13 +7,13 @@ with.
 keyboard breaks when the host application normalizes the buffer differently from
 the keyboard's output form. We can fix the keyboards *we* produce at source level
 — that work is specified in
-[specs/062-canonical-context-tolerance/](../../specs/062-canonical-context-tolerance/spec.md).
+[specs/062-canonical-context-tolerance/](../../specs/062-canonical-context-tolerance/AS-BUILT.md).
 The remaining question is whether to spend political capital pushing Keyman to
 fix it centrally, which would fix every keyboard, including the thousands that
 will never pass through this studio.
 
 The technical evidence is in
-[specs/062-canonical-context-tolerance/research.md](../../specs/062-canonical-context-tolerance/research.md).
+[specs/062-canonical-context-tolerance/research.md](../../specs/_archive/062-canonical-context-tolerance/research.md).
 This document is the argument built on it.
 
 ---
@@ -251,7 +251,7 @@ almost all the value.
 | The keyboard named in the upstream report | [`../keyboards/release/g/galaxie_greek_mnemonic`](../keyboard-index.md) |
 
 Verification caveat carried from
-[research.md](../../specs/062-canonical-context-tolerance/research.md): the TR35
+[research.md](../../specs/_archive/062-canonical-context-tolerance/research.md): the TR35
 wording was gathered through a summarizing fetch and corroborated against the
 vendored CLDR 46 schema, but the section number was never pinned. **Re-read TR35
 §keyboards first-hand before quoting it in any public comment.**

@@ -32,6 +32,6 @@
 ## Notes
 
 - Both markers were resolved on 2026-09-25 with their proposed defaults (see spec Clarifications). FR-031: no skip link or shortcut, file a follow-up. FR-042: the hint stays in the body only, revisited after the manual walk.
-- The Problem statement audit findings (A-1 to A-6) and the Appendix A step inventory cite source files and line numbers as evidence, following the house style of [057](../../057-bulletproof-navigation/spec.md) and [079](../../079-survey-answer-persistence/spec.md). The requirements, entities and success criteria stay implementation-free. The issue's proposed store and hook are recorded only under "Implementation notes (non-normative)".
+- The Problem statement audit findings (A-1 to A-6) and the Appendix A step inventory cite source files and line numbers as evidence, following the house style of [057](../../057-bulletproof-navigation/AS-BUILT.md) and [079](../../079-survey-answer-persistence/spec.md). The requirements, entities and success criteria stay implementation-free. The issue's proposed store and hook are recorded only under "Implementation notes (non-normative)".
 - Test handles (`data-testid`) and message ids appear in the FRs because preserving them is an explicit acceptance criterion of #1778 and a spec 046 rule. They are contract surfaces, not implementation choices.
 - One deliberate amendment is recorded: the 079 journey-strip contract §6 height may grow to 52 px under a coarse pointer (FR-020a). 057 FR-040 is not amended.

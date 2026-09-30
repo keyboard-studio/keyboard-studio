@@ -1,6 +1,6 @@
 # Contract: the shared case-pair proposal (studio UI)
 
-**Feature**: [../spec.md](../spec.md) · **Data model**: [../data-model.md](../data-model.md)
+**Feature**: [../spec.md](../../_archive/074-uppercase-counterpart-suggestion/spec.md) · **Data model**: [../data-model.md](../data-model.md)
 
 This is the interface the four placement mechanisms share so FR-011 ("the interaction reads
 identically regardless of mechanism") holds structurally rather than by convention. Consumers are
@@ -91,9 +91,9 @@ input side and output side both case-shifted through `caseCounterpart`:
   `partitionSequenceAssignment`, with `secondLetter` unchanged, `firstLetterOut` = uppercased content,
   `collapsedChar` = `counterpart`. The existing `(firstLetterOut, secondLetter)` dedup applies — an
   already-recorded parallel combo is a no-op, not a duplicate ref.
-- The trigger / indicator is **never** case-shifted (see [../research.md](../research.md) R3).
+- The trigger / indicator is **never** case-shifted (see [../research.md](../../_archive/074-uppercase-counterpart-suggestion/research.md) R3).
 - No proposal when the input side is not a single cased character with a non-null counterpart
-  ([../research.md](../research.md) R4).
+  ([../research.md](../../_archive/074-uppercase-counterpart-suggestion/research.md) R4).
 
 ### Touch (FR-005)
 
@@ -128,7 +128,7 @@ lowercase case-pair's RAlt layer rather than an unrelated combo (see the comment
 
 `onDismiss` records nothing and clears. The proposal is not re-raised for that placement; a subsequent
 *new* apply for the same character is a new placement and may raise a new proposal
-([../research.md](../research.md) R9).
+([../research.md](../../_archive/074-uppercase-counterpart-suggestion/research.md) R9).
 
 ## Test surface
 

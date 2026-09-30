@@ -8,7 +8,7 @@
 
 **Input**: User description: "Scan the chosen base keyboard for the decisions it has already made — axes and facets — use them as defaults, and let the survey confirm, strengthen, lessen, or overturn them with knowledgeable consent. Coupled decisions form bundles (AZERTY → QWERTY). Every finding and resolution is logged in the decision record and shown in the decision trail."
 
-**Governing context**: [spec.md](../../spec.md) §3c (defaults are the product: propose-then-confirm, "no default is a defect") and §5 "Base-derived pre-fill"; [007-strategy-selection](../007-strategy-selection/spec.md) (axes A1–A7, the decision tree, axis-fill precedence survey > import-derived > script-class prior); [008-data-flow](../008-data-flow/spec.md) (base-derived prefill; axis probes pruned to what the base did not settle); [038-adaptation-questions](../038-adaptation-questions/) (inheritance posture, evidence provider left unimplemented); [053-decision-audit](../053-decision-audit/spec.md) and [055-legible-decision-trail](../055-legible-decision-trail/spec.md) (decision record, `base-derived` agency, FR-032 proposal lookup); [070-keyboard-facet-index](../070-keyboard-facet-index/) and the facet classifier specs 037/041/043 (offline per-keyboard facets whose logic this feature brings to runtime). On conflict those documents win, except where this spec explicitly amends 007 (see Assumptions).
+**Governing context**: [spec.md](../../spec.md) §3c (defaults are the product: propose-then-confirm, "no default is a defect") and §5 "Base-derived pre-fill"; [007-strategy-selection](../007-strategy-selection/spec.md) (axes A1–A7, the decision tree, axis-fill precedence survey > import-derived > script-class prior); [008-data-flow](../008-data-flow/spec.md) (base-derived prefill; axis probes pruned to what the base did not settle); [038-adaptation-questions](../038-adaptation-questions/) (inheritance posture, evidence provider left unimplemented); [053-decision-audit](../053-decision-audit/AS-BUILT.md) and [055-legible-decision-trail](../055-legible-decision-trail/AS-BUILT.md) (decision record, `base-derived` agency, FR-032 proposal lookup); [070-keyboard-facet-index](../070-keyboard-facet-index/) and the facet classifier specs 037/041/043 (offline per-keyboard facets whose logic this feature brings to runtime). On conflict those documents win, except where this spec explicitly amends 007 (see Assumptions).
 
 ## Why this exists
 
@@ -296,7 +296,7 @@ For example: "Accent input: base used a dead key for 11 of 12 vowels → strengt
 - [007-strategy-selection](../007-strategy-selection/spec.md) — axes A1–A7, the decision tree, axis-fill precedence; amended by this spec (see Assumptions).
 - [008-data-flow](../008-data-flow/spec.md) — base-derived prefill and axis-probe pruning.
 - The engine's `mutate()` seam (specs/014-mutate-seam-touch-propagation; constitution principle IX) — all working-keyboard changes this feature makes route through it.
-- [053-decision-audit](../053-decision-audit/spec.md) and [055-legible-decision-trail](../055-legible-decision-trail/spec.md) — the decision record this feature extends.
+- [053-decision-audit](../053-decision-audit/AS-BUILT.md) and [055-legible-decision-trail](../055-legible-decision-trail/AS-BUILT.md) — the decision record this feature extends.
 - The offline facet classifiers from [070-keyboard-facet-index](../070-keyboard-facet-index/) and specs 037/041/043 — the single source of detection logic (FR-008).
 - The langtags region data — seeds the physical-keyboard question's prefill (FR-013).
 
