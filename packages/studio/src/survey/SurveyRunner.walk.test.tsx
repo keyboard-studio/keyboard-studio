@@ -292,20 +292,36 @@ const FOCUS_FLOW: FlowDef = {
 };
 
 describe("SurveyRunner — footer Next keeps focus across a question change (R-10)", () => {
-  it("the pressed Next stays focused, relabelled to Finish, as Back appears beside it", async () => {
+  it("the pressed Next stays focused, keeps its Continue label, as Back appears beside it", async () => {
     const user = userEvent.setup();
     render(<SurveyRunner flow={FOCUS_FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     const next = screen.getByTestId("survey-advance");
-    expect(next.textContent).toBe("Next");
+    expect(next.textContent).toBe("Continue");
     expect(screen.queryByTestId("survey-back")).toBeNull();
 
     await user.click(next);
 
     expect(screen.getByText("Focus two")).toBeTruthy();
     expect(screen.getByTestId("survey-advance")).toBe(next);
-    expect(next.textContent).toBe("Finish");
+    expect(next.textContent).toBe("Continue");
     expect(screen.getByTestId("survey-back")).toBeTruthy();
     expect(document.activeElement).toBe(next);
+  });
+
+  it("labels the last question Continue unless the wrapper passes finalLabel", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<SurveyRunner flow={FOCUS_FLOW} onComplete={vi.fn()} />, { withStepNav: true });
+    await user.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByText("Focus two")).toBeTruthy();
+    expect(screen.getByTestId("survey-advance").textContent).toBe("Continue");
+    unmount();
+    act(() => {
+      useSurveyAnswerStore.getState().setPosition("identity", "f1");
+    });
+    render(<SurveyRunner flow={FOCUS_FLOW} onComplete={vi.fn()} finalLabel="Done" />, { withStepNav: true });
+    await user.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByText("Focus two")).toBeTruthy();
+    expect(screen.getByTestId("survey-advance").textContent).toBe("Done");
   });
 
   it("the focused forward button survives Back disappearing on the first question", async () => {
@@ -325,7 +341,7 @@ describe("SurveyRunner — footer Next keeps focus across a question change (R-1
     expect(screen.getByText("Focus one")).toBeTruthy();
     expect(screen.queryByTestId("survey-back")).toBeNull();
     expect(screen.getByTestId("survey-advance")).toBe(next);
-    expect(next.textContent).toBe("Next");
+    expect(next.textContent).toBe("Continue");
     expect(document.activeElement).toBe(next);
   });
 });

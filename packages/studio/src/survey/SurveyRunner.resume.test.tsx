@@ -69,7 +69,7 @@ describe("SurveyRunner — resumeAnswers", () => {
     expect(screen.queryByText("First question")).toBeNull();
     // Restored answer keeps Finish enabled.
     const advanceBtn = screen.getByTestId("survey-advance") as HTMLButtonElement;
-    expect(advanceBtn.textContent).toBe("Finish");
+    expect(advanceBtn.textContent).toBe("Continue");
     expect(advanceBtn.disabled).toBe(false);
   });
 

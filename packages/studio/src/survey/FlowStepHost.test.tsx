@@ -149,7 +149,7 @@ describe("FlowStepHost — completion path", () => {
     const input = screen.getByRole("textbox");
     fireEvent.change(input, { target: { value: "answer one" } });
 
-    const finishButton = screen.getByRole("button", { name: /finish/i });
+    const finishButton = screen.getByRole("button", { name: /continue/i });
     await act(async () => {
       fireEvent.click(finishButton);
     });
@@ -212,7 +212,7 @@ describe("FlowStepHost — onAnswerCommit plumbing", () => {
     const q1Input = screen.getByRole("textbox");
     fireEvent.change(q1Input, { target: { value: "first answer" } });
 
-    const nextButton = screen.getByRole("button", { name: /next/i });
+    const nextButton = screen.getByRole("button", { name: /continue/i });
     await act(async () => {
       fireEvent.click(nextButton);
     });

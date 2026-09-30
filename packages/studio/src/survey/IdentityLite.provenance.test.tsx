@@ -132,7 +132,7 @@ async function selectLanguage(code: string): Promise<void> {
 async function commitRegion(region: string): Promise<void> {
   const input = screen.getByRole<HTMLInputElement>("combobox");
   fireEvent.change(input, { target: { value: region } });
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   // Region routes straight on to the autonym step (English name is already done).
   await waitFor(() => {
     expect(screen.getByText(/What is your language called in your own language\?/)).toBeTruthy();
