@@ -195,7 +195,7 @@ body {
   /* Content scrolls under the bar — unless the phase stepper sits directly
    * below it (desktop survey route): the stepper is opaque chrome, and
    * floating frost over chrome would stack two bars. There the nav stays in
-   * flow and the fade below it reads as a soft shadow. */
+   * flow and drops its fade (below). */
   margin-bottom: calc(-1 * var(--topbar-h));
 }
 .ks-chrome-bar-top:has(+ [data-testid="phase-stepper"]) {
@@ -222,7 +222,16 @@ body {
   background: linear-gradient(to top, transparent, var(--app-chrome-surface));
   -webkit-backdrop-filter: blur(var(--app-chrome-blur));
   backdrop-filter: blur(var(--app-chrome-blur));
+  /* Ramp the blur out with the tint, as the footer fade does, so it has no
+   * hard edge 24 px below the bar. */
+  -webkit-mask-image: linear-gradient(to top, transparent, black);
+  mask-image: linear-gradient(to top, transparent, black);
   pointer-events: none;
+}
+/* No fade over the phase stepper: nothing scrolls beneath the nav there, and
+ * the band would frost the stepper's own labels. */
+.ks-chrome-bar-top:has(+ [data-testid="phase-stepper"])::after {
+  display: none;
 }
 
 /* Frosted chrome follows the platform transparency preference: drop the blur
