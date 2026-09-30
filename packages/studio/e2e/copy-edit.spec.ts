@@ -395,6 +395,27 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 
   });
 
+  test("#1905: no stale KMW load-failure banner once the final keyboard is active on a Track 1 copy", async ({
+    page,
+  }) => {
+    // The copy transform triggers a recompile whose blob can be revoked
+    // before KMW's script tag fetches it; the superseded load's failure used
+    // to leave a red "KMW: keyboard load failed" line up forever, even though
+    // the final (renamed) keyboard activated fine. basic_kbdfr has a web
+    // target, so the preview loads a real compiled .js here.
+    await fillIdentityLite(page);
+    await pickBaseKeyboardCopyEdit(page);
+    await chooseTrackCopy(page);
+    await acceptProjectName(page);
+    await confirmPrefill(page);
+
+    // Wait for the final keyboard to actually activate inside the frame
+    // (KEYBOARD_ACTIVE is what clears a stale error) before asserting.
+    const oskFrame = page.frameLocator('iframe[src="/osk-frame.html"]');
+    await expect(oskFrame.locator(".kmw-key").first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("KMW:")).toBeHidden();
+  });
+
   test("base keyboard compiles cleanly via kmcmplib WASM oracle (open-base mode)", async ({
     page,
   }) => {

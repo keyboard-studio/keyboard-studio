@@ -41,6 +41,28 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
     expect(renderReadmeMd(input)).toBe("# Piaroa\n");
   });
 
+  it("renderReadmeMd appends the Supported Platforms section from projected targets in the no-description fallback (#1906)", () => {
+    // The generator satisfies its own 5.7 readme-targets check even before
+    // the author has written a description: a fresh Track 1 copy of an
+    // `any`-target keyboard must not warn about its own stub.
+    expect(renderReadmeMd(baseInput({ platforms: ["any"] }))).toBe(
+      "# Piaroa\n\n## Supported Platforms\n- any\n",
+    );
+  });
+
+  it("renderReadmeMd lists explicit projected targets in the no-description fallback (#1906)", () => {
+    expect(renderReadmeMd(baseInput({ platforms: ["windows", "web"] }))).toBe(
+      "# Piaroa\n\n## Supported Platforms\n- windows\n- web\n",
+    );
+  });
+
+  it("renderReadmeMd keeps the byte-identical bare stub when no platforms are known (#1906)", () => {
+    // Deliberate: with nothing to list, the FR-002 contract (bare `# title`
+    // stub) is unchanged; the section appears only when there is something
+    // to say.
+    expect(renderReadmeMd(baseInput())).toBe("# Piaroa\n");
+  });
+
   it("renderReadmeHtm is byte-identical to today's packageDocs stub when answers is null", () => {
     expect(renderReadmeHtm(baseInput())).toBe(readmeHtm("Piaroa"));
   });

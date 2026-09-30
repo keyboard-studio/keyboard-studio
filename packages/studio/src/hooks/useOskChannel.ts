@@ -60,6 +60,14 @@ export function useOskChannel(
           // error belongs to a superseded load.
           setEngineError(null);
           setKeyboardActivations((n) => n + 1);
+          // #1905: a KEYBOARD_ACTIVE means the latest keyboard loaded and is
+          // typeable, so any earlier ENGINE_ERROR is stale — it belonged to a
+          // superseded load (e.g. a recompile whose blob was revoked before
+          // KMW's script tag fetched it). Without this the red banner sticks
+          // forever over a working keyboard. A genuine failure of the latest
+          // load still surfaces: it posts ENGINE_ERROR with no following
+          // KEYBOARD_ACTIVE.
+          setEngineError(null);
           break;
         case "TEXT_UPDATED":
           setTextValue(event.data.value);
