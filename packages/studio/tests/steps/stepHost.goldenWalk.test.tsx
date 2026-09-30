@@ -408,7 +408,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 
 /**
  * Drive the full copy-track walk.
- * identity -> choose_base -> track(copy) -> project_name ->
+ * identity -> layout -> choose_base -> track(copy) -> project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
  *
@@ -431,6 +431,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "survey-advance" },
+    { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-copy" },
     { stepId: "project_name", testId: "survey-advance" },
@@ -457,7 +458,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 
 /**
  * Drive the full adapt-track walk.
- * identity -> choose_base -> track(adapt) ->
+ * identity -> layout -> choose_base -> track(adapt) ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
@@ -467,6 +468,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "survey-advance" },
+    { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
