@@ -27,7 +27,24 @@ import { useRulesDemoArtifactStore, type RulesDemoArtifact } from "../../stores/
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { answerString } from "../../survey/answerString.ts";
+import {
+  rulesBody,
+  rulesCode,
+  rulesFieldset,
+  rulesInput,
+  rulesLabel,
+  rulesLegend,
+  rulesNote,
+  rulesSection,
+  rulesSectionHeading,
+  rulesTable,
+  rulesTableWrap,
+  rulesTd,
+  rulesTh,
+} from "./rulesStyles.ts";
+import { ERROR_BORDER, ERROR_TEXT } from "../../ui/theme.ts";
 import { getPatternLibraryService } from "../../lib/browserPatternLibrary.ts";
+import { useLayoutFamilyAnswer, usePickedWindowsLayout } from "../../lib/layoutFamily.ts";
 import {
   loadDemoSimulate,
   textToDemoKeys,
@@ -50,6 +67,7 @@ import {
   HOST_LAYOUTS_DEMO_NOTE,
   LIKELY_HOSTS_NOTE,
   hostLayoutById,
+  demoHostForReferenceHost,
   resolveLikelyHosts,
   type HostLayoutId,
   type LayoutFamilyAnswer,
@@ -81,28 +99,40 @@ export function DemoPane(props: DemoPaneProps = {}) {
     () => (storeBcp47 === undefined || storeBcp47 === null || storeBcp47 === "" ? [] : [storeBcp47]),
     [storeBcp47],
   );
-  // 1802 A3.1: the existing `layout_family` answer is the PRIMARY likely-host
-  // input; BCP47 inference is the fallback. The answer lives in the persisted
-  // identity-phase result (populated when the question is surfaced in the
-  // main flow). Unknown values are ignored — never a crash, never a guess.
+  // Likely-host inputs, strongest first:
+  //   1. the community-layout step's pick ("Which keyboard layout do your
+  //      typists use?", answer `host_layout`) when it IS a reference host;
+  //   2. the layout step's effective family (the pick's derived family, else
+  //      the stored `layout_family` answer) — both via lib/layoutFamily.ts,
+  //      the same reads the carve gallery uses;
+  //   3. the legacy identity-phase `layout_family` answer (1802 A3.1);
+  //   4. BCP47 inference, then the five reference hosts.
+  // Unknown values are ignored — never a crash, never a guess.
+  const pickedLayout = usePickedWindowsLayout();
+  const pickedHost = useMemo(
+    () => (pickedLayout?.host !== undefined ? demoHostForReferenceHost(pickedLayout.host) : null),
+    [pickedLayout],
+  );
+  const layoutStepFamily = useLayoutFamilyAnswer();
   const identityPhaseResult = useSurveySessionStore((s) => s.identityPhaseResult);
   const layoutFamily = useMemo<LayoutFamilyAnswer | null>(() => {
+    if (layoutStepFamily !== undefined) return layoutStepFamily;
     if (identityPhaseResult === null) return null;
     const raw = answerString(identityPhaseResult, "layout_family");
     return raw === "qwerty" || raw === "qwertz" || raw === "azerty" || raw === "non-roman"
       ? raw
       : null;
-  }, [identityPhaseResult]);
+  }, [layoutStepFamily, identityPhaseResult]);
 
   const [text, setText] = useState("");
-  // The demo set is per-keyboard likely hosts (1802 A3/A3.1): layout_family
-  // first, BCP47 region inference second, the five reference hosts when
-  // neither signals. Derived silently — no author question for what the data
+  // The demo set is per-keyboard likely hosts (1802 A3/A3.1): the layout
+  // pick first, then layout_family, BCP47 region inference, and the five
+  // reference hosts when nothing signals. Derived silently — no author question for what the data
   // can answer. "blocked" is appended as a demonstration mode. Manual
   // switching stays available via the selector.
   const likelyHosts = useMemo(
-    () => resolveLikelyHosts({ layoutFamily, bcp47: bcp47Tags }),
-    [layoutFamily, bcp47Tags],
+    () => resolveLikelyHosts({ pickedHost, layoutFamily, bcp47: bcp47Tags }),
+    [pickedHost, layoutFamily, bcp47Tags],
   );
   const orderedHosts = useMemo<HostLayoutId[]>(
     () => [...likelyHosts, "blocked"],
@@ -296,11 +326,11 @@ export function DemoPane(props: DemoPaneProps = {}) {
   const showTrace = artifactStatus === "ready" && rows.length > 0;
 
   return (
-    <section aria-label="Rule demo" data-testid="rules-demo-pane">
-      <h3>
+    <section aria-label="Rule demo" data-testid="rules-demo-pane" style={rulesSection}>
+      <h3 style={rulesSectionHeading}>
         <Trans id="rules.demo.heading">Try the rules</Trans>
       </h3>
-      <p>
+      <p style={rulesNote}>
         <Trans id="rules.demo.lede">
           Type below and watch what each keystroke does — the stored code points, the rendered
           result, and the rule that fired.
@@ -308,21 +338,33 @@ export function DemoPane(props: DemoPaneProps = {}) {
       </p>
 
       {artifactStatus === "error" && (
-        <div role="alert" data-testid="rules-demo-error">
-          <p>
+        <div
+          role="alert"
+          data-testid="rules-demo-error"
+          style={{
+            ...rulesBody,
+            color: ERROR_TEXT,
+            borderWidth: "1px",
+            borderStyle: "solid",
+            borderColor: ERROR_BORDER,
+            borderRadius: "var(--app-radius)",
+            padding: "12px 14px",
+          }}
+        >
+          <p style={rulesBody}>
             <Trans id="rules.demo.compileError">
               The demo can&apos;t run — the working copy has a compile error. Fix the error and the
               demo will pick up the next successful compile.
             </Trans>
           </p>
-          <p>
+          <p style={rulesBody}>
             <strong>{artifact.errorStep ?? "compile"}</strong>: {artifact.errorMessage}
           </p>
           {artifact.diagnostics.length > 0 && (
-            <ul>
+            <ul style={{ ...rulesBody, paddingLeft: 18 }}>
               {artifact.diagnostics.map((d, i) => (
                 <li key={i}>
-                  <code>{d.code}</code> — {d.message}
+                  <code style={rulesCode}>{d.code}</code> — {d.message}
                   {d.location !== undefined
                     ? ` (${d.location.file}:${d.location.line})`
                     : ""}
@@ -335,12 +377,13 @@ export function DemoPane(props: DemoPaneProps = {}) {
 
       {artifactStatus !== "error" && (
         <>
-          <p>
-            <label>
+          <p style={{ margin: "0 0 12px 0" }}>
+            <label style={rulesLabel}>
               <Trans id="rules.demo.inputLabel">Type here, watch what happens</Trans>{" "}
               <input
                 type="text"
                 data-testid="rules-demo-input"
+                style={{ ...rulesInput, width: "100%" }}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="abc…"
@@ -351,37 +394,37 @@ export function DemoPane(props: DemoPaneProps = {}) {
           </p>
 
           {artifactStatus === "loading" && (
-            <p data-testid="rules-demo-status">
+            <p data-testid="rules-demo-status" style={rulesNote}>
               <Trans id="rules.demo.compiling">Compiling the working copy…</Trans>
             </p>
           )}
           {artifactStatus === "idle" && (
-            <p data-testid="rules-demo-status">
+            <p data-testid="rules-demo-status" style={rulesNote}>
               <Trans id="rules.demo.idle">The demo starts once the working copy compiles.</Trans>
             </p>
           )}
           {engineError !== null && (
-            <p role="alert" data-testid="rules-demo-status">
+            <p role="alert" data-testid="rules-demo-status" style={rulesBody}>
               <Trans id="rules.demo.engineFailed">
                 The simulator failed to load: {engineError}
               </Trans>
             </p>
           )}
           {bytesError !== null && (
-            <p role="alert" data-testid="rules-demo-status">
+            <p role="alert" data-testid="rules-demo-status" style={rulesBody}>
               <Trans id="rules.demo.bytesFailed">
                 The compiled keyboard couldn&apos;t be read: {bytesError}
               </Trans>
             </p>
           )}
           {simError !== null && (
-            <p role="alert" data-testid="rules-demo-status">
+            <p role="alert" data-testid="rules-demo-status" style={rulesBody}>
               <Trans id="rules.demo.simFailed">Simulation failed: {simError}</Trans>
             </p>
           )}
 
           {artifactStatus === "ready" && artifact.diagnostics.length > 0 && (
-            <p data-testid="rules-demo-warnings">
+            <p data-testid="rules-demo-warnings" style={rulesNote}>
               <Trans id="rules.demo.warnings">
                 Compiled with {artifact.diagnostics.length} warning(s):
               </Trans>{" "}
@@ -392,7 +435,7 @@ export function DemoPane(props: DemoPaneProps = {}) {
           {showTrace && (
             <>
               {!enrichmentPresent && (
-                <p data-testid="rules-demo-no-enrichment">
+                <p data-testid="rules-demo-no-enrichment" style={rulesNote}>
                   <Trans id="rules.demo.noEnrichment">
                     The simulator didn&apos;t name fired rules for this run, so rows show
                     before/after output instead. (Pending: the SimulationStep.firedRule
@@ -400,22 +443,23 @@ export function DemoPane(props: DemoPaneProps = {}) {
                   </Trans>
                 </p>
               )}
-              <table data-testid="rules-demo-trace">
+              <div style={rulesTableWrap}>
+              <table data-testid="rules-demo-trace" style={rulesTable}>
                 <thead>
                   <tr>
-                    <th>
+                    <th style={rulesTh}>
                       <Trans id="rules.demo.colKey">Key</Trans>
                     </th>
-                    <th>
+                    <th style={rulesTh}>
                       <Trans id="rules.demo.colStored">Stored</Trans>
                     </th>
-                    <th>
+                    <th style={rulesTh}>
                       <Trans id="rules.demo.colRendered">Rendered</Trans>
                     </th>
-                    <th>
+                    <th style={rulesTh}>
                       <Trans id="rules.demo.colRule">Rule fired</Trans>
                     </th>
-                    <th>
+                    <th style={rulesTh}>
                       <Trans id="rules.demo.colHost">Host consequence</Trans>
                     </th>
                   </tr>
@@ -423,8 +467,8 @@ export function DemoPane(props: DemoPaneProps = {}) {
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.index} data-testid={`rules-demo-row-${row.index}`}>
-                      <td>
-                        <code>{row.typedChar === " " ? "Space" : row.typedChar}</code>{" "}
+                      <td style={rulesTd}>
+                        <code style={rulesCode}>{row.typedChar === " " ? "Space" : row.typedChar}</code>{" "}
                         <small>({row.vkeyLabel})</small>
                         {row.deadkeyArmed && (
                           <div>
@@ -434,31 +478,31 @@ export function DemoPane(props: DemoPaneProps = {}) {
                           </div>
                         )}
                       </td>
-                      <td>
-                        <code>{row.codePoints}</code>
+                      <td style={rulesTd}>
+                        <code style={rulesCode}>{row.codePoints}</code>
                       </td>
-                      <td>{row.rendered === "" ? <em>—</em> : row.rendered}</td>
-                      <td>{row.firedCaption ?? row.noRuleText}</td>
-                      <td>{row.hostConsequence ?? "—"}</td>
+                      <td style={rulesTd}>{row.rendered === "" ? <em>—</em> : row.rendered}</td>
+                      <td style={rulesTd}>{row.firedCaption ?? row.noRuleText}</td>
+                      <td style={rulesTd}>{row.hostConsequence ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             </>
           )}
 
-          <fieldset>
-            <legend>
+          <fieldset style={rulesFieldset}>
+            <legend style={rulesLegend}>
               <Trans id="rules.demo.hostLegend">What would the host computer have typed?</Trans>
             </legend>
-            <p>
-              <small>{ALLOW_BLOCK_QUESTION}</small>
-            </p>
-            <p>
-              <label>
+            <p style={rulesBody}>{ALLOW_BLOCK_QUESTION}</p>
+            <p style={{ margin: "0 0 10px 0" }}>
+              <label style={rulesLabel}>
                 <Trans id="rules.demo.hostLabel">Host layout</Trans>{" "}
                 <select
                   data-testid="rules-demo-host-layout"
+                  style={rulesInput}
                   value={hostLayout}
                   onChange={(e) => {
                     setHostLayout(e.target.value as HostLayoutId);
@@ -476,24 +520,12 @@ export function DemoPane(props: DemoPaneProps = {}) {
                 </select>
               </label>
             </p>
-            <p>
-              <small>
-                <em>{LIKELY_HOSTS_NOTE}</em>
-              </small>
-            </p>
-            <ul>
-              <li>
-                <small>{ALLOW_RISK_COPY}</small>
-              </li>
-              <li>
-                <small>{BLOCK_RISK_COPY}</small>
-              </li>
+            <p style={rulesNote}>{LIKELY_HOSTS_NOTE}</p>
+            <ul style={{ ...rulesNote, paddingLeft: 18 }}>
+              <li>{ALLOW_RISK_COPY}</li>
+              <li>{BLOCK_RISK_COPY}</li>
             </ul>
-            <p>
-              <small>
-                <em>{HOST_LAYOUTS_DEMO_NOTE}</em>
-              </small>
-            </p>
+            <p style={{ ...rulesNote, margin: 0 }}>{HOST_LAYOUTS_DEMO_NOTE}</p>
           </fieldset>
         </>
       )}

@@ -123,6 +123,13 @@ describe("resolveLikelyHosts (A3.1: layout_family primary, bcp47 fallback)", () 
     expect(resolveLikelyHosts({ bcp47: ["fr-FR"] })[0]).toBe("azerty");
   });
 
+  it("puts the layout-step pick first, ahead of family and bcp47", () => {
+    const hosts = resolveLikelyHosts({ pickedHost: "azerty", layoutFamily: "qwerty", bcp47: ["en-GB"] });
+    expect(hosts[0]).toBe("azerty");
+    expect(hosts.filter((id) => id === "azerty")).toHaveLength(1);
+    for (const id of DEFAULT_HOST_LAYOUTS) expect(hosts).toContain(id);
+  });
+
   it("defaults to the five with no signal at all", () => {
     expect(resolveLikelyHosts({})).toEqual([...DEFAULT_HOST_LAYOUTS]);
   });

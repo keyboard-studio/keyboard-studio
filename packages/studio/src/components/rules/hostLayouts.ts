@@ -35,6 +35,8 @@
 // The prompt asks the ONE question only the author can answer: "do your
 // typists expect a character on this key?"
 
+import type { HostLayoutId as ReferenceHostLayoutId } from "../../lib/referenceHostLayouts.ts";
+
 export type HostLayoutId = "us" | "intl" | "azerty" | "qwertz" | "uk" | "blocked";
 
 /** Which modifier layers a host key press carries. */
@@ -355,6 +357,17 @@ export function likelyHostLayouts(bcp47: readonly string[]): HostLayoutId[] {
   return ordered.length > 0 ? ordered : [...DEFAULT_HOST_LAYOUTS];
 }
 
+/**
+ * Map a reference-host id from lib/referenceHostLayouts.ts (the id the
+ * layout-step pick carries) onto this module's demo id. The two catalogs
+ * agree on every id except US-International ("us-intl" there, "intl" here).
+ */
+export function demoHostForReferenceHost(
+  id: ReferenceHostLayoutId,
+): Exclude<HostLayoutId, "blocked"> {
+  return id === "us-intl" ? "intl" : id;
+}
+
 /** Answer values of the existing `layout_family` regional-keyboard question. */
 export type LayoutFamilyAnswer = "qwerty" | "qwertz" | "azerty" | "non-roman";
 
@@ -372,10 +385,21 @@ export type LayoutFamilyAnswer = "qwerty" | "qwertz" | "azerty" | "non-roman";
  * always offers every reference layout plus "blocked").
  */
 export function resolveLikelyHosts(input: {
+  /**
+   * The reference host the author picked on the community-layout step
+   * ("Which keyboard layout do your typists use?"), when the pick IS one of
+   * the reference hosts. The exact answer — it leads, ahead of any family or
+   * language-tag inference; the rest follow for contrast.
+   */
+  pickedHost?: Exclude<HostLayoutId, "blocked"> | null;
   layoutFamily?: LayoutFamilyAnswer | null;
   bcp47?: readonly string[] | null;
 }): HostLayoutId[] {
-  const { layoutFamily, bcp47 } = input;
+  const { pickedHost, layoutFamily, bcp47 } = input;
+  if (pickedHost !== undefined && pickedHost !== null) {
+    const rest = resolveLikelyHosts({ layoutFamily: layoutFamily ?? null, bcp47: bcp47 ?? null });
+    return [pickedHost, ...rest.filter((id) => id !== pickedHost)];
+  }
   if (layoutFamily === "qwertz" || layoutFamily === "azerty") {
     return [layoutFamily, ...DEFAULT_HOST_LAYOUTS.filter((id) => id !== layoutFamily)];
   }
