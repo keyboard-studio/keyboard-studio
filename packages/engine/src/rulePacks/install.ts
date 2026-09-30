@@ -231,19 +231,36 @@ export function installPack(ir: KeyboardIR, pack: RulePack): InstallPackResult {
     }
   }
 
+  // Target the entry group — the first writable using-keys group, the same
+  // convention as pattern-apply's entryGroupOf (inlined: this module stays
+  // independent of pattern-apply, see the header). A readonly group is never
+  // written into, and a fresh `main` is minted only when the IR has no
+  // using-keys group and no group of that name at all: minting beside a
+  // readonly `main` would emit two `group(main)` blocks, which kmcmplib
+  // rejects as a duplicate group.
   const groups = ir.groups.map((g) => ({ ...g, rules: [...g.rules] }));
-  let main = groups.find((g) => g.name === "main" && !g.readonly);
-  if (main === undefined) {
-    main = {
+  let target = groups.find((g) => g.usingKeys && !g.readonly);
+  if (target === undefined) {
+    if (groups.some((g) => g.usingKeys || g.name === "main")) {
+      throw new RulePackInstallError(
+        `cannot install pack "${validPack.id}": the keyboard's key-handling group is read-only`,
+      );
+    }
+    target = {
       nodeId: mintNodeId("group"),
       name: "main",
       usingKeys: true,
       rules: [],
       readonly: false,
     };
-    groups.push(main);
+    groups.push(target);
   }
-  main.rules.push(...newRules);
+  // Insert as one contiguous block before the group's match/nomatch rules:
+  // kmcmplib requires those to be last in a group.
+  const terminal = target.rules.findIndex(
+    (r) => r.matchKind === "match" || r.matchKind === "nomatch",
+  );
+  target.rules.splice(terminal === -1 ? target.rules.length : terminal, 0, ...newRules);
 
   return {
     ir: { ...ir, stores: [...ir.stores, ...newStores], groups },

@@ -29,8 +29,13 @@ import type { RuleFamily } from "./ruleFamilies.ts";
 export interface SynthesizeMissingGuardsResult {
   /** Rules synthesized (not yet written — the caller stages them). */
   rules: IRRule[];
-  /** Entries skipped: already covered or no identifiable key element. */
-  skipped: number;
+  /** Entries skipped because their guard signature already exists (idempotent re-run). */
+  alreadyCovered: number;
+  /**
+   * Entries skipped because there is nothing to clone from: the family has
+   * no template rule, or the template has no identifiable key element.
+   */
+  noTemplate: number;
 }
 
 /** Normalized guard signature for dedup: guard store + key element. */
@@ -129,22 +134,23 @@ export function synthesizeMissingGuardRules(
   }
 
   const rules: IRRule[] = [];
-  let skipped = 0;
+  let alreadyCovered = 0;
+  let noTemplate = 0;
   for (const entry of group.missing) {
     const rule = template !== undefined ? cloneWithKey(template, entry) : null;
     if (rule === null) {
-      skipped += 1;
+      noTemplate += 1;
       continue;
     }
     const sig = guardSignature(rule);
     if (sig !== null && seen.has(sig)) {
-      skipped += 1; // idempotent: already covered
+      alreadyCovered += 1; // idempotent
       continue;
     }
     if (sig !== null) seen.add(sig);
     rules.push(rule);
   }
-  return { rules, skipped };
+  return { rules, alreadyCovered, noTemplate };
 }
 
 /**

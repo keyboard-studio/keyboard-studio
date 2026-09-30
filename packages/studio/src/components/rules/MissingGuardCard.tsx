@@ -5,7 +5,9 @@
 // keys have no guard — add them to the family?", with a per-key key +
 // emitted-mark preview and one-tap "Add all". "Add all" stages rules through
 // the normal reversible working-copy path (`setWorkingIR`) — never
-// auto-applied, idempotent on re-run, and honestly counted (added/skipped).
+// auto-applied, idempotent on re-run, and honestly counted: added, plus each
+// skip reason on its own line (already guarded / no rule to copy / no
+// editable group), since those are different facts for the author.
 
 import { useState } from "react";
 import { Trans } from "@lingui/react/macro";
@@ -22,10 +24,67 @@ import {
   useGuardIntentStore,
 } from "../../stores/guardIntentStore.ts";
 
+/** What one "Add all" tap did, per reason — rendered by {@link OutcomeNote}. */
+interface AddAllOutcome {
+  added: number;
+  /** Already guarded: re-running "Add all" never duplicates a rule. */
+  alreadyCovered: number;
+  /** The family has no rule to clone the guard from. */
+  noTemplate: number;
+  /** Synthesized, but the keyboard has no editable group to stage them in. */
+  noTarget: number;
+}
+
+function OutcomeNote({
+  outcome,
+  familyName,
+  testId,
+}: {
+  outcome: AddAllOutcome;
+  familyName: string;
+  testId: string;
+}) {
+  const { added, alreadyCovered, noTemplate, noTarget } = outcome;
+  return (
+    <p data-testid={testId}>
+      <small>
+        <Trans id="rules.guard.missing.addedNote">
+          Added {added} guard rule(s). Review them in the rule list; remove any you don&apos;t
+          want.
+        </Trans>
+        {alreadyCovered > 0 && (
+          <>
+            {" "}
+            <Trans id="rules.guard.missing.skippedCovered">
+              {alreadyCovered} skipped: already guarded.
+            </Trans>
+          </>
+        )}
+        {noTemplate > 0 && (
+          <>
+            {" "}
+            <Trans id="rules.guard.missing.skippedNoTemplate">
+              {noTemplate} not added: the “{familyName}” family has no rule to copy the guard
+              from.
+            </Trans>
+          </>
+        )}
+        {noTarget > 0 && (
+          <>
+            {" "}
+            <Trans id="rules.guard.missing.skippedNoTarget">
+              {noTarget} not added: the keyboard has no editable rule group.
+            </Trans>
+          </>
+        )}
+      </small>
+    </p>
+  );
+}
+
 export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
   const dismissMissingGroup = useGuardIntentStore((s) => s.dismissMissingGroup);
-  const [addedCount, setAddedCount] = useState<number | null>(null);
-  const [skippedCount, setSkippedCount] = useState(0);
+  const [outcome, setOutcome] = useState<AddAllOutcome | null>(null);
   const groupKey = missingGuardGroupKey(group);
 
   const addAll = () => {
@@ -33,11 +92,19 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
     if (ir === null) return;
     const rules = ir.groups.flatMap((g) => g.rules);
     const families = groupRules(rules);
-    const { rules: synthesized, skipped } = synthesizeMissingGuardRules(ir, group, families);
+    const { rules: synthesized, alreadyCovered, noTemplate } = synthesizeMissingGuardRules(
+      ir,
+      group,
+      families,
+    );
     const target = targetGroupForSynthesis(ir, families, group.store);
     if (target === null || synthesized.length === 0) {
-      setAddedCount(0);
-      setSkippedCount(group.missing.length);
+      setOutcome({
+        added: 0,
+        alreadyCovered,
+        noTemplate,
+        noTarget: target === null ? synthesized.length : 0,
+      });
       return;
     }
     const { groupIndex } = target;
@@ -54,8 +121,7 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
     intent.noteBlockBundleInstalled();
     const family = familyForGuardStore(ir, families, group.store);
     if (family !== undefined) intent.noteFamilyEdited(family.id);
-    setAddedCount(synthesized.length);
-    setSkippedCount(skipped);
+    setOutcome({ added: synthesized.length, alreadyCovered, noTemplate, noTarget: 0 });
   };
 
   return (
@@ -95,16 +161,12 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
           <Trans id="rules.guard.missing.dismiss">Dismiss</Trans>
         </button>
       </div>
-      {addedCount !== null && (
-        <p data-testid={`missing-guard-added-${groupKey}`}>
-          <small>
-            <Trans id="rules.guard.missing.addedNote">
-              Added {addedCount} guard rule(s)
-              {skippedCount > 0 ? ` — ${skippedCount} skipped (already covered)` : ""}.
-              Review them in the rule list; remove any you don&apos;t want.
-            </Trans>
-          </small>
-        </p>
+      {outcome !== null && (
+        <OutcomeNote
+          outcome={outcome}
+          familyName={group.familyName}
+          testId={`missing-guard-added-${groupKey}`}
+        />
       )}
     </section>
   );

@@ -55,8 +55,13 @@ function familiesFor(ir: KeyboardIR) {
 describe("synthesizeMissingGuardRules", () => {
   it("mirrors the family template, substituting the key and keeping modifiers", () => {
     const ir = makeIr([diablockRule("r1", "K_C"), diablockRule("r2", "K_D")]);
-    const { rules, skipped } = synthesizeMissingGuardRules(ir, GROUP, familiesFor(ir));
-    expect(skipped).toBe(0);
+    const { rules, alreadyCovered, noTemplate } = synthesizeMissingGuardRules(
+      ir,
+      GROUP,
+      familiesFor(ir),
+    );
+    expect(alreadyCovered).toBe(0);
+    expect(noTemplate).toBe(0);
     expect(rules).toHaveLength(2);
     expect(rules[0]?.context).toEqual([
       { kind: "any", storeRef: "diablock" },
@@ -79,15 +84,16 @@ describe("synthesizeMissingGuardRules", () => {
     const ir2 = makeIr([diablockRule("r1", "K_C"), ...first.rules]);
     const second = synthesizeMissingGuardRules(ir2, GROUP, familiesFor(ir2));
     expect(second.rules).toHaveLength(0);
-    expect(second.skipped).toBe(2);
+    expect(second.alreadyCovered).toBe(2);
+    expect(second.noTemplate).toBe(0);
   });
 
   it("skips a key the family already guards", () => {
     const ir = makeIr([diablockRule("r1", "K_E")]);
-    const { rules, skipped } = synthesizeMissingGuardRules(ir, GROUP, familiesFor(ir));
+    const { rules, alreadyCovered } = synthesizeMissingGuardRules(ir, GROUP, familiesFor(ir));
     expect(rules).toHaveLength(1); // only K_O
     expect(rules[0]?.context[2]).toEqual({ kind: "vkey", name: "K_O", modifiers: ["RALT"] });
-    expect(skipped).toBe(1);
+    expect(alreadyCovered).toBe(1);
   });
 
   it("substitutes the mark char when the template matches on characters", () => {

@@ -5,15 +5,10 @@
 // + version field) lives in @keyboard-studio/contracts (`rulePack.ts`); this
 // module owns serialization (canonical JSON) and the validated load path.
 //
-// NOTE: this barrel is not yet re-exported from the engine root index —
-// `packages/engine/src/index.ts` currently has uncommitted changes from a
-// sibling workstream, so the one-line re-export
-// (`export { exportPack, importPack, RulePackImportError } from
-// "./rulePacks/index.js"`) lands separately once that file is committed.
-// Until then, import from the `@keyboard-studio/engine/rulePacks` subpath
-// (exported from the package map); the studio panel validates via
-// @keyboard-studio/contracts and serializes with an identical canonical
-// form (see its canonicalPackJson).
+// Consumers import from the `@keyboard-studio/engine/rulePacks` subpath
+// (exported from the package map); this barrel is not re-exported from the
+// engine root index. The studio rule builder serializes through
+// {@link exportPack} here, so there is one canonical form.
 
 import {
   validateRulePack,

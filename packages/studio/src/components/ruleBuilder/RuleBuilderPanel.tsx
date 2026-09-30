@@ -38,6 +38,7 @@ import {
   type RuleFamily,
   type RuleKind,
 } from "@keyboard-studio/engine/kmAssist";
+import { exportPack } from "@keyboard-studio/engine/rulePacks";
 import {
   ACCENT,
   BG_CARD,
@@ -165,33 +166,6 @@ export function formatRuleSummary(rule: IRRule): string {
   const rhs = rule.output.map(fmtOutputElement).join(" ");
   const prefix = rule.matchKind !== undefined ? `${rule.matchKind} ` : "";
   return `${prefix}${lhs} > ${rhs}`;
-}
-
-// ---------------------------------------------------------------------------
-// Canonical JSON (mirrors the engine's exportPack byte-for-byte)
-// ---------------------------------------------------------------------------
-
-function sortKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortKeysDeep);
-  }
-  if (typeof value === "object" && value !== null) {
-    const sorted: Record<string, unknown> = {};
-    for (const key of Object.keys(value).sort()) {
-      sorted[key] = sortKeysDeep((value as Record<string, unknown>)[key]);
-    }
-    return sorted;
-  }
-  return value;
-}
-
-/**
- * Canonical bundle serialization: sorted keys, 2-space indent, trailing
- * newline. Byte-identical to the engine's exportPack; kept local until the
- * engine root index re-exports ./rulePacks (see note on formatRuleSummary).
- */
-function canonicalPackJson(pack: RulePack): string {
-  return JSON.stringify(sortKeysDeep(pack), null, 2) + "\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -589,7 +563,7 @@ export function RuleBuilderPanel({
       const result = validateRulePack(buildPack());
       if (result.ok) {
         setErrors([]);
-        onExport(canonicalPackJson(result.pack));
+        onExport(exportPack(result.pack));
         setSaved({ name: bundleName.trim(), scriptLabel: scriptName(scriptKey!.trim()) });
         return;
       }

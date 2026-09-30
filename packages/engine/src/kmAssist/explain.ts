@@ -147,7 +147,8 @@ function describeOutputElement(el: OutputElement): string {
   }
 }
 
-function ordinal(n: number): string {
+/** "1st", "2nd", "11th" — exported for group.ts. */
+export function ordinal(n: number): string {
   const suffix = n % 10 === 1 && n % 100 !== 11 ? "st"
     : n % 10 === 2 && n % 100 !== 12 ? "nd"
     : n % 10 === 3 && n % 100 !== 13 ? "rd"
@@ -155,7 +156,8 @@ function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
-function joinList(items: string[]): string {
+/** "a, b and c" — exported for group.ts. */
+export function joinList(items: string[]): string {
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }

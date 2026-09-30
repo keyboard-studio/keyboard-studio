@@ -37,13 +37,13 @@ function diablockRule(nodeId: string, vkey: string): IRRule {
   };
 }
 
-function seedIr(): void {
+function seedIr(rules: IRRule[] = [diablockRule("r1", "K_C")]): void {
   const ir = {
     origin: "scaffolded",
     header: { keyboardId: "t", name: "t", bcp47: [], copyright: "", version: "1.0", targets: [], storeDirectives: [] },
     stores: [],
     groups: [
-      { nodeId: "g1", name: "main", usingKeys: true, rules: [diablockRule("r1", "K_C")], readonly: false },
+      { nodeId: "g1", name: "main", usingKeys: true, rules, readonly: false },
     ],
     comments: [],
     raw: [],
@@ -94,9 +94,24 @@ describe("MissingGuardCard", () => {
     expect(ruleCount()).toBe(3);
     fireEvent.click(button);
     expect(ruleCount()).toBe(3);
-    expect(
-      screen.getByTestId("missing-guard-added-diablock::Diacritic blocking").textContent,
-    ).toMatch(/Added 0/);
+    const note = screen.getByTestId("missing-guard-added-diablock::Diacritic blocking").textContent;
+    expect(note).toMatch(/Added 0/);
+    expect(note).toMatch(/2 skipped: already guarded/);
+    expect(note).not.toMatch(/no rule to copy/);
+  });
+
+  it("says there was no rule to copy when the family has no template — not 'already covered'", () => {
+    // No rule references the guard store, so there is no family template.
+    seedIr([
+      { nodeId: "r1", context: [{ kind: "raw", text: "+" }, { kind: "vkey", name: "K_C", modifiers: [] }], output: [{ kind: "char", value: "c" }] },
+    ]);
+    render(<MissingGuardCard group={GROUP} />);
+    fireEvent.click(screen.getByTestId("missing-guard-add-all-diablock::Diacritic blocking"));
+    expect(ruleCount()).toBe(1);
+    const note = screen.getByTestId("missing-guard-added-diablock::Diacritic blocking").textContent;
+    expect(note).toMatch(/Added 0/);
+    expect(note).toMatch(/2 not added: the “Diacritic blocking” family has no rule to copy/);
+    expect(note).not.toMatch(/already guarded/);
   });
 
   it("Dismiss records the group so it stays hidden", () => {

@@ -59,8 +59,10 @@ describe("installPack (FR-015: through the spine)", () => {
 
     const mainAfter = mainGroup(result.ir);
     expect(mainAfter.rules.length).toBe(mainBefore + 36);
-    // 076: guards and blocks sit after real bindings.
-    const installed = mainAfter.rules.slice(mainBefore);
+    // 076: guards and blocks sit after real bindings (and before the
+    // group's terminal `match` rule — see the ordering test below).
+    const installed = mainAfter.rules.filter((r) => r.ownedByBehaviour !== undefined);
+    expect(installed).toHaveLength(36);
     for (const rule of installed) {
       expect(rule.ownedByBehaviour).toBe(
         "cameroon-diacritic-blocking/cameroon_diacritic_blocking",
@@ -173,6 +175,38 @@ describe("installPack (FR-015: through the spine)", () => {
       ],
     };
     expect(() => installPack(loadFixtureIr(), badRulePack)).toThrow(RulePackInstallError);
+  });
+
+  it("refuses a readonly main group instead of minting a second group(main)", () => {
+    const pack = loadPack();
+    const fixture = loadFixtureIr();
+    const readonlyMain: KeyboardIR = {
+      ...fixture,
+      groups: fixture.groups.map((g) => (g.name === "main" ? { ...g, readonly: true } : g)),
+    };
+    expect(() => installPack(readonlyMain, pack)).toThrow(RulePackInstallError);
+    expect(() => installPack(readonlyMain, pack)).toThrow(/read-only/);
+  });
+
+  it("mints a main group when the keyboard has no key-handling group at all", () => {
+    const pack = loadPack();
+    const noGroups: KeyboardIR = { ...loadFixtureIr(), groups: [] };
+    const { ir } = installPack(noGroups, pack);
+    expect(ir.groups.filter((g) => g.name === "main")).toHaveLength(1);
+    expect(mainGroup(ir).rules).toHaveLength(36);
+  });
+
+  it("lands the installed rules as one block before the group's match/nomatch rules", () => {
+    const pack = loadPack();
+    // The fixture's main group ends in `match > use(deadkeys)`.
+    const before = mainGroup(loadFixtureIr()).rules;
+    const matchAt = before.findIndex((r) => r.matchKind === "match");
+    expect(matchAt).toBe(before.length - 1);
+
+    const after = mainGroup(installPack(loadFixtureIr(), pack).ir).rules;
+    expect(after[after.length - 1]!.matchKind).toBe("match");
+    const block = after.slice(matchAt, matchAt + 36);
+    expect(block.every((r) => r.ownedByBehaviour !== undefined)).toBe(true);
   });
 });
 

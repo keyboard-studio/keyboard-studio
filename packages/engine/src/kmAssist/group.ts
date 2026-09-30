@@ -64,6 +64,7 @@ import {
   type RuleKind,
 } from "./classify.js";
 import { emitRule } from "../codec/emit.js";
+import { describeKey, joinList, ordinal } from "./explain.js";
 
 /** A family of related rules sharing a guard store/set and output shape. */
 export interface RuleFamily {
@@ -223,73 +224,9 @@ function splitGuards(ctx: ContextElement[]): {
 }
 
 // ---------------------------------------------------------------------------
-// Small author-language helpers (mirror explain.ts phrasing)
+// Small author-language helpers (key/ordinal/list phrasing is shared with
+// explain.ts)
 // ---------------------------------------------------------------------------
-
-const KEY_LABELS: Record<string, string> = {
-  K_SPACE: "Space",
-  K_BKSP: "Backspace",
-  K_TAB: "Tab",
-  K_ENTER: "Enter",
-  K_ESC: "Esc",
-  K_BKQUOTE: "Backquote",
-  K_HYPHEN: "Hyphen",
-  K_EQUAL: "Equals",
-  K_LBRKT: "Left bracket",
-  K_RBRKT: "Right bracket",
-  K_BKSLASH: "Backslash",
-  K_SCOLON: "Semicolon",
-  K_QUOTE: "Quote",
-  K_COMMA: "Comma",
-  K_PERIOD: "Period",
-  K_SLASH: "Slash",
-};
-
-const MODIFIER_LABELS: Record<string, string> = {
-  SHIFT: "Shift",
-  LSHIFT: "Shift",
-  RSHIFT: "Shift",
-  LCTRL: "Ctrl",
-  RCTRL: "Ctrl",
-  LALT: "Alt",
-  RALT: "Right Alt",
-  LWIN: "Win",
-  RWIN: "Win",
-  NCAPS: "CapsLock off",
-};
-
-function keyLabel(name: string): string {
-  const known = KEY_LABELS[name];
-  if (known !== undefined) return known;
-  const m = /^K_([A-Z0-9])$/.exec(name);
-  if (m?.[1] !== undefined) return m[1];
-  const t = /^T_(.+)$/.exec(name);
-  if (t?.[1] !== undefined) return `touch key ${t[1]}`;
-  return name;
-}
-
-function describeKey(name: string, modifiers: string[]): string {
-  const mods = modifiers.map((mod) => MODIFIER_LABELS[mod.toUpperCase()] ?? mod);
-  const key = keyLabel(name);
-  return mods.length > 0 ? `${mods.join("+")}+${key}` : key;
-}
-
-function ordinal(n: number): string {
-  const suffix =
-    n % 10 === 1 && n % 100 !== 11
-      ? "st"
-      : n % 10 === 2 && n % 100 !== 12
-        ? "nd"
-        : n % 10 === 3 && n % 100 !== 13
-          ? "rd"
-          : "th";
-  return `${n}${suffix}`;
-}
-
-function joinList(items: string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-}
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
