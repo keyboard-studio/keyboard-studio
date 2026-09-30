@@ -45,6 +45,7 @@ import {
 import { useLingui } from "@lingui/react/macro";
 import { useViewport } from "../hooks/useViewport.ts";
 import { useModalFocus } from "../hooks/useModalFocus.ts";
+import { useInertOutside } from "../hooks/useInertOutside.ts";
 import { BREAKPOINTS } from "../ui/breakpoints.ts";
 import {
   MOTION_SPRING_DEFAULT,
@@ -63,7 +64,7 @@ import {
 export interface PreviewSheetProps {
   /** Dismissing animates the sheet out, then unmounts children (unloading KeymanWeb). */
   readonly open: boolean;
-  /** × button, backdrop, Escape, or drag-dismiss. The caller owns the invoker and restores focus to it. */
+  /** × button, backdrop, Escape, or drag-dismiss. Focus returns to the invoker once the sheet has closed. */
   readonly onOpenChange: (open: boolean) => void;
   /** Accessible name + visible header title (callers pass an already-localized string). */
   readonly label: string;
@@ -348,6 +349,30 @@ export function PreviewSheet({
     };
   }, [mounted]);
 
+  // The background takes neither clicks nor focus while the sheet is up —
+  // otherwise a keypress after a click on a non-focusable spot in the sheet
+  // (focus falls to <body>) or a Tab out of the OSK iframe (its keydowns never
+  // reach the trap below) reaches a background control.
+  // Focus returns to the invoker (e.g. the floating preview button) once the
+  // sheet unmounts. Captured BEFORE the background goes inert (which blurs a
+  // focused background element), restored AFTER it is lifted (an inert
+  // element cannot take focus) — hence the two effects around the hook.
+  const invokerRef = useRef<Element | null>(null);
+  useLayoutEffect(() => {
+    if (mounted) invokerRef.current = document.activeElement;
+  }, [mounted]);
+  useInertOutside(mounted, [sheetRef, backdropRef]);
+  useLayoutEffect(() => {
+    if (!mounted) return;
+    return () => {
+      const invoker = invokerRef.current;
+      invokerRef.current = null;
+      if (invoker instanceof HTMLElement && invoker.isConnected) {
+        invoker.focus({ preventScroll: true });
+      }
+    };
+  }, [mounted]);
+
   // A tap-close starts from rest on the default preset — ordinary UI
   // motion — unless it interrupts the enter flight, whose live velocity
   // carries over so the sheet reverses without a jump.
@@ -517,8 +542,11 @@ export function PreviewSheet({
         aria-label={label}
         data-testid={testId}
         data-sheet-dock={sideDock ? "side" : "bottom"}
+        // Focusable itself, so a click on a non-focusable spot inside the
+        // sheet keeps focus in the dialog instead of dropping it to <body>.
+        tabIndex={-1}
         onKeyDown={open ? handleKeyDownTrap : undefined}
-        style={{ ...sheetStyle, ...fadeStyle }}
+        style={{ ...sheetStyle, ...fadeStyle, outline: "none" }}
       >
         <div
           style={{
