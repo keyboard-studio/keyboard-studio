@@ -47,6 +47,21 @@ function isSuppressedScript(lang: string, script: string): boolean {
 }
 
 /**
+ * Map a confirmed language code to its canonical BCP47 primary language
+ * subtag. RFC 5646 registers the shortest ISO 639 code, so a language with a
+ * 2-letter code is tagged `ha`, never `hau`; langtags records carry that
+ * canonical bare subtag as `.code`.
+ *
+ * Reads the ALREADY-RESOLVED module synchronously (see `getLoadedLangtags`).
+ * A code with no langtags record (free text, or langtags not yet loaded) passes
+ * through unchanged, as does a language whose canonical subtag is 3-letter.
+ */
+export function canonicalLanguageSubtag(code: string): string {
+  const canonical = getLoadedLangtags()?.getLanguageDefaults(code)?.code;
+  return canonical !== undefined && canonical !== "" ? canonical : code;
+}
+
+/**
  * Build the full BCP47 target tag from an ISO 639 language subtag and a raw
  * `il_target_script` value.
  *
@@ -76,8 +91,10 @@ export function buildTargetBcp47(
   targetScriptRaw: string,
   region = "",
 ): string {
-  const lang = languageSubtag.trim();
-  if (lang === "") return "";
+  const rawLang = languageSubtag.trim();
+  if (rawLang === "") return "";
+  // Q3 confirms the 3-letter code; the assembled tag carries the canonical form.
+  const lang = canonicalLanguageSubtag(rawLang);
   const reg = normalizeRegionSubtag(region);
   // BCP47 order: language-script-region-variant.
   if (targetScriptRaw === "fonipa") return [lang, reg, "fonipa"].filter((p) => p !== "").join("-");

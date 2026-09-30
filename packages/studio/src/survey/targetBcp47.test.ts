@@ -17,7 +17,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadLangtags } from "../lib/langtagsDefaults.ts";
-import { buildTargetBcp47 } from "./targetBcp47.ts";
+import { buildTargetBcp47, canonicalLanguageSubtag } from "./targetBcp47.ts";
 
 describe("before langtags resolves — composes exactly as it did before", () => {
   it("keeps the script subtag it cannot yet know is redundant", () => {
@@ -70,5 +70,29 @@ describe("with langtags resolved — the default script is elided", () => {
     expect(buildTargetBcp47("ewo", "other")).toBe("ewo");
     expect(buildTargetBcp47("ewo", "")).toBe("ewo");
     expect(buildTargetBcp47("", "Latn")).toBe("");
+  });
+});
+
+describe("with langtags resolved — the language subtag is canonicalized", () => {
+  beforeAll(async () => {
+    await loadLangtags();
+  });
+
+  it("maps a 3-letter code with a registered 2-letter form to the 2-letter subtag", () => {
+    expect(buildTargetBcp47("hau", "Latn")).toBe("ha");
+    expect(buildTargetBcp47("hau", "Arab")).toBe("ha-Arab");
+    expect(buildTargetBcp47("hau", "Arab", "NG")).toBe("ha-Arab-NG");
+    expect(buildTargetBcp47("ara", "Arab")).toBe("ar");
+    expect(buildTargetBcp47("hau", "fonipa")).toBe("ha-fonipa");
+  });
+
+  it("leaves a language with no 2-letter code unchanged", () => {
+    expect(canonicalLanguageSubtag("abn")).toBe("abn");
+    expect(buildTargetBcp47("ewo", "Arab")).toBe("ewo-Arab");
+  });
+
+  it("passes an unmatched free-text code through unchanged", () => {
+    expect(canonicalLanguageSubtag("zzzq")).toBe("zzzq");
+    expect(buildTargetBcp47("zzzq", "Latn")).toBe("zzzq-Latn");
   });
 });
