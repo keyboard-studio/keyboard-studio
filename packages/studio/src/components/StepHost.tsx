@@ -38,7 +38,7 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { diffWorkToDo } from "../steps/workToDo.ts";
 import { useWorkToDo } from "../hooks/useWorkToDo.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
-import { affectedStepNames } from "../decisions/reproposalNotice.ts";
+import { affectedStepNames, noticeableWorkItems } from "../decisions/reproposalNotice.ts";
 import {
   useSurveySessionStore,
   performManifestBack,
@@ -233,12 +233,15 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   // the effect below diffs against the snapshot and raises the notice — one
   // Next, one diff, no polling and no new D3-governed timer.
   const workToDo = useWorkToDo();
-  const pendingBeforeRef = useRef<typeof workToDo | null>(null);
+  const pendingBeforeRef = useRef<{
+    workToDo: typeof workToDo;
+    visited: readonly string[];
+  } | null>(null);
   useEffect(() => {
     if (pendingBeforeRef.current === null) return;
     const before = pendingBeforeRef.current;
     pendingBeforeRef.current = null;
-    const delta = diffWorkToDo(before, workToDo);
+    const delta = noticeableWorkItems(diffWorkToDo(before.workToDo, workToDo), before.visited);
     if (delta.length === 0) return;
     const steps = affectedStepNames(delta, i18n);
     const message = t({
@@ -424,7 +427,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // simply produces an empty delta, a silent no-op — cheaper than trying to
     // detect "does this step's evidence feed a later step" ahead of time, and
     // never wrong.
-    pendingBeforeRef.current = workToDo;
+    pendingBeforeRef.current = { workToDo, visited: useSurveySessionStore.getState().visited };
 
     // 1. If SurveyPhaseResult-shaped: recordPhase + routeAnswersThroughMutate.
     if (isSurveyPhaseResult(result)) {
