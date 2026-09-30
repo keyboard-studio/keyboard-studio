@@ -28,6 +28,7 @@ import { manifest } from "./manifest.ts";
 /** Mirror of surveySessionStore.ActiveStepId (kept local, boundary-clean). */
 type ActiveStepId =
   | "identity"
+  | "layout"
   | "choose_base"
   | "track"
   | "project_name"
@@ -175,8 +176,14 @@ export function advance(
   switch (completedStepId) {
     case "identity":
       return ctx.identitySupported
-        ? { next: nextSpineStepAfter("identity") }   // choose_base
+        ? { next: nextSpineStepAfter("identity") }   // layout
         : { next: "unsupported" };
+
+    case "layout":
+      // The community-layout question (spec 076 A4). Answers persist per
+      // question in the answer store; no reducer side effects, so it is absent
+      // from STEPS_WITH_APPLY_COMPLETION.
+      return { next: nextSpineStepAfter("layout") }; // choose_base
 
     case "choose_base":
       return { next: nextSpineStepAfter("choose_base") }; // track

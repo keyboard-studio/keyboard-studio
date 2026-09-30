@@ -7,15 +7,19 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import {
+  HOST_LAYOUT_ANSWER_ID,
   LAYOUT_FAMILY_ANSWER_ID,
   LAYOUT_FAMILY_STEP_ID,
   REFERENCE_HOSTS,
   getLayoutFamilyAnswer,
+  getPickedWindowsLayout,
   resolveLikelyHostLayouts,
   saveLayoutFamilyAnswer,
+  savePickedWindowsLayout,
   setLikelyHostDeps,
 } from "./layoutFamily.ts";
 import type { LikelyHostDeps } from "./layoutFamily.ts";
+import { WINDOWS_LAYOUTS } from "./windowsLayouts.ts";
 
 beforeEach(() => {
   useSurveyAnswerStore.getState().reset();
@@ -128,5 +132,60 @@ describe("resolveLikelyHostLayouts — real T011 default path", () => {
       REFERENCE_HOSTS.map((h) => h.label),
     );
     expect(r.hosts.some((h) => h.label === "UK English")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 076 A4 - the community-layout step's picked layout
+// ---------------------------------------------------------------------------
+
+describe("picked Windows layout (host_layout answer)", () => {
+  it("persists the catalog id under step layout / answer host_layout", () => {
+    savePickedWindowsLayout("basic_kbdfr");
+    const saved = useSurveyAnswerStore.getState().steps[LAYOUT_FAMILY_STEP_ID]?.answers[HOST_LAYOUT_ANSWER_ID];
+    expect(saved?.value).toBe("basic_kbdfr");
+    expect(getPickedWindowsLayout()?.id).toBe("basic_kbdfr");
+  });
+
+  it("ignores an id that is not in the catalog", () => {
+    savePickedWindowsLayout("basic_kbd_nonexistent");
+    expect(getPickedWindowsLayout()).toBeUndefined();
+  });
+
+  it("derives the family from the pick", () => {
+    savePickedWindowsLayout("basic_kbdgr");
+    expect(getLayoutFamilyAnswer()).toBe("qwertz");
+  });
+
+  it("the pick wins over a legacy stored layout_family answer", () => {
+    saveLayoutFamilyAnswer("qwertz");
+    savePickedWindowsLayout("basic_kbdfr");
+    expect(getLayoutFamilyAnswer()).toBe("azerty");
+  });
+
+  it("still reads a legacy layout_family answer when no pick exists", () => {
+    saveLayoutFamilyAnswer("azerty");
+    expect(getPickedWindowsLayout()).toBeUndefined();
+    expect(getLayoutFamilyAnswer()).toBe("azerty");
+  });
+
+  it("an other-family pick contributes no family (falls through to bcp47)", () => {
+    const other = WINDOWS_LAYOUTS.find((l) => l.family === "other");
+    expect(other).toBeDefined();
+    savePickedWindowsLayout(other!.id);
+    expect(getLayoutFamilyAnswer()).toBeUndefined();
+  });
+});
+
+describe("resolveLikelyHostLayouts - picked layout (spec 076 A4)", () => {
+  it("an exact reference-host pick beats family and language tag", () => {
+    const r = resolveLikelyHostLayouts({ layoutFamily: "qwerty", bcp47: ["de-DE"], pickedHost: "uk" });
+    expect(r.hosts.map((h) => h.id)).toEqual(["uk"]);
+    expect(r.source).toBe("layout-family");
+  });
+
+  it("a non-host pick falls back to its family", () => {
+    const r = resolveLikelyHostLayouts({ layoutFamily: "qwertz", bcp47: ["en"] });
+    expect(r.hosts.map((h) => h.id)).toEqual(["qwertz"]);
   });
 });

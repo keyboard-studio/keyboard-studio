@@ -57,7 +57,7 @@ function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
     questionRegistry: REGISTRY,
     traversal: traversal({
       activeStepId: "characters",
-      history: ["identity", "choose_base", "track"],
+      history: ["identity", "layout", "choose_base", "track"],
       selectedTrack: "adapt",
     }),
     hasProject: true,

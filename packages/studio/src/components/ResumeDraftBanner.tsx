@@ -23,6 +23,7 @@ import { BG_CARD, BORDER, TEXT_MAIN, TEXT_DIM, BLUE_ACTION, FONT } from "../surv
 // Friendly labels for the step the draft was left on.
 const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   identity: "language identity",
+  layout: "community keyboard layout",
   choose_base: "choosing a base keyboard",
   track: "authoring track",
   project_name: "project name",

@@ -185,14 +185,14 @@ describe("extractIdentityLite", () => {
   // into the real spine (choose_base), never the unsupported stub (FR-011).
   describe("proven alphabetic scripts stay supported (FR-011)", () => {
     for (const script of ["Latn", "Cyrl", "Grek", "Geor", "Armn"]) {
-      it(`${script}: supported === true and advance("identity") === "choose_base"`, () => {
+      it(`${script}: supported === true and advance("identity") === "layout"`, () => {
         const identity = extractIdentityLite(result(script, "xx"));
         expect(identity.supported).toBe(true);
         const outcome = advance("identity", undefined, {
           selectedTrack: null,
           identitySupported: identity.supported,
         });
-        expect(outcome.next).toBe("choose_base");
+        expect(outcome.next).toBe("layout");
       });
     }
   });

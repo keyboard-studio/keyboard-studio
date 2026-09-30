@@ -50,6 +50,7 @@ import { manifest } from "./manifest.ts";
 
 export type StepId =
   | "identity"
+  | "layout"
   | "choose_base"
   | "track"
   | "project_name"
@@ -88,7 +89,7 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "A",
     label: msg({ id: "phaseStepper.phase.a", message: "Survey" }),
-    stepIds: ["identity"],
+    stepIds: ["identity", "layout"],
   },
   {
     letter: "B",

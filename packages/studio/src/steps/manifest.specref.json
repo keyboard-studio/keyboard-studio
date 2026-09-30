@@ -3,6 +3,9 @@
     "§8",
     "specs/030-langtags-identity-autocomplete"
   ],
+  "layout": [
+    "specs/076-rule-behaviours"
+  ],
   "choose_base": [
     "§8",
     "specs/080-documentation-completeness"
