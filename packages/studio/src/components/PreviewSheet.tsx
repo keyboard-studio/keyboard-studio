@@ -152,6 +152,10 @@ export function PreviewSheet({
   const activeSpringRef = useRef<Spring | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const exitTimerRef = useRef<number | null>(null);
+  // `drive` is a stable callback (it feeds layout effects), so it reads the
+  // reduced-motion preference through a ref rather than closing over it.
+  const reducedRef = useRef(reduced);
+  reducedRef.current = reduced;
 
   const closeLabel = t({
     id: "previewSheet.close",
@@ -205,6 +209,14 @@ export function PreviewSheet({
       // Re-seat the newly-active spring at the live position: its own x
       // may be stale from an earlier flight.
       active.snapTo(liveOffsetRef.current, velocity);
+      if (reducedRef.current) {
+        // Reduced motion: land on the target instantly instead of riding
+        // the spring. The 1:1 drag tracking that precedes a release is
+        // direct manipulation (the pointer's own motion), but the release
+        // itself may not fly a spring.
+        active.snapTo(target, 0);
+        return;
+      }
       active.retarget(target);
     },
     [],

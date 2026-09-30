@@ -67,6 +67,7 @@ import {
   FONT,
 } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED, ERROR_BG } from "../../../ui/theme.ts";
+import { usePrefersReducedMotion } from "../../../ui/motion.ts";
 import {
   GREEN_CHIP_BG,
   GREEN_CHIP_BORDER,
@@ -155,6 +156,9 @@ export function CharScrollStrip({
   loanwordSet = EMPTY_CHAR_SET,
 }: CharScrollStripProps) {
   const { t } = useLingui();
+  // The current-char scroll-into-view below is smooth by default; reduced
+  // motion takes the instant jump instead.
+  const reducedMotion = usePrefersReducedMotion();
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const stripRef = useRef<HTMLDivElement | null>(null);
 
@@ -252,7 +256,7 @@ export function CharScrollStrip({
     // that mount this strip don't need to polyfill a browser-only API.
     if (typeof el?.scrollIntoView === "function") {
       el.scrollIntoView({
-        behavior: "smooth",
+        behavior: reducedMotion ? "auto" : "smooth",
         inline: "nearest",
         block: "nearest",
       });
@@ -266,7 +270,7 @@ export function CharScrollStrip({
     if (focusAlreadyInStrip) {
       el?.focus();
     }
-  }, [currentChar]);
+  }, [currentChar, reducedMotion]);
 
   // Rendering safety net for very large `chars` lists (e.g. a tonal-syllable
   // romanization inventory of several thousand characters — Hakka's confirmed
