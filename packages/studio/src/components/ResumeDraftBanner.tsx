@@ -34,6 +34,7 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   convenience: "convenience letters",
   carve: "carve",
   deadkeys: "deadkeys",
+  rules: "rules",
   mechanisms: "mechanisms",
   touch_seed_source: "touch starting point",
   touch: "touch layout",

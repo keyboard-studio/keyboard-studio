@@ -21,6 +21,11 @@
 //      .kmn (rule half) — see projectWorkingCopyVfs.ts's own step comments.
 //      Sourced from the caller's `liveLayoutOverride.keyEditOps` (below) —
 //      omitted entirely (empty array) when no override is supplied.
+//   1.8 Rules-step additions (spec 082) — the working IR's `rulesStepAdded`
+//      rules/stores (pack install, guard synthesis, Narrow) are spliced into
+//      the carve-filtered IR in working-IR order before the .kmn re-emit, so
+//      they take effect in the preview. Derived from the working IR vs the
+//      base IR; no-op when the rules step added nothing.
 //   2. Assignments — applyAssignmentsToVfs on the carved .kmn. If no patternMap
 //      is provided (SurveyView path), this step is skipped (no assignments
 //      to apply until Phase C completes).
@@ -38,6 +43,10 @@
 //
 // Memoization key:
 //   - deletedNodeIds: serialized as a sorted join of the node ID strings.
+//   - disabledFamilyIds (spec 082 FR-018): the disabled families' member
+//     rule nodeIds, serialized as a sorted join (`disabledKey`); merged into
+//     the projection's deletion set so "Disable group" excludes the family's
+//     rules from the compiled artifact.
 //   - assignments: serialized as a compact key string (same as GalleryPreviewWithPatterns).
 //   - identity.displayName: string or undefined.
 //   - touchLayoutJson: the store's field, OR (when `liveLayoutOverride` is
@@ -69,6 +78,11 @@ import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
+import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
+import {
+  deriveRuleAdditions,
+  ruleAdditionsKey as ruleAdditionsMemoKey,
+} from "../lib/ruleAdditions.ts";
 
 /** Stable empty default for `liveLayoutOverride.keyEditOps` when the option
  * (or the whole override) is omitted — avoids allocating a fresh empty array
@@ -232,6 +246,13 @@ export function useWorkingCopyTransform(
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
+  // spec 082 FR-018 "Disable group": the carve working IR plus the disabled
+  // family ids. Disabled families' member rules are merged into the
+  // projection's deletion set below, so disabling a family excludes its
+  // rules from the compiled artifact (demo pane + download alike) without
+  // an IR mutation — the toggle stays O(1) and reversible.
+  const workingIr = useWorkingCopyStore((s) => s.ir);
+  const disabledFamilyIds = useWorkingCopyStore((s) => s.disabledFamilyIds);
   // T015: carve dispositions for the suppression stage (FR-019), read from
   // the working-copy store. Scoped to the live carve set so stale
   // dispositions never rewrite uncarved rules; projectWorkingCopyVfs scopes
@@ -309,6 +330,35 @@ export function useWorkingCopyTransform(
       ";" +
       [...deletedTouchKeyIds].sort().join("|"),
     [deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds],
+  );
+
+  // Disabled rule-family member IDs (spec 082 FR-018). Computed from the
+  // working IR via the pure `disabledFamilyRuleIds` helper; the sorted-join
+  // `disabledKey` below is the primitive-stable memo key for the outer
+  // transform (same discipline as `deletedKey` — never the raw Set).
+  const disabledRuleIds = useMemo(
+    () => disabledFamilyRuleIds(workingIr, disabledFamilyIds),
+    [workingIr, disabledFamilyIds],
+  );
+  const disabledKey = useMemo(() => [...disabledRuleIds].sort().join("|"), [disabledRuleIds]);
+
+  // spec 082: rules-step rule additions (pack install, guard synthesis,
+  // Narrow). Derived from the working IR vs the base IR via the pure
+  // `deriveRuleAdditions` helper; `ruleAdditionsKey` is the primitive-stable
+  // memo key for the outer transform (same discipline as `disabledKey` —
+  // never the raw derived object). Feeds the existing 300 ms compile cycle:
+  // installing a pack or synthesizing/narrowing a guard changes the key,
+  // which re-runs the transform and recompiles the preview — no new timer.
+  const derivedRuleAdditions = useMemo(
+    () => (baseIr === null ? null : deriveRuleAdditions(workingIr, baseIr)),
+    [workingIr, baseIr],
+  );
+  const ruleAdditionsKey = useMemo(
+    () =>
+      derivedRuleAdditions === null
+        ? ""
+        : ruleAdditionsMemoKey(derivedRuleAdditions),
+    [derivedRuleAdditions],
   );
 
   // Assignments key — compact string (scope:target:patternId/slotValues per assignment).
@@ -446,6 +496,15 @@ export function useWorkingCopyTransform(
           ? identityKeyboardId
           : undefined;
 
+      // spec 082 FR-018: merge disabled families' member rules into the
+      // deletion set. When nothing is disabled this passes the store's set
+      // through untouched, preserving the byte-identical no-op invariant for
+      // unedited working copies (the common path in the early-survey stages).
+      const effectiveDeletedItemIds =
+        disabledRuleIds.size === 0
+          ? deletedItemIds
+          : new Set([...deletedItemIds, ...disabledRuleIds]);
+
       // T015: carve dispositions for the suppression stage (FR-019), scoped to
       // the live carve set. projectWorkingCopyVfs scopes them again as a
       // backstop. A6 loud/soft (FR-009) has no UI yet — soft (loud: false).
@@ -454,33 +513,35 @@ export function useWorkingCopyTransform(
         ...deletedItemIds,
       ]);
 
-      const { warnings: projectionWarnings, effectiveKeyboardId } =
-        projectWorkingCopyVfs({
-          vfs,
-          keyboardId,
-          ...(targetKeyboardId ? { targetKeyboardId } : {}),
-          baseIr,
-          deletedNodeIds,
-          deletedItemIds,
-          carveChars,
-          deletedTouchKeyIds,
-          ...(carveDispositions.length > 0 ? { carveDispositions } : {}),
-          // T020 (FR-023): keep-inert chars for carved touch keys. The store
-          // array is NFC-normalized at write time; the Set is the engine seam.
-          ...(carveTouchKeepInertChars.length > 0
-            ? { carveTouchKeepInert: new Set(carveTouchKeepInertChars) }
-            : {}),
-          keyEditOps,
-          deadkeyOps,
-          assignments: effectiveAssignments,
-          getPattern: (id) => patternMap?.get(id),
-          identity: identityArg,
-          ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
-          ...(storeBaseDisplayName !== null
-            ? { baseDisplayName: storeBaseDisplayName }
-            : {}),
-          contextToleranceOverlay,
-        });
+      const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
+        vfs,
+        keyboardId,
+        ...(targetKeyboardId ? { targetKeyboardId } : {}),
+        baseIr,
+        deletedNodeIds,
+        deletedItemIds: effectiveDeletedItemIds,
+        carveChars,
+        deletedTouchKeyIds,
+        ...(carveDispositions.length > 0 ? { carveDispositions } : {}),
+        // T020 (FR-023): keep-inert chars for carved touch keys. The store
+        // array is NFC-normalized at write time; the Set is the engine seam.
+        ...(carveTouchKeepInertChars.length > 0
+          ? { carveTouchKeepInert: new Set(carveTouchKeepInertChars) }
+          : {}),
+        keyEditOps,
+        deadkeyOps,
+        assignments: effectiveAssignments,
+        getPattern: (id) => patternMap?.get(id),
+        identity: identityArg,
+        ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
+        ...(storeBaseDisplayName !== null ? { baseDisplayName: storeBaseDisplayName } : {}),
+        contextToleranceOverlay,
+        // spec 082: project the rules step's working-IR additions (pack
+        // install, guard synthesis, Narrow). Null only while baseIr is null,
+        // which already returned null above — the conditional spread keeps
+        // TS's narrowing honest.
+        ...(derivedRuleAdditions !== null ? { ruleAdditions: derivedRuleAdditions } : {}),
+      });
 
       return {
         warnings: [...preWarnings, ...projectionWarnings],
@@ -494,6 +555,8 @@ export function useWorkingCopyTransform(
     storeBaseKeyboardId,
     storeBaseDisplayName,
     deletedKey,
+    disabledKey,
+    ruleAdditionsKey,
     carveDispositionsKey,
     carveTouchKeepInertKey,
     assignmentsKey,

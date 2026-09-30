@@ -48,6 +48,17 @@ export function setDefaultKeyboardLoader(loader: KeyboardLoader): void {
   installed ??= loader;
 }
 
+/** Optional hooks for `loadKeyboardInterface`. */
+export interface LoadKeyboardOptions {
+  /**
+   * Called with the fresh sandbox after the harness globals are installed
+   * but before the keyboard script is evaluated. Used by the simulator to
+   * install the fired-rule tracking global (spec 082) without touching the
+   * harness itself.
+   */
+  sandboxSetup?: (sandbox: SandboxGlobals) => void;
+}
+
 function currentLoader(): KeyboardLoader {
   if (installed === undefined) {
     throw new Error(
@@ -83,10 +94,12 @@ type HarnessWithLoaded = Omit<JSKeyboardInterface, 'loadedKeyboard'> & {
  *
  * @param scriptSrc    UTF-8 text of the compiled .js keyboard.
  * @param serializer   No-op variable store serializer (blueprint §7).
+ * @param options      Optional {@link LoadKeyboardOptions} (e.g. sandboxSetup).
  */
 export function loadKeyboardInterface(
   scriptSrc: string,
   serializer: VariableStoreSerializer,
+  options?: LoadKeyboardOptions,
 ): JSKeyboardInterface {
   const loader = currentLoader();
 
@@ -104,6 +117,9 @@ export function loadKeyboardInterface(
   // constructor. The keyboard script calls `KeymanWeb.KR(obj)`, which
   // populates `interface.loadedKeyboard`.
   const kbdInterface = new JSKeyboardInterface(sandbox, MinimalKeymanGlobal, serializer) as HarnessWithLoaded;
+
+  // Optional host hook (e.g. the simulator's fired-rule tracking global).
+  options?.sandboxSetup?.(sandbox);
 
   loader.evaluate(scriptSrc, sandbox);
 

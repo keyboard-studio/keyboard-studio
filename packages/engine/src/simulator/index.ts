@@ -19,10 +19,15 @@ import type {
   SimulatorContextSeed,
   TestVectorResult,
   PatternTestResult,
+  FiredRule,
 } from '@keyboard-studio/contracts';
 import type { Pattern } from '@keyboard-studio/contracts';
 
 import { loadKeyboardInterface } from './keyboardLoader.js';
+import {
+  instrumentFiredRuleTracking,
+  type FiredRuleHit,
+} from './firedRuleTracker.js';
 
 // Vendored Keyman engine imports (relative paths, so any bundler resolves them).
 import { Codes } from './vendor/keyman/engine/keyboard/codes.js';
@@ -30,8 +35,10 @@ import { KeyEvent } from './vendor/keyman/engine/keyboard/keyEvent.js';
 import { SyntheticTextStore } from './vendor/keyman/engine/keyboard/syntheticTextStore.js';
 import { DefaultOutputRules } from './vendor/keyman/engine/keyboard/defaultOutputRules.js';
 import { DeviceSpec } from './vendor/keyman/common/web-utils/deviceSpec.js';
+import { KMWString } from './vendor/keyman/common/web-utils/index.js';
 import { JSKeyboardProcessor } from './vendor/keyman/engine/js-processor/jsKeyboardProcessor.js';
 import { ModifierKeyConstants } from './vendor/keyman/common/types/main.js';
+import type { ProcessorAction } from './vendor/keyman/engine/keyboard/keyboards/processorAction.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -122,6 +129,31 @@ function buildKeyEvent(input: SimKeyInput): KeyEvent {
   });
 }
 
+/**
+ * Build the `FiredRule` contract object for one recorded rule hit.
+ *
+ * `matchedContext` is the text the rule consumed from the left context (the
+ * `deleteLeft` characters before the caret in the pre-keystroke snapshot);
+ * `emittedOutput` is the text the rule's transform inserted. Both are `''`
+ * when the rule did neither (e.g. `> nul`, beep-only, deadkey-only rules).
+ */
+function buildFiredRule(hit: FiredRuleHit, ruleBehavior: ProcessorAction | null | undefined): FiredRule {
+  const transform = ruleBehavior?.transcription?.transform;
+  const emittedOutput = transform?.insert ?? '';
+  const deleteLeft = transform?.deleteLeft ?? 0;
+  const preText = ruleBehavior?.transcription?.preInput?.getTextBeforeCaret?.() ?? '';
+  const matchedContext =
+    deleteLeft > 0
+      ? KMWString.substr(preText, Math.max(0, KMWString.length(preText) - deleteLeft))
+      : '';
+  return {
+    group: hit.group,
+    ruleIndex: hit.ruleIndex,
+    matchedContext,
+    emittedOutput,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // simulate()
 // ---------------------------------------------------------------------------
@@ -166,6 +198,11 @@ function extractJsSource(compiled: CompileResult): string {
  *   Do NOT re-apply the transform from `ruleBehavior.transcription` (blueprint §5).
  * - Deadkey ordinal seeds are a global static counter and MUST NOT be asserted
  *   across calls or test runs (blueprint §7).
+ * - Each step's `firedRule` names the compiled-keyboard rule that matched
+ *   (spec 082, Track A FR-002), captured by instrumenting the compiled `.js`
+ *   (see firedRuleTracker.ts). Absent when no rule fired. If the script does
+ *   not instrument (unexpected shape), simulation still works — the field
+ *   simply stays absent.
  * - The function is synchronous; the Keyman JS processor is fully synchronous.
  */
 export function simulate(
@@ -175,9 +212,33 @@ export function simulate(
 ): SimulationResult {
   const scriptSrc = extractJsSource(compiled);
 
+  // Fired-rule tracking (spec 082): instrument the compiled script so each
+  // rule-match marker reports (group, ruleIndex, srcLine) to the sandbox
+  // global below. `lastHit` is reset before every keystroke; the last hit
+  // recorded during `processKeystroke` is the rule that fired for that step.
+  // (With `use()` delegation the innermost rule's hit lands last.)
+  let lastHit: FiredRuleHit | null = null;
+  const instrumented = instrumentFiredRuleTracking(scriptSrc);
+
   // Load the keyboard via the installed loader. The returned JSKeyboardInterface
   // already has activeKeyboard set (blueprint §3).
-  const kbdInterface = loadKeyboardInterface(scriptSrc, NO_OP_STORE_SERIALIZER);
+  const kbdInterface = loadKeyboardInterface(
+    instrumented?.script ?? scriptSrc,
+    NO_OP_STORE_SERIALIZER,
+    instrumented
+      ? {
+          sandboxSetup: (sandbox) => {
+            sandbox[instrumented.hookName] = (
+              group: string,
+              ruleIndex: number,
+              srcLine: number | null,
+            ): void => {
+              lastHit = { group, ruleIndex, srcLine };
+            };
+          },
+        }
+      : undefined,
+  );
   const keyboard = kbdInterface.activeKeyboard;
 
   // Build the processor with the loaded interface (mirrors nodeProctor.ts:58-62).
@@ -243,6 +304,9 @@ export function simulate(
 
     // processKeystroke mutates textStore and returns a ProcessorAction.
     // Do NOT re-apply the transform; processKeystroke already applied it (blueprint §5).
+    // Reset the fired-rule hit first: anything recorded from here on belongs
+    // to this keystroke (resetContext above may have run NewContext groups).
+    lastHit = null;
     const ruleBehavior = processor.processKeystroke(keyEvent, textStore);
 
     // Finalize the action: applies setStore mutations, variable store saves, beep, etc.
@@ -261,12 +325,20 @@ export function simulate(
 
     const beep = ruleBehavior?.beep ?? false;
 
-    trace.push({
+    // Attach the fired rule when one matched (absent on default-output fall-through).
+    // Built as a fresh object per step; `lastHit` is re-armed at the top of the
+    // next iteration, so no hit can leak across keystrokes.
+    const step: SimulationStep = {
       input,
       outputAfter,
       pendingDeadkeys,
       beep,
-    });
+    };
+    if (lastHit !== null) {
+      step.firedRule = buildFiredRule(lastHit, ruleBehavior);
+    }
+
+    trace.push(step);
   }
 
   const finalOutput = trace.length > 0 ? (trace[trace.length - 1]?.outputAfter ?? '') : '';

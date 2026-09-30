@@ -115,8 +115,12 @@ describe("nextSpineStepAfter", () => {
     expect(nextSpineStepAfter("carve")).toBe("deadkeys");
   });
 
-  it("deadkeys → mechanisms", () => {
-    expect(nextSpineStepAfter("deadkeys")).toBe("mechanisms");
+  it("deadkeys → rules (spec 082: rules step follows deadkeys)", () => {
+    expect(nextSpineStepAfter("deadkeys")).toBe("rules");
+  });
+
+  it("rules → mechanisms", () => {
+    expect(nextSpineStepAfter("rules")).toBe("mechanisms");
   });
 
   it("mechanisms → touch (skips touch_seed_source which is spine:false)", () => {
@@ -142,13 +146,13 @@ describe("nextSpineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> marks -> carve -> deadkeys -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> marks -> carve -> deadkeys -> rules -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     // Spec 035 R4/R12: with no recorded fork choice (copyCtx.touchSeedSource === null),
     // mechanisms routes through the off-spine touch_seed_source fork before touch.
     expect(sequence).toEqual([
       "identity", "layout", "choose_base", "track", "project_name", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch_seed_source", "touch", "help", "done",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
@@ -158,7 +162,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
       "identity", "layout", "choose_base", "track", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch_seed_source", "touch", "help", "done",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     expect(navigateAtEnd).toBe("output");
@@ -216,7 +220,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
     const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
       "identity", "layout", "choose_base", "track", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "mechanisms", "touch", "help", "package",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch", "help", "package",
     ]);
   });
 });
@@ -339,8 +343,12 @@ describe("advance: spine hops", () => {
     expect(advance("carve", undefined, copyCtx).next).toBe("deadkeys");
   });
 
-  it("deadkeys → mechanisms (spec 083)", () => {
-    expect(advance("deadkeys", undefined, copyCtx).next).toBe("mechanisms");
+  it("deadkeys → rules (spec 082)", () => {
+    expect(advance("deadkeys", undefined, copyCtx).next).toBe("rules");
+  });
+
+  it("rules → mechanisms", () => {
+    expect(advance("rules", undefined, copyCtx).next).toBe("mechanisms");
   });
 
   it("mechanisms → touch_seed_source when no fork choice is recorded (spec 035 R4/R12)", () => {

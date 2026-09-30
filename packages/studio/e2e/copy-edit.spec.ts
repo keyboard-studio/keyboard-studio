@@ -246,9 +246,12 @@ async function finishGalleryWork(page: Page, fx: WalkFixture = FIXTURE): Promise
   await page.getByTestId("carve-continue").click();
   // Spec 083 inserts the Deadkeys step between carve and mechanisms (Phase D):
   // walk through it. The walk defines no deadkeys, so Continue advances
-  // straight to the mechanisms gallery driveMechanismsGallery expects.
+  // straight to the rules step.
   await expect(page.getByTestId("deadkeys-continue")).toBeVisible({ timeout: 30_000 });
   await page.getByTestId("deadkeys-continue").click();
+  // Spec 082: the rules step sits between deadkeys and mechanisms — accept it
+  // as-is (no bundle installs in the e2e walk) and continue.
+  await page.getByTestId("rules-continue").click();
   await driveMechanismsGallery(
     page,
     fx.placement !== undefined ? { placements: { [fx.charToAdd]: fx.placement } } : {},
