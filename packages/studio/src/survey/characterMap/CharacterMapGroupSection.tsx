@@ -237,8 +237,8 @@ export function CharacterMapGroupSection({
                   onClick={() => onToggleCell(cell)}
                   aria-pressed={selected}
                   aria-label={cellAriaLabel}
-                  // Activation attributes for the character info popover
-                  // (keyboard-studio#1783): the pane's delegated
+                  // Activation attributes for the character info popover:
+                  // the pane's delegated
                   // pointerover/focusin listeners read the cell's character
                   // and block from here. Attributes only — no per-cell DOM
                   // nodes, no per-cell handlers (3000 cells per group).

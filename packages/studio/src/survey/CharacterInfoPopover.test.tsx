@@ -1,5 +1,4 @@
-// Tests for the character map's hover/focus info popover
-// (keyboard-studio#1783).
+// Tests for the character map's hover/focus info popover.
 //
 // Strategy (mirrors CharacterMapPane.test.tsx):
 //   - characterMapGroups is mocked via vi.mock("../lib/services.ts").

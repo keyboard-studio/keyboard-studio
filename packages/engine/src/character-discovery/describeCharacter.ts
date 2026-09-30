@@ -1,6 +1,6 @@
 /**
  * describeCharacter — per-character Unicode facts for the character map's
- * hover/focus info popover (keyboard-studio#1783).
+ * hover/focus info popover.
  *
  * Answers, for one NFC grapheme: its Unicode name(s), every code point, the
  * General_Category of each code point, whether the grapheme combines with the

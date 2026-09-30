@@ -1,5 +1,5 @@
 // Tests for describeCharacter — the character map info popover's Unicode
-// facts helper (keyboard-studio#1783).
+// facts helper.
 //
 // The helper is pure and dependency-free by design (the 1.5 MB pinned table
 // is injected, never imported), so the category matrix below runs against a

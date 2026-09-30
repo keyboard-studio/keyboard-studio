@@ -1,5 +1,4 @@
-// Lazy loader for the pinned Unicode data table
-// (keyboard-studio#1783).
+// Lazy loader for the pinned Unicode data table.
 //
 // The table (`@keyboard-studio/contracts/unicode`, ~1.5 MB generated) is the
 // single authoritative source of Unicode names, General_Category, and

@@ -42,10 +42,10 @@ const ABOVE_CCC = new Set([214, 216, 228, 230, 232, 234]);
 /**
  * Canonical combining classes that render below the base: 220 Below,
  * 218 Below left, 222 Below right, 233 Double below, 202 Below attached,
- * 200 Below left attached, 204 Below right attached, 240 iota subscript
- * (written below the base vowel).
+ * 200 Below left attached, 240 iota subscript (written below the base vowel).
+ * UAX #44 defines no attached-below-right class.
  */
-const BELOW_CCC = new Set([200, 202, 204, 218, 220, 222, 233, 240]);
+const BELOW_CCC = new Set([200, 202, 218, 220, 222, 233, 240]);
 
 /** First and last Arabic fixed-position canonical combining classes (UAX #44). */
 const ARABIC_FIXED_CCC_MIN = 27;

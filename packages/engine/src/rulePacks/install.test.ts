@@ -188,6 +188,16 @@ describe("installPack (FR-015: through the spine)", () => {
     expect(() => installPack(readonlyMain, pack)).toThrow(/read-only/);
   });
 
+  it("refuses a non-key-handling group named main instead of minting a duplicate", () => {
+    const pack = loadPack();
+    const fixture = loadFixtureIr();
+    const contextOnlyMain: KeyboardIR = {
+      ...fixture,
+      groups: fixture.groups.map((g) => (g.name === "main" ? { ...g, usingKeys: false } : g)),
+    };
+    expect(() => installPack(contextOnlyMain, pack)).toThrow(/a group named "main" already exists/);
+  });
+
   it("mints a main group when the keyboard has no key-handling group at all", () => {
     const pack = loadPack();
     const noGroups: KeyboardIR = { ...loadFixtureIr(), groups: [] };

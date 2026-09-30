@@ -241,9 +241,14 @@ export function installPack(ir: KeyboardIR, pack: RulePack): InstallPackResult {
   const groups = ir.groups.map((g) => ({ ...g, rules: [...g.rules] }));
   let target = groups.find((g) => g.usingKeys && !g.readonly);
   if (target === undefined) {
-    if (groups.some((g) => g.usingKeys || g.name === "main")) {
+    if (groups.some((g) => g.usingKeys)) {
       throw new RulePackInstallError(
         `cannot install pack "${validPack.id}": the keyboard's key-handling group is read-only`,
+      );
+    }
+    if (groups.some((g) => g.name === "main")) {
+      throw new RulePackInstallError(
+        `cannot install pack "${validPack.id}": a group named "main" already exists and is not the key-handling group`,
       );
     }
     target = {

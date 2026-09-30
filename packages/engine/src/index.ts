@@ -436,7 +436,7 @@ export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
 // spec 047 — pure Unicode General-Category classifier for the inventory breakdown.
 export { glyphCategory } from "./character-discovery/glyphCategory.js";
 export type { GlyphCategory } from "./character-discovery/glyphCategory.js";
-// keyboard-studio#1783 — per-character Unicode facts for the character map's
+// Per-character Unicode facts for the character map's
 // hover/focus info popover. Pure + dependency-free: the pinned table is
 // injected by the caller (dynamically imported in the studio) so this adds
 // nothing to any bundle statically.

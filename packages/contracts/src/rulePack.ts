@@ -15,6 +15,7 @@
 // the schema changes incompatibly; readers reject unknown versions loudly.
 
 import { z } from "zod";
+import type { AssignableTo, DeepStripUndefined, Expect } from "./utils/schemaGuards";
 
 /** Current pack schema version. Packs carrying any other version are rejected. */
 export const PACK_VERSION = "1.0" as const;
@@ -244,18 +245,10 @@ export type ValidateRulePackResult =
   | { ok: true; pack: RulePack }
   | { ok: false; issues: RulePackIssue[] };
 
-/**
- * Bridges zod's `.optional()` (which infers `T | undefined`) to the
- * contract's exactOptionalPropertyTypes `?:` form — the same idea as
- * schemas.ts's DeepStripUndefined. Applied at both the type level (drift
- * guards below) and the value level (stripUndefinedDeep), so the validated
- * pack genuinely satisfies the interfaces above rather than relying on a cast.
- */
-type DeepStripUndefined<T> = T extends (infer U)[]
-  ? DeepStripUndefined<U>[]
-  : T extends object
-    ? { [K in keyof T]: DeepStripUndefined<Exclude<T[K], undefined>> }
-    : T;
+// stripUndefinedDeep is the value-level twin of DeepStripUndefined (see
+// utils/schemaGuards): it applies the same `.optional()` -> `?:` bridge to the
+// parsed data, so the validated pack genuinely satisfies the interfaces above
+// rather than relying on a cast.
 
 /** Recursively drop `undefined`-valued keys (JSON has no undefined). */
 function stripUndefinedDeep<T>(value: T): DeepStripUndefined<T> {
@@ -302,9 +295,6 @@ export function validateRulePack(data: unknown): ValidateRulePackResult {
 // field is added, removed, or retyped on an interface without updating the
 // schema, the alias resolves to Expect<false> and fails the build.
 // ---------------------------------------------------------------------------
-
-type Expect<T extends true> = T;
-type AssignableTo<S, T> = [DeepStripUndefined<S>] extends [T] ? true : false;
 
 // These aliases are intentionally unused at the value level — their
 // declaration is the assertion. A failure surfaces as a constraint error.

@@ -1,5 +1,4 @@
-// CharacterInfoPopover — the character map's hover/focus info popover
-// (keyboard-studio#1783).
+// CharacterInfoPopover — the character map's hover/focus info popover.
 //
 // ONE instance per CharacterMapPane, always rendered (hidden when no cell is
 // active) and positioned at the hovered/focused cell. There is deliberately

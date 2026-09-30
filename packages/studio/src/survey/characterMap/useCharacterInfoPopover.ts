@@ -1,5 +1,5 @@
 // useCharacterInfoPopover — delegated hover/focus activation for the
-// character map's info popover (keyboard-studio#1783).
+// character map's info popover.
 //
 // Performance contract: groups render up to 3000 cells, so this hook
 // attaches exactly ONE set of listeners to the pane's scroll container —

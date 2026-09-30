@@ -151,7 +151,7 @@ export function CharacterMapPane({
   // Zoom factor for the chip grid — see useZoomControl.ts.
   const { zoom, zoomOutButtonRef, zoomInButtonRef, handleZoom } = useZoomControl(setAnnouncement);
 
-  // Character info popover (keyboard-studio#1783): one shared instance per
+  // Character info popover: one shared instance per
   // pane, activated by delegated pointerover/focusin listeners on the group
   // scroll container below — no per-cell handlers, no per-cell DOM.
   const charInfoContainerRef = useRef<HTMLDivElement | null>(null);
@@ -607,7 +607,7 @@ export function CharacterMapPane({
       </div>
 
       {/* Group scroll container — also the delegation root for the character
-          info popover (keyboard-studio#1783): ONE set of pointerover/focusin
+          info popover: ONE set of pointerover/focusin
           listeners here reads the hovered/focused cell from its data-char /
           data-block attributes, instead of attaching handlers to up to 3000
           cell buttons. The handlers only ADD capability (observing events
@@ -657,7 +657,7 @@ export function CharacterMapPane({
         )}
       </div>
       {/* The character info popover's single instance per pane
-          (keyboard-studio#1783) — always rendered, hidden when no cell is
+          — always rendered, hidden when no cell is
           active, positioned at the hovered/focused cell by the component. */}
       <CharacterInfoPopover
         target={charInfo.target}
