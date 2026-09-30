@@ -248,6 +248,12 @@ export interface SurveyRunnerProps {
   context?: SurveyContext;
   onComplete: (result: SurveyPhaseResult) => void;
   onBack?: () => void;
+  /**
+   * Forward-button label for the last question of this flow. Omit it (the
+   * default) unless the flow is the final step of the whole journey; otherwise
+   * the button reads "Continue" on every question, including the last.
+   */
+  finalLabel?: string;
   findingsByQuestionId?: Record<string, LintFinding[]>;
   /**
    * Called when the user advances past a question, committing its answered value
@@ -377,6 +383,7 @@ export function SurveyRunner({
   context = {},
   onComplete,
   onBack,
+  finalLabel,
   findingsByQuestionId,
   onAnswerCommit,
   getSeedValue,
@@ -729,9 +736,14 @@ export function SurveyRunner({
               }
             : {}),
           forward: {
-            label: isLastQuestion
-              ? t({ id: "survey.surveyRunner.finishButton", message: "Finish" })
-              : t({ id: "survey.surveyRunner.nextButton", message: "Next" }),
+            // Advance-label rule: mid-journey steps say "Continue". A flow running out
+            // of questions is not the end of the journey, so the label is never keyed
+            // off `next === null`; only a wrapper that knows it ends the journey
+            // passes `finalLabel`.
+            label:
+              isLastQuestion && finalLabel !== undefined
+                ? finalLabel
+                : t({ id: "survey.surveyRunner.nextButton", message: "Continue" }),
             onClick: handleNext,
             disabled: !canAdvance,
             testId: "survey-advance",
