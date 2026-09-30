@@ -16,6 +16,7 @@ import { plural } from "@lingui/core/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "../../components/OSKFrame.tsx";
+import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { OskModeToggle } from "../../components/OskModeToggle.tsx";
 import type { OskMode } from "../../components/OskModeToggle.tsx";
 import {
@@ -44,6 +45,10 @@ export function GalleryPreviewPane({
   const { t } = useLingui();
   const resolvedWarningLabel = warningLabel ?? t({ id: "editor.assignLoop.preview.defaultWarningsLabel", message: "Warnings:" });
   const [oskMode, setOskMode] = useState<OskMode>(defaultOskMode);
+  // Narrow viewports render this pane in AssignLoopShell's flush PreviewSheet:
+  // the keyboard spans the sheet edge to edge, so the text blocks carry their
+  // own 12px side inset (the SurveyPreviewPane `compact` convention).
+  const inset = useIsNarrow() ? "0 12px" : 0;
 
   const applyWarnings =
     stage.kind === "ready" && stage.scaffoldWarnings.length > 0
@@ -73,6 +78,7 @@ export function GalleryPreviewPane({
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: 10,
+          margin: inset,
         }}
       >
         <h2
@@ -102,6 +108,7 @@ export function GalleryPreviewPane({
             border: "1px solid var(--app-warning)",
             borderRadius: 6,
             padding: "8px 12px",
+            margin: inset,
             fontSize: 12,
             color: "var(--app-warning-text)",
             fontFamily: FONT,
@@ -125,6 +132,7 @@ export function GalleryPreviewPane({
             border: "1px solid var(--app-warning)",
             borderRadius: 6,
             padding: "8px 12px",
+            margin: inset,
             fontSize: 12,
             color: "var(--app-warning-text)",
             fontFamily: FONT,
@@ -148,6 +156,7 @@ export function GalleryPreviewPane({
           aria-label={t({ id: "editor.assignLoop.preview.loadingAriaLabel", message: "Loading keyboard preview" })}
           style={{
             padding: "24px 0",
+            margin: inset,
             textAlign: "center",
             color: TEXT_DIM,
             fontSize: 13,
@@ -170,6 +179,7 @@ export function GalleryPreviewPane({
           aria-live="assertive"
           style={{
             padding: "16px 20px",
+            margin: inset,
             background: "var(--app-danger-bg)",
             border: "1px solid var(--app-danger)",
             borderRadius: 8,
@@ -229,6 +239,7 @@ export function GalleryPreviewPane({
             border: `1px solid ${BORDER}`,
             borderRadius: 6,
             padding: "8px 12px",
+            margin: inset,
             fontSize: 11,
             color: TEXT_DIM,
             fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",

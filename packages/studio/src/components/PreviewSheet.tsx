@@ -334,6 +334,20 @@ export function PreviewSheet({
     return;
   }, [mounted, open, reduced, sideDock, drive]);
 
+  // Lock the page behind the sheet while it is on screen. Besides stopping
+  // background scroll under the backdrop, this drops the page's classic
+  // scrollbar: a fixed `left: 0; right: 0` sheet spans the viewport MINUS
+  // that scrollbar, which inset the edge-to-edge keyboard by its width.
+  useLayoutEffect(() => {
+    if (!mounted) return;
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, [mounted]);
+
   // A tap-close starts from rest on the default preset — ordinary UI
   // motion — unless it interrupts the enter flight, whose live velocity
   // carries over so the sheet reverses without a jump.
@@ -511,6 +525,10 @@ export function PreviewSheet({
             flexGrow: 1,
             overflowY: "auto",
             minHeight: 0,
+            // A classic (desktop) scrollbar here would take its width out of
+            // the content and inset the edge-to-edge keyboard. The sheet
+            // still scrolls by wheel, touch, and keyboard.
+            scrollbarWidth: "none",
           }}
         >
           {/* Sticky translucent header: content scrolls under the frosted chrome. */}

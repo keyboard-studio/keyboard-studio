@@ -214,6 +214,7 @@ export function AssignLoopShell({
           onOpenChange={setSheetOpen}
           label={previewSheetLabel}
           testId="assign-loop-preview-sheet"
+          flush
         >
           {rightContent}
         </PreviewSheet>

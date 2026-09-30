@@ -246,8 +246,6 @@
     }
     var profile = devices[currentMode] || devices.desktop;
 
-    oskHostFrame.className = profile.name === "Google Pixel 5" ? "Pixel5" : "Windows";
-
     if (currentOsk) {
       try {
         if (currentOsk.element && currentOsk.element.parentNode === oskHost) {

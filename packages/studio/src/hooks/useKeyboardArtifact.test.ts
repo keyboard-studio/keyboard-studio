@@ -756,3 +756,19 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effe
 // download enabled, but the zip emitted without it. Worth closing with an
 // integration test at the services boundary rather than the hook boundary.
 // ---------------------------------------------------------------------------
+
+describe("isOskStylesheetPath", () => {
+  it.each([
+    // The keyboard's own OSK stylesheet stays.
+    ["sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.css", true],
+    // A keyboard whose folder is itself named "help" is not a doc folder.
+    ["sil/help/source/help.css", true],
+    // The welcome / help pages' own stylesheets are dropped.
+    ["sil/sil_cameroon_qwerty/source/welcome/kb.css", false],
+    ["sil/sil_cameroon_qwerty/source/help/kb.css", false],
+    [String.raw`sil\x\source\Welcome\kb.css`, false],
+  ])("%s -> %s", async (path, expected) => {
+    const { isOskStylesheetPath } = await import("./useKeyboardArtifact");
+    expect(isOskStylesheetPath(path)).toBe(expected);
+  });
+});
