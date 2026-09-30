@@ -3,7 +3,7 @@
   "specName": "Rule behaviours — managing reorder, blocking, and context rules as intents",
   "branch": "km/issue-1802-spec",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "plan",
@@ -207,6 +207,13 @@
       "by": "ai",
       "at": "2026-09-29T00:55:00Z",
       "note": "Layer B shadowing audit: emitted KMN from pre-carve vs carved IR through the live kmcmplib WASM oracle, diffed KM_HINT_UNREACHABLE_RULE findings across 10 probe scenarios — 0 new unreachable findings from the carve in all cases (slot guard, bare-key/text/deadkey rewrites, loud, derived arming, redundant guard, duplicate-LHS pin). No synthesis fix needed. Permanent gate: pattern-apply/carveShadowingAudit.test.ts (8 tests); pattern-apply suite 48 files / 1071 tests green."
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-30T05:49:38.992Z"
     }
   ],
   "coverage": {
