@@ -100,6 +100,8 @@ export interface Spring {
   /** Stop the loop and release the frame callback. */
   dispose(): void;
   readonly position: number;
+  /** Current velocity in px/s — read for gesture handoffs (grab mid-flight, re-targeting). */
+  readonly velocity: number;
   readonly target: number;
   readonly running: boolean;
 }
@@ -164,6 +166,9 @@ export function createSpring(options: SpringOptions = {}): Spring {
   return {
     get position(): number {
       return x;
+    },
+    get velocity(): number {
+      return velocity;
     },
     get target(): number {
       return target;
