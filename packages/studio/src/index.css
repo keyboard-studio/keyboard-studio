@@ -191,3 +191,46 @@ body {
  * import HoverDangerChip directly). No CSS class is needed for this
  * affordance; kept as a comment here so a future attempt at a `:hover` class
  * doesn't silently lose to the inline styles again. */
+
+/* Long-press progress hint (KeyGridCell) ------------------------------------
+ * `.ks-longpress-hint` is the ring that fills around a key while the 500ms
+ * long-press hold is registering. A class (not an inline style) because the
+ * fill needs `@keyframes` — keyframes cannot be expressed inline — and the
+ * reduced-motion fallback cannot be expressed inline either.
+ *
+ * The progress lives in the `--ks-longpress-p` custom property, animated 0 to
+ * 1 over the hold duration; the ring itself is a conic-gradient masked to a
+ * 3px band (mask-composite: exclude), so the fill is a pure paint of a
+ * gradient stop — no transform trickery needed to fake a clockwise ring, and
+ * nothing bounces or overshoots: the fill is `linear` and `forwards`.
+ * The element sets its own `animation-duration` inline from LONG_PRESS_MS in
+ * the component so the two cannot drift apart.
+ *
+ * Reduced motion: no fill — the ring shows as a static low-opacity band so
+ * the hold still has a visible marker, without the time-based progress. */
+@property --ks-longpress-p {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.ks-longpress-hint {
+  animation: ks-longpress-fill 500ms linear forwards;
+}
+
+@keyframes ks-longpress-fill {
+  from {
+    --ks-longpress-p: 0;
+  }
+  to {
+    --ks-longpress-p: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ks-longpress-hint {
+    animation: none;
+    background: var(--app-accent);
+    opacity: 0.35;
+  }
+}
