@@ -81,7 +81,7 @@ The extraction logic is already there: `harvestChars` captures **every distinct
 character** in whatever it is given and drops only CR/LF/CRLF/tab/space (spec 047
 FR-001/FR-002), reporting unusual invisibles rather than swallowing them.
 
-This feature is the sibling of [044-cldr-sldr-exemplars](../044-cldr-sldr-exemplars/spec.md):
+This feature is the sibling of [044-cldr-sldr-exemplars](../044-cldr-sldr-exemplars/AS-BUILT.md):
 044 makes a **reference set** (CLDR/SLDR exemplars) prefill Phase B through a propose-then-
 confirm, per-character-attributed contract (FR-016/FR-016a/FR-017, confirmed shipped and
 verified this session). This spec's remaining work is making the author's **own corpus** go
@@ -227,7 +227,7 @@ assert the union is proposed with per-character attribution.
   corrected Context section above) already handles arbitrary raw text and already has its
   multiline surface; this feature adds the upload path and MUST NOT fork the extraction.
 - **Depends on 044's prefill contract**: FR-016/FR-016a/FR-017 and the attribution model
-  live in [044](../044-cldr-sldr-exemplars/spec.md) — confirmed shipped and verified this
+  live in [044](../044-cldr-sldr-exemplars/AS-BUILT.md) — confirmed shipped and verified this
   session (2026-08-19), so this dependency is satisfied. The remaining work is replacing
   `pb_text_sample_review`'s plain bool gate with that actual contract, not waiting on it.
 - **No new screen and no new discovery choice**: the text area lives on the existing

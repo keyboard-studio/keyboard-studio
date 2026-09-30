@@ -16,7 +16,7 @@ lifecycle.
 The build reads these definitions to populate the committed per-keyboard facet index
 (`docs/keyboard-facet-index.json`, [specs/070-keyboard-facet-index/data-model.md](../../specs/070-keyboard-facet-index/data-model.md)
 Entity 3); the classification algorithms themselves belong to
-[specs/037-facet-classifiers](../../specs/037-facet-classifiers/spec.md).
+[specs/037-facet-classifiers](../../specs/037-facet-classifiers/AS-BUILT.md).
 
 ## Layout
 
@@ -64,7 +64,7 @@ mechanism described above.
 
 Most construction facets are further **rule-structure** classifiers reading the
 same parsed-`.kmn` evidence as `strategy fingerprint` (see
-[specs/037-facet-classifiers](../../specs/037-facet-classifiers/spec.md)).
+[specs/037-facet-classifiers](../../specs/037-facet-classifiers/AS-BUILT.md)).
 **`source.touch-combo-mechanism` is the exception**: its classifier reads the
 keyboard's **touch-layout JSON**, a distinct evidence source from the
 KMN-rule-structure recognizer that feeds the other rule-structure classifiers —
@@ -77,4 +77,4 @@ The `script` facet (`script.yaml`, spec 070) and the `source.*` construction fac
 (encoding, casing, combo-mechanism, normalization, reordering, caps-handling, fall-through posture,
 rule/store compaction, mnemonic-vs-positional, and the touch-specific variants) now exist in this
 directory as candidate/planned classifiers — see [specs/070-keyboard-facet-index/](../../specs/070-keyboard-facet-index/)
-and [specs/037-facet-classifiers](../../specs/037-facet-classifiers/spec.md).
+and [specs/037-facet-classifiers](../../specs/037-facet-classifiers/AS-BUILT.md).

@@ -1,6 +1,6 @@
 # Runbook: crash reporting
 
-Operational setup for [spec.md](spec.md). Everything here is a **dashboard action for the repository
+Operational setup for [spec.md](../_archive/060-crash-reporting/spec.md). Everything here is a **dashboard action for the repository
 owner** — none of it is code, and none of it blocks development or tests. Every server task ships
 fully tested against an injected fetch stub with no repository, App, or credential in existence
 (FR-136). What these steps unblock is the route's **live function**: until they are done,

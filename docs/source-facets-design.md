@@ -1,6 +1,6 @@
 # Source (construction) facets — design brief
 
-**Status:** design brief (input to [specs/037-facet-classifiers](../specs/037-facet-classifiers/spec.md)
+**Status:** design brief (input to [specs/037-facet-classifiers](../specs/037-facet-classifiers/AS-BUILT.md)
 enrichment + a new deferred transform spec). Not itself a spec. Produced from a
 grilling session on 2026-07-16 against [standards.md](../standards.md).
 
@@ -32,7 +32,7 @@ sharper schema than defining them for display alone.
 |---|---|---|
 | Session facets | "who is asking, on what, for whom, where output goes" | [content/facets/](../content/facets/README.md) (6 families) |
 | Keyboard-level facets | "what this corpus keyboard **is**" (from its own rules) | [content/keyboard-facets/](../content/keyboard-facets/README.md) |
-| Classifiers | how keyboard-facet values are *deterministically derived* | [specs/037-facet-classifiers](../specs/037-facet-classifiers/spec.md) |
+| Classifiers | how keyboard-facet values are *deterministically derived* | [specs/037-facet-classifiers](../specs/037-facet-classifiers/AS-BUILT.md) |
 
 **Placement decision:**
 - Per-base construction facts are **keyboard-facet definitions** (measured from the
@@ -197,7 +197,7 @@ toward `U+` values. Hence a policy, not a constant.
 | 1 | facet READMEs ([session](../content/facets/README.md), [keyboard](../content/keyboard-facets/README.md)) | add the `source/` family + transform-ready fields to the schemas | content/schema |
 | 2 | `content/facets/source/*.yaml` | author the `source.*` session-facet records (candidate) | content data |
 | 3 | `content/keyboard-facets/*.yaml` + `orth.display-difficulty` | author the per-base construction keyboard-facet definitions | content data |
-| 4 | [specs/037-facet-classifiers/spec.md](../specs/037-facet-classifiers/spec.md) | amend: US1 fall-through clarification; note construction classifiers | spec amendment |
+| 4 | [specs/037-facet-classifiers/spec.md](../specs/_archive/037-facet-classifiers/spec.md) | amend: US1 fall-through clarification; note construction classifiers | spec amendment |
 | 5 | **new** `specs/0NN-facet-transform/` | the deferred transform engine -- owns the value-transition matrix + migration rules; cites `source.*` as input | new spec (stub) |
 
 Items 1-4 are the substance of "enrich the spec before 037." Item 5 is birthed via

@@ -24,6 +24,11 @@ status of the unit it came from. If a snippet isn't enough, `Read` that file **a
 opening the whole file spends the tokens the search just saved. Output is byte-capped (default
 2048; `--budget` to change). Details in [docs/tooling.md](docs/tooling.md#searching-the-corpus).
 
+**Retired specs.** `specs/_archive/**` holds the full working docs of shipped features. Don't
+Read them by default: start from `specs/NNN-slug/AS-BUILT.md` (or `contracts.md`); the code is
+the truth. `spec-search` still indexes the archive -- skip `specs/_archive/` hits unless the task
+is explicitly historical, and scope Grep to exclude it.
+
 For keyboards specifically, [docs/keyboard-index.md](docs/keyboard-index.md) is the phonebook —
 see below.
 
