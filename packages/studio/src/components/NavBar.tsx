@@ -159,7 +159,9 @@ export function NavBar({
           style={{
             fontSize: 15,
             fontWeight: 700,
-            letterSpacing: "-0.01em",
+            // System tracking for a 15px title: the headline step of the
+            // type scale, replacing the ad-hoc -0.01em.
+            letterSpacing: "var(--app-tracking-headline)",
             color: "var(--app-text)",
             fontFamily: "var(--app-font)",
             whiteSpace: "nowrap",

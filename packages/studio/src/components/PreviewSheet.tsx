@@ -233,10 +233,11 @@ export function PreviewSheet({
           <span
             style={{
               flexGrow: 1,
-              fontSize: 14,
-              fontWeight: 600,
+              // Type-scale label role: weight + size + leading + tracking
+              // as one set, replacing the ad-hoc 14px/600 pair.
+              font: "var(--app-type-label)",
+              letterSpacing: "var(--app-tracking-label)",
               color: TEXT_DIM,
-              fontFamily: FONT,
               // The pill sits above the title row; leave it room.
               paddingTop: sideDock ? 0 : 8,
             }}
