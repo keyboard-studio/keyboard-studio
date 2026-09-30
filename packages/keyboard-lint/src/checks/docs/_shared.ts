@@ -367,7 +367,17 @@ export function normalizeDocBody(html: string): string {
   let body = stripKeyboardLayoutSection(stripPhpHeader(html));
   // Drop document chrome so a criteria-compliant help fragment (no
   // </body></html>) still compares equal to a full welcome.htm document.
-  body = body.replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
+  // The doctype declaration and HTML comments are non-rendering chrome in
+  // the same sense, so they compare equal too.
+  body = body
+    .replace(/<!DOCTYPE[^>]*>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
+  // Sibling documentation links name the same logical page in different
+  // delivery containers: the welcome page links its `.htm` companions
+  // while the help page links the `.php` twins. Normalize the extension so
+  // the parity check compares the link target, not the container.
+  body = body.replace(/\.(?:htm|php)(?=["'#])/gi, ".page");
   return collapseWhitespace(body);}
 
 const STYLE_ATTR_RE = /\bstyle\s*=\s*"([^"]*)"|\bstyle\s*=\s*'([^']*)'/gi;

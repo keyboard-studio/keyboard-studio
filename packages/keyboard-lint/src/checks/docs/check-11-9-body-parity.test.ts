@@ -40,4 +40,32 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
     expect(checkBodyParity(makeInput({ "welcome-htm": "<p>Hi</p>" }))).toEqual([]);
     expect(checkBodyParity(makeInput({ "help-php": "<p>Hi</p>" }))).toEqual([]);
   });
+
+  it("ignores doctype declarations and HTML comments (non-rendering chrome)", () => {
+    const members = {
+      "welcome-htm":
+        "<!DOCTYPE html><html><body><!-- a note --><p>Welcome to Test</p></body></html>",
+      "help-php": "<p>Welcome to Test</p>",
+    };
+    expect(checkBodyParity(makeInput(members))).toEqual([]);
+  });
+
+  it("treats .htm and .php sibling links as the same delivery container", () => {
+    const members = {
+      "welcome-htm":
+        '<html><body><p>See <a href="layout-us-en.htm">all combinations</a>.</p></body></html>',
+      "help-php":
+        '<?php\n$pagename = "Test Help";\n?>\n<p>See <a href="layout-us-en.php">all combinations</a>.</p>',
+    };
+    expect(checkBodyParity(makeInput(members))).toEqual([]);
+  });
+
+  it("still fires when .htm/.php link basenames differ", () => {
+    const members = {
+      "welcome-htm":
+        '<html><body><a href="layout-us-en.htm">x</a></body></html>',
+      "help-php": '<a href="layout-uk-en.php">x</a>',
+    };
+    expect(checkBodyParity(makeInput(members))).toHaveLength(1);
+  });
 });
