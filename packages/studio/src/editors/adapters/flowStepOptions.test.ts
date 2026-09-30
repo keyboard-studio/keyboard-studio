@@ -24,6 +24,9 @@ import {
 import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
+import pfMoreDetailGateMod from "../../survey/questions/f/pf_more_detail_gate.ts";
+import pfDocLanguageMod from "../../survey/questions/f/pf_doc_language.ts";
+import pfHistoryEntryMod from "../../survey/questions/f/pf_history_entry.ts";
 import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
@@ -323,6 +326,19 @@ describe("trackOptions.onCommit", () => {
       keyboardId: "existing_kb",
       displayName: "Existing",
     });
+  });
+});
+
+describe("phaseFOptions.seeds.getSeedValue (choice-question defaults)", () => {
+  it.each([
+    [pfMoreDetailGateMod, "false"],
+    [pfDocLanguageMod, "english"],
+    [pfHistoryEntryMod, "confirm"],
+  ])("seeds a valid default for %#", (mod, expected) => {
+    const { deps } = buildDeps();
+    const seed = phaseFOptions.seeds!.getSeedValue(mod.definition.id, deps);
+    expect(seed).toBe(expected);
+    expect(mod.validate(seed).ok).toBe(true);
   });
 });
 
