@@ -27,7 +27,6 @@ export interface GalleryPreviewPaneProps {
   baseKeyboard: BaseKeyboard | null;
   stage: Stage;
   retry: () => void;
-  onKeyTap?: (keyId: string) => void;
   defaultOskMode: OskMode;
   heading: string;
   warningLabel?: string;
@@ -37,7 +36,6 @@ export function GalleryPreviewPane({
   baseKeyboard,
   stage,
   retry,
-  onKeyTap,
   defaultOskMode,
   heading,
   warningLabel,
@@ -220,7 +218,6 @@ export function GalleryPreviewPane({
           oskMode={oskMode}
           stage={stage}
           retry={retry}
-          {...(onKeyTap !== undefined ? { onKeyTap } : {})}
           // Narrow = the PreviewSheet the author just opened.
           autoFocus={narrow}
         />

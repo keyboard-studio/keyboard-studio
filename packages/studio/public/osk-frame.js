@@ -11,7 +11,6 @@
 //   frame -> host: { type: "ENGINE_ERROR", message }
 //   frame -> host: { type: "KEYBOARD_ACTIVE" }
 //   frame -> host: { type: "TEXT_UPDATED", value }
-//   frame -> host: { type: "KEY_TAPPED", keyId }
 //   frame -> host: { type: "CONTENT_HEIGHT", height }
 //
 // Sizing: the keyboard is sized to the host box's CURRENT width, and re-sized
@@ -457,37 +456,6 @@
   oskTarget.addEventListener("input", function () {
     post({ type: "TEXT_UPDATED", value: oskTarget.value });
   });
-
-  // Capture-phase pointerup on the OSK host: walk up from the tap target
-  // to find the nearest element with an own `keyId` expando (set by KMW's
-  // internal link() helper on each .kmw-key div), then post KEY_TAPPED.
-  // Does NOT call preventDefault/stopPropagation — KMW must still process
-  // the tap for normal typing and long-press popups.
-  oskHost.addEventListener("pointerup", function (event) {
-    try {
-      var el = event.target;
-      // The key id is an expando KMW's link() sets on the inner .kmw-key
-      // div. Prefer closest(".kmw-key") (handles taps on the child label
-      // span), then fall back to an own-keyId ancestor walk for safety.
-      var keyEl =
-        el && typeof el.closest === "function" ? el.closest(".kmw-key") : null;
-      if (!keyEl || typeof keyEl.keyId !== "string") {
-        var p = el;
-        while (p && p !== oskHost && !Object.prototype.hasOwnProperty.call(p, "keyId")) {
-          p = p.parentElement;
-        }
-        if (p && p !== oskHost && Object.prototype.hasOwnProperty.call(p, "keyId")) {
-          keyEl = p;
-        }
-      }
-      if (keyEl) {
-        var kid = keyEl.keyId;
-        if (typeof kid === "string" && kid.length > 0) {
-          post({ type: "KEY_TAPPED", keyId: kid });
-        }
-      }
-    } catch (_) {}
-  }, true);
 
   window.addEventListener("message", function (event) {
     // Security: only accept commands from our own document's parent, on our

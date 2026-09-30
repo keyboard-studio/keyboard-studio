@@ -14,11 +14,6 @@ export const DEADKEY_OPTIONS = [
   { value: "K_BKQUOTE", label: "K_BKQUOTE (backtick `)" },
 ] as const;
 
-/** The DEADKEY_OPTIONS values as a set — for O(1) membership checks. */
-export const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
-  DEADKEY_OPTIONS.map((o) => o.value),
-);
-
 /**
  * Maps each DEADKEY_OPTIONS key value to the unshifted character it
  * produces (US QWERTY) — the proposed double-tap accent character for a

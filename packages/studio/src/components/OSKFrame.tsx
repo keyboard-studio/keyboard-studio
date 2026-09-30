@@ -32,8 +32,6 @@ export interface OSKFrameProps {
   /** Retry callback from useKeyboardArtifact in the parent. */
   retry: () => void;
   onTextChange?: (text: string) => void;
-  /** Called when the user taps a key on the rendered OSK. keyId is the KMW key identifier (e.g. "K_A"). */
-  onKeyTap?: (keyId: string) => void;
   /**
    * Put the caret in the type-here textarea once the first keyboard is
    * active, so the author can type straight away. For previews the author
@@ -70,12 +68,11 @@ export function OSKFrame({
   stage,
   retry,
   onTextChange,
-  onKeyTap,
   autoFocus = false,
 }: OSKFrameProps) {
   const { t } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const channel = useOskChannel(iframeRef, onKeyTap);
+  const channel = useOskChannel(iframeRef);
   // Viewport-relative sizing: narrow or scarce-height viewports shrink the
   // frame to fit instead of overflowing (mockup 6). Measured from the
   // viewport hook — not CSS dvh — so the value is deterministic in tests and

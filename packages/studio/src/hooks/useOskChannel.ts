@@ -25,7 +25,6 @@ export interface OskChannelResult {
  */
 export function useOskChannel(
   iframeRef: React.RefObject<HTMLIFrameElement | null>,
-  onKeyTap?: (keyId: string) => void
 ): OskChannelResult {
   const [lastEvent, setLastEvent] = useState<OskEvent | null>(null);
   const [engineReady, setEngineReady] = useState(false);
@@ -37,11 +36,6 @@ export function useOskChannel(
   // Keep the iframe ref stable in the listener closure without re-registering.
   const iframeRefRef = useRef(iframeRef);
   iframeRefRef.current = iframeRef;
-
-  // Keep the latest onKeyTap callback in a ref so repeated taps of the same
-  // key always invoke the current callback without re-registering the listener.
-  const onKeyTapRef = useRef(onKeyTap);
-  onKeyTapRef.current = onKeyTap;
 
   useEffect(() => {
     function handleMessage(event: MessageEvent): void {
@@ -66,9 +60,6 @@ export function useOskChannel(
           break;
         case "TEXT_UPDATED":
           setTextValue(event.data.value);
-          break;
-        case "KEY_TAPPED":
-          onKeyTapRef.current?.(event.data.keyId);
           break;
         case "CONTENT_HEIGHT":
           setContentHeight(event.data.height);

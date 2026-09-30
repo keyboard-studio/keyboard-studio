@@ -15,7 +15,7 @@ import { parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
-import { changeSelectMenu, selectMenuValue } from "../../test/selectMenuTestUtils.ts";
+import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
 import { installMechanismGalleryHooks } from "../../test/mechanismGallery/mocks.tsx";
 import { seedInventory, instantiateWithModifiersInUse } from "../../test/mechanismGallery/harness.ts";
 
@@ -123,46 +123,6 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
     expect(screen.getByText(/Not a valid Unicode value/i)).toBeTruthy();
     const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("tapping a key in the OSK preview while custom mode is active exits custom mode and clears the stale custom text", async () => {
-    seedInventory(["ẑ"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-      // Flush the patterns-loading microtasks so GalleryPreviewWithPatterns
-      // (and the mocked OSKFrame's tap button) mounts.
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    fireEvent.click(screen.getByText(/Assign to a key/i));
-    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
-    expect(
-      screen.getByLabelText(/Custom character for the assigned key/i),
-    ).toBeTruthy();
-
-    // Type some (possibly-invalid) custom text before the tap — this is the
-    // stale state that must NOT survive a tap-to-select.
-    fireEvent.change(screen.getByLabelText(/Custom character for the assigned key/i), {
-      target: { value: "zz" },
-    });
-
-    // The OSKFrame mock's "tap-K_E" button simulates an OSK key tap.
-    fireEvent.click(screen.getByRole("button", { name: "tap-K_E" }));
-
-    // Custom mode is exited — the select now shows K_E and the custom input
-    // is gone.
-    expect(
-      screen.queryByLabelText(/Custom character for the assigned key/i),
-    ).toBeNull();
-    expect(
-      selectMenuValue(screen.getByLabelText(/Physical key for Assign to a key/i)),
-    ).toBe("K_E");
-
-    // Re-opening "Enter my own character..." starts clean — the paired
-    // custom-char state was cleared by the tap, not left stale from before.
-    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
-    expect(
-      (screen.getByLabelText(/Custom character for the assigned key/i) as HTMLInputElement).value,
-    ).toBe("");
   });
 });
 

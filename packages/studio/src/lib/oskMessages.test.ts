@@ -2,7 +2,7 @@
 // Coverage:
 //   1. isOskEvent returns true for every valid OskEvent type.
 //   2. isOskEvent returns false for non-objects, nulls, and unknown type strings.
-//   3. KEY_TAPPED shape (new in gallery-QoL) is accepted with any non-empty keyId.
+//   3. The retired KEY_TAPPED event (OSK tap-to-pick, removed) is rejected.
 
 import { describe, it, expect } from "vitest";
 import { isOskEvent } from "./oskMessages";
@@ -20,12 +20,8 @@ describe("isOskEvent — valid OskEvent shapes", () => {
     expect(isOskEvent({ type: "TEXT_UPDATED", value: "hello" })).toBe(true);
   });
 
-  it("accepts KEY_TAPPED with a keyId", () => {
-    expect(isOskEvent({ type: "KEY_TAPPED", keyId: "K_A" })).toBe(true);
-  });
-
-  it("accepts KEY_TAPPED with an empty keyId", () => {
-    expect(isOskEvent({ type: "KEY_TAPPED", keyId: "" })).toBe(true);
+  it("accepts KEYBOARD_ACTIVE", () => {
+    expect(isOskEvent({ type: "KEYBOARD_ACTIVE" })).toBe(true);
   });
 });
 
@@ -43,7 +39,11 @@ describe("isOskEvent — rejects non-event payloads", () => {
   });
 
   it("rejects a string", () => {
-    expect(isOskEvent("KEY_TAPPED")).toBe(false);
+    expect(isOskEvent("TEXT_UPDATED")).toBe(false);
+  });
+
+  it("rejects the retired KEY_TAPPED event", () => {
+    expect(isOskEvent({ type: "KEY_TAPPED", keyId: "K_A" })).toBe(false);
   });
 
   it("rejects an object with an unknown type", () => {

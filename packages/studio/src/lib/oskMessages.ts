@@ -91,10 +91,6 @@ export interface TextUpdatedEvent {
   value: string;
 }
 
-export interface KeyTappedEvent {
-  type: "KEY_TAPPED";
-  keyId: string;
-}
 
 /**
  * The frame document's natural height in CSS px — posted whenever its layout
@@ -111,7 +107,6 @@ export type OskEvent =
   | EngineErrorEvent
   | KeyboardActiveEvent
   | TextUpdatedEvent
-  | KeyTappedEvent
   | ContentHeightEvent;
 
 // ---------------------------------------------------------------------------
@@ -129,7 +124,6 @@ export function isOskEvent(data: unknown): data is OskEvent {
     t === "ENGINE_READY" ||
     t === "ENGINE_ERROR" ||
     t === "KEYBOARD_ACTIVE" ||
-    t === "TEXT_UPDATED" ||
-    t === "KEY_TAPPED"
+    t === "TEXT_UPDATED"
   );
 }

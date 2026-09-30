@@ -639,51 +639,9 @@ describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (meth
 });
 
 // ---------------------------------------------------------------------------
-// OSK key-tap → base key selection while RAlt method + Shift+RAlt layer is
-// active (handleKeyTap wiring, covers the keycap-mislabel fix's companion
-// authoring path: picking the base key via the OSK rather than the dropdown).
-// ---------------------------------------------------------------------------
-
-describe("MechanismGallery — OSK key-tap selects the RAlt base key", () => {
-  it("tapping the OSK sets the base key and Apply emits [SHIFT RALT <tappedKey>] when Shift+RAlt is selected", async () => {
-    // Seed a chiral alt token as already in use (on a different key) so the
-    // slot-1 default leads with RALT rather than generic ALT
-    // (computeModifierPool's generic-until-chiral-then-both gating rule).
-    instantiateWithModifiersInUse("K_W", ["RALT"]);
-    seedInventory(["Ε"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-      // Flush the patterns-loading microtasks so GalleryPreviewWithPatterns
-      // (and the mocked OSKFrame's tap button) mounts.
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    fireEvent.click(screen.getByText(/Assign to a key/i));
-    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
-
-    // Tap the OSK mock (always taps "K_E") to pick the base key instead of
-    // using the dropdown.
-    fireEvent.click(screen.getByRole("button", { name: "tap-K_E" }));
-
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
-
-    const assignments = useWorkingCopyStore
-      .getState()
-      .session.assignments.filter((a) => a.modality === "physical");
-    expect(assignments).toHaveLength(1);
-    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
-      "[SHIFT RALT K_E]",
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Physical-key type-to-select while a KeyPickerField dropdown is open
 // (SelectMenu's opt-in resolveKeyToValue, wired by KeyPickerField via
-// keyOptions.ts's charToVkey) — the physical-keyboard companion to the OSK
-// tap-to-select coverage above.
+// keyOptions.ts's charToVkey).
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — physical-key type-to-select in an open key picker", () => {
