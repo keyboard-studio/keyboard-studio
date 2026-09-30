@@ -40,6 +40,7 @@ import { plural } from "@lingui/core/macro";
 import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
 import { useIsNarrow } from "../hooks/useViewport.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
+import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
@@ -87,6 +88,9 @@ const KMP_DIAGNOSTIC_LIMIT = 5;
 
 export function OutputScreen() {
   const { t } = useLingui();
+  // The identity-warning "go to" button smooth-scrolls to the keyboard id
+  // field; reduced motion takes the instant jump instead.
+  const reducedMotion = usePrefersReducedMotion();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
   const narrow = useIsNarrow();
@@ -719,7 +723,10 @@ export function OutputScreen() {
                   })}
                   onClick={() => {
                     const el = document.getElementById("identity-keyboard-id");
-                    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    el?.scrollIntoView({
+                      behavior: reducedMotion ? "auto" : "smooth",
+                      block: "center",
+                    });
                     (el as HTMLInputElement | null)?.focus();
                   }}
                   style={{

@@ -187,6 +187,7 @@ import {
   TEXT_MAIN,
   FONT,
 } from "../../../lib/galleryTheme.ts";
+import { usePrefersReducedMotion } from "../../../ui/motion.ts";
 
 /**
  * One tab in the platform tablist (T077, FR-034 "render whatever platforms
@@ -326,6 +327,9 @@ export function KeyGrid({
   // `i18n` beside `t` because findingCopy.ts composes with an `I18n` rather
   // than a JSX macro — the same split KeyInspector.tsx uses.
   const { t, i18n } = useLingui();
+  // The selected-cell scroll-into-view below is smooth by default; reduced
+  // motion takes the instant jump instead.
+  const reducedMotion = usePrefersReducedMotion();
   const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const gridRef = useRef<HTMLDivElement | null>(null);
   const platformTabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -510,7 +514,7 @@ export function KeyGrid({
 
     if (typeof el?.scrollIntoView === "function") {
       el.scrollIntoView({
-        behavior: "smooth",
+        behavior: reducedMotion ? "auto" : "smooth",
         block: "nearest",
         inline: "nearest",
       });
@@ -519,7 +523,7 @@ export function KeyGrid({
     if (focusInGridRef.current) {
       el?.focus();
     }
-  }, [selectedAddress]);
+  }, [selectedAddress, reducedMotion]);
 
   const gridLabel =
     label ??

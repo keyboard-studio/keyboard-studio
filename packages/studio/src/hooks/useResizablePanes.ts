@@ -28,6 +28,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
+import { usePrefersReducedMotion } from "../ui/motion.ts";
 
 export interface ResizablePanesOptions {
   /** Minimum left-pane width as a percentage of the container. */
@@ -114,6 +115,11 @@ export function useResizablePanes({
   onChange,
 }: ResizablePanesOptions): ResizablePanesResult {
   const [leftPct, setLeftPct] = useState(initPct);
+  // Reduced motion replaces the system-driven settle flight with an
+  // instant placement. The rubber-band stretch DURING the drag is
+  // untouched: that is the pointer's own motion (direct manipulation),
+  // not an animation.
+  const reducedMotion = usePrefersReducedMotion();
 
   const dragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -190,11 +196,17 @@ export function useResizablePanes({
     document.removeEventListener("pointermove", onPointerMove);
     document.removeEventListener("pointerup", onPointerUp);
     // A release inside the bounds needs no animation. A stretched rubber
-    // band settles back onto the bound it was pulled past.
+    // band settles back onto the bound it was pulled past — instantly
+    // under reduced motion, with the exponential settle otherwise.
     const resting = pctRef.current;
+    if (reducedMotion) {
+      if (resting < minPct) setDisplayPct(minPct);
+      else if (resting > maxPct) setDisplayPct(maxPct);
+      return;
+    }
     if (resting < minPct) settleToBound(minPct);
     else if (resting > maxPct) settleToBound(maxPct);
-  }, [onPointerMove, minPct, maxPct, settleToBound]);
+  }, [onPointerMove, minPct, maxPct, settleToBound, reducedMotion, setDisplayPct]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
