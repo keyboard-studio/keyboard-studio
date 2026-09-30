@@ -99,7 +99,7 @@ import { severityLabel } from "./findingCopy.ts";
 // Layer C's info-severity blue has no dedicated *-severity named export in
 // ui/theme.ts (WARNING/ERROR_RED cover Layer B/A already) — matches the
 // editor gutter's own Layer C convention (docs/architecture.md "Editor
-// gutter diagnostics"). Reuses the accent-text token directly (epic #533).
+// gutter diagnostics"). Reuses the accent-text token directly (epic 533).
 const INFO_BLUE = "var(--app-accent-text)";
 
 export interface KeyGridCellProps {
@@ -755,7 +755,7 @@ export function KeyGridCell({
             // under the exclude-composite mask, the rest is clipped away.
             padding: 3,
             background: `conic-gradient(${ACCENT} calc(var(--ks-longpress-p, 0) * 1turn), transparent 0)`,
-            WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+            WebkitMask: "linear-gradient(white 0 0) content-box, linear-gradient(white 0 0)",
             WebkitMaskComposite: "xor",
             maskComposite: "exclude",
             animationDuration: `${LONG_PRESS_MS}ms`,
