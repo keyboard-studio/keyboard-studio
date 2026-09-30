@@ -12,6 +12,16 @@
 // content, its open/close state machine, or its per-open state resets —
 // those stay with the caller, exactly as before.
 //
+// Motion: the frame enters and exits on the shared critically damped UI
+// spring (ui/motion.ts) — scale plus fade, no overshoot. The exit mirrors
+// the enter exactly: the same spring, the same from-scale, reversed. The
+// frame stays mounted through the exit flight and unmounts when the spring
+// settles, so flipping `open` false never pops the dialog out from under
+// the animation. An optional `anchor` (the invoking element or its rect)
+// points the scale at the trigger via transform-origin; without one the
+// dialog scales from its own center. Under prefers-reduced-motion the
+// spring is replaced by a short opacity cross-fade with no scale.
+//
 // Desktop-invariance: the migrated dialogs render byte-identical frames
 // (same z-indexes, padding, gap, tokens). The 44px close button is OPT-IN
 // (`showCloseButton`) — the migrated dialogs keep their Cancel buttons and
@@ -24,15 +34,38 @@
 // The caller owns the invoker and restores focus to it (the key-grid
 // dialogs' existing convention).
 import {
+  useEffect,
+  useLayoutEffect,
   useRef,
+  useState,
+  type CSSProperties,
   type FormEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { BG_CARD, BORDER, FONT, TEXT_DIM } from "./theme.ts";
 import { useModalFocus } from "../hooks/useModalFocus.ts";
+import {
+  MOTION_SPRING_DEFAULT,
+  createSpring,
+  usePrefersReducedMotion,
+  type Spring,
+} from "./motion.ts";
+
+/**
+ * Anchor for the dialog's enter/exit scale: the invoking element (as a
+ * ref) or an explicit rect. The frame's transform-origin is set to the
+ * anchor's center so the dialog grows out of — and collapses back into —
+ * its trigger, keeping the spatial relationship obvious.
+ */
+export type DialogAnchor = RefObject<HTMLElement | null> | DOMRectReadOnly;
 
 export interface DialogProps {
-  /** Nothing renders while `false`. */
+  /**
+   * Flipping to `true` mounts the frame and plays the enter animation;
+   * flipping to `false` plays the exit animation and unmounts when it
+   * settles. The caller still owns the boolean itself.
+   */
   readonly open: boolean;
   /** Escape, the close button, or the backdrop. Does not itself move focus back — the caller owns the invoker. */
   readonly onCancel: () => void;
@@ -68,11 +101,41 @@ export interface DialogProps {
    * byte-identical frames.
    */
   readonly fullscreen?: boolean;
+  /**
+   * Optional anchor for the enter/exit scale: the invoking element (as a
+   * ref) or an explicit rect. The frame scales from the anchor's center;
+   * without an anchor it scales from its own center. Ignored under
+   * reduced motion, where there is no scale.
+   */
+  readonly anchor?: DialogAnchor;
 }
 
 const BACKDROP_BG = "color-mix(in srgb, var(--sil-black) 50%, transparent)";
 const DIALOG_SHADOW =
   "0 8px 24px color-mix(in srgb, var(--sil-black) 50%, transparent)";
+
+/**
+ * The spring flies 0..100 rather than 0..1 so the foundation's settle
+ * epsilons stay in the px-scale regime they were calibrated for — a 0..1
+ * flight would read as "close enough" and snap through most of the tail.
+ */
+const SPRING_OPEN = 100;
+const SPRING_CLOSED = 0;
+/**
+ * Frame scale at the closed end of the flight. A subtle grow — dialogs
+ * are not momentum interactions, so the critically damped default spring
+ * (damping ratio 1.0) guarantees no bounce or overshoot past 1.
+ */
+const ENTER_FROM_SCALE = 0.94;
+/** Reduced-motion cross-fade duration — matches --app-motion-duration-reduced. */
+const REDUCED_FADE_MS = 120;
+
+function anchorRectOf(anchor: DialogAnchor): DOMRectReadOnly | null {
+  if ("current" in anchor) {
+    return anchor.current?.getBoundingClientRect() ?? null;
+  }
+  return anchor;
+}
 
 export function Dialog({
   open,
@@ -88,18 +151,106 @@ export function Dialog({
   initialFocus = "first",
   zIndex = 299,
   fullscreen = false,
+  anchor,
 }: DialogProps) {
   const dialogRef = useRef<HTMLFormElement | HTMLDivElement | null>(null);
+  const reduced = usePrefersReducedMotion();
+
+  // `visible` keeps the frame mounted through the exit flight; the
+  // caller's `open` flips instantly and the spring follows. `progress` is
+  // the spring value 0..100 driving opacity and scale on the motion path.
+  const [visible, setVisible] = useState(open);
+  const [progress, setProgress] = useState(SPRING_CLOSED);
+  // Reduced-motion cross-fade target — opacity 0/1 with a short CSS
+  // transition, no spring and no scale.
+  const [fadedIn, setFadedIn] = useState(false);
+  // transform-origin for the scale: the anchor's center, else the frame's.
+  const [origin, setOrigin] = useState("50% 50%");
+
+  const springRef = useRef<Spring | null>(null);
+  if (springRef.current === null) {
+    springRef.current = createSpring({
+      preset: MOTION_SPRING_DEFAULT,
+      initial: SPRING_CLOSED,
+      onUpdate: (x) => setProgress(x),
+      onSettle: (target) => {
+        // The exit flight ends by unmounting — symmetric with the enter,
+        // which mounts before flying.
+        if (target <= SPRING_CLOSED) setVisible(false);
+      },
+    });
+  }
+
+  // The rAF loop is the spring's only browser surface; release it on unmount.
+  useEffect(() => {
+    const spring = springRef.current;
+    return () => {
+      spring?.dispose();
+    };
+  }, []);
+
+  // Drive the enter/exit flights off the caller's `open`. Re-targeting is
+  // seamless by construction: the spring keeps its current on-screen
+  // position and velocity, so a close-reopen mid-flight never jumps.
+  useEffect(() => {
+    const spring = springRef.current;
+    if (open) {
+      setVisible(true);
+      if (reduced) {
+        spring?.cancel();
+        setFadedIn(true);
+      } else {
+        setFadedIn(false);
+        spring?.retarget(SPRING_OPEN);
+      }
+      return undefined;
+    }
+    if (!visible) return undefined;
+    if (reduced) {
+      spring?.cancel();
+      setFadedIn(false);
+      const id = window.setTimeout(() => setVisible(false), REDUCED_FADE_MS);
+      return () => window.clearTimeout(id);
+    }
+    spring?.retarget(SPRING_CLOSED);
+    return undefined;
+  }, [open, reduced, visible]);
+
+  // Point the scale at the trigger. Measured in a layout effect while the
+  // origin is still the default center, so the center-relative fractions
+  // come out exact regardless of the frame's current scale.
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const frame = dialogRef.current;
+    const rect = anchor === undefined ? null : anchorRectOf(anchor);
+    if (frame === null || rect === null) {
+      setOrigin("50% 50%");
+      return;
+    }
+    const box = frame.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0) {
+      setOrigin("50% 50%");
+      return;
+    }
+    const cx = box.left + box.width / 2;
+    const cy = box.top + box.height / 2;
+    const ox = 50 + ((rect.left + rect.width / 2 - cx) / box.width) * 100;
+    const oy = 50 + ((rect.top + rect.height / 2 - cy) / box.height) * 100;
+    setOrigin(`${ox}% ${oy}%`);
+  }, [visible, anchor]);
+
   // Focus trap, Escape, focus-on-open — the shared modal accessibility shape
-  // (hooks/useModalFocus.ts), also used by PreviewSheet.
+  // (hooks/useModalFocus.ts), also used by PreviewSheet. Keyed on `visible`
+  // so the trap stays wired through the exit flight and focus moves back
+  // in on every re-open.
   const handleKeyDownTrap = useModalFocus({
-    open,
+    open: visible,
     containerRef: dialogRef,
     onEscape: onCancel,
     moveFocusOnOpen: initialFocus !== "none",
   });
 
-  if (!open) return null;
+  if (!visible) return null;
 
   const frameStyle = fullscreen
     ? ({
@@ -150,6 +301,30 @@ export function Dialog({
         boxShadow: DIALOG_SHADOW,
       } as const);
 
+  // Motion overlay: the spring drives opacity and scale on the motion
+  // path; reduced motion gets a pure opacity cross-fade. The exit is the
+  // enter reversed — same spring, same from-scale, same origin.
+  const p = Math.min(1, Math.max(0, progress / SPRING_OPEN));
+  const scale = ENTER_FROM_SCALE + (1 - ENTER_FROM_SCALE) * p;
+  const motionFrameStyle: CSSProperties = reduced
+    ? {
+        opacity: fadedIn ? 1 : 0,
+        transition: `opacity ${REDUCED_FADE_MS}ms linear`,
+      }
+    : {
+        opacity: p,
+        transform: fullscreen
+          ? `scale(${scale})`
+          : `translate(-50%, -50%) scale(${scale})`,
+        transformOrigin: origin,
+      };
+  const motionBackdropStyle: CSSProperties = reduced
+    ? {
+        opacity: fadedIn ? 1 : 0,
+        transition: `opacity ${REDUCED_FADE_MS}ms linear`,
+      }
+    : { opacity: p };
+
   const closeButton = showCloseButton ? (
     <button
       type="button"
@@ -192,7 +367,7 @@ export function Dialog({
         data-testid={testId}
         onSubmit={onSubmit}
         onKeyDown={handleKeyDownTrap}
-        style={frameStyle}
+        style={{ ...frameStyle, ...motionFrameStyle }}
       >
         {closeButton}
         {children}
@@ -206,7 +381,7 @@ export function Dialog({
         aria-label={label}
         data-testid={testId}
         onKeyDown={handleKeyDownTrap}
-        style={frameStyle}
+        style={{ ...frameStyle, ...motionFrameStyle }}
       >
         {closeButton}
         {children}
@@ -217,7 +392,13 @@ export function Dialog({
     <>
       {/* Fixed transparent backdrop — click outside to cancel. */}
       <div
-        style={{ position: "fixed", inset: 0, background: BACKDROP_BG, zIndex }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: BACKDROP_BG,
+          zIndex,
+          ...motionBackdropStyle,
+        }}
         onClick={onCancel}
         aria-hidden="true"
       />
