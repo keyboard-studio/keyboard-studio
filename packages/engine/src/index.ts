@@ -436,6 +436,16 @@ export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
 // spec 047 — pure Unicode General-Category classifier for the inventory breakdown.
 export { glyphCategory } from "./character-discovery/glyphCategory.js";
 export type { GlyphCategory } from "./character-discovery/glyphCategory.js";
+// Per-character Unicode facts for the character map's
+// hover/focus info popover. Pure + dependency-free: the pinned table is
+// injected by the caller (dynamically imported in the studio) so this adds
+// nothing to any bundle statically.
+export { describeCharacter } from "./character-discovery/describeCharacter.js";
+export type {
+  CharacterDescription,
+  DescribedCodePoint,
+  UnicodeCharacterLookups,
+} from "./character-discovery/describeCharacter.js";
 
 // Marks question series (spec 071): pure engine functions behind the S0-S5
 // stations — the shared posture table is the single source the facet, the S4

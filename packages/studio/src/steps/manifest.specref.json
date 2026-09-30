@@ -44,6 +44,10 @@
     "§8",
     "specs/083-deadkey-lifecycle"
   ],
+  "rules": [
+    "§8",
+    "specs/082-rule-access-tracks"
+  ],
   "mechanisms": [
     "§8",
     "specs/007-strategy-selection"

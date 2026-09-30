@@ -66,6 +66,7 @@ import type {
 } from "./decisionRecord";
 import { DECISION_RECORD_FORMAT } from "./decisionRecord";
 import type { HelpDocsAnswers } from "./help-docs";
+import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
   BaseDocumentationProfile,
   ChartPreference,
@@ -913,22 +914,13 @@ export const IRRuleOwnershipSchema = z
 // interface without the schema being updated to match, the corresponding alias
 // resolves to `Expect<false>` and fails the build.
 //
-// DeepStripUndefined bridges zod's `.optional()` (which infers `T | undefined`)
+// DeepStripUndefined (utils/schemaGuards) bridges zod's `.optional()` (which infers `T | undefined`)
 // to the contract's exactOptionalPropertyTypes `?:` form, so the guard reacts
 // to real drift rather than to that representational difference. The reverse
 // direction — that the schema is not *stricter* than real data — is covered at
 // runtime by schemas.test.ts, which parses every fixture and data record.
 // ---------------------------------------------------------------------------
 
-type DeepStripUndefined<T> =
-  T extends (infer U)[]
-    ? DeepStripUndefined<U>[]
-    : T extends object
-      ? { [K in keyof T]: DeepStripUndefined<Exclude<T[K], undefined>> }
-      : T;
-
-type Expect<T extends true> = T;
-type AssignableTo<S, T> = [DeepStripUndefined<S>] extends [T] ? true : false;
 type Equal<X, Y> =
   (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false;
 

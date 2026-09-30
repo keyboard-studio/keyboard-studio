@@ -45,6 +45,38 @@ export interface SimulatorContextSeed {
 }
 
 /**
+ * Identity of the compiled-keyboard rule that fired for one simulated keystroke.
+ *
+ * Populated by `simulate()` (spec 082, Track A FR-002) when a keyboard rule
+ * matched the keystroke. Absent when no rule fired — i.e. the keystroke fell
+ * through to the default output rules (or to the host).
+ *
+ * `group` is the rule's group name in the compiled keyboard (e.g. `"main"`);
+ * `ruleIndex` is the rule's 0-based ordinal within that group, in compiled
+ * source order, so the studio can map it back to IR rules. When a rule
+ * delegates via `use()` and a rule in the called group also matches, the
+ * reported rule is the innermost one — the rule that determined the final
+ * match and output.
+ */
+export interface FiredRule {
+  /** Group name in the compiled keyboard (e.g. `"main"`). */
+  group: string;
+  /** 0-based ordinal of the rule within its group, in compiled source order. */
+  ruleIndex: number;
+  /**
+   * Text the rule consumed from the left context (the characters its context
+   * clause deleted). Empty string when the rule consumed no text — e.g.
+   * deadkey-only matches, pure insertions, or `> nul` on an empty context.
+   */
+  matchedContext?: string;
+  /**
+   * Text the rule inserted. Empty string when the rule emitted nothing —
+   * e.g. `> nul` blocking rules or beep-only rules.
+   */
+  emittedOutput?: string;
+}
+
+/**
  * Trace entry produced after processing one key event.
  *
  * `outputAfter` is the full text-store contents after this keystroke (not
@@ -52,12 +84,14 @@ export interface SimulatorContextSeed {
  * the time of capture.
  *
  * Required trace fields per issue #183: key input, deadkey state, string output.
+ * `firedRule` (spec 082) names the compiled-keyboard rule that fired, when one did.
  */
 export interface SimulationStep {
   input: SimKeyInput;
   outputAfter: string;
   pendingDeadkeys: DeadkeySnapshot[];
   beep: boolean;
+  firedRule?: FiredRule;
 }
 
 /**

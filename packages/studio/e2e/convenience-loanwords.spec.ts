@@ -135,6 +135,8 @@ test.describe("Convenience letters: loanword-only letters", () => {
     await page.getByTestId("convenience-continue").click();
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 20_000 });
     await page.getByTestId("carve-continue").click();
+    // Spec 082: the rules step sits between carve and mechanisms.
+    await page.getByTestId("rules-continue").click();
     await page.getByRole("button", { name: "Start the mechanism gallery" }).click({ timeout: 30_000 });
     await expect(page.getByTestId("char-scroll-loanword-0071")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("char-scroll-loanword-0061")).toHaveCount(0);

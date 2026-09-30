@@ -153,6 +153,7 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["invisibles-continue"], settleFor: "carve-continue" },
   { testIds: ["carve-continue"] },
   { testIds: ["deadkeys-continue"] },
+  { testIds: ["rules-continue"] },
   { testIds: ["mechanisms-continue"] },
   { testIds: ["seed-source-confirm"] },
 ];

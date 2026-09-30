@@ -103,6 +103,7 @@ export type ActiveStepId =
   | "characters"
   | "carve"
   | "deadkeys"
+  | "rules"
   | "marks"
   | "punctuation"
   | "invisibles"
