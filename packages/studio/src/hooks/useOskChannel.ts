@@ -10,6 +10,8 @@ export interface OskChannelResult {
   textValue: string;
   /** Frame document's natural height (CONTENT_HEIGHT), or null until reported. */
   contentHeight: number | null;
+  /** KEYBOARD_ACTIVE count: 0 until the first keyboard is typeable. */
+  keyboardActivations: number;
 }
 
 /**
@@ -23,22 +25,17 @@ export interface OskChannelResult {
  */
 export function useOskChannel(
   iframeRef: React.RefObject<HTMLIFrameElement | null>,
-  onKeyTap?: (keyId: string) => void
 ): OskChannelResult {
   const [lastEvent, setLastEvent] = useState<OskEvent | null>(null);
   const [engineReady, setEngineReady] = useState(false);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [textValue, setTextValue] = useState("");
   const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const [keyboardActivations, setKeyboardActivations] = useState(0);
 
   // Keep the iframe ref stable in the listener closure without re-registering.
   const iframeRefRef = useRef(iframeRef);
   iframeRefRef.current = iframeRef;
-
-  // Keep the latest onKeyTap callback in a ref so repeated taps of the same
-  // key always invoke the current callback without re-registering the listener.
-  const onKeyTapRef = useRef(onKeyTap);
-  onKeyTapRef.current = onKeyTap;
 
   useEffect(() => {
     function handleMessage(event: MessageEvent): void {
@@ -58,11 +55,11 @@ export function useOskChannel(
         case "ENGINE_ERROR":
           setEngineError(event.data.message);
           break;
+        case "KEYBOARD_ACTIVE":
+          setKeyboardActivations((n) => n + 1);
+          break;
         case "TEXT_UPDATED":
           setTextValue(event.data.value);
-          break;
-        case "KEY_TAPPED":
-          onKeyTapRef.current?.(event.data.keyId);
           break;
         case "CONTENT_HEIGHT":
           setContentHeight(event.data.height);
@@ -85,5 +82,13 @@ export function useOskChannel(
     frame.contentWindow.postMessage(cmd, window.location.origin);
   }, []);
 
-  return { send, lastEvent, engineReady, engineError, textValue, contentHeight };
+  return {
+    send,
+    lastEvent,
+    engineReady,
+    engineError,
+    textValue,
+    contentHeight,
+    keyboardActivations,
+  };
 }

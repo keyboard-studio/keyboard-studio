@@ -53,7 +53,20 @@ export interface SetStringsCommand {
   };
 }
 
-export type OskCommand = SetKeyboardCommand | SetOskModeCommand | SetStringsCommand;
+/**
+ * Move the caret into the frame's type-here textarea so the author can type
+ * straight away. The host focuses the iframe element first; this command
+ * picks the element inside it.
+ */
+export interface FocusTargetCommand {
+  type: "FOCUS_TARGET";
+}
+
+export type OskCommand =
+  | SetKeyboardCommand
+  | SetOskModeCommand
+  | SetStringsCommand
+  | FocusTargetCommand;
 
 // ---------------------------------------------------------------------------
 // Events: frame → host
@@ -68,15 +81,16 @@ export interface EngineErrorEvent {
   message: string;
 }
 
+/** A keyboard finished activating — the OSK is rendered and typeable. */
+export interface KeyboardActiveEvent {
+  type: "KEYBOARD_ACTIVE";
+}
+
 export interface TextUpdatedEvent {
   type: "TEXT_UPDATED";
   value: string;
 }
 
-export interface KeyTappedEvent {
-  type: "KEY_TAPPED";
-  keyId: string;
-}
 
 /**
  * The frame document's natural height in CSS px — posted whenever its layout
@@ -91,8 +105,8 @@ export interface ContentHeightEvent {
 export type OskEvent =
   | EngineReadyEvent
   | EngineErrorEvent
+  | KeyboardActiveEvent
   | TextUpdatedEvent
-  | KeyTappedEvent
   | ContentHeightEvent;
 
 // ---------------------------------------------------------------------------
@@ -106,5 +120,10 @@ export function isOskEvent(data: unknown): data is OskEvent {
     const h = (data as Record<string, unknown>)["height"];
     return typeof h === "number" && Number.isFinite(h) && h > 0;
   }
-  return t === "ENGINE_READY" || t === "ENGINE_ERROR" || t === "TEXT_UPDATED" || t === "KEY_TAPPED";
+  return (
+    t === "ENGINE_READY" ||
+    t === "ENGINE_ERROR" ||
+    t === "KEYBOARD_ACTIVE" ||
+    t === "TEXT_UPDATED"
+  );
 }

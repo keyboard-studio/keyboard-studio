@@ -121,10 +121,11 @@ const sectionStyle: React.CSSProperties = {
 
 const headingStyle: React.CSSProperties = {
   margin: 0,
-  fontSize: 14,
-  fontWeight: 700,
+  // Type-scale subhead role: weight + size + leading + tracking as one
+  // set, replacing the ad-hoc 14px/700 pair.
+  font: "var(--app-type-subhead)",
+  letterSpacing: "var(--app-tracking-subhead)",
   color: TEXT_MAIN,
-  fontFamily: FONT,
 };
 
 const listStyle: React.CSSProperties = {

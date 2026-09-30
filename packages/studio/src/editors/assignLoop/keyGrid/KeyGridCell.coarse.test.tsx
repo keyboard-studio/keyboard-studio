@@ -377,3 +377,233 @@ describe("KeyGridCell — coarse-pointer long-press", () => {
     expect(screen.getByTestId(ADD_WEDGE)).not.toBeNull();
   });
 });
+
+const LONGPRESS_HINT = `${CELL_TESTID}-longpress-hint`;
+
+describe("KeyGridCell — long-press discipline (M3)", () => {
+  it("the hold shows a progress hint that fills, then hides on commit", () => {
+    const { handlers, el } = renderSelectedCell();
+
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+
+    // The hint is visible while the hold registers, driven by the CSS fill
+    // whose duration is pinned to the long-press threshold — the visual and
+    // the timer cannot drift apart.
+    const hint = screen.getByTestId(LONGPRESS_HINT);
+    expect(hint.className).toContain("ks-longpress-hint");
+    expect(hint.style.animationDuration).toBe("500ms");
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(handlers.onOpenCommandMenu).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId(LONGPRESS_HINT)).toBeNull();
+  });
+
+  it("release before the threshold hides the progress hint", () => {
+    const { el } = renderSelectedCell();
+
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    expect(screen.getByTestId(LONGPRESS_HINT)).not.toBeNull();
+
+    fireEvent.pointerUp(el, { pointerId: 1, isPrimary: true });
+    expect(screen.queryByTestId(LONGPRESS_HINT)).toBeNull();
+  });
+
+  it("a press that drifts hides the progress hint too", () => {
+    const { handlers, el } = renderSelectedCell();
+
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    expect(screen.getByTestId(LONGPRESS_HINT)).not.toBeNull();
+
+    fireEvent.pointerMove(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 230,
+    });
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(screen.queryByTestId(LONGPRESS_HINT)).toBeNull();
+    expect(handlers.onOpenCommandMenu).not.toHaveBeenCalled();
+  });
+
+  it("tap commits immediately — the selection does not wait for the hold timer", () => {
+    const onSelectCell = vi.fn();
+    const handlers = requiredKeyGridHandlers();
+    const cell = makeCell({ id: "K1" });
+    const vm = makeViewModel([makeRow([cell])]);
+    render(
+      <KeyGrid
+        {...handlers}
+        viewModel={vm}
+        selectedAddress={null}
+        onSelectCell={onSelectCell}
+      />,
+    );
+    const el = screen.getByTestId(CELL_TESTID);
+
+    // A quick tap: pointer down, a fraction of the 500ms passes, release,
+    // click — the tap path must commit without the timer ever reaching the
+    // threshold, let alone being awaited.
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    act(() => {
+      vi.advanceTimersByTime(120);
+    });
+    fireEvent.pointerUp(el, { pointerId: 1, isPrimary: true });
+    fireEvent.click(el);
+
+    expect(onSelectCell).toHaveBeenCalledTimes(1);
+    expect(onSelectCell).toHaveBeenCalledWith(cell);
+
+    // The cancelled timer must never open the menu afterwards.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(handlers.onOpenCommandMenu).not.toHaveBeenCalled();
+  });
+
+  it("an interrupted hold cancels and does not swallow the next tap", () => {
+    const onSelectCell = vi.fn();
+    const cell = makeCell({ id: "K1" });
+    const vm = makeViewModel([makeRow([cell])]);
+    render(
+      <KeyGrid
+        {...requiredKeyGridHandlers()}
+        viewModel={vm}
+        selectedAddress={null}
+        onSelectCell={onSelectCell}
+      />,
+    );
+    const el = screen.getByTestId(CELL_TESTID);
+
+    // First gesture: the hold starts, then the pointer lifts early.
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    fireEvent.pointerUp(el, { pointerId: 1, isPrimary: true });
+    fireEvent.click(el);
+    expect(onSelectCell).toHaveBeenCalledTimes(1);
+
+    // Second gesture: a plain tap still reaches the cell — nothing about
+    // the cancelled hold suppresses it.
+    fireEvent.pointerDown(el, {
+      pointerId: 2,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    fireEvent.pointerUp(el, { pointerId: 2, isPrimary: true });
+    fireEvent.click(el);
+    expect(onSelectCell).toHaveBeenCalledTimes(2);
+  });
+
+  it("commit fires a guarded haptic on the same frame as the menu", () => {
+    const vibrate = vi.fn();
+    Object.defineProperty(window.navigator, "vibrate", {
+      value: vibrate,
+      configurable: true,
+    });
+    try {
+      const { handlers, el } = renderSelectedCell();
+
+      fireEvent.pointerDown(el, {
+        pointerId: 1,
+        isPrimary: true,
+        clientX: 100,
+        clientY: 200,
+      });
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      expect(vibrate).toHaveBeenCalledWith(15);
+      expect(handlers.onOpenCommandMenu).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (window.navigator as { vibrate?: unknown }).vibrate;
+    }
+  });
+
+  it("a throwing vibrate does not break the commit", () => {
+    Object.defineProperty(window.navigator, "vibrate", {
+      value: vi.fn(() => {
+        throw new Error("vibrate unavailable");
+      }),
+      configurable: true,
+    });
+    try {
+      const { handlers, el } = renderSelectedCell();
+
+      fireEvent.pointerDown(el, {
+        pointerId: 1,
+        isPrimary: true,
+        clientX: 100,
+        clientY: 200,
+      });
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      expect(handlers.onOpenCommandMenu).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (window.navigator as { vibrate?: unknown }).vibrate;
+    }
+  });
+
+  it("fine pointers never start the hold — no hint, no menu", () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: false,
+        media: "",
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    setViewport(390, 844);
+    const { handlers, el } = renderSelectedCell();
+
+    fireEvent.pointerDown(el, {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 200,
+    });
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(screen.queryByTestId(LONGPRESS_HINT)).toBeNull();
+    expect(handlers.onOpenCommandMenu).not.toHaveBeenCalled();
+  });
+});

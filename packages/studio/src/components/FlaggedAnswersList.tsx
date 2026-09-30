@@ -51,7 +51,9 @@ export function FlaggedAnswersList({ stepId, items }: FlaggedAnswersListProps) {
   if (items.length === 0) return null;
   return (
     <section data-testid="flagged-answers-list" aria-label={t(msg({ id: "survey.flagged.heading", message: "Needs reconfirming" }))}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: TEXT_MAIN, margin: "0 0 8px 0" }}>
+      {/* Type-scale label role: weight + size + leading + tracking as one
+          set, replacing the ad-hoc 14px/600 pair. */}
+      <h3 style={{ font: "var(--app-type-label)", letterSpacing: "var(--app-tracking-label)", color: TEXT_MAIN, margin: "0 0 8px 0" }}>
         {t(msg({ id: "survey.flagged.heading", message: "Needs reconfirming" }))}
       </h3>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>

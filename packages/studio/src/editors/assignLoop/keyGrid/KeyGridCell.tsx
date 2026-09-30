@@ -99,7 +99,7 @@ import { severityLabel } from "./findingCopy.ts";
 // Layer C's info-severity blue has no dedicated *-severity named export in
 // ui/theme.ts (WARNING/ERROR_RED cover Layer B/A already) — matches the
 // editor gutter's own Layer C convention (docs/architecture.md "Editor
-// gutter diagnostics"). Reuses the accent-text token directly (epic #533).
+// gutter diagnostics"). Reuses the accent-text token directly (epic 533).
 const INFO_BLUE = "var(--app-accent-text)";
 
 export interface KeyGridCellProps {
@@ -167,6 +167,13 @@ const WEDGE_MENU = "menu";
  *     command, including "add key after", at full menu-item size).
  * Touch sizing follows the POINTER (`useIsCoarsePointer`), never the
  * viewport width — a landscape phone is wide and coarse simultaneously.
+ *
+ * The hold shows a progress hint while it registers (a ring filling over
+ * LONG_PRESS_MS, `.ks-longpress-hint` in index.css — a static low-opacity
+ * ring under prefers-reduced-motion), and the commit fires a guarded
+ * `navigator.vibrate` haptic on the same frame as the visual commit.
+ * The tap path is never gated on this timer: click still commits selection
+ * immediately, and the timer is cancelled on release before the threshold.
  */
 const LONG_PRESS_MS = 500;
 /** Pointer drift beyond this cancels the long-press (it was a scroll). */
@@ -243,6 +250,9 @@ export function KeyGridCell({
   const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
   const lastLongPressAt = useRef(0);
+  // Whether the progress hint is visible — a LOCAL state, like isHovered:
+  // only this cell re-renders while the hold registers, never the grid.
+  const [holding, setHolding] = useState(false);
   // The long-press timer outlives its gesture but must not outlive the
   // cell: if the cell unmounts mid-hold, the pending callback would fire
   // `setTouchRevealed` / `onOpenCommandMenu` for a stale, unmounted cell.
@@ -442,6 +452,25 @@ export function KeyGridCell({
       longPressTimer.current = null;
     }
     longPressOrigin.current = null;
+    // The hold ended before the threshold (release, drift, unmount) — the
+    // progress hint must not linger for a gesture that never committed.
+    setHolding(false);
+  }
+
+  /**
+   * Commit-point haptic, fired on the same frame as the visual commit.
+   * Kept local and guarded — never a shared module (owned elsewhere), never
+   * throwing: on a device without vibrate support this is a silent no-op.
+   */
+  function fireCommitHaptic(): void {
+    try {
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate(15);
+      }
+    } catch {
+      // Haptics are feedback only — a failing vibrate must never break the
+      // menu opening underneath it.
+    }
   }
 
   /**
@@ -466,9 +495,14 @@ export function KeyGridCell({
       lastLongPressAt.current = Date.now();
       // The release click must not move selection after the menu opened.
       suppressClick.current = true;
+      // The hint has done its job — hide it on the same frame the menu
+      // opens, alongside the commit haptic.
+      setHolding(false);
+      fireCommitHaptic();
       setTouchRevealed(false);
       onOpenCommandMenu(cell, origin);
     }, LONG_PRESS_MS);
+    setHolding(true);
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLButtonElement>): void {
@@ -701,6 +735,32 @@ export function KeyGridCell({
         >
           {"⋯"}
         </span>
+      )}
+      {/* The long-press progress hint (coarse pointer only): a ring that fills
+      around the key while the hold registers. The fill runs entirely in CSS
+      (.ks-longpress-hint in index.css — linear, no bounce, static ring under
+      prefers-reduced-motion); this element only mounts while the hold is
+      live. Decorative and aria-hidden — the hold has no spoken state. */}
+      {holding && (
+        <span
+          aria-hidden="true"
+          data-testid={`key-grid-cell-${cell.address}-longpress-hint`}
+          className="ks-longpress-hint"
+          style={{
+            position: "absolute",
+            inset: 2,
+            borderRadius: 4,
+            pointerEvents: "none",
+            // 3px band: the padding-box minus the content-box stays visible
+            // under the exclude-composite mask, the rest is clipped away.
+            padding: 3,
+            background: `conic-gradient(${ACCENT} calc(var(--ks-longpress-p, 0) * 1turn), transparent 0)`,
+            WebkitMask: "linear-gradient(white 0 0) content-box, linear-gradient(white 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            animationDuration: `${LONG_PRESS_MS}ms`,
+          }}
+        />
       )}
       {finding !== undefined && (
         <span

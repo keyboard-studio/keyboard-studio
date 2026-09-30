@@ -33,15 +33,24 @@ export interface PreviewButtonProps {
 }
 
 /**
- * Bottom padding a scroll container needs so its last line can scroll clear
- * of the floating button (button height + offset + a little air).
+ * How far the button sits above the bottom of its column. The journey footer
+ * overlaps the bottom of the content column (translucent chrome: content
+ * scrolls under the frosted bar), so the offset adds the bar's height —
+ * `--studio-footer-h` is 0 when no footer is mounted (index.css).
  */
-export const PREVIEW_BUTTON_CLEARANCE_PX = 72;
+const BUTTON_OFFSET = "calc(12px + var(--studio-footer-h, 0px))";
+
+/**
+ * Bottom padding a scroll container needs so its last line can scroll clear
+ * of the floating button and the footer beneath it (button height + offset +
+ * a little air).
+ */
+export const PREVIEW_BUTTON_CLEARANCE = "calc(72px + var(--studio-footer-h, 0px))";
 
 const BUTTON_STYLE: CSSProperties = {
   position: "absolute",
   right: 12,
-  bottom: 12,
+  bottom: BUTTON_OFFSET,
   zIndex: 5,
   display: "inline-flex",
   alignItems: "center",
@@ -120,7 +129,7 @@ export function PreviewButton({
     <div
       style={{
         position: "sticky",
-        bottom: 12,
+        bottom: BUTTON_OFFSET,
         display: "flex",
         justifyContent: "flex-end",
         pointerEvents: "none",

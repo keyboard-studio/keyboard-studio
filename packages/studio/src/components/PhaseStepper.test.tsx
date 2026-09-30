@@ -3,8 +3,14 @@
 // Prop-driven component — no store, no I18nProvider dependency beyond the
 // shared `renderWithI18n` wrapper every Lingui-ified component test uses
 // (see that module's header).
-import { describe, it, expect, afterEach } from "vitest";
-import { screen, cleanup, fireEvent, within } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import {
+  screen,
+  cleanup,
+  fireEvent,
+  within,
+  act,
+} from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseStepper } from "./PhaseStepper.tsx";
 import { manifest } from "../steps/manifest.ts";
@@ -103,9 +109,48 @@ describe("PhaseStepper compact (narrow viewport)", () => {
     });
   }
 
+  // requestAnimationFrame is stubbed with a manual queue so the shared
+  // Dialog's spring enter/exit flights advance deterministically — no real
+  // timers, no jsdom rAF behavior to depend on (the convention from
+  // ui/motion.test.ts).
+  let rafQueue: FrameRequestCallback[] = [];
+
+  function runFrames(count: number): void {
+    for (let i = 0; i < count; i += 1) {
+      const callback = rafQueue.shift();
+      if (callback === undefined) {
+        break;
+      }
+      callback(performance.now());
+    }
+  }
+
+  beforeEach(() => {
+    rafQueue = [];
+    let nextRafId = 0;
+    const rafIds = new Map<number, FrameRequestCallback>();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      nextRafId += 1;
+      rafIds.set(nextRafId, callback);
+      rafQueue.push(callback);
+      return nextRafId;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+      const callback = rafIds.get(id);
+      rafIds.delete(id);
+      if (callback !== undefined) {
+        const index = rafQueue.indexOf(callback);
+        if (index >= 0) {
+          rafQueue.splice(index, 1);
+        }
+      }
+    });
+  });
+
   afterEach(() => {
     cleanup();
     setViewportWidth(DESKTOP_WIDTH);
+    vi.unstubAllGlobals();
   });
 
   it("renders the compact summary instead of the pill row on narrow viewports", () => {
@@ -158,6 +203,12 @@ describe("PhaseStepper compact (narrow viewport)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Phase D/ }));
     expect(screen.getByTestId("phase-stepper-dialog")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Close phase list" }));
+    // The exit mirrors the enter: the frame stays mounted while the spring
+    // flies back to closed, then unmounts on settle.
+    expect(screen.queryByTestId("phase-stepper-dialog")).not.toBeNull();
+    act(() => {
+      runFrames(300);
+    });
     expect(screen.queryByTestId("phase-stepper-dialog")).toBeNull();
   });
 

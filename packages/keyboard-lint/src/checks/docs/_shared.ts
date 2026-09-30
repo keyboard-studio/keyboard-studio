@@ -247,26 +247,104 @@ export function compareVersions(a: string, b: string): number {
 // README.md "Supported Platforms" parsing (5.7)
 // ---------------------------------------------------------------------------
 
-const README_PLATFORMS_HEADING = "## Supported Platforms";
+const README_PLATFORMS_TITLE_RE = /^supported platforms$/i;
+const README_ATX_HEADING_RE = /^#{1,6}\s+(.*?)\s*#*$/;
+const README_SETEXT_UNDERLINE_RE = /^(?:=+|-+)$/;
+const README_BULLET_RE = /^[-*+]\s+(.*)$/;
 
 /**
- * Parse the platform list `renderReadmeMd` (engine `helpDocsRender.ts`)
- * writes under "## Supported Platforms" — a run of `- <platform>` bullets
- * ending at the next heading or end of file. `[]` when the section is absent.
+ * Parse the "Supported Platforms" bullet list(s) out of a README.md: the run
+ * of `-`/`*`/`+` bullets under each such heading, ending at the next heading
+ * or end of file. Headings may be ATX (`## Supported Platforms`, what
+ * `renderReadmeMd` writes) or setext (the title underlined with `---`, what
+ * most of the corpus writes). An inherited base README with the tool's own
+ * section appended below it has two such sections; both are read. `[]` when
+ * the section is absent.
  */
 export function parseReadmePlatforms(readmeMdText: string): string[] {
-  const lines = readmeMdText.split(/\r\n|\r|\n/);
-  const headingIdx = lines.findIndex((l) => l.trim() === README_PLATFORMS_HEADING);
-  if (headingIdx === -1) return [];
-
+  const lines = readmeMdText.split(/\r\n|\r|\n/).map((l) => l.trim());
   const platforms: string[] = [];
-  for (let i = headingIdx + 1; i < lines.length; i++) {
+  let inSection = false;
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
-    if (/^##\s+/.test(line.trim())) break;
-    const m = /^-\s+(.*)$/.exec(line.trim());
-    if (m) platforms.push((m[1] ?? "").trim());
+    const atx = README_ATX_HEADING_RE.exec(line);
+    if (atx) {
+      inSection = README_PLATFORMS_TITLE_RE.test(atx[1] ?? "");
+      continue;
+    }
+    const bullet = README_BULLET_RE.exec(line);
+    if (line !== "" && bullet === null && README_SETEXT_UNDERLINE_RE.test(lines[i + 1] ?? "")) {
+      inSection = README_PLATFORMS_TITLE_RE.test(line);
+      i++; // the underline
+      continue;
+    }
+    if (inSection && bullet) platforms.push((bullet[1] ?? "").trim());
   }
   return platforms;
+}
+
+/** The concrete platforms a Keyman `&TARGETS` value can name. */
+const ALL_PLATFORMS = [
+  "windows",
+  "macosx",
+  "linux",
+  "web",
+  "iphone",
+  "ipad",
+  "androidphone",
+  "androidtablet",
+] as const;
+
+/**
+ * Keyman `&TARGETS` tokens and the display names READMEs use for them, each
+ * mapped to the concrete platforms it covers. `any`, `desktop`, `mobile` and
+ * `tablet` are the compiler's composite targets; the rest are the corpus's
+ * README spellings ("MacOS", "iOS", "Android phone", "Mobile devices", ...).
+ * Keys are lowercased with spaces and hyphens removed.
+ */
+const PLATFORM_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  any: ALL_PLATFORMS,
+  all: ALL_PLATFORMS,
+  allplatforms: ALL_PLATFORMS,
+  windows: ["windows"],
+  macosx: ["macosx"],
+  macos: ["macosx"],
+  mac: ["macosx"],
+  osx: ["macosx"],
+  linux: ["linux"],
+  web: ["web"],
+  mobileweb: ["web"],
+  desktopweb: ["web"],
+  keymanweb: ["web"],
+  iphone: ["iphone"],
+  ipad: ["ipad"],
+  ios: ["iphone", "ipad"],
+  androidphone: ["androidphone"],
+  androidtablet: ["androidtablet"],
+  android: ["androidphone", "androidtablet"],
+  desktop: ["windows", "macosx", "linux"],
+  desktopdevices: ["windows", "macosx", "linux"],
+  mobile: ["iphone", "androidphone"],
+  mobiledevices: ["iphone", "androidphone"],
+  tablet: ["ipad", "androidtablet"],
+  tablets: ["ipad", "androidtablet"],
+  tabletdevices: ["ipad", "androidtablet"],
+};
+
+/**
+ * Expand `&TARGETS` tokens or README platform names to the set of concrete
+ * platforms they cover, so `any` in the `.kmn` and "Windows, macOS, Linux,
+ * Web, iOS, Android" in the README compare equal. A name with no known
+ * meaning is kept as itself (lowercased), so it still surfaces as a mismatch.
+ */
+export function expandPlatforms(names: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const name of names) {
+    const key = name.toLowerCase().replace(/[\s_-]+/g, "");
+    if (key === "") continue;
+    for (const p of PLATFORM_ALIASES[key] ?? [name.trim().toLowerCase()]) out.add(p);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -358,8 +436,9 @@ function collapseWhitespace(s: string): string {
 
 /**
  * Normalize a welcome/help body for the 11.9 parity comparison: strip the PHP
- * header (help-only), the outer `<html>`/`<head>`/`<body>` document chrome
- * (welcome always; older help pages sometimes), and the "Keyboard Layout"
+ * header (help-only), the document chrome — `<html>`/`<body>` tags and the
+ * whole `<head>` (welcome always; older help pages sometimes) — any `<style>`
+ * block (11.10 compares those), and the "Keyboard Layout"
  * section (welcome-only), then collapse whitespace so formatting differences
  * don't register as content differences (criterion 11.9 wording).
  */
@@ -367,7 +446,23 @@ export function normalizeDocBody(html: string): string {
   let body = stripKeyboardLayoutSection(stripPhpHeader(html));
   // Drop document chrome so a criteria-compliant help fragment (no
   // </body></html>) still compares equal to a full welcome.htm document.
-  body = body.replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
+  // The doctype declaration and HTML comments are non-rendering chrome in
+  // the same sense, so they compare equal too. The whole `<head>` goes, not
+  // just its tags: its title/meta/link are document chrome a help fragment
+  // never carries (the site's header.php owns them). `<style>` blocks are
+  // dropped wherever they sit — style parity is check 11.10's comparison,
+  // not this one's.
+  body = body
+    .replace(/<!DOCTYPE[^>]*>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
+  // Sibling documentation links name the same logical page in different
+  // delivery containers: the welcome page links its `.htm` companions
+  // while the help page links the `.php` twins. Normalize the extension so
+  // the parity check compares the link target, not the container.
+  body = body.replace(/\.(?:htm|php)(?=["'#])/gi, ".page");
   return collapseWhitespace(body);}
 
 const STYLE_ATTR_RE = /\bstyle\s*=\s*"([^"]*)"|\bstyle\s*=\s*'([^']*)'/gi;

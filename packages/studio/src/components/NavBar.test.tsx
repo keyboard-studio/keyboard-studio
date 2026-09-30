@@ -34,7 +34,27 @@ describe("NavBar", () => {
   afterEach(() => {
     cleanup();
     setViewportWidth(DESKTOP_WIDTH);
-    useJourneyContentsStore.setState({ available: false, open: false });
+    useJourneyContentsStore.setState({
+      available: false,
+      open: false,
+      origin: null,
+    });
+  });
+
+  it("desktop: the bar carries the frosted-chrome class", () => {
+    setViewportWidth(DESKTOP_WIDTH);
+    render(<NavBar {...BASE_PROPS} />);
+    expect(screen.getByRole("navigation").className).toContain(
+      "ks-chrome-bar-top",
+    );
+  });
+
+  it("narrow: the bar keeps its opaque look (no chrome class)", () => {
+    setViewportWidth(NARROW_WIDTH);
+    render(<NavBar {...BASE_PROPS} />);
+    expect(screen.getByRole("navigation").className).not.toContain(
+      "ks-chrome-bar-top",
+    );
   });
 
   it("desktop: renders the center tab row, brand, and keyboard indicator", () => {
@@ -147,9 +167,7 @@ describe("NavBar", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(document.getElementById("nav-language-select")).toBeNull();
     expect(
-      screen
-        .getByRole("button", { name: "Menu" })
-        .getAttribute("aria-expanded"),
+      screen.getByRole("button", { name: "Menu" }).getAttribute("aria-expanded"),
     ).toBe("false");
   });
 
@@ -173,13 +191,19 @@ describe("NavBar", () => {
 
   it("narrow: the Contents item closes the menu and opens the contents sheet", () => {
     setViewportWidth(NARROW_WIDTH);
-    useJourneyContentsStore.setState({ available: true, open: false });
+    useJourneyContentsStore.setState({
+      available: true,
+      open: false,
+      origin: null,
+    });
     render(<NavBar {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     const contents = screen.getByTestId("nav-journey-contents");
     expect(contents.textContent).toBe("Contents");
     fireEvent.click(contents);
     expect(useJourneyContentsStore.getState().open).toBe(true);
+    // The sheet anchors its enter/exit at the menu item that opened it.
+    expect(useJourneyContentsStore.getState().origin).not.toBeNull();
     // Menu closed.
     expect(screen.queryByTestId("nav-journey-contents")).toBeNull();
     expect(

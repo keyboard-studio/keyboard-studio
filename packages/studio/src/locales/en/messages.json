@@ -786,6 +786,8 @@
   "editor.carve.continueButton": "Continue →",
   "editor.carve.loadingKeyboard": "Loading keyboard…",
   "editor.carve.skipButton": "Skip",
+  "editor.deadkey.backButton": "← Back",
+  "editor.deadkey.continueButton": "Continue →",
   "editor.help.docsPreview.helpPhpHeading": "Online help page",
   "editor.help.docsPreview.readmeHeading": "README.md",
   "editor.help.docsPreview.readmeHtmHeading": "Package popup text",

@@ -11,15 +11,10 @@
 // result via a callback prop, so there is exactly one place the mapping
 // logic lives.
 //
-// OSK tap-to-select: when a real key is tapped in the live preview while
-// this picker's custom mode is active, the caller sets `value` back to that
-// key id directly (see handleKeyTap in both galleries) — that alone exits
-// custom mode, since custom mode is purely `value === CUSTOM_KEY_OPTION_VALUE`.
-//
 // Physical-key type-to-select: while THIS field's dropdown is open, pressing
-// the corresponding physical key selects it, the same way OSK tap does —
-// `value` is set directly to the resolved vkey id, which likewise exits
-// custom mode for free. Wired via SelectMenu's opt-in `resolveKeyToValue`
+// the corresponding physical key selects it — `value` is set directly to the
+// resolved vkey id, which exits custom mode for free (custom mode is purely
+// `value === CUSTOM_KEY_OPTION_VALUE`). Wired via SelectMenu's opt-in `resolveKeyToValue`
 // prop (see that prop's doc comment in ui/SelectMenu.tsx) rather than a
 // second keydown listener here, so there is exactly one place a keydown on
 // the open list is interpreted. Scoped to KEY pickers only — this resolver

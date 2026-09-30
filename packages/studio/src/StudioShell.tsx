@@ -84,7 +84,7 @@ import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { PreviewSheet } from "./components/PreviewSheet.tsx";
 import {
   PreviewButton,
-  PREVIEW_BUTTON_CLEARANCE_PX,
+  PREVIEW_BUTTON_CLEARANCE,
 } from "./components/PreviewButton.tsx";
 import type { OskMode } from "./components/OskModeToggle.tsx";
 import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
@@ -1494,7 +1494,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
                   // Tighter gutters on a phone; extra bottom room so the last
                   // line scrolls clear of the floating preview button.
                   padding: hasPreviewContent
-                    ? `16px 16px ${PREVIEW_BUTTON_CLEARANCE_PX}px`
+                    ? `16px 16px ${PREVIEW_BUTTON_CLEARANCE}`
                     : 16,
                 }
               : questionsPaneStyle

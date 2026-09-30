@@ -30,6 +30,20 @@ describe("checkReadmeTargets (5.7 KM_LINT_README_TARGETS_MISMATCH)", () => {
     expect(findings[0]?.message).toContain("extra: linux");
   });
 
+  it("passes a corpus README listing every platform against TARGETS 'any' (sil_cameroon_qwerty)", () => {
+    const readmeMd =
+      "Cameroon QWERTY keyboard\n=====\n\nSupported Platforms\n-------------------\n" +
+      " * Windows\n * Linux\n * MacOS\n * Web\n * Mobile Web\n * iOS\n * Android\n";
+    expect(checkReadmeTargets(makeInput(readmeMd, ["any"]))).toEqual([]);
+  });
+
+  it("names the concrete platforms a partial README leaves out of TARGETS 'any'", () => {
+    const readmeMd = "Supported Platforms\n---\n * Windows\n * Web\n";
+    const findings = checkReadmeTargets(makeInput(readmeMd, ["any"]));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.message).toContain("missing: macosx, linux, iphone, ipad, androidphone, androidtablet");
+  });
+
   it("returns [] when readme-md is absent", () => {
     expect(checkReadmeTargets(makeInput(undefined, ["windows"]))).toEqual([]);
   });

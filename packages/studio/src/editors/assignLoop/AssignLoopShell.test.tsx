@@ -10,11 +10,56 @@
 //     seam, reused).
 //
 // Viewport width is stubbed via `window.innerWidth` (geometry path needs no
-// matchMedia stub — see useViewport.ts's fallback).
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+// matchMedia stub — see useViewport.ts's fallback). requestAnimationFrame is
+// stubbed with a manual queue (the motion.test.ts pattern) so the sheet's
+// spring exit can be driven to settle deterministically.
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { screen, cleanup, fireEvent, act } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
+
+let rafQueue: FrameRequestCallback[] = [];
+let nextRafId = 0;
+const rafIds = new Map<number, FrameRequestCallback>();
+
+function runFrames(count: number): void {
+  for (let i = 0; i < count; i += 1) {
+    const callback = rafQueue.shift();
+    if (callback === undefined) {
+      break;
+    }
+    callback(performance.now());
+  }
+}
+
+beforeEach(() => {
+  setViewportWidth(1280);
+  rafQueue = [];
+  nextRafId = 0;
+  rafIds.clear();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    nextRafId += 1;
+    rafIds.set(nextRafId, callback);
+    rafQueue.push(callback);
+    return nextRafId;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+    const callback = rafIds.get(id);
+    rafIds.delete(id);
+    if (callback !== undefined) {
+      const index = rafQueue.indexOf(callback);
+      if (index >= 0) {
+        rafQueue.splice(index, 1);
+      }
+    }
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  setViewportWidth(1280);
+  vi.unstubAllGlobals();
+});
 
 function setViewportWidth(width: number): void {
   Object.defineProperty(window, "innerWidth", {
@@ -25,15 +70,6 @@ function setViewportWidth(width: number): void {
     window.dispatchEvent(new Event("resize"));
   });
 }
-
-beforeEach(() => {
-  setViewportWidth(1280);
-});
-
-afterEach(() => {
-  cleanup();
-  setViewportWidth(1280);
-});
 
 function renderShell(rightContent: React.ReactNode = <div data-testid="right-pane">preview</div>) {
   return render(
@@ -83,11 +119,20 @@ describe("AssignLoopShell — narrow", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Show keyboard preview" }),
     );
+    act(() => {
+      runFrames(200);
+    });
     expect(screen.getByTestId("right-pane")).not.toBeNull();
     expect(
       screen.getByRole("dialog", { name: "Keyboard preview" }),
     ).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Close preview" }));
+    // The exit animates first; the preview unmounts on settle (principle 9:
+    // closing the sheet unloads KeymanWeb, but never mid-animation).
+    expect(screen.queryByTestId("right-pane")).not.toBeNull();
+    act(() => {
+      runFrames(300);
+    });
     expect(screen.queryByTestId("right-pane")).toBeNull();
   });
 
