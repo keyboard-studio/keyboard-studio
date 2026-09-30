@@ -56,6 +56,9 @@ export function useOskChannel(
           setEngineError(event.data.message);
           break;
         case "KEYBOARD_ACTIVE":
+          // A keyboard activating means the latest load succeeded; any earlier
+          // error belongs to a superseded load.
+          setEngineError(null);
           setKeyboardActivations((n) => n + 1);
           break;
         case "TEXT_UPDATED":
