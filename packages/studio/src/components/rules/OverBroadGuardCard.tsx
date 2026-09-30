@@ -20,6 +20,9 @@ import { Trans } from "@lingui/react/macro";
 import type { OverBroadGuard } from "./guardAnalysis.ts";
 import { narrowOverBroadGuard, undoNarrow } from "./narrowGuard.ts";
 import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
+import { Button } from "../../ui/Button.tsx";
+import { rulesActions, rulesBody, rulesCode, rulesInsetCard, rulesNote } from "./rulesStyles.ts";
+import { secondaryButton } from "../../survey/surveyStyles.ts";
 
 export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
   const keepOverBroadGuard = useGuardIntentStore((s) => s.keepOverBroadGuard);
@@ -53,46 +56,47 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
     <section
       data-testid={`overbroad-guard-${guard.guardRuleId}`}
       aria-label="Guard question"
+      style={rulesInsetCard}
     >
-      <p>
+      <p style={rulesBody}>
         <strong>{guard.question}</strong>
       </p>
-      <p>
+      <p style={rulesBody}>
         <small>
           <Trans id="rules.guard.overbroad.detail">
-            Guard rule <code>{guard.guardRuleId}</code> blocks {guard.markChar} (key{" "}
+            Guard rule <code style={rulesCode}>{guard.guardRuleId}</code> blocks {guard.markChar} (key{" "}
             {guard.markKey}) after “{guard.blockedChar}”.
           </Trans>
         </small>
       </p>
-      <div>
-        <button
-          type="button"
+      <div style={rulesActions}>
+        <Button
+          style={secondaryButton}
           data-testid={`overbroad-guard-keep-${guard.guardRuleId}`}
           onClick={() => keepOverBroadGuard(guard.guardRuleId)}
         >
           <Trans id="rules.guard.overbroad.keep">Keep as is</Trans>
-        </button>{" "}
+        </Button>
         {narrowedRuleId === null ? (
-          <button
-            type="button"
+          <Button
+            style={secondaryButton}
             data-testid={`overbroad-guard-narrow-${guard.guardRuleId}`}
             onClick={narrow}
           >
             <Trans id="rules.guard.overbroad.narrow">Narrow this guard</Trans>
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button
+            style={secondaryButton}
             data-testid={`overbroad-guard-undo-${guard.guardRuleId}`}
             onClick={undo}
           >
             <Trans id="rules.guard.overbroad.undo">Undo narrow</Trans>
-          </button>
+          </Button>
         )}
       </div>
       {narrowedRuleId !== null && (
-        <p data-testid={`overbroad-guard-narrowed-${guard.guardRuleId}`}>
+        <p style={rulesNote} data-testid={`overbroad-guard-narrowed-${guard.guardRuleId}`}>
           <small>
             <Trans id="rules.guard.overbroad.narrowedNote">
               Narrowed: {guard.markChar} (key {guard.markKey}) is now allowed after
@@ -103,7 +107,7 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
         </p>
       )}
       {undone && narrowedRuleId === null && (
-        <p data-testid={`overbroad-guard-undone-${guard.guardRuleId}`}>
+        <p style={rulesNote} data-testid={`overbroad-guard-undone-${guard.guardRuleId}`}>
           <small>
             <Trans id="rules.guard.overbroad.undoneNote">
               Narrow undone — the exception rule was removed.
@@ -112,7 +116,7 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
         </p>
       )}
       {narrowStale && (
-        <p data-testid={`overbroad-guard-stale-${guard.guardRuleId}`}>
+        <p style={rulesNote} data-testid={`overbroad-guard-stale-${guard.guardRuleId}`}>
           <small>
             <Trans id="rules.guard.overbroad.staleNote">
               That guard rule isn&apos;t in the current rules — this suggestion may

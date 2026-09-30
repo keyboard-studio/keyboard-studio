@@ -10,6 +10,7 @@ import { Trans } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { getRuleListView, type RuleRegionProps } from "./ruleViewRegistry.ts";
 import { FamilyCardList } from "./FamilyCardList.tsx";
+import { rulesNote } from "./rulesStyles.ts";
 
 export function RuleListMount() {
   const ir = useWorkingCopyStore((s) => s.ir);
@@ -20,7 +21,7 @@ export function RuleListMount() {
   }
   if (ir === null) {
     return (
-      <p data-testid="rules-list-empty">
+      <p data-testid="rules-list-empty" style={rulesNote}>
         <Trans id="rules.list.noIr">
           No compiled rules yet — the rule list appears once the working copy compiles.
         </Trans>

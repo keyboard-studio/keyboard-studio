@@ -39,6 +39,9 @@ import { DemoPane } from "../../components/rules/DemoPane.tsx";
 import { RuleListMount } from "../../components/rules/RuleListMount.tsx";
 import { GuardSuggestions } from "../../components/rules/GuardSuggestions.tsx";
 import { RuleBuilderMount } from "../../components/rules/RuleBuilderMount.tsx";
+import { FullStepPage } from "../../components/FullStepPage.tsx";
+import { rulesSection, rulesSectionHeading } from "../../components/rules/rulesStyles.ts";
+import { phaseHeading, leadParagraph } from "../surveyStyles.ts";
 
 const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
@@ -72,15 +75,21 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
   });
 
   if (script !== undefined && isExcludedScript(script)) {
-    return <UnsupportedScriptStub script={script} />;
+    return (
+      <FullStepPage>
+        <UnsupportedScriptStub script={script} />
+      </FullStepPage>
+    );
   }
 
+  // `layout: "full"` — StepHost clips overflow, so FullStepPage is the
+  // step's own scroll container.
   return (
-    <div data-testid="rules-step">
-      <h2>
+    <FullStepPage testId="rules-step">
+      <h2 style={phaseHeading}>
         <Trans id="survey.rules.heading">Rules</Trans>
       </h2>
-      <p>
+      <p style={leadParagraph}>
         <Trans id="survey.rules.lede">
           Your keyboard&apos;s rules decide what each keypress produces — which character it
           types, which combinations change it, and which keys stay silent. Try them below,
@@ -88,13 +97,15 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
         </Trans>
       </p>
       <DemoPane />
-      <h3>
-        <Trans id="survey.rules.listHeading">Rules in this keyboard</Trans>
-      </h3>
-      <RuleListMount />
-      <GuardSuggestions />
+      <section style={rulesSection} aria-labelledby="rules-list-heading">
+        <h3 id="rules-list-heading" style={rulesSectionHeading}>
+          <Trans id="survey.rules.listHeading">Rules in this keyboard</Trans>
+        </h3>
+        <RuleListMount />
+        <GuardSuggestions />
+      </section>
       <RuleBuilderMount />
-    </div>
+    </FullStepPage>
   );
 };
 

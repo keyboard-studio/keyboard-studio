@@ -23,6 +23,9 @@ import {
   missingGuardGroupKey,
   useGuardIntentStore,
 } from "../../stores/guardIntentStore.ts";
+import { Button } from "../../ui/Button.tsx";
+import { rulesActions, rulesBody, rulesCode, rulesInsetCard, rulesNote } from "./rulesStyles.ts";
+import { secondaryButton } from "../../survey/surveyStyles.ts";
 
 /** What one "Add all" tap did, per reason — rendered by {@link OutcomeNote}. */
 interface AddAllOutcome {
@@ -46,7 +49,7 @@ function OutcomeNote({
 }) {
   const { added, alreadyCovered, noTemplate, noTarget } = outcome;
   return (
-    <p data-testid={testId}>
+    <p style={rulesNote} data-testid={testId}>
       <small>
         <Trans id="rules.guard.missing.addedNote">
           Added {added} guard rule(s). Review them in the rule list; remove any you don&apos;t
@@ -125,41 +128,45 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
   };
 
   return (
-    <section data-testid={`missing-guard-${groupKey}`} aria-label="Missing guard suggestion">
-      <p>
+    <section
+      data-testid={`missing-guard-${groupKey}`}
+      aria-label="Missing guard suggestion"
+      style={rulesInsetCard}
+    >
+      <p style={rulesBody}>
         <Trans id="rules.guard.missing.prompt">
           {group.missing.length} more diacritic keys have no guard — add them to the
           “{group.familyName}” family?
         </Trans>
       </p>
-      <ul>
+      <ul style={{ ...rulesBody, paddingLeft: 18 }}>
         {group.missing.map((entry) => (
           <li
             key={`${entry.key}::${entry.outputChar}`}
             data-testid={`missing-guard-entry-${entry.key}`}
           >
-            <code>{entry.key}</code> → {entry.outputChar}
+            <code style={rulesCode}>{entry.key}</code> → {entry.outputChar}
             {entry.outputName !== undefined && entry.outputName !== "" && (
               <small> ({entry.outputName})</small>
             )}
           </li>
         ))}
       </ul>
-      <div>
-        <button
-          type="button"
+      <div style={rulesActions}>
+        <Button
+          variant="primary"
           data-testid={`missing-guard-add-all-${groupKey}`}
           onClick={addAll}
         >
           <Trans id="rules.guard.missing.addAll">Add all</Trans>
-        </button>{" "}
-        <button
-          type="button"
+        </Button>
+        <Button
+          style={secondaryButton}
           data-testid={`missing-guard-dismiss-${groupKey}`}
           onClick={() => dismissMissingGroup(groupKey)}
         >
           <Trans id="rules.guard.missing.dismiss">Dismiss</Trans>
-        </button>
+        </Button>
       </div>
       {outcome !== null && (
         <OutcomeNote

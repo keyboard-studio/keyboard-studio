@@ -163,6 +163,8 @@
   "dashboard.tabs.scriptRouting": "Routage d’écriture (§9)",
   "dashboard.tabs.strategyTree": "Arbre de stratégie (§7.2)",
   "dashboard.tabs.surveyFlow": "Parcours du sondage",
+  "deadkey.step.heading": "",
+  "deadkey.step.lede": "",
   "diagnostics.empty": "Aucun diagnostic du compilateur.",
   "diagnostics.heading": "Diagnostics du compilateur ({0})",
   "diagnostics.item.severityAriaLabel": "Gravité : {0}",

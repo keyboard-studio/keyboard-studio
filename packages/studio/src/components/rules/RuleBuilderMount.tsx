@@ -16,6 +16,7 @@ import { useRulesStepUiStore } from "../../stores/rulesStepUiStore.ts";
 import { getRuleBuilderPanel, type RuleRegionProps } from "./ruleViewRegistry.ts";
 import { groupRules, familyOfRule } from "./ruleFamilies.ts";
 import { RuleBuilderPanel } from "../ruleBuilder/RuleBuilderPanel.tsx";
+import { rulesNote, rulesSection, rulesSectionHeading } from "./rulesStyles.ts";
 
 /** Download the exported bundle JSON — the mount's `onExport` handler. */
 function downloadBundle(json: string): void {
@@ -48,11 +49,11 @@ export function RuleBuilderMount() {
 
   if (ir === null) {
     return (
-      <div data-testid="rules-builder-placeholder">
-        <h3>
+      <div data-testid="rules-builder-placeholder" style={rulesSection}>
+        <h3 style={rulesSectionHeading}>
           <Trans id="rules.builder.heading">Build a rule</Trans>
         </h3>
-        <p>
+        <p style={rulesNote}>
           <Trans id="rules.builder.placeholderNote">
             The rule builder isn&apos;t available yet — instantiate a working copy first.
           </Trans>

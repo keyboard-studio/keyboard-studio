@@ -25,6 +25,8 @@ import { useRulesStepUiStore } from "../../stores/rulesStepUiStore.ts";
 import { groupRules, type RuleFamily } from "./ruleFamilies.ts";
 import { formatRuleSummary } from "../ruleBuilder/RuleBuilderPanel.tsx";
 import { BG_CARD, BORDER, FONT_MONO, TEXT_DIM, TEXT_MAIN } from "../../ui/theme.ts";
+import { Button } from "../../ui/Button.tsx";
+import { secondaryButton } from "../../survey/surveyStyles.ts";
 
 /** Scroll the demo pane into view and focus its input. */
 function focusDemoPane(): void {
@@ -99,19 +101,18 @@ function FamilyCard({ family, rules }: { family: RuleFamily; rules: IRRule[] }) 
             <Trans id="rules.familyCard.disabledBadge">Disabled</Trans>
           </span>
         )}
-        <button
-          type="button"
+        <Button
+          style={{ ...secondaryButton, marginLeft: "auto" }}
           data-testid={`family-card-expand-${family.id}`}
           onClick={toggleExpanded}
           aria-expanded={expanded}
-          style={{ marginLeft: "auto" }}
         >
           {expanded ? (
             <Trans id="rules.familyCard.collapse">Collapse</Trans>
           ) : (
             <Trans id="rules.familyCard.expand">Show rules</Trans>
           )}
-        </button>
+        </Button>
       </div>
 
       <p style={{ margin: "6px 0", color: TEXT_DIM, fontSize: 13 }}>{family.patternSummary}</p>
@@ -144,22 +145,22 @@ function FamilyCard({ family, rules }: { family: RuleFamily; rules: IRRule[] }) 
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-        <button
-          type="button"
+        <Button
+          style={secondaryButton}
           data-testid={`family-card-test-${family.id}`}
           onClick={focusDemoPane}
         >
           <Trans id="rules.familyCard.test">Test this group</Trans>
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          style={secondaryButton}
           data-testid={`family-card-bundle-${family.id}`}
           onClick={bundleAsPack}
         >
           <Trans id="rules.familyCard.bundle">Bundle as pack</Trans>
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          style={secondaryButton}
           data-testid={`family-card-disable-${family.id}`}
           onClick={() => toggleFamilyDisabled(family.id)}
           aria-pressed={isDisabled}
@@ -169,7 +170,7 @@ function FamilyCard({ family, rules }: { family: RuleFamily; rules: IRRule[] }) 
           ) : (
             <Trans id="rules.familyCard.disable">Disable group</Trans>
           )}
-        </button>
+        </Button>
       </div>
       {isDisabled && (
         <p style={{ margin: "6px 0 0", color: TEXT_DIM, fontSize: 13 }}>

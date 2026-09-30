@@ -24,6 +24,7 @@ import { deriveOrthographyModel } from "./orthographyModel.ts";
 import { familyOfRule, groupRules } from "./ruleFamilies.ts";
 import { MissingGuardCard } from "./MissingGuardCard.tsx";
 import { OverBroadGuardCard } from "./OverBroadGuardCard.tsx";
+import { rulesSubHeading } from "./rulesStyles.ts";
 
 export function GuardSuggestions() {
   const ir = useWorkingCopyStore((s) => s.ir);
@@ -67,8 +68,12 @@ export function GuardSuggestions() {
   }
 
   return (
-    <section data-testid="guard-suggestions" aria-label="Guard suggestions">
-      <h4>
+    <section
+      data-testid="guard-suggestions"
+      aria-label="Guard suggestions"
+      style={{ marginTop: 16 }}
+    >
+      <h4 style={rulesSubHeading}>
         <Trans id="rules.guard.suggestionsHeading">Guard suggestions</Trans>
       </h4>
       {visibleOverBroad.map((guard) => (

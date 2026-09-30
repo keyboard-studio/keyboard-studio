@@ -163,6 +163,8 @@
   "dashboard.tabs.scriptRouting": "Script routing (§9)",
   "dashboard.tabs.strategyTree": "Strategy tree (§7.2)",
   "dashboard.tabs.surveyFlow": "Survey flow",
+  "deadkey.step.heading": "Deadkeys",
+  "deadkey.step.lede": "A deadkey types nothing by itself — it changes what the next key produces. Review the deadkeys this keyboard already has, fix the ones that need repair, or define new ones.",
   "diagnostics.empty": "No compiler diagnostics.",
   "diagnostics.heading": "Compiler diagnostics ({0})",
   "diagnostics.item.severityAriaLabel": "Severity: {0}",
