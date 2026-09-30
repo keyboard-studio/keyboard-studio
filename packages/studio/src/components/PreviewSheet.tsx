@@ -247,6 +247,11 @@ export function PreviewSheet({
             ref={closeRef}
             type="button"
             aria-label={closeLabel}
+            // Press feedback via the shared .ks-press utility (index.css):
+            // this button pins no transform inline, so the class stays
+            // additive. (The sheet drag transform is on the container above,
+            // not on this control.)
+            className="ks-press"
             onClick={() => onOpenChange(false)}
             data-testid={
               testId !== undefined ? `${testId}-close` : undefined

@@ -344,7 +344,9 @@ export function StudioFooter() {
         <>
           <button
             type="button"
-            className="ks-focus-ring"
+            // Press feedback via the shared .ks-press utility (index.css): the
+            // inline styles pin no transform, so the class stays additive.
+            className="ks-focus-ring ks-press"
             aria-haspopup="dialog"
             onClick={() => setContentsOpen(true)}
             data-testid="journey-contents-open"
