@@ -24,4 +24,33 @@
   /* References --app-border so the bar shadow stays theme-correct even
      though this file itself doesn't vary by theme. */
   --app-shadow-bar: 0 1px 0 var(--app-border);
+
+  /* Motion foundation tokens (shared motion physics vocabulary — one token
+     set, never doubled across form factors).
+     The JS spring presets live in packages/studio/src/ui/motion.ts; these
+     tokens give CSS transitions the matching durations and easings, and keep
+     reduced-motion behavior declarative:
+       - default UI spring: critically damped (damping ratio 1.0, no
+         overshoot), ~0.3s response;
+       - momentum variant: damping ratio ~0.8 (slight bounce), ONLY for
+         gesture-with-momentum interactions like flicks.
+     Under prefers-reduced-motion the spring degrades to a short cross-fade:
+     the response and press durations drop to zero and fades shorten. */
+  --app-motion-response: 300ms;
+  --app-motion-damping-default: 1;
+  --app-motion-damping-momentum: 0.8;
+  --app-motion-duration-press: 100ms;
+  --app-motion-duration-fade: 200ms;
+  --app-motion-duration-reduced: 120ms;
+  /* CSS analogue of the critically damped default spring. */
+  --app-motion-ease-ui: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --app-motion-response: 0ms;
+    --app-motion-duration-press: 0ms;
+    --app-motion-duration-fade: var(--app-motion-duration-reduced);
+    --app-motion-ease-ui: linear;
+  }
 }
