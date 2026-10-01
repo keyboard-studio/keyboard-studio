@@ -463,9 +463,10 @@ export type {
 export {
   groupMarkClasses,
   attestedBasesOf,
+  attestedLetterCount,
   ATTACHMENT_SIMILARITY_THRESHOLD,
 } from "./marks/mark-classes.js";
-export type { MarkClass } from "./marks/mark-classes.js";
+export type { AttestationCaseFold, MarkClass } from "./marks/mark-classes.js";
 export {
   proposeAttachments,
   deriveCaseCounterparts,

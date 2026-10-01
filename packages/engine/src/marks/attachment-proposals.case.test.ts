@@ -1,12 +1,15 @@
-// proposeAttachments with caseFold — case-symmetric attestation, so a mark
-// seen only on a capital still pre-ticks the lowercase row the station shows
-// (spec 049 US1 display fold, spec 071 FR-006/FR-007/FR-008).
+// Case-symmetric attestation (caseFold) across proposals, grouping and the
+// treatment prefill: a mark seen only on a capital still pre-ticks the
+// lowercase row the station shows, groups with a sibling seen on the lowercase
+// letter, and counts one letter once toward productivity spread (spec 049 US1
+// display fold, spec 071 FR-006/FR-007/FR-008/FR-010).
 
 import { describe, it, expect } from "vitest";
 import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { groupMarkClasses } from "./mark-classes.js";
 import { proposeAttachments } from "./attachment-proposals.js";
+import { computeMarkTreatmentPrefills } from "./treatment-prefill.js";
 
 const ACUTE = "́";
 const GRAVE = "̀";
@@ -125,5 +128,51 @@ describe("proposeAttachments — caseFold", () => {
     });
     const acute = rowFor(a, ACUTE, { caseFold: true });
     expect(acute.states["a"]).toBe("attested");
+  });
+});
+
+describe("groupMarkClasses — caseFold", () => {
+  // Grave seen only on `N`, acute only on `n`: unfolded they share no base.
+  const a = makeConfirmedAlphabet({
+    bases: ["n", "N", "m", "M"],
+    marks: [GRAVE, ACUTE],
+    attestedStacks: [
+      { base: "N", marks: [GRAVE] },
+      { base: "n", marks: [ACUTE] },
+    ],
+  });
+
+  it("links marks attested on opposite cases of the same letter", () => {
+    const classes = groupMarkClasses(a, { caseFold: true });
+    expect(classes).toHaveLength(1);
+    expect(classes[0]?.marks).toEqual([GRAVE, ACUTE]);
+  });
+
+  it("keeps the unfolded grouping when caseFold is off", () => {
+    expect(groupMarkClasses(a)).toHaveLength(2);
+  });
+});
+
+describe("computeMarkTreatmentPrefills — caseFold", () => {
+  // Acute on two letters, each in both cases: four bases, two letters.
+  const a = makeConfirmedAlphabet({
+    bases: ["a", "A", "e", "E"],
+    marks: [ACUTE],
+    attestedStacks: ["a", "A", "e", "E"].map((base) => ({ base, marks: [ACUTE] })),
+  });
+
+  function spread(options: { caseFold?: boolean }) {
+    const classes = groupMarkClasses(a, options);
+    const proposals = proposeAttachments(a, classes, options);
+    const [prefill] = computeMarkTreatmentPrefills(a, classes, proposals, options);
+    return prefill?.signals.productivitySpread;
+  }
+
+  it("counts productivity spread in letters, not cases", () => {
+    expect(spread({ caseFold: true })).toBe(2);
+  });
+
+  it("keeps the per-base count when caseFold is off", () => {
+    expect(spread({})).toBe(4);
   });
 });

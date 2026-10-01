@@ -8,8 +8,8 @@
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { stackKey } from "@keyboard-studio/contracts";
 import { caseCounterpart } from "../character-discovery/casePair.js";
-import type { MarkClass } from "./mark-classes.js";
-import { attestedBasesOf } from "./mark-classes.js";
+import type { AttestationCaseFold, MarkClass } from "./mark-classes.js";
+import { attestedBasesOf, attestedLetterCount } from "./mark-classes.js";
 
 /**
  * The PROPOSAL tri-state — distinct from the contracts' AttachmentState:
@@ -29,19 +29,11 @@ export interface AttachmentProposal {
   autoConfirmed: boolean;
 }
 
-export interface ProposeAttachmentsOptions {
-  /**
-   * Treat attestation as case-symmetric: a mark seen on either case of a cased
-   * letter counts as seen on both, when the other case is in the confirmed
-   * alphabet. Pass the same gate that opens spec 049's lowercase-only display
-   * (casing facet `cased` or `mixed`). Without it, a mark seen only on a
-   * capital (`Ǹ` opening a sentence) leaves the lowercase row, the only one
-   * the station shows, blocked.
-   */
-  caseFold?: boolean;
-  /** Locale for the case pairing (Turkic dotted/dotless I). */
-  bcp47?: string;
-}
+/**
+ * Without `caseFold`, a mark seen only on a capital (`Ǹ` opening a sentence)
+ * leaves the lowercase row, the only one the station shows, blocked.
+ */
+export type ProposeAttachmentsOptions = AttestationCaseFold;
 
 /**
  * Compute one proposal row per mark. The plausibility heuristic is the
@@ -53,29 +45,7 @@ export function proposeAttachments(
   classes: MarkClass[],
   options: ProposeAttachmentsOptions = {},
 ): AttachmentProposal[] {
-  const bases = new Set(alphabet.bases);
-  const counterpartOf = (base: string) => {
-    if (options.caseFold !== true) return null;
-    const pair = caseCounterpart(base, options.bcp47);
-    return pair !== null && bases.has(pair.counterpart) ? pair : null;
-  };
-  const attested = attestedBasesOf(alphabet);
-  if (options.caseFold === true) {
-    // Additive only: counterparts are added, nothing is removed.
-    for (const set of attested.values()) {
-      for (const base of [...set]) {
-        const pair = counterpartOf(base);
-        if (pair !== null) set.add(pair.counterpart);
-      }
-    }
-  }
-  // One letter in two cases is one attestation, not two (FR-008's "exactly
-  // one attested base" must still hold for a mark seen only on `n`).
-  const letterCount = (set: ReadonlySet<string>) =>
-    new Set([...set].map((base) => {
-      const pair = counterpartOf(base);
-      return pair?.direction === "toLower" ? pair.counterpart : base;
-    })).size;
+  const attested = attestedBasesOf(alphabet, options);
   const classOf = new Map<string, MarkClass>();
   for (const markClass of classes) {
     for (const mark of markClass.marks) classOf.set(mark, markClass);
@@ -98,7 +68,9 @@ export function proposeAttachments(
     return {
       mark,
       states,
-      autoConfirmed: letterCount(own) === 1 && plausible.size === 0,
+      // One letter in two cases is one attestation, not two (FR-008's "exactly
+      // one attested base" must still hold for a mark seen only on `n`).
+      autoConfirmed: attestedLetterCount(alphabet, own, options) === 1 && plausible.size === 0,
     };
   });
 }
