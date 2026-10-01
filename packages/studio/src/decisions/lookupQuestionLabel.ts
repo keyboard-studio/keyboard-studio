@@ -45,7 +45,7 @@ function defaultGetQuestionLabelSource(questionId: string): QuestionLabelSource 
 // The station and the question it records read the same way to the author.
 const MARKS_CONTEXT_TOLERANCE_LABEL = msg({
   id: "trail.question.marksContextTolerance",
-  message: "Accents typed as separate characters",
+  message: "Diacritics typed as separate characters",
 });
 
 /**
@@ -77,7 +77,7 @@ const EDITOR_QUESTION_LABELS: Readonly<Record<string, MessageDescriptor>> = {
   "marks.context_tolerance": MARKS_CONTEXT_TOLERANCE_LABEL,
   "marks.context_tolerance.sites": msg({
     id: "trail.question.marksContextToleranceSites",
-    message: "Rules fixed for accents typed as separate characters",
+    message: "Rules fixed for diacritics typed as separate characters",
   }),
 };
 

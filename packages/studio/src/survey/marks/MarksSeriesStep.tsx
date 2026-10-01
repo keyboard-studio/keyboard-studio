@@ -654,8 +654,8 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
           t({
             id: "marks.contextTolerance.station.description",
             message: plural(added, {
-              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the accent is joined to the letter or stored as a separate character.`,
-              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the accent is joined to the letter or stored as a separate character.`,
+              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
+              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
             }),
           }),
       },
@@ -1151,7 +1151,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       {activeStation === "marks_context_tolerance" && toleranceProposal === null && (
         <p data-testid="context-tolerance-checking" style={mutedParaFlush}>
           <Trans id="marks.contextTolerance.station.checking">
-            Checking whether your keys also work when the letter and its accent are stored as separate characters.
+            Checking whether your keys also work when the letter and its diacritic are stored as separate characters.
             You can continue; the result will appear with the other messages.
           </Trans>
         </p>

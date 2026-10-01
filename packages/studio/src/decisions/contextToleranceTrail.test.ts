@@ -96,7 +96,7 @@ describe("context-tolerance decision on the trail (spec 078)", () => {
     record(decision("accept", PROPOSED));
     const [entry] = entries();
     const spec = headlineOf(entry!.payload, entry!.provenance, { lookupQuestionLabel: createLookupQuestionLabel() });
-    expect(JSON.stringify(spec)).toContain("Accents typed as separate characters");
+    expect(JSON.stringify(spec)).toContain("Diacritics typed as separate characters");
     expect(JSON.stringify(spec)).not.toMatch(/"known":false/);
   });
 });
