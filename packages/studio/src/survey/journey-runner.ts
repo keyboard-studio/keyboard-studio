@@ -676,7 +676,7 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
               .flatMap((c) => c.chars);
             useWorkingCopyStore.getState().recordPhase({ phase: "C", answers: [], retainedConvenienceChars: retained });
           } else if (gate.kind === "applies") {
-            // FR-064/#1761's inverse: a fixture that declares no "convenience"
+            // FR-064's inverse: a fixture that declares no "convenience"
             // event asserts the gate did NOT open. Pinning both directions
             // means a regression that makes the gate permanently skip (the
             // original bug) AND one that makes it permanently open both fail
@@ -693,7 +693,7 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
 
         case "carve": {
           collectEditorActionEvents(group, "gallery_edit");
-          // #1761/spec 079: retained convenience letters must actually reach
+          // spec 079: retained convenience letters must actually reach
           // carve — the real contract is CarveGalleryV2.tsx's own
           // `retainedSet` union (`orthographyNeededSet ∪
           // session.retainedConvenienceChars`) feeding `recommendedRemovalChars`,
