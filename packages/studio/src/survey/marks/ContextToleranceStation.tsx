@@ -126,15 +126,15 @@ export function ContextToleranceStation({
     return (
       <div data-testid="context-tolerance-station" data-prior={prior.decision} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <h3 style={{ margin: 0 }}>
-          <Trans id="marks.contextTolerance.station.heading">Accents typed as separate characters</Trans>
+          <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
         </h3>
         <p style={mutedParaFlush}>
           {prior.decision === "accept"
             ? t({
                 id: "marks.contextTolerance.station.prior.accepted",
                 message: plural(accepted, {
-                  one: "You chose to fix # rule so it also works when the letter and its accent are separate characters.",
-                  other: "You chose to fix # rules so they also work when the letter and its accent are separate characters.",
+                  one: "You chose to fix # rule so it also works when the letter and its diacritic are separate characters.",
+                  other: "You chose to fix # rules so they also work when the letter and its diacritic are separate characters.",
                 }),
               })
             : prior.decision === "partial"
@@ -164,14 +164,14 @@ export function ContextToleranceStation({
         heading={
           <>
             <h3 style={{ margin: 0 }}>
-              <Trans id="marks.contextTolerance.station.heading">Accents typed as separate characters</Trans>
+              <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
             </h3>
             <p style={mutedParaFlush}>
               {t({
                 id: "marks.contextTolerance.station.intro",
                 message: plural(siteCount, {
-                  one: "Some programs, such as FieldWorks, store a letter and its accent as two separate characters instead of one. # of your keyboard's rules only works when the accent is already joined to the letter. The tool can add rules so it works both ways. Typing with joined accents stays exactly as it is.",
-                  other: "Some programs, such as FieldWorks, store a letter and its accent as two separate characters instead of one. # of your keyboard's rules only work when the accent is already joined to the letter. The tool can add rules so they work both ways. Typing with joined accents stays exactly as it is.",
+                  one: "# of your keyboard's rules only works when the diacritic is already joined to the letter. The tool can add rules so it works both ways. Typing with joined diacritics stays exactly as it is.",
+                  other: "# of your keyboard's rules only work when the diacritic is already joined to the letter. The tool can add rules so they work both ways. Typing with joined diacritics stays exactly as it is.",
                 }),
               })}
             </p>

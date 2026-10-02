@@ -133,7 +133,7 @@ describe("context-tolerance overlay (spec 078)", () => {
           siteKey: "k1",
           groupName: "main",
           beforeRuleText: emitRule(ir.groups[0]!.rules[1]!, true),
-          comment: "Accept the accent typed as a separate character (decomposed text) as well as the joined form.",
+          comment: "Accept the diacritic typed as a separate character (decomposed text) as well as the joined form.",
           rules: [{ nodeId: "decomposed_accent_x_0", context: [{ kind: "char", value: "x" }, { kind: "raw", text: "+" }, { kind: "char", value: "]" }], output: [{ kind: "char", value: "y" }] }],
         },
         {
@@ -152,6 +152,6 @@ describe("context-tolerance overlay (spec 078)", () => {
 
     const again = applyContextToleranceOverlay(removeContextToleranceOverlay(once.ir, overlay), overlay).ir;
     expect(ruleTexts(again)).toEqual(ruleTexts(once.ir));
-    expect(emit(again)).toContain("Accept the accent typed as a separate character");
+    expect(emit(again)).toContain("Accept the diacritic typed as a separate character");
   });
 });
