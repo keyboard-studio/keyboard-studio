@@ -311,17 +311,82 @@ function readPhaseFSeedContext(): PhaseFSeedContext {
 }
 
 /**
- * Where each seeded Phase F question's proposal comes from, for the decision
- * trail. `pf_more_detail_gate` is absent on purpose: its "No" is a plain
- * default, not something any data suggested.
+ * One seeded Phase F question: its value resolver plus where the proposal
+ * comes from, for the decision trail. The two travel together so a new
+ * seeded question can never land in the value list without its source (or
+ * an explicit sourceless `source`), and vice versa.
  */
-const PHASE_F_SEED_SOURCES: Readonly<Record<string, DecisionProposalSource>> = {
-  pf_welcome_paragraph: "base",
-  pf_contact_info: "identity",
-  pf_doc_language: "identity",
-  pf_history_entry: "analysis",
-  pf_project_url: "base",
-  pf_provenance_basis: "base",
+interface PhaseFSeedSpec {
+  /** Resolve the proposed value. Receives the flow deps — seeds are contextual. */
+  getValue: (deps: FlowStepDeps) => string | string[] | undefined;
+  /**
+   * Where the proposal comes from, for the decision trail. Absent means a
+   * plain default no data stands behind — still recorded as `tool-proposed`,
+   * just without naming a source (see `AnswerProposal.source`).
+   */
+  source?: DecisionProposalSource;
+}
+
+/**
+ * The single registry of Phase F seeded questions. `getSeedValue` and
+ * `getSeedSource` below both read this table, so the two lists cannot drift
+ * as Phase F grows (km-triage, PR #1927): presence in the table means
+ * "seeded", and `source` names the data behind the proposal.
+ */
+const PHASE_F_SEEDS: Readonly<Record<string, PhaseFSeedSpec>> = {
+  // spec 079 FR-009: on an adaptation whose base has a usable description,
+  // propose it for confirmation (accept/edit/replace in one action, §3c).
+  // Net-new, copy (Track 1), and a base classified none/minimal all
+  // resolve to undefined here — pf_welcome_paragraph behaves exactly as
+  // before (required, unfilled). See `getRequiredOverride` below, which
+  // waives `required` in exactly this same case.
+  pf_welcome_paragraph: {
+    getValue: () => prefillWelcomeParagraph(readAdaptiveDescriptionContext()),
+    source: "base",
+  },
+
+  // pf_contact_info stays OPTIONAL. Seeding pre-fills the field; it does not
+  // require an answer. The author can clear it, or replace it with a community
+  // channel that is not their own address — several shipped keyboards publish a
+  // language-community contact rather than the author's personal one.
+  pf_contact_info: {
+    getValue: (deps) => {
+      const contact = deps.surveyContext[CTX_AUTHOR_CONTACT];
+      return contact !== undefined && contact !== "" ? contact : undefined;
+    },
+    source: "identity",
+  },
+
+  // Choice questions open with a defensible default so none is left blank.
+  // The author can overturn any of them; blank already meant these values.
+  // pf_more_detail_gate's "No" is a plain default, not something any data
+  // suggested — so it carries no source.
+  pf_more_detail_gate: { getValue: () => "false" },
+  pf_doc_language: {
+    getValue: (deps) => {
+      const tag = deps.surveyContext["bcp47_tag"];
+      const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
+      return primary === "" || primary === "en" ? "english" : "bilingual";
+    },
+    source: "identity",
+  },
+  pf_history_entry: { getValue: () => "confirm", source: "analysis" },
+
+  // Text proposals derived from the starting point (lib/phaseFSeeds.ts).
+  pf_project_url: {
+    getValue: () => proposeProjectUrl(readPhaseFSeedContext()),
+    source: "base",
+  },
+  pf_provenance_basis: {
+    getValue: () => proposeProvenanceBasis(readPhaseFSeedContext()),
+    source: "base",
+  },
+
+  // pf_credits is deliberately NOT in this table. Thanking and owning are
+  // different things: shipped credits sections routinely acknowledge advisors
+  // and contributors who hold no copyright. Pre-filling the holder here would
+  // produce exactly the duplicated boilerplate the question exists to collect
+  // something better than.
 };
 
 /**
@@ -461,57 +526,13 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
 
   seeds: {
     getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
-      // spec 079 FR-009: on an adaptation whose base has a usable description,
-      // propose it for confirmation (accept/edit/replace in one action, §3c).
-      // Net-new, copy (Track 1), and a base classified none/minimal all
-      // resolve to undefined here — pf_welcome_paragraph behaves exactly as
-      // before (required, unfilled). See `getRequiredOverride` below, which
-      // waives `required` in exactly this same case.
-      if (questionId === "pf_welcome_paragraph") {
-        return prefillWelcomeParagraph(readAdaptiveDescriptionContext());
-      }
-
-      // pf_contact_info stays OPTIONAL. Seeding pre-fills the field; it does not
-      // require an answer. The author can clear it, or replace it with a community
-      // channel that is not their own address — several shipped keyboards publish a
-      // language-community contact rather than the author's personal one.
-      if (questionId === "pf_contact_info") {
-        const contact = deps.surveyContext[CTX_AUTHOR_CONTACT];
-        return contact !== undefined && contact !== "" ? contact : undefined;
-      }
-
-      // Choice questions open with a defensible default so none is left blank.
-      // The author can overturn any of them; blank already meant these values.
-      if (questionId === "pf_more_detail_gate") {
-        return "false";
-      }
-      if (questionId === "pf_doc_language") {
-        const tag = deps.surveyContext["bcp47_tag"];
-        const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
-        return primary === "" || primary === "en" ? "english" : "bilingual";
-      }
-      if (questionId === "pf_history_entry") {
-        return "confirm";
-      }
-
-      // Text proposals derived from the starting point (lib/phaseFSeeds.ts).
-      if (questionId === "pf_project_url") {
-        return proposeProjectUrl(readPhaseFSeedContext());
-      }
-      if (questionId === "pf_provenance_basis") {
-        return proposeProvenanceBasis(readPhaseFSeedContext());
-      }
-
-      // pf_credits is deliberately NOT seeded from the copyright holder. Thanking
-      // and owning are different things: shipped credits sections routinely
-      // acknowledge advisors and contributors who hold no copyright. Pre-filling
-      // the holder here would produce exactly the duplicated boilerplate the
-      // question exists to collect something better than.
-      return undefined;
+      // Single registry above — one entry per seeded question, so the value
+      // and its trail source can never drift apart.
+      return PHASE_F_SEEDS[questionId]?.getValue(deps);
     },
 
     getSeedSource(questionId: string): DecisionProposalSource | undefined {
-      return PHASE_F_SEED_SOURCES[questionId];
+      return PHASE_F_SEEDS[questionId]?.source;
     },
 
     // spec 079 FR-009: waives pf_welcome_paragraph's static `required: true`

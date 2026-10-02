@@ -963,4 +963,17 @@ describe("phaseFOptions.seeds — derived text proposals", () => {
     expect(sourceFor("pf_provenance_basis")).toBe("base");
     expect(sourceFor("pf_more_detail_gate")).toBeUndefined();
   });
+
+  it("value and source lookups agree on the seeded set: unseeded ids return neither", () => {
+    // Regression guard for km-triage finding 1 (PR #1927): getSeedValue and
+    // getSeedSource both read the single PHASE_F_SEEDS registry, so a
+    // question id can never be seeded without its source or sourced without
+    // a value resolver. Unseeded ids (deliberately unseeded, unknown, or
+    // belonging to another flow) resolve to neither.
+    const { deps } = buildDeps();
+    for (const id of ["pf_credits", "pf_not_a_question", "il_language_code"]) {
+      expect(phaseFOptions.seeds!.getSeedValue(id, deps)).toBeUndefined();
+      expect(phaseFOptions.seeds!.getSeedSource!(id, deps)).toBeUndefined();
+    }
+  });
 });

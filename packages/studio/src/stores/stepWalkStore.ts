@@ -140,6 +140,11 @@ export function peekAnswerProposals(stepId: string): Readonly<Record<string, See
   if (answers === undefined) return out;
   for (const [id, a] of Object.entries(answers)) {
     const p = a.proposal;
+    // SeedProposal's value is string | string[] — no SurveyRunner question
+    // produces boolean answers, and seeded bool answers are stored as
+    // strings in this pipeline, so a boolean here could only come from a
+    // stale or hand-written store entry. Skipped (not reattached) to keep
+    // the resumed proposal shape the runner compares against.
     if (p === undefined || typeof p.value === "boolean") continue;
     out[id] = p.source !== undefined ? { value: p.value, source: p.source } : { value: p.value };
   }
