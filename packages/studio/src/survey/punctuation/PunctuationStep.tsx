@@ -385,6 +385,7 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   // add-only in practice. After seeding it is normally empty; a REMOVED
   // proposal reappears here so the author can take it back.
   const offered = useMemo(() => tier.filter((c) => !chars.includes(c)), [tier, chars]);
+  const showSuggestions = loading || inventory === null || tier.length === 0 || offered.length > 0;
 
   // The chosen list, grouped by what proposed it. Grouping is derived from
   // the single-valued provenance; an authored character is one the author
@@ -401,11 +402,15 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   ).toUpperCase();
 
   function tick(c: string): void {
+    // Ticking the last suggestion unmounts the whole section, chip included;
+    // hand focus to the type-in field rather than dropping it to <body>.
+    const wasLast = offered.length === 1 && offered[0] === c;
     // A removed proposal is on the rejection ledger, which vetoes every
     // proposal add. Ticking it back is as deliberate as typing it, so it
     // becomes the author's own (FR-022: "typing it by hand overrides").
     if (rejected.includes(c) || inventory === null) addChar(c);
     else addProposed(c, inventory.source);
+    if (wasLast) inputRef.current?.focus();
   }
 
   function add(): void {
@@ -533,66 +538,68 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         </p>
       </div>
 
-      {/* Section 1: suggested punctuation from the sourced exemplars */}
-      <section
-        aria-label={t({
-          id: "survey.punctuation.suggestedSectionAriaLabel",
-          message: "Suggested punctuation",
-        })}
-      >
-        <h3 style={sectionHeading}>
-          <Trans id="survey.punctuation.suggestedHeading">Suggested punctuation</Trans>
-        </h3>
-        {loading ? (
-          <div style={mutedNote}>
-            <Trans id="survey.punctuation.suggestionsLoading">
-              Checking for suggested punctuation…
-            </Trans>
-          </div>
-        ) : inventory === null ? (
-          <div style={mutedNote}>
-            <Trans id="survey.punctuation.cldrAbsent.noExemplars">
-              No suggested punctuation: no exemplar data covers {displayName}.
-              Add your own below.
-            </Trans>
-          </div>
-        ) : tier.length === 0 ? (
-          <div style={mutedNote}>
-            <Trans id="survey.punctuation.cldrAbsent.emptyTier">
-              No suggested punctuation: {cldrSourceLabel} attests no punctuation
-              for {displayName}. Add your own below.
-            </Trans>
-          </div>
-        ) : offered.length === 0 ? (
-          <div style={mutedNote}>
-            <Trans id="survey.punctuation.allSuggestionsAdded">
-              Every suggested punctuation mark is already in your list below.
-            </Trans>
-          </div>
-        ) : (
-          <div>
-            <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="survey.punctuation.fromExemplars">
-                from CLDR exemplars for {displayName} — tick to add
-              </Trans>
-            </p>
-            <div
-              role="group"
-              aria-label={t({
-                id: "survey.punctuation.suggestedGroupAriaLabel",
-                message: "Suggested punctuation — tick to add",
-              })}
-              style={chipRow}
-            >
-              {offered.map((c) => (
-                <SuggestedPunctuationChip key={c} char={c} onAdd={tick} />
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
+      {/* Section 1: suggested punctuation from the sourced exemplars. Since
+          spec 075 seeds the tier into the list, "every suggestion already
+          added" is the normal case, so the section only renders when it has
+          something to offer. The no-exemplar-data and empty-tier notes stay:
+          they say why nothing was suggested, which the author can act on. */}
+      {showSuggestions && (
+        <>
+          <section
+            aria-label={t({
+              id: "survey.punctuation.suggestedSectionAriaLabel",
+              message: "Suggested punctuation",
+            })}
+          >
+            <h3 style={sectionHeading}>
+              <Trans id="survey.punctuation.suggestedHeading">Suggested punctuation</Trans>
+            </h3>
+            {loading ? (
+              <div style={mutedNote}>
+                <Trans id="survey.punctuation.suggestionsLoading">
+                  Checking for suggested punctuation…
+                </Trans>
+              </div>
+            ) : inventory === null ? (
+              <div style={mutedNote}>
+                <Trans id="survey.punctuation.cldrAbsent.noExemplars">
+                  No suggested punctuation: no exemplar data covers {displayName}.
+                  Add your own below.
+                </Trans>
+              </div>
+            ) : tier.length === 0 ? (
+              <div style={mutedNote}>
+                <Trans id="survey.punctuation.cldrAbsent.emptyTier">
+                  No suggested punctuation: {cldrSourceLabel} attests no punctuation
+                  for {displayName}. Add your own below.
+                </Trans>
+              </div>
+            ) : (
+              <div>
+                <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
+                  <Trans id="survey.punctuation.fromExemplars">
+                    from CLDR exemplars for {displayName} — tick to add
+                  </Trans>
+                </p>
+                <div
+                  role="group"
+                  aria-label={t({
+                    id: "survey.punctuation.suggestedGroupAriaLabel",
+                    message: "Suggested punctuation — tick to add",
+                  })}
+                  style={chipRow}
+                >
+                  {offered.map((c) => (
+                    <SuggestedPunctuationChip key={c} char={c} onAdd={tick} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
 
-      <hr style={divider} />
+          <hr style={divider} />
+        </>
+      )}
 
       {/* Section 2: type-in */}
       <section
