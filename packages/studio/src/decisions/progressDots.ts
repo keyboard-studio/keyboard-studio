@@ -187,7 +187,7 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
 const SCREEN_OF_STAGE_MESSAGE = (stage: string, position: number, total: number) =>
   msg({
     id: "footer.screen.positionInStage",
-    message: `${stage} — ${position} of ${total}`,
+    message: `${{ stage: stage }} — ${{ position: position }} of ${{ total: total }}`,
   });
 
 /** A manifest step's localized name, falling back to the raw id (never
