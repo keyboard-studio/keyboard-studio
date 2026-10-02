@@ -169,7 +169,7 @@ describe("the working-IR write goes through the mutate seam", () => {
         siteKey: "k1",
         groupName: "main",
         beforeRuleText: null,
-        comment: "Accept the accent typed as a separate character (decomposed text) as well as the joined form.",
+        comment: "Accept the diacritic typed as a separate character (decomposed text) as well as the joined form.",
         rules: [{ nodeId: "decomposed_accent_x_0", context: [{ kind: "char" as const, value: "x" }], output: [{ kind: "char" as const, value: "y" }] }],
       },
     ],

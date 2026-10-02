@@ -88,9 +88,9 @@ export const BACKSPACE_UNWRAP_RULE_PREFIX = `${GENERATED_MARKER_PREFIX}bksp_unwr
 // purpose (FR-015) — never a per-rule stamp, and never a tool/spec-number
 // citation in text that gets emitted into the author's own `.kmn`.
 const DIACRITIC_BLOCK_COMMENT =
-  'Accept the accent typed as a separate character (decomposed text) as well as the joined form.';
+  'Accept the diacritic typed as a separate character (decomposed text) as well as the joined form.';
 const BACKSPACE_BLOCK_COMMENT =
-  'Let backspace remove one accent mark at a time, whether the accented letter is stored as one ' +
+  'Let backspace remove one diacritic at a time, whether the letter with its diacritic is stored as one ' +
   'character or as a separate letter and mark.';
 
 /**
