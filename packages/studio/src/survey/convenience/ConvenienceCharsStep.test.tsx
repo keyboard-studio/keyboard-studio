@@ -15,6 +15,8 @@ import { ConvenienceCharsStep, computeConvenienceGate } from "./ConvenienceChars
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import { usePhaseBDraftStore } from "../../stores/phaseBDraftStore.ts";
+import { DEFAULT_PHASE_B_FONT } from "../surveyStyles.ts";
 
 // neededCharsForLanguage does a real CLDR lookup when unmocked (see the same
 // stub in CarveGalleryV2.test.tsx). These tests leave identity unset, so it is
@@ -267,6 +269,18 @@ describe("ConvenienceCharsStep — the question", () => {
     expect(screen.getByLabelText("Keep q Q")).not.toBeNull();
     expect(screen.getByTestId("convenience-continue").textContent)
       .toBe("Continue, keeping 2 letters");
+  });
+
+  it("draws the convenience chips in the selected glyph font", async () => {
+    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+    try {
+      await renderQuestion();
+      const label = screen.getByLabelText("Keep q Q").closest("label") as HTMLElement;
+      const glyphSpan = label.querySelectorAll("span")[0] as HTMLElement;
+      expect(glyphSpan.style.fontFamily).toContain("Charis SIL");
+    } finally {
+      usePhaseBDraftStore.setState({ selectedFont: DEFAULT_PHASE_B_FONT });
+    }
   });
 
   it("emits only the checked pairs — both cases together — on Continue", async () => {

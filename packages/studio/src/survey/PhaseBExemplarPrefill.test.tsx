@@ -495,6 +495,22 @@ describe("loanword letters section", () => {
     expect(chars).toContain("h");
   });
 
+  it("draws the breakdown chips and the loanword chips in the selected glyph font", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const loanwords = await screen.findByTestId("alphabet-loanwords");
+    const loanwordGlyph = loanwords.querySelector("button[aria-pressed] > span") as HTMLElement;
+    expect(loanwordGlyph.style.fontFamily).toContain("Charis SIL");
+
+    const letters = screen.getByTestId("alphabet-letters");
+    const breakdownGlyph = letters.querySelector("span[title] > span") as HTMLElement;
+    expect(breakdownGlyph).not.toBeNull();
+    expect(breakdownGlyph.style.fontFamily).toContain("Charis SIL");
+  });
+
   it("adds a loanword letter with its case pair beside the alphabet, and takes both out again", async () => {
     getSourcedExemplars.set(bafutInventory());
     renderPhaseB();
