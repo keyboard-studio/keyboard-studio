@@ -29,7 +29,7 @@
 import type { IRRule } from "@keyboard-studio/contracts";
 import { isSuppressionOnlyOutput, shapeContext, shapeOutput } from "./classify.js";
 import { getCategory, getName } from "./unicodeAdapter.js";
-import { BUCKET_ORDER, bucketOfChar, describeKey, type CharBucket } from "./explain.js";
+import { BUCKET_ORDER, bucketOfChar, bucketRank, describeKey, type CharBucket } from "./explain.js";
 
 /**
  * Orthography knowledge threaded through from the Rules step (downstream
@@ -224,12 +224,11 @@ export function proposeGuardStore(ortho: OrthographyModel, forMark?: string): st
     if (!alphabetIndex.has(ch)) alphabetIndex.set(ch, i);
   });
   const candidates = [...new Set([...ortho.alphabet, ...(ortho.nonLetters ?? [])])];
-  const rank = (ch: string) => BUCKET_ORDER.indexOf(bucketOfChar(ch) ?? "other");
   return candidates
     .filter((ch) => !attached.has(ch))
     .sort(
       (a, b) =>
-        rank(a) - rank(b) ||
+        bucketRank(a) - bucketRank(b) ||
         (alphabetIndex.get(a) ?? Infinity) - (alphabetIndex.get(b) ?? Infinity) ||
         (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0),
     );

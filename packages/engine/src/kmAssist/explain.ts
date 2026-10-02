@@ -384,6 +384,15 @@ export function bucketOfChar(ch: string): CharBucket | undefined {
   return "other";
 }
 
+/**
+ * The sort rank of a character's kind: its position in BUCKET_ORDER, with
+ * unknown/unknowable characters sorting as "other". Shared by the block-set
+ * ordering in blockInventory and the guard-store ordering in suggestGuards.
+ */
+export function bucketRank(ch: string): number {
+  return BUCKET_ORDER.indexOf(bucketOfChar(ch) ?? "other");
+}
+
 function joinOr(items: string[]): string {
   if (items.length <= 1) return items.join("");
   return `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;

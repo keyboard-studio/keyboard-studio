@@ -22,11 +22,19 @@
  *
  * Order: bucket order (space, digit, punctuation, symbol, other), then code
  * point. Deterministic.
+ *
+ * Residual gap (documented, not yet surfaced): `producedGlyphs` cannot see
+ * output from opaque `.kmn` fragments (`hasUnaccountedOpaqueFragment`), so a
+ * non-ASCII character produced only that way can be missing from the draft
+ * with no signal. The desktop floor covers the ASCII universe, which is the
+ * bulk of what an opaque fragment plausibly emits. The signature stays a
+ * bare list for now; when the guard-card reasoning surface lands, a
+ * coverage flag should be added here rather than guessed at later.
  */
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { producedGlyphs } from "../inventory/producedGlyphs.js";
 import { ASCII_PUNCTUATION_FLOOR } from "../character-discovery/punctuationProposal.js";
-import { BUCKET_ORDER, bucketOfChar } from "./explain.js";
+import { bucketOfChar, bucketRank } from "./explain.js";
 
 const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
@@ -42,26 +50,18 @@ const DESKTOP_TARGETS = new Set(["any", "desktop", "windows", "macosx", "linux"]
 
 /**
  * True unless the keyboard's `&TARGETS` names only non-desktop platforms. A
- * keyboard with no `&TARGETS` store builds desktop only.
+ * keyboard with no `&TARGETS` store builds desktop only. Uses the codec's
+ * parsed `header.targets` rather than reconstructing the store text.
  */
 function targetsIncludeDesktop(ir: KeyboardIR): boolean {
-  const targets = ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === "TARGETS");
-  if (targets === undefined) return true;
-  const text = targets.items
-    .map((item) => (item.kind === "char" ? item.value : item.kind === "raw" ? item.text : " "))
-    .join("");
-  const tokens = text.toLowerCase().split(/[\s,]+/).filter((t) => t.length > 0);
-  return tokens.length === 0 || tokens.some((t) => DESKTOP_TARGETS.has(t));
+  const targets = ir.header.targets;
+  return targets.length === 0 || targets.some((t) => DESKTOP_TARGETS.has(t.toLowerCase()));
 }
 
 /** A single known non-letter, non-mark character; unknown category data is left out, never guessed. */
 function isNonLetter(ch: string): boolean {
   const bucket = bucketOfChar(ch);
   return bucket !== undefined && bucket !== "letter" && bucket !== "mark";
-}
-
-function bucketRank(ch: string): number {
-  return BUCKET_ORDER.indexOf(bucketOfChar(ch) ?? "other");
 }
 
 /**

@@ -15,7 +15,6 @@ import type {
   ContextElement,
   IRGroup,
   IRRule,
-  IRStore,
   OutputElement,
 } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -261,7 +260,9 @@ describe("guardBlockInventory — sil_cameroon_qwerty (block set covers non-lett
 
 describe("guardBlockInventory — the desktop floor", () => {
   // A keyboard whose rules produce only a letter and one comma.
-  function tinyKeyboard(targets?: string) {
+  // Targets are passed through the parsed header (as the codec supplies
+  // them), not as a reconstructed TARGETS store.
+  function tinyKeyboard(targets: string[] = []) {
     const group: IRGroup = {
       nodeId: "group#main",
       name: "main",
@@ -272,22 +273,18 @@ describe("guardBlockInventory — the desktop floor", () => {
         mkRule("r2", [vkey("K_COMMA")], [charOut(",")]),
       ],
     };
-    const stores: IRStore[] =
-      targets === undefined
-        ? []
-        : [{ nodeId: "store#targets", name: "TARGETS", isSystem: true, items: [{ kind: "char", value: targets }] }];
-    return makeTestIR([group], stores);
+    return makeTestIR([group], [], [], { header: { targets } });
   }
 
   it("adds space, digits and ASCII punctuation the rules don't produce, and never the letter", () => {
     const inventory = guardBlockInventory(tinyKeyboard());
     // No &TARGETS builds desktop only, same as naming a desktop target.
-    expect(inventory).toEqual(guardBlockInventory(tinyKeyboard("windows")));
+    expect(inventory).toEqual(guardBlockInventory(tinyKeyboard(["windows"])));
     for (const ch of DESKTOP_BLOCK_FLOOR) expect(inventory).toContain(ch);
     expect(inventory).not.toContain("a");
   });
 
   it("skips the floor for a keyboard that targets touch only", () => {
-    expect(guardBlockInventory(tinyKeyboard("mobile tablet"))).toEqual([","]);
+    expect(guardBlockInventory(tinyKeyboard(["mobile", "tablet"]))).toEqual([","]);
   });
 });
