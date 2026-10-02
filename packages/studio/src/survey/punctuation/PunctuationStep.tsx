@@ -385,7 +385,18 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   // add-only in practice. After seeding it is normally empty; a REMOVED
   // proposal reappears here so the author can take it back.
   const offered = useMemo(() => tier.filter((c) => !chars.includes(c)), [tier, chars]);
-  const showSuggestions = loading || inventory === null || tier.length === 0 || offered.length > 0;
+  // One derived state gates the section AND selects its content, so the two
+  // can never desync: a branch added or reordered in one place would
+  // otherwise leave the gate and the content disagreeing (hidden-but-content,
+  // or shown-but-empty). The no-exemplar-data and empty-tier notes stay:
+  // they say why nothing was suggested, which the author can act on.
+  type SuggestionState = "loading" | "no-exemplars" | "empty-tier" | "offering" | "hidden";
+  const suggestionState: SuggestionState =
+    loading ? "loading"
+    : inventory === null ? "no-exemplars"
+    : tier.length === 0 ? "empty-tier"
+    : offered.length === 0 ? "hidden"
+    : "offering";
 
   // The chosen list, grouped by what proposed it. Grouping is derived from
   // the single-valued provenance; an authored character is one the author
@@ -543,7 +554,7 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
           added" is the normal case, so the section only renders when it has
           something to offer. The no-exemplar-data and empty-tier notes stay:
           they say why nothing was suggested, which the author can act on. */}
-      {showSuggestions && (
+      {suggestionState !== "hidden" && (
         <>
           <section
             aria-label={t({
@@ -554,20 +565,20 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
             <h3 style={sectionHeading}>
               <Trans id="survey.punctuation.suggestedHeading">Suggested punctuation</Trans>
             </h3>
-            {loading ? (
+            {suggestionState === "loading" ? (
               <div style={mutedNote}>
                 <Trans id="survey.punctuation.suggestionsLoading">
                   Checking for suggested punctuation…
                 </Trans>
               </div>
-            ) : inventory === null ? (
+            ) : suggestionState === "no-exemplars" ? (
               <div style={mutedNote}>
                 <Trans id="survey.punctuation.cldrAbsent.noExemplars">
                   No suggested punctuation: no exemplar data covers {displayName}.
                   Add your own below.
                 </Trans>
               </div>
-            ) : tier.length === 0 ? (
+            ) : suggestionState === "empty-tier" ? (
               <div style={mutedNote}>
                 <Trans id="survey.punctuation.cldrAbsent.emptyTier">
                   No suggested punctuation: {cldrSourceLabel} attests no punctuation
