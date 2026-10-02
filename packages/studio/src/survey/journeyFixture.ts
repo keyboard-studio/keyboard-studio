@@ -93,6 +93,17 @@ export interface JourneyFixture {
     [key: string]: unknown;
   };
   backtrack_events?: JourneyBacktrackEvent[];
+  /**
+   * OPTIONAL. Base letters (single NFC graphemes) for the "characters" step's
+   * `SurveyPhaseResult.alphabet.bases` — a fixture-declared stand-in for
+   * PhaseB.tsx's real alphabet-confirmation UI (CLDR/SLDR exemplar lookups,
+   * manual entry), which this headless harness does not replay. Mirrors
+   * `expected_outcomes.axes`'s role for `selectStrategy()`: the harness
+   * consumes the declared value rather than re-deriving it from raw answers.
+   * Present only on fixtures whose convenience/carve needed-set must be
+   * exercised for real (journey-runner.ts's "convenience" case).
+   */
+  confirmed_alphabet_bases?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +271,16 @@ export function parseJourneyFixture(raw: string): JourneyFixture {
         );
       }
     }
+  }
+
+  if (parsed["confirmed_alphabet_bases"] !== undefined) {
+    if (
+      !Array.isArray(parsed["confirmed_alphabet_bases"]) ||
+      !parsed["confirmed_alphabet_bases"].every((x) => typeof x === "string" && x.length > 0)
+    ) {
+      fail("confirmed_alphabet_bases must be a string[] of non-empty graphemes if present");
+    }
+    fixture.confirmed_alphabet_bases = parsed["confirmed_alphabet_bases"] as string[];
   }
 
   return fixture;

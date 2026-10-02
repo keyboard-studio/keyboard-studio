@@ -1,8 +1,13 @@
 {
-  "generatedAt": "2026-09-25T02:20:35.334Z",
-  "totalSteps": 15,
-  "coveredSteps": 10,
+  "generatedAt": "2026-09-30T13:59:14.510Z",
+  "totalSteps": 17,
+  "coveredSteps": 11,
   "uncovered": [
+    {
+      "stepId": "layout",
+      "edgeType": "spine",
+      "covered_by": []
+    },
     {
       "stepId": "marks",
       "edgeType": "spine",
@@ -19,7 +24,7 @@
       "covered_by": []
     },
     {
-      "stepId": "convenience",
+      "stepId": "deadkeys",
       "edgeType": "spine",
       "covered_by": []
     },
@@ -39,6 +44,11 @@
         "minimal-defaults",
         "backtrack-journey"
       ]
+    },
+    {
+      "stepId": "layout",
+      "edgeType": "spine",
+      "covered_by": []
     },
     {
       "stepId": "choose_base",
@@ -96,7 +106,9 @@
     {
       "stepId": "convenience",
       "edgeType": "spine",
-      "covered_by": []
+      "covered_by": [
+        "bafut-end-to-end"
+      ]
     },
     {
       "stepId": "carve",
@@ -106,6 +118,11 @@
         "bj-cree-woods-track2",
         "backtrack-journey"
       ]
+    },
+    {
+      "stepId": "deadkeys",
+      "edgeType": "spine",
+      "covered_by": []
     },
     {
       "stepId": "mechanisms",
@@ -150,6 +167,6 @@
       "covered_by": []
     }
   ],
-  "renderedNodeUniverseSize": 95,
-  "coveragePercent": 67
+  "renderedNodeUniverseSize": 97,
+  "coveragePercent": 65
 }

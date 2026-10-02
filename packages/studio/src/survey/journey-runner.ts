@@ -33,24 +33,51 @@
 //     them from simulated per-key edits.
 //
 // Steps with no modular flow AND no gallery-action-summary shape in this
-// harness (marks/punctuation/invisibles/convenience) are completed as a no-op advance —
+// harness (marks/punctuation/invisibles) are completed as a no-op advance —
 // this stands in for the real S0/gate auto-skip those steps' own React
-// components apply when nothing applies (marks-free alphabet, no surplus
-// convenience letters, etc). A fixture that needs one of these steps to carry
-// a real side effect is outside this feature's scope (spec §9 loop primitive,
-// FR-015).
+// components apply when nothing applies (marks-free alphabet, etc). A fixture
+// that needs one of these steps to carry a real side effect is outside this
+// feature's scope (spec §9 loop primitive, FR-015).
+//
+// "convenience" is the ONE exception to that no-op treatment (closing the gap
+// a permanently-skipping gate would leave invisible, spec 079): the harness
+// computes the REAL tri-state gate (`computeConvenienceGate`) from the SAME
+// pure needed-set pieces the live component and carve gallery both read
+// (`@keyboard-studio/engine`'s `deriveCarveNeededSet` +
+// `@keyboard-studio/contracts`'s `nonAlphabetConfirmedInventory`, over the
+// working copy's own `session.alphabet`/`marksWorklist`/`confirmedInventory`)
+// and a real `buildProducedSet(ir)` produced-set. A fixture that declares a
+// "convenience" event asserts the gate opened (`applies`) and which offered
+// candidates it retains; a fixture that declares none asserts the gate did
+// NOT open — pinned from both sides, so a regression that made the gate
+// permanently skip (or permanently open) fails the corpus replay rather than
+// passing silently. See `deriveConvenienceGateInputs` and the "convenience"
+// case below. `session.alphabet` itself is fixture-declared data
+// (`confirmed_alphabet_bases`), not re-derived from raw Phase B answers —
+// mirroring `expected_outcomes.axes`' role below: the real alphabet
+// confirmation UI (CLDR/SLDR exemplar lookups, manual entry) is PhaseB.tsx's
+// own React state, outside this headless harness's reach, exactly like the
+// axis-derivation this module already declines to reimplement.
 
 import type {
   KeyboardIR,
+  IRGroup,
   BaseKeyboard,
   VirtualFS,
   SurveyPhaseResult,
   SurveyAnswer,
   DiscoveryAxisVector,
 } from "@keyboard-studio/contracts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus, makeBaseKeyboard } from "@keyboard-studio/contracts/fixtures";
-import { selectStrategy } from "@keyboard-studio/engine";
+import {
+  createVirtualFS,
+  buildProducedSet,
+  makeConfirmedAlphabet,
+  nonAlphabetConfirmedInventory,
+} from "@keyboard-studio/contracts";
+import { makeTestIR, basicKbdus, makeBaseKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
+import { selectStrategy, deriveCarveNeededSet } from "@keyboard-studio/engine";
+import { computeConvenienceGate } from "./convenience/convenienceGate.ts";
+import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
 import { manifest } from "../steps/manifest.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import {
@@ -98,6 +125,43 @@ const STEP_FLOW_IDS: Readonly<Record<string, string>> = {
 };
 
 // ---------------------------------------------------------------------------
+// Convenience gate (spec 079) — see the module header. Not a live modular
+// flow, so — like "routing_group" (the backtrack sentinel documented in
+// backtrack-journey.yaml) — a fixture declares its convenience decision under
+// a harness-only sentinel questionId rather than a real registry question id.
+// ---------------------------------------------------------------------------
+
+/** Harness-only sentinel questionId for the "convenience" step's retain decision. */
+const CONVENIENCE_RETAIN_QUESTION_ID = "convenience_retain";
+
+/**
+ * The produced/needed/hasSignal triple `computeConvenienceGate` needs, read
+ * off the CURRENT working copy via the SAME pure needed-set pieces
+ * `useCarveNeededSet` (the hook the live component and carve gallery both
+ * call) composes — `deriveCarveNeededSet` + `nonAlphabetConfirmedInventory`,
+ * unioned exactly as that hook's `tieredNeededSet` is. The one piece this
+ * harness cannot reproduce is the hook's async CLDR/SLDR exemplar lookup
+ * (`neededChars`) — there is no network/service layer in this headless
+ * replay — so `hasSignal` degrades to the hook's own inventory-only fallback
+ * (`tieredNeededSet.size > 0`), exactly what a real session sees before its
+ * exemplar lookup resolves. `form` is left at the pure functions' NFC default
+ * since this harness's fixtures carry no `marksOutputForm` (the marks series
+ * stays a no-op here — see module header).
+ */
+function deriveConvenienceGateInputs(): { produced: Set<string>; neededSet: Set<string>; hasSignal: boolean } {
+  const state = useWorkingCopyStore.getState();
+  const produced = state.ir !== null ? buildProducedSet(state.ir) : new Set<string>();
+  const carveNeeded = deriveCarveNeededSet({
+    alphabet: state.session.alphabet,
+    worklist: state.session.marksWorklist,
+    ...(state.session.marksOutputForm !== undefined ? { outputForm: state.session.marksOutputForm } : {}),
+  });
+  const nonAlphabetConfirmed = nonAlphabetConfirmedInventory(state.session.confirmedInventory, state.session.alphabet);
+  const neededSet = new Set([...carveNeeded.requiredPrimary, ...carveNeeded.optionalSecondary, ...nonAlphabetConfirmed]);
+  return { produced, neededSet, hasSignal: neededSet.size > 0 };
+}
+
+// ---------------------------------------------------------------------------
 // Base-keyboard fixtures for the "choose_base" step (T008/T009's persona
 // source_keyboard field). basic_kbdus reuses the real BaseKeyboard fixture
 // (@keyboard-studio/contracts/fixtures); bj_cree_woods carries the REAL
@@ -115,11 +179,27 @@ interface BaseFixture {
   ir: KeyboardIR;
 }
 
+/**
+ * A synthetic IR group producing every basic-Latin letter, both cases — one
+ * rule per output char, built with `@keyboard-studio/contracts/fixtures`'s
+ * own `irGroup`/`charRule` builders (the same ones `useInventoryDiff.test.ts`'s
+ * `seedBaseWithChars` convention is built from). Gives `buildProducedSet` a
+ * real a-z/A-Z produced set for `basic_kbdus`, the signal the convenience
+ * gate's surplus computation needs (see the module header) — an EMPTY IR,
+ * this fixture's shape before the convenience gate needed exercising,
+ * produced NOTHING and so could never show a surplus letter regardless of
+ * what the orthography needed.
+ */
+function basicLatinIRGroup(): IRGroup {
+  const chars = [..."abcdefghijklmnopqrstuvwxyz", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+  return irGroup({ rules: chars.map((char) => charRule({ context: char, output: char })) });
+}
+
 const BASE_FIXTURES: Readonly<Record<string, BaseFixture>> = {
   basic_kbdus: {
     base: basicKbdus,
     vfs: createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c basic_kbdus\n", isBinary: false }]),
-    ir: makeTestIR([]),
+    ir: makeTestIR([basicLatinIRGroup()]),
   },
   bj_cree_woods: {
     base: makeBaseKeyboard({
@@ -524,7 +604,18 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
         case "characters": {
           const answers = answerMapFromGroup(group, "characters");
           const walked = walkFlowFromAnswers(STEP_FLOW_IDS["characters"]!, surveyContext, answers);
-          const phaseResult: SurveyPhaseResult = { phase: walked.phase, answers: walked.answers };
+          // `confirmed_alphabet_bases` (see module header / journeyFixture.ts):
+          // fixture-declared stand-in for PhaseB.tsx's real alphabet-
+          // confirmation UI, which this headless harness does not replay.
+          // Only fixtures whose convenience/carve needed-set must be
+          // exercised for real declare it.
+          const phaseResult: SurveyPhaseResult = {
+            phase: walked.phase,
+            answers: walked.answers,
+            ...(fixture.confirmed_alphabet_bases !== undefined
+              ? { alphabet: makeConfirmedAlphabet({ bases: fixture.confirmed_alphabet_bases }) }
+              : {}),
+          };
           useWorkingCopyStore.getState().recordPhase(phaseResult);
           applyStepCompletion("characters", phaseResult, deps); // no-op per reducer's default case
           result = phaseResult;
@@ -533,8 +624,7 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
 
         case "marks":
         case "punctuation":
-        case "invisibles":
-        case "convenience": {
+        case "invisibles": {
           // No modular flow and no gallery-action-summary shape for these —
           // see module header. applyStepCompletion("marks", {}, deps) is a
           // genuine no-op here (an empty payload has no marksWorklist, so
@@ -545,8 +635,91 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "convenience": {
+          // See module header — the ONE gate this harness computes for real
+          // rather than treating as an unconditional no-op.
+          const { produced, neededSet, hasSignal } = deriveConvenienceGateInputs();
+          const instantiated = useWorkingCopyStore.getState().instantiationMode !== null;
+          const gate = computeConvenienceGate({ produced, needed: neededSet, hasSignal, instantiated });
+          const convenienceEvents = (group?.events ?? []).filter(isSurveyAnswerEvent);
+
+          if (convenienceEvents.length > 0) {
+            if (gate.kind !== "applies") {
+              throw new Error(
+                `journey-runner: fixture declares a "convenience" event but the gate did not open ` +
+                  `(kind: "${gate.kind}") — check confirmed_alphabet_bases against the base keyboard's ` +
+                  `produced characters`,
+              );
+            }
+            const retainEvent = convenienceEvents.find((e) => e.questionId === CONVENIENCE_RETAIN_QUESTION_ID);
+            if (retainEvent === undefined) {
+              throw new Error(
+                `journey-runner: "convenience" step event must use questionId "${CONVENIENCE_RETAIN_QUESTION_ID}"`,
+              );
+            }
+            const retainedPrimaries = new Set(
+              (Array.isArray(retainEvent.value) ? retainEvent.value : retainEvent.value.split(/\s+/)).filter(
+                (s) => s.length > 0,
+              ),
+            );
+            const offeredPrimaries = new Set(gate.candidates.map((c) => c.primary));
+            for (const primary of retainedPrimaries) {
+              if (!offeredPrimaries.has(primary)) {
+                throw new Error(
+                  `journey-runner: "convenience" step retains "${primary}", which the gate did not offer ` +
+                    `(offered: ${[...offeredPrimaries].join(", ")})`,
+                );
+              }
+            }
+            const retained = gate.candidates
+              .filter((c) => retainedPrimaries.has(c.primary))
+              .flatMap((c) => c.chars);
+            useWorkingCopyStore.getState().recordPhase({ phase: "C", answers: [], retainedConvenienceChars: retained });
+          } else if (gate.kind === "applies") {
+            // FR-064's inverse: a fixture that declares no "convenience"
+            // event asserts the gate did NOT open. Pinning both directions
+            // means a regression that makes the gate permanently skip (the
+            // original bug) AND one that makes it permanently open both fail
+            // the corpus replay, rather than either passing silently.
+            throw new Error(
+              `journey-runner: the convenience gate opened (candidates: ` +
+                `${gate.candidates.map((c) => c.primary).join(", ")}) but the fixture declares no ` +
+                `"convenience" event`,
+            );
+          }
+          result = undefined;
+          break;
+        }
+
         case "carve": {
           collectEditorActionEvents(group, "gallery_edit");
+          // spec 079: retained convenience letters must actually reach
+          // carve — the real contract is CarveGalleryV2.tsx's own
+          // `retainedSet` union (`orthographyNeededSet ∪
+          // session.retainedConvenienceChars`) feeding `recommendedRemovalChars`,
+          // so a retained letter is never proposed for removal. Reproduced
+          // here with the SAME pure function carve calls, over the SAME
+          // needed-set pieces `deriveConvenienceGateInputs` already computed —
+          // not a new derivation. A no-op when no letters were retained
+          // (`retained.size === 0` degrades to `[]`, same as every other
+          // fixture's `recommended` list).
+          {
+            const state = useWorkingCopyStore.getState();
+            const retained = new Set(state.session.retainedConvenienceChars ?? []);
+            if (retained.size > 0 && state.ir !== null) {
+              const { neededSet } = deriveConvenienceGateInputs();
+              const carveNeeded = new Set([...neededSet, ...retained]);
+              const recommended = recommendedRemovalChars({ ir: state.ir, needed: carveNeeded });
+              for (const r of recommended) {
+                if (retained.has(r.ch)) {
+                  throw new Error(
+                    `journey-runner: convenience-retained character "${r.ch}" is still proposed for ` +
+                      `removal by carve — retainedConvenienceChars did not reach carve's needed set`,
+                  );
+                }
+              }
+            }
+          }
           // Consult the real STEPS_WITH_APPLY_COMPLETION set rather than
           // hand-asserting membership — "carve" IS listed there (a prior
           // draft of this comment claimed otherwise, which was simply wrong
