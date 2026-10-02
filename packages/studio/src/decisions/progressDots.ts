@@ -184,6 +184,12 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   help: msg({ id: "footer.stage.help", message: "Help & credits" }),
 };
 
+const SCREEN_OF_STAGE_MESSAGE = (stage: string, position: number, total: number) =>
+  msg({
+    id: "footer.screen.positionInStage",
+    message: `${{ stage: stage }} — ${{ position: position }} of ${{ total: total }}`,
+  });
+
 /** A manifest step's localized name, falling back to the raw id (never
  * blank, never throws) for a step this map does not (yet) name. Exported —
  * `components/StepHost.tsx`'s FR-016 notice (T064) names affected steps
@@ -354,7 +360,31 @@ function stepScreens(
       isCursor: position.id === cursorId,
     });
   }
-  return screens;
+  return disambiguateStageLabels(stepId, screens, i18n);
+}
+
+/**
+ * A screen that resolved no label of its own fell back to the stage name, so a
+ * list that shows the stage as a heading and one row per screen (the mobile
+ * Contents sheet) would repeat the heading on every row. Number those screens
+ * "<stage> - n of total" (n counts all the step's screens) so no row equals its
+ * heading and each stays distinguishable from its siblings.
+ */
+function disambiguateStageLabels(
+  stepId: string,
+  screens: StepScreen[],
+  i18n: I18n | undefined,
+): StepScreen[] {
+  const stage = stageLabel(stepId, i18n);
+  const total = screens.length;
+  return screens.map((screen, index) =>
+    screen.label === stage
+      ? {
+          ...screen,
+          label: resolveMessage(i18n, SCREEN_OF_STAGE_MESSAGE(stage, index + 1, total)),
+        }
+      : screen,
+  );
 }
 
 /**
