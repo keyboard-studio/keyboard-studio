@@ -11,8 +11,8 @@
  * Two directions (FR-022):
  * - missing: combining-mark keys (Unicode General_Category M*) with no
  *   guard rule, each suggestion scoped to THAT mark's non-base set from
- *   the orthography model (`alphabet − markAttachments[mark]`), not to a
- *   global non-letter store. Carries a `reasoning` string naming the mark's
+ *   the orthography model (`(alphabet ∪ nonLetters) − markAttachments[mark]`),
+ *   not to one global store. Carries a `reasoning` string naming the mark's
  *   attachment set.
  * - overBroad: guard rules that block a mark after a character the
  *   orthography says the mark attaches to — rendered as a question, never
@@ -29,7 +29,7 @@
 import type { IRRule } from "@keyboard-studio/contracts";
 import { isSuppressionOnlyOutput, shapeContext, shapeOutput } from "./classify.js";
 import { getCategory, getName } from "./unicodeAdapter.js";
-import { describeKey } from "./explain.js";
+import { BUCKET_ORDER, bucketOfChar, describeKey, type CharBucket } from "./explain.js";
 
 /**
  * Orthography knowledge threaded through from the Rules step (downstream
@@ -41,6 +41,12 @@ export interface OrthographyModel {
   alphabet: string[];
   /** Combining-mark char → base chars it attaches to in this orthography. */
   markAttachments: Map<string, string[]>;
+  /**
+   * Space, digits, punctuation and symbols the keyboard can type
+   * (`guardBlockInventory`). Block sets cover these as well as the alphabet;
+   * absent means only the alphabet is known.
+   */
+  nonLetters?: string[];
 }
 
 /** One combining-mark key missing its guard rule. */
@@ -186,26 +192,47 @@ function collectGuardRules(rules: IRRule[]): GuardRule[] {
 }
 
 /**
- * The characters a guard store should hold.
+ * The characters a guard store should hold: the alphabet plus the keyboard's
+ * non-letters (`ortho.nonLetters`), minus the characters the mark attaches to.
  *
- * - With `forMark`: that mark's non-base set — `alphabet −
+ * - With `forMark`: that mark's non-base set — `(alphabet ∪ nonLetters) −
  *   markAttachments[mark]` (FR-022 direction A scoping).
  * - Without: the default block set — characters that never appear as any
  *   mark's base, for an author starting fresh ("we drafted the block set
  *   from your orthography" instead of a blank store).
  *
- * Alphabet order is preserved; deterministic.
+ * A non-letter is only left out when the orthography attests the mark on it,
+ * so marks that legitimately sit on non-letters (a keycap on a digit, a tone
+ * mark on an apostrophe-like letter, IPA symbols) are proposed for blocking
+ * unless confirmed; the reasoning text tells the author to untick them.
+ *
+ * Order is deterministic: by character kind (space, digit, punctuation,
+ * letter, mark, symbol, other), alphabet order within the alphabet, then
+ * code point.
  */
 export function proposeGuardStore(ortho: OrthographyModel, forMark?: string): string[] {
+  const attached = new Set<string>();
   if (forMark !== undefined) {
-    const bases = new Set(ortho.markAttachments.get(forMark) ?? []);
-    return ortho.alphabet.filter((ch) => !bases.has(ch));
+    for (const b of ortho.markAttachments.get(forMark) ?? []) attached.add(b);
+  } else {
+    for (const bases of ortho.markAttachments.values()) {
+      for (const b of bases) attached.add(b);
+    }
   }
-  const allBases = new Set<string>();
-  for (const bases of ortho.markAttachments.values()) {
-    for (const b of bases) allBases.add(b);
-  }
-  return ortho.alphabet.filter((ch) => !allBases.has(ch));
+  const alphabetIndex = new Map<string, number>();
+  ortho.alphabet.forEach((ch, i) => {
+    if (!alphabetIndex.has(ch)) alphabetIndex.set(ch, i);
+  });
+  const candidates = [...new Set([...ortho.alphabet, ...(ortho.nonLetters ?? [])])];
+  const rank = (ch: string) => BUCKET_ORDER.indexOf(bucketOfChar(ch) ?? "other");
+  return candidates
+    .filter((ch) => !attached.has(ch))
+    .sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        (alphabetIndex.get(a) ?? Infinity) - (alphabetIndex.get(b) ?? Infinity) ||
+        (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0),
+    );
 }
 
 function previewList(items: string[], max: number): string {
@@ -213,16 +240,50 @@ function previewList(items: string[], max: number): string {
   return items.length > max ? `${shown} …` : shown;
 }
 
+/** "a, b and c" — for naming the character kinds a preview covers. */
+function joinAnd(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+const NON_LETTER_KIND_NAMES: Partial<Record<CharBucket, string>> = {
+  space: "space",
+  digit: "digits",
+  punctuation: "punctuation",
+  symbol: "symbols",
+};
+
+/**
+ * The non-letter part of a block set, previewed separately from the
+ * alphabet: the space is shown by name, and the author is told which kinds
+ * are included and to untick any the mark really sits on.
+ */
+function nonLetterClause(nonLetters: string[]): string {
+  if (nonLetters.length === 0) return "";
+  const kinds = BUCKET_ORDER.filter((b) => nonLetters.some((ch) => bucketOfChar(ch) === b))
+    .map((b) => NON_LETTER_KIND_NAMES[b])
+    .filter((name): name is string => name !== undefined);
+  const preview = previewList(nonLetters.map((ch) => (ch === " " ? "space" : ch)), 12);
+  return (
+    `, plus the ${joinAnd(kinds)} your keyboard can type: {${preview}}. ` +
+    "Untick any of those the mark really sits on (a keycap on a digit, a tone mark on an apostrophe, IPA symbols)"
+  );
+}
+
 function missingGuardReasoning(char: string, cp: number, ortho: OrthographyModel): string {
   const label = markLabel(cp);
   const bases = ortho.markAttachments.get(char) ?? [];
   const nonBases = proposeGuardStore(ortho, char);
-  const nonBasePreview = previewList(nonBases, 12);
+  const inAlphabet = new Set(ortho.alphabet);
+  const alphabetPart = nonBases.filter((ch) => inAlphabet.has(ch));
+  const nonLetterPart = nonBases.filter((ch) => !inAlphabet.has(ch));
+  const nonBasePreview = previewList(alphabetPart, 12);
+  const extra = nonLetterClause(nonLetterPart);
   if (bases.length === 0) {
-    return `${label} has no attachment bases in your orthography — guard it after every character: {${nonBasePreview}}.`;
+    return `${label} has no attachment bases in your orthography — guard it after every character: {${nonBasePreview}}${extra}.`;
   }
   const basePreview = previewList(bases, 8);
-  return `${label} attaches to {${basePreview}} in your orthography — guard it after everything else: {${nonBasePreview}}.`;
+  return `${label} attaches to {${basePreview}} in your orthography — guard it after everything else: {${nonBasePreview}}${extra}.`;
 }
 
 /**

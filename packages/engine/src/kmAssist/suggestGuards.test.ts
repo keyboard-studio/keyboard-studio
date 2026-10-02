@@ -13,14 +13,20 @@ import { fileURLToPath } from "node:url";
 import { parse } from "../codec/parse.js";
 import type {
   ContextElement,
+  IRGroup,
   IRRule,
+  IRStore,
   OutputElement,
 } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import {
   analyzeDiacriticGuards,
   proposeGuardStore,
   type OrthographyModel,
 } from "./suggestGuards.js";
+import { DESKTOP_BLOCK_FLOOR, guardBlockInventory } from "./blockInventory.js";
+import { bucketOfChar } from "./explain.js";
+import { producedGlyphs } from "../inventory/producedGlyphs.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_PATH = resolve(__dir, "__fixtures__/sil_cameroon_qwerty.kmn");
@@ -183,11 +189,105 @@ describe("analyzeDiacriticGuards — direction B, over-broad guards (FR-022)", (
 });
 
 describe("proposeGuardStore (FR-022)", () => {
-  it("per-mark: the mark's non-base set, in alphabet order", () => {
-    expect(proposeGuardStore(stubOrtho(), ACUTE)).toEqual(["b", "c", "d", "f", " ", "1", "."]);
+  it("per-mark: the mark's non-base set, by character kind then alphabet order", () => {
+    expect(proposeGuardStore(stubOrtho(), ACUTE)).toEqual([" ", "1", ".", "b", "c", "d", "f"]);
   });
 
   it("default: characters that are never any mark's base", () => {
-    expect(proposeGuardStore(stubOrtho())).toEqual(["b", "d", "f", " ", "1", "."]);
+    expect(proposeGuardStore(stubOrtho())).toEqual([" ", "1", ".", "b", "d", "f"]);
+  });
+
+  it("covers the keyboard's non-letters too, in kind then code-point order", () => {
+    const ortho: OrthographyModel = {
+      alphabet: ["a", "e", "b"],
+      markAttachments: new Map([[ACUTE, ["a", "e"]]]),
+      nonLetters: ["$", " ", "9", ",", "0"],
+    };
+    expect(proposeGuardStore(ortho, ACUTE)).toEqual([" ", "0", "9", ",", "b", "$"]);
+  });
+
+  it("leaves out a non-letter the orthography attests the mark on", () => {
+    const APOSTROPHE = "’";
+    const ortho: OrthographyModel = {
+      alphabet: ["a"],
+      markAttachments: new Map([[ACUTE, ["a", APOSTROPHE]]]),
+      nonLetters: [" ", APOSTROPHE],
+    };
+    expect(proposeGuardStore(ortho, ACUTE)).toEqual([" "]);
+  });
+
+  it("the reasoning previews the non-letters separately, names their kinds and warns to untick", () => {
+    const ortho: OrthographyModel = {
+      alphabet: ["a", "b"],
+      markAttachments: new Map([[ACUTE, ["a"]]]),
+      nonLetters: [" ", "1", "."],
+    };
+    const rules = [mkRule("acute", [vkey("K_QUOTE")], [charOut(ACUTE)])];
+    const [group] = analyzeDiacriticGuards(rules, ortho).missing;
+    const reasoning = group?.missing[0]?.reasoning ?? "";
+    expect(reasoning).toContain("guard it after everything else: {b}");
+    expect(reasoning).toContain("plus the space, digits and punctuation your keyboard can type: {space 1 .}");
+    expect(reasoning).toContain("Untick any of those the mark really sits on");
+  });
+});
+
+describe("guardBlockInventory — sil_cameroon_qwerty (block set covers non-letters)", () => {
+  const PACK_PATH = resolve(__dir, "../rulePacks/seedPacks/cameroon-diacritic-blocking.pack.json");
+  const pack = JSON.parse(readFileSync(PACK_PATH, "utf-8")) as {
+    behaviours: { parameters: { guardedContextChars: string[] } }[];
+  };
+  const packChars = pack.behaviours[0]?.parameters.guardedContextChars ?? [];
+
+  it("covers every non-letter in the shipped Cameroon block set that the keyboard can type", () => {
+    const ir = fixtureParsed().ir;
+    const typable = new Set([...producedGlyphs(ir, { includeSpace: true }), ...DESKTOP_BLOCK_FLOOR]);
+    const inventory = new Set(guardBlockInventory(ir));
+    const expected = packChars.filter((ch) => typable.has(ch) && !/\p{L}|\p{M}/u.test(ch));
+    expect(expected.length).toBeGreaterThan(40);
+    for (const ch of expected) expect(inventory.has(ch)).toBe(true);
+  });
+
+  it("orders spaces, then digits, then punctuation, then symbols", () => {
+    const inventory = guardBlockInventory(fixtureParsed().ir);
+    const kinds = inventory.map((ch) => bucketOfChar(ch));
+    const order = ["space", "digit", "punctuation", "symbol", "other"];
+    const ranks = kinds.map((k) => order.indexOf(k ?? "other"));
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    expect(inventory[0]).toBe(" ");
+    expect(inventory.indexOf(",")).toBeLessThan(inventory.indexOf("$"));
+  });
+
+});
+
+describe("guardBlockInventory — the desktop floor", () => {
+  // A keyboard whose rules produce only a letter and one comma.
+  function tinyKeyboard(targets?: string) {
+    const group: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        mkRule("r1", [vkey("K_A")], [charOut("a")]),
+        mkRule("r2", [vkey("K_COMMA")], [charOut(",")]),
+      ],
+    };
+    const stores: IRStore[] =
+      targets === undefined
+        ? []
+        : [{ nodeId: "store#targets", name: "TARGETS", isSystem: true, items: [{ kind: "char", value: targets }] }];
+    return makeTestIR([group], stores);
+  }
+
+  it("adds space, digits and ASCII punctuation the rules don't produce, and never the letter", () => {
+    const inventory = guardBlockInventory(tinyKeyboard());
+    // No &TARGETS builds desktop only, same as naming a desktop target.
+    expect(inventory).toEqual(guardBlockInventory(tinyKeyboard("windows")));
+    for (const ch of DESKTOP_BLOCK_FLOOR) expect(inventory).toContain(ch);
+    expect(inventory).not.toContain("a");
+  });
+
+  it("skips the floor for a keyboard that targets touch only", () => {
+    expect(guardBlockInventory(tinyKeyboard("mobile tablet"))).toEqual([","]);
   });
 });

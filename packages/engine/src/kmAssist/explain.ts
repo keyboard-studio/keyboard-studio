@@ -363,11 +363,13 @@ function shortUnicodeName(name: string): string {
   return name.replace(/^combining\s+/i, "").toLowerCase();
 }
 
-type CharBucket = "space" | "digit" | "punctuation" | "letter" | "mark" | "symbol" | "other";
-const BUCKET_ORDER: CharBucket[] = ["space", "digit", "punctuation", "letter", "mark", "symbol", "other"];
+export type CharBucket = "space" | "digit" | "punctuation" | "letter" | "mark" | "symbol" | "other";
+/** The stable order character kinds are listed in (also the guard block-set order). */
+export const BUCKET_ORDER: readonly CharBucket[] = ["space", "digit", "punctuation", "letter", "mark", "symbol", "other"];
 const CORE_BUCKETS: CharBucket[] = ["space", "digit", "punctuation"];
 
-function bucketOfChar(ch: string): CharBucket | undefined {
+/** The kind of a single code point, or undefined for a cluster or unknown category data. */
+export function bucketOfChar(ch: string): CharBucket | undefined {
   if ([...ch].length !== 1) return undefined;
   const cp = ch.codePointAt(0);
   if (cp === undefined) return undefined;

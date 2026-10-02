@@ -38,7 +38,7 @@ export function GuardSuggestions() {
   const analysis = useMemo(() => {
     const rules = ir?.groups.flatMap((g) => g.rules) ?? [];
     const stores = ir ? storeCharsOf(ir) : new Map<string, string[]>();
-    return analyzeGuardCoverage(rules, deriveOrthographyModel(alphabet), stores);
+    return analyzeGuardCoverage(rules, deriveOrthographyModel(alphabet, ir), stores);
   }, [ir, alphabet]);
 
   const familyIdForStore = (store: string): string | undefined =>
