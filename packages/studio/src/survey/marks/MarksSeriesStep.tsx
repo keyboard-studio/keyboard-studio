@@ -280,11 +280,6 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   const gate = useMemo(() => computeMarksGate(alphabet), [alphabetKey]);
 
   // Derived station inputs — all pure engine functions over the gate alphabet.
-  const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet), [gate.alphabet]);
-  const proposals = useMemo(
-    () => proposeAttachments(gate.alphabet, classes),
-    [gate.alphabet, classes],
-  );
   const bcp47 = surveyContext.bcp47_tag;
   // The GATE for "is this base cased at all" (spec 048 FR-006): reads the
   // working-copy IR's `casing` facet, effective-value accessor, rather than
@@ -307,6 +302,18 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // require new filtering, because that's what these primitives already do.
   const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
   const isCasedBase = casingValue === "cased" || casingValue === "mixed";
+  // Attestation is case-symmetric behind the same gate: a mark seen only on a
+  // capital must still pre-tick the lowercase row, the only one shown below,
+  // and must still group with a sibling seen only on the lowercase letter.
+  const fold = useMemo(
+    () => ({ caseFold: isCasedBase, ...(bcp47 !== undefined ? { bcp47 } : {}) }),
+    [isCasedBase, bcp47],
+  );
+  const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet, fold), [gate.alphabet, fold]);
+  const proposals = useMemo(
+    () => proposeAttachments(gate.alphabet, classes, fold),
+    [gate.alphabet, classes, fold],
+  );
   // Marks questions offer only lowercase/caseless bases (spec 049, US1); the
   // uppercase counterpart's attachment is derived, not asked. The affordance
   // count is pinned to the folded lowercase view (SC-004), and the shared fold
@@ -372,9 +379,9 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         baseIr,
         keyBudget,
         attachments: expandedAttachments,
-        ...(bcp47 !== undefined ? { bcp47 } : {}),
+        ...fold,
       }),
-    [gate.alphabet, classes, proposals, baseIr, keyBudget, expandedAttachments, bcp47],
+    [gate.alphabet, classes, proposals, baseIr, keyBudget, expandedAttachments, fold],
   );
 
   // What each class could promote — offered on lowercase/caseless bases only.

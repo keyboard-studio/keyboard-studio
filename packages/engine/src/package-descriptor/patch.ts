@@ -90,6 +90,14 @@ const INFO_ELEMENT_RE = /(<Info>)([\s\S]*?)(<\/Info>)/;
  * @param welcomeFolderFiles the files the projection ships in `source/welcome/`
  *   beside the page, as bare names (see `buildKpsContent`). Listed on generate;
  *   appended when missing on patch.
+ * @param reportKeyboardId the id warnings name the descriptor by. The projection
+ *   calls this under the PRE-rename id and renames the file afterwards, so it
+ *   passes the author's id here: a warning naming `source/<base id>.kps` reads
+ *   as the base's identity leaking into the output (spec 059 FR-003).
+ *
+ * Generating a missing descriptor is not reported. On the adapt track it is the
+ * designed path, not a fault (FR-006 asks only that a FAILURE be named);
+ * `generated` in the result says it happened.
  */
 export function applyIdentityToKps(
   vfs: VirtualFS,
@@ -98,15 +106,17 @@ export function applyIdentityToKps(
   kmnText: string,
   version?: string,
   welcomeFolderFiles: readonly string[] = [],
+  reportKeyboardId: string = keyboardId,
 ): ApplyIdentityToKpsResult {
   const path = `source/${keyboardId}.kps`;
+  const reportPath = `source/${reportKeyboardId}.kps`;
   const warnings: string[] = [];
 
   let entry: ReturnType<VirtualFS["get"]>;
   try {
     entry = vfs.get(path);
   } catch (err: unknown) {
-    warnings.push(`[package-descriptor] could not write identity into ${path}: ${reasonOf(err)}`);
+    warnings.push(`[package-descriptor] could not write identity into ${reportPath}: ${reasonOf(err)}`);
     return { warnings, generated: false };
   }
 
@@ -121,12 +131,9 @@ export function applyIdentityToKps(
         false,
       );
     } catch (err: unknown) {
-      warnings.push(`[package-descriptor] could not write identity into ${path}: ${reasonOf(err)}`);
+      warnings.push(`[package-descriptor] could not write identity into ${reportPath}: ${reasonOf(err)}`);
       return { warnings, generated: false };
     }
-    warnings.push(
-      `[package-descriptor] generated a package descriptor for ${keyboardId} (none was present)`,
-    );
     return { warnings, generated: true };
   }
 
@@ -136,7 +143,7 @@ export function applyIdentityToKps(
   // would destroy whatever it actually holds.
   if (typeof entry.content !== "string") {
     warnings.push(
-      `[package-descriptor] could not write identity into ${path}: descriptor is not text`,
+      `[package-descriptor] could not write identity into ${reportPath}: descriptor is not text`,
     );
     return { warnings, generated: false };
   }
@@ -144,18 +151,18 @@ export function applyIdentityToKps(
   const result = patchKpsIdentity(entry.content, identity, keyboardId);
   if (result.unwritable.length > 0) {
     warnings.push(
-      `[package-descriptor] could not write identity into ${path}: ${result.unwritable.join("; ")}`,
+      `[package-descriptor] could not write identity into ${reportPath}: ${result.unwritable.join("; ")}`,
     );
   }
   // spec 080 FR-002: the welcome-path migration — the module's one sanctioned
   // write into <Options> / <Files>. Reported rewrite by rewrite.
   const migrated = migrateWelcomePaths(result.text, welcomeFolderFiles);
   for (const rewrite of migrated.rewrites) {
-    warnings.push(`[package-descriptor] migrated welcome path in ${path}: ${rewrite}`);
+    warnings.push(`[package-descriptor] migrated welcome path in ${reportPath}: ${rewrite}`);
   }
   if (migrated.unlisted.length > 0) {
     warnings.push(
-      `[package-descriptor] could not list welcome-folder files in ${path} (no <Files> block): ${migrated.unlisted.join(", ")}`,
+      `[package-descriptor] could not list welcome-folder files in ${reportPath} (no <Files> block): ${migrated.unlisted.join(", ")}`,
     );
   }
   const text = migrated.text;
@@ -163,7 +170,7 @@ export function applyIdentityToKps(
     try {
       vfs.set(path, text, false);
     } catch (err: unknown) {
-      warnings.push(`[package-descriptor] could not write identity into ${path}: ${reasonOf(err)}`);
+      warnings.push(`[package-descriptor] could not write identity into ${reportPath}: ${reasonOf(err)}`);
     }
   }
   return { warnings, generated: false };

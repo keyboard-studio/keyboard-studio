@@ -1467,10 +1467,8 @@ describe("projectWorkingCopyVfs — package descriptor (step 3.6)", () => {
 
     const kps = vfs.get("source/bm_sil.kps")?.content;
     expect(kps).toContain('<Language ID="bm-Latn">Bambara</Language>');
-    // Named, not silent (FR-006) — the pre-057 adapt path failed invisibly.
-    expect(warnings).toEqual([
-      "[package-descriptor] generated a package descriptor for bm_sil (none was present)",
-    ]);
+    // Generation is the designed path, not a fault: FR-006 names FAILURES only.
+    expect(warnings).toEqual([]);
   });
 
   it("declares the und placeholder, never the base's tag, on a blank code (US1-3, FR-007)", async () => {

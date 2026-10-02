@@ -251,7 +251,7 @@ describe("applyIdentityToKps — <WebSite> on the patch path (spec 061 FR-012)",
 });
 
 describe("applyIdentityToKps — generating an absent descriptor (US3, FR-006, D-09)", () => {
-  it("generates the descriptor and reports that it did", () => {
+  it("generates the descriptor and reports it through `generated`, not a warning", () => {
     const vfs = createVirtualFS();
     const result = applyIdentityToKps(
       vfs,
@@ -262,9 +262,9 @@ describe("applyIdentityToKps — generating an absent descriptor (US3, FR-006, D
     );
 
     expect(result.generated).toBe(true);
-    expect(result.warnings).toEqual([
-      "[package-descriptor] generated a package descriptor for bm_sil (none was present)",
-    ]);
+    // Generation is reported through `generated`, not as a warning (FR-006
+    // names failures only).
+    expect(result.warnings).toEqual([]);
 
     const kps = textAt(vfs, "source/bm_sil.kps");
     expect(allLanguageLines(kps)).toEqual(['<Language ID="bm-Latn">Bambara</Language>']);
@@ -313,6 +313,15 @@ describe("applyIdentityToKps — failure names itself rather than throwing (FR-0
       "[package-descriptor] could not write identity into source/bm_sil.kps: descriptor is not text",
     ]);
     expect(result.generated).toBe(false);
+  });
+
+  it("names the descriptor by reportKeyboardId, the id the author will receive", () => {
+    const vfs = createVirtualFS();
+    vfs.set("source/basic_kbdus.kps", new Uint8Array([0, 1, 2]), true);
+    const result = applyIdentityToKps(vfs, "basic_kbdus", { displayName: "Bambara" }, KMN, undefined, [], "bm_sil");
+    expect(result.warnings).toEqual([
+      "[package-descriptor] could not write identity into source/bm_sil.kps: descriptor is not text",
+    ]);
   });
 
   it("emits no emoji in any warning (house convention)", () => {

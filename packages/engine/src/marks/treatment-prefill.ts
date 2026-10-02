@@ -27,7 +27,7 @@
 import type { ConfirmedAlphabet, KeyboardIR } from "@keyboard-studio/contracts";
 import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
 import type { MarkClass } from "./mark-classes.js";
-import { attestedBasesOf } from "./mark-classes.js";
+import { attestedBasesOf, attestedLetterCount } from "./mark-classes.js";
 import type { AttachmentProposal } from "./attachment-proposals.js";
 import type {
   BaseMarkMechanism,
@@ -102,6 +102,11 @@ export interface MarkTreatmentPrefillOptions {
   attachments?: Record<string, Record<string, boolean>>;
   /** Locale tag for the case fold applied to promotable bases (spec 049). */
   bcp47?: string;
+  /**
+   * Count productivity spread in letters, not cases: a mark seen on `n` and
+   * `N` has spread 1. Pass the same gate as `proposeAttachments`' `caseFold`.
+   */
+  caseFold?: boolean;
 }
 
 /**
@@ -114,7 +119,8 @@ export function computeMarkTreatmentPrefills(
   proposals: AttachmentProposal[],
   opts: MarkTreatmentPrefillOptions = {},
 ): MarkTreatmentPrefill[] {
-  const attested = attestedBasesOf(alphabet);
+  const fold = { caseFold: opts.caseFold === true, ...(opts.bcp47 !== undefined ? { bcp47: opts.bcp47 } : {}) };
+  const attested = attestedBasesOf(alphabet, fold);
   const baseMechanism = opts.baseIr != null ? detectBaseMarkMechanism(opts.baseIr) : null;
   const spareKeys = opts.keyBudget?.spareKeys ?? null;
   const attachments = opts.attachments;
@@ -122,7 +128,7 @@ export function computeMarkTreatmentPrefills(
   return classes.map((markClass) => {
     const spread = Math.max(
       0,
-      ...markClass.marks.map((m) => (attested.get(m) ?? new Set()).size),
+      ...markClass.marks.map((m) => attestedLetterCount(alphabet, attested.get(m) ?? new Set(), fold)),
     );
 
     // What the author could promote, before the budget has a say. Derived from

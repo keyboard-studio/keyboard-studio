@@ -12,6 +12,7 @@
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { getCCC } from "@keyboard-studio/contracts/unicode";
+import { caseCounterpart } from "../character-discovery/casePair.js";
 
 export interface MarkClass {
   /** Stable within a session (deterministic from the alphabet). */
@@ -89,17 +90,77 @@ function bucketOf(mark: string): FunctionBucket {
   return "other";
 }
 
-/** Attested base set per mark, from the order-preserving stacks. */
-export function attestedBasesOf(alphabet: ConfirmedAlphabet): Map<string, Set<string>> {
+/**
+ * Case-symmetric attestation. Every consumer of {@link attestedBasesOf} takes
+ * the same pair so grouping, proposals and the treatment prefill agree about
+ * which letters a mark was seen on.
+ */
+export interface AttestationCaseFold {
+  /**
+   * Treat attestation as case-symmetric: a mark seen on either case of a cased
+   * letter counts as seen on both, when the other case is in the confirmed
+   * alphabet. Pass the same gate that opens spec 049's lowercase-only display
+   * (casing facet `cased` or `mixed`).
+   */
+  caseFold?: boolean;
+  /** Locale for the case pairing (Turkic dotted/dotless I). */
+  bcp47?: string;
+}
+
+/** The base's case counterpart, when folding is on and the counterpart is confirmed. */
+function confirmedCounterpart(
+  alphabet: ConfirmedAlphabet,
+  fold: AttestationCaseFold,
+): (base: string) => ReturnType<typeof caseCounterpart> {
+  if (fold.caseFold !== true) return () => null;
+  const bases = new Set(alphabet.bases);
+  return (base) => {
+    const pair = caseCounterpart(base, fold.bcp47);
+    return pair !== null && bases.has(pair.counterpart) ? pair : null;
+  };
+}
+
+/**
+ * Attested base set per mark, from the order-preserving stacks. With
+ * `caseFold`, each attested base also adds its confirmed case counterpart
+ * (additive only: nothing is removed).
+ */
+export function attestedBasesOf(
+  alphabet: ConfirmedAlphabet,
+  fold: AttestationCaseFold = {},
+): Map<string, Set<string>> {
+  const counterpartOf = confirmedCounterpart(alphabet, fold);
   const byMark = new Map<string, Set<string>>();
   for (const mark of alphabet.marks) byMark.set(mark, new Set());
   for (const stack of alphabet.attestedStacks) {
     for (const mark of stack.marks) {
       const set = byMark.get(mark);
-      if (set !== undefined) set.add(stack.base);
+      if (set === undefined) continue;
+      set.add(stack.base);
+      const pair = counterpartOf(stack.base);
+      if (pair !== null) set.add(pair.counterpart);
     }
   }
   return byMark;
+}
+
+/**
+ * How many distinct LETTERS a set of attested bases covers: with `caseFold`,
+ * one letter in two cases counts once, not twice. Without it, every base is
+ * its own letter.
+ */
+export function attestedLetterCount(
+  alphabet: ConfirmedAlphabet,
+  set: ReadonlySet<string>,
+  fold: AttestationCaseFold = {},
+): number {
+  const counterpartOf = confirmedCounterpart(alphabet, fold);
+  return new Set(
+    [...set].map((base) => {
+      const pair = counterpartOf(base);
+      return pair?.direction === "toLower" ? pair.counterpart : base;
+    }),
+  ).size;
 }
 
 function jaccard(a: Set<string>, b: Set<string>): number {
@@ -115,9 +176,15 @@ function jaccard(a: Set<string>, b: Set<string>): number {
  * each function bucket, linking two marks when their attested base sets meet
  * {@link ATTACHMENT_SIMILARITY_THRESHOLD}. Deterministic: classes and members
  * keep first-appearance order; ids are `<bucket>-<n>` in emission order.
+ *
+ * Pass the same `fold` as `proposeAttachments`: otherwise a mark seen only on
+ * `N` and a sibling seen only on `n` share no base and never link.
  */
-export function groupMarkClasses(alphabet: ConfirmedAlphabet): MarkClass[] {
-  const attested = attestedBasesOf(alphabet);
+export function groupMarkClasses(
+  alphabet: ConfirmedAlphabet,
+  fold: AttestationCaseFold = {},
+): MarkClass[] {
+  const attested = attestedBasesOf(alphabet, fold);
   const byBucket = new Map<FunctionBucket, string[]>();
   for (const mark of alphabet.marks) {
     const bucket = bucketOf(mark);
