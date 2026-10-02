@@ -46,6 +46,7 @@ import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { offeredKey, convenienceKey } from "../../steps/evidence.ts";
 import { useCarveNeededSet } from "../../hooks/useCarveNeededSet.ts";
+import { useGlyphFontStack } from "../useGlyphFontStack.ts";
 import { computeConvenienceGate } from "./convenienceGate.ts";
 import type { ConvenienceCandidate } from "@keyboard-studio/engine";
 import {
@@ -118,6 +119,7 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const { neededSet, neededCharsResolved, hasSignal } = useCarveNeededSet();
   const setStatus = useSurveyAnswerStore((s) => s.setStatus);
+  const glyphFontStack = useGlyphFontStack();
 
   // The working copy, not baseIr: carve operates on `ir`, so the letters on
   // offer must be the ones carve will actually see. (Carve's own deletions are
@@ -333,7 +335,7 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
                       aria-label={t({ id: "survey.convenience.keepCheckboxAriaLabel", message: `Keep ${label}` })}
                       style={{ cursor: "pointer" }}
                     />
-                    <span style={chipGlyph(checked)}>{label}</span>
+                    <span style={chipGlyph(checked, glyphFontStack)}>{label}</span>
                     <span style={chipCodepoint()}>{codepointLabel(candidate.chars[0]!)}</span>
                   </label>
                 </li>
