@@ -76,7 +76,7 @@ function FamilyCard({ family, rules }: { family: RuleFamily; rules: IRRule[] }) 
       style={{
         background: BG_CARD,
         border: `1px solid ${BORDER}`,
-        borderRadius: 8,
+        borderRadius: "var(--app-radius)",
         padding: "12px 14px",
         marginBottom: 12,
         opacity: isDisabled ? 0.75 : 1,

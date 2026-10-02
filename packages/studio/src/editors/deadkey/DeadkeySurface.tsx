@@ -153,6 +153,7 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
             key={t.key}
             type="button"
             role="tab"
+            className="ks-focus-ring ks-hit-target"
             aria-selected={mode.tab === t.key || (t.key === "inventory" && mode.tab === "edit")}
             style={
               mode.tab === t.key || (t.key === "inventory" && mode.tab === "edit")
