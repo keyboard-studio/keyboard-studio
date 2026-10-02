@@ -38,3 +38,4 @@ export type {
   OverBroadGuard,
 } from "./suggestGuards.js";
 export { getCategory, getCCC, getName } from "./unicodeAdapter.js";
+export { DESKTOP_BLOCK_FLOOR, guardBlockInventory } from "./blockInventory.js";

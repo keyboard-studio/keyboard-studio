@@ -12,17 +12,23 @@
 // conservative core the over-broad question needs ("your orthography says
 // acute combines with e").
 
-import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
+import type { ConfirmedAlphabet, KeyboardIR } from "@keyboard-studio/contracts";
 import { attestedBasesOf } from "@keyboard-studio/engine";
+import { guardBlockInventory } from "@keyboard-studio/engine/kmAssist";
 import type { OrthographyModel } from "./guardAnalysis.ts";
 
 /**
  * Build the orthography model for guard analysis, or null when the working
  * copy has no confirmed alphabet yet (character discovery not reached) —
  * the suggestions section then stays hidden rather than guessing.
+ *
+ * With the working-copy IR, the model also carries the space, digits,
+ * punctuation and symbols the keyboard can type, so drafted block sets cover
+ * them and not just the alphabet.
  */
 export function deriveOrthographyModel(
   alphabet: ConfirmedAlphabet | undefined,
+  ir?: KeyboardIR | null,
 ): OrthographyModel | null {
   if (alphabet === undefined) return null;
   const attested = attestedBasesOf(alphabet);
@@ -33,5 +39,6 @@ export function deriveOrthographyModel(
   return {
     alphabet: [...alphabet.bases, ...alphabet.marks],
     markAttachments,
+    ...(ir != null ? { nonLetters: guardBlockInventory(ir) } : {}),
   };
 }

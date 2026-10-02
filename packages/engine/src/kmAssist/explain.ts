@@ -363,11 +363,13 @@ function shortUnicodeName(name: string): string {
   return name.replace(/^combining\s+/i, "").toLowerCase();
 }
 
-type CharBucket = "space" | "digit" | "punctuation" | "letter" | "mark" | "symbol" | "other";
-const BUCKET_ORDER: CharBucket[] = ["space", "digit", "punctuation", "letter", "mark", "symbol", "other"];
+export type CharBucket = "space" | "digit" | "punctuation" | "letter" | "mark" | "symbol" | "other";
+/** The stable order character kinds are listed in (also the guard block-set order). */
+export const BUCKET_ORDER: readonly CharBucket[] = ["space", "digit", "punctuation", "letter", "mark", "symbol", "other"];
 const CORE_BUCKETS: CharBucket[] = ["space", "digit", "punctuation"];
 
-function bucketOfChar(ch: string): CharBucket | undefined {
+/** The kind of a single code point, or undefined for a cluster or unknown category data. */
+export function bucketOfChar(ch: string): CharBucket | undefined {
   if ([...ch].length !== 1) return undefined;
   const cp = ch.codePointAt(0);
   if (cp === undefined) return undefined;
@@ -380,6 +382,15 @@ function bucketOfChar(ch: string): CharBucket | undefined {
   if (cat.startsWith("M")) return "mark";
   if (cat.startsWith("S")) return "symbol";
   return "other";
+}
+
+/**
+ * The sort rank of a character's kind: its position in BUCKET_ORDER, with
+ * unknown/unknowable characters sorting as "other". Shared by the block-set
+ * ordering in blockInventory and the guard-store ordering in suggestGuards.
+ */
+export function bucketRank(ch: string): number {
+  return BUCKET_ORDER.indexOf(bucketOfChar(ch) ?? "other");
 }
 
 function joinOr(items: string[]): string {
