@@ -546,6 +546,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   const controls = usePhaseBDraftStore((s) => s.controls);
   const lastPick = usePhaseBDraftStore((s) => s.lastPick);
   const [showUppercase, setShowUppercase] = useState(false);
+  const glyphFontStack = useGlyphFontStack();
 
   // Render once the alphabet has any content to break down. Spec 047 US3 shows
   // the Letters section (with its lowercase/uppercase toggle) even for a
@@ -580,7 +581,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
         // pointer cursor — removal stays on the CharChipEditor pick chips above.
         style={{ ...charChip(false), cursor: "default" }}
       >
-        <span style={chipGlyph(true)}>{display}</span>
+        <span style={chipGlyph(true, glyphFontStack)}>{display}</span>
         <CpLabel grapheme={glyph} />
         {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
       </span>
@@ -746,6 +747,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
   const addLoanword = usePhaseBDraftStore((s) => s.addLoanword);
   const removeLoanword = usePhaseBDraftStore((s) => s.removeLoanword);
   const remove = usePhaseBDraftStore((s) => s.remove);
+  const glyphFontStack = useGlyphFontStack();
 
   const loanwords = useMemo(() => {
     if (inventory === null) return [];
@@ -835,7 +837,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
               className="ks-focus-ring ks-hit-target"
               style={charChip(selected, LOANWORD_CHIP_SCALE)}
             >
-              <span style={chipGlyph(selected, undefined, LOANWORD_CHIP_SCALE)}>{letters}</span>
+              <span style={chipGlyph(selected, glyphFontStack, LOANWORD_CHIP_SCALE)}>{letters}</span>
               <CpLabel grapheme={ch} />
               <span style={chipIndicator(chipIndicatorColor(selected), LOANWORD_CHIP_SCALE)}>
                 {chipIndicatorText(selected)}
