@@ -24,10 +24,9 @@ from pathlib import Path
 
 # The sibling modules' filenames have hyphens, so import them dynamically.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import companion_config as cc  # noqa: E402
-
 wc = importlib.import_module("write-context")
 dff = importlib.import_module("derive-from-files")
+from spec_context import STEP_COMPLETED_STATUS, TERMINAL_STATUSES, feature_spec_path  # noqa: E402
 
 # Canonical forward pipeline (clarify/analyze are optional and not part of the
 # default next-action path). Mirrors src/core/types/specContext.ts STEP_NAMES.
@@ -41,44 +40,39 @@ NEXT_STEP = {
 }
 
 STEP_COMMAND = {
-    "specify": "/speckit.specify",
-    "plan": "/speckit.plan",
-    "tasks": "/speckit.tasks",
-    "implement": "/speckit.implement",
+    "specify": "speckit.specify",
+    "plan": "speckit.plan",
+    "tasks": "speckit.tasks",
+    "implement": "speckit.implement",
 }
 
-# Turbo/companion family — mirrors STEP_COMMAND's keys. Resume dispatches these
-# when the spec's recorded profile is "turbo" so the command family matches the
-# flow the spec has been running.
+# Companion family — mirrors STEP_COMMAND's keys. Status reports and resume
+# dispatches these when the spec records the companion workflow, so the command
+# family matches the flow the spec has been running.
 COMPANION_STEP_COMMAND = {
-    "specify": "/speckit.companion.specify",
-    "plan": "/speckit.companion.plan",
-    "tasks": "/speckit.companion.tasks",
-    "implement": "/speckit.companion.implement",
+    "specify": "speckit.companion.specify",
+    "plan": "speckit.companion.plan",
+    "tasks": "speckit.companion.tasks",
+    "implement": "speckit.companion.implement",
 }
 
+def _is_companion(ctx: dict) -> bool:
+    """Whether the spec runs the companion pipeline. `workflow` is the live
+    signal; `profile: turbo` is the retired field, still honored so specs
+    written before the workflow-choice collapse keep resuming on companion."""
+    return ctx.get("workflow") == "companion" or ctx.get("profile") == "turbo"
 
-def _step_command(step: str | None, profile: str | None) -> str | None:
-    """Resolve a step to its command in the family the spec is running:
-    the companion map for turbo specs, the stock map otherwise (standard/absent)."""
-    table = COMPANION_STEP_COMMAND if profile == "turbo" else STEP_COMMAND
+
+def _step_command(step: str | None, companion: bool) -> str | None:
+    """Resolve a step to its command in the family the spec is running."""
+    table = COMPANION_STEP_COMMAND if companion else STEP_COMMAND
     return table.get(step)
-
-# Status that marks each step's own completion (the point at which we advance).
-STEP_DONE_STATUS = {
-    "specify": "specified",
-    "plan": "planned",
-    "tasks": "ready-to-implement",
-    "implement": "implemented",
-}
 
 NEXT_LABEL = {
     "plan": "Plan the feature",
     "tasks": "Generate tasks",
     "implement": "Implement",
 }
-
-TERMINAL_STATUSES = {"implemented", "completed", "archived"}
 
 # Pipeline ordering + the artifact each step requires on disk. Used to reconcile
 # recorded state against on-disk evidence (FR-011).
@@ -98,17 +92,43 @@ def _should_prefer_disk(feature_dir: Path, rec_step: str, disk_step: str) -> boo
     if rec_step not in PIPELINE_ORDER:
         return True
     req = REQUIRED_FILE.get(rec_step)
-    if req and not (feature_dir / req).is_file():
+    req_path = feature_spec_path(feature_dir) if req == "spec.md" else feature_dir / req
+    if req and not req_path.is_file():
         return True
     return PIPELINE_ORDER.get(disk_step, -1) > PIPELINE_ORDER[rec_step]
 
 
-def _decisions(ctx: dict) -> list[str]:
-    """The top-level `decisions[]` passthrough (surfaced as ViewerState.decisions)."""
+def decision_entries(ctx: dict) -> list[dict]:
+    """The top-level `decisions[]` as entries, in recorded order.
+
+    Capture writes `{"decision", "why"?, "rejected"?}`; hand-authored contexts
+    carry bare strings. Reading both, and keeping the entry's detail for a
+    verbose report, follows `pickEntryList` in
+    src/features/spec-viewer/stateDerivation.ts. The one deliberate difference:
+    a bare number renders here because it always did, while the viewer drops it."""
     raw = ctx.get("decisions")
-    if isinstance(raw, list):
-        return [str(d) for d in raw if isinstance(d, (str, int, float)) and str(d).strip()]
-    return []
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for d in raw:
+        if isinstance(d, dict):
+            text = d.get("decision")
+            if isinstance(text, str) and text.strip():
+                out.append(d)
+        elif isinstance(d, str) and d.strip():
+            out.append({"decision": d})
+        elif isinstance(d, (int, float)) and not isinstance(d, bool):
+            # A bare number rendered before this change, so it still does —
+            # dropping it would be a second silent disappearance. A bool is
+            # excluded deliberately: "True" is not a decision anyone wrote, and
+            # the viewer's reader drops it too.
+            out.append({"decision": str(d)})
+    return out
+
+
+def _decisions(ctx: dict) -> list[str]:
+    """Just the decision text of each entry (surfaced as ViewerState.decisions)."""
+    return [e["decision"] for e in decision_entries(ctx)]
 
 
 def _next_unchecked_task(feature_dir: Path) -> str | None:
@@ -159,7 +179,7 @@ def resolve(feature_dir: Path) -> dict:
     status = ctx.get("status")
     spec_name = ctx.get("specName") or wc._spec_name(feature_dir)
     decisions = _decisions(ctx)
-    profile = ctx.get("profile")
+    companion = _is_companion(ctx)
 
     resolution = {
         "source": source,
@@ -188,17 +208,17 @@ def resolve(feature_dir: Path) -> dict:
             resolution["nextActionLabel"] = "Pipeline complete"
             return resolution
         resolution["nextStep"] = "implement"
-        resolution["nextCommand"] = _step_command("implement", profile)
+        resolution["nextCommand"] = _step_command("implement", companion)
         resolution["nextTask"] = next_task
         resolution["nextActionLabel"] = f"Continue implementation at {next_task}"
         return resolution
 
-    done_status = STEP_DONE_STATUS.get(current_step)
+    done_status = STEP_COMPLETED_STATUS.get(current_step)
     if done_status is not None and status == done_status:
         # Current step finished — advance to the next pipeline step.
         next_step = NEXT_STEP.get(current_step)
         resolution["nextStep"] = next_step
-        resolution["nextCommand"] = _step_command(next_step, profile) if next_step else None
+        resolution["nextCommand"] = _step_command(next_step, companion) if next_step else None
         resolution["nextActionLabel"] = NEXT_LABEL.get(next_step, "Continue") if next_step else "Pipeline complete"
         if next_step is None:
             resolution["complete"] = True
@@ -209,70 +229,45 @@ def resolve(feature_dir: Path) -> dict:
         if current_step in ("clarify", "analyze"):
             next_step = NEXT_STEP.get(current_step)
             resolution["nextStep"] = next_step
-            resolution["nextCommand"] = _step_command(next_step, profile) if next_step else None
+            resolution["nextCommand"] = _step_command(next_step, companion) if next_step else None
             resolution["nextActionLabel"] = NEXT_LABEL.get(next_step, "Continue")
         else:
             resolution["nextStep"] = current_step
-            resolution["nextCommand"] = _step_command(current_step, profile)
+            resolution["nextCommand"] = _step_command(current_step, companion)
             resolution["nextActionLabel"] = f"Finish {current_step}"
 
     return resolution
 
 
-def _summary_lines(res: dict) -> list[str]:
-    """The human summary as lines, built without printing (see _print_summary)."""
+def _print_summary(res: dict) -> None:
     if res.get("empty"):
-        return ["Nothing to summarize (no spec files or recorded state found)."]
+        print("Nothing to summarize (no spec files or recorded state found).")
+        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
+        return
 
-    lines = [
-        f"Spec: {res['specName']}   (source: {res['source']})",
-        f"Step: {res['currentStep']}   Status: {res['status']}",
-    ]
+    print(f"Spec: {res['specName']}   (source: {res['source']})")
+    print(f"Step: {res['currentStep']}   Status: {res['status']}")
 
     decisions = res.get("decisions") or []
     if decisions:
-        lines.append("Decisions:")
-        lines.extend(f"  - {d}" for d in decisions)
+        print("Decisions:")
+        for d in decisions:
+            print(f"  - {d}")
     else:
-        lines.append("Decisions: (none recorded)")
+        print("Decisions: (none recorded)")
 
     if res.get("complete"):
-        lines.append("Next: Pipeline complete  →  —")
+        print("Next: Pipeline complete  →  —")
     elif res.get("nextTask"):
-        lines.append(f"Next: {res['nextActionLabel']}  →  dispatching {res['nextCommand']}")
+        print(f"Next: {res['nextActionLabel']}  →  dispatching {res['nextCommand']}")
     else:
         nxt = res.get("nextCommand") or "—"
-        lines.append(f"Next: {res['nextActionLabel']}  →  {nxt}")
+        print(f"Next: {res['nextActionLabel']}  →  {nxt}")
 
-    return lines
-
-
-def _print_summary(res: dict) -> None:
-    """Emit the human summary, then the machine line, as two independent writes.
-
-    Building the block up front means a rendering failure can't leave a
-    half-written summary, and keeping RESOLUTION out of that try means `resume`
-    still gets its input even when the human half fails.
-    """
-    try:
-        print("\n".join(_summary_lines(res)))
-    except Exception as exc:  # noqa: BLE001 - the machine line matters more
-        print(f"[companion] Warning: could not render the summary: {exc}", file=sys.stderr)
-
-    try:
-        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
-    except UnicodeEncodeError:
-        # Last resort on a stream that rejected UTF-8: \uXXXX-escaped ASCII is
-        # still JSON and parses back to the identical object.
-        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=True)}")
+    print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
 
 
 def main() -> int:
-    # First statement, as in every script here: argparse writes --help and its
-    # error messages (which can quote a user-supplied path) before anything else
-    # runs, so the stream has to be safe before parsing, not after.
-    cc.configure_stdio()
-
     parser = argparse.ArgumentParser(
         description="Resolve a feature's pipeline position and next action."
     )
