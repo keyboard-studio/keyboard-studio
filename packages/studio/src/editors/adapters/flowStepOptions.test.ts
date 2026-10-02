@@ -23,7 +23,7 @@ import {
 } from "./flowStepOptions.tsx";
 import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
-import { slugifyKeyboardId } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeBaseKeyboard, slugifyKeyboardId } from "@keyboard-studio/contracts";
 import pfMoreDetailGateMod from "../../survey/questions/f/pf_more_detail_gate.ts";
 import pfDocLanguageMod from "../../survey/questions/f/pf_doc_language.ts";
 import pfHistoryEntryMod from "../../survey/questions/f/pf_history_entry.ts";
@@ -911,6 +911,69 @@ describe("phaseFOptions.seeds.getSeedValue (choice defaults)", () => {
       if (d.options !== undefined) {
         expect(d.options.map((o) => o.value), d.id).toContain(seed);
       }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.seeds — text proposals derived from the starting point, and the
+// source each seed is recorded with
+// ---------------------------------------------------------------------------
+
+describe("phaseFOptions.seeds — derived text proposals", () => {
+  const BASE = makeBaseKeyboard({
+    id: "sil_bafut",
+    path: "release/sil/sil_bafut",
+    script: "Latn",
+    targets: ["windows"],
+    displayName: "Bafut",
+    version: "1.2",
+  });
+
+  function withBase(instantiationMode: "new-from-base" | "adapt-existing"): void {
+    const baseVfs = createVirtualFS();
+    baseVfs.set("source/sil_bafut.kps", '<Info><WebSite URL="https://bafut.org">https://bafut.org</WebSite></Info>');
+    useWorkingCopyStore.getState().reset();
+    useWorkingCopyStore.setState({ instantiationMode, baseKeyboard: BASE, baseVfs });
+  }
+
+  const seedFor = (id: string) => phaseFOptions.seeds!.getSeedValue(id, buildDeps().deps);
+
+  it("an update proposes the released package's website", () => {
+    withBase("adapt-existing");
+    expect(seedFor("pf_project_url")).toBe("https://bafut.org");
+    expect(seedFor("pf_provenance_basis")).toBeUndefined();
+  });
+
+  it("a copy proposes the copied keyboard as its provenance", () => {
+    withBase("new-from-base");
+    expect(seedFor("pf_provenance_basis")).toBe(
+      "This keyboard started as a copy of the Bafut keyboard (sil_bafut).",
+    );
+    expect(seedFor("pf_project_url")).toBeUndefined();
+  });
+
+  it("names a source for every data-backed seed, and none for the plain gate default", () => {
+    const sourceFor = (id: string) => phaseFOptions.seeds!.getSeedSource!(id, buildDeps().deps);
+    expect(sourceFor("pf_welcome_paragraph")).toBe("base");
+    expect(sourceFor("pf_contact_info")).toBe("identity");
+    expect(sourceFor("pf_doc_language")).toBe("identity");
+    expect(sourceFor("pf_history_entry")).toBe("analysis");
+    expect(sourceFor("pf_project_url")).toBe("base");
+    expect(sourceFor("pf_provenance_basis")).toBe("base");
+    expect(sourceFor("pf_more_detail_gate")).toBeUndefined();
+  });
+
+  it("value and source lookups agree on the seeded set: unseeded ids return neither", () => {
+    // Regression guard for km-triage finding 1 (PR #1927): getSeedValue and
+    // getSeedSource both read the single PHASE_F_SEEDS registry, so a
+    // question id can never be seeded without its source or sourced without
+    // a value resolver. Unseeded ids (deliberately unseeded, unknown, or
+    // belonging to another flow) resolve to neither.
+    const { deps } = buildDeps();
+    for (const id of ["pf_credits", "pf_not_a_question", "il_language_code"]) {
+      expect(phaseFOptions.seeds!.getSeedValue(id, deps)).toBeUndefined();
+      expect(phaseFOptions.seeds!.getSeedSource!(id, deps)).toBeUndefined();
     }
   });
 });

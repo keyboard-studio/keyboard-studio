@@ -14,7 +14,7 @@
 // C1.4: exported from survey/index.ts so the golden-walk vi.mock("../survey/index.ts")
 // seam intercepts it.
 
-import type { LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { DecisionProposalSource, LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { surveyPageColumn, phaseHeading } from "./surveyStyles.ts";
 import type { FlowDef, SurveyContext } from "./types.ts";
@@ -32,6 +32,8 @@ export interface FlowStepHostProps {
   onBack?: () => void;
   /** Optional seeding (project_name slug). Forwarded to SurveyRunner. */
   getSeedValue?: (questionId: string) => string | string[] | undefined;
+  /** Where a seed came from. Forwarded to SurveyRunner. */
+  getSeedSource?: (questionId: string) => DecisionProposalSource | undefined;
   onAnswerCommit?: (questionId: string, value: string | string[] | undefined) => void;
   /**
    * Optional per-question `required` override (spec 079 FR-009's adaptive
@@ -54,6 +56,7 @@ export function FlowStepHost({
   onComplete,
   onBack,
   getSeedValue,
+  getSeedSource,
   onAnswerCommit,
   findingsByQuestionId,
   getRequiredOverride,
@@ -68,6 +71,7 @@ export function FlowStepHost({
         onComplete={onComplete}
         {...(onBack !== undefined ? { onBack } : {})}
         {...(getSeedValue !== undefined ? { getSeedValue } : {})}
+        {...(getSeedSource !== undefined ? { getSeedSource } : {})}
         {...(onAnswerCommit !== undefined ? { onAnswerCommit } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
         {...(getRequiredOverride !== undefined ? { getRequiredOverride } : {})}

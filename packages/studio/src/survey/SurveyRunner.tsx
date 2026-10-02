@@ -14,8 +14,23 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useId, useMemo, useRef, useEffect } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
-import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageSummary } from "@keyboard-studio/contracts";
+import type {
+  FlowDef,
+  FlowQuestion,
+  FlowOption,
+  FlowGotoRule,
+  SurveyContext,
+  AnswerStackEntry,
+  SeedProposal,
+} from "./types.ts";
+import type {
+  DecisionProposalSource,
+  SurveyAnswer,
+  SurveyPhaseResult,
+  LintFinding,
+  LangtagsProvenance,
+  LanguageSummary,
+} from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -23,6 +38,7 @@ import {
   useStepWalkStore,
   peekStepCursor,
   peekAnswerDraft,
+  peekAnswerProposals,
 } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore, type SavedAnswer } from "../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
@@ -284,6 +300,13 @@ export interface SurveyRunnerProps {
    */
   getSeedValue?: (questionId: string) => string | string[] | undefined;
   /**
+   * Where a `getSeedValue` seed came from, recorded with the saved answer so
+   * the decision trail can name it when the author keeps the default. Return
+   * undefined for a plain default with no data behind it; the answer is still
+   * saved as a proposal either way.
+   */
+  getSeedSource?: (questionId: string) => DecisionProposalSource | undefined;
+  /**
    * Called when rendering a question to retrieve its provenance label, if any.
    * Returns a LangtagsProvenance when the question's current value was seeded
    * from langtags, or undefined when no provenance applies.
@@ -387,6 +410,7 @@ export function SurveyRunner({
   findingsByQuestionId,
   onAnswerCommit,
   getSeedValue,
+  getSeedSource,
   getSeedProvenance,
   getFieldWarning,
   getSeedOptions,
@@ -410,6 +434,18 @@ export function SurveyRunner({
   onAnswerCommitRef.current = onAnswerCommit;
   const getSeedValueRef = useRef(getSeedValue);
   getSeedValueRef.current = getSeedValue;
+  const getSeedSourceRef = useRef(getSeedSource);
+  getSeedSourceRef.current = getSeedSource;
+
+  // The caller's seed for a question, as the proposal its entry carries. Only a
+  // caller seed is a proposal: a debug pin is a test convenience, not something
+  // the studio suggested.
+  function callerProposal(questionId: string): SeedProposal | undefined {
+    const value = getSeedValueRef.current?.(questionId);
+    if (value === undefined) return undefined;
+    const source = getSeedSourceRef.current?.(questionId);
+    return source !== undefined ? { value, source } : { value };
+  }
   const getSeedProvenanceRef = useRef(getSeedProvenance);
   getSeedProvenanceRef.current = getSeedProvenance;
   const getFieldWarningRef = useRef(getFieldWarning);
@@ -440,12 +476,15 @@ export function SurveyRunner({
   // Callers must provide key={flow.flow_id} so React remounts this component
   // when the flow identity changes — useState does not re-run its initialiser on re-renders.
   // For the first question, check both getSeedValue (caller) and debugPinsStore (fallback).
-  const firstSeed: string | string[] | undefined = (() => {
-    if (firstId === null) return undefined;
-    const callerFirst = getSeedValue?.(firstId);
-    if (callerFirst !== undefined) return callerFirst;
-    return debugEnabled ? debugPinsStore.getPinned(firstId) : undefined;
-  })();
+  const firstProposal = firstId !== null ? callerProposal(firstId) : undefined;
+  const firstSeed: string | string[] | undefined =
+    firstId === null
+      ? undefined
+      : firstProposal !== undefined
+        ? firstProposal.value
+        : debugEnabled
+          ? debugPinsStore.getPinned(firstId)
+          : undefined;
   // The step this runner is the walk for. Read from the traversal store rather
   // than threaded through five call sites (FlowStepHost, IdentityLite, PhaseA,
   // PhaseB) as a prop: a runner is only ever rendered INSIDE the active step, so
@@ -488,7 +527,19 @@ export function SurveyRunner({
           : { ...resumeAnswers, ...draft };
     const resumed =
       replay !== undefined ? buildResumeStack(firstId, replay, context, index) : null;
-    const stack = resumed ?? [{ questionId: firstId ?? "", value: firstSeed }];
+    // A resumed entry gets back the proposal its saved answer was pre-filled
+    // with, so a default the author kept still saves as one after a remount.
+    const proposals = peekAnswerProposals(walkStepId);
+    const stack =
+      resumed?.map((e) => {
+        const proposal = proposals[e.questionId];
+        return proposal !== undefined ? { ...e, proposal } : e;
+      }) ??
+      [
+        firstProposal !== undefined
+          ? { questionId: firstId ?? "", value: firstSeed, proposal: firstProposal }
+          : { questionId: firstId ?? "", value: firstSeed },
+      ];
     // Arrival position: honour a cursor a jump parked for this step BEFORE this
     // component existed (lib/jumpToLocation.ts writes it, see its own comment on
     // ordering). Read in the initializer, not an effect, so the first render is
@@ -614,10 +665,19 @@ export function SurveyRunner({
       // untouched question as deliberately blank.
       if (value === undefined) return;
       const q = index.get(entry.questionId);
+      // A pre-filled answer is the studio's proposal until the author changes
+      // it; only an answer that was never pre-filled is the author's outright.
+      const proposal = entry.proposal;
       saved[entry.questionId] = {
         value,
         answerType: q !== undefined ? answerTypeFor(q) : "text",
-        origin: "confirmed",
+        origin:
+          proposal === undefined
+            ? "confirmed"
+            : answersDiffer(proposal.value, value)
+              ? "overturned"
+              : "proposed",
+        ...(proposal !== undefined ? { proposal } : {}),
         stage: "draft",
         evidenceKey: null,
         screenId: entry.questionId,
@@ -847,16 +907,14 @@ export function SurveyRunner({
     // the "default once, then user owns it" contract is preserved. Skipped
     // entirely when the committed answer ahead is being kept — a seed must never
     // overwrite an answer the author already gave.
+    const nextProposal = keepAhead ? existingNext.proposal : callerProposal(nextId);
     const nextValue = keepAhead
       ? existingNext.value
-      : (() => {
-          const callerSeed = getSeedValueRef.current?.(nextId);
-          return callerSeed !== undefined
-            ? callerSeed
-            : debugEnabled
-              ? debugPinsStore.getPinned(nextId)
-              : undefined;
-        })();
+      : nextProposal !== undefined
+        ? nextProposal.value
+        : debugEnabled
+          ? debugPinsStore.getPinned(nextId)
+          : undefined;
 
     // Save the committed value onto the current entry, then move forward onto
     // either the preserved tail or a freshly seeded entry.
@@ -866,7 +924,11 @@ export function SurveyRunner({
       );
       const ahead = keepAhead
         ? updated.slice(prev.cursor + 1)
-        : [{ questionId: nextId, value: nextValue }];
+        : [
+            nextProposal !== undefined
+              ? { questionId: nextId, value: nextValue, proposal: nextProposal }
+              : { questionId: nextId, value: nextValue },
+          ];
       return {
         stack: [...updated.slice(0, prev.cursor + 1), ...ahead],
         cursor: prev.cursor + 1,

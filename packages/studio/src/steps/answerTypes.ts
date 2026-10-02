@@ -8,7 +8,7 @@
 // stores/surveyAnswerStore.ts re-exports them. Studio-local: none of this is in
 // @keyboard-studio/contracts, and `AnswerType` is only read from there.
 
-import type { AnswerType } from "@keyboard-studio/contracts";
+import type { AnswerType, DecisionProposalSource } from "@keyboard-studio/contracts";
 
 /** Manifest step id. */
 export type StepId = string;
@@ -26,6 +26,15 @@ export interface SavedAnswer {
   value: SavedValue;
   answerType: AnswerType;
   origin: "proposed" | "confirmed" | "overturned";
+  /**
+   * What the studio pre-filled this answer with, when the question opened
+   * seeded. `origin` follows from it: "proposed" while the value still equals
+   * it, "overturned" once the author changed it. The decision recorder reads it
+   * back so a kept default is recorded as the studio's suggestion rather than
+   * as the author's own choice. `source` is absent for a plain default that no
+   * particular data stands behind.
+   */
+  proposal?: AnswerProposalRecord;
   /** FR-008: a draft until its screen's Next confirms it. */
   stage: "draft" | "confirmed";
   /** `null` = the answer depends on no earlier answer. */
@@ -33,6 +42,12 @@ export interface SavedAnswer {
   screenId: ScreenId;
   /** Ordering and debugging only; never shown. */
   savedAt: number;
+}
+
+/** A pre-filled value and where it came from (see `SavedAnswer.proposal`). */
+export interface AnswerProposalRecord {
+  value: SavedValue;
+  source?: DecisionProposalSource;
 }
 
 /** Why a step passed without asking (FR-065). Rendered through the catalog. */

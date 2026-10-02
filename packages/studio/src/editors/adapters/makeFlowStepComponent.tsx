@@ -31,6 +31,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type {
+  DecisionProposalSource,
   SurveyPhaseResult,
   LintFinding,
   HelpDocsAnswers,
@@ -171,6 +172,12 @@ export interface FlowStepOptions<Extracted = unknown> {
    */
   seeds?: {
     getSeedValue: (questionId: string, deps: FlowStepDeps) => string | string[] | undefined;
+    /**
+     * Where `getSeedValue`'s seed for a question came from, recorded with the
+     * saved answer so the decision trail can name it. Optional: without it a
+     * seed is still saved as a proposal, just with no source.
+     */
+    getSeedSource?: (questionId: string, deps: FlowStepDeps) => DecisionProposalSource | undefined;
     onAnswerCommit?: (questionId: string, value: string | string[] | undefined, deps: FlowStepDeps) => void;
     /**
      * Optional per-question `required` override (spec 079 FR-009). Forwarded
@@ -300,6 +307,14 @@ export function makeFlowStepComponent<Extracted>(
       [],
     );
 
+    const getSeedSource = useCallback(
+      options.seeds?.getSeedSource
+        ? (questionId: string) => options.seeds!.getSeedSource!(questionId, depsRef.current)
+        : (_questionId: string) => undefined,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [],
+    );
+
     const onAnswerCommit = useCallback(
       options.seeds?.onAnswerCommit
         ? (questionId: string, value: string | string[] | undefined) =>
@@ -346,6 +361,7 @@ export function makeFlowStepComponent<Extracted>(
         onComplete={wrappedOnComplete}
         {...(onBack ? { onBack } : {})}
         {...(options.seeds ? { getSeedValue } : {})}
+        {...(options.seeds?.getSeedSource ? { getSeedSource } : {})}
         {...(options.seeds?.onAnswerCommit ? { onAnswerCommit } : {})}
         {...(options.seeds?.getRequiredOverride ? { getRequiredOverride } : {})}
         {...(options.usesFindings ? { findingsByQuestionId } : {})}

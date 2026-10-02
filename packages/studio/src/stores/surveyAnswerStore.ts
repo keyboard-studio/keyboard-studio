@@ -84,6 +84,11 @@ function sameValue(a: SavedAnswer["value"], b: SavedAnswer["value"]): boolean {
   return a === b;
 }
 
+function sameProposal(a: SavedAnswer["proposal"], b: SavedAnswer["proposal"]): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return sameValue(a.value, b.value) && a.source === b.source;
+}
+
 /** Field equality ignoring `savedAt`, so a no-change save does not notify subscribers. */
 function sameAnswer(prev: SavedAnswer | undefined, next: Omit<SavedAnswer, "savedAt">): boolean {
   return (
@@ -91,6 +96,7 @@ function sameAnswer(prev: SavedAnswer | undefined, next: Omit<SavedAnswer, "save
     sameValue(prev.value, next.value) &&
     prev.answerType === next.answerType &&
     prev.origin === next.origin &&
+    sameProposal(prev.proposal, next.proposal) &&
     prev.stage === next.stage &&
     prev.evidenceKey === next.evidenceKey &&
     prev.screenId === next.screenId

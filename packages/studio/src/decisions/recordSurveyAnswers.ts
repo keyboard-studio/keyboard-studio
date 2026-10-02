@@ -11,20 +11,16 @@
 // `SurveyAnswer` carries no provenance (deliberately — the locked contract type
 // is not extended, research D-03), so agency has to be derived by comparing the
 // recorded value against what the tool proposed. That comparison needs a proposal
-// to compare against, and today the studio has no session-wide register of
-// per-question proposals: the one real source, the langtags seeds in
-// `survey/IdentityLite.tsx`, keeps them in a component-local ref
-// (`provenanceRef`) that nothing outside that component can read.
+// to compare against. The register is the saved answer itself: when
+// SurveyRunner pre-fills a field it saves the seed as `SavedAnswer.proposal`,
+// and the studio wiring (`createStudioDecisionRecorder`) reads it back through
+// `resolveProposal`, alongside the base-inherited values it already knew.
 //
-// So `resolveProposal` is a seam, fully implemented and tested here, and the
-// shipped wiring supplies only what is actually reachable. Where no proposal is
-// known the entry records `"hand-set"` — which is the truthful floor: absent
-// evidence that a value was proposed, what the record can honestly say is that
-// this is the value the author confirmed. Lifting the identity step's seeds into
-// the session so they flow through this seam is a contained follow-up, and until
-// it lands most survey entries will read as `"hand-set"`. That is a stated Phase-1
-// limitation, in the same spirit as research D-05's note about the mutate seam —
-// not a gap papered over with a guess.
+// Where no proposal is known the entry records `"hand-set"` — which is the
+// truthful floor: absent evidence that a value was proposed, what the record can
+// honestly say is that this is the value the author confirmed. A seed whose
+// caller names no source (`getSeedSource`) still records as `"tool-proposed"`,
+// just without one.
 
 import type {
   DecisionProposalSource,
@@ -38,7 +34,11 @@ import type { DecisionEntryInput } from "./decisionLogStore.ts";
 /** A value the tool proposed for a question, and where the proposal came from. */
 export interface AnswerProposal {
   value: string | readonly string[] | boolean;
-  source: DecisionProposalSource;
+  /**
+   * Absent for a plain default that no particular data stands behind — it still
+   * records as the tool's suggestion, just without naming a source.
+   */
+  source?: DecisionProposalSource;
   /**
    * The offer to keep on the record when the author overrides it
    * (`DecisionProvenance.proposed`, spec 078). Absent for proposals whose
@@ -47,8 +47,11 @@ export interface AnswerProposal {
   keepOnOverride?: NonNullable<DecisionProvenance["proposed"]>;
 }
 
-/** Looks up the proposal for a question id, or `undefined` when none is known. */
-export type ProposalLookup = (questionId: string) => AnswerProposal | undefined;
+/**
+ * Looks up the proposal for a question id (answered in `stepId`), or
+ * `undefined` when none is known.
+ */
+export type ProposalLookup = (questionId: string, stepId: string) => AnswerProposal | undefined;
 
 export interface RecordSurveyAnswersDeps {
   /** The log's append (returns `null` on an identical revisit). */
@@ -92,9 +95,10 @@ export function deriveAnswerProvenance(
       ? { agency: "hand-set", proposed: proposal.keepOnOverride }
       : { agency: "hand-set" };
   }
-  return proposal.source === "base"
-    ? { agency: "base-derived", source: "base" }
-    : { agency: "tool-proposed", source: proposal.source };
+  if (proposal.source === "base") return { agency: "base-derived", source: "base" };
+  return proposal.source !== undefined
+    ? { agency: "tool-proposed", source: proposal.source }
+    : { agency: "tool-proposed" };
 }
 
 /**
@@ -135,7 +139,7 @@ export function recordSurveyAnswers(
     const entryId = deps.append({
       stepId,
       payload: payloadFor(answer),
-      provenance: deriveAnswerProvenance(answer.value, deps.resolveProposal?.(answer.questionId)),
+      provenance: deriveAnswerProvenance(answer.value, deps.resolveProposal?.(answer.questionId, stepId)),
     });
     if (entryId !== null) recorded.push(entryId);
   }

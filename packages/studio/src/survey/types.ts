@@ -2,7 +2,7 @@
 // These describe the static definition shape parsed from content/flows/*.yaml —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
-import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
+import type { DecisionProposalSource, IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -118,6 +118,18 @@ export interface SurveyContext {
 export interface AnswerStackEntry {
   questionId: string;
   value: string | string[] | undefined;
+  /**
+   * The value the entry was pre-filled with, when a caller seed supplied one
+   * (a debug pin is not a proposal). Kept alongside `value` so the saved answer
+   * can say whether the author kept the default or overturned it.
+   */
+  proposal?: SeedProposal;
+}
+
+/** A caller seed and, when known, where it came from. */
+export interface SeedProposal {
+  value: string | string[];
+  source?: DecisionProposalSource;
 }
 
 /**

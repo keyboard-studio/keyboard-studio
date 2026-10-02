@@ -795,6 +795,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           useSurveyAnswerStore.getState().steps[stepId]?.lastRecorded[screenId],
         resolveCompletionScreen: (stepId) =>
           useSurveyAnswerStore.getState().steps[stepId]?.position ?? stepId,
+        getSavedAnswer: (stepId, questionId) =>
+          useSurveyAnswerStore.getState().steps[stepId]?.answers[questionId],
       }),
     [],
   );

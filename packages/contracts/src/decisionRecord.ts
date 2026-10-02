@@ -80,7 +80,12 @@ export type DecisionProposalSource =
 /** Agency plus, for a proposal, where the proposal came from. */
 export interface DecisionProvenance {
   agency: DecisionAgency;
-  /** Omitted when `agency` is `"hand-set"` — an author's own value has no proposal source. */
+  /**
+   * Omitted when `agency` is `"hand-set"` — an author's own value has no
+   * proposal source — and for `"tool-proposed"` values whose proposal names
+   * no data behind it: a plain default is still the tool's suggestion, just
+   * a sourceless one (see `AnswerProposal.source`).
+   */
   source?: DecisionProposalSource;
   /**
    * The tool's offer, kept when the author overrides it (spec 078) — e.g. a
