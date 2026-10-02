@@ -16,17 +16,17 @@
       "installed_at": "2026-06-15T19:39:43.565264+00:00"
     },
     "companion": {
-      "version": "0.19.0",
+      "version": "0.23.0",
       "source": "local",
-      "manifest_hash": "sha256:d1de5c9a502e3ec5d08fc95d938a120e25b980c07bd009c62d14b51b1cef637e",
+      "manifest_hash": "sha256:1fb0b64a279599c6369eb6d8ab383cc65432f56d2ea74e1600eac45e1e36b2fd",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
         "claude": [
-          "speckit.companion.capture",
-          "speckit.companion.capture-plan",
-          "speckit.companion.capture-tasks",
-          "speckit.companion.capture-implement",
+          "speckit.companion.after-specify",
+          "speckit.companion.after-plan",
+          "speckit.companion.after-tasks",
+          "speckit.companion.after-implement",
           "speckit.companion.status",
           "speckit.companion.resume",
           "speckit.companion.specify",
@@ -36,13 +36,18 @@
           "speckit.companion.classify",
           "speckit.companion.mark-complete",
           "speckit.companion.auto",
-          "speckit.companion.adopt",
-          "speckit.companion.drift",
-          "speckit.companion.coverage"
+          "speckit.companion.doctor",
+          "speckit.companion.living-adopt",
+          "speckit.companion.living-move",
+          "speckit.companion.living-drift",
+          "speckit.companion.living-show",
+          "speckit.companion.living-validate",
+          "speckit.companion.living-coverage",
+          "speckit.companion.living-sync"
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-07-15T21:03:54.995356+00:00"
+      "installed_at": "2026-10-01T03:02:43.256594+00:00"
     }
   }
 }
