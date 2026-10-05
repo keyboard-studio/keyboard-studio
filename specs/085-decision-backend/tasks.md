@@ -49,11 +49,11 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 ## Phase 5: US3 — Decisions mutate the working keyboard (P2)
 
 **### Tests** — fail-fast on writes violation (FR-007):
-- [ ] **T030** [US3] Test: a patch touching paths outside declared `writes` is rejected whole-patch; the working copy is untouched · packages/studio/src/steps/mutateApply.test.ts (new)
+- [x] **T030** [US3] Test: a patch touching paths outside declared `writes` is rejected whole-patch; the working copy is untouched · packages/studio/src/steps/mutateApply.test.ts (new)
 
 **### Implementation**
 **Wave 1 — single task:**
-- [ ] **T031** [US3] `mutateApply`: reducer output → declared-`writes` containment check → path-scoped deep merge onto the working copy; wire step completion through it in `FlowStepHost` · packages/studio/src/steps/mutateApply.ts (new), packages/studio/src/survey/FlowStepHost.tsx
+- [x] **T031** [US3] `mutateApply`: reducer output → declared-`writes` containment check → path-scoped deep merge onto the working copy; wire step completion through it in `FlowStepHost` · packages/studio/src/steps/mutateApply.ts (new), packages/studio/src/survey/FlowStepHost.tsx
 
 **Checkpoint:** answering a question changes the working copy through the contained apply path; violations fail fast.
 

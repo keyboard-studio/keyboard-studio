@@ -140,6 +140,22 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-05T08:05:19.888Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:07:45.281Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:07:45.389Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
@@ -259,7 +275,7 @@
       "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
     }
   },
-  "currentTask": "T022",
+  "currentTask": "T031",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -348,6 +364,21 @@
       "files": [
         "packages/studio/src/adaptation/firing.ts",
         "packages/studio/src/survey/questions/a/il_target_script.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Whole-patch rejection test: undeclared-path patch throws MutatePatchContainmentError, working copy untouched; contained patch merges",
+      "files": [
+        "packages/studio/src/steps/mutateApply.test.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "FlowStepHost mutateDeps seam: committed answers for modules with mutate() route through the injected applyAnswer; purity (C1.3) preserved",
+      "files": [
+        "packages/studio/src/survey/FlowStepHost.tsx",
+        "packages/studio/src/survey/FlowStepHost.test.tsx"
       ]
     }
   }

@@ -281,3 +281,72 @@ describe("FlowStepHost — findingsByQuestionId plumbing", () => {
     expect(screen.getByText("Something to fix")).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// mutateDeps — decision-model write seam (spec 085 T031)
+// ---------------------------------------------------------------------------
+
+describe("FlowStepHost — mutateDeps write seam", () => {
+  function stubModule(id: string, withMutate: boolean) {
+    return {
+      definition: { id, type: "short_text" as const },
+      fixtures: { valid: [{ value: "x" }], invalid: [] },
+      inputs: [],
+      writes: [],
+      ...(withMutate
+        ? { mutate: () => ({}) as Record<string, never> }
+        : {}),
+    };
+  }
+
+  it("routes a committed answer through applyAnswer when its module defines mutate()", async () => {
+    const applyAnswer = vi.fn();
+    const modules = [stubModule("q1", true), stubModule("q2", false)];
+
+    render(
+      <FlowStepHost
+        flow={buildTwoQuestionFlow()}
+        title="Test Title"
+        context={{}}
+        onComplete={vi.fn()}
+        mutateDeps={{ modules, applyAnswer }}
+      />,
+      { withStepNav: true },
+    );
+
+    const q1Input = screen.getByRole("textbox");
+    fireEvent.change(q1Input, { target: { value: "first answer" } });
+    const nextButton = screen.getByRole("button", { name: /next/i });
+    await act(async () => {
+      fireEvent.click(nextButton);
+    });
+
+    expect(applyAnswer).toHaveBeenCalledTimes(1);
+    expect(applyAnswer).toHaveBeenCalledWith(modules[0], "first answer");
+  });
+
+  it("does not call applyAnswer for modules without mutate()", async () => {
+    const applyAnswer = vi.fn();
+    const modules = [stubModule("q1", false), stubModule("q2", false)];
+
+    render(
+      <FlowStepHost
+        flow={buildTwoQuestionFlow()}
+        title="Test Title"
+        context={{}}
+        onComplete={vi.fn()}
+        mutateDeps={{ modules, applyAnswer }}
+      />,
+      { withStepNav: true },
+    );
+
+    const q1Input = screen.getByRole("textbox");
+    fireEvent.change(q1Input, { target: { value: "first answer" } });
+    const nextButton = screen.getByRole("button", { name: /next/i });
+    await act(async () => {
+      fireEvent.click(nextButton);
+    });
+
+    expect(applyAnswer).not.toHaveBeenCalled();
+  });
+});
