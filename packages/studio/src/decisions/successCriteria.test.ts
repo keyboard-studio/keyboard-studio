@@ -13,29 +13,61 @@ import { runDecisionFlow } from "./decisionFlow.ts";
 import { buildExtractContext } from "./extractContext.ts";
 import { orderDecisions } from "./orderDecisions.ts";
 import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ---------------------------------------------------------------------------
-// SC-001: ≥80% pre-fill on 5 real keyboards
+// SC-001: pre-fill on 5 real keyboards
+//
+// Five REAL keyboards: real .kmn sources parsed by the real codec, with
+// catalog metadata (script/languages) standing in for the catalog row.
+// Two live in the repo's walkBases fixtures; three are vendored from the
+// upstream keyboards corpus into tests/fixtures/scKeyboards/.
 // ---------------------------------------------------------------------------
 
 const KEYBOARDS = [
-  { id: "sil_cameroon_qwerty", script: "Latn", copyright: "© 2026 Cameroon", bcp47: [] as string[] },
-  { id: "sil_bafut", script: "Latn", copyright: "© 2026 Bafut", bcp47: [] as string[] },
-  { id: "ethiopic_test", script: "Ethi", copyright: "© 2026 Ethiopic", bcp47: [] as string[] },
-  { id: "arabic_test", script: "Arab", copyright: "© 2026 Arabic", bcp47: [] as string[] },
-  { id: "devanagari_test", script: "Deva", copyright: "© 2026 Devanagari", bcp47: [] as string[] },
+  {
+    id: "basic_kbdus",
+    kmnPath: "../../tests/fixtures/walkBases/release/basic/basic_kbdus/source/basic_kbdus.kmn",
+    script: "Latn",
+    languages: ["en"],
+    copyright: "© 2008-2020 SIL International",
+  },
+  {
+    id: "basic_kbdru",
+    kmnPath: "../../tests/fixtures/walkBases/release/basic/basic_kbdru/source/basic_kbdru.kmn",
+    script: "Cyrl",
+    languages: ["ru"],
+    copyright: "© 2009-2019 SIL International",
+  },
+  {
+    id: "basic_kbdgr",
+    kmnPath: "../../tests/fixtures/scKeyboards/basic_kbdgr.kmn",
+    script: "Grek",
+    languages: ["el"],
+    copyright: "(c) 2009-2019 SIL International",
+  },
+  {
+    id: "arabic_izza",
+    kmnPath: "../../tests/fixtures/scKeyboards/arabic_izza.kmn",
+    script: "Arab",
+    languages: ["ar"],
+    copyright: "© 2017-2025 Prof. Abdelmalek Bouhadjera",
+  },
+  {
+    id: "basic_kbduk",
+    kmnPath: "../../tests/fixtures/scKeyboards/basic_kbduk.kmn",
+    script: "Latn",
+    languages: ["en"],
+    copyright: "(c) 2009-2019 SIL International",
+  },
 ];
 
-function buildKeyboard(kb: (typeof KEYBOARDS)[number]) {
-  const source = `c ${kb.id} test source
-store(&COPYRIGHT) '${kb.copyright}'
-begin Unicode > use(main)
-group(main) using keys
-+ [K_A] > 'a'
-`;
+/** The real import pipeline: real .kmn → IR + catalog metadata. */
+function loadKeyboard(kb: (typeof KEYBOARDS)[number]) {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(resolve(here, kb.kmnPath), "utf-8");
   const { ir } = parseKmn(source, kb.id);
   const catalog = makeBaseKeyboard({
     id: kb.id,
@@ -44,7 +76,7 @@ group(main) using keys
     targets: ["windows"],
     displayName: kb.id,
     version: "1.0",
-    languages: ["test"],
+    languages: kb.languages,
   });
   return { ir, catalog };
 }
@@ -66,34 +98,74 @@ const IDENTITY_MODULES = [
 // reflects the real pre-fill surface.
 const SC001_MODULES = [...IDENTITY_MODULES, pbCharacterInventory];
 
-describe("SC-001: ≥80% pre-fill on 5 real keyboards", () => {
-  it("extracts identity/script/character decisions with correct source labels", () => {
-    let totalDecisions = 0;
-    let prefilledDecisions = 0;
-
+describe("SC-001: pre-fill on 5 real keyboards", () => {
+  // The spec's success criterion is ≥80% pre-fill of identity/script/character
+  // questions. This test pins the MEASURED rate with hand-verified
+  // expectations per keyboard: 4 of the 6 decisions extract (language-code,
+  // target-script, copyright-holder, character-inventory). language-name and
+  // author-name have no extractors by design — they require author input —
+  // so they surface for asking rather than as silent defaults. The spec's
+  // 80% bar needs one more extractor on the identity set (5/6 = 83%); that
+  // gap is a tracked follow-up (specs/085-decision-backend/followups.md),
+  // not a silently lowered bar.
+  it("extracts the 4 extractable decisions with correct source labels", () => {
     for (const kb of KEYBOARDS) {
-      const { ir, catalog } = buildKeyboard(kb);
+      const { ir, catalog } = loadKeyboard(kb);
       const decisions = runDecisionFlow({
         modules: SC001_MODULES,
         context: buildExtractContext(ir, catalog),
       });
 
-      // Count pre-filled (extracted provenance) vs total.
+      // Hand-verified per keyboard: extracted values match the real .kmn
+      // (copyright store) and the real catalog row (bcp47/script).
+      expect(decisions["language-code"]?.provenance).toBe("extracted");
+      expect(decisions["language-code"]?.value).toBe(kb.languages[0]);
+      expect(decisions["language-code"]?.source).toContain(kb.id);
+
+      expect(decisions["target-script"]?.provenance).toBe("extracted");
+      expect(decisions["target-script"]?.value).toBe(kb.script);
+      expect(decisions["target-script"]?.source).toContain(kb.id);
+
+      expect(decisions["copyright-holder"]?.provenance).toBe("extracted");
+      expect(decisions["copyright-holder"]?.value).toBe(kb.copyright);
+      expect(decisions["copyright-holder"]?.source).toContain(kb.id);
+
+      const inventory = decisions["character-inventory"];
+      expect(inventory?.provenance).toBe("extracted");
+      expect(Array.isArray(inventory?.value)).toBe(true);
+      expect((inventory?.value as unknown[]).length).toBeGreaterThan(0);
+      expect(inventory?.source).toContain(kb.id);
+
+      // The mechanism boundary: these two require author input and must
+      // never be presented as extracted.
+      expect(decisions["language-name"]?.provenance).not.toBe("extracted");
+      expect(decisions["author-name"]?.provenance).not.toBe("extracted");
+    }
+  });
+
+  it("measured pre-fill rate equals the mechanism ceiling (4/6)", () => {
+    let totalDecisions = 0;
+    let prefilledDecisions = 0;
+
+    for (const kb of KEYBOARDS) {
+      const { ir, catalog } = loadKeyboard(kb);
+      const decisions = runDecisionFlow({
+        modules: SC001_MODULES,
+        context: buildExtractContext(ir, catalog),
+      });
+
       for (const decision of Object.values(decisions)) {
         totalDecisions++;
         if (decision?.provenance === "extracted") {
           prefilledDecisions++;
-          // Source label must name the keyboard.
-          expect(decision.source).toContain(kb.id);
         }
       }
     }
 
-    const rate = prefilledDecisions / totalDecisions;
-    // The mechanism achieves the maximum extractable rate for the available
-    // data. il_language_english and il_author_name have no extractors by
-    // design (they require author input).
-    expect(rate).toBeGreaterThanOrEqual(0.65);
+    // Pins the floor: a regression fails loudly. A future extractor raising
+    // the rate toward the spec's 80% bar updates this assertion deliberately.
+    expect(totalDecisions).toBe(KEYBOARDS.length * SC001_MODULES.length);
+    expect(prefilledDecisions / totalDecisions).toBeGreaterThanOrEqual(4 / 6);
   });
 });
 
@@ -175,7 +247,7 @@ describe("SC-003: zero ordering artifacts + parity", () => {
 describe("SC-004: corpus sample compiles through the unified flow", () => {
   it("5 keyboards run the full decision flow without errors", () => {
     for (const kb of KEYBOARDS) {
-      const { ir, catalog } = buildKeyboard(kb);
+      const { ir, catalog } = loadKeyboard(kb);
       // The unified flow: extract + order + gate.
       const decisions = runDecisionFlow({
         modules: IDENTITY_MODULES,
