@@ -392,7 +392,7 @@ export type {
 } from "./character-discovery/suggestMissing.js";
 // Case-pair proposal helper for the shift-layer studio feature (bidirectional;
 // distinct from suggestMissing's isCovered coverage check — see casePair.ts docstring).
-export { caseCounterpart } from "./character-discovery/casePair.js";
+export { caseCounterpart, confirmedCaseCounterpart } from "./character-discovery/casePair.js";
 // Pre-carve "keep these for convenience?" candidates: basic-Latin letters the
 // base produces that the orthography does not use (loanwords / email / URLs).
 export {
@@ -464,6 +464,7 @@ export {
   groupMarkClasses,
   attestedBasesOf,
   attestedLetterCount,
+  buildAttestationFold,
   ATTACHMENT_SIMILARITY_THRESHOLD,
 } from "./marks/mark-classes.js";
 export type { AttestationCaseFold, MarkClass } from "./marks/mark-classes.js";

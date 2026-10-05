@@ -85,8 +85,9 @@ describe("propagateDesktopLayersToTouch — synthesizing a missing layer", () =>
     // K_A gets the combo's output.
     expect(ctrlLayer.row[0].key[0].id).toBe("K_A");
     expect(ctrlLayer.row[0].key[0].text).toBe("x");
-    // Keyman's schema has no `output` member (KM04000); the .kmn rules type it.
-    expect(ctrlLayer.row[0].key[0]).not.toHaveProperty("output");
+    // Working copy keeps `output` for the studio key-grid UI (per-layer disambiguator);
+    // conformTouchLayoutToKeymanSchema strips it on the output projection (KM04000).
+    expect(ctrlLayer.row[0].key[0]).toHaveProperty("output", "x");
     // K_NUMLOCK had no CTRL-combo output — blank text, and its nextlayer is
     // repointed to "default" (the synthesized layer's way back).
     expect(ctrlLayer.row[0].key[1].id).toBe("K_NUMLOCK");
@@ -217,7 +218,7 @@ describe("propagateDesktopLayersToTouch — editing an existing layer", () => {
     expect(layer.row).toHaveLength(1); // no rows added/removed
     expect(layer.row[0].key).toHaveLength(2); // no keys added/removed
     expect(layer.row[0].key[0].text).toBe("new-a");
-    expect(layer.row[0].key[0]).not.toHaveProperty("output");
+    expect(layer.row[0].key[0]).toHaveProperty("output", "new-a");
     expect(layer.row[0].key[0].customField).toBe("keep-me"); // unknown field preserved
     expect(layer.row[0].key[1].text).toBe("untouched"); // K_B not present in this layer — no-op
     expect(warnings).toHaveLength(0);
@@ -379,7 +380,7 @@ describe("propagateDesktopLayersToTouch — real S-08 pattern (any/index store i
     expect(layer).toBeDefined();
     const eKey = layer.row[0].key.find((k: { id: string }) => k.id === "K_E");
     expect(eKey.text).toBe("é");
-    expect(eKey).not.toHaveProperty("output");
+    expect(eKey).toHaveProperty("output", "é");
   });
 });
 
@@ -454,7 +455,7 @@ describe("propagateDesktopLayersToTouch — legacy 'altgr' layer-id alias (pre-r
       .find((k: { id: string }) => k.id === "K_E");
     expect(eKey).toBeDefined();
     expect(eKey.text).toBe("é");
-    expect(eKey).not.toHaveProperty("output");
+    expect(eKey).toHaveProperty("output", "é");
   });
 });
 
@@ -463,7 +464,7 @@ describe("propagateDesktopLayersToTouch — legacy 'altgr' layer-id alias (pre-r
 // ---------------------------------------------------------------------------
 
 describe("propagateDesktopLayersToTouch — Keyman touch-layout schema", () => {
-  it("writes only schema members on both the patch path and the clone path", () => {
+  it("keeps working-copy output for the key-grid UI; conform strips it for Keyman Developer", () => {
     // The sil_bafut shape: an existing `shift` layer is patched, and the
     // `rightalt` / `rightalt-shift` layers are synthesized from `default`.
     const ir = makeMinimalIR([
@@ -499,6 +500,41 @@ describe("propagateDesktopLayersToTouch — Keyman touch-layout schema", () => {
     const { json } = propagateDesktopLayersToTouch(rawJson, ir, []);
     const layerIds = JSON.parse(json).tablet.layer.map((l: { id: string }) => l.id);
     expect(layerIds).toEqual(expect.arrayContaining(["shift", "rightalt", "rightalt-shift"]));
-    expect(conformTouchLayoutToKeymanSchema(json).removed).toEqual([]);
+    // Working copy carries output for the studio UI; the output projection strips it (KM04000).
+    const conformed = conformTouchLayoutToKeymanSchema(json);
+    expect(conformed.removed.filter((r) => r.endsWith(".output")).length).toBeGreaterThan(0);
+    expect(conformed.removed.every((r) => r.endsWith(".output"))).toBe(true);
+  });
+
+  it("keeps per-layer output distinct so the key-grid UI does not show the union on every cell", () => {
+    // Regression for km-qc #1873: without `output`, keyGridViewModel's
+    // producedChars falls back to producedByKeyId's union across ALL layers,
+    // showing q/Q/ɛ/Ɛ on every K_Q cell of a modifier_as_layer_switch keyboard.
+    const ir = makeMinimalIR([
+      makeGroup([
+        makeRule("K_Q", [], "q"),
+        makeRule("K_Q", ["SHIFT"], "Q"),
+        makeRule("K_Q", ["RALT"], "ɛ"),
+        makeRule("K_Q", ["RALT", "SHIFT"], "Ɛ"),
+      ]),
+    ]);
+    const rawJson = JSON.stringify({
+      phone: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "q" }] }] },
+          { id: "shift", row: [{ id: 1, key: [{ id: "K_Q", text: "old" }] }] },
+        ],
+      },
+    });
+
+    const { json } = propagateDesktopLayersToTouch(rawJson, ir, []);
+    const data = JSON.parse(json);
+    const byId = new Map(data.phone.layer.map((l: { id: string }) => [l.id, l]));
+    const qOf = (layerId: string) =>
+      byId.get(layerId).row[0].key.find((k: { id: string }) => k.id === "K_Q");
+
+    expect(qOf("shift").output).toBe("Q");
+    expect(qOf("rightalt").output).toBe("ɛ");
+    expect(qOf("rightalt-shift").output).toBe("Ɛ");
   });
 });

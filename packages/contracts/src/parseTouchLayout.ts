@@ -103,7 +103,7 @@ const PLATFORM_ORDER = ["desktop", "tablet", "phone"] as const;
 // carries — is deliberately dropped rather than surfaced. On valid corpus this
 // is unreachable; the tightening only affects malformed/non-standard input,
 // where dropping a bogus direction (incl. its check-18-5 reachability) is correct.
-const FLICK_DIRECTIONS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
+export const FLICK_DIRECTIONS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 
 // ---------------------------------------------------------------------------
 // Provenance wire field (spec-014 US3 / T028, FR-008/-009/-010)

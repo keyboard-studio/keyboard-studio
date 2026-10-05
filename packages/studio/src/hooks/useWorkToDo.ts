@@ -23,6 +23,7 @@ import {
   computeMarkTreatmentPrefills,
   nfcPostureOfInventory,
   expandCaseCounterpartAttachments,
+  buildAttestationFold,
   getEffectiveFacet,
   CASING_FACET_ID,
 } from "@keyboard-studio/engine";
@@ -70,7 +71,7 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
     const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
     const isCasedBase = casingValue === "cased" || casingValue === "mixed";
     // Same case-symmetric grouping and proposal the step renders from (parity, spec 079 US3).
-    const fold = { caseFold: isCasedBase, ...(bcp47 !== undefined ? { bcp47 } : {}) };
+    const fold = buildAttestationFold(isCasedBase, bcp47);
     const classes = groupMarkClasses(alphabet, fold);
     const proposals = proposeAttachments(alphabet, classes, fold);
     const attachmentBases = isCasedBase ? lowercaseBaseView(alphabet.bases, bcp47) : alphabet.bases;
@@ -214,7 +215,7 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
     const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
     const isCasedBase = casingValue === "cased" || casingValue === "mixed";
     // Same case-symmetric grouping and proposal the step renders from (parity, spec 079 US3).
-    const fold = { caseFold: isCasedBase, ...(bcp47 !== undefined ? { bcp47 } : {}) };
+    const fold = buildAttestationFold(isCasedBase, bcp47);
     const classes = groupMarkClasses(alphabet, fold);
     const proposals = proposeAttachments(alphabet, classes, fold);
     const attachmentBases = isCasedBase ? lowercaseBaseView(alphabet.bases, bcp47) : alphabet.bases;

@@ -7,7 +7,7 @@
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { stackKey } from "@keyboard-studio/contracts";
-import { caseCounterpart } from "../character-discovery/casePair.js";
+import { confirmedCaseCounterpart } from "../character-discovery/casePair.js";
 import type { AttestationCaseFold, MarkClass } from "./mark-classes.js";
 import { attestedBasesOf, attestedLetterCount } from "./mark-classes.js";
 
@@ -88,8 +88,8 @@ export function deriveCaseCounterparts(
   const bases = new Set(alphabet.bases);
   const result = new Map<string, string>();
   for (const stack of alphabet.attestedStacks) {
-    const pair = caseCounterpart(stack.base, bcp47);
-    if (pair !== null && bases.has(pair.counterpart)) {
+    const pair = confirmedCaseCounterpart(stack.base, bases, bcp47);
+    if (pair !== null) {
       result.set(stackKey(stack), pair.counterpart);
     }
   }

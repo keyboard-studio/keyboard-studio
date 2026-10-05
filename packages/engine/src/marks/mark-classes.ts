@@ -12,7 +12,7 @@
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { getCCC } from "@keyboard-studio/contracts/unicode";
-import { caseCounterpart } from "../character-discovery/casePair.js";
+import { caseCounterpart, confirmedCaseCounterpart } from "../character-discovery/casePair.js";
 
 export interface MarkClass {
   /** Stable within a session (deterministic from the alphabet). */
@@ -107,6 +107,15 @@ export interface AttestationCaseFold {
   bcp47?: string;
 }
 
+/**
+ * Build the shared `AttestationCaseFold` from the casing-facet gate.
+ * Single source for the `{ caseFold, bcp47 }` construction previously
+ * duplicated across `useWorkToDo.ts` (2x) and `MarksSeriesStep.tsx` (1x).
+ */
+export function buildAttestationFold(isCasedBase: boolean, bcp47?: string): AttestationCaseFold {
+  return { caseFold: isCasedBase, ...(bcp47 !== undefined ? { bcp47 } : {}) };
+}
+
 /** The base's case counterpart, when folding is on and the counterpart is confirmed. */
 function confirmedCounterpart(
   alphabet: ConfirmedAlphabet,
@@ -114,10 +123,7 @@ function confirmedCounterpart(
 ): (base: string) => ReturnType<typeof caseCounterpart> {
   if (fold.caseFold !== true) return () => null;
   const bases = new Set(alphabet.bases);
-  return (base) => {
-    const pair = caseCounterpart(base, fold.bcp47);
-    return pair !== null && bases.has(pair.counterpart) ? pair : null;
-  };
+  return (base) => confirmedCaseCounterpart(base, bases, fold.bcp47);
 }
 
 /**

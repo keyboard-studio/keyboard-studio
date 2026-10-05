@@ -52,6 +52,7 @@ import {
 } from "@keyboard-studio/contracts";
 import {
   groupMarkClasses,
+  buildAttestationFold,
   proposeAttachments,
   nfcPostureOfInventory,
   resolveOutputFormProposal,
@@ -305,10 +306,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // Attestation is case-symmetric behind the same gate: a mark seen only on a
   // capital must still pre-tick the lowercase row, the only one shown below,
   // and must still group with a sibling seen only on the lowercase letter.
-  const fold = useMemo(
-    () => ({ caseFold: isCasedBase, ...(bcp47 !== undefined ? { bcp47 } : {}) }),
-    [isCasedBase, bcp47],
-  );
+  const fold = useMemo(() => buildAttestationFold(isCasedBase, bcp47), [isCasedBase, bcp47]);
   const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet, fold), [gate.alphabet, fold]);
   const proposals = useMemo(
     () => proposeAttachments(gate.alphabet, classes, fold),

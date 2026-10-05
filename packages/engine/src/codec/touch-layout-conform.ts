@@ -29,6 +29,7 @@
  */
 
 import { TOUCH_LAYOUT_JSON_INDENT } from "./parse-touch.js";
+import { FLICK_DIRECTIONS as CANONICAL_FLICK_DIRECTIONS } from "@keyboard-studio/contracts";
 
 const PLATFORM_MEMBERS = new Set(["font", "fontsize", "layer", "displayUnderlying", "defaultHint"]);
 const LAYER_MEMBERS = new Set(["id", "row"]);
@@ -40,7 +41,7 @@ const KEY_MEMBERS = new Set([
 const SUBKEY_MEMBERS = new Set([
   "id", "text", "layer", "nextlayer", "sp", "pad", "width", "fontsize", "font", "dk", "default",
 ]);
-const FLICK_DIRECTIONS = new Set(["n", "s", "e", "w", "ne", "nw", "se", "sw"]);
+const FLICK_DIRECTIONS = new Set<string>(CANONICAL_FLICK_DIRECTIONS);
 const PLATFORM_IDS = new Set(["tablet", "phone", "desktop"]);
 
 export interface ConformTouchLayoutResult {
