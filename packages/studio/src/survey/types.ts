@@ -3,6 +3,7 @@
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
+import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -275,6 +276,46 @@ export interface QuestionModule {
    * unlike the manifest requirement, question modules may omit it.
    */
   specRef?: string | readonly string[];
+
+  // -------------------------------------------------------------------------
+  // Decision-spike seam (km/decisions-spike). All optional: absent = no
+  // decision wiring, so every existing module and the contract suite compile
+  // unchanged.
+  // -------------------------------------------------------------------------
+
+  /**
+   * The typed decision this module provides once answered. `orderDecisions()`
+   * derives the walk order from `provides`/`requires` instead of
+   * hand-maintained YAML lists and spine flags.
+   */
+  provides?: DecisionId;
+
+  /** Decisions that must be resolved before this module can run. */
+  requires?: readonly DecisionId[];
+
+  /**
+   * Conditional-routing preservation: when present, the module is only asked
+   * if this returns true for the decisions resolved so far. This is the
+   * decision-level equivalent of `definition.next` FlowGotoRule conditions —
+   * without it, conditional branches would silently become unconditional.
+   */
+  gatedBy?: (decisions: DecisionSet) => boolean;
+
+  /**
+   * Base-keyboard probe: read this module's decision from an imported
+   * keyboard's IR instead of asking the author. Return `undefined` when the
+   * base keyboard carries no evidence for the decision.
+   */
+  extract?: (baseIR: KeyboardIR) => unknown;
+
+  /**
+   * Custom renderer for bulk decisions (e.g. a character-inventory picker).
+   * Absent (or "default") = the standard question field; a component dissolves
+   * a large editor panel into the same module registry. Size lives in the
+   * renderer, not the module system.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  renderer?: "default" | React.ComponentType<any>;
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {
