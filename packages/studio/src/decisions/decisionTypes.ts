@@ -43,6 +43,20 @@ export interface Decision<T = unknown> {
 export type DecisionSet = Readonly<Partial<Record<DecisionId, Decision<unknown>>>>;
 
 /**
+ * The one prop contract every decision renderer satisfies (km/decisions-spike
+ * fix 3). The runner owns the value; the renderer only renders and reports.
+ * `T` is the module's answer type (e.g. `string[]` for a character
+ * inventory); the registry field uses `DecisionRendererProps<any>` because
+ * modules in one registry carry different `T`s — the same heterogeneous-
+ * registry pattern as `EditorStepProps` in steps/types.ts.
+ */
+export interface DecisionRendererProps<T = unknown> {
+  value: T | undefined;
+  onChange: (value: T) => void;
+  decisionId: DecisionId;
+}
+
+/**
  * Declared relation between each decision and the KeyboardIR locations it
  * populates (km/decisions-spike fix 1).
  *

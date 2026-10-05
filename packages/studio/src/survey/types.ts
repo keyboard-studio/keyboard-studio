@@ -3,7 +3,7 @@
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
+import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -313,9 +313,14 @@ export interface QuestionModule {
    * Absent (or "default") = the standard question field; a component dissolves
    * a large editor panel into the same module registry. Size lives in the
    * renderer, not the module system.
+   *
+   * Typed as DecisionRendererProps<any>: modules in one registry carry
+   * different answer types T, so the field is heterogeneous by design — the
+   * same pattern as EditorStepProps in steps/types.ts. Each component
+   * declares its own T (e.g. DecisionRendererProps<string[]>).
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  renderer?: "default" | React.ComponentType<any>;
+  renderer?: "default" | React.ComponentType<DecisionRendererProps<any>>;
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {

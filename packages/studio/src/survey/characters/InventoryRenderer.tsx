@@ -10,15 +10,16 @@
 
 import { useState } from "react";
 import { parseUPlusNotation } from "@keyboard-studio/contracts";
+import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { nfcDedup } from "../charNormUtils.ts";
 
-export interface InventoryRendererProps {
-  value: string[];
-  onChange: (next: string[]) => void;
-}
+/** InventoryRenderer's contract: the shared DecisionRendererProps at T = string[]. */
+export type InventoryRendererProps = DecisionRendererProps<string[]>;
 
 export function InventoryRenderer({ value, onChange }: InventoryRendererProps) {
   const [draft, setDraft] = useState("");
+  // The runner may hand down undefined before the first answer exists.
+  const chars = value ?? [];
 
   const addDraft = () => {
     const text = draft.trim();
@@ -26,18 +27,18 @@ export function InventoryRenderer({ value, onChange }: InventoryRendererProps) {
     // Accept U+XXXX notation or a literal character.
     const ch = parseUPlusNotation(text) ?? Array.from(text)[0];
     if (ch === undefined || ch.length === 0) return;
-    onChange(nfcDedup([], [...value, ch]));
+    onChange(nfcDedup([], [...chars, ch]));
     setDraft("");
   };
 
   const removeChar = (ch: string) => {
-    onChange(value.filter((c) => c !== ch));
+    onChange(chars.filter((c) => c !== ch));
   };
 
   return (
     <div className="inventory-renderer">
       <div role="list" aria-label="Character inventory">
-        {value.map((ch) => (
+        {chars.map((ch) => (
           <div key={ch} role="listitem">
             <button
               type="button"
