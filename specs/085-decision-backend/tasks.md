@@ -65,7 +65,7 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 - [x] **T041** [P] [US4] `migrateDraft`: versioned old-answer-key → DecisionId table; answers map onto decisions at load, orphans surface visibly, never dropped (Q5) · packages/studio/src/decisions/migrateDraft.ts (new)
 
 **⟶ Wait for Wave 1 to finish, then:**
-- [ ] **T042** [US4] Manifest spine → derived projection, last (Article IX names it; the constitution is amended to name the registry when this lands) · packages/studio/src/steps/manifest.ts
+- [x] **T042** [US4] Manifest spine → derived projection, last (Article IX names it; the constitution is amended to name the registry when this lands) · packages/studio/src/steps/manifest.ts
 
 **Checkpoint:** zero ordering artifacts outside the registry; in-flight drafts migrate automatically.
 

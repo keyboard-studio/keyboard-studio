@@ -1,9 +1,17 @@
-// manifest — the single ordered list of all survey steps.
+// manifest — the ordered list of survey steps (a projection, not the authority).
 //
-// T024 (P4b foundation). This is the ONE source of survey ordering (FR-008,
-// FR-012). The runtime (T028) and the dashboard (T031) both read this array.
-// Editing this file changes the order in both places simultaneously —
-// "map == runtime by construction" (FR-010).
+// T024 (P4b foundation), revised by spec 085 T042. This array is a PROJECTION
+// of the decision registry's ordering: question order within each flow is
+// derived from the modules' provides/requires declarations (decisions/
+// orderDecisions.ts), and each step's flowRefs points at the registry-derived
+// FlowDef. The manifest defines step-level structure (components, inputs,
+// writes, spine flags); it does NOT define question ordering — that authority
+// moved to the derived decision registry (constitution Article IX).
+//
+// The runtime (T028) and the dashboard (T031) both read this array. Editing
+// this file changes the step structure in both places simultaneously —
+// "map == runtime by construction" (FR-010) — but question sequence comes
+// from the registry, never from this file.
 //
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →

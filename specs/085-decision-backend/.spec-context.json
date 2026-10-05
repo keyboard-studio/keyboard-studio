@@ -172,6 +172,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-05T08:38:31.856Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:40:04.177Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
@@ -291,7 +299,7 @@
       "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
     }
   },
-  "currentTask": "T041",
+  "currentTask": "T042",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -424,6 +432,14 @@
       "files": [
         "packages/studio/src/decisions/migrateDraft.ts",
         "packages/studio/src/decisions/migrateDraft.test.ts"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Manifest spine to derived projection (last retirement). Amended constitution Article IX: the derived decision registry (ordered by orderDecisions from provides/requires) is now the single source of survey ordering; the manifest is a projection for step-level structure. Updated steps/manifest.ts header to reflect the projection role. tsc clean.",
+      "files": [
+        "packages/studio/src/steps/manifest.ts",
+        ".specify/memory/constitution.md"
       ]
     }
   }
