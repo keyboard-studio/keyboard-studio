@@ -21,6 +21,8 @@ import path from "node:path";
 import { formatIRPath, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { parseThinYaml } from "../../src/survey/loadModularFlow.ts";
 import { questionRegistry } from "../../src/survey/questions/registry.ts";
+import { phaseARegistry } from "../../src/survey/questions/registry.a.ts";
+import { orderDecisions } from "../../src/decisions/orderDecisions.ts";
 
 // ---------------------------------------------------------------------------
 // Resolve paths
@@ -62,7 +64,11 @@ function allIds(manifest: ReturnType<typeof parseThinYaml>): string[] {
 // Any .modular.yaml file not in this list is appended at the end with its
 // filename as the phase label, ensuring future additions are never silently
 // skipped by this lint.
-const KNOWN_PHASE_ORDER: Array<{ phase: string; filename: string }> = [
+const KNOWN_PHASE_ORDER: Array<{
+  phase: string;
+  filename?: string;
+  derivedIds?: readonly string[];
+}> = [
   // spec 025: phase_a_identity is a PROPOSED flow, relocated to content/flows/proposed/.
   // It is still linted for orphan inputs (path is joined onto flowsDir below); the
   // readdirSync auto-discovery only scans the top level, so proposed flows are listed
@@ -70,17 +76,28 @@ const KNOWN_PHASE_ORDER: Array<{ phase: string; filename: string }> = [
   { phase: "A (proposed)", filename: path.join("proposed", "phase_a_identity.modular.yaml") },
   { phase: "B", filename: "phase_b_characters.modular.yaml" },
   { phase: "F", filename: "phase_f_helpdocs.modular.yaml" },
-  // identity_lite is the short hybrid head (spec §8); its 5 il_* modules
-  // all declare empty inputs/writes so they trivially pass the orphan lint.
-  { phase: "A (identity-lite)", filename: "identity_lite.modular.yaml" },
+  // identity_lite's thin-YAML order list was deleted (spec 085 T040). Its
+  // manifest is now the derived order from the il_* modules' own
+  // provides/requires declarations — the same order the survey actually
+  // walks (see decisions/orderParity.test.ts). The il_* modules declare
+  // empty inputs/writes, so they trivially pass the orphan lint; keeping the
+  // entry preserves the "every registry module is manifested" coverage.
+  {
+    phase: "A (identity-lite)",
+    derivedIds: orderDecisions(Object.values(phaseARegistry)).map(
+      (m) => m.definition.id,
+    ),
+  },
 ];
 
-const knownFilenames = new Set(KNOWN_PHASE_ORDER.map((e) => e.filename));
+const knownFilenames = new Set(
+  KNOWN_PHASE_ORDER.map((e) => e.filename).filter((f) => f !== undefined),
+);
 
 // Build the final ordered list: known phases first (in spec order), then any
 // newly discovered files appended alphabetically so they are linted and not
 // silently exempt.
-const orderedEntries: Array<{ phase: string; filename: string }> = [
+const orderedEntries: Array<{ phase: string; filename?: string; derivedIds?: readonly string[] }> = [
   ...KNOWN_PHASE_ORDER,
   ...allModularFilenames
     .filter((f) => !knownFilenames.has(f))
@@ -89,7 +106,13 @@ const orderedEntries: Array<{ phase: string; filename: string }> = [
 ];
 
 const phaseOrder: Array<{ phase: string; ids: string[] }> = orderedEntries.map(
-  ({ phase, filename }) => ({ phase, ids: allIds(loadManifest(filename)) }),
+  ({ phase, filename, derivedIds }) => ({
+    phase,
+    ids:
+      filename !== undefined
+        ? allIds(loadManifest(filename))
+        : [...(derivedIds ?? [])],
+  }),
 );
 
 // Build the set of all manifested IDs for exemption check.

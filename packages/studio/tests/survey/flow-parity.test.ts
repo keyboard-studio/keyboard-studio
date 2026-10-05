@@ -23,7 +23,8 @@
 // to keep. It fails only when routing actually changes, so it is not churn.
 
 import { describe, it, expect } from "vitest";
-import { loadModularFlow } from "../../src/survey/loadModularFlow.ts";
+import { loadDerivedFlowDef, loadModularFlow } from "../../src/survey/loadModularFlow.ts";
+import { phaseARegistry } from "../../src/survey/questions/registry.a.ts";
 
 // ---------------------------------------------------------------------------
 // ?raw YAML imports (Vite handles these; typed via src/vite-env.d.ts)
@@ -31,7 +32,9 @@ import { loadModularFlow } from "../../src/survey/loadModularFlow.ts";
 
 import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
+// identity_lite.modular.yaml was deleted (spec 085 T040) — the order now
+// derives from the il_* modules' provides/requires declarations via
+// loadDerivedFlowDef below. No raw import.
 import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
 import projectNameModularRaw from "../../../../content/flows/project_name.modular.yaml?raw";
 
@@ -187,14 +190,22 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 });
 
 // ---------------------------------------------------------------------------
-// identity_lite structural integrity (T017)
-// Order + derivation are covered insertion-tolerantly in IdentityLite.test.ts;
-// here we keep the routing-shape invariants (gate / terminal / branch / options)
-// that are unique to this harness.
+// identity_lite structural integrity (T017, retargeted spec 085 T040)
+// The thin-YAML order list was deleted — the FlowDef now comes from
+// loadDerivedFlowDef over the il_* modules' own declarations. Order +
+// derivation are covered insertion-tolerantly in IdentityLite.test.ts and
+// pinned by decisions/orderParity.test.ts; here we keep the routing-shape
+// invariants (gate / terminal / branch / options) that are unique to this
+// harness. Module definitions (including definition.next routing) are
+// registry-sourced either way, so the assertions are unchanged.
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: identity_lite — routing shape", () => {
-  const modular = loadModularFlow(identityLiteModularRaw);
+  const modular = loadDerivedFlowDef(
+    "identity_lite",
+    "A",
+    Object.values(phaseARegistry),
+  );
 
   it("flow_id is identity_lite", () => {
     expect(modular.flow_id).toBe("identity_lite");
