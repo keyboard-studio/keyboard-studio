@@ -70,7 +70,7 @@ const mod: QuestionModule = {
   outputs: [{ target: "package-descriptor", field: "bcp47" }],
   specRef: "specs/030-langtags-identity-autocomplete",
   // Decision spike (km/decisions-spike).
-  provides: "language-code",
+  provides: ["language-code"],
   requires: ["language-name"],
   extract: extractLanguageCode,
 };

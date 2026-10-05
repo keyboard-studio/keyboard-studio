@@ -91,6 +91,6 @@ const mod: QuestionModule = {
   outputs: [{ target: "package-descriptor", field: "languageName" }],
   specRef: "specs/030-langtags-identity-autocomplete",
   // Decision spike (km/decisions-spike): anchor of the dependency chain.
-  provides: "language-name",
+  provides: ["language-name"],
 };
 export default mod;

@@ -92,7 +92,7 @@ const mod: QuestionModule = {
   inputs: [],
   writes: [],
   // Decision spike (km/decisions-spike).
-  provides: "copyright-holder",
+  provides: ["copyright-holder"],
   requires: ["author-name"],
 };
 export default mod;

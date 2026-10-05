@@ -114,7 +114,7 @@ describe("runSpikeDecisionFlow", () => {
       fixtures: { valid: [{ value: "Latn" }], invalid: [] },
       inputs: [],
       writes: [],
-      provides: "target-script",
+      provides: ["target-script"],
       extract: () => "not-a-script",
       validate: (v) =>
         v === "not-a-script"
@@ -139,7 +139,7 @@ describe("runSpikeDecisionFlow", () => {
       fixtures: { valid: [{ value: "Latn" }], invalid: [] },
       inputs: [],
       writes: [],
-      provides: "target-script",
+      provides: ["target-script"],
       extract: () => {
         throw new Error("kaboom");
       },

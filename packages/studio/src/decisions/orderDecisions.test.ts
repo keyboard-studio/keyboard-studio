@@ -14,7 +14,7 @@ import type { DecisionId } from "./decisionTypes.ts";
 function stubModule(
   id: string,
   opts: {
-    provides?: DecisionId;
+    provides?: DecisionId[];
     requires?: readonly DecisionId[];
     gatedBy?: (decisions: Parameters<NonNullable<QuestionModule["gatedBy"]>>[0]) => boolean;
     next?: FlowQuestion["next"];
@@ -34,8 +34,8 @@ const ids = (mods: QuestionModule[]) => mods.map((m) => m.definition.id);
 
 describe("orderDecisions", () => {
   it("sorts a dependency chain regardless of input order", () => {
-    const a = stubModule("a", { provides: "language-name" });
-    const b = stubModule("b", { provides: "language-code", requires: ["language-name"] });
+    const a = stubModule("a", { provides: ["language-name"] });
+    const b = stubModule("b", { provides: ["language-code"], requires: ["language-name"] });
     const c = stubModule("c", { requires: ["language-code"] });
     expect(ids(orderDecisions([c, b, a]))).toEqual(["a", "b", "c"]);
   });
@@ -47,7 +47,7 @@ describe("orderDecisions", () => {
   });
 
   it("fans out: several modules may require the same decision", () => {
-    const a = stubModule("a", { provides: "language-name" });
+    const a = stubModule("a", { provides: ["language-name"] });
     const b = stubModule("b", { requires: ["language-name"] });
     const c = stubModule("c", { requires: ["language-name"] });
     expect(ids(orderDecisions([c, b, a]))).toEqual(["a", "c", "b"]);
@@ -61,14 +61,14 @@ describe("orderDecisions", () => {
   });
 
   it("throws on a dependency cycle, naming the modules in the cycle", () => {
-    const a = stubModule("a", { provides: "language-name", requires: ["language-code"] });
-    const b = stubModule("b", { provides: "language-code", requires: ["language-name"] });
+    const a = stubModule("a", { provides: ["language-name"], requires: ["language-code"] });
+    const b = stubModule("b", { provides: ["language-code"], requires: ["language-name"] });
     expect(() => orderDecisions([a, b])).toThrow(/dependency cycle: .*a.*b/);
   });
 
   it("throws on duplicate providers, naming both modules", () => {
-    const a = stubModule("a", { provides: "language-name" });
-    const b = stubModule("b", { provides: "language-name" });
+    const a = stubModule("a", { provides: ["language-name"] });
+    const b = stubModule("b", { provides: ["language-name"] });
     expect(() => orderDecisions([a, b])).toThrow(
       'duplicate provider for decision "language-name": a, b',
     );
@@ -138,10 +138,10 @@ describe("gatedByFromNext", () => {
 
   it("a hand-written gatedBy wins as an explicit override", () => {
     const handWritten = () => true;
-    const m = stubModule("x", { provides: "language-code", gatedBy: handWritten });
+    const m = stubModule("x", { provides: ["language-code"], gatedBy: handWritten });
     // x is also the target of a conditional rule — the override still wins.
     const source = stubModule("s", {
-      provides: "target-script",
+      provides: ["target-script"],
       next: [{ condition: "value == 'Ethi'", goto: "x" }],
     });
     expect(effectiveGatedBy(m, [source, m])).toBe(handWritten);

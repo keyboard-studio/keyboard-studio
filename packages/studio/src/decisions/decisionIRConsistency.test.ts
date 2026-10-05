@@ -61,12 +61,13 @@ describe("decisionIRPaths consistency", () => {
     spikeModules().map((m) => [m.definition.id, m] as const),
   )("%s", (_id, mod) => {
     it("declares writes covering decisionIRPaths[provides]", () => {
-      if (mod.provides === undefined) return;
-      expect(
-        coversPath(mod.writes, decisionIRPaths[mod.provides]),
-        `${mod.definition.id} provides "${mod.provides}" but its writes ` +
-          `do not cover ${JSON.stringify(decisionIRPaths[mod.provides])}`,
-      ).toBe(true);
+      for (const p of mod.provides ?? []) {
+        expect(
+          coversPath(mod.writes, decisionIRPaths[p]),
+          `${mod.definition.id} provides "${p}" but its writes ` +
+            `do not cover ${JSON.stringify(decisionIRPaths[p])}`,
+        ).toBe(true);
+      }
     });
   });
 

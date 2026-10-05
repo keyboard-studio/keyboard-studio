@@ -110,7 +110,7 @@ export function extractTargetScript(baseIR: KeyboardIR): string | undefined {
 
 const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "bcp47" }],
   // Decision spike (km/decisions-spike).
-  provides: "target-script",
+  provides: ["target-script"],
   requires: ["language-code"],
   extract: extractTargetScript,
 };

@@ -18,15 +18,16 @@ function indexProviders(
 ): Readonly<Map<DecisionId, QuestionModule>> {
   const providers = new Map<DecisionId, QuestionModule>();
   for (const m of modules) {
-    if (m.provides === undefined) continue;
-    const existing = providers.get(m.provides);
-    if (existing !== undefined) {
-      throw new Error(
-        `duplicate provider for decision "${m.provides}": ` +
-          `${existing.definition.id}, ${m.definition.id}`,
-      );
+    for (const p of m.provides ?? []) {
+      const existing = providers.get(p);
+      if (existing !== undefined) {
+        throw new Error(
+          `duplicate provider for decision "${p}": ` +
+            `${existing.definition.id}, ${m.definition.id}`,
+        );
+      }
+      providers.set(p, m);
     }
-    providers.set(m.provides, m);
   }
   return providers;
 }
@@ -107,7 +108,7 @@ export function orderDecisions(
       if (!ready) continue;
       emitted.add(m);
       ordered.push(m);
-      if (m.provides !== undefined) provided.add(m.provides);
+      for (const p of m.provides ?? []) provided.add(p);
       progress = true;
     }
   }
@@ -149,11 +150,13 @@ export function filterGated(
  * top-to-bottom evaluation). The target's gate is the OR over all such
  * effective conditions.
  *
- * `value` in a condition refers to the owning module's answer, i.e. the
- * decision that module `provides`. `ctx.*` conditions have no DecisionSet
- * equivalent and make derivation impossible — as does a conditional owner
- * with no `provides`. In both cases this returns `undefined` (fail open:
- * the module stays ungated, exactly as before).
+ * `value` in a condition refers to the owning module's answer, i.e. one of the
+ * decisions that module `provides` — so the derivation emits one clause per
+ * provided decision, and the gate holds when the condition matches any of
+ * them. `ctx.*` conditions have no DecisionSet equivalent and make derivation
+ * impossible — as does a conditional owner with no provided decisions. In
+ * both cases this returns `undefined` (fail open: the module stays ungated,
+ * exactly as before).
  *
  * Returns `undefined` when nothing routes to the target conditionally —
  * including plain-string `next` hops and terminal modules.
@@ -181,13 +184,16 @@ export function gatedByFromNext(
     for (const rule of next) {
       if (rule.goto === target.id) {
         // `value` in the condition is this module's answer — unmappable
-        // without a provided decision id.
-        if (m.provides === undefined) return undefined;
-        clauses.push({
-          provides: m.provides,
-          positive: rule.condition ?? null,
-          negatives: [...seen],
-        });
+        // without provided decision ids. One clause per provided decision.
+        const provided = m.provides;
+        if (provided === undefined || provided.length === 0) return undefined;
+        for (const p of provided) {
+          clauses.push({
+            provides: p,
+            positive: rule.condition ?? null,
+            negatives: [...seen],
+          });
+        }
       }
       if (rule.condition !== undefined) seen.push(rule.condition);
     }

@@ -53,7 +53,7 @@ const mod: QuestionModule = {
   // No hand-written gatedBy: the gate is DERIVED from il_target_script's
   // conditional `next` via gatedByFromNext (single source for conditional
   // routing — never both by hand).
-  provides: "author-name",
+  provides: ["author-name"],
   requires: ["target-script"],
 };
 export default mod;

@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "decision backend",
   "branch": "km/decisions-spike",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -39,42 +39,115 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-10-05T07:45:58.296Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T07:49:10.203Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-05T07:49:10.310Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-05T07:51:01.584Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T07:55:56.150Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
   "coverage": {
     "FR-001": {
-      "title": "Derive question order from declared provides/requires dependencies, never hand-maintained lists"
+      "title": "Modules declare provides, requires, gatedBy, extract, renderer",
+      "tasks": [
+        "T001",
+        "T011",
+        "T012"
+      ]
     },
     "FR-002": {
-      "title": "Fail fast with named errors on unresolved decisions, duplicate providers, dependency cycles"
+      "title": "Unresolved, duplicate, and cyclic dependencies fail fast with named errors",
+      "tasks": [
+        "T004",
+        "T010"
+      ]
     },
     "FR-003": {
-      "title": "Every decision carries provenance: asked, extracted with source, or default"
+      "title": "Every decision carries provenance: asked, extracted, or default",
+      "tasks": [
+        "T003",
+        "T020"
+      ]
     },
     "FR-004": {
-      "title": "Run extracted values through the owning question's validation; failures treated as absent"
+      "title": "Extracted values pass through validate() before acceptance",
+      "tasks": [
+        "T003",
+        "T020"
+      ]
     },
     "FR-005": {
-      "title": "Exactly one declared source for conditional question visibility"
+      "title": "Conditional routing derives from definition.next via gatedByFromNext",
+      "tasks": [
+        "T001",
+        "T011"
+      ]
     },
     "FR-006": {
-      "title": "Import a real base keyboard from the catalog and extract identity/script/character decisions from the artifact"
+      "title": "Real base keyboards import and extract identity, script, and character decisions",
+      "tasks": [
+        "T020",
+        "T021"
+      ]
     },
     "FR-007": {
-      "title": "Applying decisions writes exactly declared effects; out-of-scope writes reject the whole application"
+      "title": "Mutations apply only within the module's declared writes; violations rejected",
+      "tasks": [
+        "T030",
+        "T031"
+      ]
     },
     "FR-008": {
-      "title": "Add, remove, reorder questions with violations as named errors, never silent misordering"
+      "title": "Legacy ordering systems are deleted; registry is the single source",
+      "tasks": [
+        "T012",
+        "T040",
+        "T042"
+      ]
     },
     "FR-009": {
-      "title": "Question-management interface available only in local developer mode"
+      "title": "Question management renders only in local developer mode",
+      "tasks": [
+        "T061"
+      ]
     },
     "FR-010": {
-      "title": "Every submission-gate check traces to at least one decision; gaps listed explicitly"
+      "title": "The DecisionId vocabulary is mined from the keyboard corpus",
+      "tasks": [
+        "T050",
+        "T051"
+      ]
     },
     "FR-011": {
-      "title": "Question renderers satisfy a single typed props contract"
+      "title": "Renderers use the typed DecisionRendererProps contract",
+      "tasks": [
+        "T060"
+      ]
     }
   },
   "approach": "Unify the studio's question/order machineries into the Decision unit on the existing km/decisions-spike branch: multi-provide modules, derived topological ordering, IR-plus-catalog extraction with provenance, mutate-seam write path; retire YAML lists, spine, fan-out, and the parallel adaptation classifier in risk order, each wave parity-gated.",
@@ -109,6 +182,27 @@
     "plan": {
       "summary": "Plan written: unification on km/decisions-spike in story-sized waves with parity gates",
       "key_finding": "Constitution Article IX names the manifest as ordering authority — plan records a justified evolution to the derived registry, flagging the constitution for amendment at US4"
+    },
+    "tasks": {
+      "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
+    }
+  },
+  "currentTask": "T001",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Widened QuestionModule.provides to DecisionId[]; orderDecisions/gatedByFromNext/spikeRunner/demo fan out one clause/decision per provided id",
+      "files": [
+        "packages/studio/src/survey/types.ts",
+        "packages/studio/src/decisions/orderDecisions.ts",
+        "packages/studio/src/decisions/spikeRunner.ts",
+        "packages/studio/src/decisions/DecisionsDemo.tsx",
+        "packages/studio/src/survey/questions/a/",
+        "packages/studio/src/survey/questions/b/pb_character_inventory.ts",
+        "packages/studio/src/decisions/orderDecisions.test.ts",
+        "packages/studio/src/decisions/spikeRunner.test.ts",
+        "packages/studio/src/decisions/decisionIRConsistency.test.ts"
+      ]
     }
   }
 }

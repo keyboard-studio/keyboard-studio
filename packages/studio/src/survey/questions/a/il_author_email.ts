@@ -50,7 +50,7 @@ const mod: QuestionModule = {
   inputs: [],
   writes: [],
   // Decision spike (km/decisions-spike).
-  provides: "author-email",
+  provides: ["author-email"],
   requires: ["author-name"],
 };
 export default mod;

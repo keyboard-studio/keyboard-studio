@@ -72,7 +72,7 @@ const mod: QuestionModule = {
   inputs: [irPath("header", "bcp47")],
   writes: [],
   // Decision spike (km/decisions-spike).
-  provides: "character-inventory",
+  provides: ["character-inventory"],
   requires: ["target-script"],
   renderer: InventoryRenderer,
 };

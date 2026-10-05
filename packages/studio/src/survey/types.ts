@@ -284,11 +284,13 @@ export interface QuestionModule {
   // -------------------------------------------------------------------------
 
   /**
-   * The typed decision this module provides once answered. `orderDecisions()`
+   * The typed decisions this module provides once answered. `orderDecisions()`
    * derives the walk order from `provides`/`requires` instead of
-   * hand-maintained YAML lists and spine flags.
+   * hand-maintained YAML lists and spine flags. One module may provide
+   * several decisions (spec 085 Q4); the duplicate-provider rule applies
+   * per decision, not per module.
    */
-  provides?: DecisionId;
+  provides?: DecisionId[];
 
   /** Decisions that must be resolved before this module can run. */
   requires?: readonly DecisionId[];

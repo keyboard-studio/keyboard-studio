@@ -232,7 +232,7 @@ export function DecisionsDemo() {
 
   // -- Section 5: manage questions (in-memory; the real registry is untouched)
   const [customModules, setCustomModules] = useState<QuestionModule[]>([]);
-  const [declEdits, setDeclEdits] = useState<Record<string, { provides: DecisionId | undefined; requires: DecisionId[] | undefined }>>({});
+  const [declEdits, setDeclEdits] = useState<Record<string, { provides: DecisionId[] | undefined; requires: DecisionId[] | undefined }>>({});
   const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(new Set());
   const [inspectedId, setInspectedId] = useState<string | null>(null);
 
@@ -264,27 +264,30 @@ export function DecisionsDemo() {
   const providersByDecision = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const m of managedModules) {
-      if (m.provides !== undefined) {
-        const arr = map.get(m.provides) ?? [];
+      for (const p of m.provides ?? []) {
+        const arr = map.get(p) ?? [];
         arr.push(m.definition.id);
-        map.set(m.provides, arr);
+        map.set(p, arr);
       }
     }
     return map;
   }, [managedModules]);
 
   const inspectedMod = managedModules.find((m) => m.definition.id === inspectedId) ?? null;
-  const inspectedProvides: DecisionId | undefined = inspectedMod?.provides;
+  const inspectedProvides: DecisionId[] | undefined = inspectedMod?.provides;
   const inspectedConsumers: string[] = [];
   if (inspectedMod !== null && inspectedProvides !== undefined) {
     for (const o of managedModules) {
-      if (o.definition.id !== inspectedMod.definition.id && (o.requires ?? []).includes(inspectedProvides)) {
+      if (
+        o.definition.id !== inspectedMod.definition.id &&
+        inspectedProvides.some((p) => (o.requires ?? []).includes(p))
+      ) {
         inspectedConsumers.push(o.definition.id);
       }
     }
   }
 
-  const updateDecls = (id: string, provides: DecisionId | undefined, requires: DecisionId[]) => {
+  const updateDecls = (id: string, provides: DecisionId[] | undefined, requires: DecisionId[]) => {
     setDeclEdits((prev) => ({ ...prev, [id]: { provides, requires } }));
   };
   const deleteModule = (id: string) => {
@@ -402,7 +405,7 @@ export function DecisionsDemo() {
               />
               <span style={{ ...mono, flex: 1, opacity: included[id] ? 1 : 0.4 }}>{id}</span>
               <span style={{ fontSize: "0.75rem", color: "var(--app-text-subtle)" }}>
-                {m.provides ? `→ ${m.provides}` : "(no decision)"}
+                {m.provides?.length ? `→ ${m.provides.join(", ")}` : "(no decision)"}
                 {m.requires?.length ? ` · needs ${(m.requires as readonly string[]).join(", ")}` : ""}
               </span>
               <button style={btn} onClick={() => move(id, -1)} aria-label={`move ${id} up`}>↑</button>
@@ -494,7 +497,7 @@ export function DecisionsDemo() {
               );
             })}
             <div style={{ fontSize: "0.8rem", marginTop: "8px", color: "var(--app-text-subtle)" }}>
-              → required by{inspectedProvides !== undefined ? ` (via ${inspectedProvides})` : " (provides nothing)"}
+              → required by{inspectedProvides !== undefined ? ` (via ${inspectedProvides.join(", ")})` : " (provides nothing)"}
             </div>
             {inspectedProvides !== undefined &&
               (inspectedConsumers.length > 0 ? (
@@ -576,7 +579,13 @@ function NewQuestionForm(props: { existingIds: ReadonlySet<string>; onAdd: (m: Q
       fixtures: { valid: [{ value: "x" }], invalid: [] },
     };
     const trimmedProvides = provides.trim();
-    if (trimmedProvides !== "") mod.provides = trimmedProvides as DecisionId;
+    if (trimmedProvides !== "") {
+      const parsed = trimmedProvides
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s !== "") as DecisionId[];
+      if (parsed.length > 0) mod.provides = parsed;
+    }
     const parsedRequires = requiresText
       .split(",")
       .map((s) => s.trim())
@@ -658,17 +667,21 @@ function ManagedModuleRow(props: {
   isCustom: boolean;
   selected: boolean;
   onSelect: () => void;
-  onUpdateDecls: (id: string, provides: DecisionId | undefined, requires: DecisionId[]) => void;
+  onUpdateDecls: (id: string, provides: DecisionId[] | undefined, requires: DecisionId[]) => void;
   onDelete: () => void;
 }) {
   const { mod } = props;
-  const [providesText, setProvidesText] = useState(mod.provides ?? "");
+  const [providesText, setProvidesText] = useState((mod.provides ?? []).join(", "));
   const [requiresText, setRequiresText] = useState((mod.requires ?? []).join(", "));
 
   const commit = () => {
+    const parsedProvides = providesText
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s !== "") as DecisionId[];
     props.onUpdateDecls(
       mod.definition.id,
-      providesText.trim() === "" ? undefined : (providesText.trim() as DecisionId),
+      parsedProvides.length === 0 ? undefined : parsedProvides,
       requiresText
         .split(",")
         .map((s) => s.trim())
