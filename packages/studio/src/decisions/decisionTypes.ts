@@ -5,6 +5,8 @@
 // renderer EDITS it. One id space, three views — this is what lets questions
 // be added, removed, and reordered without touching any flow glue.
 
+import type { IRPath } from "@keyboard-studio/contracts";
+
 /** The typed facts the spike tracks, by stable id. */
 export type DecisionId =
   | "language-name"
@@ -39,3 +41,31 @@ export interface Decision<T = unknown> {
  * entries for questions the author was never asked).
  */
 export type DecisionSet = Readonly<Partial<Record<DecisionId, Decision<unknown>>>>;
+
+/**
+ * Declared relation between each decision and the KeyboardIR locations it
+ * populates (km/decisions-spike fix 1).
+ *
+ * This is what keeps the two dependency graphs — ordering (`provides` /
+ * `requires`) and data flow (`inputs` / `writes`) — from diverging silently:
+ * `decisionIRConsistency.test.ts` asserts every provider's declared `writes`
+ * covers its mapped paths (each mapped path must be a prefix of, or equal to,
+ * a declared write). The `Record` type makes the map exhaustive at compile
+ * time: a new DecisionId cannot be added without declaring its IR relation.
+ *
+ * Today every spike decision reaches its artifact through `outputs`
+ * (package-descriptor), not IR writes, so all entries are `[]` — the map is
+ * the declared relation, and the lint enforces coverage as later phases give
+ * decisions real IR writes.
+ */
+export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
+  "language-name": [],
+  "language-region": [],
+  "language-autonym": [],
+  "language-code": [],
+  "target-script": [],
+  "author-name": [],
+  "author-email": [],
+  "copyright-holder": [],
+  "character-inventory": [],
+};
