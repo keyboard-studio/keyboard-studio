@@ -45,6 +45,12 @@ export interface ScriptClassification {
  * Classify the base's script posture under the trust policy. Lowering the
  * threshold reclassifies a "mixed" base to "single-script" (and the provenance
  * names the threshold that decided it); raising it does the reverse. Pure.
+ *
+ * @deprecated (spec 085 Q2) — the target-script decision's extraction
+ * (`il_target_script`'s `extract`) is the single system answering "what
+ * script did the base decide". New code must read the decision; this
+ * remains only for the q_sa2 predicate until the adaptation catalog is
+ * retired (spec 085 US4).
  */
 export function classifyBaseScript(
   evidence: AdaptationEvidence,

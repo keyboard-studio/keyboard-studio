@@ -91,20 +91,28 @@ export const fixtures: QuestionModule["fixtures"] = {
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the answer contributes the script/variant subtag to the
 // composed tag the descriptor declares.
-// Decision spike (km/decisions-spike): base-keyboard probe. Reads the script
-// subtag from the imported keyboard's BCP 47 tag. Only ISO 15924 script codes
-// this question offers are extractable — "romanization-Latn", "fonipa", and
-// "other" cannot be determined from a BCP 47 tag alone, so those (and absent
-// metadata) yield undefined and the author is asked.
+// Decision spike (km/decisions-spike): base-keyboard probe AND the single
+// system answering "what script did the base decide" (spec 085 Q2 — the
+// adaptation catalog's parallel classifyBaseScript is deprecated in favor
+// of this). Reads the script from the catalog entry — the codec leaves the
+// IR header's bcp47 empty on real catalog imports, so the catalog is
+// primary and the IR header is a fallback. Only ISO 15924 script codes
+// this question offers are extractable — "romanization-Latn", "fonipa",
+// and "other" cannot be determined from metadata alone, so those (and
+// absent metadata) yield undefined and the author is asked.
 const EXTRACTABLE_SCRIPTS = new Set([
   "Latn", "Arab", "Hebr", "Deva", "Cyrl", "Grek", "Geor", "Armn",
   "Ethi", "Hani", "Hang",
 ]);
 
 export function extractTargetScript(ctx: ExtractContext): string | undefined {
-  const baseIR = ctx.ir;
-  if (baseIR === null) return undefined;
-  const tag = baseIR.header.bcp47[0];
+  // Catalog first: the codec leaves the IR header's bcp47 empty on real
+  // catalog imports. Only script codes this question offers are extractable.
+  const catalogScript = ctx.catalog?.script;
+  if (catalogScript !== undefined && EXTRACTABLE_SCRIPTS.has(catalogScript)) {
+    return catalogScript;
+  }
+  const tag = ctx.ir?.header.bcp47[0];
   if (!tag) return undefined;
   const script = tag.split("-").find((s) => /^[A-Z][a-z]{3}$/.test(s));
   return script !== undefined && EXTRACTABLE_SCRIPTS.has(script) ? script : undefined;

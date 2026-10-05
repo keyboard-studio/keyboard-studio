@@ -48,13 +48,15 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 // Decision spike (km/decisions-spike): base-keyboard probe. Reads the BCP 47
-// language subtag from the imported keyboard's header — the same fact this
-// question confirms in ask mode. Returns undefined when the base keyboard
-// carries no language metadata.
+// language subtag from the catalog entry — the same fact this question
+// confirms in ask mode. The codec leaves the IR header's bcp47 empty on real
+// catalog imports, so the catalog is the primary source; the IR header is a
+// fallback for non-catalog imports. Returns undefined when neither carries
+// language metadata.
 export function extractLanguageCode(ctx: ExtractContext): string | undefined {
-  const baseIR = ctx.ir;
-  if (baseIR === null) return undefined;
-  const tag = baseIR.header.bcp47[0];
+  const catalogTag = ctx.catalog?.languages?.[0];
+  if (catalogTag) return catalogTag;
+  const tag = ctx.ir?.header.bcp47[0];
   if (!tag) return undefined;
   const subtag = tag.split("-")[0];
   return subtag ? subtag : undefined;

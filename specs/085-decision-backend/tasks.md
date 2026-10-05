@@ -37,12 +37,12 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 ## Phase 4: US2 — Real base-keyboard extraction (P1)
 
 **### Tests** — extraction over a real catalog keyboard, no fixtures (FR-006):
-- [ ] **T020** [P] [US2] Extraction test: import a real catalog keyboard, assert identity/script/inventory decisions pre-fill with `extracted` provenance and source identity · packages/studio/src/decisions/extractContext.test.ts (new)
+- [x] **T020** [P] [US2] Extraction test: import a real catalog keyboard, assert identity/script/inventory decisions pre-fill with `extracted` provenance and source identity · packages/studio/src/decisions/extractContext.test.ts (new)
 
 **### Implementation**
 **Wave 1 — independent (different files):**
-- [ ] **T021** [P] [US2] Wire real extractors: language-code → `catalog.languages[0]`, target-script → `catalog.script`, copyright-holder → `baseIr.header.copyright`, character-inventory → `buildProducedSet(baseIr)`; language identity reads from catalog where the codec leaves the IR empty · packages/studio/src/survey/questions/a/il_*.ts (`extract` fields)
-- [ ] **T022** [P] [US2] Fold `classifyBaseScript` into target-script extraction provenance (Q2); deprecate the parallel export · packages/studio/src/adaptation/firing.ts, target-script module in packages/studio/src/survey/questions/a/
+- [x] **T021** [P] [US2] Wire real extractors: language-code → `catalog.languages[0]`, target-script → `catalog.script`, copyright-holder → `baseIr.header.copyright`, character-inventory → `buildProducedSet(baseIr)`; language identity reads from catalog where the codec leaves the IR empty · packages/studio/src/survey/questions/a/il_*.ts (`extract` fields)
+- [x] **T022** [P] [US2] Fold `classifyBaseScript` into target-script extraction provenance (Q2); deprecate the parallel export · packages/studio/src/adaptation/firing.ts, target-script module in packages/studio/src/survey/questions/a/
 
 **Checkpoint:** importing a real base keyboard pre-fills decisions with provenance; one system answers "what did the base decide".
 

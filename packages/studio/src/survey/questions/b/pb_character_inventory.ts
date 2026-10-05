@@ -14,7 +14,8 @@
 // spike.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
-import { irPath } from "@keyboard-studio/contracts";
+import type { ExtractContext } from "../../../decisions/extractContext.ts";
+import { buildProducedSet, irPath } from "@keyboard-studio/contracts";
 import { InventoryRenderer } from "../../characters/InventoryRenderer.tsx";
 
 export const definition = {
@@ -65,6 +66,18 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
+// Decision spike (km/decisions-spike): base-keyboard probe. Reads the
+// characters the base keyboard can already produce — the same inventory this
+// question asks the author to confirm. Returns undefined when the IR yields
+// no produced characters (e.g. parse failed).
+export function extractCharacterInventory(ctx: ExtractContext): string[] | undefined {
+  const ir = ctx.ir;
+  if (ir === null) return undefined;
+  const produced = buildProducedSet(ir);
+  if (produced.size === 0) return undefined;
+  return [...produced].sort();
+}
+
 const mod: QuestionModule = {
   definition,
   validate,
@@ -75,5 +88,6 @@ const mod: QuestionModule = {
   provides: ["character-inventory"],
   requires: ["target-script"],
   renderer: InventoryRenderer,
+  extract: extractCharacterInventory,
 };
 export default mod;

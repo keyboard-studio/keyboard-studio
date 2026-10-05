@@ -116,6 +116,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-05T08:01:48.226Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:05:19.678Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:05:19.784Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:05:19.888Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
@@ -235,7 +259,7 @@
       "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
     }
   },
-  "currentTask": "T012",
+  "currentTask": "T022",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -299,6 +323,31 @@
         "packages/studio/src/survey/questions/registry.a.ts",
         "packages/studio/src/survey/questions/registry.a.test.ts",
         "packages/studio/src/decisions/orderDecisions.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Real-keyboard extraction test (TDD: failed first on empty-bcp47 IR, green after T021): catalog identity + IR facts pre-fill with extracted provenance",
+      "files": [
+        "packages/studio/src/decisions/extractContext.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Wired real extractors per the wiring map: language-code/target-script from catalog (IR fallback), copyright from IR header, inventory from buildProducedSet",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_code.ts",
+        "packages/studio/src/survey/questions/a/il_target_script.ts",
+        "packages/studio/src/survey/questions/a/il_copyright_holder.ts",
+        "packages/studio/src/survey/questions/b/pb_character_inventory.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Folded base-script classification into target-script extraction ownership; deprecated classifyBaseScript in firing.ts",
+      "files": [
+        "packages/studio/src/adaptation/firing.ts",
+        "packages/studio/src/survey/questions/a/il_target_script.ts"
       ]
     }
   }
