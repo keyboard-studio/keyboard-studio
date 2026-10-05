@@ -17,6 +17,7 @@
 // free text, so a typed/blank value is preserved.
 
 import type { QuestionModule } from "../../types.ts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 export const definition = {
   id: "il_language_code",
@@ -46,6 +47,17 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
+// Decision spike (km/decisions-spike): base-keyboard probe. Reads the BCP 47
+// language subtag from the imported keyboard's header — the same fact this
+// question confirms in ask mode. Returns undefined when the base keyboard
+// carries no language metadata.
+export function extractLanguageCode(baseIR: KeyboardIR): string | undefined {
+  const tag = baseIR.header.bcp47[0];
+  if (!tag) return undefined;
+  const subtag = tag.split("-")[0];
+  return subtag ? subtag : undefined;
+}
+
 // Output reach (spec 059 FR-016): `writes` stays `[]` — this question writes no
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the answer contributes the language subtag to the
@@ -57,5 +69,9 @@ const mod: QuestionModule = {
   writes: [],
   outputs: [{ target: "package-descriptor", field: "bcp47" }],
   specRef: "specs/030-langtags-identity-autocomplete",
+  // Decision spike (km/decisions-spike).
+  provides: "language-code",
+  requires: ["language-name"],
+  extract: extractLanguageCode,
 };
 export default mod;

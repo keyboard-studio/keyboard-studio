@@ -69,5 +69,8 @@ const mod: QuestionModule = {
   writes: [],
   outputs: [],
   specRef: "specs/030-langtags-identity-autocomplete",
+  // Decision spike (km/decisions-spike).
+  provides: "language-autonym",
+  requires: ["language-name"],
 };
 export default mod;

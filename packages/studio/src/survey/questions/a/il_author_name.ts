@@ -42,5 +42,19 @@ export function validate(
 
 export const fixtures: QuestionModule["fixtures"] = authorDisplayName.fixtures;
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [],
+  // Decision spike (km/decisions-spike): attribution capture follows a
+  // supported script (spec 064 US1) — gated scripts terminate before it.
+  provides: "author-name",
+  requires: ["target-script"],
+  gatedBy: (decisions) => {
+    const script = decisions["target-script"]?.value;
+    return script !== "Ethi" && script !== "Hani" && script !== "Hang";
+  },
+};
 export default mod;

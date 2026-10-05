@@ -6,6 +6,7 @@
 // stub-gated to il_script_not_supported consistent with §9 three-group routing.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 const VALID_SCRIPT_VALUES = new Set([
   "Latn", "romanization-Latn", "fonipa",
@@ -90,5 +91,27 @@ export const fixtures: QuestionModule["fixtures"] = {
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the answer contributes the script/variant subtag to the
 // composed tag the descriptor declares.
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "bcp47" }] };
+// Decision spike (km/decisions-spike): base-keyboard probe. Reads the script
+// subtag from the imported keyboard's BCP 47 tag. Only ISO 15924 script codes
+// this question offers are extractable — "romanization-Latn", "fonipa", and
+// "other" cannot be determined from a BCP 47 tag alone, so those (and absent
+// metadata) yield undefined and the author is asked.
+const EXTRACTABLE_SCRIPTS = new Set([
+  "Latn", "Arab", "Hebr", "Deva", "Cyrl", "Grek", "Geor", "Armn",
+  "Ethi", "Hani", "Hang",
+]);
+
+export function extractTargetScript(baseIR: KeyboardIR): string | undefined {
+  const tag = baseIR.header.bcp47[0];
+  if (!tag) return undefined;
+  const script = tag.split("-").find((s) => /^[A-Z][a-z]{3}$/.test(s));
+  return script !== undefined && EXTRACTABLE_SCRIPTS.has(script) ? script : undefined;
+}
+
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "bcp47" }],
+  // Decision spike (km/decisions-spike).
+  provides: "target-script",
+  requires: ["language-code"],
+  extract: extractTargetScript,
+};
 export default mod;

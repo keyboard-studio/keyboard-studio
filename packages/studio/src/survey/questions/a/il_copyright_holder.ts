@@ -86,5 +86,13 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  // Decision spike (km/decisions-spike).
+  provides: "copyright-holder",
+  requires: ["author-name"],
+};
 export default mod;
