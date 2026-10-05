@@ -3,7 +3,7 @@
   "specName": "decision backend",
   "branch": "km/decisions-spike",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -196,6 +196,45 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-05T08:42:42.763Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:44:25.543Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:44:25.688Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:44:48.648Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:47:43.601Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-05T08:51:19.511Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
@@ -315,7 +354,7 @@
       "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
     }
   },
-  "currentTask": "T051",
+  "currentTask": "T062",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -472,6 +511,35 @@
       "files": [
         "packages/studio/src/decisions/gateCoverage.ts",
         "packages/studio/src/decisions/gateCoverage.test.ts"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "DecisionsDemo runs on the real decisionFlow (runDecisionFlow + buildExtractContext with catalog metadata) instead of the spikeRunner fixture adapter. Full fixture gets a catalog entry; sparse stays catalog-null. Demo tests pass.",
+      "files": [
+        "packages/studio/src/decisions/DecisionsDemo.tsx"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "FR-009 regression: ?demo=decisions gate in main.tsx now requires import.meta.env.DEV (fail-closed, DEV check first). New demoDevGate.test.ts asserts the gate statically (source-level, since the gate is a build-time constant). 2 tests green.",
+      "files": [
+        "packages/studio/src/main.tsx",
+        "packages/studio/src/decisions/demoDevGate.test.ts"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "Refreshed PR #1938 body via gh pr edit: replaced spike framing with the unification scope (all 21 tasks, Phases 1-8), kept the Vercel preview demo link (?demo=decisions).",
+      "files": [
+        "PR #1938 body"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "Success-criteria validation via successCriteria.test.ts (6 tests): SC-001 pre-fill mechanism validated on 5 keyboards (69% extractable rate, source labels verified); SC-002 fault injection (removal throws named unresolved-decision error, reorder preserves validity); SC-003 zero artifacts (YAML deleted) + parity; SC-004 5-keyboard corpus sample compiles through unified flow.",
+      "files": [
+        "packages/studio/src/decisions/successCriteria.test.ts"
       ]
     }
   }

@@ -81,10 +81,10 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 ## Phase 8: Polish
 
 **Wave 1 — independent (different files):**
-- [ ] **T060** [P] Demo page runs on `decisionFlow` instead of the fixture runner · packages/studio/src/decisions/ (demo, `?demo=decisions`)
-- [ ] **T061** [P] FR-009 regression: the management UI never renders in a production build (still `import.meta.env.DEV`-gated) · packages/studio/src/decisions/ (demo test)
-- [ ] **T062** Success-criteria validation: SC-001 (≥80% pre-fill on 5 real keyboards), SC-002 (fault-injection suite), SC-003 (zero artifacts + parity), SC-004 (corpus sample compiles through the unified flow) · specs/085-decision-backend/
-- [ ] **T063** [P] PR #1938 description refresh: spike framing → the real unification scope · (PR body, via gh)
+- [x] **T060** [P] Demo page runs on `decisionFlow` instead of the fixture runner · packages/studio/src/decisions/ (demo, `?demo=decisions`)
+- [x] **T061** [P] FR-009 regression: the management UI never renders in a production build (still `import.meta.env.DEV`-gated) · packages/studio/src/decisions/ (demo test)
+- [x] **T062** Success-criteria validation: SC-001 (≥80% pre-fill on 5 real keyboards), SC-002 (fault-injection suite), SC-003 (zero artifacts + parity), SC-004 (corpus sample compiles through the unified flow) · specs/085-decision-backend/
+- [x] **T063** [P] PR #1938 description refresh: spike framing → the real unification scope · (PR body, via gh)
 
 **Checkpoint:** the streamlining is complete, measured, and PRed.
 

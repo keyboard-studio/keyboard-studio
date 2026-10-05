@@ -138,8 +138,10 @@ async function mountApp(): Promise<void> {
     typeof window !== "undefined" &&
     window.location.search.includes("demo=lint");
   // Decision-spike demo (km/decisions-spike) — dev-only visualization of the
-  // decision primitive. Same query-param gate pattern as demo=lint.
+  // decision primitive. FR-009: DEV-gated so the management UI never renders
+  // in a production build.
   const isDemoDecisions =
+    import.meta.env.DEV &&
     typeof window !== "undefined" &&
     window.location.search.includes("demo=decisions");
 

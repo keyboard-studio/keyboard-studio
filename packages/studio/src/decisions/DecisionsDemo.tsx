@@ -1,19 +1,20 @@
 // SPIKE DEMO — not product UI (km/decisions-spike).
 //
 // Dev-only visualization of the "Decision as the only unit" spike. Mounted via
-// ?demo=decisions (see main.tsx), mirroring the ?demo=lint precedent. Calls the
-// spike API only (orderDecisions / filterGated / runSpikeDecisionFlow /
-// diffDecisions); no new logic lives here.
+// ?demo=decisions (see main.tsx), mirroring the ?demo=lint precedent. Runs on
+// the real decisionFlow (T060); no new logic lives here.
 //
 // Access at: /?demo=decisions
 
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { makeBaseKeyboard } from "@keyboard-studio/contracts";
 import type { FlowQuestion, QuestionModule } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { orderDecisions, filterGated } from "./orderDecisions.ts";
-import { runSpikeDecisionFlow } from "./spikeRunner.ts";
+import { runDecisionFlow } from "./decisionFlow.ts";
+import { buildExtractContext } from "./extractContext.ts";
 import { diffDecisions } from "./adaptDiff.ts";
 
 import ilAuthorEmail from "../survey/questions/a/il_author_email.ts";
@@ -80,6 +81,18 @@ function makeFixtureIR(opts: { keyboardId: string; name: string; bcp47: string[]
 
 const FULL_IR = makeFixtureIR({ keyboardId: "sil_cameroon_qwerty", name: "Cameroon QWERTY", bcp47: ["bam-Latn"] });
 const SPARSE_IR = makeFixtureIR({ keyboardId: "mystery_keyboard", name: "Mystery", bcp47: [] });
+
+// Catalog metadata for the full fixture (the real import pipeline pairs the
+// codec IR with the catalog entry; the demo models that via decisionFlow).
+const FULL_CATALOG = makeBaseKeyboard({
+  id: "sil_cameroon_qwerty",
+  script: "Latn",
+  path: "release/sil/sil_cameroon_qwerty",
+  targets: ["windows"],
+  displayName: "Cameroon QWERTY",
+  version: "1.0",
+  languages: ["bam"],
+});
 
 // ---------------------------------------------------------------------------
 // Styles (minimal; theme tokens only)
@@ -186,10 +199,19 @@ export function DecisionsDemo() {
   );
 
   // -- Section 2: extract -----------------------------------------------------
+  // Runs on the real decisionFlow (T060): the fixture IR plus catalog metadata
+  // becomes an ExtractContext, exactly as the import pipeline provides.
   const baseIR = fixture === "full" ? FULL_IR : SPARSE_IR;
   const extracted = useMemo(
-    () => runSpikeDecisionFlow({ modules: ALL_MODULES, baseIR }),
-    [baseIR],
+    () =>
+      runDecisionFlow({
+        modules: ALL_MODULES,
+        context: buildExtractContext(
+          baseIR,
+          fixture === "full" ? FULL_CATALOG : null,
+        ),
+      }),
+    [baseIR, fixture],
   );
 
   // -- Section 3: adapt diff --------------------------------------------------
@@ -222,7 +244,7 @@ export function DecisionsDemo() {
     const answers = simulateEthi
       ? { il_language_english: "Amharic", il_language_code: "amh", il_target_script: "Ethi" }
       : { il_language_english: "Bamanankan", il_language_code: "bam", il_target_script: "Latn" };
-    const decisions = runSpikeDecisionFlow({ modules: selected, answers });
+    const decisions = runDecisionFlow({ modules: selected, answers });
     const kept = new Set(filterGated(selected, decisions).map((m) => m.definition.id));
     return { decisions, dropped: selected.map((m) => m.definition.id).filter((id) => !kept.has(id)) };
   }, [selected, simulateEthi]);
