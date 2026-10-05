@@ -8,7 +8,7 @@
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
 import type { Decision, DecisionSet } from "./decisionTypes.ts";
-import { orderDecisions } from "./orderDecisions.ts";
+import { effectiveGatedBy, orderDecisions } from "./orderDecisions.ts";
 
 export interface SpikeRunInput {
   modules: readonly QuestionModule[];
@@ -31,7 +31,21 @@ export function runSpikeDecisionFlow(input: SpikeRunInput): DecisionSet {
   const decisions: Record<string, Decision<unknown>> = {};
 
   for (const m of orderDecisions(modules)) {
-    if (m.gatedBy && !m.gatedBy(decisions)) continue;
+    // Gate: hand-written gatedBy wins, otherwise derived from conditional
+    // `next` routing. A throwing gate aborts the run — wrapped with the
+    // module id so the failure names its source.
+    const gate = effectiveGatedBy(m, modules);
+    if (gate !== undefined) {
+      let pass: boolean;
+      try {
+        pass = gate(decisions);
+      } catch (err) {
+        throw new Error(
+          `gatedBy for module "${m.definition.id}" threw: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      if (!pass) continue;
+    }
     if (m.provides === undefined) continue;
 
     let decision: Decision<unknown>;

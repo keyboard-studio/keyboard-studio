@@ -41,12 +41,9 @@ const mod: QuestionModule = {
   inputs: [],
   writes: [],
   // Decision spike (km/decisions-spike): only reached for not-yet-supported
-  // scripts — mirrors the definition.next condition on il_target_script at
-  // decision level, so conditional routing survives derived ordering.
+  // scripts. No hand-written gatedBy: the gate is DERIVED from
+  // il_target_script's conditional `next` via gatedByFromNext (single source
+  // for conditional routing — never both by hand).
   requires: ["target-script"],
-  gatedBy: (decisions) => {
-    const script = decisions["target-script"]?.value;
-    return script === "Ethi" || script === "Hani" || script === "Hang";
-  },
 };
 export default mod;

@@ -50,11 +50,10 @@ const mod: QuestionModule = {
   writes: [],
   // Decision spike (km/decisions-spike): attribution capture follows a
   // supported script (spec 064 US1) — gated scripts terminate before it.
+  // No hand-written gatedBy: the gate is DERIVED from il_target_script's
+  // conditional `next` via gatedByFromNext (single source for conditional
+  // routing — never both by hand).
   provides: "author-name",
   requires: ["target-script"],
-  gatedBy: (decisions) => {
-    const script = decisions["target-script"]?.value;
-    return script !== "Ethi" && script !== "Hani" && script !== "Hang";
-  },
 };
 export default mod;
