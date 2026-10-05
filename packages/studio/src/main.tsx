@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { AppRoot } from "./AppRoot.tsx";
 import { StudioShell } from "./StudioShell.tsx";
 import { LintDemo } from "./lint/index.ts";
+import { DecisionsDemo } from "./decisions/DecisionsDemo.tsx";
 import { OAuthCallbackScreen } from "./components/OAuthCallbackScreen.tsx";
 import {
   detectOAuthCallback,
@@ -136,10 +137,15 @@ async function mountApp(): Promise<void> {
   const isDemoLint =
     typeof window !== "undefined" &&
     window.location.search.includes("demo=lint");
+  // Decision-spike demo (km/decisions-spike) — dev-only visualization of the
+  // decision primitive. Same query-param gate pattern as demo=lint.
+  const isDemoDecisions =
+    typeof window !== "undefined" &&
+    window.location.search.includes("demo=decisions");
 
   createRoot(rootEl).render(
     <StrictMode>
-      <AppRoot>{isDemoLint ? <LintDemo /> : <StudioShell />}</AppRoot>
+      <AppRoot>{isDemoLint ? <LintDemo /> : isDemoDecisions ? <DecisionsDemo /> : <StudioShell />}</AppRoot>
     </StrictMode>,
   );
 }
