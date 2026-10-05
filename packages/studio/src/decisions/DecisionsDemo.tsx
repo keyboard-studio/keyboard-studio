@@ -442,7 +442,8 @@ export function DecisionsDemo() {
         </div>
       </div>
 
-      {/* 5 — Manage questions */}
+      {/* 5 — Manage questions (local dev only: mutation is a developer tool) */}
+      {import.meta.env.DEV ? (
       <div style={section}>
         <h2 style={h2}>5. Manage questions — define, edit, inspect dependencies</h2>
         <p style={{ fontSize: "0.85rem" }}>
@@ -526,6 +527,14 @@ export function DecisionsDemo() {
           )}
         </div>
       </div>
+      ) : (
+        <div style={section}>
+          <h2 style={h2}>5. Manage questions</h2>
+          <p style={{ fontSize: "0.85rem", color: "var(--app-text-subtle)" }}>
+            Question management is available in local dev mode (<span style={mono}>pnpm dev</span>).
+          </p>
+        </div>
+      )}
     </div>
   );
 }
