@@ -49,9 +49,35 @@ export function runSpikeDecisionFlow(input: SpikeRunInput): DecisionSet {
     if (m.provides === undefined) continue;
 
     let decision: Decision<unknown>;
-    const extracted = baseIR !== undefined && m.extract !== undefined
-      ? m.extract(baseIR)
-      : undefined;
+    // Extract, then validate: an extracted value the question itself would
+    // reject is treated as absent — fall through to asked/default rather
+    // than injecting an invalid decision (km/decisions-spike fix 4).
+    // A throwing extract/validate aborts the run, wrapped with the module
+    // id so the failure names its source.
+    let extracted: unknown;
+    if (baseIR !== undefined && m.extract !== undefined) {
+      try {
+        extracted = m.extract(baseIR);
+      } catch (err) {
+        throw new Error(
+          `extract() for module "${m.definition.id}" threw: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      // A null extract carries no value — normalize to absent (the contract
+      // is "return undefined when the base keyboard carries no evidence").
+      if (extracted === null) extracted = undefined;
+      if (extracted !== undefined && m.validate !== undefined) {
+        let result;
+        try {
+          result = m.validate(extracted as string | string[] | undefined);
+        } catch (err) {
+          throw new Error(
+            `validate() for module "${m.definition.id}" threw on an extracted value: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        if (!result.ok) extracted = undefined;
+      }
+    }
     if (extracted !== undefined) {
       decision = {
         id: m.provides,

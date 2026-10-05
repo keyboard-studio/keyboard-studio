@@ -18,6 +18,34 @@ export interface DecisionDiff {
 }
 
 /**
+ * Structural equality for decision values (km/decisions-spike fix 4):
+ * primitives via Object.is, arrays element-wise, plain objects by key.
+ * Reference equality would mark every array/object answer "changed".
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
+    return false;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const aRecord = a as Record<string, unknown>;
+  const bRecord = b as Record<string, unknown>;
+  const aKeys = Object.keys(aRecord);
+  const bKeys = Object.keys(bRecord);
+  return (
+    aKeys.length === bKeys.length &&
+    aKeys.every(
+      (k) =>
+        Object.prototype.hasOwnProperty.call(bRecord, k) &&
+        deepEqual(aRecord[k], bRecord[k]),
+    )
+  );
+}
+
+/**
  * Compare an extracted decision set against the author's answers.
  *
  * - "confirmed": extracted and never overridden (or overridden with an equal value)
@@ -39,7 +67,7 @@ export function diffDecisions(
     const a = answers[id];
     if (
       a?.value !== undefined &&
-      (e?.value === undefined || a.value !== e.value)
+      (e?.value === undefined || !deepEqual(a.value, e.value))
     ) {
       diffs.push({ id, status: "changed", provenance: a.provenance });
     } else if (e?.value !== undefined) {

@@ -8,15 +8,25 @@ import type { QuestionModule } from "../survey/types.ts";
 import type { FlowQuestion } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 
-/** First module (in input order) providing each decision wins. */
+/**
+ * Index the providing module for each decision. Two modules providing the
+ * same decision is a fail-fast error — first-wins-silent would drop one
+ * provider without a trace at 50+ ids (km/decisions-spike fix 4).
+ */
 function indexProviders(
   modules: readonly QuestionModule[],
 ): Readonly<Map<DecisionId, QuestionModule>> {
   const providers = new Map<DecisionId, QuestionModule>();
   for (const m of modules) {
-    if (m.provides !== undefined && !providers.has(m.provides)) {
-      providers.set(m.provides, m);
+    if (m.provides === undefined) continue;
+    const existing = providers.get(m.provides);
+    if (existing !== undefined) {
+      throw new Error(
+        `duplicate provider for decision "${m.provides}": ` +
+          `${existing.definition.id}, ${m.definition.id}`,
+      );
     }
+    providers.set(m.provides, m);
   }
   return providers;
 }

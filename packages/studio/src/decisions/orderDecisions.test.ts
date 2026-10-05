@@ -65,6 +65,14 @@ describe("orderDecisions", () => {
     const b = stubModule("b", { provides: "language-code", requires: ["language-name"] });
     expect(() => orderDecisions([a, b])).toThrow(/dependency cycle: .*a.*b/);
   });
+
+  it("throws on duplicate providers, naming both modules", () => {
+    const a = stubModule("a", { provides: "language-name" });
+    const b = stubModule("b", { provides: "language-name" });
+    expect(() => orderDecisions([a, b])).toThrow(
+      'duplicate provider for decision "language-name": a, b',
+    );
+  });
 });
 
 describe("filterGated", () => {

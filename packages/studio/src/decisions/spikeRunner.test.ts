@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import type { QuestionModule } from "../survey/types.ts";
 import { runSpikeDecisionFlow } from "./spikeRunner.ts";
 
 function fixtureIR(bcp47: string[], keyboardId = "sil_cameroon_qwerty"): KeyboardIR {
@@ -105,5 +106,46 @@ describe("runSpikeDecisionFlow", () => {
       value: undefined,
       provenance: "default",
     });
+  });
+
+  it("treats an extracted value the module would reject as absent", () => {
+    const picky: QuestionModule = {
+      definition: { id: "pick_script", type: "text" },
+      fixtures: { valid: [{ value: "Latn" }], invalid: [] },
+      inputs: [],
+      writes: [],
+      provides: "target-script",
+      extract: () => "not-a-script",
+      validate: (v) =>
+        v === "not-a-script"
+          ? { ok: false, code: "invalid", message: "not a script" }
+          : { ok: true },
+    };
+    const decisions = runSpikeDecisionFlow({
+      modules: [picky],
+      baseIR: fixtureIR(["bam-Latn"]),
+      answers: { pick_script: "Latn" },
+    });
+    // Falls through to the asked answer instead of injecting the invalid extract.
+    expect(decisions["target-script"]).toMatchObject({
+      value: "Latn",
+      provenance: "asked",
+    });
+  });
+
+  it("wraps a throwing extract with the module id", () => {
+    const boom: QuestionModule = {
+      definition: { id: "boom_script", type: "text" },
+      fixtures: { valid: [{ value: "Latn" }], invalid: [] },
+      inputs: [],
+      writes: [],
+      provides: "target-script",
+      extract: () => {
+        throw new Error("kaboom");
+      },
+    };
+    expect(() =>
+      runSpikeDecisionFlow({ modules: [boom], baseIR: fixtureIR(["bam-Latn"]) }),
+    ).toThrow('extract() for module "boom_script" threw: kaboom');
   });
 });

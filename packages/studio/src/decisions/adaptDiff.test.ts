@@ -32,4 +32,69 @@ describe("diffDecisions", () => {
   it("is empty when both sets are empty", () => {
     expect(diffDecisions({}, {})).toEqual([]);
   });
+
+  it("compares array/object values structurally, not by reference", () => {
+    const extracted: DecisionSet = {
+      "character-inventory": {
+        id: "character-inventory",
+        value: ["a", "é"],
+        provenance: "extracted",
+      },
+    };
+    const same: DecisionSet = {
+      "character-inventory": {
+        id: "character-inventory",
+        value: ["a", "é"],
+        provenance: "asked",
+      },
+    };
+    const reordered: DecisionSet = {
+      "character-inventory": {
+        id: "character-inventory",
+        value: ["é", "a"],
+        provenance: "asked",
+      },
+    };
+    const byId = (d: DecisionSet) =>
+      Object.fromEntries(diffDecisions(extracted, d).map((x) => [x.id, x]));
+
+    // Structurally equal arrays → confirmed (reference equality would say changed).
+    expect(byId(same)["character-inventory"]).toMatchObject({
+      status: "confirmed",
+      provenance: "extracted",
+    });
+    // Different order → changed.
+    expect(byId(reordered)["character-inventory"]).toMatchObject({
+      status: "changed",
+      provenance: "asked",
+    });
+  });
+
+  it("compares nested objects structurally", () => {
+    const extracted: DecisionSet = {
+      "language-name": {
+        id: "language-name",
+        value: { name: "Hausa", tags: ["a"] },
+        provenance: "extracted",
+      },
+    };
+    const same: DecisionSet = {
+      "language-name": {
+        id: "language-name",
+        value: { name: "Hausa", tags: ["a"] },
+        provenance: "asked",
+      },
+    };
+    const different: DecisionSet = {
+      "language-name": {
+        id: "language-name",
+        value: { name: "Hausa", tags: ["b"] },
+        provenance: "asked",
+      },
+    };
+    const byId = (d: DecisionSet) =>
+      Object.fromEntries(diffDecisions(extracted, d).map((x) => [x.id, x]));
+    expect(byId(same)["language-name"]).toMatchObject({ status: "confirmed" });
+    expect(byId(different)["language-name"]).toMatchObject({ status: "changed" });
+  });
 });
