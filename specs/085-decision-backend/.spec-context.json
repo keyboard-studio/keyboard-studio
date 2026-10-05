@@ -68,6 +68,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-05T07:55:56.150Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:00:24.558Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:00:24.663Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:00:24.765Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
@@ -187,7 +211,7 @@
       "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
     }
   },
-  "currentTask": "T001",
+  "currentTask": "T004",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -201,6 +225,32 @@
         "packages/studio/src/survey/questions/b/pb_character_inventory.ts",
         "packages/studio/src/decisions/orderDecisions.test.ts",
         "packages/studio/src/decisions/spikeRunner.test.ts",
+        "packages/studio/src/decisions/decisionIRConsistency.test.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "ExtractContext + buildExtractContext from the working-copy store slots; extract() now takes the bundle",
+      "files": [
+        "packages/studio/src/decisions/extractContext.ts",
+        "packages/studio/src/survey/types.ts",
+        "packages/studio/src/survey/questions/a/il_language_code.ts",
+        "packages/studio/src/survey/questions/a/il_target_script.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "decisionFlow runner: extraction over the bundle with validation, provenance and catalog-preferred source; spikeRunner now a thin adapter",
+      "files": [
+        "packages/studio/src/decisions/decisionFlow.ts",
+        "packages/studio/src/decisions/decisionFlow.test.ts",
+        "packages/studio/src/decisions/spikeRunner.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Verified decisionIRPaths already exhaustive over the real module set; consistency lint green after the provides widening",
+      "files": [
         "packages/studio/src/decisions/decisionIRConsistency.test.ts"
       ]
     }

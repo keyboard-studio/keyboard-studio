@@ -5,7 +5,7 @@ Dependency-ordered, organized by user story. Each phase's work is grouped into w
 ## Phase 1: Setup
 
 **Wave 1 — prerequisite type change (single task):**
-- [ ] **T001** Widen `provides` from `DecisionId` to `DecisionId[]` on `QuestionModule` (Q4 consequence); update `gatedByFromNext` clause keying to one clause per provided decision · packages/studio/src/survey/types.ts, packages/studio/src/decisions/orderDecisions.ts
+- [x] **T001** Widen `provides` from `DecisionId` to `DecisionId[]` on `QuestionModule` (Q4 consequence); update `gatedByFromNext` clause keying to one clause per provided decision · packages/studio/src/survey/types.ts, packages/studio/src/decisions/orderDecisions.ts
 
 **Checkpoint:** the module contract speaks lists; every downstream annotation assumes multi-provide.
 
@@ -14,11 +14,11 @@ Dependency-ordered, organized by user story. Each phase's work is grouped into w
 Blocks all stories: the extraction bundle and the real (non-fixture) flow runner.
 
 **Wave 1 — independent (different files):**
-- [ ] **T002** [P] `ExtractContext` + `buildExtractContext(baseIr, baseKeyboard)` — the Q1 import bundle from the existing `workingCopyStore` slots · packages/studio/src/decisions/extractContext.ts (new)
-- [ ] **T003** [P] `decisionFlow` runner — extraction over the real bundle (validate through `validate()`, provenance + source attached) then `orderDecisions` + `filterGated`; replaces the fixture-based spike runner · packages/studio/src/decisions/decisionFlow.ts (new)
+- [x] **T002** [P] `ExtractContext` + `buildExtractContext(baseIr, baseKeyboard)` — the Q1 import bundle from the existing `workingCopyStore` slots · packages/studio/src/decisions/extractContext.ts (new)
+- [x] **T003** [P] `decisionFlow` runner — extraction over the real bundle (validate through `validate()`, provenance + source attached) then `orderDecisions` + `filterGated`; replaces the fixture-based spike runner · packages/studio/src/decisions/decisionFlow.ts (new)
 
 **⟶ Wait for Wave 1 to finish, then:**
-- [ ] **T004** Extend `decisionIRPaths` to every identity-lite decision; consistency lint green on the real module set (ordering DAG vs data-flow DAG never diverge) · packages/studio/src/decisions/decisionIRPaths.ts, packages/studio/src/decisions/orderDecisions.test.ts
+- [x] **T004** Extend `decisionIRPaths` to every identity-lite decision; consistency lint green on the real module set (ordering DAG vs data-flow DAG never diverge) · packages/studio/src/decisions/decisionIRPaths.ts, packages/studio/src/decisions/orderDecisions.test.ts
 
 **Checkpoint:** the bundle exists, the runner is real, the IR relation holds — stories can build on it.
 

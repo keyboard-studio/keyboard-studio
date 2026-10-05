@@ -4,6 +4,7 @@
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
+import type { ExtractContext } from "../decisions/extractContext.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -304,11 +305,13 @@ export interface QuestionModule {
   gatedBy?: (decisions: DecisionSet) => boolean;
 
   /**
-   * Base-keyboard probe: read this module's decision from an imported
-   * keyboard's IR instead of asking the author. Return `undefined` when the
-   * base keyboard carries no evidence for the decision.
+   * Base-keyboard probe: read this module's decisions from the import bundle
+   * (spec 085 Q1) instead of asking the author. Return `undefined` when the
+   * bundle carries no evidence for the decision. The result runs through
+   * `validate()` before acceptance — a rejected extract falls through to
+   * asked/default.
    */
-  extract?: (baseIR: KeyboardIR) => unknown;
+  extract?: (ctx: ExtractContext) => unknown;
 
   /**
    * Custom renderer for bulk decisions (e.g. a character-inventory picker).

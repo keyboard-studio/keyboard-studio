@@ -6,7 +6,7 @@
 // stub-gated to il_script_not_supported consistent with §9 three-group routing.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { ExtractContext } from "../../../decisions/extractContext.ts";
 
 const VALID_SCRIPT_VALUES = new Set([
   "Latn", "romanization-Latn", "fonipa",
@@ -101,7 +101,9 @@ const EXTRACTABLE_SCRIPTS = new Set([
   "Ethi", "Hani", "Hang",
 ]);
 
-export function extractTargetScript(baseIR: KeyboardIR): string | undefined {
+export function extractTargetScript(ctx: ExtractContext): string | undefined {
+  const baseIR = ctx.ir;
+  if (baseIR === null) return undefined;
   const tag = baseIR.header.bcp47[0];
   if (!tag) return undefined;
   const script = tag.split("-").find((s) => /^[A-Z][a-z]{3}$/.test(s));

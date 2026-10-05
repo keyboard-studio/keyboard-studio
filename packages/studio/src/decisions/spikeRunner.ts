@@ -1,14 +1,13 @@
 // Decision-spike runner (km/decisions-spike).
 //
-// Pure harness (no React): walks modules in derived order, resolving each
-// decision by EXTRACTING it from a base keyboard's IR when a probe exists, or
-// ASKING (stub answers in tests; the real runner later) otherwise. Proves the
-// ask → extract → adapt loop without touching SurveyRunner or loadModularFlow.
+// Thin adapter over runDecisionFlow: the spike's fixture-style input
+// (baseIR only, no catalog metadata) becomes an ExtractContext with a null
+// catalog. The demo page uses this until T060 moves it onto decisionFlow.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
-import type { Decision, DecisionSet } from "./decisionTypes.ts";
-import { effectiveGatedBy, orderDecisions } from "./orderDecisions.ts";
+import type { DecisionSet } from "./decisionTypes.ts";
+import { runDecisionFlow } from "./decisionFlow.ts";
 
 export interface SpikeRunInput {
   modules: readonly QuestionModule[];
@@ -19,90 +18,14 @@ export interface SpikeRunInput {
 }
 
 /**
- * Resolve every provided decision. For each module in derived order (skipping
- * gated-out branches): a defined `extract(baseIR)` result becomes
- * `{ provenance: "extracted", source: <base keyboard id> }`; otherwise the
- * stub answer becomes `{ provenance: "asked" }`; neither becomes
- * `{ provenance: "default", value: undefined }`.
+ * Resolve every provided decision (see runDecisionFlow). Kept so the
+ * `?demo=decisions` page keeps working on the old input shape.
  */
 export function runSpikeDecisionFlow(input: SpikeRunInput): DecisionSet {
-  const { modules, baseIR, answers = {} } = input;
-  const baseId = baseIR?.header.keyboardId ?? baseIR?.header.name;
-  const decisions: Record<string, Decision<unknown>> = {};
-
-  for (const m of orderDecisions(modules)) {
-    // Gate: hand-written gatedBy wins, otherwise derived from conditional
-    // `next` routing. A throwing gate aborts the run — wrapped with the
-    // module id so the failure names its source.
-    const gate = effectiveGatedBy(m, modules);
-    if (gate !== undefined) {
-      let pass: boolean;
-      try {
-        pass = gate(decisions);
-      } catch (err) {
-        throw new Error(
-          `gatedBy for module "${m.definition.id}" threw: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-      if (!pass) continue;
-    }
-    if (m.provides === undefined || m.provides.length === 0) continue;
-    const provided = m.provides;
-
-    // Extract, then validate: an extracted value the question itself would
-    // reject is treated as absent — fall through to asked/default rather
-    // than injecting an invalid decision (km/decisions-spike fix 4).
-    // A throwing extract/validate aborts the run, wrapped with the module
-    // id so the failure names its source.
-    let extracted: unknown;
-    if (baseIR !== undefined && m.extract !== undefined) {
-      try {
-        extracted = m.extract(baseIR);
-      } catch (err) {
-        throw new Error(
-          `extract() for module "${m.definition.id}" threw: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-      // A null extract carries no value — normalize to absent (the contract
-      // is "return undefined when the base keyboard carries no evidence").
-      if (extracted === null) extracted = undefined;
-      if (extracted !== undefined && m.validate !== undefined) {
-        let result;
-        try {
-          result = m.validate(extracted as string | string[] | undefined);
-        } catch (err) {
-          throw new Error(
-            `validate() for module "${m.definition.id}" threw on an extracted value: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-        if (!result.ok) extracted = undefined;
-      }
-    }
-
-    let value: unknown;
-    let provenance: Decision<unknown>["provenance"];
-    if (extracted !== undefined) {
-      value = extracted;
-      provenance = "extracted";
-    } else if (m.definition.id in answers) {
-      value = answers[m.definition.id];
-      provenance = "asked";
-    } else {
-      value = undefined;
-      provenance = "default";
-    }
-    // One Decision per provided id: the module's single answer/extract fills
-    // each decision it provides (spec 085 Q4).
-    for (const p of provided) {
-      decisions[p] = {
-        id: p,
-        value,
-        provenance,
-        // exactOptionalPropertyTypes: only set source when we have one.
-        ...(provenance === "extracted" && baseId !== undefined ? { source: baseId } : {}),
-      };
-    }
-  }
-
-  return decisions;
+  return runDecisionFlow({
+    modules: input.modules,
+    context:
+      input.baseIR !== undefined ? { ir: input.baseIR, catalog: null } : undefined,
+    answers: input.answers,
+  });
 }

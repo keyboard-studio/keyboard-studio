@@ -17,7 +17,7 @@
 // free text, so a typed/blank value is preserved.
 
 import type { QuestionModule } from "../../types.ts";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { ExtractContext } from "../../../decisions/extractContext.ts";
 
 export const definition = {
   id: "il_language_code",
@@ -51,7 +51,9 @@ export const fixtures: QuestionModule["fixtures"] = {
 // language subtag from the imported keyboard's header — the same fact this
 // question confirms in ask mode. Returns undefined when the base keyboard
 // carries no language metadata.
-export function extractLanguageCode(baseIR: KeyboardIR): string | undefined {
+export function extractLanguageCode(ctx: ExtractContext): string | undefined {
+  const baseIR = ctx.ir;
+  if (baseIR === null) return undefined;
   const tag = baseIR.header.bcp47[0];
   if (!tag) return undefined;
   const subtag = tag.split("-")[0];
