@@ -68,6 +68,10 @@ export interface EngineErrorEvent {
   message: string;
 }
 
+export interface KeyboardActiveEvent {
+  type: "KEYBOARD_ACTIVE";
+}
+
 export interface TextUpdatedEvent {
   type: "TEXT_UPDATED";
   value: string;
@@ -81,6 +85,7 @@ export interface KeyTappedEvent {
 export type OskEvent =
   | EngineReadyEvent
   | EngineErrorEvent
+  | KeyboardActiveEvent
   | TextUpdatedEvent
   | KeyTappedEvent;
 
@@ -91,5 +96,5 @@ export type OskEvent =
 export function isOskEvent(data: unknown): data is OskEvent {
   if (typeof data !== "object" || data === null) return false;
   const t = (data as Record<string, unknown>)["type"];
-  return t === "ENGINE_READY" || t === "ENGINE_ERROR" || t === "TEXT_UPDATED" || t === "KEY_TAPPED";
+  return t === "ENGINE_READY" || t === "ENGINE_ERROR" || t === "KEYBOARD_ACTIVE" || t === "TEXT_UPDATED" || t === "KEY_TAPPED";
 }

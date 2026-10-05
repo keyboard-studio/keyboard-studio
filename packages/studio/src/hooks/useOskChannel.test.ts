@@ -5,6 +5,9 @@
 //   2. Repeated taps of the same keyId each fire onKeyTap (not de-duplicated).
 //   3. KEY_TAPPED from a DIFFERENT source (not the iframe's contentWindow) is ignored.
 //   4. TEXT_UPDATED still updates textValue when onKeyTap is provided.
+//   5. A stale engineError is cleared when a later KEYBOARD_ACTIVE arrives
+//      (#1905); a genuine ENGINE_ERROR with no following KEYBOARD_ACTIVE
+//      still surfaces.
 //
 // NOTE: The security guard in useOskChannel requires event.source === frame.contentWindow.
 // We achieve this by creating a real iframe element in the document, grabbing its
@@ -101,6 +104,29 @@ describe("useOskChannel — onKeyTap callback", () => {
 
     // Each tap fires onKeyTap — no de-duplication
     expect(onKeyTap).toHaveBeenCalledTimes(3);
+  });
+
+  it("clears a stale engineError when a later KEYBOARD_ACTIVE arrives", async () => {
+    const { ref, frame } = makeIframeRef();
+    const { result } = renderHook(() => useOskChannel(ref));
+    const frameWindow = frame.contentWindow;
+    if (!frameWindow) return;
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "KMW: load failed" });
+    });
+    expect(result.current.engineError).toBe("KMW: load failed");
+
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "KEYBOARD_ACTIVE" });
+    });
+    expect(result.current.engineError).toBeNull();
+
+    // A genuine failure of the latest keyboard still surfaces.
+    await act(async () => {
+      dispatchFromSource(frameWindow, { type: "ENGINE_ERROR", message: "KMW: second failure" });
+    });
+    expect(result.current.engineError).toBe("KMW: second failure");
   });
 
   it("ignores KEY_TAPPED from a window that is not the iframe contentWindow", async () => {

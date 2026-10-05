@@ -8,6 +8,7 @@
 //   host -> frame: { type: "SET_STRINGS",   strings: { placeholder?, statusReady? } }
 //   frame -> host: { type: "ENGINE_READY" }
 //   frame -> host: { type: "ENGINE_ERROR", message }
+//   frame -> host: { type: "KEYBOARD_ACTIVE" }
 //   frame -> host: { type: "TEXT_UPDATED", value }
 //   frame -> host: { type: "KEY_TAPPED", keyId }
 //
@@ -346,6 +347,7 @@
         setStatus("active: " + keyboardId);
         setOsk();
         try { oskTarget.focus(); } catch (_) {}
+        post({ type: "KEYBOARD_ACTIVE" });
       })
       .catch(function (err) {
         if (myToken !== loadToken) return;        // a superseded load's failure (e.g. a blob the host already revoked) — ignore

@@ -55,6 +55,14 @@ export function useOskChannel(
         case "ENGINE_ERROR":
           setEngineError(event.data.message);
           break;
+        case "KEYBOARD_ACTIVE":
+          // A keyboard activating means the latest load succeeded; any earlier
+          // error belongs to a superseded load (#1905). Without this the red
+          // banner sticks forever over a working keyboard. A genuine failure
+          // of the latest load still surfaces: it posts ENGINE_ERROR with no
+          // following KEYBOARD_ACTIVE.
+          setEngineError(null);
+          break;
         case "TEXT_UPDATED":
           setTextValue(event.data.value);
           break;
