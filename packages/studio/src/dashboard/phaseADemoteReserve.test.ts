@@ -24,7 +24,7 @@
 import { describe, it, expect } from "vitest";
 
 import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import { buildModularFlowGraph, buildDerivedFlowGraph } from "./buildStepGraph.ts";
+import { buildDerivedFlowGraph } from "./buildStepGraph.ts";
 import { buildLeftoverSection } from "./renderedNodeSet.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
