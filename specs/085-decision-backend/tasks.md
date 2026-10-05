@@ -25,12 +25,12 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 ## Phase 3: US1 — Safe decision foundation (P1)
 
 **### Tests** — named-error cases (unresolved / duplicate / cycle) and extract-validation already landed in Phase 1; this phase adds:
-- [ ] **T010** [P] [US1] Parity test: derived order of the annotated identity-lite set equals `content/flows/identity_lite.modular.yaml` order exactly · packages/studio/src/decisions/orderDecisions.test.ts
+- [x] **T010** [P] [US1] Parity test: derived order of the annotated identity-lite set equals `content/flows/identity_lite.modular.yaml` order exactly · packages/studio/src/decisions/orderDecisions.test.ts
 
 **### Implementation**
 **Wave 1 — independent (different files):**
-- [ ] **T011** [P] [US1] Annotate the real identity-lite modules (`questions/a/il_*.ts`) with `provides[]` / `requires` / `extract` per the wiring map · packages/studio/src/survey/questions/a/
-- [ ] **T012** [P] [US1] `registry.a.ts` registers modules by decision id (first fan-out retirement step) · packages/studio/src/survey/questions/registry.a.ts
+- [x] **T011** [P] [US1] Annotate the real identity-lite modules (`questions/a/il_*.ts`) with `provides[]` / `requires` / `extract` per the wiring map · packages/studio/src/survey/questions/a/
+- [x] **T012** [P] [US1] `registry.a.ts` registers modules by decision id (first fan-out retirement step) · packages/studio/src/survey/questions/registry.a.ts
 
 **Checkpoint:** the identity-lite flow derives its order from declarations; the parity badge is green on the real set.
 

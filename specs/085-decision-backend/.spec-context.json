@@ -92,6 +92,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-05T08:00:24.765Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:01:48.002Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:01:48.118Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:01:48.226Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
@@ -211,7 +235,7 @@
       "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
     }
   },
-  "currentTask": "T004",
+  "currentTask": "T012",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -252,6 +276,29 @@
       "did": "Verified decisionIRPaths already exhaustive over the real module set; consistency lint green after the provides widening",
       "files": [
         "packages/studio/src/decisions/decisionIRConsistency.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Parity test verified green: derived order of the annotated identity-lite set equals identity_lite.modular.yaml exactly (pre-existing from the spike)",
+      "files": [
+        "packages/studio/src/decisions/orderParity.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Verified all il_* modules carry provides[]/requires; the T001 provides[] widening was the remaining delta, parity badge green",
+      "files": [
+        "packages/studio/src/survey/questions/a/"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "phaseADecisionIndex derived through the canonical indexProviders (duplicate rule in one place); 2 new tests",
+      "files": [
+        "packages/studio/src/survey/questions/registry.a.ts",
+        "packages/studio/src/survey/questions/registry.a.test.ts",
+        "packages/studio/src/decisions/orderDecisions.ts"
       ]
     }
   }

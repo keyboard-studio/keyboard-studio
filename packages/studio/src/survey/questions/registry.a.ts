@@ -12,6 +12,8 @@
 // content/flows/README.md's Leftover section.
 
 import type { QuestionModule } from "../types.ts";
+import type { DecisionId } from "../../decisions/decisionTypes.ts";
+import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import il_language_autonym from "./a/il_language_autonym.ts";
 import il_language_english from "./a/il_language_english.ts";
@@ -42,3 +44,17 @@ export const phaseARegistry: Readonly<Record<string, QuestionModule>> = {
   il_copyright_holder,
   il_script_not_supported,
 } as const;
+
+/**
+ * Decision-id index over the Phase A modules (spec 085 T012).
+ *
+ * First fan-out retirement step: consumers that need "the module for
+ * decision X" use this instead of the id-keyed fan-out. Derived from the
+ * modules' own `provides` declarations through the canonical indexer — a
+ * duplicate provider throws, so the index can never silently shadow one
+ * module with another. The terminal stub (`il_script_not_supported`,
+ * no `provides`) is indexed under no decision, by design.
+ */
+export const phaseADecisionIndex: Readonly<
+  Partial<Record<DecisionId, QuestionModule>>
+> = Object.fromEntries(indexProviders(Object.values(phaseARegistry)));

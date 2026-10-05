@@ -12,8 +12,11 @@ import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
  * Index the providing module for each decision. Two modules providing the
  * same decision is a fail-fast error — first-wins-silent would drop one
  * provider without a trace at 50+ ids (km/decisions-spike fix 4).
+ *
+ * Exported: registries build their decision-id indexes through this, so the
+ * duplicate rule lives in exactly one place (spec 085 T012).
  */
-function indexProviders(
+export function indexProviders(
   modules: readonly QuestionModule[],
 ): Readonly<Map<DecisionId, QuestionModule>> {
   const providers = new Map<DecisionId, QuestionModule>();
