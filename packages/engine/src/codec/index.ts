@@ -16,6 +16,9 @@ export {
   TOUCH_LAYOUT_JSON_INDENT,
 } from "./parse-touch.js";
 
+export { conformTouchLayoutToKeymanSchema } from "./touch-layout-conform.js";
+export type { ConformTouchLayoutResult } from "./touch-layout-conform.js";
+
 export { OPAQUE_REASONS } from "./opaque-reasons.js";
 export type { OpaqueReason } from "./opaque-reasons.js";
 

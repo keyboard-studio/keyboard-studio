@@ -180,17 +180,44 @@ describe("delivered artifact — adapt track (US3, FR-005, FR-006)", () => {
     );
   });
 
-  // FR-006 / US3-3: a failure to write is NAMED. Here the descriptor is generated
-  // rather than patched, and the writer says so on the download path.
-  it("names the generation on the download path rather than doing it silently (FR-006)", async () => {
+  // Generating the descriptor is the adapt track's designed path, not a fault:
+  // FR-006 asks only that a FAILURE be named. And after a rename, nothing the
+  // author sees may name the base keyboard (FR-003).
+  it("generates the descriptor on adapt + rename without a warning or any base identity", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedAdaptTrackWithoutDescriptor("1.0");
-    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setIdentity({ ...AUTHOR_IDENTITY, keyboardId: "bm_sil" });
 
     const result = await serializeWorkingCopy();
-    expect(result!.warnings).toContain(
-      "[package-descriptor] generated a package descriptor for basic_kbdus (none was present)",
+    expect(result!.keyboardId).toBe("bm_sil");
+    expect(result!.warnings.filter((w) => w.startsWith("[package-descriptor]"))).toEqual([]);
+    for (const w of result!.warnings) expect(w).not.toContain("basic_kbdus");
+
+    expect(deliveredVfs!.get("source/basic_kbdus.kps")).toBeUndefined();
+    const kps = descriptorText("bm_sil");
+    expect(kps).toContain("<ID>bm_sil</ID>");
+    expect(kps).not.toContain("basic_kbdus");
+    expect(kps).not.toContain("US English (Basic)");
+  });
+
+  it("names the renamed descriptor, not the base's, when it cannot be written", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: BASE_KMN, isBinary: false },
+      { path: "source/basic_kbdus.kps", content: "not a package at all", isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    ir.header.version = "1.0";
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().setIdentity({ ...AUTHOR_IDENTITY, keyboardId: "bm_sil" });
+
+    const result = await serializeWorkingCopy();
+    const descriptorWarnings = result!.warnings.filter((w) =>
+      w.startsWith("[package-descriptor] could not write identity into"),
     );
+    expect(descriptorWarnings).toHaveLength(1);
+    expect(descriptorWarnings[0]).toContain("source/bm_sil.kps");
+    expect(descriptorWarnings[0]).not.toContain("basic_kbdus");
   });
 
   it("names an unwritable descriptor on the download path instead of failing silently", async () => {
@@ -344,13 +371,14 @@ describe("delivered artifact — a descriptor always ships, even with no identit
     expect(langs[0]).not.toMatch(/\ben(-US)?\b/);
   });
 
-  it("reports the generation rather than doing it silently", async () => {
+  it("generates it without a warning: that is the designed path, not a fault (FR-006)", async () => {
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedCopyTrackWithoutDescriptorOrIdentity();
 
     const projected = await projectWorkingCopyForOutput();
 
-    expect(projected!.warnings.join(" ")).toMatch(/generated a package descriptor/);
+    expect(projected!.vfs.get("source/basic_kbdus.kps")).toBeDefined();
+    expect(projected!.warnings.filter((w) => w.startsWith("[package-descriptor]"))).toEqual([]);
   });
 
   it("still prefers the author's identity once set", async () => {

@@ -104,9 +104,11 @@ not author-facing prose, so they are not catalog strings (053 FR-016 governs aut
 only — the studio localizes what the author reads).
 
 ```
-[package-descriptor] generated a package descriptor for <id> (none was present)
 [package-descriptor] could not write identity into <path>: <reason>
 ```
+
+Generating a descriptor when none was present is silent: it is reported only through the result's
+`generated` flag, not as a warning.
 
 ---
 

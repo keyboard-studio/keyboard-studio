@@ -41,6 +41,7 @@ import {
   parseKvks,
   parseTouchLayout,
   ensurePackageFiles,
+  conformTouchLayoutToKeymanSchema,
 } from "@keyboard-studio/engine";
 import type { HelpDocsRenderInput } from "@keyboard-studio/engine";
 import type { KeyboardIR, KvksIR, LayoutChartFile, TouchLayoutIR } from "@keyboard-studio/contracts";
@@ -588,6 +589,20 @@ export async function projectWorkingCopyForOutput(
   const { created } = ensurePackageFiles({ vfs: clonedVfs });
   if (created.length > 0) {
     docWarnings.push(`[package] generated missing package files: ${created.join(", ")}`);
+  }
+
+  // 5e. Keyman Developer rejects a touch layout carrying any member outside
+  //     its schema (KM04000), and several working-copy writers legitimately
+  //     add one: the provenance tag `p`, and `output` from older appliers or an
+  //     imported base. Conform every layout here, on the output projection
+  //     only; the working copy and the preview keep `p`. Nothing is reported:
+  //     no stripped member changes what the keyboard types.
+  for (const path of clonedVfs.list()) {
+    if (!path.endsWith(".keyman-touch-layout")) continue;
+    const text = readVfsText(clonedVfs, path);
+    if (text === undefined) continue;
+    const { json, removed } = conformTouchLayoutToKeymanSchema(text);
+    if (removed.length > 0) clonedVfs.set(path, json, false);
   }
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection

@@ -978,6 +978,9 @@ export function projectWorkingCopyVfs(
       kmnTextForKps,
       identity.version,
       input.welcomeFolderFiles ?? [],
+      // Warnings name the file the author will actually receive: step 4 renames
+      // it, so the pre-rename (base) id must not appear in them.
+      targetKeyboardId ?? keyboardId,
     );
     warnings.push(...kpsResult.warnings);
   }
