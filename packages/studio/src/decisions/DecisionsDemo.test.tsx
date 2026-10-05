@@ -3,7 +3,7 @@
 // is proven by orderParity.test.ts, this only checks the page mounts and
 // the interactive sections respond.
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { DecisionsDemo } from "./DecisionsDemo.tsx";
 
 afterEach(cleanup);
@@ -36,5 +36,59 @@ describe("DecisionsDemo smoke", () => {
     expect(inputs.length).toBe(3);
     fireEvent.change(inputs[1]!, { target: { value: "xyz" } });
     expect(screen.getAllByText("changed").length).toBeGreaterThan(0);
+  });
+});
+
+describe("DecisionsDemo manage questions", () => {
+  it("adding a question with a satisfied requirement appears in derived order", () => {
+    render(<DecisionsDemo />);
+    fireEvent.change(screen.getByLabelText("New question id"), { target: { value: "q_demo_extra" } });
+    fireEvent.change(screen.getByLabelText("New question requires"), { target: { value: "language-name" } });
+    fireEvent.click(screen.getByText("Add question"));
+    const list = within(screen.getByTestId("managed-order-list"));
+    const rows = list.getAllByText(/^\d+\. /).map((el) => el.textContent ?? "");
+    const idxNew = rows.findIndex((t) => t.includes("q_demo_extra"));
+    const idxProvider = rows.findIndex((t) => t.includes("il_language_english"));
+    expect(idxNew).toBeGreaterThan(-1);
+    expect(idxProvider).toBeGreaterThan(-1);
+    // The new module sorts after its requirement's provider, not at list end by fiat.
+    expect(idxNew).toBeGreaterThan(idxProvider);
+    // In-memory modules are marked so they are distinguishable from shipped ones.
+    expect(screen.getAllByText("custom").length).toBeGreaterThan(0);
+  });
+
+  it("rejects a duplicate question id in the form", () => {
+    render(<DecisionsDemo />);
+    fireEvent.change(screen.getByLabelText("New question id"), { target: { value: "il_language_code" } });
+    fireEvent.click(screen.getByText("Add question"));
+    expect(screen.getByText(/already exists/)).toBeTruthy();
+  });
+
+  it("editing requires to a nonexistent id surfaces the unresolved error", () => {
+    render(<DecisionsDemo />);
+    const input = screen.getByLabelText("requires for il_target_script");
+    fireEvent.change(input, { target: { value: "no-such-decision" } });
+    fireEvent.blur(input);
+    const err = screen.getByTestId("managed-order-error");
+    expect(err.textContent).toContain("unresolved decision");
+    expect(err.textContent).toContain("no-such-decision");
+    expect(err.textContent).toContain("il_target_script");
+  });
+
+  it("deleting a provider surfaces the unresolved error in the managed order", () => {
+    render(<DecisionsDemo />);
+    fireEvent.click(screen.getByLabelText("delete il_language_english"));
+    // il_language_code requires language-name, whose only provider is gone.
+    const err = screen.getByTestId("managed-order-error");
+    expect(err.textContent).toContain("unresolved decision");
+    expect(err.textContent).toContain("language-name");
+  });
+
+  it("selecting a module shows its dependency inspector", () => {
+    render(<DecisionsDemo />);
+    fireEvent.click(screen.getByLabelText("inspect il_language_code"));
+    const inspector = within(screen.getByTestId("dependency-inspector"));
+    expect(inspector.getByText("language-name")).toBeTruthy();
+    expect(inspector.getByText(/il_language_english/)).toBeTruthy();
   });
 });
