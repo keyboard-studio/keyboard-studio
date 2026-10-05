@@ -15,8 +15,6 @@ import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { orderDecisions, filterGated } from "./orderDecisions.ts";
 import { runSpikeDecisionFlow } from "./spikeRunner.ts";
 import { diffDecisions } from "./adaptDiff.ts";
-import { parseThinYaml } from "../survey/loadModularFlow.ts";
-import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 
 import ilAuthorEmail from "../survey/questions/a/il_author_email.ts";
 import ilAuthorName from "../survey/questions/a/il_author_name.ts";
@@ -42,7 +40,19 @@ const ALL_MODULES: readonly QuestionModule[] = [
   ilCopyrightHolder,
 ];
 const MODULE_IDS = ALL_MODULES.map((m) => m.definition.id);
-const LEGACY_IDS: readonly string[] = parseThinYaml(identityLiteRaw).questions;
+// Frozen from the deleted content/flows/identity_lite.modular.yaml (spec 085
+// T040) — the parity badge compares the derived order against this.
+const LEGACY_IDS: readonly string[] = [
+  "il_language_english",
+  "il_language_region",
+  "il_language_autonym",
+  "il_language_code",
+  "il_target_script",
+  "il_script_not_supported",
+  "il_author_name",
+  "il_author_email",
+  "il_copyright_holder",
+];
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -309,7 +319,7 @@ export function DecisionsDemo() {
             {parity ? "PARITY: MATCH" : "PARITY: MISMATCH"}
           </span>{" "}
           <span style={mono}>orderDecisions()</span> output {parity ? "equals" : "differs from"}{" "}
-          <span style={mono}>identity_lite.modular.yaml</span> question list — reordering is derived from{" "}
+          the frozen legacy question list (identity_lite.modular.yaml, deleted spec 085 T040) — reordering is derived from{" "}
           <span style={mono}>provides</span>/<span style={mono}>requires</span>, not declared.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>

@@ -17,7 +17,6 @@
 //                bijection; rendered as an ordered graph in the Flow Map's Library
 //                section (spec 025, D6). Its YAML also carries `status: proposed`.
 
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 import phaseAIdentityModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
@@ -31,6 +30,8 @@ import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/re
 import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 
 import type { QuestionModule } from "../survey/types.ts";
+import type { FlowDef } from "../survey/types.ts";
+import { loadDerivedFlowDef, loadModularFlow } from "../survey/loadModularFlow.ts";
 
 // ---------------------------------------------------------------------------
 // FlowSource shape
@@ -38,13 +39,23 @@ import type { QuestionModule } from "../survey/types.ts";
 
 /**
  * A single survey flow registered in this catalogue.
- * Keyed by the flow's flow_id (matches the YAML `flow_id:` field).
+ * Keyed by the flow's flow_id.
  */
 export interface FlowSource {
-  /** Stable id — equals the YAML flow_id field. */
+  /** Stable id — equals the flow_id. */
   id: string;
-  /** The ?raw import of the thin modular YAML descriptor. */
-  raw: string;
+  /**
+   * The ?raw import of the thin modular YAML descriptor.
+   * Absent when the flow's order is derived (see `derivedModules`) — the
+   * YAML list was deleted per spec 085 Q3.
+   */
+  raw?: string;
+  /**
+   * Question modules whose provides/requires declarations supply this flow's
+   * order via `orderDecisions` (spec 085 T040). Present exactly when `raw`
+   * is absent — one ordering source per flow, never both.
+   */
+  derivedModules?: readonly QuestionModule[];
   /** Human title for the Flow Map drill-down header. */
   title: string;
   /** Registry of QuestionModule definitions for this flow's questions. */
@@ -55,6 +66,27 @@ export interface FlowSource {
    *              full ordered graphs; Stage 1 renders a flat Library list only.
    */
   status: "live" | "proposed";
+}
+
+/**
+ * Load a flow source's FlowDef: derived order when `derivedModules` is
+ * present, otherwise the thin YAML. Exactly one ordering source per flow —
+ * both absent or both present is a fail-fast error.
+ */
+export function loadFlowSourceDef(source: FlowSource): FlowDef {
+  const hasRaw = source.raw !== undefined;
+  const hasDerived = source.derivedModules !== undefined;
+  if (hasRaw === hasDerived) {
+    throw new Error(
+      `flowSources: "${source.id}" must declare exactly one of raw / derivedModules`,
+    );
+  }
+  if (hasDerived) {
+    // Phase comes from the deleted YAML's `phase:` field — identity_lite is A.
+    // (Only identity_lite is derived today; generalize when the next flow migrates.)
+    return loadDerivedFlowDef(source.id, "A", source.derivedModules ?? []);
+  }
+  return loadModularFlow(source.raw as string);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +113,10 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
 
   identity_lite: {
     id: "identity_lite",
-    raw: identityLiteModularRaw,
+    // spec 085 T040: the thin YAML order list is deleted — the order is
+    // derived from the il_* modules' own provides/requires declarations
+    // (parity with the deleted list proven by orderParity.test.ts).
+    derivedModules: Object.values(phaseARegistry),
     title: "Identity-lite",
     // phaseARegistry now holds ONLY the il_* modules (the demoted battery was
     // physically relocated to questions/reserve/), so computeReserveNodes

@@ -31,7 +31,7 @@ import { flowSources } from "../../steps/flowSources.ts";
 import { ruleTarget } from "../../dashboard/flowUtils.ts";
 import { buildManifestProjection, CHARACTERS_STEP_ID } from "../../dashboard/manifestProjection.ts";
 import { resolveNext } from "../SurveyRunner.tsx";
-import { loadModularFlow } from "../loadModularFlow.ts";
+import { loadFlowSourceDef } from "../../steps/flowSources.ts";
 import type { FlowQuestion } from "../types.ts";
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ function computeSurveyReach(): Set<string> {
   for (const source of liveSources) {
     let flow;
     try {
-      flow = loadModularFlow(source.raw);
+      flow = loadFlowSourceDef(source);
     } catch {
       continue;
     }

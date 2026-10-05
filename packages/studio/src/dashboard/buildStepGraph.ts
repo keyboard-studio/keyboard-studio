@@ -219,6 +219,27 @@ export function buildModularFlowGraph(
   registry: Readonly<Record<string, QuestionModule>>,
 ): FlowGraph {
   const flow = loadModularFlow(raw);
+  return buildFlowGraph(flow, title, registry);
+}
+
+/**
+ * Build a normalized FlowGraph from an already-loaded FlowDef (spec 085
+ * T040) — the derived-order counterpart to buildModularFlowGraph, for flow
+ * sources whose thin YAML list was deleted.
+ */
+export function buildDerivedFlowGraph(
+  flow: FlowDef,
+  title: string,
+  registry: Readonly<Record<string, QuestionModule>>,
+): FlowGraph {
+  return buildFlowGraph(flow, title, registry);
+}
+
+function buildFlowGraph(
+  flow: FlowDef,
+  title: string,
+  registry: Readonly<Record<string, QuestionModule>>,
+): FlowGraph {
   const reserveNodes = computeReserveNodes(flow, registry);
   return buildGraphFromQuestions(flow, title, { extraNodes: reserveNodes });
 }

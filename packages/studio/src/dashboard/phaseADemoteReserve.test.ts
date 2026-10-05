@@ -24,10 +24,10 @@
 import { describe, it, expect } from "vitest";
 
 import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import { buildModularFlowGraph } from "./buildStepGraph.ts";
+import { buildModularFlowGraph, buildDerivedFlowGraph } from "./buildStepGraph.ts";
 import { buildLeftoverSection } from "./renderedNodeSet.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
-import { flowSources } from "../steps/flowSources.ts";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 // The demoted-Phase-A id list is derived ONCE from phase_a_identity.modular.yaml
 // (shared with noDeleteGuardrail.test.ts) — single source of truth.
@@ -35,10 +35,10 @@ import { DEMOTED_PHASE_A } from "../survey/questions/demotedPhaseA.fixture.ts";
 
 describe("spec 022 — demoted Phase A is Leftover, not clog (FR-001/FR-003/SC-001)", () => {
   // The identity-lite drill-down as wired in PRODUCTION (its real flowSources
-  // registry — now the il_*-only phaseARegistry).
+  // registry — now the il_*-only phaseARegistry, order derived).
   const identityLite = flowSources["identity_lite"]!;
-  const identityGraph = buildModularFlowGraph(
-    identityLite.raw,
+  const identityGraph = buildDerivedFlowGraph(
+    loadFlowSourceDef(identityLite),
     identityLite.title,
     identityLite.registry,
   );

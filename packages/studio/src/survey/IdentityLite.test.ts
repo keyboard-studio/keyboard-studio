@@ -12,8 +12,7 @@ import { describe, it, expect } from "vitest";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { extractIdentityLite, buildTargetBcp47, normalizeRegionSubtag } from "./IdentityLite.tsx";
 import { advance } from "../steps/advance.ts";
-import { loadModularFlow } from "./loadModularFlow.ts";
-import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 
 function result(
   targetScript: string,
@@ -35,7 +34,7 @@ function result(
 // ---------------------------------------------------------------------------
 
 describe("identity_lite flow order (English name first)", () => {
-  const flow = loadModularFlow(identityLiteRaw as string);
+  const flow = loadFlowSourceDef(flowSources["identity_lite"]!);
 
   it("orders the questions: english -> region -> autonym -> code -> script -> not-supported -> attribution", () => {
     // Relative order via indexOf rather than a brittle full-order literal.

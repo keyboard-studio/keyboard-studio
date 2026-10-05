@@ -25,7 +25,7 @@ import { useScrollRestoration } from "../hooks/useScrollRestoration.ts";
 // live in the shared dashboard/renderedNodeSet.ts helper (spec 016, D2a), so
 // the Flow Map and the drift guardrail consume ONE composition. Do NOT import
 // the legacy *.yaml files here — they are retired and will be deleted.
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 
 import {
   buildManifestProjection,
@@ -765,7 +765,7 @@ export function FlowMapView({
         </>
       )}
 
-      {section === "routing" && <ScriptRoutingView identityLiteRaw={identityLiteModularRaw} />}
+      {section === "routing" && <ScriptRoutingView flow={loadFlowSourceDef(flowSources["identity_lite"]!)} />}
 
       {section === "strategy" && (
         <StrategyTreeView {...(axisFills !== undefined ? { axisFills } : {})} />

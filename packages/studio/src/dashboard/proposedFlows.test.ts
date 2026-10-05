@@ -75,17 +75,30 @@ describe("spec 025 — buildProposedFlowGraph (FR-001)", () => {
 describe("spec 025 — YAML status matches flowSources status for every entry (FR-003)", () => {
   for (const [id, source] of Object.entries(flowSources)) {
     it(`"${id}": parseThinYaml(status) === flowSources status ("${source.status}")`, () => {
+      // Derived flows (spec 085) have no YAML — the flowSources status IS the
+      // authority; there is no separate status declaration to drift.
+      if (source.raw === undefined) {
+        expect(source.derivedModules).toBeDefined();
+        return;
+      }
       const yamlStatus = parseThinYaml(source.raw).status; // default "live"
       expect(yamlStatus).toBe(source.status);
     });
   }
 
   it("phase_a_identity YAML carries status: proposed", () => {
-    expect(parseThinYaml(flowSources["phase_a_identity"]!.raw).status).toBe("proposed");
+    expect(parseThinYaml(flowSources["phase_a_identity"]!.raw!).status).toBe("proposed");
   });
 
   it("a live flow YAML omits status and defaults to 'live'", () => {
-    expect(parseThinYaml(flowSources["identity_lite"]!.raw).status).toBe("live");
+    // identity_lite is now derived (spec 085 T040) — its "live" status lives
+    // in flowSources, not in a YAML file. A remaining live YAML flow still
+    // defaults to live when the status key is omitted.
+    const liveYamlSource = Object.values(flowSources).find(
+      (s) => s.status === "live" && s.raw !== undefined,
+    );
+    expect(liveYamlSource).toBeDefined();
+    expect(parseThinYaml(liveYamlSource!.raw!).status).toBe("live");
   });
 });
 

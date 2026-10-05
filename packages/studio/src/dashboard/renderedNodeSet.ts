@@ -27,12 +27,12 @@
 // traversal lives in the depcruise-excluded guardrail test, not here.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { buildModularFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes, buildLeftoverNodes } from "./buildStepGraph.ts";
+import { buildModularFlowGraph, buildDerivedFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes, buildLeftoverNodes } from "./buildStepGraph.ts";
+import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { buildManifestProjection, attachDrillDowns, CHARACTERS_STEP_ID as _CHARACTERS_STEP_ID } from "./manifestProjection.ts";
 import type { FlowGraph, GraphNode } from "./model.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { manifest } from "../steps/manifest.ts";
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
@@ -71,7 +71,19 @@ function safeBuild(sourceId: string, stepId: string): BuiltFlowSource {
     };
   }
   try {
-    const graph = buildModularFlowGraph(source.raw, source.title, source.registry);
+    // Derived order when the source declares it (spec 085 T040), otherwise
+    // the thin YAML — one ordering source per flow, enforced by loadFlowSourceDef.
+    // Exactly one of derivedModules/raw is set (enforced by loadFlowSourceDef).
+    // The else branch is the legacy YAML path; raw is defined there by the
+    // invariant, and loadModularFlow fails loudly if it is not.
+    const graph =
+      source.derivedModules !== undefined
+        ? buildDerivedFlowGraph(
+            loadFlowSourceDef(source),
+            source.title,
+            source.registry,
+          )
+        : buildModularFlowGraph(source.raw ?? "", source.title, source.registry);
     return { graph, error: null, title: source.title, stepId };
   } catch (err) {
     return {
@@ -237,7 +249,7 @@ function parseAllSources(): ParsedSource[] {
         id: source.id,
         title: source.title,
         status: source.status,
-        flow: loadModularFlow(source.raw),
+        flow: loadFlowSourceDef(source),
         error: null,
       };
     } catch (err) {

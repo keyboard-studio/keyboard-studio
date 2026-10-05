@@ -1,25 +1,33 @@
-// Parity test: the decision-spike derived order reproduces the legacy
-// identity-lite YAML order exactly (km/decisions-spike).
+// Derived-order regression guard (km/decisions-spike, spec 085 T040).
 //
-// This is the no-regression proof for derived ordering: with the
-// provides/requires annotations on the il_* modules, dropping the hand-written
-// question list changes nothing about the walk the author experiences.
+// The thin identity_lite.modular.yaml order list was deleted — the order is
+// now derived from the il_* modules' own provides/requires declarations.
+// This test pins the derived order against the deleted list's frozen
+// content, so any accidental reorder fails loudly. (Provenance: the parity
+// test that compared derived vs YAML before the cutover.)
 
 import { describe, it, expect } from "vitest";
-import { parseThinYaml } from "../survey/loadModularFlow.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { orderDecisions } from "./orderDecisions.ts";
-import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 
-describe("orderDecisions parity with identity_lite.modular.yaml", () => {
-  it("derived order equals the legacy YAML question order", () => {
-    const thin = parseThinYaml(identityLiteRaw);
-    const modules = thin.questions.map((id) => {
-      const mod = questionRegistry[id];
-      if (!mod) throw new Error(`question "${id}" not in registry`);
-      return mod;
-    });
-    const derived = orderDecisions(modules).map((m) => m.definition.id);
-    expect(derived).toEqual(thin.questions);
+/** Frozen from the deleted content/flows/identity_lite.modular.yaml. */
+const LEGACY_IDENTITY_LITE_ORDER: readonly string[] = [
+  "il_language_english",
+  "il_language_region",
+  "il_language_autonym",
+  "il_language_code",
+  "il_target_script",
+  "il_script_not_supported",
+  "il_author_name",
+  "il_author_email",
+  "il_copyright_holder",
+];
+
+describe("orderDecisions — identity_lite derived order (post-YAML)", () => {
+  it("derived order equals the frozen legacy order", () => {
+    const derived = orderDecisions(Object.values(phaseARegistry)).map(
+      (m) => m.definition.id,
+    );
+    expect(derived).toEqual([...LEGACY_IDENTITY_LITE_ORDER]);
   });
 });

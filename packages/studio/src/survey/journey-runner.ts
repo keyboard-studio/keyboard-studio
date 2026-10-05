@@ -63,7 +63,7 @@ import {
 } from "../steps/reducer.ts";
 import { useWorkingCopyStore, bindManifest } from "../stores/workingCopyStore.ts";
 import { flowSources } from "../steps/flowSources.ts";
-import { loadModularFlow } from "./loadModularFlow.ts";
+import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { evalCondition as _evalCondition, resolveNext, advanceThrough } from "./SurveyRunner.tsx";
 import type { FlowQuestion, SurveyContext } from "./types.ts";
 import {
@@ -223,7 +223,7 @@ function walkFlowFromAnswers(
   if (source === undefined) {
     throw new Error(`journey-runner: unknown flow id "${flowId}" — not a live entry in steps/flowSources.ts`);
   }
-  const flow = loadModularFlow(source.raw);
+  const flow = loadFlowSourceDef(source);
   const index = new Map<string, FlowQuestion>();
   for (const q of flow.questions) index.set(q.id, q);
   for (const q of flow.provenance_questions ?? []) index.set(q.id, q);

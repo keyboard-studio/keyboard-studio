@@ -61,8 +61,8 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 
 **### Implementation**
 **Wave 1 — independent (different files):**
-- [ ] **T040** [P] [US4] Delete the thin YAML order lists (Q3) — only after each flow's parity test is green · content/flows/*.modular.yaml
-- [ ] **T041** [P] [US4] `migrateDraft`: versioned old-answer-key → DecisionId table; answers map onto decisions at load, orphans surface visibly, never dropped (Q5) · packages/studio/src/decisions/migrateDraft.ts (new)
+- [x] **T040** [P] [US4] Delete the thin YAML order lists (Q3) — only after each flow's parity test is green · content/flows/*.modular.yaml
+- [x] **T041** [P] [US4] `migrateDraft`: versioned old-answer-key → DecisionId table; answers map onto decisions at load, orphans surface visibly, never dropped (Q5) · packages/studio/src/decisions/migrateDraft.ts (new)
 
 **⟶ Wait for Wave 1 to finish, then:**
 - [ ] **T042** [US4] Manifest spine → derived projection, last (Article IX names it; the constitution is amended to name the registry when this lands) · packages/studio/src/steps/manifest.ts

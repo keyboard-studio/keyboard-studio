@@ -5,6 +5,7 @@
 import { type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { buildScriptRouting, type ScriptRoutingRow } from "./buildScriptRouting.ts";
+import type { FlowDef } from "../survey/types.ts";
 import type { ScriptRoutingGroup } from "../lib/scriptAxes.ts";
 import { MONO, SANS, Badge, COLORS } from "./tokens.tsx";
 
@@ -30,11 +31,11 @@ function GroupChip({ group, gated }: { group: ScriptRoutingGroup | null; gated: 
 }
 
 interface ScriptRoutingViewProps {
-  identityLiteRaw: string;
+  flow: FlowDef;
 }
 
-export function ScriptRoutingView({ identityLiteRaw }: ScriptRoutingViewProps) {
-  const rows: ScriptRoutingRow[] = buildScriptRouting(identityLiteRaw);
+export function ScriptRoutingView({ flow }: ScriptRoutingViewProps) {
+  const rows: ScriptRoutingRow[] = buildScriptRouting(flow);
 
   const cell: CSSProperties = {
     padding: "8px 12px",

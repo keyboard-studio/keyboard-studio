@@ -19,9 +19,10 @@
 // modification.
 
 import { parse } from "yaml";
-import type { FlowDef } from "./types.ts";
+import type { FlowDef, QuestionModule } from "./types.ts";
 import { questionRegistry } from "./questions/registry.ts";
 import { VALID_PHASES } from "./constants.ts";
+import { orderDecisions } from "../decisions/orderDecisions.ts";
 
 // ---------------------------------------------------------------------------
 // Thin YAML shape
@@ -145,5 +146,28 @@ export function loadModularFlow(raw: string): FlowDef {
     phase: thin.phase,
     questions,
     ...(provenanceQuestions && { provenance_questions: provenanceQuestions }),
+  };
+}
+
+/**
+ * Build a FlowDef from the modules' own provides/requires declarations
+ * (spec 085 T040) — the derived-order replacement for a deleted thin-YAML
+ * order list. The question order is `orderDecisions(modules)`; routing still
+ * lives in each module's definition.next. Throws on the same malformed
+ * inputs orderDecisions rejects (unresolved / duplicate / cycle).
+ */
+export function loadDerivedFlowDef(
+  flowId: string,
+  phase: string,
+  modules: readonly QuestionModule[],
+): FlowDef {
+  const ordered = orderDecisions(modules);
+  if (ordered.length === 0) {
+    throw new Error("loadDerivedFlowDef: modules list must not be empty");
+  }
+  return {
+    flow_id: flowId,
+    phase,
+    questions: ordered.map((m) => m.definition),
   };
 }

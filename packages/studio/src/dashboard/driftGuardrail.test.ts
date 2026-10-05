@@ -41,7 +41,7 @@ import { buildManifestStepGraph } from "./buildStepGraph.ts";
 import { findUnreachable } from "./completeness.ts";
 import { resolveNext } from "../survey/SurveyRunner.tsx";
 import { ruleTarget } from "./flowUtils.ts";
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
+import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { FlowQuestion } from "../survey/types.ts";
@@ -136,7 +136,7 @@ function computeSurveyReach(): Set<string> {
   for (const source of liveSources) {
     let flow;
     try {
-      flow = loadModularFlow(source.raw);
+      flow = loadFlowSourceDef(source);
     } catch {
       continue; // a parse failure surfaces in the rendered-side error path
     }

@@ -9,11 +9,9 @@
 
 import { describe, it, expect } from "vitest";
 import type { IRPath } from "@keyboard-studio/contracts";
-import { parseThinYaml } from "../survey/loadModularFlow.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { decisionIRPaths, type DecisionId } from "./decisionTypes.ts";
-import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
 
 /** True when every mapped path is a prefix of (or equal to) a declared write. */
@@ -29,13 +27,9 @@ function coversPath(
 }
 
 function spikeModules(): QuestionModule[] {
-  const thin = parseThinYaml(identityLiteRaw);
-  const modules = thin.questions.map((id) => {
-    const mod = questionRegistry[id];
-    if (!mod) throw new Error(`question "${id}" not in registry`);
-    return mod;
-  });
-  return [...modules, pbCharacterInventory];
+  // The thin identity_lite.modular.yaml was deleted (spec 085 T040) — the
+  // module set now comes straight from the Phase A registry.
+  return [...Object.values(phaseARegistry), pbCharacterInventory];
 }
 
 describe("decisionIRPaths consistency", () => {
