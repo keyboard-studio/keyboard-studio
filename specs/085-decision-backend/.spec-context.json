@@ -180,6 +180,22 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-05T08:40:04.177Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:42:42.654Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-05T08:42:42.763Z"
     }
   ],
   "last_action": "clarify Q1 asked: extract() input bundle (IR vs IR+catalog)",
@@ -299,7 +315,7 @@
       "summary": "21 tasks across 8 phases with wave joins; stories P1 first, retirement before corpus mining"
     }
   },
-  "currentTask": "T042",
+  "currentTask": "T051",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -440,6 +456,22 @@
       "files": [
         "packages/studio/src/steps/manifest.ts",
         ".specify/memory/constitution.md"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "New decisions/corpusMine.ts: mineCorpus runs module extractors over a corpus sample (IR + catalog metadata via buildExtractContext), records per-decision variance with deep-compared distinct values; zero-variance decisions become defaults with provenance default and the mining run as source. Throwing extractors yield no value (observational). 3 tests green.",
+      "files": [
+        "packages/studio/src/decisions/corpusMine.ts",
+        "packages/studio/src/decisions/corpusMine.test.ts"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "New decisions/gateCoverage.ts: buildGateCoverage traces keyboard-lint submission gates to decisions (18.6 inventory + touch coverage map to character-inventory); unmapped gates (touch geometry, layer graph, context tolerance, longpress) land on the explicit gap list with rationale. Coverage fraction reported. 3 tests green.",
+      "files": [
+        "packages/studio/src/decisions/gateCoverage.ts",
+        "packages/studio/src/decisions/gateCoverage.test.ts"
       ]
     }
   }

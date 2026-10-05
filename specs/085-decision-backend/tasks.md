@@ -73,8 +73,8 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 
 **### Implementation**
 **Wave 1 — independent (different files):**
-- [ ] **T050** [P] [US5] Corpus mining harness: run the import pipeline over a catalog sample, record per-decision variance — decisions no keyboard varies become defaults with provenance · packages/studio/src/decisions/corpusMine.ts (new)
-- [ ] **T051** [P] [US5] Gate→decision mapping: every keyboard-lint submission gate traces to the decision(s) that satisfy it; unmapped gates become the explicit gap list (SC-005) · packages/studio/src/decisions/gateCoverage.ts (new)
+- [x] **T050** [P] [US5] Corpus mining harness: run the import pipeline over a catalog sample, record per-decision variance — decisions no keyboard varies become defaults with provenance · packages/studio/src/decisions/corpusMine.ts (new)
+- [x] **T051** [P] [US5] Gate→decision mapping: every keyboard-lint submission gate traces to the decision(s) that satisfy it; unmapped gates become the explicit gap list (SC-005) · packages/studio/src/decisions/gateCoverage.ts (new)
 
 **Checkpoint:** the DecisionId vocabulary is corpus-derived; every constraint traces to a decision or sits on the named gap list.
 
