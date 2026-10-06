@@ -3,7 +3,8 @@
 // Validates SC-001 through SC-004 against the implemented unification.
 // This is the measurable proof that the migration meets its success criteria.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
+import { loadLangtags } from "../lib/langtagsDefaults.ts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
 import { questionRegistry, flowModules } from "../survey/questions/registry.ts";
@@ -28,6 +29,7 @@ import { fileURLToPath } from "node:url";
 const KEYBOARDS = [
   {
     id: "basic_kbdus",
+    languageName: "English",
     kmnPath: "../../tests/fixtures/walkBases/release/basic/basic_kbdus/source/basic_kbdus.kmn",
     script: "Latn",
     languages: ["en"],
@@ -35,6 +37,7 @@ const KEYBOARDS = [
   },
   {
     id: "basic_kbdru",
+    languageName: "Russian",
     kmnPath: "../../tests/fixtures/walkBases/release/basic/basic_kbdru/source/basic_kbdru.kmn",
     script: "Cyrl",
     languages: ["ru"],
@@ -42,6 +45,7 @@ const KEYBOARDS = [
   },
   {
     id: "basic_kbdgr",
+    languageName: "Greek",
     kmnPath: "../../tests/fixtures/scKeyboards/basic_kbdgr.kmn",
     script: "Grek",
     languages: ["el"],
@@ -49,6 +53,7 @@ const KEYBOARDS = [
   },
   {
     id: "arabic_izza",
+    languageName: "Arabic",
     kmnPath: "../../tests/fixtures/scKeyboards/arabic_izza.kmn",
     script: "Arab",
     languages: ["ar"],
@@ -56,6 +61,7 @@ const KEYBOARDS = [
   },
   {
     id: "basic_kbduk",
+    languageName: "English",
     kmnPath: "../../tests/fixtures/scKeyboards/basic_kbduk.kmn",
     script: "Latn",
     languages: ["en"],
@@ -98,16 +104,20 @@ const IDENTITY_MODULES = [
 const SC001_MODULES = [...IDENTITY_MODULES, pbCharacterInventory];
 
 describe("SC-001: pre-fill on 5 real keyboards", () => {
+  // language-name resolves through the lazily-loaded langtags dataset, which
+  // the studio has loaded by the time the name picker is shown.
+  beforeAll(async () => {
+    await loadLangtags();
+  });
+
   // The spec's success criterion is ≥80% pre-fill of identity/script/character
   // questions. This test pins the MEASURED rate with hand-verified
-  // expectations per keyboard: 4 of the 6 decisions extract (language-code,
-  // target-script, copyright-holder, character-inventory). language-name and
-  // author-name have no extractors by design — they require author input —
-  // so they surface for asking rather than as silent defaults. The spec's
-  // 80% bar needs one more extractor on the identity set (5/6 = 83%); that
-  // gap is a tracked follow-up (specs/087-decision-backend/followups.md),
-  // not a silently lowered bar.
-  it("extracts the 4 extractable decisions with correct source labels", () => {
+  // expectations per keyboard: 5 of the 6 decisions extract (language-code,
+  // language-name, target-script, copyright-holder, character-inventory) =
+  // 83%, meeting the spec's 80% bar. author-name has no extractor by design —
+  // it requires author input — so it surfaces for asking rather than as a
+  // silent default.
+  it("extracts the 5 extractable decisions with correct source labels", () => {
     for (const kb of KEYBOARDS) {
       const { ir, catalog } = loadKeyboard(kb);
       const decisions = runDecisionFlow({
@@ -135,14 +145,18 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
       expect((inventory?.value as unknown[]).length).toBeGreaterThan(0);
       expect(inventory?.source).toContain(kb.id);
 
-      // The mechanism boundary: these two require author input and must
+      // Hand-checked English name of the primary tag (en/ru/el/ar).
+      expect(decisions["language-name"]?.provenance).toBe("extracted");
+      expect(decisions["language-name"]?.value).toBe(kb.languageName);
+      expect(decisions["language-name"]?.source).toContain(kb.id);
+
+      // The mechanism boundary: author-name requires author input and must
       // never be presented as extracted.
-      expect(decisions["language-name"]?.provenance).not.toBe("extracted");
       expect(decisions["author-name"]?.provenance).not.toBe("extracted");
     }
   });
 
-  it("measured pre-fill rate equals the mechanism ceiling (4/6)", () => {
+  it("measured pre-fill rate meets the 80% bar (5/6 = 83%)", () => {
     let totalDecisions = 0;
     let prefilledDecisions = 0;
 
@@ -161,10 +175,9 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
       }
     }
 
-    // Pins the floor: a regression fails loudly. A future extractor raising
-    // the rate toward the spec's 80% bar updates this assertion deliberately.
+    // Pins the floor: a regression fails loudly. Measured 5/6 per keyboard.
     expect(totalDecisions).toBe(KEYBOARDS.length * SC001_MODULES.length);
-    expect(prefilledDecisions / totalDecisions).toBeGreaterThanOrEqual(4 / 6);
+    expect(prefilledDecisions / totalDecisions).toBeGreaterThanOrEqual(0.8);
   });
 });
 
@@ -251,12 +264,14 @@ describe("SC-004: corpus sample compiles through the unified flow", () => {
       const decisions = runDecisionFlow({
         modules: IDENTITY_MODULES,
         context: buildExtractContext(ir, catalog),
-        answers: { il_language_english: "Test Language" },
+        answers: { il_author_name: "Test Author" },
       });
       // Flow completes; decisions are recorded with provenance.
       expect(Object.keys(decisions).length).toBeGreaterThan(0);
-      // Asked answers take precedence over extracted.
-      expect(decisions["language-name"]?.provenance).toBe("asked");
+      // An answer fills a decision no extractor covers (author-name). A
+      // decision that IS extracted (language-name) keeps its extracted value.
+      expect(decisions["author-name"]?.provenance).toBe("asked");
+      expect(decisions["language-name"]?.provenance).toBe("extracted");
     }
   });
 });

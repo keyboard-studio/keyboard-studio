@@ -33,17 +33,18 @@ in `survey/questions/a/il_target_script.ts`.
 
 ## 3. SC-001: close the gap to the spec's 80% pre-fill bar
 
-Measured on 5 real keyboards
-(`src/decisions/successCriteria.test.ts`): 4 of 6 identity/script/character
-decisions extract (language-code, target-script, copyright-holder,
-character-inventory). language-name and author-name have no extractors by
-design — they require author input.
-
-The spec's SC-001 bar is ≥80%. One more extractor on the identity set
-(e.g. language-name from catalog displayName/language metadata, or
-author-name from package metadata) takes the set to 5/6 = 83% and meets
-the bar. The test pins the current 4/6 floor; raising it is a deliberate
-follow-up, not a silent bar-lowering. Status: OPEN (67%, below the 80% bar).
+Resolved. `il_language_english` now extracts language-name: the primary
+catalog language tag (same one language-code extracts) is resolved to its
+English name through the already-loaded langtags dataset
+(`ExtractContext.resolveLanguageName`), validated by the module's own
+`validate()`. The IR `&NAME` is the keyboard name, not the language name, so it
+is not a fallback. Measured on 5 real keyboards
+(`src/decisions/successCriteria.test.ts`): 5 of 6 identity/script/character
+decisions extract (language-code, language-name, target-script,
+copyright-holder, character-inventory) = 83%. author-name stays author input
+(the catalog carries no author). Caveat: language-name is only extracted once
+langtags has loaded (lazy chunk); otherwise the author is asked. Status: DONE
+(83%, meets the 80% bar).
 
 ## 4. Declaration-order tie-breaks still decide many adjacent pairs
 

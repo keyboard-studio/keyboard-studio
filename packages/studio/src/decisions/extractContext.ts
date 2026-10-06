@@ -7,6 +7,7 @@
 // from whichever holds it.
 
 import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import { getLoadedLangtags } from "../lib/langtagsDefaults.ts";
 
 /**
  * The import bundle every `extract()` probe reads (spec 087 Q1).
@@ -22,6 +23,11 @@ export interface ExtractContext {
    * Where language identity lives when the IR does not carry it.
    */
   catalog: BaseKeyboard | null;
+  /**
+   * Resolves a bare language subtag to its English name via the (lazily
+   * loaded) langtags dataset; undefined when not loaded or unknown.
+   */
+  resolveLanguageName?: (subtag: string) => string | undefined;
 }
 
 /**
@@ -32,5 +38,14 @@ export function buildExtractContext(
   baseIr: KeyboardIR | null,
   baseKeyboard: BaseKeyboard | null,
 ): ExtractContext {
-  return { ir: baseIr, catalog: baseKeyboard };
+  return {
+    ir: baseIr,
+    catalog: baseKeyboard,
+    resolveLanguageName: (subtag) => {
+      const key = subtag.toLowerCase();
+      return getLoadedLangtags()
+        ?.lookupByName(key)
+        .find((l) => l.code.toLowerCase() === key)?.englishName;
+    },
+  };
 }

@@ -125,7 +125,7 @@ As the maintainer, I want the decision vocabulary mined from the thousand-keyboa
 - **SC-004:** A completed adapt flow produces a keyboard that passes the studio's own submission gates.
 - **SC-005:** Every submission-gate check maps to at least one decision; unmapped checks appear as an explicit gap list, not as unknowns.
 
-**Status (2026-10-06):** SC-002, SC-003, SC-004 and SC-005 are met (SC-003 incl. US4: order lists, spine flags and per-phase registries deleted, parity tests green). SC-001 is NOT met: measured at 4/6 = 67%, below the 80% bar (followups.md item 3). Adjacent pairs with no dependency between them still use declaration-order tie-breaks, frozen by parity tests (followups.md item 4).
+**Status (2026-10-06):** SC-002, SC-003, SC-004 and SC-005 are met (SC-003 incl. US4: order lists, spine flags and per-phase registries deleted, parity tests green). SC-001 is met: measured at 5/6 = 83% on the 5 corpus keyboards (language-name extractor added; author-name stays author input; followups.md item 3). Adjacent pairs with no dependency between them still use declaration-order tie-breaks, frozen by parity tests (followups.md item 4).
 
 ## Assumptions
 
