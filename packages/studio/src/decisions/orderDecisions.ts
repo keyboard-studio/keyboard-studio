@@ -200,27 +200,48 @@ export function orderByDependencies<T>(
   }
 
   const routePreds = routingPredecessors(items, node);
-  const emittedIds = new Set<string>();
 
-  // Kahn's algorithm, input-order stable.
-  const provided = new Set<DecisionId>();
-  const emitted = new Set<T>();
+  // Kahn's algorithm with a stable tie-break: after every emit the ready item
+  // with the LOWEST input index goes next, so a later item never jumps ahead
+  // of an earlier one that has become ready.
+  const indexOfId = new Map<string, number[]>();
+  items.forEach((item, i) => {
+    const id = node(item).id;
+    const list = indexOfId.get(id);
+    if (list === undefined) indexOfId.set(id, [i]);
+    else list.push(i);
+  });
+  const providerIndex = new Map<DecisionId, number>();
+  items.forEach((item, i) => {
+    for (const p of node(item).provides ?? []) providerIndex.set(p, i);
+  });
+  const waitingOn = items.map(() => new Set<number>());
+  const dependents = items.map(() => [] as number[]);
+  items.forEach((item, i) => {
+    const n = node(item);
+    const deps = waitingOn[i]!;
+    for (const r of n.requires ?? []) deps.add(providerIndex.get(r)!);
+    for (const p of routePreds.get(n.id) ?? []) {
+      for (const j of indexOfId.get(p) ?? []) deps.add(j);
+    }
+    for (const j of deps) dependents[j]!.push(i);
+  });
+  const ready: number[] = [];
+  waitingOn.forEach((deps, i) => {
+    if (deps.size === 0) ready.push(i);
+  });
   const ordered: T[] = [];
-  let progress = true;
-  while (ordered.length < items.length && progress) {
-    progress = false;
-    for (const item of items) {
-      if (emitted.has(item)) continue;
-      const n = node(item);
-      const ready = (n.requires ?? []).every((r) => provided.has(r));
-      if (!ready) continue;
-      const routed = [...(routePreds.get(n.id) ?? [])].every((p) => emittedIds.has(p));
-      if (!routed) continue;
-      emitted.add(item);
-      emittedIds.add(n.id);
-      ordered.push(item);
-      for (const p of n.provides ?? []) provided.add(p);
-      progress = true;
+  while (ready.length > 0) {
+    let best = 0;
+    for (let k = 1; k < ready.length; k++) if (ready[k]! < ready[best]!) best = k;
+    const i = ready[best]!;
+    ready[best] = ready[ready.length - 1]!;
+    ready.pop();
+    ordered.push(items[i]!);
+    for (const d of dependents[i]!) {
+      const deps = waitingOn[d]!;
+      deps.delete(i);
+      if (deps.size === 0) ready.push(d);
     }
   }
 

@@ -32,6 +32,14 @@ function stubModule(
 const ids = (mods: QuestionModule[]) => mods.map((m) => m.definition.id);
 
 describe("orderDecisions", () => {
+  it("stable tie-break: a later ready item never jumps ahead of an earlier one", () => {
+    const a = stubModule("a", { requires: ["language-name"] });
+    const b = stubModule("b", { provides: ["language-name"] });
+    const c = stubModule("c");
+    // Stable Kahn: b is the only ready item, then a (index 0) beats c (index 2).
+    expect(ids(orderDecisions([a, b, c]))).toEqual(["b", "a", "c"]);
+  });
+
   it("sorts a dependency chain regardless of input order", () => {
     const a = stubModule("a", { provides: ["language-name"] });
     const b = stubModule("b", { provides: ["language-code"], requires: ["language-name"] });
