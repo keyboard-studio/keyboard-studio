@@ -55,10 +55,66 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-06T07:24:37.276Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:29:20.740Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:29:30.401Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:09.445Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:09.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:23.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:41.037Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:41.361Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T002",
+  "currentTask": "T008",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -69,6 +125,56 @@
       "did": "Created normalization-step/index.ts with generator version, group name and generated_cn_ store prefix constants",
       "files": [
         "packages/engine/src/pattern-apply/normalization-step/index.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added US_BASE_LAYOUT map and export",
+      "files": [
+        "packages/contracts/src/ir/usBaseLayout.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Wrote usBaseLayout.test.ts: 47 printable keys shifted/unshifted, spot checks, no non-printables",
+      "files": [
+        "packages/contracts/src/ir/usBaseLayout.test.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added normalization step contract types to toleranceReport.ts",
+      "files": [
+        "packages/contracts/src/toleranceReport.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Replaced US_TRIGGER_CHAR with US_BASE_LAYOUT lookup in deadkeys.ts",
+      "files": [
+        "packages/contracts/src/ir/deadkeys.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added storeSketch parser tests",
+      "files": [
+        "packages/engine/src/codec/parse-store-sketch.test.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added optional storeSketch?: StoreItem[] to RawKmnFragment (no zod mirror exists)",
+      "files": [
+        "packages/contracts/src/keyboard-ir.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Opaque store path fills storeSketch leniently (outs flattened, SMP chars, named deadkeys); codec tests 293 pass",
+      "files": [
+        "packages/engine/src/codec/parse.ts"
       ]
     }
   },
