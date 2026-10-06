@@ -103,20 +103,20 @@ const page: CSSProperties = {
   margin: "0 auto",
   padding: "24px",
   fontFamily: "system-ui, sans-serif",
-  color: "var(--app-text, #1a1a1a)",
-  background: "var(--app-bg, #fff)",
+  color: "var(--app-text)",
+  background: "var(--app-bg)",
 };
 const banner: CSSProperties = {
-  border: "2px dashed #b45309",
-  background: "#fffbeb",
-  color: "#92400e",
+  border: "2px dashed var(--app-warning-border)",
+  background: "var(--app-warning-bg)",
+  color: "var(--app-warning-text)",
   padding: "8px 16px",
   borderRadius: "8px",
   fontWeight: 700,
   marginBottom: "16px",
 };
 const section: CSSProperties = {
-  border: "1px solid var(--app-border, #ddd)",
+  border: "1px solid var(--app-border)",
   borderRadius: "8px",
   padding: "16px",
   marginBottom: "16px",
@@ -127,7 +127,7 @@ const row: CSSProperties = {
   gap: "8px",
   alignItems: "center",
   padding: "4px 0",
-  borderBottom: "1px dotted var(--app-border, #eee)",
+  borderBottom: "1px dotted var(--app-border)",
   fontSize: "0.85rem",
 };
 const mono: CSSProperties = { fontFamily: "monospace" };
@@ -143,29 +143,29 @@ const chip = (bg: string, fg: string): CSSProperties => ({
 });
 const btn: CSSProperties = {
   padding: "4px 10px",
-  border: "1px solid var(--app-border, #ccc)",
+  border: "1px solid var(--app-border)",
   borderRadius: "6px",
-  background: "var(--app-bg, #fff)",
+  background: "var(--app-bg)",
   cursor: "pointer",
 };
-const activeBtn: CSSProperties = { ...btn, background: "#1d4ed8", color: "#fff", borderColor: "#1d4ed8" };
+const activeBtn: CSSProperties = { ...btn, background: "var(--app-accent)", color: "var(--app-text-on-accent)", borderColor: "var(--app-accent)" };
 const input: CSSProperties = {
   padding: "4px 8px",
-  border: "1px solid var(--app-border, #ccc)",
+  border: "1px solid var(--app-border)",
   borderRadius: "6px",
   fontFamily: "monospace",
   width: "140px",
 };
 
 function provenanceChip(p: string): CSSProperties {
-  if (p === "extracted") return chip("#dcfce7", "#166534");
-  if (p === "asked") return chip("#dbeafe", "#1d4ed8");
-  return chip("#f3f4f6", "#6b7280");
+  if (p === "extracted") return chip("var(--app-success-bg)", "var(--app-success-text)");
+  if (p === "asked") return chip("var(--app-accent-bg)", "var(--app-accent-text)");
+  return chip("var(--app-surface-2)", "var(--app-text-subtle)");
 }
 function diffChip(s: string): CSSProperties {
-  if (s === "confirmed") return chip("#dcfce7", "#166534");
-  if (s === "changed") return chip("#fef3c7", "#92400e");
-  return chip("#f3f4f6", "#6b7280");
+  if (s === "confirmed") return chip("var(--app-success-bg)", "var(--app-success-text)");
+  if (s === "changed") return chip("var(--app-warning-bg)", "var(--app-warning-text)");
+  return chip("var(--app-surface-2)", "var(--app-text-subtle)");
 }
 function fmtValue(v: unknown): string {
   return v === undefined ? "—" : JSON.stringify(v);
@@ -337,7 +337,7 @@ export function DecisionsDemo() {
       <div style={section}>
         <h2 style={h2}>1. Derived order vs legacy YAML order</h2>
         <p style={{ fontSize: "0.85rem" }}>
-          <span style={parity ? chip("#dcfce7", "#166534") : chip("#fee2e2", "#991b1b")}>
+          <span style={parity ? chip("var(--app-success-bg)", "var(--app-success-text)") : chip("var(--app-danger-bg)", "var(--app-danger-text)")}>
             {parity ? "PARITY: MATCH" : "PARITY: MISMATCH"}
           </span>{" "}
           <span style={mono}>orderDecisions()</span> output {parity ? "equals" : "differs from"}{" "}
@@ -448,7 +448,7 @@ export function DecisionsDemo() {
         <div style={{ marginTop: "12px" }}>
           <div style={{ ...h2, fontSize: "0.8rem", color: "var(--app-text-subtle)" }}>Derived order for selection</div>
           {derivedSelected.error ? (
-            <div style={{ ...mono, fontSize: "0.85rem", color: "#991b1b" }}>✕ {derivedSelected.error}</div>
+            <div style={{ ...mono, fontSize: "0.85rem", color: "var(--app-danger-text)" }}>✕ {derivedSelected.error}</div>
           ) : (
             derivedSelected.ids.map((id, i) => (
               <div key={id} style={row}><span style={mono}>{i + 1}. {id}</span></div>
@@ -505,7 +505,7 @@ export function DecisionsDemo() {
 
         {inspectedMod !== null && (
           <div
-            style={{ marginTop: "12px", padding: "12px", border: "1px solid var(--app-border, #ddd)", borderRadius: "6px" }}
+            style={{ marginTop: "12px", padding: "12px", border: "1px solid var(--app-border)", borderRadius: "6px" }}
             data-testid="dependency-inspector"
           >
             <div style={{ fontSize: "0.85rem", fontWeight: 700 }}>
@@ -523,7 +523,7 @@ export function DecisionsDemo() {
                   {providers.length > 0 ? (
                     <span style={{ fontSize: "0.8rem" }}>← {providers.join(", ")}</span>
                   ) : (
-                    <span style={chip("#fee2e2", "#991b1b")}>unresolved: no provider</span>
+                    <span style={chip("var(--app-danger-bg)", "var(--app-danger-text)")}>unresolved: no provider</span>
                   )}
                 </div>
               );
@@ -548,7 +548,7 @@ export function DecisionsDemo() {
           </div>
           {managedOrder.error !== null ? (
             <div
-              style={{ ...mono, fontSize: "0.85rem", color: "#991b1b", padding: "8px", border: "1px solid #fecaca", borderRadius: "6px", background: "#fef2f2" }}
+              style={{ ...mono, fontSize: "0.85rem", color: "var(--app-danger-text)", padding: "8px", border: "1px solid var(--app-danger-border)", borderRadius: "6px", background: "var(--app-danger-bg)" }}
               data-testid="managed-order-error"
             >
               ✕ {managedOrder.error}
@@ -632,7 +632,7 @@ function NewQuestionForm(props: { existingIds: ReadonlySet<string>; onAdd: (m: Q
   };
 
   return (
-    <div style={{ padding: "12px", border: "1px dashed var(--app-border, #ccc)", borderRadius: "6px" }}>
+    <div style={{ padding: "12px", border: "1px dashed var(--app-border)", borderRadius: "6px" }}>
       <div style={{ fontSize: "0.85rem", fontWeight: 700, marginBottom: "8px" }}>Define a new question</div>
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "flex-end" }}>
         <label style={{ fontSize: "0.8rem" }}>
@@ -689,7 +689,7 @@ function NewQuestionForm(props: { existingIds: ReadonlySet<string>; onAdd: (m: Q
         </label>
         <button style={activeBtn} onClick={submit}>Add question</button>
       </div>
-      {error !== null && <div style={{ color: "#991b1b", fontSize: "0.8rem", marginTop: "6px" }}>{error}</div>}
+      {error !== null && <div style={{ color: "var(--app-danger-text)", fontSize: "0.8rem", marginTop: "6px" }}>{error}</div>}
     </div>
   );
 }
@@ -722,7 +722,7 @@ function ManagedModuleRow(props: {
   };
 
   return (
-    <div style={{ ...row, background: props.selected ? "#eff6ff" : undefined }}>
+    <div style={{ ...row, background: props.selected ? "var(--app-accent-subtle)" : undefined }}>
       <button
         style={{ ...btn, ...mono, fontSize: "0.8rem" }}
         onClick={props.onSelect}
@@ -730,7 +730,7 @@ function ManagedModuleRow(props: {
       >
         {mod.definition.id}
       </button>
-      {props.isCustom && <span style={chip("#ede9fe", "#5b21b6")}>custom</span>}
+      {props.isCustom && <span style={chip("var(--sil-violet-10)", "var(--sil-violet-dark)")}>custom</span>}
       <label style={{ fontSize: "0.75rem", color: "var(--app-text-subtle)" }}>
         provides{" "}
         <input
