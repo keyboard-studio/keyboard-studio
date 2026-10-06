@@ -152,6 +152,12 @@ build artifacts you should regenerate rather than hand-edit:
   pins is byte-identical, and it validates every stored set through the engine's own
   `parseUnicodeSet`, imported from source under Node type stripping (importing the compiled
   module would be circular).
+- `codegen-normalization-regressed` — derives the studio's slim list of keyboard ids the corpus
+  harness found `regressed` under the spec 086 normalization step from the committed
+  [docs/context-normalization-verification.json](context-normalization-verification.json) into
+  `packages/studio/src/lib/generated/normalizationRegressed.generated.json`. Tiny and **committed**
+  (so studio tests need no prebuild); `normalizationVerification.test.ts` fails when it drifts from
+  the record. Needs no corpus checkout.
 
 Not in the prebuild chain: `pnpm run codegen-host-layouts` derives the studio's reference
 host-layout tables (spec 076 FR-023) from the Keyman basic keyboards in `../keyboards/release/basic`

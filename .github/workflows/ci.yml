@@ -211,6 +211,12 @@ jobs:
       - name: Corpus gate (context tolerance — zero regressed keyboards)
         run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed
 
+      # spec 086: the committed verification record for the context normalization
+      # step must be fresh for every corpus keyboard (source hash and generator
+      # version). --check never simulates; regenerate with --incremental when it fails.
+      - name: Corpus gate (context normalization verification record is fresh)
+        run: node utilities/nfd-tolerance-corpus/run.mjs --mode normalization-step --check
+
       # kbgen is a prototype outside the workspace too, and since the
       # parseUnicodeSet retirement it imports engine character-discovery
       # internals by relative src path (spec 044 FR-015: one exemplar path).

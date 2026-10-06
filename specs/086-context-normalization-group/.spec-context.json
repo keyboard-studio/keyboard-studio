@@ -383,10 +383,98 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-06T10:13:40.642Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:35.847Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:35.970Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.097Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.225Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.353Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.478Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.602Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.758Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:37.010Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:11:37.162Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T043",
+  "currentTask": "T054",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -696,6 +784,90 @@
       "did": "Gate green: engine 4696 pass, studio 7958 pass, typecheck clean, lint 0 errors",
       "files": [
         "-"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "normalization-step.test.ts: record format, freshness, incremental carry-forward, refusal/regressed outcomes (31 harness tests green)",
+      "files": [
+        "utilities/nfd-tolerance-corpus/normalization-step.test.ts"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "measured spike seven (259 s) and 20 random keyboards (302 s); recorded timings and projection in research R8",
+      "files": [
+        "specs/086-context-normalization-group/research.md"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "simulable() opt-in allowCompileErrors plus errorDiagnosticCount; default 062 mode unchanged",
+      "files": [
+        "utilities/nfd-tolerance-corpus/analyze.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "normalization-step.ts: typed and pasted checks, diagnostics, sorted record writer, freshness, merge, 10-minute budget",
+      "files": [
+        "utilities/nfd-tolerance-corpus/normalization-step.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "cli --mode normalization-step with --jobs/--incremental/--check/--record/--budget-minutes; run.mjs drops HMR socket for parallel workers",
+      "files": [
+        "utilities/nfd-tolerance-corpus/cli.ts",
+        "utilities/nfd-tolerance-corpus/run.mjs"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "sil_yoruba8 and the seven spike keyboards all verified, typed.differ=0, pasted fail=0, diagnostics equal (yoruba 9/9)",
+      "files": [
+        "utilities/nfd-tolerance-corpus/normalization-step.ts"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "full record for 920 keyboards: 588 verified, 311 refused, 10 harness-error, 11 regressed (pasted-only); decision recorded in research R8",
+      "files": [
+        "docs/context-normalization-verification.json",
+        "specs/086-context-normalization-group/research.md"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "studio verificationLookup wired to slim regressed-id list generated at prebuild from the record",
+      "files": [
+        "scripts/codegen-normalization-regressed.mjs",
+        "packages/studio/src/lib/normalizationVerification.ts",
+        "packages/studio/src/lib/generated/normalizationRegressed.generated.json",
+        "package.json",
+        "docs/tooling.md",
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "ci.yml build job runs the normalization-step --check gate after the existing corpus gate",
+      "files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "removed duplicate nfd-tolerance-corpus Test step from ci.yml (isolated hunk)",
+      "files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Gate green: nfd-tolerance-corpus 31/31, --check 920 fresh, pnpm typecheck and lint exit 0",
+      "files": [
+        "none"
       ]
     }
   },

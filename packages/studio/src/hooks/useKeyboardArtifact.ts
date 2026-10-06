@@ -16,6 +16,7 @@ import { readVfsText } from "../lib/vfsText.ts";
 import { computeBaselineDocFindings } from "../lib/collectDocLintInput.ts";
 import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
 import { analyseContextTolerance } from "../lib/contextToleranceAnalysis.ts";
+import { lookupNormalizationVerification } from "../lib/normalizationVerification.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -500,6 +501,7 @@ export function useKeyboardArtifact(
     setContextTolerance({ status: "analysing", runId: thisRunId });
     analyseContextTolerance(ir, isCurrent, contextToleranceOverlay, {
       normalizationSnapshot: contextNormalizationStep,
+      verificationLookup: lookupNormalizationVerification,
       onNormalizationStored: (stored) => {
         // Persist only a changed entry (spec 086 FR-016): a cache hit re-stores nothing.
         if (isCurrent() && stored.cacheKey !== contextNormalizationStep?.cacheKey) {

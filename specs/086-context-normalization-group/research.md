@@ -137,6 +137,19 @@ Results go to a committed `docs/context-normalization-verification.json`, keyed 
 
 The real per-keyboard cost is measured in the first implementation task. If the first full run exceeds 2 hours with `--jobs 8`, the record is scoped to keyboards with a phonebook entry plus those with alternates, and the decision is recorded in this file.
 
+**Measured (T045, T050; Windows, one process per keyboard, corpus pin `435f82d`, 920 keyboards).**
+
+| Sample | Result |
+|---|---|
+| Seven spike keyboards, one at a time | `el_dinka` 0.7 s, `fv_tlingit` 3.6 s, `sil_yoruba8` 21 s, `sil_tchad` 26 s, `el_pan_sahelian` 35 s, `fv_northern_tutchone` 84 s, `sil_cameroon_qwerty` 88 s (259 s total) |
+| 20 random keyboards (seeded sample) | 302 s total; 15 verified at 0.2 to 50 s each, 5 refused in under 0.3 s each; mean 15 s per keyboard |
+
+The random sample projected 920 x 15 s / 8 = about 29 minutes at `--jobs 8`. The real first run was longer: 896 of 920 keyboards finished in about 100 minutes, and the last 24 (in batches of three) needed another 29 minutes. The tail is a handful of large keyboards (the Vietnamese Telex family, `gandhari`, `taigi_telex`) whose typed grid costs far more than the sample: `simulate()` rebuilds its whole VM on every call, and a large compiled keyboard makes each of the 2 x ~35,000 calls slow.
+
+**Decision.** The record stays unscoped: all 920 corpus keyboards have an entry, because 311 of them refuse without compiling and 588 verify well within budget. Instead of scoping by phonebook, each keyboard has a 10-minute wall-clock budget (`--budget-minutes`); a keyboard past it is recorded `harness-error` ("verification exceeded its 10-minute budget") and the studio treats it as `unknown`, not `regressed`. Six keyboards hit the budget (`gandhari`, `taigi_telex`, `taigi_viet_telex`, `vietnam`, `vietnamese_telex`, `vietnamese_telex_legacy`); `vietnamese_telex` was also tried with a 240-minute budget and still had not finished after roughly 80 minutes, so it stays unverified. Making these verifiable needs a cheaper simulate path (a reusable VM per build) and is a follow-up, not part of this feature. Four more keyboards (`bu_phonetic`, `el_naija`, `el_yolngu`, `lao_2008_rapid`) are `harness-error` because a build emits no KeymanWeb JS.
+
+**Result of the first full record.** 588 verified, 311 refused (286 `no-alternates`, 18 `no-unicode-entry`, 7 `opaque-entry`), 10 `harness-error`, 11 `regressed`. No keyboard has a typed-output difference or a compile-diagnostic mismatch (SC-006 holds across the corpus). All 11 `regressed` keyboards fail only the pasted check (Indic inscript layouts with multi-codepoint clusters, several using supplementary-plane scripts: `dives_akuru_inscript`, `easy_chakma`, `grantha_inscript`, `kaithi_inscript`, `kirat_rai_inscript`, `malar_tirhuta`, `nlci_tamil_winscript`, `siddham_inscript`, `takri`, `tirhuta`, `todhri`); their `detail` field lists the first failing probes. They are marked `regressed` conservatively so the studio falls back to the spec 062 proposal for them.
+
 **Note.** `ci.yml:226` duplicates the harness test step at `:208`. Remove the duplicate when wiring the new mode (out-of-scope cleanup, its own commit).
 
 ## R9. Studio surface (FR-020)
