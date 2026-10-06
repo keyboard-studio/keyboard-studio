@@ -1,9 +1,9 @@
 {
-  "workflow": "speckit",
+  "workflow": "companion",
   "specName": "Context normalization group",
   "branch": "086-context-normalization-group",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -1051,6 +1051,16 @@
       "what": "corpus-gated tests at CI pin 435f82d6",
       "command": "vitest run src/pattern-apply/normalization-step; pnpm run test:nfd-tolerance-corpus",
       "result": "parity corpus pass; nfd harness 31/31 pass"
+    },
+    {
+      "what": "km-lead post-implement review (km-keyman, km-domain, km-frontend, km-qc, km-synthesis)",
+      "command": "one parallel review cycle, read-only",
+      "result": "no P0; all APPROVE WITH NOTES / PASS",
+      "warnings": [
+        "km-qc P1 issue numbers in persistWorkingCopy.ts are pre-existing, not added on this branch",
+        "km-synthesis P1 missing codegen --check downgraded: normalizationVerification.test.ts already asserts the generated list equals deriveRegressedList(record) in pnpm -r test",
+        "km-keyman P1 context literals not seeded downgraded: the repertoire closure seeds clusters reachable across keystrokes; corpus harness verifies typed parity"
+      ]
     }
   ],
   "last_action": "all 59 tasks done, full gate green",
@@ -1094,6 +1104,11 @@
       "decision": "Documented NFC-equal-only probes as nfcEqual (non-failing) in the harness contract rather than changing the harness",
       "why": "matches the committed verification record; changing it would regenerate the record",
       "rejected": "counting nfcEqual as fail"
+    },
+    {
+      "decision": "Review CONDITIONAL approve; no fix cycle",
+      "why": "no P0; remaining items are P1/P2 hardening",
+      "rejected": "blocking completion on P1 hardening"
     }
   ],
   "concerns": [
@@ -1132,6 +1147,22 @@
     {
       "note": "FR-021 reorder-group coexistence deferred: no task in 086 covers it",
       "step": "implement"
+    },
+    {
+      "note": "Engine removal of the step writes an explicit entryPoints.main even when the original entry was implicit (insert.ts:41,66); apply/remove is not identity (km-keyman P1)",
+      "step": "implement"
+    },
+    {
+      "note": "Maps cover only NFC/NFD of each produced cluster; a non-canonical mark order the keyboard emits gets no other-order alternates, and ambiguous targets are recorded but not surfaced to the author (km-domain P1)",
+      "step": "implement"
+    },
+    {
+      "note": "No in-flight dedupe in getOrProposeNormalizationStep; overlapping analyses both generate (km-frontend P2). Station aria-label hard-coded in FacetTransformPanel; async proposal arrival not announced (P2)",
+      "step": "implement"
+    },
+    {
+      "note": "No store-count refusal for very large repertoires against kmcmplib limits (km-keyman P2)",
+      "step": "implement"
     }
   ],
   "coverage": {
@@ -1147,5 +1178,6 @@
     "implement": {
       "summary": "Spec 086 complete: normalization step proposed, cached, verified; analyze findings resolved"
     }
-  }
+  },
+  "telemetryInstanceId": "b84634b9-c5ff-46b8-836f-34e7511ba1b0"
 }
