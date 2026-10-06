@@ -1,4 +1,4 @@
-// Decision flow runner (spec 085).
+// Decision flow runner (spec 087).
 //
 // Pure harness (no React): walks modules in derived order, resolving each
 // provided decision by EXTRACTING it from the import bundle when a probe
@@ -99,7 +99,7 @@ export function runDecisionFlow(input: DecisionFlowInput): DecisionSet {
       provenance = "default";
     }
     // One Decision per provided id: the module's single answer/extract fills
-    // each decision it provides (spec 085 Q4).
+    // each decision it provides (spec 087 Q4).
     for (const p of provided) {
       decisions[p] = {
         id: p,

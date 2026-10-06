@@ -1,4 +1,4 @@
-// Tests for gate→decision coverage (spec 085 T051, SC-005).
+// Tests for gate→decision coverage (spec 087 T051, SC-005).
 
 import { describe, it, expect } from "vitest";
 import { buildGateCoverage } from "./gateCoverage.ts";

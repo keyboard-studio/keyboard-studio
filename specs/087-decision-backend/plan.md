@@ -1,4 +1,4 @@
-# Implementation Plan: Decisions Backend (specs/085-decision-backend)
+# Implementation Plan: Decisions Backend (specs/087-decision-backend)
 
 ## Summary
 
@@ -17,7 +17,7 @@ packages/studio/src/steps/            # manifest spine retirement (last, constit
 packages/studio/src/adaptation/       # firing.ts classifyBaseScript folded into target-script extraction (Q2)
 packages/studio/src/stores/           # workingCopyStore baseIr/baseKeyboard slots — the extract bundle source (no change)
 content/flows/                        # thin YAML order lists deleted (Q3)
-specs/085-decision-backend/           # spec, plan, research, data-model, contracts
+specs/087-decision-backend/           # spec, plan, research, data-model, contracts
 ```
 
 **Structure Decision:** everything lands on the existing `km/decisions-spike` branch (PR #1938) in story-sized waves; no new top-level directories. The `decisions/` package directory — already home to the spike, the demo, and `DecisionTrailView` — is the feature's home. Engine's codec/import pipeline is consumed as-is (the scan exists); no engine changes unless the wiring map finds a gap.

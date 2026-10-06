@@ -1,4 +1,4 @@
-# Research: Decisions Backend (specs/085-decision-backend)
+# Research: Decisions Backend (specs/087-decision-backend)
 
 ## R1 — Condition evaluation for derived gating (settled in Phase 1)
 

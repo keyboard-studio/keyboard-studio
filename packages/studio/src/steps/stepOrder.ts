@@ -1,6 +1,6 @@
 // stepOrder — the wizard's step order and side-trail structure, DERIVED.
 //
-// The decision registry is the single source of order (spec 085 Q3). Steps
+// The decision registry is the single source of order (spec 087 Q3). Steps
 // declare provides / requires / gatedBy (steps/stepDependencies.ts) and are
 // sorted by the same implementation that orders questions
 // (decisions/orderDecisions.ts `orderByDependencies`) — there is no second sort

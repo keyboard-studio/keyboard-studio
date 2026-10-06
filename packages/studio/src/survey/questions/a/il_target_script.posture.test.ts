@@ -1,5 +1,5 @@
 // extractBaseScriptPosture — the single classifier of a base's script posture
-// (spec 085 Q2). Covers the mixed posture and the dominant-script reading
+// (spec 087 Q2). Covers the mixed posture and the dominant-script reading
 // that the adaptation catalog's q_sa2 predicate consumes.
 
 import { describe, it, expect } from "vitest";

@@ -1,4 +1,4 @@
-// Tests for draft migration (spec 085 T041, Q5): old-flow answers map onto
+// Tests for draft migration (spec 087 T041, Q5): old-flow answers map onto
 // decisions at load; unmappable answers surface visibly, never dropped.
 
 import { describe, it, expect } from "vitest";
@@ -75,7 +75,7 @@ describe("migrateDraft", () => {
   });
 });
 
-describe("migrateDraft — Phase G flows (spec 085 T042)", () => {
+describe("migrateDraft — Phase G flows (spec 087 T042)", () => {
   it("maps track and project-name answers through the real registries", async () => {
     const { flowModules } = await import("../survey/questions/registry.ts");
     const result = migrateDraft(

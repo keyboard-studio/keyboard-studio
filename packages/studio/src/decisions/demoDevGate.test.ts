@@ -1,4 +1,4 @@
-// FR-009 regression (spec 085 T061): the question-management interface
+// FR-009 regression (spec 087 T061): the question-management interface
 // (the ?demo=decisions page) MUST be available only in local developer mode
 // and MUST NOT be reachable in deployed builds.
 //

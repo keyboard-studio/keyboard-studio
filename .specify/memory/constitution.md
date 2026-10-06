@@ -77,7 +77,7 @@ Every IR write routes through the mutate() seam (specs/014-mutate-seam-touch-pro
 decision registry is the single source of order, for questions AND for steps: question modules
 (survey/questions/registry.ts) and wizard steps (steps/stepDependencies.ts) both declare
 provides/requires, and one sort (decisions/orderDecisions.ts `orderByDependencies`) derives every
-order (specs/085-decision-backend). No hand-maintained order list, spine flag, or join target
+order (specs/087-decision-backend). No hand-maintained order list, spine flag, or join target
 exists anywhere: a step's side-trail status derives from its `gatedBy`, and its join target from
 its next ungated successor. The step manifest (steps/manifest.ts) is an unordered set of step
 declarations (components, inputs, writes, persistence); it never states what comes before what. A

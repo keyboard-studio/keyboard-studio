@@ -1,6 +1,6 @@
 // Spec 022 — shared fixture: the demoted-Phase-A id list, derived ONCE from the
 // phase_a_identity proposed flow (steps/flowSources.ts, order derived from the
-// reserve modules' provides/requires — spec 085 US4) so the no-delete guardrail
+// reserve modules' provides/requires — spec 087 US4) so the no-delete guardrail
 // and the reserve-node assertion consume a single source of truth (not two
 // hand-copied lists). The full non-identity Phase A = the flow's `questions`
 // (15 identity) + `provenance_questions` (15 provenance_*) lists.

@@ -12,7 +12,7 @@ import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 /**
  * The ordering-relevant view of anything that declares decisions: a question
  * module, or a wizard step. The one sort below is written against this shape,
- * so questions and steps share a single implementation (spec 085 Q3: the
+ * so questions and steps share a single implementation (spec 087 Q3: the
  * registry is the single source of order for both).
  */
 export interface DependencyNode {
@@ -57,7 +57,7 @@ function indexProvidersBy<T>(
  * Index the providing module for each decision (fail-fast on duplicates).
  *
  * Exported: registries build their decision-id indexes through this, so the
- * duplicate rule lives in exactly one place (spec 085 T012).
+ * duplicate rule lives in exactly one place (spec 087 T012).
  */
 export function indexProviders(
   modules: readonly QuestionModule[],

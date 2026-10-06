@@ -1,5 +1,5 @@
 // Tests for the decision flow runner: the import bundle (IR + catalog
-// metadata) as the extraction input (spec 085, clarify Q1).
+// metadata) as the extraction input (spec 087, clarify Q1).
 
 import { describe, it, expect } from "vitest";
 import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";

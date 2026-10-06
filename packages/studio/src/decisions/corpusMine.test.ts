@@ -1,4 +1,4 @@
-// Tests for the corpus mining harness (spec 085 T050).
+// Tests for the corpus mining harness (spec 087 T050).
 
 import { describe, it, expect } from "vitest";
 import { parseKmn } from "@keyboard-studio/engine";

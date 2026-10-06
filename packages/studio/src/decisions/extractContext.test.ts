@@ -1,4 +1,4 @@
-// Extraction over a REAL catalog keyboard (spec 085 FR-006, T020).
+// Extraction over a REAL catalog keyboard (spec 087 FR-006, T020).
 //
 // Not fixtures: a .kmn parsed by the real codec (whose header.bcp47 comes
 // back EMPTY on real imports — the codec never populates it) paired with

@@ -1,6 +1,6 @@
 // stepDependencies — what each wizard step settles, needs, and when it is asked.
 //
-// The decision registry is the single source of order (spec 085 Q3). Question
+// The decision registry is the single source of order (spec 087 Q3). Question
 // modules declare `provides` / `requires`; this table gives every wizard step
 // the same declarations, so the step order is derived by the SAME sort
 // (decisions/orderDecisions.ts → steps/stepOrder.ts) and no hand-maintained

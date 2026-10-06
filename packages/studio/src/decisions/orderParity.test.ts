@@ -1,4 +1,4 @@
-// Derived-order regression guard (km/decisions-spike, spec 085 T040).
+// Derived-order regression guard (km/decisions-spike, spec 087 T040).
 //
 // The thin identity_lite.modular.yaml order list was deleted — the order is
 // now derived from the il_* modules' own provides/requires declarations.
@@ -35,7 +35,7 @@ describe("orderDecisions — identity_lite derived order (post-YAML)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase G flows (spec 085 T042) — one frozen legacy order per migrated flow.
+// Phase G flows (spec 087 T042) — one frozen legacy order per migrated flow.
 // Add a row here when migrating the next flow (see flowSources.ts header).
 // ---------------------------------------------------------------------------
 
@@ -160,7 +160,7 @@ describe("orderDecisions — derived flows equal their frozen legacy YAML order"
 });
 
 // ---------------------------------------------------------------------------
-// phase_a_identity (proposed flow, spec 085 US4). It cannot ride the table
+// phase_a_identity (proposed flow, spec 087 US4). It cannot ride the table
 // above: the YAML carried TWO lists (`questions` + `provenance_questions`), and
 // the flow derives one order over all 30 modules then splits it, so the table's
 // single-list row shape does not fit. Both lists are frozen here.

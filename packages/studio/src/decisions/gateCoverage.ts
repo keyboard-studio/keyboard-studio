@@ -1,4 +1,4 @@
-// Gate→decision coverage (spec 085 T051, US5, SC-005).
+// Gate→decision coverage (spec 087 T051, US5, SC-005).
 //
 // Every keyboard-lint submission gate traces to the decision(s) that satisfy
 // it. Gates with no decision mapping land on the explicit gap list — not a

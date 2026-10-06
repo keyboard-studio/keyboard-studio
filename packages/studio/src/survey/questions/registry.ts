@@ -248,7 +248,7 @@ export const flowModules = {
 
   phase_f_helpdocs: [
     // Keys are in WALK order: orderDecisions uses registry order as the tie-break
-    // where provides/requires are silent (spec 085 Q3).
+    // where provides/requires are silent (spec 087 Q3).
 
     // --- Default path ---
     pfWelcomeParagraphMod,
@@ -361,7 +361,7 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = module
 ]);
 
 /**
- * The single DecisionId -> module index (spec 085). Built through the canonical
+ * The single DecisionId -> module index (spec 087). Built through the canonical
  * `indexProviders`, so a duplicate provider throws rather than silently
  * shadowing a module.
  */

@@ -1,6 +1,6 @@
 // manifest — the survey steps, in DERIVED order (not a hand-ordered list).
 //
-// The decision registry is the single source of order (spec 085 Q3, SC-003).
+// The decision registry is the single source of order (spec 087 Q3, SC-003).
 // Each step below is a declaration — component, inputs, writes, persistence —
 // held in an unordered pool. Its provides / requires / gatedBy come from
 // steps/stepDependencies.ts, and `manifest` is the pool sorted by the same

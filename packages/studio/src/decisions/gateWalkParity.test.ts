@@ -1,6 +1,6 @@
 // Property test: the gates derived from `definition.next` (gatedByFromNext,
 // as used by runDecisionFlow) select exactly the questions the survey runner
-// reaches by walking `definition.next` (spec 085 FR-005, one routing source).
+// reaches by walking `definition.next` (spec 087 FR-005, one routing source).
 //
 // For every derived flow in flowSources and a set of answer combinations
 // (every gate option enumerated; sampled when the product is large), the set of

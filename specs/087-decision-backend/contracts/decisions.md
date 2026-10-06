@@ -1,4 +1,4 @@
-# Contracts: Decisions Backend (specs/085-decision-backend)
+# Contracts: Decisions Backend (specs/087-decision-backend)
 
 The interfaces this feature exposes. Identifiers below are the spike's established vocabulary (the spec pins no verbatim identifiers, so these exact strings *are* the contract — do not rename, recase, or pluralize them downstream).
 

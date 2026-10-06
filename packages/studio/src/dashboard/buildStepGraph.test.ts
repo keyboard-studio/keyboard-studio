@@ -36,7 +36,7 @@ function assertLiveNodeSetEqualsManifest(
 // All-flows modular table
 // ---------------------------------------------------------------------------
 
-// identity_lite now derives its order (spec 085 T040) — the test builds the
+// identity_lite now derives its order (spec 087 T040) — the test builds the
 // FlowDef through the production flowSources entry, exercising the real path.
 const identityLiteFlow = loadFlowSourceDef(flowSources["identity_lite"]!);
 
@@ -65,11 +65,11 @@ const ALL_FLOWS = [
   { flowDef: identityLiteFlow, title: "Identity-lite", registry: phaseARegistry },
   // phase_a_identity (the demoted battery) keys off reserveRegistry in production.
   { flowDef: loadFlowSourceDef(flowSources["phase_a_identity"]!), title: "Phase A", registry: reserveRegistry },
-  // Phase B derives its order (spec 085), built through flowSources.
+  // Phase B derives its order (spec 087), built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["phase_b_characters"]!), title: "Phase B", registry: phaseBRegistry },
-  // phase_f_helpdocs derives its order (spec 085) � built through flowSources.
+  // phase_f_helpdocs derives its order (spec 087) � built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["phase_f_helpdocs"]!), title: "Phase F", registry: phaseFRegistry },
-  // Phase G flows derive their order (spec 085) — built through flowSources.
+  // Phase G flows derive their order (spec 087) — built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["track"]!), title: "Track selection", registry: phaseTrackRegistry },
   { flowDef: loadFlowSourceDef(flowSources["project_name"]!), title: "Project name", registry: phaseProjectRegistry },
 ];

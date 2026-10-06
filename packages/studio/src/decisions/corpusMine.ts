@@ -1,4 +1,4 @@
-// Corpus mining harness (spec 085 T050, US5).
+// Corpus mining harness (spec 087 T050, US5).
 //
 // Runs the import pipeline (real codec → IR + catalog metadata → module
 // extractors) over a catalog sample and records per-decision variance.

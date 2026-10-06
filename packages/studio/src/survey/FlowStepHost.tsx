@@ -45,7 +45,7 @@ export interface FlowStepHostProps {
   /** Optional per-question lint findings (phase_f). Forwarded to SurveyRunner. */
   findingsByQuestionId?: Record<string, LintFinding[]>;
   /**
-   * Decision-model write seam (spec 085 T031). When provided, FlowStepHost
+   * Decision-model write seam (spec 087 T031). When provided, FlowStepHost
    * routes each committed answer through its question module's `mutate()`
    * (when the module defines one) via the injected `applyAnswer` — the
    * factory owns the store and the `applyMutatePatch` containment check.
@@ -79,7 +79,7 @@ export function FlowStepHost({
   getRequiredOverride,
   mutateDeps,
 }: FlowStepHostProps) {
-  // Decision-model write path (spec 085 T031): a committed answer whose
+  // Decision-model write path (spec 087 T031): a committed answer whose
   // module defines `mutate()` is routed through the injected seam. The
   // factory's applyAnswer runs mutate() + applyMutatePatch against the
   // working copy; containment violations throw there (M3) and the working

@@ -12,7 +12,7 @@ import { orderDecisions } from "../decisions/orderDecisions.ts";
 
 /**
  * Build a FlowDef from the modules' own provides/requires declarations
- * (spec 085). The question order is `orderDecisions(modules)`. Throws on the
+ * (spec 087). The question order is `orderDecisions(modules)`. Throws on the
  * same malformed inputs orderDecisions rejects (unresolved / duplicate / cycle).
  *
  * `provenanceModules` (Phase A only) marks the subset of `modules` that

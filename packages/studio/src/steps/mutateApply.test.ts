@@ -1,4 +1,4 @@
-// Tests for the mutate() apply path (spec 085 T030, FR-007).
+// Tests for the mutate() apply path (spec 087 T030, FR-007).
 //
 // A patch touching any path outside the module's declared `writes` is
 // rejected WHOLE-PATCH: the error names the offending paths, nothing is

@@ -1,4 +1,4 @@
-# Data Model: Decisions Backend (specs/085-decision-backend)
+# Data Model: Decisions Backend (specs/087-decision-backend)
 
 ## Decision
 

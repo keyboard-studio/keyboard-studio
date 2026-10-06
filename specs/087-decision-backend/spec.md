@@ -1,6 +1,6 @@
 # Backend Streamlining: Decisions as the Only Unit
 
-**Feature:** specs/085-decision-backend
+**Feature:** specs/087-decision-backend
 **Status:** specifying
 **Branch:** km/decisions-spike (PR #1938)
 

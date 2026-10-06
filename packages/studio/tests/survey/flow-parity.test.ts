@@ -179,7 +179,7 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 });
 
 // ---------------------------------------------------------------------------
-// identity_lite structural integrity (T017, retargeted spec 085 T040)
+// identity_lite structural integrity (T017, retargeted spec 087 T040)
 // The thin-YAML order list was deleted — the FlowDef now comes from
 // loadDerivedFlowDef over the il_* modules' own declarations. Order +
 // derivation are covered insertion-tolerantly in IdentityLite.test.ts and

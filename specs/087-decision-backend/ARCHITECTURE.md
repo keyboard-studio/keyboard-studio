@@ -1,4 +1,4 @@
-# Architecture: Decisions Backend (spec 085)
+# Architecture: Decisions Backend (spec 087)
 
 The studio's questions, base-keyboard adaptation, flow ordering, and editors are one system. Its only semantic unit is the **Decision**.
 

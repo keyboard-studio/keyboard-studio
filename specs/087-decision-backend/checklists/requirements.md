@@ -2,7 +2,7 @@
 
 **Purpose**: Validate Companion specification completeness before planning
 **Created**: 2026-10-05
-**Feature**: specs/085-decision-backend/spec.md
+**Feature**: specs/087-decision-backend/spec.md
 
 ## Content Quality
 

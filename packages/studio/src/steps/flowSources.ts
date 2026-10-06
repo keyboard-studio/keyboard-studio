@@ -2,7 +2,7 @@
 // flows, keyed by flow_id.
 //
 // Spec 024 (ADR-0001): the Flow Map derives drill-downs from the step flowRefs
-// declared in the manifest. Spec 085: every flow's membership is the module list
+// declared in the manifest. Spec 087: every flow's membership is the module list
 // registered for it in survey/questions/registry.ts (`flowModules`) and its ORDER
 // is derived from those modules' provides/requires — there are no hand-maintained
 // order lists. This file only adds per-flow metadata (title, phase letter,

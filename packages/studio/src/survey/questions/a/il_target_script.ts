@@ -92,7 +92,7 @@ export const fixtures: QuestionModule["fixtures"] = {
 // emitted artifact. Here, the answer contributes the script/variant subtag to the
 // composed tag the descriptor declares.
 // Decision spike (km/decisions-spike): base-keyboard probe AND the single
-// system answering "what script did the base decide" (spec 085 Q2 — the
+// system answering "what script did the base decide" (spec 087 Q2 — the
 // adaptation catalog reads posture via extractBaseScriptPosture below). Reads the script from the catalog entry — the codec leaves the
 // IR header's bcp47 empty on real catalog imports, so the catalog is
 // primary and the IR header is a fallback. Only ISO 15924 script codes

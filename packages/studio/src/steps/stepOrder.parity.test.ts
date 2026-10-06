@@ -1,5 +1,5 @@
 // stepOrder.parity.test.ts — the wizard's step order is DERIVED from step
-// declarations (provides / requires / gatedBy), not hand-ordered (spec 085 Q3,
+// declarations (provides / requires / gatedBy), not hand-ordered (spec 087 Q3,
 // SC-003). This file freezes the order the hand-maintained manifest had at the
 // moment of the migration as LITERALS, and asserts the derivation reproduces it
 // exactly: order, side-trail membership, join targets, lock order, and the

@@ -1,4 +1,4 @@
-// Extraction context (spec 085, clarify Q1).
+// Extraction context (spec 087, clarify Q1).
 //
 // `extract()` receives the whole import bundle: the parsed KeyboardIR plus
 // the catalog entry. Language identity lives in catalog metadata (the codec
@@ -9,7 +9,7 @@
 import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 
 /**
- * The import bundle every `extract()` probe reads (spec 085 Q1).
+ * The import bundle every `extract()` probe reads (spec 087 Q1).
  *
  * `ir` is null when parsing failed — every extract then yields absent and
  * the author is asked. `catalog` is null for non-catalog imports.

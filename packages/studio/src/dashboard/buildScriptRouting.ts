@@ -1,7 +1,7 @@
 // Derive the §9 script → routing-group table from the survey's own data.
 //
 // The script choices come from the identity_lite flow's `il_target_script`
-// question (order derived, spec 085 — the thin YAML list was deleted).
+// question (order derived, spec 087 — the thin YAML list was deleted).
 // options; each is run through the same scriptAxes helpers the engine uses
 // (normalizeTargetScript, routingGroupOf, scriptClassOf), and the "not yet
 // supported" gate is read back out of that question's own branching (a script
@@ -56,7 +56,7 @@ function resolveGoto(next: FlowQuestion["next"], value: string): string | null {
 
 /**
  * Build the script-routing table from the identity-lite flow.
- * @param flow the loaded identity-lite FlowDef (derived order, spec 085).
+ * @param flow the loaded identity-lite FlowDef (derived order, spec 087).
  */
 export function buildScriptRouting(flow: FlowDef): ScriptRoutingRow[] {
   const byId = new Map(flow.questions.map((q) => [q.id, q]));

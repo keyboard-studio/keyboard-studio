@@ -1,4 +1,4 @@
-# Tasks: Decisions Backend (specs/085-decision-backend)
+# Tasks: Decisions Backend (specs/087-decision-backend)
 
 Dependency-ordered, organized by user story. Each phase's work is grouped into waves; a wave is a set of tasks touching different files with no incomplete dependencies between them. `[P]` marks tasks inside an independent wave. Same-file or dependent tasks are never in the same wave.
 
@@ -83,7 +83,7 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 **Wave 1 — independent (different files):**
 - [x] **T060** [P] Demo page runs on `decisionFlow` instead of the fixture runner · packages/studio/src/decisions/ (demo, `?demo=decisions`)
 - [x] **T061** [P] FR-009 regression: the management UI never renders in a production build (still `import.meta.env.DEV`-gated) · packages/studio/src/decisions/ (demo test)
-- [x] **T062** Success-criteria validation: SC-001 (≥80% pre-fill on 5 real keyboards), SC-002 (fault-injection suite), SC-003 (zero artifacts + parity), SC-004 (corpus sample compiles through the unified flow) · specs/085-decision-backend/
+- [x] **T062** Success-criteria validation: SC-001 (≥80% pre-fill on 5 real keyboards), SC-002 (fault-injection suite), SC-003 (zero artifacts + parity), SC-004 (corpus sample compiles through the unified flow) · specs/087-decision-backend/
 - [x] **T063** [P] PR #1938 description refresh: spike framing → the real unification scope · (PR body, via gh)
 
 **Checkpoint:** the streamlining is complete, measured, and PRed.

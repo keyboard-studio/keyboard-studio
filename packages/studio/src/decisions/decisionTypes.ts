@@ -21,7 +21,7 @@ export type DecisionId =
   | "authoring-track"
   | "project-display-name"
   | "project-keyboard-id"
-  // Proposed full-identity (reserve) flow answers (spec 085 US4) — distinct from the live il_* ids
+  // Proposed full-identity (reserve) flow answers (spec 087 US4) — distinct from the live il_* ids
   // so the two flows never double-provide a decision.
   | "reserve-desktop-notice"
   | "reserve-language-name"
@@ -52,13 +52,13 @@ export type DecisionId =
   | "reserve-community-involvement"
   | "reserve-casing-notes"
   | "reserve-additional-notes"
-  // Phase B character-discovery answers (spec 085 US4)
+  // Phase B character-discovery answers (spec 087 US4)
   | "text-sample"
   | "special-letters"
   | "latin-digraphs-wanted"
   | "indic-onset-vowels-wanted"
   | "syllabic-finals-wanted"
-  // Phase F help-doc answers (spec 085 US4)
+  // Phase F help-doc answers (spec 087 US4)
   | "help-welcome-paragraph"
   | "help-usage-tip-1"
   | "help-usage-tip-2"
@@ -78,7 +78,7 @@ export type DecisionId =
   | "help-credits"
   | "help-contact-info"
   // Phase B/F, reserve and parked-question answers whose modules previously
-  // carried no provides (spec 085 US4) — every answerable module now provides.
+  // carried no provides (spec 087 US4) — every answerable module now provides.
   | "additional-methods"
   | "azerty-qz-swap"
   | "char-count"
@@ -136,7 +136,7 @@ export type DecisionId =
   | "tp3-orthography-join"
   | "typing-approach"
   | "use-case"
-  // Wizard-step decisions (spec 085 US4): what an editor step settles that no
+  // Wizard-step decisions (spec 087 US4): what an editor step settles that no
   // question module asks for. Provided/required by steps (steps/stepDependencies.ts)
   // and ordered by the same orderByDependencies as the questions.
   | "windows-layout"

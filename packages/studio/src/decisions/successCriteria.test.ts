@@ -1,4 +1,4 @@
-// Success-criteria validation (spec 085 T062).
+// Success-criteria validation (spec 087 T062).
 //
 // Validates SC-001 through SC-004 against the implemented unification.
 // This is the measurable proof that the migration meets its success criteria.
@@ -105,7 +105,7 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
   // author-name have no extractors by design — they require author input —
   // so they surface for asking rather than as silent defaults. The spec's
   // 80% bar needs one more extractor on the identity set (5/6 = 83%); that
-  // gap is a tracked follow-up (specs/085-decision-backend/followups.md),
+  // gap is a tracked follow-up (specs/087-decision-backend/followups.md),
   // not a silently lowered bar.
   it("extracts the 4 extractable decisions with correct source labels", () => {
     for (const kb of KEYBOARDS) {

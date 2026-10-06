@@ -1,4 +1,4 @@
-# Spec 085 — accepted follow-ups (post-review, 2026-10-05)
+# Spec 087 — accepted follow-ups (post-review, 2026-10-05)
 
 Tracked deferred work from the km-lead review of the decision-backend
 unification. None of these blocks the unification itself; each has a

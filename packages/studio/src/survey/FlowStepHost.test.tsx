@@ -283,7 +283,7 @@ describe("FlowStepHost — findingsByQuestionId plumbing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// mutateDeps — decision-model write seam (spec 085 T031)
+// mutateDeps — decision-model write seam (spec 087 T031)
 // ---------------------------------------------------------------------------
 
 describe("FlowStepHost — mutateDeps write seam", () => {

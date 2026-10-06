@@ -199,7 +199,7 @@ function computeReserveNodes(
 }
 
 /**
- * Build a normalized FlowGraph from an already-loaded FlowDef (spec 085
+ * Build a normalized FlowGraph from an already-loaded FlowDef (spec 087
  * T040): reserve modules — registered in the supplied registry but absent from
  * the flow — are appended as "library-not-in-flow" nodes so the reserve set is
  * visible without claiming to be live.

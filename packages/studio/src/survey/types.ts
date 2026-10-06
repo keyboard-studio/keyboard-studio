@@ -300,7 +300,7 @@ export interface QuestionModule {
    * The typed decisions this module provides once answered. `orderDecisions()`
    * derives the walk order from `provides`/`requires` instead of
    * hand-maintained YAML lists and spine flags. One module may provide
-   * several decisions (spec 085 Q4); the duplicate-provider rule applies
+   * several decisions (spec 087 Q4); the duplicate-provider rule applies
    * per decision, not per module.
    */
   provides?: DecisionId[];
@@ -318,7 +318,7 @@ export interface QuestionModule {
 
   /**
    * Base-keyboard probe: read this module's decisions from the import bundle
-   * (spec 085 Q1) instead of asking the author. Return `undefined` when the
+   * (spec 087 Q1) instead of asking the author. Return `undefined` when the
    * bundle carries no evidence for the decision. The result runs through
    * `validate()` before acceptance — a rejected extract falls through to
    * asked/default.

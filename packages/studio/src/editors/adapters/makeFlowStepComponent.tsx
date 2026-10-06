@@ -235,7 +235,7 @@ export function makeFlowStepComponent<Extracted>(
 
   function FlowStepComponent({ onComplete, onBack }: EditorStepProps): React.ReactElement | null {
     // C2.3 — load the flow once, memoised. Derived order when the source
-    // declares it (spec 085 T040), otherwise the thin YAML.
+    // declares it (spec 087 T040), otherwise the thin YAML.
     // capturedSource is bound at factory-call time; stable for this component's lifetime.
     const flow = useMemo(() => loadFlowSourceDef(capturedSource), []);
 
