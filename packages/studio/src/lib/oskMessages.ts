@@ -53,7 +53,20 @@ export interface SetStringsCommand {
   };
 }
 
-export type OskCommand = SetKeyboardCommand | SetOskModeCommand | SetStringsCommand;
+/**
+ * Move the caret into the frame's type-here textarea so the author can type
+ * straight away. The host focuses the iframe element first; this command
+ * picks the element inside it.
+ */
+export interface FocusTargetCommand {
+  type: "FOCUS_TARGET";
+}
+
+export type OskCommand =
+  | SetKeyboardCommand
+  | SetOskModeCommand
+  | SetStringsCommand
+  | FocusTargetCommand;
 
 // ---------------------------------------------------------------------------
 // Events: frame → host
@@ -68,6 +81,7 @@ export interface EngineErrorEvent {
   message: string;
 }
 
+/** A keyboard finished activating — the OSK is rendered and typeable. */
 export interface KeyboardActiveEvent {
   type: "KEYBOARD_ACTIVE";
 }
@@ -77,9 +91,15 @@ export interface TextUpdatedEvent {
   value: string;
 }
 
-export interface KeyTappedEvent {
-  type: "KEY_TAPPED";
-  keyId: string;
+
+/**
+ * The frame document's natural height in CSS px — posted whenever its layout
+ * changes (keyboard load, mode switch, width change, textarea resize) so the
+ * host can size the iframe to show the whole keyboard instead of cropping it.
+ */
+export interface ContentHeightEvent {
+  type: "CONTENT_HEIGHT";
+  height: number;
 }
 
 export type OskEvent =
@@ -87,7 +107,7 @@ export type OskEvent =
   | EngineErrorEvent
   | KeyboardActiveEvent
   | TextUpdatedEvent
-  | KeyTappedEvent;
+  | ContentHeightEvent;
 
 // ---------------------------------------------------------------------------
 // Type guard — validates that an unknown postMessage payload is an OskEvent.
@@ -96,5 +116,14 @@ export type OskEvent =
 export function isOskEvent(data: unknown): data is OskEvent {
   if (typeof data !== "object" || data === null) return false;
   const t = (data as Record<string, unknown>)["type"];
-  return t === "ENGINE_READY" || t === "ENGINE_ERROR" || t === "KEYBOARD_ACTIVE" || t === "TEXT_UPDATED" || t === "KEY_TAPPED";
+  if (t === "CONTENT_HEIGHT") {
+    const h = (data as Record<string, unknown>)["height"];
+    return typeof h === "number" && Number.isFinite(h) && h > 0;
+  }
+  return (
+    t === "ENGINE_READY" ||
+    t === "ENGINE_ERROR" ||
+    t === "KEYBOARD_ACTIVE" ||
+    t === "TEXT_UPDATED"
+  );
 }

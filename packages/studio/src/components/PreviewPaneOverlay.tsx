@@ -97,8 +97,10 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
     >
       <div
         style={{
-          fontSize: 16,
-          fontWeight: 600,
+          // Type-scale headline role: weight + size + leading + tracking
+          // as one set, replacing the ad-hoc 16px/600 pair.
+          font: "var(--app-type-headline)",
+          letterSpacing: "var(--app-tracking-headline)",
           color: isError ? "var(--app-warning-text)" : "var(--app-accent-text)",
         }}
       >

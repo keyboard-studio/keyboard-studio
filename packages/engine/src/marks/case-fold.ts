@@ -9,7 +9,7 @@
 // rule — and never clears an existing check (FR-007).
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
-import { caseCounterpart } from "../character-discovery/casePair.js";
+import { confirmedCaseCounterpart } from "../character-discovery/casePair.js";
 
 /**
  * Additively expand a per-mark/per-base attachment map so every checked cased
@@ -31,8 +31,8 @@ export function expandCaseCounterpartAttachments(
     const next: Record<string, boolean> = { ...row };
     for (const [base, checked] of Object.entries(row)) {
       if (checked !== true) continue;
-      const cc = caseCounterpart(base, bcp47);
-      if (cc?.direction === "toUpper" && present.has(cc.counterpart)) {
+      const cc = confirmedCaseCounterpart(base, present, bcp47, "toUpper");
+      if (cc !== null) {
         next[cc.counterpart] = true;
       }
     }

@@ -15,6 +15,8 @@ Vercel dashboard -> **Storage**:
 - Create/connect a **Postgres** (Neon) store -> injects `POSTGRES_URL` (+ `POSTGRES_*` variants) into the project.
 - Create/connect a **Blob** store -> injects `BLOB_READ_WRITE_TOKEN`.
 
+Before connecting either store, work through [deploy-security.md §5](deploy-security.md#5-draft-storage-when-enabling-my-keyboards): mark both variables Sensitive, confirm the `draftId` allowlist is deployed, and decide on an edge limit for `/drafts*`.
+
 Connect both to the project for the **Preview** environment first (that is what the `dev` branch deploys to), and to **Production** when we promote to `main`.
 
 Note: if for any reason you set `POSTGRES_URL` by hand, use that exact name — not `DATABASE_URL`. The config check accepts either, but the `@vercel/postgres` driver only reads `POSTGRES_URL`; setting only `DATABASE_URL` makes the endpoint look configured (401 instead of 503) while every query fails.

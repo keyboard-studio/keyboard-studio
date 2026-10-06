@@ -72,6 +72,7 @@ import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { useShallow } from "zustand/react/shallow";
 import type {
   BaseKeyboard,
+  KeyboardIR,
   Pattern,
   MechanismAssignment,
   MechanismRef,
@@ -124,7 +125,6 @@ import {
 } from "../../survey/placementSeeds.ts";
 import {
   KEY_OPTIONS,
-  ALL_PICKABLE_KEYS,
   CUSTOM_KEY_OPTION_VALUE,
 } from "../../lib/keyOptions.ts";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
@@ -138,6 +138,7 @@ import {
   reflectCharInput,
   type ResolveCharInputOptions,
   type KeyPickerResolveOptions,
+  type KeyPickerResolution,
 } from "../../lib/charInput.ts";
 import {
   useCasePairCompanion,
@@ -158,6 +159,8 @@ import type { StepNavSpec } from "../../stores/stepNavStore.ts";
 import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
+import { useIsNarrow } from "../../hooks/useViewport.ts";
+import { Dialog } from "../../ui/Dialog.tsx";
 import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
@@ -209,6 +212,16 @@ import {
   PATTERN_RALT,
   isSequenceAssignmentForChar,
 } from "./patternIds.ts";
+// S-02 deadkey trigger suggestions + id allocation seam (spec 083):
+// DEADKEY_OPTIONS / TRIGGER_KEY_CHARS are the
+// shared card suggestions (the Deadkeys step's define form reuses them);
+// allocateDeadkeyId is the single numeric-id source for S-02 mints.
+import {
+  DEADKEY_OPTIONS,
+  TRIGGER_KEY_CHARS,
+} from "../deadkey/deadkeyTriggerOptions.ts";
+import { allocateDeadkeyId } from "@keyboard-studio/contracts";
+import { hex4 } from "../deadkey/deadkeyWrite.ts";
 
 // Re-exported for existing importers that reach the pattern id constants via
 // this module; the canonical declarations now live in ./patternIds.ts.
@@ -382,28 +395,107 @@ function excludeSequenceMechanisms(
   return result;
 }
 
-// Maps each DEADKEY_OPTIONS key value to the unshifted character it produces.
-// Used to derive a deadkey ID matching the sil_cameroon_qwerty convention
-// (dk ID = Unicode codepoint of the trigger key's character, e.g. dk(003b) for `;`).
-const TRIGGER_KEY_CHARS: Record<string, string> = {
-  K_LBRKT: "[", // left bracket [
-  K_RBRKT: "]", // right bracket ]
-  K_BKQUOTE: "`", // backtick `
-  K_COLON: ";", // semicolon ;
-};
+// ---------------------------------------------------------------------------
+// S-02 deadkey id/allocation seam (spec 083).
+//
+// `buildDeadkeyAssignment` (below) is the shared assignment-shape builder for
+// the manual deadkey card, the S-02 suggestion accept, and the case-pair
+// companion — the three write paths cannot drift on the slotValues shape.
+//
+// The id + accentChar derivation is the second half of the seam:
+// `resolveS02DeadkeyIdentity` is the ONLY place an S-02 mint derives its
+// deadkeyName/accentChar. The manual deadkey Apply and the S-02 suggestion
+// accept both call it; the case-pair companion reuses the identity the
+// proposal captured (it must share the id, never mint a new one).
+//
+// Ids are numeric-only (hex4 for the deadkeyName slot): the "dead0" forced
+// derivation is gone — every mint goes through allocateDeadkeyId.
+//
+// Honest seam note: allocateDeadkeyId(workingIr) alone is NOT enough. The
+// working IR does not carry this session's phase-C assignments
+// (recordAssignments stores them in phaseResults; the working IR only sees
+// setWorkingIR mutations), so a second S-02 mint in the same gallery visit
+// would re-mint the first one's id. allocateS02DeadkeyId additionally
+// reserves every numeric deadkeyName already minted in this session's
+// assignments and skips past them. The reservation is session-local; ids
+// minted by the Deadkeys step (committed through setWorkingIR) are visible
+// via the IR itself.
+// ---------------------------------------------------------------------------
 
 /**
- * Returns the hex deadkey ID for a given trigger key, following the convention
- * used in sil_cameroon_qwerty: `dk(003b)` for `;`, `dk(0027)` for `'`, etc.
- * Matches the character the key produces (unshifted) on US QWERTY.
+ * Numeric ids already minted as S-02 deadkeyName slots in this session's
+ * assignments. 1–8 hex chars count — the pipeline imposes no 0xffff cap,
+ * so a 5-digit session-minted id must still be reserved.
  */
-function deadkeyNameFor(triggerKey: string): string {
-  const char = TRIGGER_KEY_CHARS[triggerKey];
-  if (char !== undefined) {
-    return char.codePointAt(0)!.toString(16).padStart(4, "0");
+function sessionMintedDeadkeyIds(
+  sessionAssignments: readonly MechanismAssignment[],
+): Set<number> {
+  const ids = new Set<number>();
+  for (const a of sessionAssignments) {
+    for (const m of a.mechanisms) {
+      if (m.patternId !== PATTERN_DEADKEY) continue;
+      const name = m.slotValues?.["deadkeyName"];
+      // 1–8 hex digits — matches the deadkey editors' parseIdText: the
+      // pipeline imposes no 0xffff cap, so a 5-digit session-minted id
+      // must still be reserved.
+      if (typeof name !== "string" || !/^[0-9a-fA-F]{1,8}$/.test(name)) continue;
+      const id = parseInt(name, 16);
+      if (!Number.isNaN(id)) ids.add(id);
+    }
   }
-  // Fallback: unknown key — use a generic ID.
-  return "dead0";
+  return ids;
+}
+
+/**
+ * Allocate the numeric id for a NEW S-02 deadkey assignment: the engine's
+ * allocateDeadkeyId over the working IR, skipping past any ids already
+ * minted in this session's assignments (see the seam note above).
+ */
+function allocateS02DeadkeyId(
+  workingIr: KeyboardIR | null,
+  sessionAssignments: readonly MechanismAssignment[],
+): number {
+  // Mirrors the engine's LEGACY_ID_CEILING floor (0x2FFF) for the
+  // no-working-IR case — allocateDeadkeyId itself applies the same floor.
+  let id = workingIr !== null ? allocateDeadkeyId(workingIr) : 0x3000;
+  const reserved = sessionMintedDeadkeyIds(sessionAssignments);
+  while (reserved.has(id)) id += 1;
+  return id;
+}
+
+/** The identity half of an S-02 mint: numeric id + trigger literal. */
+export interface S02DeadkeyIdentity {
+  /** hex4 numeric id for the deadkeyName slot — never "dead0". */
+  deadkeyName: string;
+  /**
+   * The trigger key's literal character (double-tap escape output). For the
+   * 4 built-in trigger keys this is the key's character (e.g. ';' for
+   * K_COLON); for a custom trigger character, the resolved character itself.
+   */
+  accentChar: string;
+}
+
+/**
+ * Resolve the identity for a new S-02 deadkey assignment — the single seam
+ * the manual deadkey card and the S-02 suggestion accept derive
+ * deadkeyName/accentChar through. accentChar keeps the old convention (the
+ * trigger key's literal character); the id is always freshly allocated.
+ */
+export function resolveS02DeadkeyIdentity(params: {
+  /** Raw key-picker value (one of DEADKEY_OPTIONS or ""). */
+  triggerKey: string;
+  /** resolveKeyPickerSelection(triggerKey, triggerKeyCustomChar, …). */
+  triggerResolution: KeyPickerResolution;
+  workingIr: KeyboardIR | null;
+  sessionAssignments: readonly MechanismAssignment[];
+}): S02DeadkeyIdentity {
+  const { triggerKey, triggerResolution, workingIr, sessionAssignments } = params;
+  const id = allocateS02DeadkeyId(workingIr, sessionAssignments);
+  const accentChar =
+    triggerResolution.kind === "customOk"
+      ? triggerResolution.char
+      : (TRIGGER_KEY_CHARS[triggerKey] ?? "");
+  return { deadkeyName: hex4(id), accentChar };
 }
 
 /**
@@ -435,10 +527,14 @@ function suggestionComboTokensFor(entry: PlacementSeedEntry): ModifierToken[] {
 
 /**
  * Build the S-02 (deadkey) {@link MechanismAssignment} shape — shared by
- * `handleApply`'s manual deadkey method and `handleSuggestionAccept`'s S-02
- * branch, so the two write paths cannot drift on this mechanism's
- * slotValues shape (see docs/design-notes/mechanism-gallery-flow.md's
- * "Method → assignment" seam).
+ * `handleApply`'s manual deadkey method, `handleSuggestionAccept`'s S-02
+ * branch, and the case-pair companion confirm, so the three write paths
+ * cannot drift on this mechanism's slotValues shape (see
+ * docs/design-notes/mechanism-gallery-flow.md's "Method → assignment" seam).
+ *
+ * The deadkeyName/accentChar values come from `resolveS02DeadkeyIdentity`
+ * (the S-02 id/allocation seam above) for new mints; the companion reuses
+ * the proposal's preserved identity. This builder never derives an id.
  */
 function buildDeadkeyAssignment(params: {
   currentChar: string;
@@ -486,14 +582,12 @@ interface GalleryPreviewWithPatternsProps {
   selectedBaseKeyboard: BaseKeyboard;
   stage: Stage;
   retry: () => void;
-  onKeyTap?: (keyId: string) => void;
 }
 
 function GalleryPreviewWithPatterns({
   selectedBaseKeyboard,
   stage,
   retry,
-  onKeyTap,
 }: GalleryPreviewWithPatternsProps) {
   const { t } = useLingui();
   return (
@@ -501,7 +595,6 @@ function GalleryPreviewWithPatterns({
       baseKeyboard={selectedBaseKeyboard}
       stage={stage}
       retry={retry}
-      {...(onKeyTap !== undefined ? { onKeyTap } : {})}
       defaultOskMode="desktop"
       heading={t({
         id: "editor.assignLoop.preview.heading",
@@ -678,18 +771,10 @@ interface MethodChooserProps {
   onApply: () => void;
 }
 
-const DEADKEY_OPTIONS = [
-  { value: "K_COLON", label: "K_COLON (semicolon ;)" },
-  { value: "K_LBRKT", label: "K_LBRKT (left bracket [)" },
-  { value: "K_RBRKT", label: "K_RBRKT (right bracket ])" },
-  { value: "K_BKQUOTE", label: "K_BKQUOTE (backtick `)" },
-] as const;
-
-// Module-level Sets for O(1) membership checks in handleKeyTap.
-// ALL_PICKABLE_KEYS is imported from keyOptions.ts.
-const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
-  DEADKEY_OPTIONS.map((o) => o.value),
-);
+// DEADKEY_OPTIONS now lives in
+// ../deadkey/deadkeyTriggerOptions.ts (shared with the Deadkeys step's
+// define form, spec 083) — the card suggestions must not drift between the
+// two surfaces.
 
 // selectStyle — used by the S-08 layer-combo dropdowns (the modifier-token
 // SelectMenus); the base-key picker itself uses KeyPickerField, which carries
@@ -1464,6 +1549,11 @@ export function MechanismGallery({
   worklist,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
+  // Narrow-viewport branch (mobile adaptation, Phase 4): the
+  // assign-loop panes stack with the preview in a sheet, and the S-03
+  // sequence builder becomes a fullscreen modal instead of swapping the
+  // right pane. Desktop rendering is untouched.
+  const narrow = useIsNarrow();
   // Id for the "Done is blocked" hint (spec 081) — referenced by the footer's
   // forward button via aria-describedby only while the hint is mounted.
   const unaccountedHintId = useId();
@@ -2503,18 +2593,16 @@ export function MechanismGallery({
         markSuggestionEntryDismissed(currentChar, entry.strategyId);
         return;
       }
-      let deadkeyName: string;
-      let accentChar: string;
-      if (triggerResolution.kind === "customOk") {
-        deadkeyName = triggerResolution.char
-          .codePointAt(0)!
-          .toString(16)
-          .padStart(4, "0");
-        accentChar = triggerResolution.char;
-      } else {
-        deadkeyName = deadkeyNameFor(triggerKey);
-        accentChar = TRIGGER_KEY_CHARS[triggerKey] ?? "";
-      }
+      // The id + accent char come from the shared S-02 seam
+      // (resolveS02DeadkeyIdentity) — the same call handleApply's manual
+      // deadkey method makes, so the two write paths cannot drift. The
+      // numeric id is freshly allocated (never the "dead0" fallback).
+      const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
+        triggerKey,
+        triggerResolution,
+        workingIr,
+        sessionAssignments,
+      });
       assignment = buildDeadkeyAssignment({
         currentChar,
         baseLetter,
@@ -2594,6 +2682,7 @@ export function MechanismGallery({
     currentChar,
     triggerKey,
     triggerKeyCustomChar,
+    workingIr,
     sessionAssignments,
     recordAssignments,
     resetMethodState,
@@ -2733,26 +2822,19 @@ export function MechanismGallery({
       );
       const resolvedTriggerVkey = resolvedVkeyOf(triggerResolution);
       if (!base.ok || resolvedTriggerVkey === null) return;
-      // accentChar: the character emitted when the trigger key is pressed
-      // twice. For the 4 built-in trigger keys, always use the key's literal
-      // character (e.g. ';' for K_COLON) so trigger+trigger escapes back to
-      // the bare character. For a custom trigger character, the resolved
-      // custom character itself IS that literal — deadkeyName follows the
-      // same convention as deadkeyNameFor (the character's codepoint hex,
-      // padded to 4), never the "dead0" fallback deadkeyNameFor uses for an
-      // unrecognised built-in key id.
-      let deadkeyName: string;
-      let accentChar: string;
-      if (triggerResolution.kind === "customOk") {
-        deadkeyName = triggerResolution.char
-          .codePointAt(0)!
-          .toString(16)
-          .padStart(4, "0");
-        accentChar = triggerResolution.char;
-      } else {
-        deadkeyName = deadkeyNameFor(triggerKey);
-        accentChar = TRIGGER_KEY_CHARS[triggerKey] ?? "";
-      }
+      // The id + accent char come from the shared S-02 seam
+      // (resolveS02DeadkeyIdentity) — the same call the S-02 suggestion
+      // accept makes, so the two write paths cannot drift. accentChar keeps
+      // the old convention (the trigger key's literal character, so
+      // trigger+trigger escapes back to the bare character); the id is
+      // always freshly allocated via allocateDeadkeyId — the "dead0"
+      // forced derivation is gone.
+      const { deadkeyName, accentChar } = resolveS02DeadkeyIdentity({
+        triggerKey,
+        triggerResolution,
+        workingIr,
+        sessionAssignments,
+      });
       assignment = buildDeadkeyAssignment({
         currentChar,
         baseLetter: base.value,
@@ -3633,7 +3715,7 @@ export function MechanismGallery({
   //
   // Auto-unlock (mechanism-gallery-progression friction removal): this is no
   // longer wired to an explicit "Unlock to edit" button click. Every edit
-  // entry point below (handleKeyTap, Apply, Mark for later, suggestion
+  // entry point below (Apply, Mark for later, suggestion
   // accept/remove, existing-method/sequence removal) calls this FIRST,
   // guarded on `locked`, so the very first interaction with a completed
   // gallery both unlocks it and performs the edit in one action — the lock
@@ -3663,27 +3745,6 @@ export function MechanismGallery({
       );
     }
   }, [unlockDesktop, markStale, touchLayoutJson, t]);
-
-  const handleKeyTap = useCallback(
-    (keyId: string) => {
-      if (locked) handleUnlock();
-      if (method === "swap" && ALL_PICKABLE_KEYS.has(keyId)) {
-        setSelectedSwapKey(keyId);
-        // Tapping a real key sets the picker to that key; clear the paired
-        // custom-char text so re-opening "Enter my own character..." starts
-        // clean instead of re-showing stale (possibly invalid) text.
-        setSelectedSwapKeyCustomChar("");
-      } else if (
-        method === "deadkey" &&
-        VALID_DEADKEY_TRIGGER_KEYS.has(keyId)
-      ) {
-        setTriggerKey(keyId);
-        setTriggerKeyCustomChar("");
-      }
-      // method === "sequence" or unrecognised key: ignore
-    },
-    [method, locked, handleUnlock],
-  );
 
   // ---------------------------------------------------------------------------
   // Shared styles
@@ -4017,7 +4078,7 @@ export function MechanismGallery({
           removal) — the desktop layout still locks on Mechanisms completion
           (lockDesktop() fires via reducer R1, unchanged), but editing it no
           longer requires an explicit "Unlock to edit" click first: every edit
-          entry point (handleKeyTap, Apply, Mark for later, suggestion
+          entry point (Apply, Mark for later, suggestion
           accept, existing-method/sequence removal) auto-unlocks via
           handleUnlock on first use. This informational line replaces the old
           blocking role="alert" banner+button with a quiet, always-visible
@@ -4919,6 +4980,52 @@ export function MechanismGallery({
   // Two-pane layout
   // ---------------------------------------------------------------------------
 
+  // The live preview pane. On desktop this shares the right pane with the
+  // sequence builder (swapped via the display:none wrapper below — the
+  // iframe stays mounted so KMW stays warm). On narrow viewports the shell
+  // moves this node into the PreviewSheet, and the sequence builder becomes
+  // a fullscreen modal instead (mobile adaptation, Phase 4).
+  const previewContent = (
+    <div
+      data-testid="mechanism-preview-wrapper"
+      style={{
+        display:
+          !narrow && method === "sequence" && currentChar !== null
+            ? "none"
+            : "contents",
+      }}
+    >
+      {!loading && loadError === null ? (
+        <GalleryPreviewWithPatterns
+          selectedBaseKeyboard={selectedBaseKeyboard}
+          stage={artifactStage}
+          retry={artifactRetry}
+        />
+      ) : loading ? (
+        <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+          <Trans id="editor.assignLoop.loadingPatterns">
+            Loading patterns...
+          </Trans>
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const sequencePanel =
+    method === "sequence" && currentChar !== null ? (
+      <SequenceBuilderPanel
+        char={currentChar}
+        sessionAssignments={sessionAssignments}
+        recordAssignments={recordAssignments}
+        onApplied={handleSequenceApplied}
+        onCancel={resetMethodState}
+      />
+    ) : null;
+  // Fullscreen modal on narrow viewports (the sheet hosts the preview, so
+  // the builder needs its own surface); the desktop right-pane swap below
+  // is untouched.
+  const showSequenceModal = narrow && sequencePanel !== null;
+
   return (
     <>
       {/* Back / forward render in the footer (spec 081). */}
@@ -4953,43 +5060,33 @@ export function MechanismGallery({
           // the WASM/KMW-backed iframe on every method toggle — exactly the
           // "expensive"/unsafe reinit its own doc comment warns against. Always
           // render it; only the wrapping div's `display` changes.
-          <>
-            <div
-              data-testid="mechanism-preview-wrapper"
-              style={{
-                display:
-                  method === "sequence" && currentChar !== null
-                    ? "none"
-                    : "contents",
-              }}
-            >
-              {!loading && loadError === null ? (
-                <GalleryPreviewWithPatterns
-                  selectedBaseKeyboard={selectedBaseKeyboard}
-                  stage={artifactStage}
-                  retry={artifactRetry}
-                  onKeyTap={handleKeyTap}
-                />
-              ) : loading ? (
-                <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
-                  <Trans id="editor.assignLoop.loadingPatterns">
-                    Loading patterns...
-                  </Trans>
-                </p>
-              ) : null}
-            </div>
-            {method === "sequence" && currentChar !== null && (
-              <SequenceBuilderPanel
-                char={currentChar}
-                sessionAssignments={sessionAssignments}
-                recordAssignments={recordAssignments}
-                onApplied={handleSequenceApplied}
-                onCancel={resetMethodState}
-              />
-            )}
-          </>
+          //
+          // On narrow viewports `previewContent` is the whole right pane —
+          // the shell moves it into the PreviewSheet and the sequence
+          // builder renders as a fullscreen modal (showSequenceModal) instead
+          // of swapping the pane.
+          narrow ? previewContent : <>{previewContent}{sequencePanel}</>
         }
       />
+      {showSequenceModal && (
+        <Dialog
+          open
+          onCancel={resetMethodState}
+          label={t({
+            id: "editor.assignLoop.sequenceModalLabel",
+            message: "Build a key sequence",
+          })}
+          testId="sequence-builder-modal"
+          fullscreen
+          showCloseButton
+          closeLabel={t({
+            id: "editor.assignLoop.sequenceModalClose",
+            message: "Close sequence builder",
+          })}
+        >
+          {sequencePanel}
+        </Dialog>
+      )}
     </>
   );
 }

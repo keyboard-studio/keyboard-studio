@@ -83,16 +83,19 @@ describe("M5 — all step ids are unique", () => {
 // M2 — spine order
 //
 // FR-012: Identity → choose_base → track → Characters → Marks → Carve →
-//         Mechanisms → (lock:physical on mechanisms) →
+//         Rules → Mechanisms → (lock:physical on mechanisms) →
 //         touch carve+add → (lock:touch) → Help → Package
 //
 // track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
 // Sequences (S-03) build inline in the Mechanism Gallery's method chooser —
 // there is no separate "sequences" spine step.
+// Rules (spec 082) sits between carve and mechanisms: the before/after rule
+// demo + rule list/builder, after the author has shaped which keys exist.
 // ---------------------------------------------------------------------------
 
 const EXPECTED_SPINE_ORDER = [
   "identity",
+  "layout",
   "choose_base",
   "track",
   "characters",
@@ -101,6 +104,8 @@ const EXPECTED_SPINE_ORDER = [
   "invisibles",
   "convenience",
   "carve",
+  "deadkeys",
+  "rules",
   "mechanisms",
   "touch",
   "help",
@@ -124,6 +129,13 @@ describe("M2 — spine order matches FR-012", () => {
     expect(last?.id).toBe("package");
   });
 
+  it("'layout' sits right after 'identity' and before 'choose_base' (spec 076 A4)", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "identity", "layout");
+    assertStepOrder(spine, "layout", "choose_base");
+    expect(spine[1]?.id).toBe("layout");
+  });
+
   it("'track' is a spine step between 'choose_base' and 'characters'", () => {
     const spine = spineSteps(manifest);
     assertStepOrder(spine, "choose_base", "track");
@@ -134,8 +146,10 @@ describe("M2 — spine order matches FR-012", () => {
     assertStepOrder(spineSteps(manifest), "mechanisms", "touch");
   });
 
-  it("'carve' appears before 'mechanisms' on the spine", () => {
-    assertStepOrder(spineSteps(manifest), "carve", "mechanisms");
+  it("'carve' appears before 'rules' before 'mechanisms' on the spine (spec 082)", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "carve", "rules");
+    assertStepOrder(spine, "rules", "mechanisms");
   });
 
   it("'characters' appears before 'carve' on the spine", () => {
@@ -316,15 +330,15 @@ describe("Off-spine step inventory", () => {
 // needs the two-pane shell's persistent right-pane OSKFrame suppressed, or
 // two live OSKs co-mount).
 //
-// Exactly {carve, mechanisms, touch, touch_seed_source} must declare
-// layout:"full". All other steps must have layout:"pane" or omit the field
-// (implicit "pane").
+// Exactly {carve, deadkeys, rules, mechanisms, touch, touch_seed_source}
+// must declare layout:"full". All other steps must have layout:"pane" or
+// omit the field (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch", "touch_seed_source"] as const;
+const FULL_LAYOUT_IDS = ["carve", "deadkeys", "rules", "mechanisms", "touch", "touch_seed_source"] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly four steps declare layout:'full'", () => {
+  it("exactly six steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -333,6 +347,16 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("carve declares layout:'full'", () => {
     const carve = manifest.find((s) => s.id === "carve");
     expect(carve?.layout).toBe("full");
+  });
+
+  it("deadkeys declares layout:'full' (spec 083: three-tab editor needs the full working area, like carve)", () => {
+    const deadkeys = manifest.find((s) => s.id === "deadkeys");
+    expect(deadkeys?.layout).toBe("full");
+  });
+
+  it("rules declares layout:'full' (spec 082: the demo pane + rule builder need the full width)", () => {
+    const rules = manifest.find((s) => s.id === "rules");
+    expect(rules?.layout).toBe("full");
   });
 
   it("mechanisms declares layout:'full'", () => {

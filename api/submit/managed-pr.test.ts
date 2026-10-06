@@ -40,7 +40,9 @@ function postReq(body: unknown): Request {
  * Build a stub ManagedPRPipelineConfig whose fetch function returns the given
  * sequence of responses in order (one per pipeline step). Under the same-repo
  * staging model there is no fork-check step, so a success run makes 6 calls:
- * master-ref, parent-commit, tree, commit, branch-ref, PR.
+ * master-ref, parent-commit, tree, commit, branch-ref, PR. The global-cap
+ * probe (GET /pulls?...) is answered with an empty list outside the sequence
+ * and not counted, so these indices stay one-per-pipeline-step.
  */
 function stubConfig(
   responses: Array<Partial<GitHubPipelineFetchResponse> & { body?: unknown }>,
@@ -50,8 +52,11 @@ function stubConfig(
   return {
     getInstallationToken: () => Promise.resolve(tokenOverride),
     orgLogin: "test-org",
-    fetch: async (_url, _init) => {
-      const r = responses[callIndex++] ?? { ok: true, status: 200, body: {} };
+    fetch: async (url, init) => {
+      const probe = url.includes("/pulls?") && init.method === "GET";
+      const r = probe
+        ? { ok: true, status: 200, body: [] }
+        : (responses[callIndex++] ?? { ok: true, status: 200, body: {} });
       const body = r.body ?? {};
       return {
         ok: r.ok ?? true,
@@ -262,5 +267,87 @@ describe("runManagedPRHandler — error mapping", () => {
     const res = await runManagedPRHandler(postReq(validBody()), brokenConfig);
     expect(res.status).toBe(502);
     expect((await res.json() as { error: string }).error).toBe("submission_unavailable");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Security audit run-1 regression tests
+// ---------------------------------------------------------------------------
+
+describe("managed-pr — tree-path confinement (audit: unvalidated-tree-path-privileged-write)", () => {
+  const evilPaths = [
+    ".github/workflows/planted.yml", // plain repo-relative escape, no ".." needed
+    "../escape.kmn",
+    "release/t/test_kbd/../../escape.kmn",
+    "/absolute/path.kmn",
+    "release\\t\\test_kbd\\evil.kmn",
+    ".git/hooks/post-checkout",
+    "release/t/test_kbd/.git/config",
+    "release//t//test_kbd//x.kmn",
+  ];
+
+  for (const path of evilPaths) {
+    it(`rejects 400 for path ${JSON.stringify(path)}`, async () => {
+      const body = validBody();
+      body.sourceFiles = [{ path, content: "x" }];
+      const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+      expect(res.status).toBe(400);
+      expect((await res.json() as { error: string }).error).toBe("invalid_request");
+    });
+  }
+
+  it("rejects 400 for a path outside the keyboard directory", async () => {
+    const body = validBody();
+    body.sourceFiles = [{ path: "release/o/other_kbd/other.kmn", content: "x" }];
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts the engine's real output paths", async () => {
+    const body = validBody();
+    body.sourceFiles = [
+      { path: "release/t/test_kbd/source/test_kbd.kmn", content: "store(&VERSION) '1.0'" },
+      { path: "release/t/test_kbd/test_kbd.kps", content: "<Keyboard/>" },
+    ];
+    const res = await runManagedPRHandler(postReq(body), stubConfig(successResponses()));
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("managed-pr — commit trailer injection (audit: commit-trailer-injection-displayname)", () => {
+  it("rejects 400 for a newline in displayName", async () => {
+    const body = validBody();
+    body.attribution.displayName = "Alice\nCo-authored-by: Mallory <m@evil.example>";
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects 400 for a newline in prTitle", async () => {
+    const body = validBody();
+    body.prTitle = "Add keyboard\nSigned-off-by: Mallory <m@evil.example>";
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("managed-pr — anonymous throttle (audit: anonymous-unbounded-installation-token-mint)", () => {
+  it("returns 429 rate_limited with Retry-After when the throttle denies", async () => {
+    const res = await runManagedPRHandler(
+      postReq(validBody()),
+      stubConfig([]),
+      () => Promise.resolve({ allowed: false, retryAfterSeconds: 3600 }),
+    );
+    expect(res.status).toBe(429);
+    expect((await res.json() as { error: string }).error).toBe("rate_limited");
+    expect(res.headers.get("Retry-After")).toBe("3600");
+  });
+
+  it("proceeds when the throttle allows", async () => {
+    const res = await runManagedPRHandler(
+      postReq(validBody()),
+      stubConfig(successResponses()),
+      () => Promise.resolve({ allowed: true }),
+    );
+    expect(res.status).toBe(200);
   });
 });

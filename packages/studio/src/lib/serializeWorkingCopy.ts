@@ -24,6 +24,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
+import { deriveRuleAdditions } from "./ruleAdditions.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import {
@@ -40,6 +41,7 @@ import {
   parseKvks,
   parseTouchLayout,
   ensurePackageFiles,
+  conformTouchLayoutToKeymanSchema,
 } from "@keyboard-studio/engine";
 import type { HelpDocsRenderInput } from "@keyboard-studio/engine";
 import type { KeyboardIR, KvksIR, LayoutChartFile, TouchLayoutIR } from "@keyboard-studio/contracts";
@@ -175,7 +177,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -426,18 +428,26 @@ export async function projectWorkingCopyForOutput(
     baseIr,
     deletedNodeIds,
     deletedItemIds,
+    carveChars,
     deletedTouchKeyIds,
     assignments: sessionAssignments,
     getPattern: (id) => patternCache.get(id),
     identity: identityForProjection,
     touchLayoutJson,
     welcomeFolderFiles,
+    // spec 083: the committed deadkey lifecycle overlay, replayed at step
+    // 1.8 so the download carries the same deadkey edits the preview does.
+    deadkeyOps: state.deadkeyOverlay.ops,
     // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
     // fallback above sets identityForProjection.displayName to this same value,
     // so they compare equal and the base's &NAME store is left byte-identical.
     baseDisplayName: baseKeyboard.displayName,
     // spec 078: the same applied context-tolerance fix the preview replays.
     contextToleranceOverlay: contextToleranceOverlay?.overlay ?? null,
+    // spec 082: the same rules-step additions the preview projects — the
+    // download must contain exactly what the OSK compiled (pack install,
+    // guard synthesis, Narrow).
+    ruleAdditions: deriveRuleAdditions(workingIr, baseIr),
   });
 
   // The projector's own report of what id the VFS actually ended up under is
@@ -527,7 +537,7 @@ export async function projectWorkingCopyForOutput(
   for (const chart of charts) {
     clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
   }
-  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText), false);
+  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText, baseWelcomeHtmText), false);
 
   // spec 079 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
   // production from the author's proposal decision — a confirmed or edited
@@ -579,6 +589,20 @@ export async function projectWorkingCopyForOutput(
   const { created } = ensurePackageFiles({ vfs: clonedVfs });
   if (created.length > 0) {
     docWarnings.push(`[package] generated missing package files: ${created.join(", ")}`);
+  }
+
+  // 5e. Keyman Developer rejects a touch layout carrying any member outside
+  //     its schema (KM04000), and several working-copy writers legitimately
+  //     add one: the provenance tag `p`, and `output` from older appliers or an
+  //     imported base. Conform every layout here, on the output projection
+  //     only; the working copy and the preview keep `p`. Nothing is reported:
+  //     no stripped member changes what the keyboard types.
+  for (const path of clonedVfs.list()) {
+    if (!path.endsWith(".keyman-touch-layout")) continue;
+    const text = readVfsText(clonedVfs, path);
+    if (text === undefined) continue;
+    const { json, removed } = conformTouchLayoutToKeymanSchema(text);
+    if (removed.length > 0) clonedVfs.set(path, json, false);
   }
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection

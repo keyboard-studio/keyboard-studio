@@ -12,9 +12,25 @@
 // `modalityLabelPlacement` selects between the two; `headerExtras` carries
 // the touch-only counter/description nodes. Neither gallery's outer
 // flex/border/padding shell differs — that part is fully owned here.
+//
+// Narrow viewports (mobile adaptation, Phase 4): the two-pane row
+// becomes a stack — the assign card (leftContent) takes the full width and
+// the live preview (rightContent) moves into a toggleable PreviewSheet
+// (bottom sheet in portrait, side dock in landscape). Opening the sheet
+// mounts the OSK iframe; dismissing it unmounts the iframe (principle 9).
+// The `rightContent === undefined` collapse seam is reused: with no right
+// pane there is no sheet and no trigger.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useLingui } from "@lingui/react/macro";
 import { BORDER, ACCENT, TEXT_DIM, FONT, galleryPageStyle as pageStyle } from "../../lib/galleryTheme.ts";
+import { useIsNarrow } from "../../hooks/useViewport.ts";
+import { PreviewSheet } from "../../components/PreviewSheet.tsx";
+import {
+  PreviewButton,
+  FOOTER_CLEARANCE,
+  PREVIEW_BUTTON_CLEARANCE,
+} from "../../components/PreviewButton.tsx";
 
 /**
  * The canonical left-pane share of a full-bleed two-pane gallery screen
@@ -71,7 +87,8 @@ export interface AssignLoopShellProps {
 
 /**
  * Shared two-pane outer shell for the assign-loop galleries. Fixed 45% split
- * — not resizable. Renders only layout/chrome; all data/behavior comes from
+ * — not resizable — on desktop; stacked assign-card + preview sheet on
+ * narrow viewports. Renders only layout/chrome; all data/behavior comes from
  * props.
  */
 export function AssignLoopShell({
@@ -82,9 +99,27 @@ export function AssignLoopShell({
   leftContent,
   rightContent,
 }: AssignLoopShellProps) {
+  const { t } = useLingui();
+  // Layout branch on viewport WIDTH — coarse pointers do not stack panes by
+  // themselves (see useViewport.ts).
+  const narrow = useIsNarrow();
+  const [sheetOpen, setSheetOpen] = useState(false);
   // `undefined` means "no right pane at all" (T033); an explicit `null` is a
   // caller asking for an empty one, and still gets the two-pane split.
   const hasRightPane = rightContent !== undefined;
+
+  const showPreviewLabel = t({
+    id: "assignLoopShell.showPreview",
+    message: "Show keyboard preview",
+  });
+  const previewButtonLabel = t({
+    id: "previewButton.label",
+    message: "Preview",
+  });
+  const previewSheetLabel = t({
+    id: "assignLoopShell.previewSheetLabel",
+    message: "Keyboard preview",
+  });
 
   const modalityLabelSpan = (
     <span
@@ -101,6 +136,93 @@ export function AssignLoopShell({
     </span>
   );
 
+  const header = (
+    /* Header bar — title + modality label (+ optional extras). The primary
+       forward action lives in the top toolbar row of the left pane (see
+       leftContent), paired with the Back button, rather than here. */
+    <div
+      style={{
+        borderBottom: `1px solid ${BORDER}`,
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "baseline",
+        gap: 16,
+        ...(headerExtras !== undefined ? { flexWrap: "wrap" as const } : {}),
+        padding: "16px 24px 14px",
+      }}
+    >
+      <h1
+        style={{
+          margin: 0,
+          fontSize: "1.05rem",
+          fontWeight: 600,
+          color: ACCENT,
+          fontFamily: FONT,
+          ...(modalityLabelPlacement === "inline"
+            ? { display: "flex", alignItems: "center", gap: 8 }
+            : {}),
+        }}
+      >
+        {headingText}
+        {modalityLabelPlacement === "inline" ? modalityLabelSpan : null}
+      </h1>
+      {modalityLabelPlacement === "sibling" ? modalityLabelSpan : null}
+      {headerExtras}
+    </div>
+  );
+
+  // Narrow + a preview to show: stack. The assign card scrolls full-width;
+  // the preview lives in the sheet — opening it mounts the OSK iframe,
+  // dismissing it unmounts the iframe (principle 9). No right pane means no
+  // sheet and no trigger (the T033 collapse seam, reused).
+  if (narrow && hasRightPane) {
+    return (
+      <div
+        style={{
+          ...pageStyle,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          overflow: "hidden",
+        }}
+      >
+        {header}
+        {/* The preview trigger floats over the scrolling card (shared with
+            the survey — see PreviewButton) instead of taking a bar of its
+            own, so the card keeps the height and the footer's forward
+            action stays reachable. */}
+        <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+          <div
+            style={{
+              height: "100%",
+              overflowY: "auto",
+              boxSizing: "border-box",
+              paddingBottom: PREVIEW_BUTTON_CLEARANCE,
+            }}
+          >
+            {leftContent}
+          </div>
+          <PreviewButton
+            label={previewButtonLabel}
+            ariaLabel={showPreviewLabel}
+            onClick={() => setSheetOpen(true)}
+            testId="assign-loop-show-preview"
+          />
+        </div>
+        <PreviewSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          label={previewSheetLabel}
+          testId="assign-loop-preview-sheet"
+          flush
+        >
+          {rightContent}
+        </PreviewSheet>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -111,41 +233,13 @@ export function AssignLoopShell({
         overflow: "hidden",
       }}
     >
-      {/* Header bar — title + modality label (+ optional extras). The primary
-          forward action lives in the top toolbar row of the left pane (see
-          leftContent), paired with the Back button, rather than here. */}
-      <div
-        style={{
-          borderBottom: `1px solid ${BORDER}`,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "baseline",
-          gap: 16,
-          ...(headerExtras !== undefined ? { flexWrap: "wrap" as const } : {}),
-          padding: "16px 24px 14px",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "1.05rem",
-            fontWeight: 600,
-            color: ACCENT,
-            fontFamily: FONT,
-            ...(modalityLabelPlacement === "inline"
-              ? { display: "flex", alignItems: "center", gap: 8 }
-              : {}),
-          }}
-        >
-          {headingText}
-          {modalityLabelPlacement === "inline" ? modalityLabelSpan : null}
-        </h1>
-        {modalityLabelPlacement === "sibling" ? modalityLabelSpan : null}
-        {headerExtras}
-      </div>
+      {header}
 
-      {/* Two-pane row */}
+      {/* Two-pane row. Both panes pad their bottom by the footer's height:
+          the journey footer overlaps the bottom of the column, so without
+          it the last control in a pane sits under the bar, unclickable. A
+          child that scrolls itself (height: 100%) then ends at the footer's
+          top edge instead. */}
       <div
         style={{
           flex: 1,
@@ -164,6 +258,7 @@ export function AssignLoopShell({
                   borderRight: `1px solid ${BORDER}`,
                   overflowY: "auto",
                   boxSizing: "border-box",
+                  paddingBottom: FOOTER_CLEARANCE,
                 }
               : {
                   // No basis, no border, no shrink cap: the single pane simply
@@ -174,6 +269,7 @@ export function AssignLoopShell({
                   flexGrow: 1,
                   overflowY: "auto",
                   boxSizing: "border-box",
+                  paddingBottom: FOOTER_CLEARANCE,
                 }
           }
         >
@@ -186,7 +282,7 @@ export function AssignLoopShell({
             style={{
               flexGrow: 1,
               overflowY: "auto",
-              padding: "24px 20px",
+              padding: `24px 20px calc(24px + ${FOOTER_CLEARANCE})`,
               boxSizing: "border-box",
             }}
           >

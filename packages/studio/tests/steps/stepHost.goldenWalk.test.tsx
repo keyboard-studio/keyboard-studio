@@ -92,6 +92,9 @@ vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
 vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () =>
   import("../../src/test/studioShellMocks/CarveGalleryV2.tsx"),
 );
+vi.mock("../../src/editors/adapters/deadkeyAdapter.tsx", () =>
+  import("../../src/test/studioShellMocks/deadkeyAdapter.tsx"),
+);
 vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
   import("../../src/test/studioShellMocks/MechanismGallery.tsx"),
 );
@@ -405,13 +408,19 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 
 /**
  * Drive the full copy-track walk.
- * identity -> choose_base -> track(copy) -> project_name ->
- * characters(prefill->B) -> punctuation -> invisibles -> carve -> mechanisms ->
- * touch_seed_source -> touch -> help -> done
+ * identity -> layout -> choose_base -> track(copy) -> project_name ->
+ * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
+ * rules ->
+ * mechanisms -> touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
  * right-hand preview pane swaps for a one-character sequence builder while
  * that method is selected) — there is no separate "sequences" step.
+ *
+ * deadkeys (spec 083) sits between carve and mechanisms: the Deadkeys step
+ * renders the mocked DeadkeyAdapter stub — driven via its own
+ * "deadkeys-continue" testid — before the real "mechanisms" step (still the
+ * MechanismGallery mock, "mechanisms-continue").
  *
  * touch_seed_source (spec 035 R4/R12) is inserted between mechanisms and touch
  * on a FRESH walk because touchSeedSource starts null — advance("mechanisms")
@@ -423,6 +432,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "survey-advance" },
+    { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-copy" },
     { stepId: "project_name", testId: "survey-advance" },
@@ -439,6 +449,8 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     // convenience skip that follows it is absorbed by this window instead.
     { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
     { stepId: "carve", testId: "carve-continue" },
+    { stepId: "deadkeys", testId: "deadkeys-continue" },
+    { stepId: "rules", testId: "rules-continue" },
     { stepId: "mechanisms", testId: "mechanisms-continue" },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
@@ -448,9 +460,10 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 
 /**
  * Drive the full adapt-track walk.
- * identity -> choose_base -> track(adapt) ->
- * characters(prefill->B) -> punctuation -> invisibles -> carve -> mechanisms ->
- * touch_seed_source -> touch -> help -> done
+ * identity -> layout -> choose_base -> track(adapt) ->
+ * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
+ * rules ->
+ * mechanisms -> touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
  * separate "sequences" step.
@@ -458,6 +471,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
     { stepId: "identity", testId: "survey-advance" },
+    { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
@@ -471,6 +485,8 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     // convenience skip that follows it is absorbed by this window instead.
     { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
     { stepId: "carve", testId: "carve-continue" },
+    { stepId: "deadkeys", testId: "deadkeys-continue" },
+    { stepId: "rules", testId: "rules-continue" },
     { stepId: "mechanisms", testId: "mechanisms-continue" },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },

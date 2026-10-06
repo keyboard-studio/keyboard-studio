@@ -13,7 +13,7 @@
 // synthesizing a click.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { act, cleanup, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
 import { render } from "../test/renderWithI18n.tsx";
@@ -25,6 +25,7 @@ import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
 import { useStepNavStore, type StepNavSpec } from "../stores/stepNavStore.ts";
 import { charToPositionToken } from "../lib/stepWalk.ts";
+import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
 import { StudioFooter } from "./StudioFooter.tsx";
 
 const BASE = makeBaseKeyboard({
@@ -792,5 +793,115 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     const { container } = render(<StudioFooter />);
     expect(container.querySelector("footer")).not.toBeNull();
     expect(screen.getByTestId("demo-continue")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Narrow viewports: the dot row gives way to a "Contents" button that opens the
+// labelled journey list (JourneyContents), and publishes availability for
+// NavBar's menu.
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — narrow viewport contents button", () => {
+  const originalWidth = window.innerWidth;
+
+  function setWidth(width: number): void {
+    Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
+  }
+
+  beforeEach(() => {
+    useJourneyContentsStore.setState({ available: false, open: false, origin: null });
+  });
+
+  afterEach(() => {
+    setWidth(originalWidth);
+    useJourneyContentsStore.setState({ available: false, open: false, origin: null });
+  });
+
+  it("desktop: keeps the dot row and shows no Contents button", () => {
+    setWidth(1024);
+    render(<StudioFooter />);
+    expect(screen.getByTestId("progress-dot-row")).toBeTruthy();
+    expect(screen.queryByTestId("journey-contents-open")).toBeNull();
+    expect(useJourneyContentsStore.getState().available).toBe(false);
+  });
+
+  it("narrow: replaces the dot row with a Contents button that opens the sheet", () => {
+    setWidth(390);
+    render(<StudioFooter />);
+    expect(screen.queryByTestId("progress-dot-row")).toBeNull();
+    const open = screen.getByTestId("journey-contents-open");
+    expect(open.textContent).toContain("Contents");
+    expect(open.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(screen.queryByTestId("journey-contents-sheet")).toBeNull();
+
+    fireEvent.click(open);
+
+    expect(useJourneyContentsStore.getState().open).toBe(true);
+    const sheet = screen.getByRole("dialog", { name: "Contents" });
+    // The sheet lists the same marks, each with a visible label.
+    const current = within(sheet)
+      .getAllByRole("button")
+      .find((b) => b.getAttribute("aria-current") === "step");
+    expect(current).toBeDefined();
+    expect(current!.getAttribute("aria-label")).toMatch(/you are here/i);
+    expect((current!.textContent ?? "").length).toBeGreaterThan(0);
+  });
+
+  it("narrow: the Contents button hands its trigger point to the sheet", () => {
+    setWidth(390);
+    render(<StudioFooter />);
+    fireEvent.click(screen.getByTestId("journey-contents-open"));
+    expect(useJourneyContentsStore.getState().open).toBe(true);
+    // The sheet anchors its enter/exit at this point; jsdom measures the
+    // button at 0,0, so only the shape is asserted here.
+    const origin = useJourneyContentsStore.getState().origin;
+    expect(origin).not.toBeNull();
+    expect(typeof origin!.x).toBe("number");
+    expect(typeof origin!.y).toBe("number");
+  });
+
+  it("narrow: activating a reached row in the sheet jumps and closes the sheet", () => {
+    setWidth(390);
+    render(<StudioFooter />);
+    fireEvent.click(screen.getByTestId("journey-contents-open"));
+    const sheet = screen.getByRole("dialog", { name: "Contents" });
+    const completed = within(sheet)
+      .getAllByRole("button")
+      .find((b) => b.getAttribute("data-progress-dot-kind") === "completed");
+    expect(completed).toBeDefined();
+    fireEvent.click(completed!);
+    expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
+    expect(useJourneyContentsStore.getState().open).toBe(false);
+  });
+
+  it("narrow: a refused row keeps the sheet open and states why", () => {
+    setWidth(390);
+    render(<StudioFooter />);
+    fireEvent.click(screen.getByTestId("journey-contents-open"));
+    const sheet = screen.getByRole("dialog", { name: "Contents" });
+    const upcoming = within(sheet)
+      .getAllByRole("button")
+      .find((b) => b.getAttribute("data-progress-dot-kind") === "upcoming");
+    expect(upcoming).toBeDefined();
+    fireEvent.click(upcoming!);
+    expect(useSurveySessionStore.getState().activeStepId).toBe("characters");
+    expect(useJourneyContentsStore.getState().open).toBe(true);
+    expect(within(sheet).getByText(/not yet reached/i)).toBeTruthy();
+  });
+
+  it("publishes availability while narrow and mounted, and clears it on unmount", () => {
+    setWidth(390);
+    const { unmount } = render(<StudioFooter />);
+    expect(useJourneyContentsStore.getState().available).toBe(true);
+    unmount();
+    expect(useJourneyContentsStore.getState().available).toBe(false);
+  });
+
+  it("is not available before the journey starts", () => {
+    setWidth(390);
+    seedNothing();
+    render(<StudioFooter />);
+    expect(useJourneyContentsStore.getState().available).toBe(false);
   });
 });

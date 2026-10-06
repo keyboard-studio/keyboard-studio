@@ -23,7 +23,10 @@ import {
 } from "./flowStepOptions.tsx";
 import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
-import { slugifyKeyboardId } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeBaseKeyboard, slugifyKeyboardId } from "@keyboard-studio/contracts";
+import pfMoreDetailGateMod from "../../survey/questions/f/pf_more_detail_gate.ts";
+import pfDocLanguageMod from "../../survey/questions/f/pf_doc_language.ts";
+import pfHistoryEntryMod from "../../survey/questions/f/pf_history_entry.ts";
 import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
@@ -323,6 +326,19 @@ describe("trackOptions.onCommit", () => {
       keyboardId: "existing_kb",
       displayName: "Existing",
     });
+  });
+});
+
+describe("phaseFOptions.seeds.getSeedValue (choice-question defaults)", () => {
+  it.each([
+    [pfMoreDetailGateMod, "false"],
+    [pfDocLanguageMod, "english"],
+    [pfHistoryEntryMod, "confirm"],
+  ])("seeds a valid default for %#", (mod, expected) => {
+    const { deps } = buildDeps();
+    const seed = phaseFOptions.seeds!.getSeedValue(mod.definition.id, deps);
+    expect(seed).toBe(expected);
+    expect(mod.validate(seed).ok).toBe(true);
   });
 });
 
@@ -749,11 +765,10 @@ describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
     expect(seed("pf_credits", { copyright_holder: "SIL Global" })).toBeUndefined();
   });
 
-  it("seeds no other Phase F question", () => {
+  it("seeds no free-text Phase F question", () => {
     for (const id of [
       "pf_welcome_paragraph",
       "pf_usage_tip_1",
-      "pf_more_detail_gate",
       "pf_font_guidance",
       "pf_project_url",
     ]) {
@@ -856,5 +871,109 @@ describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spe
     // The runtime override is applied by SurveyRunner (getRequiredOverride),
     // never by mutating the module's own static definition.
     expect(pfWelcomeParagraphMod.definition.required).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.seeds.getSeedValue — choice questions always open selected
+// ---------------------------------------------------------------------------
+
+describe("phaseFOptions.seeds.getSeedValue (choice defaults)", () => {
+  const seedFor = (id: string, surveyContext = {}): string | string[] | undefined =>
+    phaseFOptions.seeds!.getSeedValue(id, buildDeps({ surveyContext }).deps);
+
+  it("defaults the more-detail gate to No", () => {
+    expect(seedFor("pf_more_detail_gate")).toBe("false");
+  });
+
+  it("defaults the help language to English, or bilingual for a non-English keyboard", () => {
+    expect(seedFor("pf_doc_language")).toBe("english");
+    expect(seedFor("pf_doc_language", { bcp47_tag: "en-Latn" })).toBe("english");
+    expect(seedFor("pf_doc_language", { bcp47_tag: "ha-Latn" })).toBe("bilingual");
+  });
+
+  it("preselects adding the drafted HISTORY entry", () => {
+    expect(seedFor("pf_history_entry")).toBe("confirm");
+  });
+
+  it("seeds every bool/radio question in the Phase F question set with a valid option", () => {
+    const modules = import.meta.glob<{ default: { definition: { id: string; type: string; options?: { value: string }[] } } }>(
+      "../../survey/questions/f/*.ts",
+      { eager: true },
+    );
+    const choice = Object.values(modules)
+      .map((m) => m.default?.definition)
+      .filter((d) => d !== undefined && (d.type === "bool" || d.type === "radio"));
+    expect(choice.length).toBeGreaterThanOrEqual(3);
+    for (const d of choice) {
+      const seed = seedFor(d.id);
+      expect(seed, d.id).toBeDefined();
+      if (d.options !== undefined) {
+        expect(d.options.map((o) => o.value), d.id).toContain(seed);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.seeds — text proposals derived from the starting point, and the
+// source each seed is recorded with
+// ---------------------------------------------------------------------------
+
+describe("phaseFOptions.seeds — derived text proposals", () => {
+  const BASE = makeBaseKeyboard({
+    id: "sil_bafut",
+    path: "release/sil/sil_bafut",
+    script: "Latn",
+    targets: ["windows"],
+    displayName: "Bafut",
+    version: "1.2",
+  });
+
+  function withBase(instantiationMode: "new-from-base" | "adapt-existing"): void {
+    const baseVfs = createVirtualFS();
+    baseVfs.set("source/sil_bafut.kps", '<Info><WebSite URL="https://bafut.org">https://bafut.org</WebSite></Info>');
+    useWorkingCopyStore.getState().reset();
+    useWorkingCopyStore.setState({ instantiationMode, baseKeyboard: BASE, baseVfs });
+  }
+
+  const seedFor = (id: string) => phaseFOptions.seeds!.getSeedValue(id, buildDeps().deps);
+
+  it("an update proposes the released package's website", () => {
+    withBase("adapt-existing");
+    expect(seedFor("pf_project_url")).toBe("https://bafut.org");
+    expect(seedFor("pf_provenance_basis")).toBeUndefined();
+  });
+
+  it("a copy proposes the copied keyboard as its provenance", () => {
+    withBase("new-from-base");
+    expect(seedFor("pf_provenance_basis")).toBe(
+      "This keyboard started as a copy of the Bafut keyboard (sil_bafut).",
+    );
+    expect(seedFor("pf_project_url")).toBeUndefined();
+  });
+
+  it("names a source for every data-backed seed, and none for the plain gate default", () => {
+    const sourceFor = (id: string) => phaseFOptions.seeds!.getSeedSource!(id, buildDeps().deps);
+    expect(sourceFor("pf_welcome_paragraph")).toBe("base");
+    expect(sourceFor("pf_contact_info")).toBe("identity");
+    expect(sourceFor("pf_doc_language")).toBe("identity");
+    expect(sourceFor("pf_history_entry")).toBe("analysis");
+    expect(sourceFor("pf_project_url")).toBe("base");
+    expect(sourceFor("pf_provenance_basis")).toBe("base");
+    expect(sourceFor("pf_more_detail_gate")).toBeUndefined();
+  });
+
+  it("value and source lookups agree on the seeded set: unseeded ids return neither", () => {
+    // Regression guard for km-triage finding 1 (PR #1927): getSeedValue and
+    // getSeedSource both read the single PHASE_F_SEEDS registry, so a
+    // question id can never be seeded without its source or sourced without
+    // a value resolver. Unseeded ids (deliberately unseeded, unknown, or
+    // belonging to another flow) resolve to neither.
+    const { deps } = buildDeps();
+    for (const id of ["pf_credits", "pf_not_a_question", "il_language_code"]) {
+      expect(phaseFOptions.seeds!.getSeedValue(id, deps)).toBeUndefined();
+      expect(phaseFOptions.seeds!.getSeedSource!(id, deps)).toBeUndefined();
+    }
   });
 });

@@ -51,6 +51,20 @@ export type OutputElement =
   | { kind: "char"; value: string }
   | { kind: "deadkey"; id: number }
   | { kind: "beep" }
+  /**
+   * The `nul` keyword — the rule produces nothing (suppression). Typed per
+   * 076 FR-004 so the suppression compiler and Layer A check #8 can
+   * distinguish "output nothing" from literal text structurally.
+   */
+  | { kind: "nul" }
+  /**
+   * A context reference in output position: the bare `context` keyword
+   * re-emits the whole matched context, `context(N)` the Nth character of the
+   * matched context (1-based). Typed per 076 FR-004. The bare keyword is
+   * represented as `offset: 0` — offset 0 never arises from `context(0)`,
+   * which the codec rejects (malformed), so the two are unambiguous.
+   */
+  | { kind: "context"; offset: number }
   | { kind: "index"; storeRef: string; offset: number }
   | { kind: "outs"; storeRef: string }
   /** `use(groupName)` group transition in output position — a control-flow
@@ -247,6 +261,26 @@ export interface IRHeader {
    * ANSI keyboards at import time without altering the stores array.
    */
   encoding?: "Unicode" | "ANSI";
+  /**
+   * The set of `begin` entry points, modelled for fidelity (spec 076 FR-004).
+   * `main` is the group named in the `begin <encoding> > use(<group>)`
+   * directive — the parser keeps it (first directive wins, mirroring
+   * `encoding`) so the emitter reuses it instead of rebuilding a single
+   * entry from the first non-readonly group. `newContext` / `postKeystroke`
+   * record the presence of the reserved entry groups. Together with
+   * {@link IRHeader.encoding} this is the full entry-point set.
+   * `NewContext` and `PostKeystroke` groups are `readonly` and MUST NOT be
+   * used as reorder hooks — they are modelled for fidelity only.
+   * Absent when the keyboard was constructed in-memory (scaffolded).
+   */
+  entryPoints?: {
+    /** Group named in `begin <encoding> > use(<group>)`. */
+    main?: string;
+    /** The source declared a `group(NewContext)` entry group. */
+    newContext?: boolean;
+    /** The source declared a `group(PostKeystroke)` entry group. */
+    postKeystroke?: boolean;
+  };
 }
 
 /** A single KMN store declaration. */
@@ -266,6 +300,13 @@ export interface IRStore {
   /** True for system/compiler-directive stores (&NAME, &COPYRIGHT, etc.). */
   isSystem: boolean;
   /**
+   * Ownership marker for stores synthesized by a rule-pack install
+   * (spec 082 FR-015; sibling of {@link IRRule.ownedByBehaviour}). Format
+   * `"<packId>/<behaviourId>"`. Lets uninstall remove exactly the stores the
+   * install added, never a pre-existing same-named store.
+   */
+  ownedByBehaviour?: string;
+  /**
    * Set when the source line carried a `$keyman[web|only]:` prefix.
    * Preserved structurally so the codec can round-trip per-target stores.
    */
@@ -283,6 +324,14 @@ export interface IRStore {
    * but preserved on emit. Mirrors IRRule.trailingComment.
    */
   trailingComment?: string;
+  /**
+   * Marker for stores synthesized by the rules survey step (spec 082 pack
+   * install). Set when the store is minted into the working IR; never by the
+   * codec parser. The VFS projection splices marked stores absent from the
+   * base IR into the projected artifact alongside the marked rules that
+   * reference them. Sibling of {@link IRRule.rulesStepAdded}.
+   */
+  rulesStepAdded?: true;
 }
 
 /** A KMN group (begin / group ... using keys). */
@@ -311,6 +360,19 @@ export interface IRRule {
   /** ID of the Pattern that owns this node; set by the pattern recognizer. */
   ownedByPattern?: string;
   /**
+   * Ownership marker for rules compiled from a behaviour (spec 082 FR-015;
+   * 076 FR-002). Set by the behaviour compiler — e.g. rule-pack install
+   * (`packages/engine/src/rulePacks/install.ts`) — never by the codec parser.
+   * Format `"<packId>/<behaviourId>"`, e.g.
+   * `"cameroon-diacritic-blocking/cameroon_diacritic_blocking"` or
+   * `"carve-suppression"` for behaviour-owned suppression rules. Lets a rule
+   * be recompiled, removed, and displayed by owner. A plain string (not a
+   * union) so future behaviours reuse the marker without a contract change.
+   * Mutually exclusive with {@link ownedByPattern} on one rule — see
+   * IRRuleOwnershipSchema (spec 076 FR-002).
+   */
+  ownedByBehaviour?: string;
+  /**
    * Set for group-transition rules of the form `match > use(g)` or
    * `nomatch > use(g)`. Preserved structurally so the codec can round-trip
    * the leading keyword — emit-without-this-field produces a bare `>`,
@@ -330,6 +392,18 @@ export interface IRRule {
    * Absent for in-memory (scaffolded/synthesized) rules.
    */
   sourceLine?: number;
+  /**
+   * Marker for rules added by the rules survey step (spec 082: pack install,
+   * guard synthesis, Narrow exceptions). Set by the studio/engine when the
+   * rule is minted into the working IR; never by the codec parser. The VFS
+   * projection (`projectWorkingCopyVfs`, via `deriveRuleAdditions`) splices
+   * marked rules that are absent from the base IR into the projected
+   * artifact in working-IR order, so they take effect in the preview and
+   * download. Rules minted by other flows (context-tolerance replay, touch
+   * rule synthesis) deliberately do NOT carry this marker — they reach the
+   * artifact through their own projection paths.
+   */
+  rulesStepAdded?: true;
 }
 
 /** A KMN comment node. */

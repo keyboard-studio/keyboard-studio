@@ -271,6 +271,20 @@ function withOneTrailingNewline(s: string): string {
   return `${s.replace(/\s+$/, "")}\n`;
 }
 
+/**
+ * The "## Supported Platforms" block rendered from the projected `&TARGETS`
+ * tokens — shared by the description path and the no-description fallback
+ * (#1906: the generator satisfies its own 5.7 readme-targets check even
+ * before the author has written a description). The raw token spellings are
+ * kept (`- any`, `- windows`); `expandPlatforms` resolves them the same way
+ * it resolves the `.kmn` side, so both sides compare equal. Empty when no
+ * platforms are known.
+ */
+function supportedPlatformsLines(platforms: readonly string[]): string[] {
+  if (platforms.length === 0) return [];
+  return ["", "## Supported Platforms", ...platforms.map((p) => `- ${p}`)];
+}
+
 /** The description/Links/Supported-Platforms body `renderReadmeMd` shares between the fresh-title path and the FR-006 base-inheritance path, WITHOUT the `# title` heading. */
 function buildReadmeBody(input: HelpDocsRenderInput, description: string): string {
   const { answers, platforms } = input;
@@ -285,8 +299,7 @@ function buildReadmeBody(input: HelpDocsRenderInput, description: string): strin
   }
 
   if (platforms.length > 0) {
-    lines.push("", "## Supported Platforms");
-    for (const p of platforms) lines.push(`- ${p}`);
+    lines.push(...supportedPlatformsLines(platforms));
   }
 
   return lines.join("\n");
@@ -298,8 +311,8 @@ function buildReadmeBody(input: HelpDocsRenderInput, description: string): strin
  *
  * @param baseReadmeMdText spec 080 FR-006: a fetched base's own `README.md`,
  *   inherited even before the author has answered anything. `null` keeps
- *   today's byte-identical behaviour (the bare `# title` stub, or the
- *   title + description/links/platforms once answered). Non-null: no
+ *   the FR-002 fallback shape (the bare `# title` stub, plus the Supported
+ *   Platforms section whenever projected `&TARGETS` are known). Non-null: no
  *   description yet -> the base text verbatim (one trailing newline); a
  *   description answered -> the base text, one blank line, then the tool's
  *   own sections WITHOUT a second `# title` heading (the base already has one).
@@ -317,8 +330,12 @@ export function renderReadmeMd(
   }
 
   if (description === undefined) {
-    // FR-002 fallback — byte-identical to today's bare scaffolder stub.
-    return `# ${displayName}\n`;
+    // FR-002 fallback — byte-identical to the bare scaffolder stub when no
+    // platforms are known; with projected &TARGETS the Supported Platforms
+    // section is appended so the generated README passes the tool's own 5.7
+    // readme-targets check (#1906).
+    const lines = [`# ${displayName}`, ...supportedPlatformsLines(input.platforms)];
+    return `${lines.join("\n")}\n`;
   }
 
   return `# ${displayName}\n\n${buildReadmeBody(input, description)}\n`;
@@ -385,6 +402,29 @@ export function renderWelcomeHtm(
 }
 
 /**
+ * The help-page body fragment for a welcome page: its `<style>` blocks (so
+ * inline-CSS parity, criterion 11.10, holds) followed by the content of its
+ * `<body>`, with no document chrome (criterion 11.4 — the help site's
+ * `header.php` owns it). Relative links to sibling `.htm` pages point at their
+ * `.php` twins, the help site's form of the same page.
+ */
+function helpFragmentFromWelcome(welcomeHtml: string): string {
+  const head = /<head\b[^>]*>([\s\S]*?)<\/head>/i.exec(welcomeHtml)?.[1] ?? "";
+  const styles = head.match(/<style\b[^>]*>[\s\S]*?<\/style>/gi) ?? [];
+  const bodyMatch = /<body\b[^>]*>([\s\S]*)<\/body>/i.exec(welcomeHtml);
+  const body = (
+    bodyMatch?.[1] ??
+    welcomeHtml
+      .replace(/<!DOCTYPE[^>]*>/gi, "")
+      .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
+      .replace(/<\/?(?:html|body)\b[^>]*>/gi, "")
+  )
+    .replace(/(\bhref\s*=\s*["'])(?![a-z][a-z0-9+.-]*:|\/\/)([^"'#]*?)\.htm(?=["'#])/gi, "$1$2.php")
+    .trim();
+  return `${[...styles, body].join("\n")}\n`;
+}
+
+/**
  * `source/help/<id>.php` — the online help page. Merges with the base's own help
  * page when one was fetched (FR-013); a base page keeps its own header and is
  * never given a second one. Inherits the base page verbatim even before
@@ -396,12 +436,24 @@ export function renderWelcomeHtm(
  * FR-006) therefore applies to welcome.htm and to inherited help pages that
  * already carry an `<html>` element; a fresh help page has no `<html>` to
  * annotate.
+ *
+ * @param baseWelcomeHtmText the base's own welcome page, for a base that ships
+ *   one but no help page of its own. The help page is then derived from the
+ *   welcome page {@link renderWelcomeHtm} renders from it, so the two carry the
+ *   same body (criterion 11.9) instead of an inherited welcome page beside the
+ *   bare placeholder stub.
  */
 export function renderHelpPhp(
   input: HelpDocsRenderInput,
   baseHelpPhpText: string | null,
+  baseWelcomeHtmText: string | null = null,
 ): string {
   const { answers, displayName, primaryBcp47 } = input;
+  if (baseHelpPhpText === null && baseWelcomeHtmText !== null) {
+    return `${helpSiteHeader(displayName)}${helpFragmentFromWelcome(
+      renderWelcomeHtm(input, baseWelcomeHtmText),
+    )}`;
+  }
   const description = answers !== null ? nonBlank(answers.description) : undefined;
   if (description === undefined) {
     // FR-006: inherit the base help page even before anything is authored.

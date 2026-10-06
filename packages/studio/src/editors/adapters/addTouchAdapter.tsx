@@ -41,6 +41,7 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   // Raw fork choice (spec 035 FR-006) — may legitimately be null (defensive
   // edge case); the reducer's injected buildTouchLayoutJson dep resolves the
@@ -57,11 +58,11 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   // overlay or Phase C assignments actually change — the sets/array are
   // replaced immutably on every mutation, so a size/length-based key is a
   // cheap, correct proxy (mirrors TouchGallery's touchKey precedent).
-  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${phaseResults.length}`;
+  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
 
   const mods = useMemo<DesktopModifications>(() => {
     if (baseIr === null) return EMPTY_MODS;
-    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults);
+    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseIr, modsDepsKey]);
 

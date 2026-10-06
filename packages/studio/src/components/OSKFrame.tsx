@@ -2,13 +2,20 @@
 // drives postMessage commands from the parent state, surfaces incoming
 // text + ready/error events back up via useOskChannel.
 //
-// The iframe is mounted unconditionally (even before a keyboard is picked)
-// so KMW's init() runs once and stays warm. Hiding & re-creating the iframe
-// would reset KMW context on every selection — expensive.
+// The iframe mounts whenever this component renders — including before a
+// keyboard is picked — so KMW's init() runs and stays warm while the preview
+// is visible. The parent unmounts this component when the author hides the
+// preview via the OSK visibility switch (mobile adaptation, principle 9):
+// unmounting destroys the iframe and unloads KeymanWeb,
+// freeing the library's memory. Showing the preview remounts here and the
+// normal init path (iframe onLoad → SET_STRINGS → SET_KEYBOARD on engine
+// ready) runs again cleanly — no warm-state assumptions survive the unmount.
 
 import { useCallback, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { BREAKPOINTS } from "../ui/breakpoints.ts";
+import { useViewport } from "../hooks/useViewport.ts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { useOskChannel } from "../hooks/useOskChannel.ts";
@@ -25,9 +32,35 @@ export interface OSKFrameProps {
   /** Retry callback from useKeyboardArtifact in the parent. */
   retry: () => void;
   onTextChange?: (text: string) => void;
-  /** Called when the user taps a key on the rendered OSK. keyId is the KMW key identifier (e.g. "K_A"). */
-  onKeyTap?: (keyId: string) => void;
+  /**
+   * Put the caret in the type-here textarea once the first keyboard is
+   * active, so the author can type straight away. For previews the author
+   * explicitly opened (a PreviewSheet); an always-visible pane must not
+   * steal focus from the survey. Fires once per mount — later reloads
+   * (every edit recompiles) leave focus where the author put it.
+   */
+  autoFocus?: boolean;
 }
+
+/**
+ * Viewport-relative OSK sizing (mobile adaptation, Phase 4).
+ *
+ * The desktop frame is a fixed 560px — untouched. On narrow viewports and
+ * scarce heights (landscape phones) the iframe shrinks to fit the viewport
+ * instead of pushing chrome off-screen: `min(560, max(240, vh - chrome))`.
+ *
+ * `OSK_VIEWPORT_CHROME_PX` reserves room for the chrome the keyboard shares
+ * the viewport with: ~88px in the PreviewSheet (header + content padding),
+ * ~118px in the landscape two-pane (gallery header + bottom tab bar). 120px
+ * covers both with a small margin. It is an estimate, not a measurement —
+ * the 240px floor keeps the keyboard usable when the estimate overshoots on
+ * very short viewports.
+ */
+const OSK_VIEWPORT_CHROME_PX = 120;
+/** Floor so the keyboard never collapses below a usable height. */
+const OSK_MIN_HEIGHT_PX = 240;
+/** The long-standing desktop frame height — unchanged. */
+const OSK_DESKTOP_HEIGHT_PX = 560;
 
 export function OSKFrame({
   baseKeyboard,
@@ -35,11 +68,24 @@ export function OSKFrame({
   stage,
   retry,
   onTextChange,
-  onKeyTap,
+  autoFocus = false,
 }: OSKFrameProps) {
   const { t } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const channel = useOskChannel(iframeRef, onKeyTap);
+  const channel = useOskChannel(iframeRef);
+  // Viewport-relative sizing: narrow or scarce-height viewports shrink the
+  // frame to fit instead of overflowing (mockup 6). Measured from the
+  // viewport hook — not CSS dvh — so the value is deterministic in tests and
+  // updates live on rotation. Desktop viewports keep the fixed 560px frame.
+  const viewport = useViewport();
+  const compactHeight =
+    viewport.isNarrow || viewport.height <= BREAKPOINTS.shortHeightMax;
+  const estimatedHeightPx = compactHeight
+    ? Math.min(
+        OSK_DESKTOP_HEIGHT_PX,
+        Math.max(OSK_MIN_HEIGHT_PX, viewport.height - OSK_VIEWPORT_CHROME_PX),
+      )
+    : OSK_DESKTOP_HEIGHT_PX;
   // Working-copy identity drives the bcp47 language tag passed to KMW's
   // setActiveKeyboard — Track 1 (Copy) supplies the author-chosen language,
   // Track 2 (Adapt) leaves it null and we fall back to the base's first
@@ -50,7 +96,20 @@ export function OSKFrame({
   // and the booleans are primitives. Depending on the object directly
   // re-fires these effects every render and spams the iframe with
   // duplicate SET_KEYBOARD messages.
-  const { send, engineReady, textValue } = channel;
+  const { send, engineReady, textValue, keyboardActivations } = channel;
+  const contentHeight = channel.contentHeight ?? null;
+  // Once the frame reports its natural height (CONTENT_HEIGHT), size the
+  // iframe to it so the whole keyboard shows — a fixed estimate cropped the
+  // bottom rows at phone widths. Compact viewports use the reported height
+  // exactly (the containing pane or sheet scrolls if it is taller than the
+  // screen); desktop keeps its 560px frame as a floor, growing only for a
+  // taller layout (e.g. the tablet profile).
+  const frameHeightPx =
+    contentHeight === null
+      ? estimatedHeightPx
+      : compactHeight
+        ? contentHeight
+        : Math.max(OSK_DESKTOP_HEIGHT_PX, contentHeight);
 
   // The frame is a static document with no Lingui catalog of its own, so its
   // user-facing chrome is localized here and pushed in via SET_STRINGS. Keep
@@ -64,8 +123,14 @@ export function OSKFrame({
     id: "osk.frame.status.ready",
     message: "Ready — pick a keyboard",
   });
-  const stringsRef = useRef({ placeholder: placeholderText, statusReady: statusReadyText });
-  stringsRef.current = { placeholder: placeholderText, statusReady: statusReadyText };
+  const stringsRef = useRef({
+    placeholder: placeholderText,
+    statusReady: statusReadyText,
+  });
+  stringsRef.current = {
+    placeholder: placeholderText,
+    statusReady: statusReadyText,
+  };
 
   const sendStrings = useCallback(() => {
     send({ type: "SET_STRINGS", strings: stringsRef.current });
@@ -98,16 +163,24 @@ export function OSKFrame({
     // needs the language tag the compiled .js registers under — otherwise it
     // errors with "Cannot find the <id> keyboard for English".
     const activeBcp47 =
-      (identity?.bcp47 && identity.bcp47.trim() !== "" ? identity.bcp47 : undefined) ??
-      baseKeyboard.languages?.[0];
+      (identity?.bcp47 && identity.bcp47.trim() !== ""
+        ? identity.bcp47
+        : undefined) ?? baseKeyboard.languages?.[0];
     send({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
       keyboardId: activeKeyboardId,
-      ...(activeBcp47 !== undefined && activeBcp47 !== "" ? { bcp47: activeBcp47 } : {}),
-      ...(stage.fontFaceUrl !== undefined ? { fontFaceUrl: stage.fontFaceUrl } : {}),
-      ...(stage.fontFaceFamily !== undefined ? { fontFaceFamily: stage.fontFaceFamily } : {}),
-      ...(stage.keyboardCssUrls !== undefined && stage.keyboardCssUrls.length > 0
+      ...(activeBcp47 !== undefined && activeBcp47 !== ""
+        ? { bcp47: activeBcp47 }
+        : {}),
+      ...(stage.fontFaceUrl !== undefined
+        ? { fontFaceUrl: stage.fontFaceUrl }
+        : {}),
+      ...(stage.fontFaceFamily !== undefined
+        ? { fontFaceFamily: stage.fontFaceFamily }
+        : {}),
+      ...(stage.keyboardCssUrls !== undefined &&
+      stage.keyboardCssUrls.length > 0
         ? { keyboardCssUrls: stage.keyboardCssUrls }
         : {}),
     });
@@ -118,6 +191,18 @@ export function OSKFrame({
     send({ type: "SET_OSK_MODE", mode: oskMode });
   }, [oskMode, engineReady, send]);
 
+  // autoFocus: on the first activation only. Focusing the iframe element
+  // hands the page's focus to the frame; FOCUS_TARGET then picks the
+  // textarea inside it (a focus() call inside a frame that is not itself
+  // focused does not move the page's focus).
+  const autoFocusedRef = useRef(false);
+  useEffect(() => {
+    if (!autoFocus || autoFocusedRef.current || keyboardActivations === 0) return;
+    autoFocusedRef.current = true;
+    iframeRef.current?.focus({ preventScroll: true });
+    send({ type: "FOCUS_TARGET" });
+  }, [autoFocus, keyboardActivations, send]);
+
   if (baseKeyboard !== null && isExcludedScript(baseKeyboard.script)) {
     return <UnsupportedScriptStub script={baseKeyboard.script} />;
   }
@@ -127,10 +212,16 @@ export function OSKFrame({
       style={{
         position: "relative",
         width: "100%",
-        minHeight: 380,
-        borderRadius: 12,
+        minHeight:
+          contentHeight !== null ? undefined : compactHeight ? OSK_MIN_HEIGHT_PX : 380,
         overflow: "hidden",
-        border: "1px solid var(--app-border)",
+        // Phone widths: edge to edge like a real keyboard — no rounded card.
+        ...(viewport.isNarrow
+          ? {
+              borderTop: "1px solid var(--app-border)",
+              borderBottom: "1px solid var(--app-border)",
+            }
+          : { borderRadius: 12, border: "1px solid var(--app-border)" }),
         background: "var(--app-bg)",
       }}
     >
@@ -138,7 +229,10 @@ export function OSKFrame({
         ref={iframeRef}
         src="/osk-frame.html"
         onLoad={sendStrings}
-        title={t({ id: "osk.frame.title", message: "On-screen keyboard preview" })}
+        title={t({
+          id: "osk.frame.title",
+          message: "On-screen keyboard preview",
+        })}
         // allow-same-origin is load-bearing for the frame's postMessage
         // origin check (osk-frame.js compares event.origin against its own
         // window.location.origin) and for KMW's relative .js fetches in dev.
@@ -147,7 +241,7 @@ export function OSKFrame({
         sandbox="allow-scripts allow-same-origin"
         style={{
           width: "100%",
-          height: 560,
+          height: frameHeightPx,
           border: "0",
           display: "block",
           // Unified with the app surface (epic #533). Was a one-off near-black

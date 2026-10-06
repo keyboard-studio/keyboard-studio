@@ -29,28 +29,36 @@ export interface SourcedExemplarsState {
  * pre-044 behaviour, so a missing or unloadable index can never block the step.
  */
 export function useSourcedExemplars(bcp47: string | undefined): SourcedExemplarsState {
-  const [state, setState] = useState<SourcedExemplarsState>({ inventory: null, loading: true });
+  // The result is stored WITH the tag it answers. When the tag changes, the
+  // render before the effect re-runs would otherwise hand back the previous
+  // tag's settled `{ loading: false }` — and a caller that latches its
+  // default on the first settled result (IntroChooser) would latch on the
+  // wrong answer and never pre-select the exemplar option.
+  const [state, setState] = useState<{
+    tag: string | undefined;
+    inventory: SourcedInventory | null;
+  } | null>(null);
+
+  const hasTag = bcp47 !== undefined && bcp47.trim() !== "";
 
   useEffect(() => {
-    if (bcp47 === undefined || bcp47.trim() === "") {
-      setState({ inventory: null, loading: false });
-      return;
-    }
+    if (bcp47 === undefined || !hasTag) return;
     let cancelled = false;
-    setState({ inventory: null, loading: true });
     sourcedExemplars(bcp47)
       .then((inventory) => {
-        if (!cancelled) setState({ inventory, loading: false });
+        if (!cancelled) setState({ tag: bcp47, inventory });
       })
       .catch(() => {
         // Degrade to "no proposal available" rather than surfacing an error:
         // the author still has every pre-044 way to build their alphabet.
-        if (!cancelled) setState({ inventory: null, loading: false });
+        if (!cancelled) setState({ tag: bcp47, inventory: null });
       });
     return () => {
       cancelled = true;
     };
-  }, [bcp47]);
+  }, [bcp47, hasTag]);
 
-  return state;
+  if (!hasTag) return { inventory: null, loading: false };
+  if (state === null || state.tag !== bcp47) return { inventory: null, loading: true };
+  return { inventory: state.inventory, loading: false };
 }

@@ -23,6 +23,7 @@ import {
   computeMarkTreatmentPrefills,
   nfcPostureOfInventory,
   expandCaseCounterpartAttachments,
+  buildAttestationFold,
   getEffectiveFacet,
   CASING_FACET_ID,
 } from "@keyboard-studio/engine";
@@ -67,10 +68,12 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
 
   const marksFlagged = useMemo<readonly FlaggedAnswerInput[]>(() => {
     if (alphabet === undefined || alphabet.marks.length === 0) return [];
-    const classes = groupMarkClasses(alphabet);
-    const proposals = proposeAttachments(alphabet, classes);
     const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
     const isCasedBase = casingValue === "cased" || casingValue === "mixed";
+    // Same case-symmetric grouping and proposal the step renders from (parity, spec 079 US3).
+    const fold = buildAttestationFold(isCasedBase, bcp47);
+    const classes = groupMarkClasses(alphabet, fold);
+    const proposals = proposeAttachments(alphabet, classes, fold);
     const attachmentBases = isCasedBase ? lowercaseBaseView(alphabet.bases, bcp47) : alphabet.bases;
     const keyBudget = baseIr != null ? measureKeyBudget(baseIr) : null;
     // spec 079 US3 parity fix: reconcile against the SAME saved answers
@@ -89,7 +92,7 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
       baseIr,
       keyBudget,
       attachments: expandedAttachments,
-      ...(bcp47 !== undefined ? { bcp47 } : {}),
+      ...fold,
     });
     const multiMarkStacks = alphabet.attestedStacks.filter((s) => s.marks.length >= 2);
     const posture = nfcPostureOfInventory(alphabet);
@@ -209,10 +212,12 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
 
   let marksFlagged: readonly FlaggedAnswerInput[] = [];
   if (alphabet !== undefined && alphabet.marks.length > 0) {
-    const classes = groupMarkClasses(alphabet);
-    const proposals = proposeAttachments(alphabet, classes);
     const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
     const isCasedBase = casingValue === "cased" || casingValue === "mixed";
+    // Same case-symmetric grouping and proposal the step renders from (parity, spec 079 US3).
+    const fold = buildAttestationFold(isCasedBase, bcp47);
+    const classes = groupMarkClasses(alphabet, fold);
+    const proposals = proposeAttachments(alphabet, classes, fold);
     const attachmentBases = isCasedBase ? lowercaseBaseView(alphabet.bases, bcp47) : alphabet.bases;
     const keyBudget = baseIr != null ? measureKeyBudget(baseIr) : null;
     const reconciled = reconciledAttachmentChecked(alphabet, proposals, marksStepAnswers?.answers ?? EMPTY_ANSWERS);
@@ -223,7 +228,7 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
       baseIr,
       keyBudget,
       attachments: expandedAttachments,
-      ...(bcp47 !== undefined ? { bcp47 } : {}),
+      ...fold,
     });
     const multiMarkStacks = alphabet.attestedStacks.filter((s) => s.marks.length >= 2);
     const posture = nfcPostureOfInventory(alphabet);

@@ -42,19 +42,42 @@ function defaultGetQuestionLabelSource(questionId: string): QuestionLabelSource 
   };
 }
 
+// The station and the question it records read the same way to the author.
+const MARKS_CONTEXT_TOLERANCE_LABEL = msg({
+  id: "trail.question.marksContextTolerance",
+  message: "Diacritics typed as separate characters",
+});
+
 /**
  * Labels for questions an editor step records itself, which have no flow-question
  * module to read a prompt from (spec 078: the marks series' context-tolerance
  * decision). Consulted only when the registry has no entry for the id.
  */
 const EDITOR_QUESTION_LABELS: Readonly<Record<string, MessageDescriptor>> = {
-  "marks.context_tolerance": msg({
-    id: "trail.question.marksContextTolerance",
-    message: "Accents typed as separate characters",
+  // The marks series' stations — each is one screen (and one footer / Contents
+  // mark) that has no flow-question module. Labels follow each station's
+  // heading, shortened to a topic.
+  "marks_attachment": msg({
+    id: "trail.question.marksAttachment",
+    message: "Which letters take each mark",
   }),
+  "marks_treatment": msg({
+    id: "trail.question.marksTreatment",
+    message: "How marks are typed",
+  }),
+  "marks_output_form": msg({
+    id: "trail.question.marksOutputForm",
+    message: "What backspace does to an accented letter",
+  }),
+  "marks_stacking": msg({
+    id: "trail.question.marksStacking",
+    message: "Two marks on one letter",
+  }),
+  "marks_context_tolerance": MARKS_CONTEXT_TOLERANCE_LABEL,
+  "marks.context_tolerance": MARKS_CONTEXT_TOLERANCE_LABEL,
   "marks.context_tolerance.sites": msg({
     id: "trail.question.marksContextToleranceSites",
-    message: "Rules fixed for accents typed as separate characters",
+    message: "Rules fixed for diacritics typed as separate characters",
   }),
 };
 

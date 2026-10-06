@@ -7,9 +7,9 @@
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { stackKey } from "@keyboard-studio/contracts";
-import { caseCounterpart } from "../character-discovery/casePair.js";
-import type { MarkClass } from "./mark-classes.js";
-import { attestedBasesOf } from "./mark-classes.js";
+import { confirmedCaseCounterpart } from "../character-discovery/casePair.js";
+import type { AttestationCaseFold, MarkClass } from "./mark-classes.js";
+import { attestedBasesOf, attestedLetterCount } from "./mark-classes.js";
 
 /**
  * The PROPOSAL tri-state — distinct from the contracts' AttachmentState:
@@ -30,6 +30,12 @@ export interface AttachmentProposal {
 }
 
 /**
+ * Without `caseFold`, a mark seen only on a capital (`Ǹ` opening a sentence)
+ * leaves the lowercase row, the only one the station shows, blocked.
+ */
+export type ProposeAttachmentsOptions = AttestationCaseFold;
+
+/**
  * Compute one proposal row per mark. The plausibility heuristic is the
  * mark-class one: a base is plausible for a mark when it is attested for a
  * DIFFERENT mark of the same class (marks that behave alike attach alike).
@@ -37,8 +43,9 @@ export interface AttachmentProposal {
 export function proposeAttachments(
   alphabet: ConfirmedAlphabet,
   classes: MarkClass[],
+  options: ProposeAttachmentsOptions = {},
 ): AttachmentProposal[] {
-  const attested = attestedBasesOf(alphabet);
+  const attested = attestedBasesOf(alphabet, options);
   const classOf = new Map<string, MarkClass>();
   for (const markClass of classes) {
     for (const mark of markClass.marks) classOf.set(mark, markClass);
@@ -61,7 +68,9 @@ export function proposeAttachments(
     return {
       mark,
       states,
-      autoConfirmed: own.size === 1 && plausible.size === 0,
+      // One letter in two cases is one attestation, not two (FR-008's "exactly
+      // one attested base" must still hold for a mark seen only on `n`).
+      autoConfirmed: attestedLetterCount(alphabet, own, options) === 1 && plausible.size === 0,
     };
   });
 }
@@ -79,8 +88,8 @@ export function deriveCaseCounterparts(
   const bases = new Set(alphabet.bases);
   const result = new Map<string, string>();
   for (const stack of alphabet.attestedStacks) {
-    const pair = caseCounterpart(stack.base, bcp47);
-    if (pair !== null && bases.has(pair.counterpart)) {
+    const pair = confirmedCaseCounterpart(stack.base, bases, bcp47);
+    if (pair !== null) {
       result.set(stackKey(stack), pair.counterpart);
     }
   }

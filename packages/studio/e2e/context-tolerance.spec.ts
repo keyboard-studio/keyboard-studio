@@ -57,13 +57,13 @@ test.describe("Context tolerance — US1 diagnosis (spec 078)", () => {
     const notice = page.getByTestId("context-tolerance-notice");
     await expect(notice).toBeVisible({ timeout: 120_000 });
     await expect(notice.locator("xpath=ancestor::*[@role='status'][@aria-live='polite']")).toHaveCount(1);
-    await expect(notice).toContainText(/only works? when the accent is already joined to the letter/);
+    await expect(notice).toContainText(/only works? when the diacritic is already joined to the letter/);
 
     await notice.getByRole("button", { name: /show the affected rules/i }).click();
     await expect(notice).toContainText("U+0323 COMBINING DOT BELOW", { timeout: 30_000 });
     await expect(notice).toContainText(/U\+[0-9A-F]{4} LATIN SMALL LETTER [A-Z]\b/);
     // The typed text is shown too, so the case is reproducible (FR-003).
-    await expect(notice).toContainText(/After this text, with the accent joined to the letter/);
+    await expect(notice).toContainText(/After this text, with the diacritic joined to the letter/);
 
     // Advisory only (FR-002): the download stays available with the finding up.
     await page.click('a[href="#output"]');
@@ -130,7 +130,7 @@ test.describe("Context tolerance — US2 accept and US3 decline (spec 078)", () 
     // fix, the preview recompiles, and the re-analysis reports the rules fixed.
     await expect(page.getByTestId("context-tolerance-made-tolerant")).toBeVisible({ timeout: 180_000 });
     // Every proposed rule was accepted, so no gap is left.
-    await expect(page.getByTestId("context-tolerance-notice")).not.toContainText(/only works? when the accent/);
+    await expect(page.getByTestId("context-tolerance-notice")).not.toContainText(/only works? when the diacritic/);
   });
 
   test("a partial accept applies only the ticked rules", async ({ page }) => {
@@ -143,7 +143,7 @@ test.describe("Context tolerance — US2 accept and US3 decline (spec 078)", () 
     await expect(page.getByTestId("context-tolerance-made-tolerant")).toBeVisible({ timeout: 180_000 });
     const notice = page.getByTestId("context-tolerance-notice");
     // The unticked rule is still reported as a gap.
-    await expect(notice).toContainText(/1 rule only works when the accent is already joined to the letter/);
+    await expect(notice).toContainText(/1 rule only works when the diacritic is already joined to the letter/);
   });
 
   test("declining leaves the keyboard without the fix and keeps the finding", async ({ page }) => {
@@ -152,7 +152,7 @@ test.describe("Context tolerance — US2 accept and US3 decline (spec 078)", () 
 
     // The finding stays visible as advisory (FR-009).
     await expect(page.getByTestId("context-tolerance-notice")).toContainText(
-      /only works? when the accent is already joined to the letter/,
+      /only works? when the diacritic is already joined to the letter/,
       { timeout: 60_000 },
     );
     // Nothing was applied: after a settle period no rule reads as fixed.

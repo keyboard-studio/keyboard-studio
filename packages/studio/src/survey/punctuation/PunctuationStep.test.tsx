@@ -156,9 +156,10 @@ describe("PunctuationStep — sourced suggestions", () => {
     render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
 
     // Seeded on settle: a PROPOSED pick (dashed attribution), and the
-    // suggestion panel has nothing left to offer.
+    // suggestion panel, with nothing left to offer, is not rendered at all.
     expect(await screen.findByTestId("proposed-punctuation-chip")).toBeTruthy();
-    expect(screen.getByText("Every suggested punctuation mark is already in your list below.")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Suggested punctuation" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Suggested punctuation" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Add । / })).toBeNull();
 
     fireEvent.click(screen.getByTestId("punctuation-done"));
@@ -394,6 +395,22 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Add ! (U+0021)" }));
     expect(usePhaseBDraftStore.getState().chars).toContain("!");
     expect(usePhaseBDraftStore.getState().provenance["!"]).toBe("author");
+  });
+
+  it("the suggestion section appears only while it has something to offer, and ticking the last chip moves focus to the type-in field", async () => {
+    mocks.inventory = hindiInventory();
+    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    await screen.findByTestId("cldr-punctuation-group");
+    expect(screen.queryByRole("region", { name: "Suggested punctuation" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
+    const chip = await screen.findByRole("button", { name: "Add ! (U+0021)" });
+    expect(screen.getByRole("region", { name: "Suggested punctuation" })).toBeTruthy();
+
+    chip.focus();
+    fireEvent.click(chip);
+    expect(screen.queryByRole("region", { name: "Suggested punctuation" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByLabelText("Punctuation to add"));
   });
 });
 

@@ -17,6 +17,7 @@ import {
   fingerprintLabel,
   framesFromRawStack,
   normalizeMessage,
+  scrubContext,
   scrubText,
 } from "./crash-report-pipeline.js";
 import type { CrashReportBody } from "./crash-report-schemas.js";
@@ -344,5 +345,37 @@ describe("scrubText", () => {
     // the domain neutralized.
     const out = scrubText("alice@example.com");
     expect(out).toBe("<redacted-email>");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Security audit run-1: breadcrumb `at` markdown injection
+// (crash-report/unscrubbed-breadcrumb-at-markdown-injection)
+// ---------------------------------------------------------------------------
+
+describe("scrubContext — breadcrumb at field", () => {
+  it("strips backticks and line breaks from breadcrumb `at`", () => {
+    const out = scrubContext({
+      breadcrumbs: [
+        { at: "x\n```\n", channel: "route", label: "l" },
+        { at: "[click](https://evil.example)", channel: "route", label: "l" },
+        { at: "@maintainer look", channel: "route", label: "l" },
+      ],
+    });
+    const ats = out.breadcrumbs!.map((b) => b.at);
+    for (const at of ats) {
+      expect(at).not.toMatch(/[`\r\n]/);
+    }
+    // The fence-close payload is defused: no backtick run survives.
+    expect(ats[0]).not.toContain("```");
+    // Mentions are neutralized by scrubText (zero-width space), not raw.
+    expect(ats[2]).not.toMatch(/^@maintainer/);
+  });
+
+  it("leaves benign timestamps untouched", () => {
+    const out = scrubContext({
+      breadcrumbs: [{ at: "12:34:56", channel: "route", label: "l" }],
+    });
+    expect(out.breadcrumbs![0]!.at).toBe("12:34:56");
   });
 });

@@ -204,7 +204,7 @@ preference. Ship the record; the evaluation harness decides promotion.
 
 Facets supply the *evidence*; the adaptation-question catalog
 ([content/adaptation-questions/](../adaptation-questions/README.md), spec
-[038](../../specs/038-adaptation-questions/spec.md)) turns that evidence into the
+[038](../../specs/_archive/038-adaptation-questions/spec.md)) turns that evidence into the
 §3c confirmations that carry a base keyboard's classified values forward. A
 catalog record's `prefill.sessionFacet` points here, and this facet's
 `consumers.prefills` must name that question in return — a bijection

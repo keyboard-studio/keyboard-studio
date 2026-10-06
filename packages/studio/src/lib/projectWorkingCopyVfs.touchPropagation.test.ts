@@ -165,7 +165,10 @@ describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation"
     // Real key text, not blank — proves the propagation step was fed the
     // freshly re-parsed post-assignment .kmn, not a stale IR.
     expect(eKey.text).toBe("é");
-    expect(eKey.output).toBe("é");
+    // Working copy keeps `output` for the studio key-grid UI (per-layer
+    // disambiguator); conformTouchLayoutToKeymanSchema strips it on the
+    // output projection (KM04000).
+    expect(eKey).toHaveProperty("output", "é");
     // No propagation-step warnings (the missing-.kvks warning is step 3.5's
     // keycap-label projection — irrelevant to this test's fixture, which
     // ships no .kvks file).
@@ -195,7 +198,9 @@ describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation"
     expect(raltLayer).toBeDefined();
     const eKey = raltLayer.row[0].key.find((k: { id: string }) => k.id === "K_E");
     expect(eKey.text).toBe("é");
-    expect(eKey.output).toBe("é");
+    // Working-copy convention: output stays on the working copy for the
+    // studio key-grid UI; conform strips it on the output projection.
+    expect(eKey).toHaveProperty("output", "é");
     expect(warnings.some((w) => w.includes("propagation"))).toBe(false);
   });
 

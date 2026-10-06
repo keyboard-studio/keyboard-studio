@@ -1,11 +1,11 @@
 # Phase 1 Data Model: En-Masse Adaptation Preference Questions
 
-**Feature**: 038-adaptation-questions | **Date**: 2026-07-17 | **Spec**: [spec.md](spec.md)
+**Feature**: 038-adaptation-questions | **Date**: 2026-07-17 | **Spec**: [spec.md](../_archive/038-adaptation-questions/spec.md)
 
 Entities this feature introduces or reshapes. These are **content-owned data
 shapes** (candidate status, empirical — not locked `packages/contracts` types),
 plus two engine-owned session shapes. Field-level detail for the interfaces a
-consumer/test codes against lives in [contracts/](contracts/).
+consumer/test codes against lives in [contracts/](../_archive/038-adaptation-questions/contracts).
 
 ## Entity 1 — Question record (`content/adaptation-questions/<id>.yaml`)
 

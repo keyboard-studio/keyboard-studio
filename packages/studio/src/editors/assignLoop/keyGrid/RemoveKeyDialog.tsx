@@ -102,14 +102,7 @@
 // `useKeyCommands.ts`: no `useWorkingCopyStore` import, no `commitKeyEdit`
 // call. `onConfirm` fires exactly once with the op the caller commits.
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -121,10 +114,16 @@ import {
   type KeyEditOperation,
   type SuppressShapeChoice,
 } from "@keyboard-studio/engine";
-import { Badge, Button, Checkbox, Notice, RadioGroup } from "../../../ui/index.ts";
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Dialog,
+  Notice,
+  RadioGroup,
+} from "../../../ui/index.ts";
 import type { RadioOption } from "../../../ui/index.ts";
-import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
-import { FOCUSABLE_SELECTOR } from "../../../lib/focusableSelector.ts";
+import { TEXT_DIM, TEXT_MAIN } from "../../../lib/galleryTheme.ts";
 import { resolveMessage } from "../../../lib/i18nResolve.ts";
 import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
 
@@ -140,16 +139,26 @@ import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
  */
 export type RemoveKeyDialogOutcome = "suppress" | "reflow" | "redistribute";
 
-const OUTCOME_ORDER: readonly RemoveKeyDialogOutcome[] = ["suppress", "reflow", "redistribute"];
+const OUTCOME_ORDER: readonly RemoveKeyDialogOutcome[] = [
+  "suppress",
+  "reflow",
+  "redistribute",
+];
 
 // ---------------------------------------------------------------------------
 // Confirm result — the seam the caller commits through
 // ---------------------------------------------------------------------------
 
 /** `Omit<..., "seq">` of the engine's own `suppress` operation — never hand-duplicated (mirrors `RenameDialog.tsx`'s `RenameDialogRenameOp` / `useKeyCommands.ts`'s `AddKeyAfterOp`). */
-export type RemoveKeyDialogSuppressOp = Omit<Extract<KeyEditOperation, { kind: "suppress" }>, "seq">;
+export type RemoveKeyDialogSuppressOp = Omit<
+  Extract<KeyEditOperation, { kind: "suppress" }>,
+  "seq"
+>;
 /** `Omit<..., "seq">` of the engine's own `remove` operation, either outcome. */
-export type RemoveKeyDialogRemoveOp = Omit<Extract<KeyEditOperation, { kind: "remove" }>, "seq">;
+export type RemoveKeyDialogRemoveOp = Omit<
+  Extract<KeyEditOperation, { kind: "remove" }>,
+  "seq"
+>;
 
 /**
  * The engine's own two-string shape vocabulary, imported rather than restated:
@@ -207,17 +216,26 @@ export function buildRemoveKeyDialogConfirmResult(
 ): RemoveKeyDialogConfirmResult {
   if (keepRow && outcome !== "suppress") {
     const { spClass, sentinelId } = proposeSuppressFields("spacer");
-    return { outcome: "keepRow", op: { address, kind: "suppress", spClass, sentinelId } };
+    return {
+      outcome: "keepRow",
+      op: { address, kind: "suppress", spClass, sentinelId },
+    };
   }
   switch (outcome) {
     case "suppress": {
       const { spClass, sentinelId } = proposeSuppressFields(suppressShape);
-      return { outcome, op: { address, kind: "suppress", spClass, sentinelId } };
+      return {
+        outcome,
+        op: { address, kind: "suppress", spClass, sentinelId },
+      };
     }
     case "reflow":
       return { outcome, op: { address, kind: "remove", outcome: "reflow" } };
     case "redistribute":
-      return { outcome, op: { address, kind: "remove", outcome: "redistribute" } };
+      return {
+        outcome,
+        op: { address, kind: "remove", outcome: "redistribute" },
+      };
   }
 }
 
@@ -272,7 +290,9 @@ export type RemoveKeyDialogLayerKind = "twin" | "standalone";
  */
 export function classifyLayerKind(layerId: string): RemoveKeyDialogLayerKind {
   const decomposition = decomposeLayerId(layerId);
-  return decomposition.kind === "parsed" && decomposition.plane === undefined ? "twin" : "standalone";
+  return decomposition.kind === "parsed" && decomposition.plane === undefined
+    ? "twin"
+    : "standalone";
 }
 
 export interface ProposeRemoveKeyOutcomeInput {
@@ -319,7 +339,9 @@ export interface RemoveKeyDialogProposal {
  * every option, still fully overridable (FR-029f/FR-029g "MUST allow
  * override").
  */
-export function computeProposedRemoveOutcome(input: ProposeRemoveKeyOutcomeInput): RemoveKeyDialogProposal {
+export function computeProposedRemoveOutcome(
+  input: ProposeRemoveKeyOutcomeInput,
+): RemoveKeyDialogProposal {
   const { platform, layerId, rowKeys, i18n } = input;
 
   const limit = PLATFORM_ROW_KEY_LIMIT[platform];
@@ -344,7 +366,8 @@ export function computeProposedRemoveOutcome(input: ProposeRemoveKeyOutcomeInput
         i18n,
         msg({
           id: "editor.assignLoop.keyGrid.removeKeyDialog.proposal.twin",
-          message: "This layer mirrors another layer's key positions; suppressing keeps them aligned.",
+          message:
+            "This layer mirrors another layer's key positions; suppressing keeps them aligned.",
         }),
       ),
     };
@@ -356,7 +379,8 @@ export function computeProposedRemoveOutcome(input: ProposeRemoveKeyOutcomeInput
       i18n,
       msg({
         id: "editor.assignLoop.keyGrid.removeKeyDialog.proposal.standalone",
-        message: "This layer has no positional counterpart to preserve, so redistributing gives the row larger touch targets.",
+        message:
+          "This layer has no positional counterpart to preserve, so redistributing gives the row larger touch targets.",
       }),
     ),
   };
@@ -438,16 +462,17 @@ export function RemoveKeyDialog({
 }: RemoveKeyDialogProps) {
   const { t } = useLingui();
   const uid = useId();
-  const dialogRef = useRef<HTMLFormElement>(null);
 
   // Pre-selects the CALLER'S proposal (never a value this component computes
   // itself) — `null` means no selection at all, which is the deliberately
   // safe state before T098 supplies a real proposal (module doc, "Seams").
-  const [selectedOutcome, setSelectedOutcome] = useState<RemoveKeyDialogOutcome | null>(null);
+  const [selectedOutcome, setSelectedOutcome] =
+    useState<RemoveKeyDialogOutcome | null>(null);
   // FR-029a: the shape choice is proposed (default "spacer" — removing a key
   // is more often "make it disappear" than "leave a keycap-shaped hole") but
   // never removed as a control; the radio group below always renders it.
-  const [suppressShape, setSuppressShape] = useState<RemoveKeyDialogSuppressShape>("spacer");
+  const [suppressShape, setSuppressShape] =
+    useState<RemoveKeyDialogSuppressShape>("spacer");
   // T099 (FR-029, US4 AS2): defaults to KEEPING the row — Keyman Developer's
   // own behaviour is to silently delete it instead, which breaks the
   // positional alignment sibling layers depend on. Only consulted when
@@ -456,27 +481,15 @@ export function RemoveKeyDialog({
   // other per-open default in this file.
   const [keepRow, setKeepRow] = useState(true);
 
-  // Reset on every open/target change, and move focus into the dialog — the
-  // APG dialog pattern's "opening a dialog moves focus into it"
-  // (docs/accessibility.md rule 4).
+  // Reset on every open/target change. Focus-into-dialog on open is owned
+  // by the shared Dialog primitive (APG dialog pattern).
   useEffect(() => {
     if (!open || selectedCell === null) return;
     setSelectedOutcome(proposedOutcome ?? null);
     setSuppressShape("spacer");
     setKeepRow(true);
-    dialogRef.current?.querySelector<HTMLInputElement>('input[type="radio"]')?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `proposedOutcome` is intentionally read only at open/target-change time; a later change to the SAME proposal while the dialog stays open must not silently overwrite an author's own in-progress choice.
   }, [open, selectedCell]);
-
-  // Escape closes from anywhere in the dialog (APG dialog pattern).
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onCancel]);
 
   const canConfirm = selectedCell !== null && selectedOutcome !== null;
 
@@ -486,32 +499,24 @@ export function RemoveKeyDialog({
   // so asking "keep the row?" next to it would be a redundant, confusing
   // question rather than a genuine choice (see module doc, "Seams").
   const keepRowControlVisible =
-    isLastKeyInRow === true && (selectedOutcome === "reflow" || selectedOutcome === "redistribute");
-
-  function handleKeyDownTrap(e: ReactKeyboardEvent<HTMLFormElement>): void {
-    if (e.key !== "Tab" || dialogRef.current === null) return;
-    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-    if (focusable.length === 0) return;
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
+    isLastKeyInRow === true &&
+    (selectedOutcome === "reflow" || selectedOutcome === "redistribute");
 
   function handleSubmit(e: FormEvent): void {
     e.preventDefault();
-    if (!canConfirm || selectedCell === null || selectedOutcome === null) return;
+    if (!canConfirm || selectedCell === null || selectedOutcome === null)
+      return;
     // `keepRow` only takes effect while its control is actually visible —
     // guards against a stale `true` from a PRIOR open where the control was
     // shown, in case a future change reorders the reset-vs-derivation timing.
     const effectiveKeepRow = keepRowControlVisible && keepRow;
     onConfirm(
-      buildRemoveKeyDialogConfirmResult(selectedCell.address, selectedOutcome, suppressShape, effectiveKeepRow),
+      buildRemoveKeyDialogConfirmResult(
+        selectedCell.address,
+        selectedOutcome,
+        suppressShape,
+        effectiveKeepRow,
+      ),
     );
   }
 
@@ -546,17 +551,20 @@ export function RemoveKeyDialog({
       case "suppress":
         return t({
           id: "editor.assignLoop.keyGrid.removeKeyDialog.outcome.suppress.note",
-          message: "Positions stay identical across every layer; the touchable area does not change.",
+          message:
+            "Positions stay identical across every layer; the touchable area does not change.",
         });
       case "reflow":
         return t({
           id: "editor.assignLoop.keyGrid.removeKeyDialog.outcome.reflow.note",
-          message: "The row closes up; its stretched last key absorbs the freed width unevenly.",
+          message:
+            "The row closes up; its stretched last key absorbs the freed width unevenly.",
         });
       case "redistribute":
         return t({
           id: "editor.assignLoop.keyGrid.removeKeyDialog.outcome.redistribute.note",
-          message: "The freed width is shared across the row's remaining keys, giving each a genuinely larger touch target.",
+          message:
+            "The freed width is shared across the row's remaining keys, giving each a genuinely larger touch target.",
         });
     }
   };
@@ -577,11 +585,18 @@ export function RemoveKeyDialog({
             detail: (
               <span
                 data-testid={`remove-key-dialog-proposed-${outcome}`}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4 }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 4,
+                }}
               >
                 <Badge tone="accent">{proposedBadgeText}</Badge>
                 {proposedReason !== undefined && (
-                  <span style={{ fontSize: 11, color: TEXT_DIM }}>{proposedReason}</span>
+                  <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                    {proposedReason}
+                  </span>
                 )}
               </span>
             ),
@@ -599,7 +614,8 @@ export function RemoveKeyDialog({
       }),
       note: t({
         id: "editor.assignLoop.keyGrid.removeKeyDialog.shape.keycapHole.note",
-        message: "Renders a blank keycap outline; the space still looks occupied.",
+        message:
+          "Renders a blank keycap outline; the space still looks occupied.",
       }),
     },
     {
@@ -624,150 +640,175 @@ export function RemoveKeyDialog({
       message: `Remove ${{ id: selectedCell.id }}`,
     });
 
-  const hasLostOutputs = collateralWarning !== undefined && collateralWarning.lostOutputs.length > 0;
+  const hasLostOutputs =
+    collateralWarning !== undefined && collateralWarning.lostOutputs.length > 0;
   const hasAvailableElsewhere =
-    collateralWarning !== undefined && collateralWarning.stillAvailableElsewhere.length > 0;
+    collateralWarning !== undefined &&
+    collateralWarning.stillAvailableElsewhere.length > 0;
 
+  // The modal frame (backdrop, centering, focus trap, Escape, width clamp)
+  // is the shared ui/Dialog primitive — this component owns only content
+  // and its open/target state machine.
   return (
-    <>
-      {/* Fixed transparent backdrop — click outside to cancel (mirrors RenameDialog.tsx's own convention). */}
+    <Dialog
+      open={open}
+      onCancel={onCancel}
+      label={dialogLabel}
+      testId="remove-key-dialog"
+      minWidth={360}
+      maxWidth={520}
+      onSubmit={handleSubmit}
+    >
       <div
-        style={{ position: "fixed", inset: 0, background: "color-mix(in srgb, var(--sil-black) 50%, transparent)", zIndex: 299 }}
-        onClick={onCancel}
-        aria-hidden="true"
-      />
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the ARIA APG modal DIALOG pattern (https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) requires the container itself to trap Tab focus via onKeyDown; jsx-a11y's interactive-role allowlist does not include "dialog" (it is a window/structure role, not a widget role), so this fires regardless of the explicit role — same carve-out RenameDialog.tsx already documents. */}
-      <form
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={dialogLabel}
-        data-testid="remove-key-dialog"
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDownTrap}
-        style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          zIndex: 300,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          padding: 16,
-          minWidth: 360,
-          maxWidth: 520,
-          maxHeight: "80vh",
-          overflowY: "auto",
-          background: BG_CARD,
-          border: `1px solid ${BORDER}`,
-          borderRadius: 8,
-          fontFamily: FONT,
-          boxShadow: "0 8px 24px color-mix(in srgb, var(--sil-black) 50%, transparent)",
-        }}
+        style={{ fontSize: 13, color: TEXT_MAIN }}
+        data-testid="remove-key-dialog-target"
       >
-        <div style={{ fontSize: 13, color: TEXT_MAIN }} data-testid="remove-key-dialog-target">
-          {t({
-            id: "editor.assignLoop.keyGrid.removeKeyDialog.targetLabel",
-            message: `Removing ${{ id: selectedCell.id }}`,
-          })}
-        </div>
+        {t({
+          id: "editor.assignLoop.keyGrid.removeKeyDialog.targetLabel",
+          message: `Removing ${{ id: selectedCell.id }}`,
+        })}
+      </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span id={`${uid}-outcome-label`} style={{ fontSize: 11, color: TEXT_DIM }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span
+          id={`${uid}-outcome-label`}
+          style={{ fontSize: 11, color: TEXT_DIM }}
+        >
+          {t({
+            id: "editor.assignLoop.keyGrid.removeKeyDialog.outcomeLabel",
+            message: "What should happen to the freed space?",
+          })}
+        </span>
+        <RadioGroup
+          name={`${uid}-outcome`}
+          value={selectedOutcome}
+          options={options}
+          onChange={(value) =>
+            setSelectedOutcome(value as RemoveKeyDialogOutcome)
+          }
+          ariaLabelledby={`${uid}-outcome-label`}
+        />
+      </div>
+
+      {selectedOutcome === "suppress" && (
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: 4 }}
+          data-testid="remove-key-dialog-shape"
+        >
+          <span
+            id={`${uid}-shape-label`}
+            style={{ fontSize: 11, color: TEXT_DIM }}
+          >
             {t({
-              id: "editor.assignLoop.keyGrid.removeKeyDialog.outcomeLabel",
-              message: "What should happen to the freed space?",
+              id: "editor.assignLoop.keyGrid.removeKeyDialog.shape.label",
+              message: "How should the suppressed key look?",
             })}
           </span>
           <RadioGroup
-            name={`${uid}-outcome`}
-            value={selectedOutcome}
-            options={options}
-            onChange={(value) => setSelectedOutcome(value as RemoveKeyDialogOutcome)}
-            ariaLabelledby={`${uid}-outcome-label`}
+            name={`${uid}-shape`}
+            value={suppressShape}
+            options={shapeOptions}
+            onChange={(value) =>
+              setSuppressShape(value as RemoveKeyDialogSuppressShape)
+            }
+            ariaLabelledby={`${uid}-shape-label`}
           />
         </div>
+      )}
 
-        {selectedOutcome === "suppress" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }} data-testid="remove-key-dialog-shape">
-            <span id={`${uid}-shape-label`} style={{ fontSize: 11, color: TEXT_DIM }}>
-              {t({
-                id: "editor.assignLoop.keyGrid.removeKeyDialog.shape.label",
-                message: "How should the suppressed key look?",
-              })}
-            </span>
-            <RadioGroup
-              name={`${uid}-shape`}
-              value={suppressShape}
-              options={shapeOptions}
-              onChange={(value) => setSuppressShape(value as RemoveKeyDialogSuppressShape)}
-              ariaLabelledby={`${uid}-shape-label`}
+      {keepRowControlVisible && (
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: 4 }}
+          data-testid="remove-key-dialog-keep-row"
+        >
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: TEXT_MAIN,
+            }}
+          >
+            <Checkbox
+              checked={keepRow}
+              onChange={(e) => setKeepRow(e.target.checked)}
+              data-testid="remove-key-dialog-keep-row-checkbox"
             />
-          </div>
-        )}
-
-        {keepRowControlVisible && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }} data-testid="remove-key-dialog-keep-row">
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_MAIN }}>
-              <Checkbox
-                checked={keepRow}
-                onChange={(e) => setKeepRow(e.target.checked)}
-                data-testid="remove-key-dialog-keep-row-checkbox"
-              />
-              <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.keepRow.label">
-                Keep this row (insert a full-width spacer)
-              </Trans>
-            </label>
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.keepRow.note">
-                This is the last key in its row. Keyman Developer would delete the row outright instead, which
-                breaks the positional alignment sibling layers depend on.
-              </Trans>
-            </span>
-          </div>
-        )}
-
-        {(hasLostOutputs || hasAvailableElsewhere) && (
-          <Notice tone="warn">
-            <div data-testid="remove-key-dialog-collateral" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {hasLostOutputs && (
-                <div>
-                  <div>
-                    <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.collateral.lostHeading">
-                      This would discard:
-                    </Trans>
-                  </div>
-                  <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
-                    {collateralWarning?.lostOutputs.map((entry) => <li key={entry}>{entry}</li>)}
-                  </ul>
-                </div>
-              )}
-              {hasAvailableElsewhere && (
-                <div>
-                  <div>
-                    <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.collateral.availableHeading">
-                      Still reachable elsewhere:
-                    </Trans>
-                  </div>
-                  <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
-                    {collateralWarning?.stillAvailableElsewhere.map((entry) => <li key={entry}>{entry}</li>)}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </Notice>
-        )}
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <Button type="button" variant="secondary" onClick={onCancel} data-testid="remove-key-dialog-cancel">
-            <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.cancel">Cancel</Trans>
-          </Button>
-          <Button type="submit" variant="primary" disabled={!canConfirm} data-testid="remove-key-dialog-confirm">
-            <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.confirm">Remove</Trans>
-          </Button>
+            <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.keepRow.label">
+              Keep this row (insert a full-width spacer)
+            </Trans>
+          </label>
+          <span style={{ fontSize: 11, color: TEXT_DIM }}>
+            <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.keepRow.note">
+              This is the last key in its row. Keyman Developer would delete the
+              row outright instead, which breaks the positional alignment
+              sibling layers depend on.
+            </Trans>
+          </span>
         </div>
-      </form>
-    </>
+      )}
+
+      {(hasLostOutputs || hasAvailableElsewhere) && (
+        <Notice tone="warn">
+          <div
+            data-testid="remove-key-dialog-collateral"
+            style={{ display: "flex", flexDirection: "column", gap: 6 }}
+          >
+            {hasLostOutputs && (
+              <div>
+                <div>
+                  <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.collateral.lostHeading">
+                    This would discard:
+                  </Trans>
+                </div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
+                  {collateralWarning?.lostOutputs.map((entry) => (
+                    <li key={entry}>{entry}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {hasAvailableElsewhere && (
+              <div>
+                <div>
+                  <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.collateral.availableHeading">
+                    Still reachable elsewhere:
+                  </Trans>
+                </div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>
+                  {collateralWarning?.stillAvailableElsewhere.map((entry) => (
+                    <li key={entry}>{entry}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </Notice>
+      )}
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          data-testid="remove-key-dialog-cancel"
+        >
+          <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.cancel">
+            Cancel
+          </Trans>
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!canConfirm}
+          data-testid="remove-key-dialog-confirm"
+        >
+          <Trans id="editor.assignLoop.keyGrid.removeKeyDialog.confirm">
+            Remove
+          </Trans>
+        </Button>
+      </div>
+    </Dialog>
   );
 }

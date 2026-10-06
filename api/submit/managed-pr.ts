@@ -21,6 +21,11 @@ import {
 import {
   ManagedPRBodySchema,
 } from "../../utilities/oauth-backend/src/managed-pr-schemas.js";
+import {
+  checkManagedPRRateLimit,
+  vercelClientIp,
+  type RateLimitDecision,
+} from "../../utilities/oauth-backend/src/managed-pr-rate-limit.js";
 import { jsonResponse } from "../oauth/_shared.js";
 
 // ---------------------------------------------------------------------------
@@ -93,16 +98,19 @@ function envManagedPRConfig(
 // ---------------------------------------------------------------------------
 
 /**
- * Run the managed-PR handler: method guard → config → body validation →
- * submitManagedPR → status mapping.
+ * Run the managed-PR handler: method guard → config → throttle → body
+ * validation → submitManagedPR → status mapping.
  *
  * `configOverride` lets tests inject a stub minter + stub fetch so no real env
  * or network is needed — mirrors `runTokenHandler`'s configOverride seam.
  * Pass `null` explicitly to force the not-configured (503) branch in tests.
+ * `throttleOverride` replaces the Postgres-backed rate-limit check in tests
+ * (which have no DB); omit it and the real check runs fail-open.
  */
 export async function runManagedPRHandler(
   req: Request,
   configOverride?: ManagedPRPipelineConfig | null,
+  throttleOverride?: (ip: string | null) => Promise<RateLimitDecision>,
 ): Promise<Response> {
   if (req.method !== "POST") {
     return jsonResponse(405, { error: "method_not_allowed" }, { Allow: "POST" });
@@ -121,6 +129,23 @@ export async function runManagedPRHandler(
   if (config === undefined) {
     // Org bot identity not yet provisioned — fail soft, not 500.
     return jsonResponse(503, { error: "submission_not_configured" });
+  }
+
+  // Throttle anonymous submissions before parsing the body or touching
+  // GitHub: each accepted request mints an installation token and performs
+  // ~7 API calls plus a persistent branch + draft PR (security audit run-1:
+  // managed-pr:anonymous-unbounded-installation-token-mint). The check is
+  // fail-open when the throttle table/DB is unavailable.
+  const checkThrottle = throttleOverride ?? checkManagedPRRateLimit;
+  const throttle = await checkThrottle(vercelClientIp(req));
+  if (!throttle.allowed) {
+    return jsonResponse(
+      429,
+      { error: "rate_limited" },
+      throttle.retryAfterSeconds !== undefined
+        ? { "Retry-After": String(throttle.retryAfterSeconds) }
+        : {},
+    );
   }
 
   let raw: unknown;

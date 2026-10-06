@@ -221,11 +221,22 @@ function buildFontBlobUrl(
 }
 
 /**
+ * Whether a keyboard stylesheet belongs in the OSK frame. A package's
+ * `welcome/` and `help/` folders carry the documentation pages' own CSS
+ * (commonly `kb.css`, with bare `body` / `table` rules) — injected into the
+ * frame it restyles the preview's scaffold, e.g. padding the keyboard in
+ * from the edges. Keyman never applies those sheets to the keyboard.
+ */
+export function isOskStylesheetPath(path: string): boolean {
+  return !/(^|[\\/])source[\\/](welcome|help)[\\/]/i.test(path);
+}
+
+/**
  * Build keyboard CSS blob URLs from stylesheet entries.
- * Returns an array of blob URLs (one per stylesheet).
+ * Returns an array of blob URLs (one per OSK stylesheet).
  */
 function buildCssBlobUrls(stylesheets: KpsStylesheetEntry[]): string[] {
-  return stylesheets.map((sheet) => {
+  return stylesheets.filter((sheet) => isOskStylesheetPath(sheet.vfsPath)).map((sheet) => {
     const blob = new Blob([sheet.cssText], { type: "text/css" });
     return URL.createObjectURL(blob);
   });
@@ -924,7 +935,9 @@ export function useKeyboardArtifact(
         // prevKeyboardCssBlobUrls) hold pre-rename cssText and would otherwise
         // ship the base id's wrapper class — which KMW wraps the runtime
         // keyboard in with the new id, so the rules never match.
-        const cssPaths = currentVfs.list("").filter((p) => p.endsWith(".css"));
+        const cssPaths = currentVfs
+          .list("")
+          .filter((p) => p.endsWith(".css") && isOskStylesheetPath(p));
         if (cssPaths.length > 0) {
           revokeBlobUrls(prevKeyboardCssBlobUrls);
           for (const cssPath of cssPaths) {

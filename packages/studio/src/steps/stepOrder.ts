@@ -7,6 +7,7 @@
 
 export const STEP_ORDER: readonly string[] = [
   "identity",
+  "layout",
   "choose_base",
   "track",
   "project_name",
@@ -16,6 +17,8 @@ export const STEP_ORDER: readonly string[] = [
   "invisibles",
   "convenience",
   "carve",
+  "deadkeys",
+  "rules",
   "mechanisms",
   "touch_seed_source",
   "touch",

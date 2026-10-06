@@ -99,6 +99,8 @@ function fmtOutputElement(el: OutputElement): string {
     case "char":    return fmtCodepoint(el.value);
     case "deadkey": return fmtDk(el.id);
     case "beep":    return "beep";
+    case "nul":     return "nul";
+    case "context": return el.offset === 0 ? "context" : `context(${el.offset})`;
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
     case "outs":    return `outs(${el.storeRef})`;
     case "useGroup": return `use(${el.groupName})`;
@@ -181,11 +183,22 @@ export function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
  * The two quote characters (' and ") are NOT excluded here — delimiter
  * selection in flushBuf picks whichever the buffer doesn't contain.
  */
-function isStringSafeChar(ch: string): boolean {
+function isStringSafeChar(ch: string, metadata = false): boolean {
   const cp = ch.codePointAt(0) ?? 0;
   if (cp < 0x20 || cp === 0x7f) return false;
+  // SMP codepoints stay per-character tokens even in system stores: acceptance
+  // by kmcmplib inside a string literal has not been verified, so the
+  // conservative (known-compiling) form is kept.
   if (cp > 0xffff) return false;
-  if (/\p{M}/u.test(ch)) return false;
+  // System stores (&NAME, &COPYRIGHT, ...) are human-facing metadata that rules
+  // never match against: combining marks and format characters stay inside the
+  // string so the value reads naturally.
+  if (metadata) return true;
+  // Processing stores: spell out everything invisible or attaching — combining
+  // marks, format characters (ZWJ, ZWNJ, LRM, soft hyphen, ...) and unusual
+  // spaces (NBSP, narrow NBSP, ...) — so the author can see what is stored.
+  if (/\p{M}|\p{Cf}/u.test(ch)) return false;
+  if (cp !== 0x20 && /\p{Zs}/u.test(ch)) return false;
   return true;
 }
 
@@ -279,7 +292,7 @@ function countProspectiveRanges(items: StoreItem[]): number {
  */
 const KMCMPLIB_STORE_RANGE_BUDGET = 7;
 
-function emitStoreItems(items: StoreItem[]): string {
+function emitStoreItems(items: StoreItem[], metadata = false): string {
   const parts: string[] = [];
   let buf = "";
 
@@ -298,7 +311,7 @@ function emitStoreItems(items: StoreItem[]): string {
   // comment for the compiler crash this avoids.
   const hasDeadkey = items.some((it) => it.kind === "deadkey");
   const suppressRanges =
-    hasDeadkey || countProspectiveRanges(items) > KMCMPLIB_STORE_RANGE_BUDGET;
+    metadata || hasDeadkey || countProspectiveRanges(items) > KMCMPLIB_STORE_RANGE_BUDGET;
 
   const flushBuf = (): void => {
     if (buf === "") return;
@@ -337,7 +350,7 @@ function emitStoreItems(items: StoreItem[]): string {
     if (item === undefined) { i++; continue; }
     if (item.kind === "char") {
       for (const ch of item.value) {
-        if (isStringSafeChar(ch)) {
+        if (isStringSafeChar(ch, metadata)) {
           buf += ch;
         } else {
           flushBuf();
@@ -356,7 +369,9 @@ function emitStoreItems(items: StoreItem[]): string {
 
 function emitStore(store: IRStore): string {
   const nameToken = store.isSystem ? `&${store.name}` : store.name;
-  const items = emitStoreItems(store.items);
+  // &CasedKeys holds virtual keys, not a string — it keeps the token form.
+  const metadata = store.isSystem && store.name.toUpperCase() !== "CASEDKEYS";
+  const items = emitStoreItems(store.items, metadata);
   let line = `store(${nameToken}) ${items}`;
   // Trailing `c <comment>` — same convention as emitRule.
   if (store.trailingComment !== undefined) {
@@ -689,9 +704,12 @@ export function emit(ir: KeyboardIR): string {
     }
   }
 
-  // begin directive.
-  const entryGroup = ir.groups.find(g => !g.readonly);
-  const entryName = entryGroup?.name ?? "main";
+  // begin directive — FR-004: reuse the modelled entry group so a keyboard
+  // with more than one entry group round-trips without the emitter
+  // rebuilding a single entry from the first non-readonly group.
+  const entryName = ir.header.entryPoints?.main
+    ?? ir.groups.find(g => !g.readonly)?.name
+    ?? "main";
   lines.push("");
   lines.push(`begin ${ir.header.encoding ?? "Unicode"} > use(${entryName})`);
 

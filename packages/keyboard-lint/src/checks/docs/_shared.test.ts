@@ -6,6 +6,7 @@ import {
   splitHistoryPreamble,
   compareVersions,
   parseReadmePlatforms,
+  expandPlatforms,
   parsePagename,
   expectedPagename,
   extractDataStatesLayers,
@@ -190,6 +191,51 @@ describe("parseReadmePlatforms", () => {
   it("stops at the next heading", () => {
     const text = "## Supported Platforms\n- windows\n\n## Links\n- ignored\n";
     expect(parseReadmePlatforms(text)).toEqual(["windows"]);
+  });
+});
+
+describe("parseReadmePlatforms — corpus README shapes", () => {
+  it("parses a setext heading with ' * ' bullets (sil_cameroon_qwerty)", () => {
+    const text =
+      "Links\n-----\n\n * Help: <x>\n\nSupported Platforms\n-------------------\n * Windows\n * MacOS\n * iOS\n\nOther\n=====\n * no\n";
+    expect(parseReadmePlatforms(text)).toEqual(["Windows", "MacOS", "iOS"]);
+  });
+
+  it("reads every Supported Platforms section (inherited base + tool section)", () => {
+    const text = "Supported Platforms\n---\n * Windows\n\nNew description.\n\n## Supported Platforms\n- any\n";
+    expect(parseReadmePlatforms(text)).toEqual(["Windows", "any"]);
+  });
+
+  it("accepts any ATX heading level", () => {
+    expect(parseReadmePlatforms("### Supported Platforms\n+ web\n")).toEqual(["web"]);
+  });
+});
+
+describe("expandPlatforms", () => {
+  it("expands `any` to every concrete platform", () => {
+    expect(expandPlatforms(["any"]).size).toBe(8);
+  });
+
+  it("maps README display names onto the same platforms as the .kmn tokens", () => {
+    expect(expandPlatforms(["Windows", "MacOS", "Linux", "Web", "Mobile Web", "iOS", "Android"])).toEqual(
+      expandPlatforms(["any"]),
+    );
+    expect(expandPlatforms(["Android phone", "iPhone"])).toEqual(expandPlatforms(["mobile"]));
+    expect(expandPlatforms(["Desktop devices"])).toEqual(expandPlatforms(["windows", "macosx", "linux"]));
+  });
+
+  it("keeps an unknown name as itself so it still surfaces", () => {
+    expect([...expandPlatforms(["Chromebook"])]).toEqual(["chromebook"]);
+  });
+});
+
+describe("normalizeDocBody — document chrome", () => {
+  it("drops the whole <head> and any <style> block, so a full welcome page equals its help fragment", () => {
+    const welcome =
+      '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>T</title>' +
+      '<link rel="stylesheet" href="kb.css"><style>p{color:red}</style></head><body><p>Body</p></body></html>';
+    const help = "<?php\n  $pagename = 'T';\n  require_once('header.php');\n?>\n<style>p{color:red}</style>\n<p>Body</p>\n";
+    expect(normalizeDocBody(welcome)).toBe(normalizeDocBody(help));
   });
 });
 

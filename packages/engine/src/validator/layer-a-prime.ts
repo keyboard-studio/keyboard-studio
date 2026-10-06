@@ -390,6 +390,56 @@ export function checkOwnershipConsistency(ir: KeyboardIR): LintFinding[] {
   return findings;
 }
 
+/** Code for a behaviour-owned rule that suppresses with `nul` on a text context. */
+export const NUL_ON_TEXT_CONTEXT_CODE = "KM_ERROR_NUL_ON_TEXT_CONTEXT";
+
+/**
+ * I6 extension (spec 076 FR-009/FR-014/FR-020): a rule the suppression
+ * compiler owns (`ownedByBehaviour` set) must not output a bare `nul` when its
+ * context carries text. That `nul` would delete the matched characters, so
+ * FR-020 requires `context` (or `context beep`) instead.
+ *
+ * Scoped to behaviour-owned rules on purpose. A hand-written
+ * `'gb' + [K_BKSP] > nul` deletes its context intentionally (the
+ * backspace-deletes-the-cluster idiom), is valid KMN, and appears in shipping
+ * keyboards such as sil_yoruba8. Ownership lives only in the IR, which is why
+ * this is an IR check and not part of the source-text context-ordering scan.
+ *
+ * Text-bearing means any context element except `vkey`, `deadkey`, and the
+ * untyped `+` divider marker, which matches the suppression compiler's own
+ * verb selection.
+ */
+export function checkBehaviourNulOnTextContext(ir: KeyboardIR): LintFinding[] {
+  const findings: LintFinding[] = [];
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (rule.ownedByBehaviour === undefined) continue;
+      const outputIsNul =
+        rule.output.length > 0 &&
+        rule.output[0]?.kind === "nul" &&
+        rule.output.slice(1).every((el) => el.kind === "beep");
+      if (!outputIsNul) continue;
+      const textBearing = rule.context.some(
+        (el) =>
+          el.kind !== "vkey" &&
+          el.kind !== "deadkey" &&
+          !(el.kind === "raw" && el.text === "+"),
+      );
+      if (!textBearing) continue;
+      findings.push({
+        code: NUL_ON_TEXT_CONTEXT_CODE,
+        severity: "error",
+        layer: "A-prime",
+        message:
+          `Rule node "${rule.nodeId}" (owned by "${rule.ownedByBehaviour}") suppresses with "nul" ` +
+          "on a text-bearing context, which deletes the matched characters; " +
+          "a blocking behaviour must re-emit them with `context`.",
+      });
+    }
+  }
+  return findings;
+}
+
 // ---------------------------------------------------------------------------
 // 0x05A — ERROR_TouchLayoutInvalidIdentifier, as a VALIDITY concern (spec 063
 // FR-040 / T043).

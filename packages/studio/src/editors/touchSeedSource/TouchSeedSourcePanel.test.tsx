@@ -14,8 +14,8 @@
 //     ../../test/touchGallery/mocks.tsx — no iframe/KMW in jsdom), forced into
 //     mobile/touch mode, swapping its injected VFS content per selected card
 
-import { describe, it, expect, afterEach, vi } from "vitest";
-import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchSeedSourcePanel } from "./TouchSeedSourcePanel.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -27,6 +27,45 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { ASSIGN_LOOP_LEFT_PANE_PCT } from "../assignLoop/AssignLoopShell.tsx";
+
+// requestAnimationFrame is stubbed with a manual queue (the motion.test.ts
+// pattern) so the sheet's spring exit can be driven to settle
+// deterministically in the narrow-viewport tests below.
+let rafQueue: FrameRequestCallback[] = [];
+let nextRafId = 0;
+const rafIds = new Map<number, FrameRequestCallback>();
+
+function installRafStub(): void {
+  rafQueue = [];
+  nextRafId = 0;
+  rafIds.clear();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    nextRafId += 1;
+    rafIds.set(nextRafId, callback);
+    rafQueue.push(callback);
+    return nextRafId;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+    const callback = rafIds.get(id);
+    rafIds.delete(id);
+    if (callback !== undefined) {
+      const index = rafQueue.indexOf(callback);
+      if (index >= 0) {
+        rafQueue.splice(index, 1);
+      }
+    }
+  });
+}
+
+function runFrames(count: number): void {
+  for (let i = 0; i < count; i += 1) {
+    const callback = rafQueue.shift();
+    if (callback === undefined) {
+      break;
+    }
+    callback(performance.now());
+  }
+}
 
 // ---------------------------------------------------------------------------
 // deriveSeedLayout mock — wraps the REAL implementation by default (every
@@ -700,5 +739,72 @@ describe("TouchSeedSourcePanel — leave and return (spec 079 FR-051, T029)", ()
     render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("seed-source-import-adapt").getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Narrow viewport (mobile adaptation, Phase 4): the choice cards
+// stack full-width and the live OSK preview moves behind a "Show touch
+// preview" trigger into a PreviewSheet — opening the sheet mounts the OSK
+// (mocked here), closing it unmounts the OSK (unloading KeymanWeb).
+// ---------------------------------------------------------------------------
+
+describe("TouchSeedSourcePanel — narrow viewport preview sheet", () => {
+  function setViewport(width: number, height: number): void {
+    Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: height, configurable: true });
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  function renderNarrow() {
+    setViewport(390, 844);
+    seedBase(PHONE_ONLY_JSON);
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+  }
+
+  afterEach(() => {
+    setViewport(1280, 800);
+    vi.unstubAllGlobals();
+  });
+
+  beforeEach(() => {
+    installRafStub();
+  });
+
+  it("shows the preview trigger and keeps the OSK unmounted until opened", () => {
+    renderNarrow();
+
+    expect(screen.getByTestId("seed-source-show-preview")).not.toBeNull();
+    // Sheet closed → previewContent never mounted → no OSK iframe.
+    expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+
+  it("opening the sheet mounts the OSK; closing unmounts it", () => {
+    renderNarrow();
+
+    fireEvent.click(screen.getByTestId("seed-source-show-preview"));
+    expect(screen.getByTestId("seed-source-preview-sheet")).not.toBeNull();
+    expect(screen.getByTestId("osk-frame")).not.toBeNull();
+
+    // Close via the sheet's close button. The exit animates first; the OSK
+    // unmounts (unloading KeymanWeb) once the exit settles.
+    fireEvent.click(screen.getByLabelText("Close preview"));
+    expect(screen.queryByTestId("seed-source-preview-sheet")).not.toBeNull();
+    expect(screen.queryByTestId("osk-frame")).not.toBeNull();
+    act(() => {
+      runFrames(300);
+    });
+    expect(screen.queryByTestId("seed-source-preview-sheet")).toBeNull();
+    expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+
+  it("desktop (1280px) keeps the inline preview and shows no trigger", () => {
+    setViewport(1280, 800);
+    seedBase(PHONE_ONLY_JSON);
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+
+    expect(screen.queryByTestId("seed-source-show-preview")).toBeNull();
+    expect(screen.getByTestId("osk-frame")).not.toBeNull();
+    expect(screen.queryByTestId("seed-source-preview-sheet")).toBeNull();
   });
 });

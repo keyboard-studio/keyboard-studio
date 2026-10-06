@@ -33,7 +33,7 @@ import {
   analyzeStores,
   storeRoleOf,
 } from "./applyStoreSlotRemovals.js";
-import { collectCharContributors } from "./collectCharContributors.js";
+import { collectCharContributors, collectTaintedContributors } from "./collectCharContributors.js";
 import { parseSlotId } from "./slotId.js";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
@@ -681,6 +681,46 @@ describe("classifyStoreSlotEdit — decision table", () => {
       mode: "blocked",
       reason: "notany-widens",
     });
+  });
+
+  it("prunes a tainted char from a notany() store under carveNotAnyHygiene (issue #1809, ruling §3)", () => {
+    // Ruling §3: removing a can't-exist character from a notany() store is
+    // behavior-neutral under carve's closed model — prune for hygiene instead
+    // of blocking. The carve apply path opts in via `carveNotAnyHygiene`; the
+    // general `notany-widens` block (previous test) is preserved by default.
+    const store: IRStore = {
+      nodeId: "s#word",
+      name: "word",
+      items: [
+        { kind: "char", value: "a" },
+        { kind: "char", value: "b" },
+      ],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#0",
+      context: [{ kind: "notany", storeRef: "word" }],
+      output: [{ kind: "char", value: "x" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [store]);
+    const charValues = (irAfter: KeyboardIR) =>
+      irAfter.stores
+        .find((s) => s.name === "word")!
+        .items.map((item) => (item as { kind: string; value?: string }).value);
+
+    // Default: the general notany-widens block is preserved.
+    const blocked = applyStoreSlotRemovals(ir, new Set(["s#word#0"]));
+    expect(charValues(blocked.ir)).toEqual(["a", "b"]);
+    expect(blocked.warnings.some((w) => w.includes("referenced by notany()"))).toBe(true);
+
+    // Carve-scoped hygiene: the tainted char is pruned instead of blocking.
+    const pruned = applyStoreSlotRemovals(ir, new Set(["s#word#0"]), {
+      carveNotAnyHygiene: true,
+    });
+    expect(charValues(pruned.ir)).toEqual(["b"]);
+    expect(pruned.appliedCount).toBe(1);
+    expect(pruned.warnings.some((w) => w.includes("notany()"))).toBe(false);
   });
 
   it("blocks a store referenced by index() in a rule's context", () => {
@@ -1520,6 +1560,133 @@ describe("applyStoreSlotRemovals — Cameroon canary (real keyboard)", () => {
       expect(dkf!.items.length).toBe(dkt!.items.length);
     },
   );
+});
+
+describe("applyStoreSlotRemovals — issue #1809 real-keyboard regressions (sil_cameroon_qwerty)", () => {
+  // End-to-end nomination → pruning on the real keyboard the issue was filed
+  // against (km-lead binding ruling, verification plan). Guarded by the same
+  // sibling-checkout canary as above: skipped where the checkout is absent,
+  // run in CI.
+  function parseCameroon(): KeyboardIR {
+    const kmnText = readFileSync(CAMEROON_KMN, "utf-8");
+    return parse(kmnText, "sil_cameroon_qwerty").ir;
+  }
+  function charIndex(store: IRStore, ch: string): number {
+    return store.items.findIndex((i) => i.kind === "char" && i.value === ch);
+  }
+  function storeByName(ir: KeyboardIR, name: string): IRStore {
+    const s = ir.stores.find((st) => st.name === name);
+    expect(s).toBeDefined();
+    return s!;
+  }
+
+  it.skipIf(!cameroonExists)(
+    "carve U+0308 → ä→a and ṻ→ū backspace rows pruned, paired stores stay equal length, zero system-store warnings",
+    () => {
+      const ir = parseCameroon();
+      const composed = storeByName(ir, "composed");
+      const compDia = storeByName(ir, "comp-dia");
+      const aeIdx = charIndex(composed, "ä");
+      const uhIdx = charIndex(composed, "ṻ");
+      expect(aeIdx).toBeGreaterThanOrEqual(0);
+      expect(uhIdx).toBeGreaterThanOrEqual(0);
+      // Sanity: the issue's rows really are the aligned deconstruction pair.
+      expect(compDia.items[aeIdx]).toMatchObject({ kind: "char", value: "a" });
+      expect(compDia.items[uhIdx]).toMatchObject({ kind: "char", value: "ū" });
+
+      const { storeSlotIds } = collectTaintedContributors(ir, new Set(["\u0308"]));
+      expect(storeSlotIds).toContain(`${composed.nodeId}#${aeIdx}`);
+      expect(storeSlotIds).toContain(`${composed.nodeId}#${uhIdx}`);
+
+      const { ir: pruned, warnings } = applyStoreSlotRemovals(ir, new Set(storeSlotIds), {
+        carveNotAnyHygiene: true,
+      });
+      const after = (name: string) => storeByName(pruned, name);
+      // The carved rows are gone...
+      expect(
+        after("composed").items.some((i) => i.kind === "char" && i.value === "ä"),
+      ).toBe(false);
+      expect(
+        after("composed").items.some((i) => i.kind === "char" && i.value === "ṻ"),
+      ).toBe(false);
+      // ...and every index()-paired store pair kept equal length (lockstep).
+      for (const [a, b] of [
+        ["composed", "comp-dia"],
+        ["dkf003b", "dkt003b"],
+        ["dkf003d", "dkt003d"],
+        ["lc", "uc"],
+      ] as const) {
+        expect(after(a).items.length).toBe(after(b).items.length);
+      }
+      // No system-store defense-in-depth warnings on carve input (ruling §4).
+      // (The humanized warning text is "system/compiler-directive store".)
+      expect(warnings.some((w) => w.includes("system/compiler-directive"))).toBe(false);
+    },
+  );
+
+  it.skipIf(!cameroonExists)("carve r → ṝ→ṛ row pruned (ruling §9, no transitive step)", () => {
+    const ir = parseCameroon();
+    const composed = storeByName(ir, "composed");
+    const compDia = storeByName(ir, "comp-dia");
+    // NFD(ṝ)=⟨r,U+0323,U+0304⟩ ∋ r (input tainted),
+    // NFD(ṛ)=⟨r,U+0323⟩ ∋ r (output tainted) — ruling §8.
+    const rrIdx = charIndex(composed, "ṝ");
+    expect(rrIdx).toBeGreaterThanOrEqual(0);
+    expect(compDia.items[rrIdx]).toMatchObject({ kind: "char", value: "ṛ" });
+
+    const { storeSlotIds } = collectTaintedContributors(ir, new Set(["r"]));
+    expect(storeSlotIds).toContain(`${composed.nodeId}#${rrIdx}`);
+
+    const { ir: pruned } = applyStoreSlotRemovals(ir, new Set(storeSlotIds), {
+      carveNotAnyHygiene: true,
+    });
+    const afterComposed = storeByName(pruned, "composed");
+    expect(
+      afterComposed.items.some((i) => i.kind === "char" && i.value === "ṝ"),
+    ).toBe(false);
+    expect(afterComposed.items.length).toBe(storeByName(pruned, "comp-dia").items.length);
+  });
+
+  it.skipIf(!cameroonExists)(
+    "carve q → dkf003b/dkt003b deadkey fan-out rows survive (selector never taint-tested, ruling §3)",
+    () => {
+      const ir = parseCameroon();
+      const dkf = storeByName(ir, "dkf003b");
+      const dkt = storeByName(ir, "dkt003b");
+      const qIdx = charIndex(dkf, "q");
+      // 'q' is genuinely present in the selector store — the test is vacuous otherwise.
+      expect(qIdx).toBeGreaterThanOrEqual(0);
+
+      const { storeSlotIds } = collectTaintedContributors(ir, new Set(["q"]));
+      // Neither the selector slot nor its produced slot is nominated.
+      expect(storeSlotIds).not.toContain(`${dkf.nodeId}#${qIdx}`);
+      expect(storeSlotIds).not.toContain(`${dkt.nodeId}#${qIdx}`);
+
+      const { ir: pruned } = applyStoreSlotRemovals(ir, new Set(storeSlotIds), {
+        carveNotAnyHygiene: true,
+      });
+      // The fan-out pair is untouched and still aligned.
+      expect(storeByName(pruned, "dkf003b").items.length).toBe(dkf.items.length);
+      expect(storeByName(pruned, "dkt003b").items.length).toBe(dkt.items.length);
+    },
+  );
+
+  it.skipIf(!cameroonExists)("system stores are never nominated on the real keyboard (ruling §4)", () => {
+    const ir = parseCameroon();
+    const sysNodeIds = new Set(
+      ir.stores.filter((s) => s.isSystem).map((s) => s.nodeId),
+    );
+    // The &CasedKeys et al. system stores parse with isSystem (the `&` prefix
+    // is stripped by the codec — the old startsWith("&") guard was dead).
+    expect(sysNodeIds.size).toBeGreaterThan(0);
+
+    const { storeSlotIds } = collectTaintedContributors(ir, new Set(["\u0308"]));
+    for (const id of storeSlotIds) {
+      const parsed = parseSlotId(id);
+      expect(parsed).not.toBeNull();
+      expect(sysNodeIds.has(parsed!.storeNodeId)).toBe(false);
+    }
+  });
 });
 
 const BAMUM_KMN = resolve(

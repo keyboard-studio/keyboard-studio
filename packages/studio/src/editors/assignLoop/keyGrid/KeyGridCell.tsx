@@ -77,10 +77,17 @@
 // `draggable` — adding one before the operation union admits a width change
 // would be an affordance that silently does nothing.
 
-import { useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { isSpacerKeyClass, type TouchKeyFinding } from "@keyboard-studio/contracts";
+import { useIsCoarsePointer } from "../../../hooks/useViewport.ts";
 import { codepointLabel } from "../../../survey/codepointLabel.ts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
@@ -92,7 +99,7 @@ import { severityLabel } from "./findingCopy.ts";
 // Layer C's info-severity blue has no dedicated *-severity named export in
 // ui/theme.ts (WARNING/ERROR_RED cover Layer B/A already) — matches the
 // editor gutter's own Layer C convention (docs/architecture.md "Editor
-// gutter diagnostics"). Reuses the accent-text token directly (epic #533).
+// gutter diagnostics"). Reuses the accent-text token directly (epic 533).
 const INFO_BLUE = "var(--app-accent-text)";
 
 export interface KeyGridCellProps {
@@ -149,6 +156,34 @@ const WEDGE_ADD = "add";
 const WEDGE_MENU = "menu";
 
 /**
+ * Coarse-pointer touch equivalents (mobile adaptation, Phase 4).
+ * There is no hover on a touchscreen, so the hover-revealed `(+)`/`⋯`
+ * wedges are unreachable without a tap path — and tap/long-press already
+ * work at the DOM level (click), so no gesture rewrite is needed, only
+ * intent routing:
+ *   - tap a SELECTED cell: toggles the wedges (the tap equivalent of hover);
+ *   - long-press a cell: opens the command menu at the press point (the
+ *     `⋯` wedge / right-click equivalent — the menu carries every wedge
+ *     command, including "add key after", at full menu-item size).
+ * Touch sizing follows the POINTER (`useIsCoarsePointer`), never the
+ * viewport width — a landscape phone is wide and coarse simultaneously.
+ *
+ * The hold shows a progress hint while it registers (a ring filling over
+ * LONG_PRESS_MS, `.ks-longpress-hint` in index.css — a static low-opacity
+ * ring under prefers-reduced-motion), and the commit fires a guarded
+ * `navigator.vibrate` haptic on the same frame as the visual commit.
+ * The tap path is never gated on this timer: click still commits selection
+ * immediately, and the timer is cancelled on release before the threshold.
+ */
+const LONG_PRESS_MS = 500;
+/** Pointer drift beyond this cancels the long-press (it was a scroll). */
+const LONG_PRESS_MOVE_PX = 12;
+/** A native `contextmenu` arriving within this long after our explicit
+ * long-press fired is the browser echoing the same gesture — ignore it so
+ * the menu doesn't open twice. */
+const LONG_PRESS_ECHO_MS = 800;
+
+/**
  * Highest-severity color + single-letter badge present in `findings`, or
  * undefined when there are none. Mirrors the editor gutter's Layer A (red) /
  * B (yellow) / C (blue) severity convention. The letter is not decorative
@@ -203,6 +238,32 @@ export function KeyGridCell({
   // KeyGrid — only one cell is hovered at a time, and keeping it here means a
   // hover never re-renders the other 299 mounted cells.
   const [isHovered, setIsHovered] = useState(false);
+  // Coarse-pointer wedge reveal (mobile adaptation, Phase 4): no hover on touch, so
+  // tapping an already-selected cell toggles the wedges instead. Local for
+  // the same reason as isHovered.
+  const coarse = useIsCoarsePointer();
+  const [touchRevealed, setTouchRevealed] = useState(false);
+  const wedgesVisible = isHovered || (coarse && touchRevealed);
+  // Long-press bookkeeping (coarse only). Refs, not state — the timer
+  // lifecycle must not re-render the grid.
+  const longPressTimer = useRef<number | null>(null);
+  const longPressOrigin = useRef<{ x: number; y: number } | null>(null);
+  const suppressClick = useRef(false);
+  const lastLongPressAt = useRef(0);
+  // Whether the progress hint is visible — a LOCAL state, like isHovered:
+  // only this cell re-renders while the hold registers, never the grid.
+  const [holding, setHolding] = useState(false);
+  // The long-press timer outlives its gesture but must not outlive the
+  // cell: if the cell unmounts mid-hold, the pending callback would fire
+  // `setTouchRevealed` / `onOpenCommandMenu` for a stale, unmounted cell.
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current !== null) {
+        window.clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    };
+  }, []);
   const isBlank = isSpacerKeyClass(cell.sp);
   const finding = worstSeverity(cell.findings);
   const hasAnnotations =
@@ -345,8 +406,20 @@ export function KeyGridCell({
    * any) was hit — see the module doc, "Why the wedges are `aria-hidden`
    * spans". A click anywhere that is NOT a wedge selects, which keeps the
    * cell's primary action exactly what it was before T111.
+   *
+   * Coarse pointer (mobile adaptation, Phase 4): a tap on the already-selected cell
+   * toggles the wedge reveal instead of re-selecting — the tap equivalent of
+   * hover. A tap on an unselected cell selects (and hides any reveal, so a
+   * fresh selection never inherits another cell's wedge state — each cell
+   * owns its own `touchRevealed`, but the intent is unambiguous either way).
    */
   function handleClick(event: ReactMouseEvent<HTMLButtonElement>): void {
+    if (suppressClick.current) {
+      // The click trailing a long-press: the menu already opened, the tap
+      // must not also move selection.
+      suppressClick.current = false;
+      return;
+    }
     const target = event.target;
     const wedge =
       target instanceof Element
@@ -365,7 +438,79 @@ export function KeyGridCell({
       onOpenCommandMenu(cell, { x: rect.left, y: rect.bottom });
       return;
     }
+    if (coarse && isSelected) {
+      setTouchRevealed((v) => !v);
+      return;
+    }
+    if (coarse) setTouchRevealed(false);
     onSelect(cell);
+  }
+
+  function clearLongPressTimer(): void {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressOrigin.current = null;
+    // The hold ended before the threshold (release, drift, unmount) — the
+    // progress hint must not linger for a gesture that never committed.
+    setHolding(false);
+  }
+
+  /**
+   * Commit-point haptic, fired on the same frame as the visual commit.
+   * Kept local and guarded — never a shared module (owned elsewhere), never
+   * throwing: on a device without vibrate support this is a silent no-op.
+   */
+  function fireCommitHaptic(): void {
+    try {
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate(15);
+      }
+    } catch {
+      // Haptics are feedback only — a failing vibrate must never break the
+      // menu opening underneath it.
+    }
+  }
+
+  /**
+   * Long-press (coarse pointer only): opens the command menu at the press
+   * point — the touch equivalent of the `⋯` wedge / right-click. Pointer
+   * events, not a gesture library: a press that drifts is a scroll and the
+   * timer is cancelled. Firing suppresses the click that follows on release.
+   */
+  function handlePointerDown(event: ReactPointerEvent<HTMLButtonElement>): void {
+    if (!coarse || !event.isPrimary) return;
+    clearLongPressTimer();
+    // A long-press whose release never produced a click (pointer captured
+    // elsewhere, gesture interrupted) would leave `suppressClick` set and
+    // swallow the NEXT tap. A fresh pointerdown is a fresh gesture: the
+    // stale flag is by definition from a gesture whose click never arrived.
+    suppressClick.current = false;
+    const origin = { x: event.clientX, y: event.clientY };
+    longPressOrigin.current = origin;
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null;
+      longPressOrigin.current = null;
+      lastLongPressAt.current = Date.now();
+      // The release click must not move selection after the menu opened.
+      suppressClick.current = true;
+      // The hint has done its job — hide it on the same frame the menu
+      // opens, alongside the commit haptic.
+      setHolding(false);
+      fireCommitHaptic();
+      setTouchRevealed(false);
+      onOpenCommandMenu(cell, origin);
+    }, LONG_PRESS_MS);
+    setHolding(true);
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLButtonElement>): void {
+    const origin = longPressOrigin.current;
+    if (origin === null || longPressTimer.current === null) return;
+    const dx = event.clientX - origin.x;
+    const dy = event.clientY - origin.y;
+    if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_PX) clearLongPressTimer();
   }
 
   /**
@@ -373,9 +518,15 @@ export function KeyGridCell({
    * anchored at the pointer. Always suppresses the browser's own menu and
    * opens ours: `onOpenCommandMenu` is a required prop now, so there is
    * always a menu to put in the browser's place.
+   *
+   * Coarse pointer: mobile browsers fire `contextmenu` on long-press too —
+   * when it arrives right after our explicit long-press fired, it is the
+   * browser echoing the same gesture, so it is ignored (the menu is already
+   * open).
    */
   function handleContextMenu(event: ReactMouseEvent<HTMLButtonElement>): void {
     event.preventDefault();
+    if (Date.now() - lastLongPressAt.current < LONG_PRESS_ECHO_MS) return;
     onOpenCommandMenu(cell, { x: event.clientX, y: event.clientY });
   }
 
@@ -407,6 +558,10 @@ export function KeyGridCell({
       onDoubleClick={handleDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearLongPressTimer}
+      onPointerCancel={clearLongPressTimer}
       // T111: no `draggable`, and no resize handle anywhere below — see the
       // module doc, "Drag-and-drop is deliberately absent".
       title={canFollowNextLayer ? followTitle : undefined}
@@ -507,12 +662,23 @@ export function KeyGridCell({
       )}
       {/* T111's hover wedges (FR-021) — decorative, aria-hidden hit regions,
       NOT nested buttons (see the module doc, "Why the wedges are aria-hidden
-      spans"). Rendered only while hovered, and only when the matching
-      callback exists, so a cell at rest looks exactly as it did before T111
-      and an inert wedge is never shown. `visibility` rather than conditional
-      mounting would keep them in the layout; conditional mounting is what
-      makes "hover REVEALS" literally true. */}
-      {isHovered && showAddWedge && (
+      spans"). Rendered while hovered, or — on coarse pointers, where there is
+      no hover — while the tap-reveal is on (mobile adaptation, Phase 4); only when
+      the matching callback exists, so a cell at rest looks exactly as it did
+      before T111 and an inert wedge is never shown. `visibility` rather than
+      conditional mounting would keep them in the layout; conditional mounting
+      is what makes "hover REVEALS" literally true.
+      
+      Coarse-pointer wedges render at touch size (32px). Touch-target note: the
+      44px guideline applies to the cell itself — already a 48px target — and
+      the wedges are secondary, revealed-on-demand actions, not primary
+      targets. 32px was chosen deliberately over 44px: a 44px wedge would span
+      nearly the cell's full 48px height and the two wedges would overlap on
+      narrow phone-grid cells, while 32px clears WCAG 2.5.8 AA (24px) with
+      margin. Near-miss is benign — a tap that lands off-wedge on the
+      already-selected cell only toggles the reveal, never a destructive
+      action. */}
+      {wedgesVisible && showAddWedge && (
         <span
           aria-hidden="true"
           data-key-grid-wedge={WEDGE_ADD}
@@ -520,11 +686,15 @@ export function KeyGridCell({
           title={addWedgeTitle}
           style={{
             position: "absolute",
-            bottom: 1,
-            left: 2,
-            fontSize: 9,
-            lineHeight: "11px",
-            minWidth: 11,
+            bottom: coarse ? 2 : 1,
+            left: coarse ? 4 : 2,
+            fontSize: coarse ? 13 : 9,
+            lineHeight: coarse ? "32px" : "11px",
+            minWidth: coarse ? 32 : 11,
+            minHeight: coarse ? 32 : undefined,
+            display: coarse ? "flex" : undefined,
+            alignItems: coarse ? "center" : undefined,
+            justifyContent: coarse ? "center" : undefined,
             textAlign: "center",
             borderRadius: 2,
             fontWeight: 700,
@@ -537,7 +707,7 @@ export function KeyGridCell({
           +
         </span>
       )}
-      {isHovered && showMenuWedge && (
+      {wedgesVisible && showMenuWedge && (
         <span
           aria-hidden="true"
           data-key-grid-wedge={WEDGE_MENU}
@@ -545,11 +715,15 @@ export function KeyGridCell({
           title={menuWedgeTitle}
           style={{
             position: "absolute",
-            bottom: 1,
-            right: 2,
-            fontSize: 9,
-            lineHeight: "11px",
-            minWidth: 11,
+            bottom: coarse ? 2 : 1,
+            right: coarse ? 4 : 2,
+            fontSize: coarse ? 13 : 9,
+            lineHeight: coarse ? "32px" : "11px",
+            minWidth: coarse ? 32 : 11,
+            minHeight: coarse ? 32 : undefined,
+            display: coarse ? "flex" : undefined,
+            alignItems: coarse ? "center" : undefined,
+            justifyContent: coarse ? "center" : undefined,
             textAlign: "center",
             borderRadius: 2,
             fontWeight: 700,
@@ -561,6 +735,32 @@ export function KeyGridCell({
         >
           {"⋯"}
         </span>
+      )}
+      {/* The long-press progress hint (coarse pointer only): a ring that fills
+      around the key while the hold registers. The fill runs entirely in CSS
+      (.ks-longpress-hint in index.css — linear, no bounce, static ring under
+      prefers-reduced-motion); this element only mounts while the hold is
+      live. Decorative and aria-hidden — the hold has no spoken state. */}
+      {holding && (
+        <span
+          aria-hidden="true"
+          data-testid={`key-grid-cell-${cell.address}-longpress-hint`}
+          className="ks-longpress-hint"
+          style={{
+            position: "absolute",
+            inset: 2,
+            borderRadius: 4,
+            pointerEvents: "none",
+            // 3px band: the padding-box minus the content-box stays visible
+            // under the exclude-composite mask, the rest is clipped away.
+            padding: 3,
+            background: `conic-gradient(${ACCENT} calc(var(--ks-longpress-p, 0) * 1turn), transparent 0)`,
+            WebkitMask: "linear-gradient(white 0 0) content-box, linear-gradient(white 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+            animationDuration: `${LONG_PRESS_MS}ms`,
+          }}
+        />
       )}
       {finding !== undefined && (
         <span

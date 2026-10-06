@@ -19,7 +19,7 @@ const KMN = [
   "",
 ].join("\n");
 
-const COMMENT = "Accept the accent typed as a separate character (decomposed text) as well as the joined form.";
+const COMMENT = "Accept the diacritic typed as a separate character (decomposed text) as well as the joined form.";
 
 function overlay(beforeRuleText: string | null): ContextToleranceOverlay {
   return {

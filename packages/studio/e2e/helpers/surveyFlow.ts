@@ -267,11 +267,17 @@ export async function driveIdentityLite(
   await surveyAdvance(page).click();
 
   // Q8: Copyright holder — optional, TERMINAL (`next: null`); left blank
-  // (D1 defaults it to the author name). This hands off to the base picker.
+  // (D1 defaults it to the author name). This hands off to the layout step.
   await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
-  // Robustness check for the phase boundary: identity-lite hands off
+  // Community-layout step (spec 076 A4): sits between identity and the base
+  // picker. Confirm the studio's suggested Windows layout (the default,
+  // "Yes, use this layout") — the e2e walks never override the proposal.
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 15_000 });
+  await page.getByTestId("layout-continue").click();
+
+  // Robustness check for the phase boundary: the layout step hands off
   // to the base keyboard picker. Wait on that landmark rather than trusting
   // the question count above. BaseResolution.tsx renders its root with
   // data-testid="base-picker" (the visible field inside is a "Search
@@ -470,12 +476,20 @@ export async function driveInvisiblesStep(page: Page): Promise<void> {
  * basic-Latin letters the orthography does not use should be kept anyway, for
  * borrowed words, email addresses, and web addresses.
  *
- * Like the marks series, its gate is computed and never rendered: a base with
- * no surplus basic-Latin letters (or an unconfirmed alphabet) skips the step
- * entirely and this helper returns immediately. When it does render every
- * letter is pre-checked, so clicking Continue accepts the proposal — which is
- * what the walks want, since a kept letter is simply shielded from carve's
- * removal recommendations rather than changing the flow.
+ * Its gate is a tri-state computation (spec 079, `computeConvenienceGate`),
+ * not a plain boolean skip: a base with no surplus basic-Latin letters is
+ * `not-applicable` and completes without a screen, exactly like the marks
+ * series' S0. An UNCONFIRMED orthography signal is a DIFFERENT outcome,
+ * `unknown` — per FR-064 that RENDERS (with an explanatory notice) rather
+ * than skipping, so this helper never treats "alphabet not confirmed yet" as
+ * a reason to expect "skipped". When the step does render — either `applies`
+ * (real candidates) or `unknown` (the notice) — every candidate is
+ * pre-checked, so clicking Continue accepts the proposal; that is what the
+ * lenient default below does, and what the walks want, since a kept letter is
+ * simply shielded from carve's removal recommendations rather than changing
+ * the flow. Pass `{ expect: "shown" | "skipped" }` to assert the gate landed
+ * on the side the walk actually expects, rather than silently going with
+ * whichever one happened.
  *
  * Race-proof by construction (spec 057 Class-B diagnosis — see
  * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md): the gate is

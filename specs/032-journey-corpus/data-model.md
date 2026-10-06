@@ -21,6 +21,7 @@ interface JourneyFixture {
     [key: string]: unknown;
   };
   backtrack_events?: BacktrackEvent[];
+  confirmed_alphabet_bases?: string[]; // OPTIONAL — see contracts/journey-fixture-schema.md
 }
 
 type JourneyEvent =

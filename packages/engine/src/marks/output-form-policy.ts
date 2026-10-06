@@ -101,10 +101,10 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
       form: "base-plus-mark",
       presentedAs: "notice",
       explanation:
-        "Some of your accented letters have no single ready-made character, so " +
-        "your keyboard will build every accented letter from its letter plus its " +
-        "mark. Doing it the same way for all letters keeps searching and " +
-        "backspace behavior consistent across your whole keyboard.",
+        "Backspace will peel one mark off at a time: some of your accented " +
+        "letters have no single ready-made character, so every accented " +
+        "letter is built from its letter plus its mark — keeping backspace " +
+        "and searching consistent across your whole keyboard.",
     },
     isDefault: false,
   },
@@ -115,10 +115,10 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
       form: "base-plus-mark",
       presentedAs: "open-choice",
       explanation:
-        "Both ways can work for your alphabet. Building letters from letter plus " +
-        "mark matches how your marks attach to many letters, and backspace peels " +
-        "one mark off at a time. Ready-made characters make each accented letter " +
-        "a single unit that backspace removes in one step.",
+        "Backspace can work either way for your alphabet. With letter plus " +
+        "mark, one press peels off one mark at a time — matching how your " +
+        "marks attach to many letters. With ready-made characters, one press " +
+        "removes the whole accented letter.",
     },
     isDefault: false,
   },
@@ -129,10 +129,9 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
       form: "ready-made",
       presentedAs: "notice",
       explanation:
-        "Every accented letter in your alphabet has a single ready-made " +
-        "character, and no mark on your keyboard gets a key of its own — so " +
-        "your keyboard will produce those ready-made characters. Backspace " +
-        "removes a whole accented letter in one step.",
+        "Backspace will remove a whole accented letter in one press: every " +
+        "accented letter in your alphabet has a single ready-made character, " +
+        "and no mark on your keyboard gets a key of its own.",
     },
     isDefault: true,
   },

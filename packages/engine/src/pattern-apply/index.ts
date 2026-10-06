@@ -6,13 +6,24 @@ export type { SubstituteResult } from "./substitute.js";
 
 export { applyAssignments, resolveRenderableMechanisms } from "./applyAssignments.js";
 export type { ApplyAssignmentsResult } from "./applyAssignments.js";
+// DeadkeyConflict is defined in ../deadkey-lifecycle (spec 083 Phase 2) and
+// re-exported here for proximity: ApplyAssignmentsResult.conflicts uses it.
+export type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 
 export { buildSessionProducedSet } from "./sessionProducedSet.js";
 
 export { applyAssignmentsToVfs } from "./applyAssignmentsToVfs.js";
 
 export { applyCarveToVfs } from "./applyCarveToVfs.js";
-export type { ApplyCarveToVfsOpts } from "./applyCarveToVfs.js";
+export type { ApplyCarveToVfsOpts, ApplyCarveToVfsResult, CarvePipelineOpts } from "./applyCarveToVfs.js";
+export {
+  deriveCarvedIr,
+  partitionCarveItemIds,
+} from "./carvePipeline.js";
+export type {
+  CarvePipelineInput,
+  CarvePipelineResult,
+} from "./carvePipeline.js";
 
 export { carveFilterIr } from "./carveFilterIr.js";
 
@@ -65,7 +76,7 @@ export type { ApplyDesktopModificationsToRawJsonResult } from "./applyDesktopMod
 export { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
 export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLayersToTouch.js";
 
-export { collectCharContributors, sliceContributorDescriptors } from "./collectCharContributors.js";
+export { collectCharContributors, collectTaintedContributors, sliceContributorDescriptors } from "./collectCharContributors.js";
 export type { CharContributors, ContributorDescriptor, SlicedContributorDescriptors } from "./collectCharContributors.js";
 
 export { collectCompositionMethod } from "./collectCompositionMethod.js";
@@ -344,3 +355,16 @@ export type {
   SetLayerSwitchSpFix,
 } from "./touchKeyDiagnostics.js";
 
+export {
+  compileCarveSuppression,
+  restoreCarveSuppression,
+  CARVE_SUPPRESSION_OWNER,
+  slotGuardNodeIdPrefix,
+} from "./carveSuppression.js";
+export type {
+  SuppressionRestoration,
+  CompileCarveSuppressionOptions,
+  CompileCarveSuppressionResult,
+} from "./carveSuppression.js";
+export { isInSwallowSet } from "./swallowSet.js";
+export type { SwallowCombo } from "./swallowSet.js";

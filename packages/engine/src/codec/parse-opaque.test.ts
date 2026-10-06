@@ -5,7 +5,8 @@ import { OPAQUE_REASONS } from "./opaque-reasons.js";
 // KMN with opaque constructs:
 //   1. save(myFlag, 1)     -> option-store-directive
 //   2. outs(otherStore)    -> outs-expansion
-//   3. context(2)          -> indexed-context
+//   3. context(0)          -> indexed-context (degenerate offset; FR-004 types
+//                              context(N) with N > 1 in context position)
 //   4. U+1F600            -> smp-literal
 const OPAQUE_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'Opaque Test'
@@ -19,7 +20,7 @@ group(main) using keys
 + [K_A] > U+0061
 + [K_B] > save(myFlag, 1)
 + [K_C] > outs(otherStore)
-dk(0001) context(2) > U+0061
+dk(0001) context(0) > U+0061
 + [K_D] > U+1F600
 `;
 
@@ -36,7 +37,7 @@ describe("parse opaque features", () => {
     expect(reasons).toContain(OPAQUE_REASONS.OUTS_EXPANSION);
   });
 
-  it("produces RawKmnFragment for indexed context(2) rule", () => {
+  it("produces RawKmnFragment for degenerate context(0) rule", () => {
     const { ir } = parse(OPAQUE_KMN, "opaque-test");
     const reasons = ir.raw.map(r => r.reason);
     expect(reasons).toContain(OPAQUE_REASONS.INDEXED_CONTEXT);

@@ -9,6 +9,11 @@
 // The step-by-step backspace preview is mandatory (FR-017): the designer sees
 // the consequence rather than taking it on faith.
 //
+// Copy framing (issue #1791): every designer-facing string here asks the
+// BACKSPACE question directly ("What should backspace do to an accented
+// letter?") — never how letters are "produced" or "typed", which would
+// re-ask S2's entry question ("How should your marks be typed?").
+//
 // SC-005: no designer-facing string here may contain the words "Unicode" or
 // "normalization" — asserted mechanically in the station's tests.
 
@@ -110,16 +115,43 @@ function BackspacePreview({ pair, form }: { pair: PosturePair; form: OutputForm 
   );
 }
 
+/**
+ * Per-form option labels. They LEAD with what backspace does — the observable
+ * behaviour this decision controls (issue #1791) — and carry the ready-made
+ * vs letter-plus-mark distinction as supporting detail. New ids
+ * (backspaceLabel.*): the meaning changed from "how letters are produced" to
+ * "what backspace does" (spec 046: rename the id when the meaning changes).
+ */
 function useFormLabel(): Record<OutputForm, string> {
   const { t } = useLingui();
   return {
     "ready-made": t({
-      id: "survey.marks.outputForm.formLabel.readyMade",
-      message: "One unit per accented letter",
+      id: "survey.marks.outputForm.backspaceLabel.readyMade",
+      message: "Backspace removes the whole letter at once (one ready-made unit)",
     }),
     "base-plus-mark": t({
-      id: "survey.marks.outputForm.formLabel.basePlusMark",
-      message: "A letter and a mark, kept separate",
+      id: "survey.marks.outputForm.backspaceLabel.basePlusMark",
+      message: "Backspace removes one mark at a time (letter and mark kept separate)",
+    }),
+  };
+}
+
+/**
+ * The notice branch's override button, per target form. The option labels are
+ * full sentences now, so they can no longer be embedded in "Use … instead" —
+ * each target gets its own backspace-led sentence instead. New ids: the old
+ * single derived id's meaning is retired with it.
+ */
+function useInsteadLabel(): Record<OutputForm, string> {
+  const { t } = useLingui();
+  return {
+    "ready-made": t({
+      id: "survey.marks.outputForm.useInsteadButton.readyMade",
+      message: "Backspace should remove the whole letter at once instead",
+    }),
+    "base-plus-mark": t({
+      id: "survey.marks.outputForm.useInsteadButton.basePlusMark",
+      message: "Backspace should remove one mark at a time instead",
     }),
   };
 }
@@ -185,12 +217,15 @@ export function OutputFormStation({
 }: OutputFormStationProps) {
   const { t } = useLingui();
   const formLabel = useFormLabel();
+  const insteadLabel = useInsteadLabel();
   const formConsequence = useFormConsequence();
   const pair = previewPair(posture);
   const other: OutputForm = value === "ready-made" ? "base-plus-mark" : "ready-made";
+  // New id: the meaning changed from "how accented letters are produced" to
+  // the backspace question (issue #1791; spec 046).
   const sectionAriaLabel = t({
-    id: "survey.marks.outputForm.sectionAriaLabel",
-    message: "How accented letters behave when you backspace or search",
+    id: "survey.marks.outputForm.backspaceSectionAriaLabel",
+    message: "What backspace does to an accented letter",
   });
 
   if (proposal.presentedAs === "open-choice") {
@@ -204,15 +239,16 @@ export function OutputFormStation({
     return (
       <section data-testid="marks-output-form" aria-label={sectionAriaLabel}>
         <h3 style={sectionHeading}>
-          <Trans id="survey.marks.outputForm.heading">
-            How should accented letters behave when you backspace or search?
+          {/* New id: asks the backspace question directly (issue #1791). */}
+          <Trans id="survey.marks.outputForm.backspaceHeading">
+            What should backspace do to an accented letter?
           </Trans>
         </h3>
         <S2Premise ownKeyMarks={ownKeyMarks} />
         <p style={mutedParaFlush}>{proposal.explanation}</p>
         <div
           role="radiogroup"
-          aria-label={t({ id: "survey.marks.outputForm.radiogroupAriaLabel", message: "Output form" })}
+          aria-label={t({ id: "survey.marks.outputForm.backspaceRadiogroupAriaLabel", message: "What backspace does" })}
           style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}
         >
           {recommendedFirst.map((form) => (
@@ -261,8 +297,8 @@ export function OutputFormStation({
   return (
     <section data-testid="marks-output-form" aria-label={sectionAriaLabel}>
       <h3 style={sectionHeading}>
-        <Trans id="survey.marks.outputForm.heading">
-          How should accented letters behave when you backspace or search?
+        <Trans id="survey.marks.outputForm.backspaceHeading">
+          What should backspace do to an accented letter?
         </Trans>
       </h3>
 
@@ -286,9 +322,9 @@ export function OutputFormStation({
       {pair !== undefined && <BackspacePreview pair={pair} form={value} />}
 
       {/* Row 1 of the policy fires precisely because some pair has no
-          single-character form, so "one unit per accented letter" is not an
-          available answer — say why instead of offering a button that would
-          select an unrealisable form. */}
+          single-character form, so the whole-letter-backspace answer is not
+          available — say why instead of offering a button that would select
+          an unrealisable form. */}
       <div style={{ marginTop: 10 }}>
         {proposal.readyMadeUnavailable ? (
           <p data-testid="output-form-change-unavailable" style={{ ...mutedParaFlush, margin: 0, fontSize: 12 }}>
@@ -304,10 +340,7 @@ export function OutputFormStation({
             onClick={() => onChange(other)}
             style={secondaryButton}
           >
-            {t({
-              id: "survey.marks.outputForm.useInsteadButton",
-              message: `Use ${{ formLabel: formLabel[other].toLowerCase() }} instead`,
-            })}
+            {insteadLabel[other]}
           </button>
         )}
       </div>

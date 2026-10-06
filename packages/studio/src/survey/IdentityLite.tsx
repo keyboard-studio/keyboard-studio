@@ -7,7 +7,7 @@
 import { useMemo, useRef, useCallback } from "react";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import type { Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, DecisionProposalSource, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { surveyPageColumn, phaseHeading, leadParagraph } from "./surveyStyles.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
@@ -430,6 +430,26 @@ export function IdentityLite({
     [],
   );
 
+  // Name each seed's source for the decision trail (km-triage, PR #1927):
+  // the same provenance the field caption already shows, so the two
+  // mechanisms cannot disagree. Deriving this FROM getSeedProvenance (not a
+  // second static table) keeps the conditional cases honest — e.g.
+  // il_language_autonym's seed is langtags-sourced only when an own-script
+  // name exists, which is exactly when the provenance map has an entry (the
+  // Q1-English fallback has no langtags behind it and stays sourceless).
+  // il_author_name / il_author_email seeds come from the stored author
+  // profile, so they name "identity"; getSeedValue above returns a value
+  // for them only when the profile has one, so this can only attach to a
+  // real profile-derived proposal.
+  const getSeedSource = useCallback(
+    (questionId: string): DecisionProposalSource | undefined => {
+      if (getSeedProvenance(questionId) !== undefined) return "langtags";
+      if (questionId === "il_author_name" || questionId === "il_author_email") return "identity";
+      return undefined;
+    },
+    [getSeedProvenance],
+  );
+
   // Soft mismatch warning for il_language_code: when the typed/selected code
   // reverse-resolves (via langtags) to a DIFFERENT language than the one
   // picked at il_language_english, surface a non-blocking caption so the
@@ -580,6 +600,7 @@ export function IdentityLite({
           onComplete={handleComplete}
           onAnswerCommit={handleAnswerCommit}
           getSeedValue={getSeedValue}
+          getSeedSource={getSeedSource}
           getSeedProvenance={getSeedProvenance}
           getFieldWarning={getFieldWarning}
           getSeedOptions={getSeedOptions}

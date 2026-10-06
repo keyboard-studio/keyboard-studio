@@ -19,6 +19,8 @@ import {
   headerFieldLabel,
   HEADER_FIELD_MISSING_CODE,
   checkOwnershipConsistency,
+  checkBehaviourNulOnTextContext,
+  NUL_ON_TEXT_CONTEXT_CODE,
 } from "./layer-a-prime.js";
 import { parse } from "../codec/parse.js";
 import { computeSha256Hex } from "../codec/hash.js";
@@ -572,5 +574,50 @@ describe("checkOwnershipConsistency (I6)", () => {
       [{ id: "P1", ownedNodes: [{ kind: "rule", nodeId: "r1" }, { kind: "store", nodeId: "s1" }] }],
     );
     expect(checkOwnershipConsistency(ir)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I6 extension — behaviour-owned nul on a text-bearing context (076 FR-020)
+// ---------------------------------------------------------------------------
+
+describe("checkBehaviourNulOnTextContext", () => {
+  /** Parse one rule line; optionally stamp it as suppression-owned. */
+  function ruleIr(line: string, owned: boolean): KeyboardIR {
+    const { ir } = parse(`begin Unicode > use(main)
+
+group(main) using keys
+${line}
+`, "t");
+    const rule = ir.groups[0]!.rules[0]!;
+    expect(rule, `fixture must parse to a typed rule: ${line}`).toBeDefined();
+    if (!owned) return ir;
+    return {
+      ...ir,
+      groups: [{ ...ir.groups[0]!, rules: [{ ...rule, ownedByBehaviour: "carve-suppression" }] }],
+    };
+  }
+
+  it.each([
+    ["a quoted-text context", "'x' + [K_A] > nul"],
+    ["nul beep on a text context", "'x' + [K_A] > nul beep"],
+    ["a mixed text-plus-deadkey context", "'x' dk(1) + [K_A] > nul"],
+  ])("flags a behaviour-owned nul on %s", (_label, line) => {
+    const findings = checkBehaviourNulOnTextContext(ruleIr(line, true));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ code: NUL_ON_TEXT_CONTEXT_CODE, severity: "error" });
+  });
+
+  it.each([
+    ["a bare-key rule", "+ [K_A] > nul"],
+    ["a deadkey-only context", "dk(1) + [K_A] > nul"],
+    ["loud deadkey-only suppression", "dk(1) + [K_A] > nul beep"],
+    ["a text context re-emitted with context", "'x' + [K_A] > context"],
+  ])("accepts a behaviour-owned rule on %s", (_label, line) => {
+    expect(checkBehaviourNulOnTextContext(ruleIr(line, true))).toEqual([]);
+  });
+
+  it("ignores hand-written nul on a text context (sil_yoruba8 backspace idiom)", () => {
+    expect(checkBehaviourNulOnTextContext(ruleIr("'gb' + [K_BKSP] > nul", false))).toEqual([]);
   });
 });

@@ -26,6 +26,9 @@ vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
 vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () =>
   import("../../src/test/studioShellMocks/CarveGalleryV2.tsx"),
 );
+vi.mock("../../src/editors/adapters/deadkeyAdapter.tsx", () =>
+  import("../../src/test/studioShellMocks/deadkeyAdapter.tsx"),
+);
 vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
   import("../../src/test/studioShellMocks/MechanismGallery.tsx"),
 );
@@ -140,6 +143,7 @@ async function click(testId: string): Promise<void> {
 /** The copy-track walk from stepHost.goldenWalk.test.tsx, with the settle points it needs. */
 const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["survey-advance"] },
+  { testIds: ["layout-continue"] },
   { testIds: ["base-preview", "base-confirm"] },
   { testIds: ["track-copy"] },
   { testIds: ["survey-advance"] },
@@ -148,6 +152,8 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["punctuation-done"], settleFor: "invisibles-continue" },
   { testIds: ["invisibles-continue"], settleFor: "carve-continue" },
   { testIds: ["carve-continue"] },
+  { testIds: ["deadkeys-continue"] },
+  { testIds: ["rules-continue"] },
   { testIds: ["mechanisms-continue"] },
   { testIds: ["seed-source-confirm"] },
 ];

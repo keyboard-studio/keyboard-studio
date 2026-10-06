@@ -31,6 +31,8 @@ function computeCoverageReport(fixtures: readonly JourneyFixture[]): CoverageRep
 - `events` MUST be ordered; each entry's `stepId` MUST resolve against the live manifest (`packages/studio/src/steps/manifest.ts`).
 - `expected_outcomes.routing_group` and `.strategy` are REQUIRED; additional key-IR assertions are OPTIONAL and fixture-specific.
 - `backtrack_events`, when present, MUST name a `stepId` already visited earlier in `events`.
+- `confirmed_alphabet_bases` (OPTIONAL, `string[]`): base letters for the `characters` step's `SurveyPhaseResult.alphabet.bases`. A fixture-declared stand-in for `PhaseB.tsx`'s real alphabet-confirmation UI (CLDR/SLDR exemplar lookups, manual entry), which the harness does not replay — the same role `expected_outcomes.axes` plays for `selectStrategy()`. Declare it on any fixture whose `convenience`/`carve` needed-set must be exercised for real.
+- A `convenience` step event uses the harness-only sentinel `questionId: "convenience_retain"` (there is no live modular flow for this step — mirrors the `routing_group` backtrack sentinel). Its `value` (string or string[]) lists the retained candidates' `primary` letters (e.g. `"q x"`). Declaring this event asserts `computeConvenienceGate` opened (`applies`) for the fixture's produced/needed sets; declaring NO event for `convenience` asserts the gate did NOT open — pinned from both sides (spec 079, closing the coverage gap where a permanently-skipping OR permanently-opening gate would otherwise pass silently).
 
 ## Non-goals (explicit, per spec.md)
 

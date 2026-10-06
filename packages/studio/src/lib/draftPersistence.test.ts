@@ -1082,6 +1082,28 @@ describe("draftPersistence", () => {
       };
     }
 
+    it("keeps a saved answer's proposal, and drops only a malformed proposal (never the answer)", () => {
+      const stepWith = (answers: Record<string, unknown>) => ({
+        steps: {
+          phase_f_helpdocs: { answers, position: null, status: { kind: "in-progress" }, lastRecorded: {} },
+        },
+        recordedScreenOf: {},
+      });
+      const restored = restoreSurveyAnswerSnapshot(
+        stepWith({
+          kept: validAnswer({ origin: "proposed", proposal: { value: "x", source: "identity" } }),
+          plain: validAnswer({ origin: "proposed", proposal: { value: "false" } }),
+          badSource: validAnswer({ origin: "overturned", proposal: { value: "y", source: "not-a-source" } }),
+        }),
+      );
+      const answers = restored.steps["phase_f_helpdocs"]?.answers;
+
+      expect(answers?.["kept"]?.proposal).toEqual({ value: "x", source: "identity" });
+      expect(answers?.["plain"]?.proposal).toEqual({ value: "false" });
+      expect(answers?.["badSource"]?.value).toBe("x");
+      expect(answers?.["badSource"]?.proposal).toBeUndefined();
+    });
+
     it("keeps an unknown step id verbatim (forward-compat — a future step this build doesn't know about)", () => {
       const raw = {
         steps: {

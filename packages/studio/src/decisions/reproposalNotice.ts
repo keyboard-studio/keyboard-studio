@@ -19,6 +19,19 @@ import { stageLabel } from "./progressDots.ts";
 import { formatClauseList } from "./stageText.ts";
 
 /**
+ * The part of a `diffWorkToDo()` delta the FR-016 notice may speak about:
+ * work in steps the author had already reached when they pressed Next
+ * (`visited` is snapshotted at the click, before the advance adds the next
+ * step). FR-016 is about *later answers that already exist* being
+ * re-proposed; a step the author has not reached yet has nothing to
+ * reconfirm — e.g. the physical mechanism gallery's unassigned characters on
+ * first arrival are its own opening state, already shown as its red marks.
+ */
+export function noticeableWorkItems(delta: readonly WorkItem[], visited: readonly string[]): WorkItem[] {
+  return delta.filter((item) => visited.includes(item.stepId));
+}
+
+/**
  * The catalog-labelled, locale-joined list of steps a `selectWorkToDo()`
  * delta touches, in first-appearance order, de-duplicated. Never a raw step
  * id — every name comes from `stageLabel`.

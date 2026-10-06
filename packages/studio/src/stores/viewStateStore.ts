@@ -141,13 +141,16 @@ export const useViewStateStore = create<ViewState>((set, get) => ({
   setPaneSplitPct: (surface, pct) =>
     set({ paneSplitPct: { ...get().paneSplitPct, [surface]: pct } }),
 
-  setOskMode: (surface, mode) => set({ oskMode: { ...get().oskMode, [surface]: mode } }),
+  setOskMode: (surface, mode) =>
+    set({ oskMode: { ...get().oskMode, [surface]: mode } }),
 
-  setScrollTop: (paneId, top) => set({ scrollTop: { ...get().scrollTop, [paneId]: top } }),
+  setScrollTop: (paneId, top) =>
+    set({ scrollTop: { ...get().scrollTop, [paneId]: top } }),
 
   setCompareSelection: (compareSelection) => set({ compareSelection }),
 
-  reset: () => set({ ...INITIAL_STATE, trailCollapsedSteps: new Set<string>() }),
+  reset: () =>
+    set({ ...INITIAL_STATE, trailCollapsedSteps: new Set<string>() }),
 }));
 
 /**

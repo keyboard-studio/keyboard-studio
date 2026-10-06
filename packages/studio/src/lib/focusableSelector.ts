@@ -20,6 +20,12 @@
 //     in studio surfaces (help/embedded previews, editable labels).
 //   • `[tabindex]:not([tabindex="-1"])` — explicit opt-ins, minus the
 //     roving-tabindex opt-outs.
+//   • `:not([aria-hidden="true"])` on every clause — a caller moving focus
+//     onto an `aria-hidden` element contradicts the very attribute that
+//     removed it from the tree, and the dialogs already carry one such
+//     element (the click-outside backdrop). A no-op until a focusable
+//     `aria-hidden` descendant appears inside a dialog, popover, or the
+//     questions pane; see #1841 for the audit that asked for it.
 //
 export const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), iframe, [contenteditable]:not([contenteditable="false"]), [tabindex]:not([tabindex="-1"])';
+  'a[href]:not([aria-hidden="true"]), button:not([disabled]):not([aria-hidden="true"]), input:not([disabled]):not([type="hidden"]):not([aria-hidden="true"]), select:not([disabled]):not([aria-hidden="true"]), textarea:not([disabled]):not([aria-hidden="true"]), iframe:not([aria-hidden="true"]), [contenteditable]:not([contenteditable="false"]):not([aria-hidden="true"]), [tabindex]:not([tabindex="-1"]):not([aria-hidden="true"])';

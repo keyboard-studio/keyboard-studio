@@ -132,7 +132,7 @@ describe("IdentityLite — resume", () => {
     ).toBeNull();
     // Restored select answer keeps Finish enabled.
     const advance = screen.getByTestId("survey-advance") as HTMLButtonElement;
-    expect(advance.textContent).toBe("Finish");
+    expect(advance.textContent).toBe("Continue");
     expect(advance.disabled).toBe(false);
   });
 

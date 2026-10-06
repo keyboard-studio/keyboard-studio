@@ -20,6 +20,8 @@
 // fixture graph — same precedent as before this rewrite.
 
 import { describe, it, expect } from "vitest";
+import { I18n } from "@lingui/core";
+import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import type { DecisionEntry, DecisionRecord } from "@keyboard-studio/contracts";
 import { PRE_IDENTITY_STEP_ID } from "@keyboard-studio/contracts";
 import { manifest } from "../steps/manifest.ts";
@@ -27,6 +29,7 @@ import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { ResolveContext } from "../lib/resolveLocation.ts";
 import type { WorkItem } from "../steps/workToDo.ts";
 import { buildProgressDots, type ProgressDot } from "./progressDots.ts";
+import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -57,7 +60,7 @@ function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
     questionRegistry: REGISTRY,
     traversal: traversal({
       activeStepId: "characters",
-      history: ["identity", "choose_base", "track"],
+      history: ["identity", "layout", "choose_base", "track"],
       selectedTrack: "adapt",
     }),
     hasProject: true,
@@ -875,5 +878,100 @@ describe("optional screens left blank, and outcome-satisfied steps", () => {
     const satisfied = buildProgressDots({ ...input, satisfiedSteps: new Set(["characters"]) });
     expect(sectionFor(satisfied, "characters")?.fill).toBe("full");
     expect(sectionFor(satisfied, "characters")?.kind).toBe("completed");
+  });
+});
+
+describe("question-mark labels are distinct from their stage heading", () => {
+  const unknownLookup = (): string | undefined => undefined;
+
+  function marksQuestionDots(walk: readonly { id: string; done: boolean }[]): ProgressDot[] {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      lookupQuestionLabel: unknownLookup,
+      stepWalks: { marks: walk },
+    });
+    return dots.filter((d) => d.tier === "question" && d.location.step === "marks");
+  }
+
+  it("every real marks station gets its own label, never the stage heading", () => {
+    const stations = [
+      "marks_attachment",
+      "marks_treatment",
+      "marks_output_form",
+      "marks_stacking",
+      "marks_context_tolerance",
+    ];
+    // The real lookup: the stations' labels live in the editor label table.
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      lookupQuestionLabel: createLookupQuestionLabel(),
+      stepWalks: { marks: stations.map((id) => ({ id, done: false })) },
+    });
+    const marks = dots.filter((d) => d.tier === "question" && d.location.step === "marks");
+    expect(marks).toHaveLength(stations.length);
+    for (const d of marks) expect(d.label).not.toBe("Accents & marks");
+    expect(new Set(marks.map((d) => d.label)).size).toBe(stations.length);
+  });
+
+  it("the generic fallback disambiguates stops that resolve no label", () => {
+    const marks = marksQuestionDots([
+      { id: "ms_series_s1", done: true },
+      { id: "ms_series_s2", done: false },
+      { id: "ms_series_s3", done: false },
+    ]);
+    expect(marks.map((d) => d.label)).toEqual([
+      "Accents & marks — 1 of 3",
+      "Accents & marks — 2 of 3",
+      "Accents & marks — 3 of 3",
+    ]);
+    for (const d of marks) expect(d.label).not.toBe("Accents & marks");
+  });
+
+  it("the generic fallback interpolates through a real I18n instance (catalog path, not just the i18n-less fallback)", () => {
+    const testI18n = new I18n({ locale: "en", messages: { en: enMessages } });
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      i18n: testI18n,
+      lookupQuestionLabel: unknownLookup,
+      stepWalks: {
+        marks: [
+          { id: "ms_series_s1", done: true },
+          { id: "ms_series_s2", done: false },
+          { id: "ms_series_s3", done: false },
+        ],
+      },
+    });
+    const marks = dots.filter((d) => d.tier === "question" && d.location.step === "marks");
+    expect(marks.map((d) => d.label)).toEqual([
+      "Accents & marks — 1 of 3",
+      "Accents & marks — 2 of 3",
+      "Accents & marks — 3 of 3",
+    ]);
+  });
+
+  it("mixed real and fallback labels: fallback numbering counts every screen, labeled or not", () => {
+    const mixedLookup = (id: string): string | undefined =>
+      id === "ms_series_s2" ? "A real per-screen label" : undefined;
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      lookupQuestionLabel: mixedLookup,
+      stepWalks: {
+        marks: [
+          { id: "ms_series_s1", done: true },
+          { id: "ms_series_s2", done: false },
+          { id: "ms_series_s3", done: false },
+        ],
+      },
+    });
+    const marks = dots.filter((d) => d.tier === "question" && d.location.step === "marks");
+    expect(marks.map((d) => d.label)).toEqual([
+      "Accents & marks — 1 of 3",
+      "A real per-screen label",
+      "Accents & marks — 3 of 3",
+    ]);
   });
 });

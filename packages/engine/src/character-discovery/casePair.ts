@@ -123,3 +123,26 @@ export function caseCounterpart(
 
   return { counterpart: candidate, direction };
 }
+
+/**
+ * The case counterpart of `base`, filtered to the confirmed alphabet.
+ * Shared by the three case-fold consumers (mark-classes attestation fold,
+ * attachment-proposals FR-009 derivation, case-fold uppercase expansion):
+ * a counterpart only counts when it is present in `confirmedBases`.
+ *
+ * @param base Single character to find the counterpart of.
+ * @param confirmedBases Confirmed alphabet bases (or any set to filter against).
+ * @param bcp47 Optional BCP47 tag for locale-sensitive mapping (Turkic I).
+ * @param onlyDirection When set, only return a pair of this direction.
+ */
+export function confirmedCaseCounterpart(
+  base: string,
+  confirmedBases: ReadonlySet<string>,
+  bcp47?: string,
+  onlyDirection?: "toUpper" | "toLower",
+): { counterpart: string; direction: "toUpper" | "toLower" } | null {
+  const pair = caseCounterpart(base, bcp47);
+  if (pair === null) return null;
+  if (onlyDirection !== undefined && pair.direction !== onlyDirection) return null;
+  return confirmedBases.has(pair.counterpart) ? pair : null;
+}

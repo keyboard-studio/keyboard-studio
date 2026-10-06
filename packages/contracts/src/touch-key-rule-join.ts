@@ -201,6 +201,11 @@ export function classifyTouchRuleRole(output: readonly { kind: string; text?: st
       if (NUL_RE.test(text)) return "suppresses";
       if (CONTEXT_RE.test(text)) return "guard";
     }
+    // 076 FR-004: the codec now types `nul` / `context` / `context(N)` in
+    // output position instead of leaving them raw. Mirror the raw-text
+    // semantics above for the typed forms.
+    if (only?.kind === "nul") return "suppresses";
+    if (only?.kind === "context") return "guard";
   }
 
   const allWiring = output.every(

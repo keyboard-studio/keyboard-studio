@@ -1,0 +1,36 @@
+c firedrule.kmn — fixture for fired-rule tracking tests (spec 082, Track A FR-002).
+c
+c Rule layout (compiled ordinals, asserted by simulate.firedRule.test.ts).
+c NOTE: kmc does not preserve KMN source order — it hoists the deadkey-match
+c rule (line 28) above the deadkey-setting rule (line 27) in the compiled
+c group. Ordinals below are compiled order, which is what `firedRule.ruleIndex`
+c reports (the studio maps compiled ordinals back to IR rules itself).
+c   group(main):   0: plain key rule        (+ [K_A] > 'a')              [line 24]
+c                  1: context rule           (any(vowel) + [K_B] > 'X')   [line 25]
+c                  2: blocking rule          (+ [K_C] > nul)              [line 26]
+c                  3: deadkey-matching rule  (deadkey(1) + [K_D] > U+00E9)[line 28]
+c                  4: deadkey-setting rule   (+ [K_E] > deadkey(1))       [line 27]
+c                  5: use() delegation rule  (+ [K_F] > use(second))      [line 29]
+c   group(second): 0: plain key rule        (+ [K_F] > 'F2')             [line 32]
+c
+c store(&TARGETS) 'any' is required for kmc to emit the KeymanWeb .js artifact.
+
+store(&NAME) 'FiredRule'
+store(&VERSION) '14.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+store(&COPYRIGHT) 'test fixture'
+store(vowel) 'aei'
+
+begin Unicode > use(main)
+
+group(main) using keys
++ [K_A] > 'a'
+any(vowel) + [K_B] > 'X'
++ [K_C] > nul
++ [K_E] > deadkey(1)
+deadkey(1) + [K_D] > U+00E9
++ [K_F] > use(second)
+
+group(second) using keys
++ [K_F] > 'F2'

@@ -1,8 +1,8 @@
 # Phase 1 Data Model: Uppercase-counterpart suggestion
 
-**Feature**: [spec.md](spec.md) · **Plan**: [plan.md](plan.md) · **Research**: [research.md](research.md)
+**Feature**: [spec.md](../_archive/074-uppercase-counterpart-suggestion/spec.md) · **Plan**: [plan.md](../_archive/074-uppercase-counterpart-suggestion/plan.md) · **Research**: [research.md](../_archive/074-uppercase-counterpart-suggestion/research.md)
 
-No locked contract type changes (see [research.md](research.md) R8). Everything below is either new
+No locked contract type changes (see [research.md](../_archive/074-uppercase-counterpart-suggestion/research.md) R8). Everything below is either new
 studio-local UI state or a new **slot value** on an existing `MechanismRef`.
 
 ---

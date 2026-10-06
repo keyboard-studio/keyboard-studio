@@ -136,12 +136,17 @@ export function OAuthCallbackScreen({ provider }: { provider: OAuthProvider }) {
 
   return (
     <div style={pageStyle} role="status" aria-live="polite">
-      {/* Keyframes can't be expressed inline; scope them to this screen. */}
-      <style>{"@keyframes ks-oauth-spin { to { transform: rotate(360deg); } }"}</style>
+      {/* Keyframes can't be expressed inline; scope them to this screen.
+          Reduced motion: the spinner stops spinning and reads as a static
+          status marker — the `role="status"` live region still announces
+          the in-progress state. */}
+      <style>
+        {"@keyframes ks-oauth-spin { to { transform: rotate(360deg); } } @media (prefers-reduced-motion: reduce) { .ks-oauth-spinner { animation: none; } }"}
+      </style>
       <div style={cardStyle}>
         {phase === "working" ? (
           <>
-            <div style={spinnerStyle} aria-hidden="true" />
+            <div className="ks-oauth-spinner" style={spinnerStyle} aria-hidden="true" />
             <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 8px" }}>
               <Trans id="oauth.callback.working.heading">
                 Completing {label} sign-in…

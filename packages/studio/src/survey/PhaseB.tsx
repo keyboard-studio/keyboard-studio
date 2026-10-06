@@ -546,6 +546,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   const controls = usePhaseBDraftStore((s) => s.controls);
   const lastPick = usePhaseBDraftStore((s) => s.lastPick);
   const [showUppercase, setShowUppercase] = useState(false);
+  const glyphFontStack = useGlyphFontStack();
 
   // Render once the alphabet has any content to break down. Spec 047 US3 shows
   // the Letters section (with its lowercase/uppercase toggle) even for a
@@ -580,7 +581,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
         // pointer cursor — removal stays on the CharChipEditor pick chips above.
         style={{ ...charChip(false), cursor: "default" }}
       >
-        <span style={chipGlyph(true)}>{display}</span>
+        <span style={chipGlyph(true, glyphFontStack)}>{display}</span>
         <CpLabel grapheme={glyph} />
         {justAdded && <span style={chipIndicator(ACCENT)}>new</span>}
       </span>
@@ -746,6 +747,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
   const addLoanword = usePhaseBDraftStore((s) => s.addLoanword);
   const removeLoanword = usePhaseBDraftStore((s) => s.removeLoanword);
   const remove = usePhaseBDraftStore((s) => s.remove);
+  const glyphFontStack = useGlyphFontStack();
 
   const loanwords = useMemo(() => {
     if (inventory === null) return [];
@@ -835,7 +837,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
               className="ks-focus-ring ks-hit-target"
               style={charChip(selected, LOANWORD_CHIP_SCALE)}
             >
-              <span style={chipGlyph(selected, undefined, LOANWORD_CHIP_SCALE)}>{letters}</span>
+              <span style={chipGlyph(selected, glyphFontStack, LOANWORD_CHIP_SCALE)}>{letters}</span>
               <CpLabel grapheme={ch} />
               <span style={chipIndicator(chipIndicatorColor(selected), LOANWORD_CHIP_SCALE)}>
                 {chipIndicatorText(selected)}
@@ -875,6 +877,24 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
   const removeChar = usePhaseBDraftStore((s) => s.remove);
   const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
+
+  // Defaults-first (spec 3c): the build list can be reached without passing
+  // the intro chooser (a restored position, a progress-dot jump). If it opens
+  // EMPTY while a sourced exemplar alphabet exists and the author never
+  // declined it, apply the exemplar set, exactly as accepting the chooser's
+  // pre-selected option would. Once per mount; seedFromProposal is
+  // idempotent and never re-proposes a character the author removed.
+  const { inventory: exemplarInventory } = useSourcedExemplars(context.bcp47_tag);
+  const exemplarDeclined = usePhaseBDraftStore((s) => s.exemplarMethodDeclined);
+  const seedExemplars = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const autoSeededRef = useRef(false);
+  useEffect(() => {
+    if (autoSeededRef.current || exemplarInventory === null) return;
+    autoSeededRef.current = true;
+    if (chars.length === 0 && !exemplarDeclined) {
+      seedExemplars(exemplarInventory, context.bcp47_tag);
+    }
+  }, [exemplarInventory, chars.length, exemplarDeclined, seedExemplars, context.bcp47_tag]);
 
   // spec 079 US3 T059/T080: carried-over additions that landed outside the
   // new script after a shape change, flagged until reconfirmed. Same
@@ -1073,6 +1093,11 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         />
       </section>
 
+      {/* Section 2a: the exemplar loanword tier — shown, never pre-selected.
+          Sits directly under the alphabet it extends, ahead of the other fill
+          affordances and the breakdown. */}
+      <LoanwordsSection bcp47={context.bcp47_tag} />
+
       {/* Section 2b: the other two ways to fill the alphabet. All three
           affordances stay present regardless of the page-1 choice (spec 044
           FR-016b / obligation P1b) — declining the offer must not remove a
@@ -1084,9 +1109,6 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           spec-047 category sections — renders once the alphabet implies marks,
           accented letters, or any non-letter category. */}
       <AlphabetBreakdown bcp47={context.bcp47_tag} />
-
-      {/* Section 3b: the exemplar loanword tier — shown, never pre-selected. */}
-      <LoanwordsSection bcp47={context.bcp47_tag} />
 
       {/* The character grid has moved to the right pane —
           see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}
@@ -1531,16 +1553,19 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   // pre-selected option — unless the author already declined it for this
   // working copy, in which case the decision is not re-asserted (FR-016a).
   const offerExemplars = inventory !== null;
-  const [selected, setSelected] = useState<IntroChoice>("build-list");
-  // The offer resolves asynchronously, so the pre-selection is applied once the
-  // lookup settles rather than at first render. Only ever moves the selection
-  // off the initial default — never overrides a choice the author has made.
-  const [autoSelected, setAutoSelected] = useState(false);
-  useEffect(() => {
-    if (loading || autoSelected) return;
-    setAutoSelected(true);
-    if (offerExemplars && !declinedBefore) setSelected("exemplars");
-  }, [loading, autoSelected, offerExemplars, declinedBefore]);
+  // The offer resolves asynchronously, so until the author picks something
+  // the selection is DERIVED: the exemplar option whenever an offer exists
+  // and was not declined, else "build-list". Deriving (rather than latching
+  // once on the first settled lookup) means a late-arriving or re-resolved
+  // offer still becomes the default. An explicit author choice always wins.
+  const [authorChoice, setAuthorChoice] = useState<IntroChoice | null>(null);
+  const defaultChoice: IntroChoice =
+    !loading && offerExemplars && !declinedBefore ? "exemplars" : "build-list";
+  const selected: IntroChoice =
+    authorChoice === "exemplars" && !offerExemplars
+      ? "build-list"
+      : (authorChoice ?? defaultChoice);
+  const setSelected = setAuthorChoice;
 
   const languageName =
     context["language_name"] ?? context["detected_group"] ?? t({ id: "survey.phaseB.intro.genericLanguage", message: "your language" });

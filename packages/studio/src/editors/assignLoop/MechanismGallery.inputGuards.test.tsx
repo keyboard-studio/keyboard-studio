@@ -10,11 +10,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, act } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import { MechanismGallery } from "./MechanismGallery.tsx";
+import { MechanismGallery, resolveS02DeadkeyIdentity, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
+import { parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
-import { changeSelectMenu, selectMenuValue } from "../../test/selectMenuTestUtils.ts";
+import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
 import { installMechanismGalleryHooks } from "../../test/mechanismGallery/mocks.tsx";
 import { seedInventory, instantiateWithModifiersInUse } from "../../test/mechanismGallery/harness.ts";
 
@@ -123,53 +124,15 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
     const addBtn = screen.getByRole("button", { name: /Apply method for ẑ/i });
     expect((addBtn as HTMLButtonElement).disabled).toBe(true);
   });
-
-  it("tapping a key in the OSK preview while custom mode is active exits custom mode and clears the stale custom text", async () => {
-    seedInventory(["ẑ"]);
-    await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
-      // Flush the patterns-loading microtasks so GalleryPreviewWithPatterns
-      // (and the mocked OSKFrame's tap button) mounts.
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    fireEvent.click(screen.getByText(/Assign to a key/i));
-    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
-    expect(
-      screen.getByLabelText(/Custom character for the assigned key/i),
-    ).toBeTruthy();
-
-    // Type some (possibly-invalid) custom text before the tap — this is the
-    // stale state that must NOT survive a tap-to-select.
-    fireEvent.change(screen.getByLabelText(/Custom character for the assigned key/i), {
-      target: { value: "zz" },
-    });
-
-    // The OSKFrame mock's "tap-K_E" button simulates an OSK key tap.
-    fireEvent.click(screen.getByRole("button", { name: "tap-K_E" }));
-
-    // Custom mode is exited — the select now shows K_E and the custom input
-    // is gone.
-    expect(
-      screen.queryByLabelText(/Custom character for the assigned key/i),
-    ).toBeNull();
-    expect(
-      selectMenuValue(screen.getByLabelText(/Physical key for Assign to a key/i)),
-    ).toBe("K_E");
-
-    // Re-opening "Enter my own character..." starts clean — the paired
-    // custom-char state was cleared by the tap, not left stale from before.
-    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
-    expect(
-      (screen.getByLabelText(/Custom character for the assigned key/i) as HTMLInputElement).value,
-    ).toBe("");
-  });
 });
 
 describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => {
-  it("a custom trigger character maps to its vkey, and deadkeyName/accentChar never fall back to 'dead0'", async () => {
+  it("a custom trigger character maps to its vkey, and deadkeyName is an allocated numeric id (never 'dead0')", async () => {
     // "a" is not one of the 4 built-in DEADKEY_OPTIONS trigger keys, so this
-    // exercises the custom-trigger path exclusively — deadkeyNameFor(triggerKey)
-    // would otherwise return the "dead0" fallback for an unrecognised key id.
+    // exercises the custom-trigger path exclusively. Spec 083: the id is no
+    // longer derived from the trigger character's codepoint — it is freshly
+    // allocated via allocateDeadkeyId (studio ids start above 0x2FFF), while
+    // accentChar keeps the old convention (the trigger's literal character).
     seedInventory(["ā"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -189,9 +152,93 @@ describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => 
       .session.assignments.filter((a) => a.modality === "physical");
     const slotValues = assignments[0]?.mechanisms[0]?.slotValues;
     expect(slotValues?.["triggerKey"]).toBe("K_A");
-    expect(slotValues?.["deadkeyName"]).toBe("0061");
+    const deadkeyName = slotValues?.["deadkeyName"];
+    expect(typeof deadkeyName).toBe("string");
+    expect(deadkeyName).toMatch(/^[0-9a-f]{4}$/);
+    expect(deadkeyName).not.toBe("dead0");
+    expect(parseInt(deadkeyName as string, 16)).toBeGreaterThan(0x2fff);
     expect(slotValues?.["accentChar"]).toBe("a");
-    expect(slotValues?.["deadkeyName"]).not.toBe("dead0");
+  });
+
+  it("two S-02 mints in one session get distinct ids (session reservation)", () => {
+    // The working IR does not carry this session's phase-C assignments, so
+    // the seam reserves ids already minted in sessionAssignments — otherwise
+    // a second mint would re-mint the same allocateDeadkeyId(workingIr) value.
+    const first = resolveS02DeadkeyIdentity({
+      triggerKey: "K_COLON",
+      triggerResolution: { kind: "key", vkey: "K_COLON" },
+      workingIr: null,
+      sessionAssignments: [],
+    });
+    expect(first.deadkeyName).toBe("3000");
+    expect(first.accentChar).toBe(";");
+
+    const second = resolveS02DeadkeyIdentity({
+      triggerKey: "K_LBRKT",
+      triggerResolution: { kind: "key", vkey: "K_LBRKT" },
+      workingIr: null,
+      sessionAssignments: [
+        {
+          scope: "individual",
+          target: "ā",
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_DEADKEY,
+              strategyId: "S-02",
+              slotValues: {
+                triggerKey: "K_COLON",
+                deadkeyName: first.deadkeyName,
+                baseLetters: "a",
+                accentedForms: "ā",
+                accentChar: ";",
+              },
+            },
+          ],
+          source: "user",
+        },
+      ],
+    });
+    expect(second.deadkeyName).toBe("3001");
+    expect(second.deadkeyName).not.toBe(first.deadkeyName);
+    expect(second.accentChar).toBe("[");
+  });
+
+  it("a 5-digit session-minted id is reserved (no 0xffff cap)", () => {
+    // dk(dead0) parses as numeric 0xdead0, so allocateDeadkeyId(workingIr)
+    // proposes 0xdead1 — but the session already minted "dead1". The
+    // 5-digit reservation must be honored and the mint must bump to 0xdead2.
+    const workingIr = parseKmn(
+      `store(&version) '10.0'\nbegin Unicode > use(main)\n\ngroup(main) using keys\n+ [K_BKQUOTE] > dk(dead0)\n`,
+      "deadkey-5digit-reservation",
+    ).ir;
+    const second = resolveS02DeadkeyIdentity({
+      triggerKey: "K_LBRKT",
+      triggerResolution: { kind: "key", vkey: "K_LBRKT" },
+      workingIr,
+      sessionAssignments: [
+        {
+          scope: "individual",
+          target: "ā",
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_DEADKEY,
+              strategyId: "S-02",
+              slotValues: {
+                triggerKey: "K_COLON",
+                deadkeyName: "dead1",
+                baseLetters: "a",
+                accentedForms: "ā",
+                accentChar: ";",
+              },
+            },
+          ],
+          source: "user",
+        },
+      ],
+    });
+    expect(second.deadkeyName).toBe("dead2");
   });
 });
 

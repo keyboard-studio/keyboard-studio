@@ -41,6 +41,28 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
     expect(renderReadmeMd(input)).toBe("# Piaroa\n");
   });
 
+  it("renderReadmeMd appends the Supported Platforms section from projected targets in the no-description fallback (#1906)", () => {
+    // The generator satisfies its own 5.7 readme-targets check even before
+    // the author has written a description: a fresh Track 1 copy of an
+    // `any`-target keyboard must not warn about its own stub.
+    expect(renderReadmeMd(baseInput({ platforms: ["any"] }))).toBe(
+      "# Piaroa\n\n## Supported Platforms\n- any\n",
+    );
+  });
+
+  it("renderReadmeMd lists explicit projected targets in the no-description fallback (#1906)", () => {
+    expect(renderReadmeMd(baseInput({ platforms: ["windows", "web"] }))).toBe(
+      "# Piaroa\n\n## Supported Platforms\n- windows\n- web\n",
+    );
+  });
+
+  it("renderReadmeMd keeps the byte-identical bare stub when no platforms are known (#1906)", () => {
+    // Deliberate: with nothing to list, the FR-002 contract (bare `# title`
+    // stub) is unchanged; the section appears only when there is something
+    // to say.
+    expect(renderReadmeMd(baseInput())).toBe("# Piaroa\n");
+  });
+
   it("renderReadmeHtm is byte-identical to today's packageDocs stub when answers is null", () => {
     expect(renderReadmeHtm(baseInput())).toBe(readmeHtm("Piaroa"));
   });
@@ -527,6 +549,38 @@ describe("helpDocsRender — spec 080 FR-006 base inheritance before anything is
       "# Base\n\nBase description.\n\nNew description.\n\n## Supported Platforms\n- windows\n",
     );
     expect(rendered.match(/^# /gm)).toHaveLength(1);
+  });
+
+  it("renderHelpPhp derives the help page from the base welcome page when the base ships no help page", () => {
+    const baseWelcome =
+      '<!DOCTYPE html>\n<html lang="en">\n<head>\n<title>Base Help</title>\n<link rel="stylesheet" href="kb.css" />\n' +
+      "<style>p { color: red; }</style>\n</head>\n<body>\n" +
+      '<p>Base body.</p>\n<a href="qwerty-uk.htm">UK</a> <a href="qwerty-uk.htm#fr">FR</a> ' +
+      '<a href="https://example.org/page.htm">ext</a>\n</body>\n</html>';
+    const rendered = renderHelpPhp(baseInput(), null, baseWelcome);
+    expect(rendered.startsWith(helpSiteHeader("Piaroa"))).toBe(true);
+    const fragment = rendered.slice(helpSiteHeader("Piaroa").length);
+    expect(fragment).toContain("<p>Base body.</p>");
+    expect(fragment).toContain("<style>p { color: red; }</style>");
+    // No document chrome inside the site's header.php (criterion 11.4).
+    expect(fragment).not.toMatch(/<\/?(?:html|head|body)\b|<!DOCTYPE|<title>|<link\b/i);
+    // Sibling pages point at their help-site twins; absolute links are untouched.
+    expect(fragment).toContain('href="qwerty-uk.php"');
+    expect(fragment).toContain('href="qwerty-uk.php#fr"');
+    expect(fragment).toContain('href="https://example.org/page.htm"');
+  });
+
+  it("renderHelpPhp derives from the merged welcome page once a description is answered", () => {
+    const input = baseInput({ answers: answersWith({ description: "New description." }) });
+    const baseWelcome = "<html><body><p>Base body.</p></body></html>";
+    const fragment = renderHelpPhp(input, null, baseWelcome).slice(helpSiteHeader("Piaroa").length);
+    expect(fragment).toContain("<p>Base body.</p>");
+    expect(fragment).toContain("New description.");
+  });
+
+  it("renderHelpPhp prefers the base's own help page over deriving one", () => {
+    const baseHelp = "<?php\n  $pagename = 'X Keyboard Help';\n?>\n<p>Own help.</p>";
+    expect(renderHelpPhp(baseInput(), baseHelp, "<html><body>w</body></html>")).toBe(baseHelp);
   });
 
   it("keeps today's byte-identical behaviour when no base text is supplied", () => {

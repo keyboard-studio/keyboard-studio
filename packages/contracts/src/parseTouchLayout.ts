@@ -103,7 +103,7 @@ const PLATFORM_ORDER = ["desktop", "tablet", "phone"] as const;
 // carries — is deliberately dropped rather than surfaced. On valid corpus this
 // is unreachable; the tightening only affects malformed/non-standard input,
 // where dropping a bogus direction (incl. its check-18-5 reachability) is correct.
-const FLICK_DIRECTIONS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
+export const FLICK_DIRECTIONS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 
 // ---------------------------------------------------------------------------
 // Provenance wire field (spec-014 US3 / T028, FR-008/-009/-010)
@@ -120,6 +120,9 @@ const FLICK_DIRECTIONS = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 // oracle validates `.kmn` source only and never reads touch-layout JSON.) Note
 // the reader's separate strict `validate()` (schema `additionalProperties:
 // false`) would reject `"p"`, but the compiler build path never invokes it.
+// Keyman Developer's IDE DOES validate on load (KM04000), so the output
+// projection strips `p` (engine `conformTouchLayoutToKeymanSchema`): it lives
+// in the working copy only, and a downloaded layout reimports as `hand-set`.
 //
 // This canonical parser reads `p` back and validates it against the known
 // provenance vocabulary; an absent / legacy / out-of-vocabulary value defaults

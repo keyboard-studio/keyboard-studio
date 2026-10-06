@@ -44,6 +44,7 @@ vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowS
 vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
+vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
 vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
@@ -99,9 +100,14 @@ const confirmRebaseToSpy = confirmRebaseTo as ReturnType<typeof vi.fn>;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Drive the wizard from "identity" to "base" (click survey-advance). */
+/**
+ * Drive the wizard from "identity" to "base": identity -> layout (spec 076 A4,
+ * the real community-layout step; its suggestion is preselected, so confirming
+ * is one click) -> choose_base.
+ */
 function advanceToBase() {
   fireEvent.click(screen.getByTestId("survey-advance"));
+  fireEvent.click(screen.getByTestId("layout-continue"));
 }
 
 /**
@@ -171,10 +177,25 @@ function completeInvisibles() {
   fireEvent.click(screen.getByTestId("invisibles-continue"));
 }
 
-/** Drive from "identity" to "mechanisms". */
-async function advanceToMechanisms() {
+/** Drive from "identity" to "deadkeys" (spec 083: between carve and mechanisms). */
+async function advanceToDeadkeys() {
   await advanceToCarve();
   fireEvent.click(screen.getByTestId("carve-continue"));
+  await screen.findByTestId("stage-deadkeys");
+}
+
+/** Drive from "identity" to "rules" (spec 082: rules sits between deadkeys and mechanisms). */
+async function advanceToRules() {
+  await advanceToDeadkeys();
+  fireEvent.click(screen.getByTestId("deadkeys-continue"));
+  await screen.findByTestId("rules-step");
+}
+
+/** Drive from "identity" to "mechanisms". */
+async function advanceToMechanisms() {
+  await advanceToRules();
+  fireEvent.click(screen.getByTestId("rules-continue"));
+  await screen.findByTestId("stage-mechanisms");
 }
 
 /** Drive from "identity" to "touch_seed_source" (the seed-source fork chooser). */
@@ -264,11 +285,13 @@ describe("SurveyView — B → punctuation → carve transition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Forward transition 3: carve → mechanisms  (issue #508: was B → mechanisms)
+// Forward transition 3: carve → deadkeys → rules → mechanisms
+// (spec 083 inserts the Deadkeys step between carve and mechanisms;
+// spec 082 inserts the rules step between deadkeys and mechanisms)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — carve → mechanisms transition", () => {
-  it("renders the mechanisms stage after CarveGallery onComplete is called", async () => {
+describe("SurveyView — carve → deadkeys → rules → mechanisms transition", () => {
+  it("renders the deadkeys stage after CarveGallery onComplete is called", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -278,8 +301,36 @@ describe("SurveyView — carve → mechanisms transition", () => {
 
     fireEvent.click(screen.getByTestId("carve-continue"));
 
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
+  });
+
+  it("renders the rules stage after Deadkeys onComplete is called", async () => {
+    await act(async () => {
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+    });
+
+    await advanceToDeadkeys();
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("deadkeys-continue"));
+
+    expect(screen.getByTestId("rules-step")).toBeTruthy();
+    expect(screen.queryByTestId("stage-deadkeys")).toBeNull();
+  });
+
+  it("renders the mechanisms stage after the rules step's Continue is called", async () => {
+    await act(async () => {
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+    });
+
+    await advanceToRules();
+    expect(screen.getByTestId("rules-step")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("rules-continue"));
+
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.queryByTestId("rules-step")).toBeNull();
   });
 });
 
@@ -449,11 +500,13 @@ describe("SurveyView — F → E back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation 8: mechanisms → carve  (issue #508: was mechanisms → B)
+// Back-navigation 8: mechanisms → rules → deadkeys → carve
+// (spec 083: Deadkeys sits between carve and mechanisms;
+// spec 082: rules sits between deadkeys and mechanisms)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — mechanisms → carve back-navigation", () => {
-  it("returns to carve stage (not B) when MechanismGallery onBack is called", async () => {
+describe("SurveyView — mechanisms → rules → deadkeys → carve back-navigation", () => {
+  it("returns to the rules stage (not deadkeys) when MechanismGallery onBack is called", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -463,10 +516,38 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 
     fireEvent.click(screen.getByTestId("mechanisms-back"));
 
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(screen.getByTestId("rules-step")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
     // Confirm it did NOT go to B (the old pre-#508 behavior).
     expect(screen.queryByTestId("stage-B")).toBeNull();
+  });
+
+  it("returns to the deadkeys stage (not carve) when the rules step's Back is called", async () => {
+    await act(async () => {
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+    });
+
+    await advanceToRules();
+    expect(screen.getByTestId("rules-step")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("rules-back"));
+
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
+    expect(screen.queryByTestId("rules-step")).toBeNull();
+  });
+
+  it("returns to carve stage when Deadkeys onBack is called", async () => {
+    await act(async () => {
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+    });
+
+    await advanceToDeadkeys();
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("deadkeys-back"));
+
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(screen.queryByTestId("stage-deadkeys")).toBeNull();
   });
 });
 
@@ -928,6 +1009,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
     // L1 progress: survey-advance gives hasMeaningfulProgress() a true reading
     // (identityResult !== null / activeStepId !== "identity").
     fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("layout-continue")); // spec 076 A4 layout step
 
     // Seed a REAL pending-slot record (as the mount-time autosave's own
     // debounced write would eventually do) so its removal below is an
@@ -996,6 +1078,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
     });
 
     fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("layout-continue")); // spec 076 A4 layout step
     saveDraft(PENDING_PROJECT_KEY);
     expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
 
@@ -1077,7 +1160,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
 
     const stored = localStorage.getItem(draftKey(PENDING_PROJECT_KEY));
     expect(stored).not.toBeNull();
-    expect((JSON.parse(stored!) as DurableDraft).traversal.activeStepId).toBe("choose_base");
+    expect((JSON.parse(stored!) as DurableDraft).traversal.activeStepId).toBe("layout");
   });
 });
 
@@ -1469,13 +1552,14 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → mechanisms → touch → help → package (M2, spec 071/075)", () => {
+  it("manifest spine order is: identity → layout → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → help → package (M2, spec 071/075, spec 082, spec 083)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
       .map((s) => s.id);
     expect(spineIds).toEqual([
       "identity",
+      "layout",
       "choose_base",
       "track",
       "characters",
@@ -1484,6 +1568,8 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "invisibles",
       "convenience",
       "carve",
+      "deadkeys",
+      "rules",
       "mechanisms",
       "touch",
       "help",
@@ -1522,7 +1608,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → mechanisms → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1530,8 +1616,13 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     // identity (manifest step)
     expect(screen.getByTestId("stage-identity")).toBeTruthy();
 
-    // → choose_base (manifest step: base picker only)
+    // → layout (manifest step, spec 076 A4: the community-layout question)
     fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("layout-step")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+
+    // → choose_base (manifest step: base picker only)
+    fireEvent.click(screen.getByTestId("layout-continue"));
     expect(screen.getByTestId("stage-base")).toBeTruthy();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
 
@@ -1571,8 +1662,16 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     completeInvisibles();
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
-    // → mechanisms
+    // → deadkeys (spec 083: between carve and mechanisms)
     fireEvent.click(screen.getByTestId("carve-continue"));
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
+
+    // → rules (spec 082: the rules step sits between deadkeys and mechanisms)
+    fireEvent.click(screen.getByTestId("deadkeys-continue"));
+    expect(await screen.findByTestId("rules-step")).toBeTruthy();
+
+    // → mechanisms
+    fireEvent.click(screen.getByTestId("rules-continue"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
     // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)

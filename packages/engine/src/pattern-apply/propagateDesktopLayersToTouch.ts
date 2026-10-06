@@ -28,14 +28,18 @@
  *   - Every touch platform is processed except a literal `"desktop"` key
  *     (kept for the physical/kvks side, not a touch surface). Platforms with
  *     no `layer` array are skipped.
- *   - If a platform already has a layer with the combo's id: only `text`/
- *     `output` are updated on keys where the combo's IR key-map defines an
- *     output for that key id — existing keys/rows are never deleted or
- *     restructured.
+ *   - If a platform already has a layer with the combo's id: `text`/`output`
+ *     are updated on keys where the combo's IR key-map defines an output for
+ *     that key id — existing keys/rows are never deleted or restructured.
+ *     `output` is working-copy-only for the studio's key-grid UI (per-layer
+ *     disambiguator); `conformTouchLayoutToKeymanSchema` strips it on the
+ *     final output projection.
  *   - If a platform has NO layer with that id: one is synthesized by cloning
  *     the "default" layer's row/key geometry (same ids, `sp`/`width`/`pad`
  *     preserved verbatim). Keys get `text`/`output` set from the combo's
- *     key-map where defined, blank otherwise. `sk`/`flick`/`multitap` are
+ *     key-map where defined, blank otherwise (`output` working-copy-only,
+ *     stripped on output by `conformTouchLayoutToKeymanSchema`, same pattern
+ *     as the `p` provenance tag). `sk`/`flick`/`multitap` are
  *     stripped (those describe the default layer's own deadkey/alternate
  *     menus, not this combo's). Any key that had a `nextlayer` on the default
  *     layer keeps that role on the clone but repointed to `"default"` — the
@@ -226,8 +230,11 @@ export function propagateDesktopLayersToTouch(
 // ---------------------------------------------------------------------------
 
 /**
- * Update `text`/`output` on keys where `keyMap` defines an output for that
- * key id. Never adds, removes, or restructures keys/rows.
+ * Update `text`/`output` on keys where `keyMap` defines an output for that key id. Never adds, removes, or restructures keys/rows.
+ * `output` is kept on the working copy for the studio's own key-grid UI
+ * (keyGridViewModel/useModeContextCarry read it as the per-layer
+ * disambiguator); `conformTouchLayoutToKeymanSchema` strips it on the final
+ * output projection before the artifact reaches kmc/Keyman Developer.
  */
 function patchExistingComboLayer(layer: RawLayer, keyMap: Map<string, string>): void {
   for (const row of layer.row) {
@@ -270,6 +277,8 @@ function cloneKeyForCombo(key: RawKey, keyMap: Map<string, string>): RawKey {
   const char = keyMap.get(key.id);
   if (char !== undefined) {
     cloned.text = char;
+    // Kept for the working-copy key-grid UI; stripped on output by
+    // conformTouchLayoutToKeymanSchema (same pattern as the `p` provenance tag).
     cloned.output = char;
   } else {
     cloned.text = "";

@@ -144,8 +144,7 @@ flowchart LR
   end
 
   C --> STAGE["Stage: ready { jsBlobUrl, compileResult, warnings }"]
-  STAGE --> PREV["GalleryPreviewPane (OSK iframe)<br/>onKeyTap → picks swap/ralt/deadkey key"]
-  PREV -. "onKeyTap(keyId)" .-> mg
+  STAGE --> PREV["GalleryPreviewPane (OSK iframe)<br/>typing preview only — keys are picked in the gallery's own pickers"]
 
   classDef wasm fill:#2a0a0a,stroke:#f85149,color:#f8d7da;
   class C wasm;

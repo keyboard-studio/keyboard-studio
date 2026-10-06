@@ -6,11 +6,19 @@
 //   host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, bcp47?, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
 //   host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" | "tablet" }
 //   host -> frame: { type: "SET_STRINGS",   strings: { placeholder?, statusReady? } }
+//   host -> frame: { type: "FOCUS_TARGET" }
 //   frame -> host: { type: "ENGINE_READY" }
 //   frame -> host: { type: "ENGINE_ERROR", message }
 //   frame -> host: { type: "KEYBOARD_ACTIVE" }
 //   frame -> host: { type: "TEXT_UPDATED", value }
-//   frame -> host: { type: "KEY_TAPPED", keyId }
+//   frame -> host: { type: "CONTENT_HEIGHT", height }
+//
+// Sizing: the keyboard is sized to the host box's CURRENT width, and re-sized
+// whenever that width changes (ResizeObserver), so it never renders at a stale
+// width and clips. When the box is narrower than the device profile, the
+// height scales down with it, keeping the whole keyboard in view at a phone
+// width. CONTENT_HEIGHT reports the document's natural height so the host can
+// size the iframe to show everything rather than cropping the bottom rows.
 //
 // Font injection: when fontFaceUrl and fontFaceFamily are provided, a plain
 // CSS @font-face rule is injected into the frame document head BEFORE
@@ -186,13 +194,58 @@
 
   // Build / rebuild the inline OSK for the current device.
   // Mirror of Keyman Developer test.js setOSK().
+  // Width the current OSK was last sized at; 0 when there is none.
+  var sizedWidth = 0;
+
+  // The keyboard fills the host's width. Below the profile's own width the
+  // height scales in proportion, so every row stays visible; wider hosts keep
+  // the profile height (keys widen, they do not grow taller).
+  function oskSizeFor(profile) {
+    var w = oskHost.clientWidth || profile.dimensions[0];
+    var h = profile.dimensions[1];
+    if (w < profile.dimensions[0]) {
+      h = Math.max(120, Math.round((h * w) / profile.dimensions[0]));
+    }
+    return { width: w, height: h };
+  }
+
+  function resizeOsk() {
+    if (!currentOsk) return;
+    var profile = devices[currentMode] || devices.desktop;
+    var size = oskSizeFor(profile);
+    if (Math.abs(size.width - sizedWidth) < 1) return;
+    sizedWidth = size.width;
+    try {
+      currentOsk.setSize(size.width + "px", size.height + "px");
+    } catch (_) {}
+  }
+
+  var lastReportedHeight = 0;
+  function reportContentHeight() {
+    // Measured from the last scaffold node's bottom edge, not
+    // body.scrollHeight: the body is height:100% of the iframe, so its scroll
+    // height can never report LESS than the current frame height.
+    var bottom = oskHostFrame.offsetTop + oskHostFrame.offsetHeight;
+    var padBottom = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    var height = Math.ceil(bottom + padBottom);
+    if (height === lastReportedHeight) return;
+    lastReportedHeight = height;
+    post({ type: "CONTENT_HEIGHT", height: height });
+  }
+
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(function () {
+      resizeOsk();
+      reportContentHeight();
+    }).observe(oskHostFrame);
+    new ResizeObserver(reportContentHeight).observe(oskTarget);
+  }
+
   function setOsk() {
     if (!window.keyman || !window.keyman.views || !window.keyman.views.InlinedOSKView) {
       return;
     }
     var profile = devices[currentMode] || devices.desktop;
-
-    oskHostFrame.className = profile.name === "Google Pixel 5" ? "Pixel5" : "Windows";
 
     if (currentOsk) {
       try {
@@ -202,6 +255,7 @@
       } catch (_) {}
       window.keyman.osk = null;
       currentOsk = null;
+      sizedWidth = 0;
     }
     while (oskHost.firstChild) oskHost.removeChild(oskHost.firstChild);
 
@@ -270,8 +324,9 @@
         window.keyman.core.contextDevice = profile;
       }
       window.keyman.osk = currentOsk;
-      var hostW = oskHost.clientWidth || profile.dimensions[0];
-      currentOsk.setSize(hostW + "px", profile.dimensions[1] + "px");
+      var size = oskSizeFor(profile);
+      currentOsk.setSize(size.width + "px", size.height + "px");
+      sizedWidth = size.width;
       oskHost.appendChild(currentOsk.element);
       try {
         var active = window.keyman.contextManager && window.keyman.contextManager.activeKeyboard;
@@ -402,37 +457,6 @@
     post({ type: "TEXT_UPDATED", value: oskTarget.value });
   });
 
-  // Capture-phase pointerup on the OSK host: walk up from the tap target
-  // to find the nearest element with an own `keyId` expando (set by KMW's
-  // internal link() helper on each .kmw-key div), then post KEY_TAPPED.
-  // Does NOT call preventDefault/stopPropagation — KMW must still process
-  // the tap for normal typing and long-press popups.
-  oskHost.addEventListener("pointerup", function (event) {
-    try {
-      var el = event.target;
-      // The key id is an expando KMW's link() sets on the inner .kmw-key
-      // div. Prefer closest(".kmw-key") (handles taps on the child label
-      // span), then fall back to an own-keyId ancestor walk for safety.
-      var keyEl =
-        el && typeof el.closest === "function" ? el.closest(".kmw-key") : null;
-      if (!keyEl || typeof keyEl.keyId !== "string") {
-        var p = el;
-        while (p && p !== oskHost && !Object.prototype.hasOwnProperty.call(p, "keyId")) {
-          p = p.parentElement;
-        }
-        if (p && p !== oskHost && Object.prototype.hasOwnProperty.call(p, "keyId")) {
-          keyEl = p;
-        }
-      }
-      if (keyEl) {
-        var kid = keyEl.keyId;
-        if (typeof kid === "string" && kid.length > 0) {
-          post({ type: "KEY_TAPPED", keyId: kid });
-        }
-      }
-    } catch (_) {}
-  }, true);
-
   window.addEventListener("message", function (event) {
     // Security: only accept commands from our own document's parent, on our
     // own origin. Requires the parent iframe to be sandbox="allow-same-origin"
@@ -483,6 +507,11 @@
           if (!activeIdle) setStatus(statusReadyText);
         }
       }
+      return;
+    }
+
+    if (msg.type === "FOCUS_TARGET") {
+      try { oskTarget.focus({ preventScroll: true }); } catch (_) {}
       return;
     }
 

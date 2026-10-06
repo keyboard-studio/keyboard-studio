@@ -60,7 +60,7 @@ describe("ContextToleranceNotice — finding", () => {
         loadNames={loadNames}
       />,
     );
-    expect(screen.getByText(/2 rules only work when the accent is already joined to the letter/)).toBeTruthy();
+    expect(screen.getByText(/2 rules only work when the diacritic is already joined to the letter/)).toBeTruthy();
     const toggle = screen.getByRole("button", { name: /show the affected rules/i });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText(/U\+006F/)).toBeNull();
@@ -76,7 +76,7 @@ describe("ContextToleranceNotice — finding", () => {
     expect(screen.getAllByText("U+0323 COMBINING DOT BELOW").length).toBeGreaterThan(0);
     expect(screen.getAllByText("U+1ECD LATIN SMALL LETTER O WITH DOT BELOW").length).toBeGreaterThan(0);
     // The typed text appears in both forms, so the case is reproducible.
-    expect(screen.getByText(/After this text, with the accent joined to the letter/)).toBeTruthy();
+    expect(screen.getByText(/After this text, with the diacritic joined to the letter/)).toBeTruthy();
     expect(screen.getByText(/After the same text stored as separate characters/)).toBeTruthy();
   });
 

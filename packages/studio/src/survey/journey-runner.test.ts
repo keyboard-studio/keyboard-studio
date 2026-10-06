@@ -53,6 +53,7 @@ const JOURNEYS: readonly JourneyCase[] = [
       "project_name",
       "characters",
       "carve",
+      "deadkeys",
       "mechanisms",
       "touch",
       "help",

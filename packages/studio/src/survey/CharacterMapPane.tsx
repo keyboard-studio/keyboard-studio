@@ -28,7 +28,7 @@
 //   - the PUA role prompt (PuaRolePrompt.tsx)
 //   - the per-group render loop (groupKey.ts, CharacterMapGroupSection.tsx)
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { buildProducedSet, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -50,6 +50,8 @@ import { RawCodepointEntry } from "./characterMap/RawCodepointEntry.tsx";
 import { PuaRolePrompt } from "./characterMap/PuaRolePrompt.tsx";
 import { useZoomControl } from "./characterMap/useZoomControl.ts";
 import { ZoomControl } from "./characterMap/ZoomControl.tsx";
+import { useCharacterInfoPopover } from "./characterMap/useCharacterInfoPopover.ts";
+import { CharacterInfoPopover } from "./characterMap/CharacterInfoPopover.tsx";
 import { useSearchFiltersPopover } from "./characterMap/useSearchFiltersPopover.ts";
 import { SearchFiltersPopover } from "./characterMap/SearchFiltersPopover.tsx";
 import { CharacterMapGroupSection } from "./characterMap/CharacterMapGroupSection.tsx";
@@ -149,6 +151,15 @@ export function CharacterMapPane({
   // Zoom factor for the chip grid — see useZoomControl.ts.
   const { zoom, zoomOutButtonRef, zoomInButtonRef, handleZoom } = useZoomControl(setAnnouncement);
 
+  // Character info popover: one shared instance per
+  // pane, activated by delegated pointerover/focusin listeners on the group
+  // scroll container below — no per-cell handlers, no per-cell DOM.
+  const charInfoContainerRef = useRef<HTMLDivElement | null>(null);
+  const charInfo = useCharacterInfoPopover();
+  // Stable close callback for effect deps (the charInfo object identity
+  // changes every render; close itself is useCallback-stable).
+  const closeCharInfo = charInfo.close;
+
   // No base IR / no BCP47 yet — short-circuit BEFORE the fetch, mirroring
   // SuggestionPanel's own `!bcp47 || baseIr === null` guard (PhaseB.tsx). Without
   // this, characterMapGroups(...) was called unconditionally and always showed
@@ -186,6 +197,7 @@ export function CharacterMapPane({
     setRawError(null);
     setAnnouncement("");
     setHiddenGroups(new Set());
+    closeCharInfo();
     if (noBaseOrLanguage) {
       return;
     }
@@ -201,7 +213,7 @@ export function CharacterMapPane({
     return () => {
       cancelled = true;
     };
-  }, [noBaseOrLanguage, baseIr, bcp47, languageName, baseKeyboard, baseScripts, searchFiltersPopover.reset]);
+  }, [noBaseOrLanguage, baseIr, bcp47, languageName, baseKeyboard, baseScripts, searchFiltersPopover.reset, closeCharInfo]);
 
   // Whether the loaded groups actually carry a known produced set — the
   // engine only sets `usedByBase: true` on any group when it had a baseIr to
@@ -320,6 +332,9 @@ export function CharacterMapPane({
   }
 
   function handleToggle(cell: CharacterMapCell): void {
+    // Toggling a cell is a deliberate action — shut the info popover rather
+    // than letting it linger over the re-rendered grid.
+    closeCharInfo();
     const nfc = cell.char.normalize("NFC");
     const wasSelected = chars.includes(nfc);
     // Selecting a cased letter adds BOTH cases (its uppercase is hidden in the
@@ -494,6 +509,13 @@ export function CharacterMapPane({
     );
   }
 
+  // Zooming re-lays-out the grid (and can replace the popover's anchor
+  // element), so the info popover shuts rather than pointing at a stale cell.
+  function handleZoomAndClosePopover(direction: 1 | -1): void {
+    closeCharInfo();
+    handleZoom(direction);
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}>
       <h2 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
@@ -576,7 +598,7 @@ export function CharacterMapPane({
           zoom={zoom}
           zoomOutButtonRef={zoomOutButtonRef}
           zoomInButtonRef={zoomInButtonRef}
-          onZoom={handleZoom}
+          onZoom={handleZoomAndClosePopover}
         />
       </div>
       {/* Screen-reader announcer for toggle actions — visually hidden. */}
@@ -584,7 +606,18 @@ export function CharacterMapPane({
         {announcement}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Group scroll container — also the delegation root for the character
+          info popover: ONE set of pointerover/focusin
+          listeners here reads the hovered/focused cell from its data-char /
+          data-block attributes, instead of attaching handlers to up to 3000
+          cell buttons. The handlers only ADD capability (observing events
+          bubbling from the cell buttons inside) and never make the scroll
+          container itself interactive. */}
+      <div
+        ref={charInfoContainerRef}
+        {...charInfo.containerHandlers}
+        style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: 16 }}
+      >
         {noBaseOrLanguage ? (
           <div style={mutedNote}>
             <Trans id="survey.characterMapPane.noVerifiedList">
@@ -623,6 +656,15 @@ export function CharacterMapPane({
           ))
         )}
       </div>
+      {/* The character info popover's single instance per pane
+          — always rendered, hidden when no cell is
+          active, positioned at the hovered/focused cell by the component. */}
+      <CharacterInfoPopover
+        target={charInfo.target}
+        details={charInfo.details}
+        onPointerOut={charInfo.handlePopoverPointerOut}
+        popoverRef={charInfo.popoverRef}
+      />
     </div>
   );
 }

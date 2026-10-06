@@ -38,11 +38,15 @@ import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveProjectKeyFromWorkingCopy } from "../lib/draftPersistence.ts";
 import { createDecisionRecorder, type DecisionRecorder, type DecisionRecorderDeps } from "./createDecisionRecorder.ts";
 import type { InstantiatedMode } from "./recordBaseContribution.ts";
+import type { AnswerProposal } from "./recordSurveyAnswers.ts";
+import type { SavedAnswer } from "../steps/answerTypes.ts";
 import type { SourceSnapshotter } from "./snapshotSource.ts";
 
 export interface WorkingCopyStateForRecording {
   deletedNodeIds: ReadonlySet<string>;
   deletedItemIds: ReadonlySet<string>;
+  /** Issue #1809, ruling §1: the aggregated carved character set. */
+  carveChars: ReadonlySet<string>;
   deletedTouchKeyIds: ReadonlySet<string>;
   phaseResults: readonly SurveyPhaseResult[];
   baseIr: KeyboardIR | null;
@@ -70,6 +74,16 @@ export interface CreateStudioDecisionRecorderDeps {
   onScreenRecorded?: DecisionRecorderDeps["onScreenRecorded"];
   getLastRecordedHash?: DecisionRecorderDeps["getLastRecordedHash"];
   resolveCompletionScreen?: DecisionRecorderDeps["resolveCompletionScreen"];
+  /**
+   * A question's saved answer, read from stores/surveyAnswerStore.ts by
+   * StudioShell. Its `proposal` (what the field was pre-filled with) lets a
+   * survey seed the author kept record as the studio's suggestion rather than
+   * as their own choice.
+   */
+  getSavedAnswer?: (
+    stepId: string,
+    questionId: string,
+  ) => Pick<SavedAnswer, "answerType" | "proposal"> | undefined;
 }
 
 /**
@@ -111,6 +125,9 @@ export function createStudioDecisionRecorder(
     getBaseIr: () => getWorkingCopyState().baseIr,
     getDeletedNodeIds: () => getWorkingCopyState().deletedNodeIds,
     getDeletedItemIds: () => getWorkingCopyState().deletedItemIds,
+    // Issue #1809, ruling §1: the aggregated carved character set for the
+    // single aggregated-R projection pass.
+    getCarveChars: () => getWorkingCopyState().carveChars,
     // The keyboard's own id once the author has set one, else the base's. This
     // CALLS the project-key derivation rather than restating it: the comment
     // here used to claim it was "matching how deriveProjectKeyFromWorkingCopy
@@ -148,19 +165,38 @@ export function createStudioDecisionRecorder(
     // `choose_base` completion) and the author's superseding answer both
     // stay on the append-only record, exactly as 053 FR-015's supersede
     // semantics require.
-    resolveProposal: (questionId) => {
+    //
+    // Any other question falls back to the proposal its saved answer was
+    // pre-filled with, so a seeded default the author kept reads as accepted
+    // rather than chosen.
+    resolveProposal: (questionId, stepId) => {
       const base = getWorkingCopyState().baseKeyboard;
-      if (base === null) return undefined;
-      switch (questionId) {
-        case "script":
-          return { value: base.script, source: "base" };
-        case "targets":
-          return { value: base.targets, source: "base" };
-        case "version":
-          return { value: base.version, source: "base" };
-        default:
-          return undefined;
+      if (base !== null) {
+        switch (questionId) {
+          case "script":
+            return { value: base.script, source: "base" };
+          case "targets":
+            return { value: base.targets, source: "base" };
+          case "version":
+            return { value: base.version, source: "base" };
+        }
       }
+      const saved = deps.getSavedAnswer?.(stepId, questionId);
+      return saved?.proposal !== undefined ? recordedProposal(saved.proposal, saved.answerType) : undefined;
     },
   });
+}
+
+/**
+ * A saved proposal in the shape `deriveAnswerProvenance` compares against. The
+ * survey field holds a bool question's value as the string "true"/"false", but
+ * the recorded answer holds a boolean (SurveyRunner's `toSurveyAnswer`), so the
+ * string form is converted or a kept default would never match.
+ */
+function recordedProposal(
+  proposal: NonNullable<SavedAnswer["proposal"]>,
+  answerType: SavedAnswer["answerType"],
+): AnswerProposal {
+  const value = answerType === "boolean" ? proposal.value === "true" || proposal.value === true : proposal.value;
+  return proposal.source !== undefined ? { value, source: proposal.source } : { value };
 }

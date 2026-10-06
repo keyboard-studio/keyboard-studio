@@ -1,8 +1,9 @@
 # Deploying the OAuth backend (co-located on Vercel)
 
-This is the production deploy runbook for issue #550 — "Sign up with GitHub".
-The token-exchange logic is co-located with the studio SPA as Vercel serverless
-functions in [`api/oauth/`](../../api/oauth/), which reuse this service's tested
+This is the production deploy runbook for issue #550 — "Sign up with GitHub" and
+the org-mediated PR submit, using the dual-app topology (a GitHub App plus an
+OAuth App) that shipped with PR #885. The token-exchange logic is co-located
+with the studio SPA as Vercel serverless functions in [`api/oauth/`](../../api/oauth/), which reuse this service's tested
 core (`src/handlers.ts`, `src/schemas.ts`). The standalone Fastify entrypoint
 (`src/server.ts`) remains for local `pnpm start` and is unchanged.
 
@@ -39,18 +40,64 @@ In Vercel → Project → Settings → General:
 After this cutover verifies (step 4), delete the now-superseded
 `packages/studio/vercel.json` (its rewrites are migrated into the root file).
 
-### 2. Register a prod GitHub OAuth App (org-owned)
+### 2. Register the two prod GitHub apps (org-owned)
 
-github.com → org `keyboard-studio` → Settings → Developer settings → OAuth Apps
-→ New (separate from the dev app — one callback URL per app):
-- **Authorization callback URL:** `https://<prod-domain>/oauth/callback`
+The deploy uses **two** GitHub credentials with distinct jobs (PR #885):
+
+| App | Job | Client id prefix |
+|---|---|---|
+| **GitHub App** | Default "Sign up with GitHub" identity (user-to-server OAuth, no scope) **and** the server-side installation token that opens Option B (managed) draft PRs | `Iv23...` |
+| **OAuth App** | Option A opt-in "fork and submit yourself" only (requests `public_repo`) | `Ov23...` |
+
+The SPA sends a `client` discriminator (`github_app` default, or `oauth_app`) on
+`/oauth/exchange`; the backend picks the credential pair from it.
+
+**GitHub App** — github.com → org `keyboard-studio` → Settings → Developer
+settings → GitHub Apps (the production app is `keyboard-studio`):
+- **Callback URL:** `https://<prod-domain>/oauth/callback`
+- **Repository permissions:** Contents: read and write; Pull requests: read and
+  write.
+- Install it on the org (the staging repo `keyboard-studio/keyboards` must be
+  covered — an installation token cannot open a PR on a repo the App is not
+  installed on). Note the **App ID** and the **Installation ID**.
+- Generate a **private key** (PEM) and a **Client secret**.
+
+**OAuth App** — same Developer settings page → OAuth Apps → New (separate from
+the dev app — one callback URL per app):
+- **Authorization callback URL:** `https://<prod-domain>/oauth/callback` (the
+  SPA uses the same `/oauth/callback` route for both apps)
 - Copy the **Client ID** and generate a **Client secret**.
 
 ### 3. Set environment variables
 
-Backend (Vercel project env — server-side only, never exposed to the SPA):
-- `GITHUB_CLIENT_ID` = prod client id
-- `GITHUB_CLIENT_SECRET` = prod client secret
+Backend (Vercel project env — server-side only, never exposed to the SPA).
+Derived from `api/oauth/_shared.ts`, `api/submit/managed-pr.ts`, and
+`src/installation-token.ts`:
+
+GitHub App (default sign-in and Option B):
+- `GITHUB_CLIENT_ID` = GitHub App client id — **required**; the OAuth routes
+  return `500 server_misconfigured` when this or the secret is unset.
+- `GITHUB_CLIENT_SECRET` = GitHub App client secret — **required** (same gate).
+- `GITHUB_APP_ID` = numeric GitHub App id.
+- `GITHUB_APP_PRIVATE_KEY` = **base64 of the whole PEM**, header and footer
+  lines included. Scope it to Production. A malformed value makes
+  `/submit/managed-pr` return `502 submission_unavailable`.
+- `GITHUB_APP_INSTALLATION_ID` = installation id of the org-wide install.
+- `GITHUB_ORG_LOGIN` = org login that owns the staging repo (for example
+  `keyboard-studio`).
+- If any of the three `GITHUB_APP_*` vars or `GITHUB_ORG_LOGIN` is absent or
+  empty, `/submit/managed-pr` answers `503 submission_not_configured`.
+- `GITHUB_ORG_TOKEN` is **retired** — no code reads it any more. Remove it from
+  the deployment env if present.
+
+OAuth App (Option A opt-in only):
+- `GITHUB_OAUTH_CLIENT_ID` = OAuth App client id
+- `GITHUB_OAUTH_CLIENT_SECRET` = OAuth App client secret
+- Both are **optional** at startup. If either is missing, the default
+  `github_app` flow still works but an `oauth_app` exchange returns
+  `500 server_misconfigured` at request time.
+
+Other:
 - `OAUTH_ALLOWED_ORIGINS` — not required for same-origin co-location; only set it
   if you later split the backend to another origin.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — **optional; only for "Sign up with
@@ -63,7 +110,10 @@ Backend (Vercel project env — server-side only, never exposed to the SPA):
   Authorized redirect URI `https://<prod-domain>/oauth/google/callback`.
 
 SPA (Vite build-time env):
-- `VITE_GITHUB_CLIENT_ID` = prod client id (public — safe in the bundle)
+- `VITE_GITHUB_CLIENT_ID` = **GitHub App** client id (public — safe in the
+  bundle); used for the default sign-in.
+- `VITE_GITHUB_OAUTH_CLIENT_ID` = **OAuth App** client id (public — safe in the
+  bundle); used only by the Option A opt-in.
 - `VITE_OAUTH_BACKEND_URL` = _(leave empty — same origin)_
 - `VITE_GOOGLE_CLIENT_ID` = Google OAuth client id (public — safe in the bundle).
   Only needed when the Google button should appear; leave empty for a
@@ -72,8 +122,17 @@ SPA (Vite build-time env):
 ### 4. Verify end-to-end in prod
 
 - `GET https://<prod-domain>/oauth/health` → `{ "status": "ok" }`.
-- In the SPA `#output` step → "Sign up with GitHub" → consent →
+- `/oauth/exchange` and `/submit/managed-pr` answer JSON (405 on GET), which
+  shows the functions load. A platform-level `FUNCTION_INVOCATION_FAILED`
+  (text/plain) means a bundle-safety regression, not a config problem.
+- In the SPA `#output` step → "Sign up with GitHub" (GitHub App) → consent →
   `/oauth/callback` → signed-in state (token in tab `sessionStorage`).
+- Option B: submit from the `#output` step and confirm a draft PR appears on
+  `keyboard-studio/keyboards`. `503 submission_not_configured` means a
+  `GITHUB_APP_*` / `GITHUB_ORG_LOGIN` var is missing; `502 submission_unavailable`
+  points at the private key value.
+- Option A: use the fork-and-submit opt-in (OAuth App, `public_repo`) and confirm
+  a draft PR from the user's fork.
 - (If Google enabled) "Sign up with Google" → consent → `/oauth/google/callback`
   → signed-in state (identity claims in tab `sessionStorage`, key
   `ks.google.identity`; no Google token stored). A quick negative check without
@@ -83,8 +142,9 @@ SPA (Vite build-time env):
 
 ### 5. Update [`docs/github_flow.md`](../../docs/github_flow.md) Status
 
-Flip the two "Not started" Option A rows (OAuth App registration, backend
-deploy) to **Done** and bump the progress bar.
+Flip the rows that remain unverified there (callback URLs, backend secrets,
+`GITHUB_ORG_TOKEN` removal, the end-to-end Option A and Option B PRs from prod)
+as each is confirmed, and bump the progress bars.
 
 ## Local check
 

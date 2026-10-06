@@ -96,7 +96,7 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
     });
 
     // Q2 → Q3 (code confirmation) via Next.
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => {
       expect(screen.getByText(/Confirm your language's code/)).toBeTruthy();
     });

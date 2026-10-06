@@ -63,8 +63,14 @@ events:
   - { stepId: characters, questionId: pb_use_case, value: "literacy" }
   - { stepId: characters, questionId: pb_additional_methods, value: "done" }
 
-  # --- marks / punctuation / convenience: no fixture events (auto-skip; see
+  # --- marks / punctuation: no fixture events (auto-skip; see
   #     journey-runner.ts's module header) ---
+
+  # --- convenience (spec 079): with confirmed_alphabet_bases below excluding
+  #     q and x (basic_kbdus's own pb_spare_keys_qwerty answer), the gate
+  #     opens offering exactly q and x; both are retained as the loanword/
+  #     convenience set carve then shields (see the carve summary below). ---
+  - { stepId: convenience, questionId: convenience_retain, value: "q x" }
 
   # --- carve (Phase D — gallery loop, recorded verbatim, FR-002b/FR-015) ---
   - { stepId: carve, action_type: gallery_edit, summary: "reviewed carve gallery; kept every base character (no removals — Bafut needs the full basic_kbdus inventory as a convenience/loanword set)" }
@@ -84,6 +90,14 @@ events:
   - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
   - { stepId: help, questionId: pf_credits, value: "Bafut Language Committee, Northwest Region, Cameroon. Keyboard layout by the Bafut Literacy Project." }
   - { stepId: help, questionId: pf_contact_info, value: "bafut.keyboard@example.org" }
+
+# The "characters" step's confirmed alphabet (see journey-runner.ts's module
+# header / contracts/journey-fixture-schema.md): basic Latin a-z EXCLUDING q
+# and x — the pb_spare_keys_qwerty answer above ("X Q") — plus the five
+# special (non-Latin) letters from pb_special_letters_list. Drives the real
+# needed-set the convenience event above and carve both see.
+confirmed_alphabet_bases:
+  [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, r, s, t, u, v, w, y, z, "ŋ", "ɨ", "ə", "ɔ", "ɛ"]
 
 expected_outcomes:
   routing_group: qwerty-qwertz

@@ -3,13 +3,17 @@
 // Coverage:
 //   1. Base-layer .kvks key cleared in place; siblings and layer count unchanged.
 //   2. Same char on multiple shift layers (RA + S) both cleared (layer-agnostic).
-//   3. Touch: sk entry removed (property deleted when emptied); matched U_ main
-//      key gets text:"" and an inert T_carved_ id.
+//   3. Touch (076 FR-023 T020): carved main key REMOVED from the touch layout
+//      by default; keep-inert override keeps it with text:"" and an inert
+//      T_carved_ id ("kept, does nothing"). sk entries removed in both modes.
 //   4. Carved char absent from layer files → VFS byte-identical, no warnings.
 //   5. No .kvks / no touch layout at all → graceful silent no-op.
 //   6. NFC: decomposed .kvks key text matches a precomposed carved char.
 //   7. collectCarvedKeycapTexts survivor guard — one of two producers carved
 //      → empty set; both carved → the char. Slot-id derivation included.
+//   8. Issue #1803: group-level carve derives its rules' characters (the
+//      .kmn-side cascade) and blanks them on every .kvks layer and in the
+//      touch layout; a char surviving via another group keeps its keycap.
 
 import { describe, it, expect, vi } from "vitest";
 import {
@@ -107,7 +111,7 @@ describe("applyCarveKeycapRemovalsToVfs — layer-agnostic .kvks scan", () => {
   });
 });
 
-describe("applyCarveKeycapRemovalsToVfs — touch layout", () => {
+describe("applyCarveKeycapRemovalsToVfs — touch layout (T020 removal default)", () => {
   const touchLayout = JSON.stringify({
     tablet: {
       layer: [
@@ -135,19 +139,26 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout", () => {
     },
   });
 
-  it("removes matching popup entries and neutralizes a matched U_ main key", () => {
+  function carvedIr() {
+    return makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
+  }
+
+  it("removes a carved main key from the touch layout by default", () => {
     const vfs = makeVfs([
       { path: "source/test.keyman-touch-layout", content: touchLayout },
     ]);
-    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
-    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", carvedIr(), removalsOf({
       wholeNodeIds: ["rule#e"],
     }));
 
     expect(warnings).toHaveLength(0);
     const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
     const keys = data.tablet.layer[0].row[0].key;
+
+    // Carved U_ main key is gone from the layout entirely (T020 default).
+    expect(keys).toHaveLength(2);
+    expect(keys.some((k: { id: string }) => k.id === "U_00E9")).toBe(false);
 
     // Host whose only sk entry matched: property removed entirely.
     expect(keys[0].sk).toBeUndefined();
@@ -156,25 +167,80 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout", () => {
     // Host with a surviving sibling entry: filtered, property kept.
     expect(keys[1].sk).toHaveLength(1);
     expect(keys[1].sk[0].id).toBe("U_00E0");
+  });
 
-    // Matched main key: blank cap, inert id (U_ would keep emitting é).
+  it("keep-inert override keeps the key with a blank cap and an inert id", () => {
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", carvedIr(), {
+      ...removalsOf({ wholeNodeIds: ["rule#e"] }),
+      keepInertTouchChars: new Set(["é"]),
+    });
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const keys = data.tablet.layer[0].row[0].key;
+
+    // Key kept ("kept, does nothing"): blank cap, inert id (U_ would keep emitting é).
+    expect(keys).toHaveLength(3);
     expect(keys[2].text).toBe("");
     expect(keys[2].id).toBe("T_carved_00E9");
+
+    // Popup entries are removed in both modes (an invisible popup would still emit).
+    expect(keys[0].sk).toBeUndefined();
+    expect(keys[1].sk).toHaveLength(1);
+  });
+
+  it("keep-inert is per character: non-overridden carved popups still removed", () => {
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+    const ir = makeIR([
+      irGroup({
+        nodeId: "group#0",
+        rules: [makeCharRule("rule#e", "é"), makeCharRule("rule#a", "à", "K_G")],
+      }),
+    ]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(
+      vfs,
+      "test",
+      ir,
+      {
+        ...removalsOf({ wholeNodeIds: ["rule#e", "rule#a"] }),
+        keepInertTouchChars: new Set(["é"]),
+      },
+    );
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const keys = data.tablet.layer[0].row[0].key;
+
+    // Both carved chars hit K_O's popups: é (overridden) and à (not) are
+    // both removed from the popup list — keep-inert covers only the é main
+    // key, never a non-overridden carved character. The U_00E9 main key
+    // matches only é (overridden) → kept inert.
+    expect(keys).toHaveLength(3);
+    expect(keys[2].id).toBe("T_carved_00E9");
+    // à popup entries removed everywhere (carved, not keep-inert).
+    expect(keys[1].sk).toBeUndefined();
   });
 });
 
 describe("applyCarveKeycapRemovalsToVfs — touch layout main key U_ id independent of text", () => {
-  it("neutralizes a U_ id with a stale non-carved text label, leaving the label alone", () => {
+  it("removes a U_ id with a stale non-carved text label by default", () => {
     // A U_ id emits its code point purely off the id (KMW activeLayout /
     // defaultOutputRules), independent of `text` — a mismatched label like
-    // { id: "U_00E9", text: "e" } must still have its emission killed, but
-    // the label itself was never carved and must not be blanked.
+    // { id: "U_00E9", text: "e" } still identifies a carved key, so the T020
+    // default removes it.
     const touchLayout = JSON.stringify({
       tablet: {
         layer: [
           {
             id: "default",
-            row: [{ id: 1, key: [{ id: "U_00E9", text: "e" }] }],
+            row: [{ id: 1, key: [{ id: "U_00E9", text: "e" }, { id: "K_A", text: "a" }] }],
           },
         ],
       },
@@ -190,11 +256,38 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key U_ id independ
 
     expect(warnings).toHaveLength(0);
     const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const keys = data.tablet.layer[0].row[0].key;
+    expect(keys).toHaveLength(1);
+    expect(keys[0].id).toBe("K_A");
+  });
+
+  it("keep-inert neutralizes the U_ id but leaves the non-carved label alone", () => {
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [{ id: 1, key: [{ id: "U_00E9", text: "e" }] }],
+          },
+        ],
+      },
+    });
+    const vfs = makeVfs([
+      { path: "source/test.keyman-touch-layout", content: touchLayout },
+    ]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, {
+      ...removalsOf({ wholeNodeIds: ["rule#e"] }),
+      keepInertTouchChars: new Set(["é"]),
+    });
+
+    expect(warnings).toHaveLength(0);
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
     const key = data.tablet.layer[0].row[0].key[0];
 
     expect(key.id).toBe("T_carved_00E9");
     expect(key.text).toBe("e");
-    expect(key).toBeDefined();
   });
 });
 
@@ -213,7 +306,12 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by out
     return data.tablet.layer[0].row[0].key[0];
   }
 
-  it("clears a K_ main key matched only by `output` (no text)", () => {
+  function loadKeys(vfs: ReturnType<typeof makeVfs>) {
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    return data.tablet.layer[0].row[0].key as Record<string, unknown>[];
+  }
+
+  it("removes a K_ main key matched only by `output` (no text) by default", () => {
     const vfs = vfsWithMainKey({ id: "K_X", output: "é" });
     const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
@@ -222,24 +320,34 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by out
     }));
 
     expect(warnings).toHaveLength(0);
+    // T020 default: the key leaves the touch layout entirely.
+    expect(loadKeys(vfs)).toHaveLength(0);
+  });
+
+  it("keep-inert keeps a K_ main key matched by `output`, blanked and neutralized", () => {
+    const vfs = vfsWithMainKey({ id: "K_X", output: "é" });
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, {
+      ...removalsOf({ wholeNodeIds: ["rule#e"] }),
+      keepInertTouchChars: new Set(["é"]),
+    });
+
     const key = loadKey(vfs);
     expect(key.output).toBeUndefined();
     expect(key.text).toBe("");
     expect(key.id).toBe("T_carved_K_X");
-    // Key element itself stays present (row/key structure intact).
+    // Key element itself stays present (kept, does nothing).
     expect(key).toBeDefined();
   });
 
-  it("clears a K_ main key matched by both `text` and `output`", () => {
+  it("removes a K_ main key matched by both `text` and `output` by default", () => {
     const vfs = vfsWithMainKey({ id: "K_X", text: "é", output: "é" });
     const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
 
-    const key = loadKey(vfs);
-    expect(key.output).toBeUndefined();
-    expect(key.text).toBe("");
-    expect(key.id).toBe("T_carved_K_X");
+    expect(loadKeys(vfs)).toHaveLength(0);
   });
 
   it("leaves a main key with a non-carved `output` completely untouched", () => {
@@ -257,16 +365,13 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by out
     expect(key).toEqual({ id: "K_X", output: "z" });
   });
 
-  it("matches an NFD `output` against a carved NFC character", () => {
+  it("removes a key whose NFD `output` matches a carved NFC character", () => {
     const vfs = vfsWithMainKey({ id: "K_X", output: "e" + String.fromCharCode(0x0301) });
     const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
 
-    const key = loadKey(vfs);
-    expect(key.output).toBeUndefined();
-    expect(key.text).toBe("");
-    expect(key.id).toBe("T_carved_K_X");
+    expect(loadKeys(vfs)).toHaveLength(0);
   });
 });
 
@@ -491,5 +596,129 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
     expect([
       ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["rule#e"] })),
     ]).toEqual(["é"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #1803 — group-level carve must blank keycaps like the .kmn drops rules
+// ---------------------------------------------------------------------------
+
+/** Two-group IR: group#main keeps 'a'; group#extra produces q/Q/w. */
+function makeTwoGroupIr(extraRules?: IRRule[]): KeyboardIR {
+  return makeIR([
+    irGroup({
+      nodeId: "group#main",
+      rules: [vkeyRule({ nodeId: "rule#a", vkey: "K_A", output: "a" })],
+    }),
+    irGroup({
+      nodeId: "group#extra",
+      rules: extraRules ?? [
+        vkeyRule({ nodeId: "rule#q", vkey: "K_Q", output: "q" }),
+        vkeyRule({ nodeId: "rule#w", vkey: "K_W", output: "w" }),
+        vkeyRule({ nodeId: "rule#Q", vkey: "K_Q", modifiers: ["shift"], output: "Q" }),
+      ],
+    }),
+  ]);
+}
+
+const KVKS_TWO_LAYER = `<visualkeyboard>
+<header><version>10.0</version></header>
+<encoding name="unicode" fontname="Arial">
+<layer shift="">
+<key vkey="K_A">a</key>
+<key vkey="K_Q">q</key>
+<key vkey="K_W">w</key>
+</layer>
+<layer shift="S">
+<key vkey="K_Q">Q</key>
+</layer>
+</encoding>
+</visualkeyboard>`;
+
+describe("collectCarvedKeycapTexts — group-level carve (#1803)", () => {
+  it("derives characters from the deleted group's rules (the .kmn-side cascade)", () => {
+    const ir = makeTwoGroupIr();
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["group#extra"] })),
+    ].sort()).toEqual(["Q", "q", "w"]);
+  });
+
+  it("a char also produced by a surviving group keeps its keycap", () => {
+    // 'q' is produced both by group#extra (deleted) and by a surviving rule
+    // in group#main — the survivor guard must keep it alive.
+    const ir = makeIR([
+      irGroup({
+        nodeId: "group#main",
+        rules: [
+          vkeyRule({ nodeId: "rule#a", vkey: "K_A", output: "a" }),
+          vkeyRule({ nodeId: "rule#q2", vkey: "K_Q", output: "q" }),
+        ],
+      }),
+      irGroup({
+        nodeId: "group#extra",
+        rules: [vkeyRule({ nodeId: "rule#q", vkey: "K_Q", output: "q" })],
+      }),
+    ]);
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["group#extra"] })),
+    ]).toEqual([]);
+  });
+
+  it("a deleted group is not counted as its own survivor", () => {
+    // The survivor guard skips rules via the carve cascade, so group#extra's
+    // own deleted rules cannot resurrect their characters: the carved set is
+    // exactly the deleted group's characters.
+    const ir = makeTwoGroupIr();
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["group#extra"] })),
+    ].sort()).toEqual(["Q", "q", "w"]);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — group-level carve (#1803)", () => {
+  it("blanks the deleted group's keycaps on every .kvks layer, in place", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_TWO_LAYER }]);
+    const ir = makeTwoGroupIr();
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(
+      vfs, "test", ir, removalsOf({ wholeNodeIds: ["group#extra"] }),
+    );
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<key vkey="K_A">a</key>');
+    expect(xml).toContain('<key vkey="K_Q"></key>');
+    expect(xml).toContain('<key vkey="K_W"></key>');
+    // Shift layer cleared too — layer-agnostic scan.
+    expect(xml).not.toContain(">q</key>");
+    expect(xml).not.toContain(">Q</key>");
+    expect(xml).not.toContain(">w</key>");
+    expect(xml.match(/<layer\b/g)).toHaveLength(2);
+  });
+
+  it("removes the deleted group's characters from the touch layout as well", () => {
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }, { id: "K_Q", text: "q" }] }] },
+        ],
+      },
+    });
+    const vfs = makeVfs([{ path: "source/test.keyman-touch-layout", content: touchLayout }]);
+    const ir = makeTwoGroupIr();
+
+    applyCarveKeycapRemovalsToVfs(
+      vfs, "test", ir, removalsOf({ wholeNodeIds: ["group#extra"] }),
+    );
+
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const keys = data.tablet.layer[0].row[0].key as { id: string; text?: string }[];
+    expect(keys.find((k) => k.id === "K_A")?.text).toBe("a");
+    // 076 FR-023 (T020): the touch-layout default is removal, not blanking —
+    // the K_Q key leaves the layout entirely (its .kmn rule is carved away
+    // too, so there is no stale fallback emission). The keep-inert override
+    // ("kept, does nothing") is covered by the T020 suite above.
+    expect(keys.some((k) => k.id === "K_Q")).toBe(false);
+    expect(keys).toHaveLength(1);
   });
 });

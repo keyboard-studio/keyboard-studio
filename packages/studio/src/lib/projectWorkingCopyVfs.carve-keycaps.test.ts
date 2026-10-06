@@ -3,8 +3,10 @@
 //
 // This file does NOT mock @keyboard-studio/engine — it exercises the real
 // applyCarveKeycapRemovalsToVfs pass so we observe the actual `.kvks` and
-// `.keyman-touch-layout` content after a carve, proving the layer files keep
-// their structure while the carved character's keycaps go blank.
+// `.keyman-touch-layout` content after a carve: the `.kvks` keeps its
+// structure with the carved character's keycaps blank, while the touch
+// layout REMOVES carved main keys by default (076 FR-023 T020) or keeps
+// them visibly inert under the keep-inert override.
 //
 // AC#1: A store-slot carve blanks the keycap labeled with that slot's char in
 //       both layer files; sibling keys and layer structure survive; baseIr is
@@ -17,6 +19,10 @@
 //       producing rule from the desktop `.kmn` layout AND blanks its `.kvks`
 //       desktop-OSK keycap, while a declared-alphabet character's rule and
 //       keycap are left fully intact.
+// #1803: A GROUP-level carve removes the group's rules from the `.kmn` AND
+//       blanks their `.kvks` keycaps on every modifier layer (the .kmn-side
+//       cascade applied to keycap derivation); the kept group's keycaps and
+//       the layer structure survive.
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -165,20 +171,54 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     expect(kvks).toContain('<key vkey="K_A">a</key>');
     expect(kvks.match(/<layer\b/g)).toHaveLength(1);
 
-    // .keyman-touch-layout: the é main key keeps its object with blank text;
-    // the é longpress entry is removed (property dropped when emptied); the
-    // sibling key is untouched.
+    // .keyman-touch-layout: the é main key is REMOVED (076 FR-023 T020
+    // default); the é longpress entry is removed (property dropped when
+    // emptied); the sibling key is untouched.
+    const touch = JSON.parse(
+      vfs.get("source/test_kb.keyman-touch-layout")?.content as string,
+    );
+    const keys = touch.tablet.layer[0].row[0].key;
+    expect(keys).toHaveLength(1);
+    expect(keys[0].text).toBe("a");
+    expect(keys[0].sk).toBeUndefined();
+
+    expect(ir).toEqual(irBefore);
+  });
+
+  it("AC#1b (T020): carveTouchKeepInert keeps the carved touch key visibly inert instead of removing it", () => {
+    const ir = makeFanOutIr();
+    const vfs = makeVfs("test_kb");
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["store#dkt#0"]), // carve the é slot
+      carveTouchKeepInert: new Set(["é"]),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings).toHaveLength(0);
+
+    // .kvks is unaffected by the touch override: the é keycap still blanks.
+    const kvks = vfs.get("source/test_kb.kvks")?.content as string;
+    expect(kvks).toContain('<key vkey="K_E"></key>');
+
+    // .keyman-touch-layout: the K_E main key is KEPT but inert — blank cap
+    // ("does nothing"), not removed. The é longpress entry is still removed
+    // (an invisible popup would still emit).
     const touch = JSON.parse(
       vfs.get("source/test_kb.keyman-touch-layout")?.content as string,
     );
     const keys = touch.tablet.layer[0].row[0].key;
     expect(keys).toHaveLength(2);
-    expect(keys[0].text).toBe("a");
-    expect(keys[0].sk).toBeUndefined();
     expect(keys[1].id).toBe("K_E");
     expect(keys[1].text).toBe("");
-
-    expect(ir).toEqual(irBefore);
+    expect(keys[1].output).toBeUndefined();
+    expect(keys[0].sk).toBeUndefined();
   });
 
   it("AC#2: an S-01 assignment of the carved char in the same projection re-populates the keycap (Step 3.5 wins)", () => {
@@ -254,5 +294,76 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     const kvks = vfs.get("source/test_kb.kvks")?.content as string;
     expect(kvks).toContain('<key vkey="K_Q"></key>');
     expect(kvks).toContain('<key vkey="K_A">a</key>');
+  });
+});
+
+describe("projectWorkingCopyVfs — group-level carve keycaps (#1803)", () => {
+  const GROUP_KMN = [
+    "store(&VERSION) '10.0'",
+    "begin Unicode > use(main)",
+    "",
+    "group(main) using keys",
+    "+ [K_A] > 'a'",
+    "",
+    "group(extra) using keys",
+    "+ [K_Q] > 'q'",
+    "+ [SHIFT K_Q] > 'Q'",
+    "+ [K_W] > 'w'",
+    "",
+  ].join("\n");
+
+  const GROUP_KVKS = `<visualkeyboard>
+<header><version>10.0</version></header>
+<encoding name="unicode" fontname="Arial">
+<layer shift="">
+<key vkey="K_A">a</key>
+<key vkey="K_Q">q</key>
+<key vkey="K_W">w</key>
+</layer>
+<layer shift="S">
+<key vkey="K_Q">Q</key>
+</layer>
+</encoding>
+</visualkeyboard>`;
+
+  it("a group-level carve removes the group's rules from the .kmn AND blanks their keycaps on every .kvks layer", () => {
+    const { ir } = parseKmn(GROUP_KMN, "test_kb");
+    const extraGroup = ir.groups.find((g) => g.name === "extra");
+    if (extraGroup === undefined) throw new Error("fixture group 'extra' not found");
+    const vfs = createVirtualFS([
+      { path: "source/test_kb.kmn", content: GROUP_KMN, isBinary: false },
+      { path: "source/test_kb.kvks", content: GROUP_KVKS, isBinary: false },
+    ]);
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set([extraGroup.nodeId]),
+      deletedItemIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings).toHaveLength(0);
+
+    // Desktop layout (.kmn): the whole group is gone.
+    const kmn = vfs.get("source/test_kb.kmn")?.content as string;
+    expect(kmn).not.toContain("[K_Q]");
+    expect(kmn).not.toContain("[K_W]");
+    expect(kmn).toContain("[K_A]");
+
+    // OSK (.kvks): the carved group's keycaps are blanked on EVERY layer —
+    // the .kvks must match the .kmn it ships with — while the kept group's
+    // keycap survives and the layer structure is untouched.
+    const kvks = vfs.get("source/test_kb.kvks")?.content as string;
+    expect(kvks).toContain('<key vkey="K_A">a</key>');
+    expect(kvks).toContain('<key vkey="K_Q"></key>');
+    expect(kvks).toContain('<key vkey="K_W"></key>');
+    expect(kvks).not.toContain(">q</key>");
+    expect(kvks).not.toContain(">Q</key>");
+    expect(kvks).not.toContain(">w</key>");
+    expect(kvks.match(/<layer\b/g)).toHaveLength(2);
   });
 });

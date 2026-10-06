@@ -175,6 +175,38 @@ describe("multi-draft: put/get/delete keyed by draftId", () => {
   });
 });
 
+describe("draftId allowlist (storage pathname safety)", () => {
+  const UNSAFE = ["../../probe", "..", "a/b", "a\\b", "x.json", "drafts/99999/../../x", "", "a".repeat(81)];
+
+  it.each(UNSAFE)("400s PUT with meta.draftId %j and stores nothing", async (draftId) => {
+    const store = new MemoryDraftStore();
+    const config: DraftHandlerConfig = { store, verifyUser: async () => USER };
+    const r = await putDraft(AUTH, putBody({ ...META, draftId }), config);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("invalid_request");
+    expect(await store.listMeta(USER.id)).toEqual([]);
+  });
+
+  it.each(UNSAFE)("400s GET meta/content and DELETE with query draftId %j", async (draftId) => {
+    const config = makeConfig();
+    expect((await getDraftMeta(AUTH, config, draftId)).status).toBe(400);
+    expect((await getDraftContent(AUTH, config, draftId)).status).toBe(400);
+    expect((await deleteDraft(AUTH, config, draftId)).status).toBe(400);
+  });
+
+  it("accepts keyboard-id-shaped keys and the client sentinels", async () => {
+    const config = makeConfig();
+    for (const draftId of ["sil_euro_latin", "basic_kbdfr", "cree-woods", DEFAULT_DRAFT_ID, "__pending__"]) {
+      expect((await putDraft(AUTH, putBody({ ...META, draftId }), config)).status).toBe(200);
+      expect((await getDraftMeta(AUTH, config, draftId)).status).toBe(200);
+    }
+  });
+
+  it("still 401s before validating the id when unauthenticated", async () => {
+    expect((await getDraftMeta(AUTH, makeConfig(null), "../x")).status).toBe(401);
+  });
+});
+
 describe("listDrafts()", () => {
   it("returns an empty array when the user has no drafts", async () => {
     const config = makeConfig();

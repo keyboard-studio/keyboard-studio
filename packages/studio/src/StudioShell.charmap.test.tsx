@@ -64,18 +64,7 @@ vi.mock("./lib/navigate.ts", () => import("./test/studioShellMocks/navigate.ts")
 // ---------------------------------------------------------------------------
 
 import { SurveyView } from "./StudioShell.tsx";
-
-// ---------------------------------------------------------------------------
-// Helper: drive from "identity" to the "characters" step (prefill substage)
-// via the SHORTEST path — track-adapt skips project_name entirely.
-// ---------------------------------------------------------------------------
-
-function advanceToCharactersStep(): void {
-  fireEvent.click(screen.getByTestId("survey-advance")); // identity -> base
-  fireEvent.click(screen.getByTestId("base-preview")); // preview (separate click)
-  fireEvent.click(screen.getByTestId("base-confirm")); // commit -> track
-  fireEvent.click(screen.getByTestId("track-adapt")); // track -> characters (prefill substage)
-}
+import { advanceToCharactersStep } from "./test/advanceToCharactersStep.ts";
 
 // ---------------------------------------------------------------------------
 // Teardown
@@ -151,6 +140,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
     // for the track step is "preview" (default), so showCharacterMap must stay
     // false even though discoveryMethod is already "build-list".
     fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("layout-continue"));
     fireEvent.click(screen.getByTestId("base-preview"));
     fireEvent.click(screen.getByTestId("base-confirm"));
     act(() => {

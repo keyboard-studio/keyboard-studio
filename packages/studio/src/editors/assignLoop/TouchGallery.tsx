@@ -265,7 +265,7 @@ import {
   GREEN_CHIP_TEXT,
 } from "./parts/RemovableChipRow.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
-import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
+import { KEY_OPTIONS } from "../../lib/keyOptions.ts";
 import { stripVkeyPrefix } from "../../lib/keyLabel.ts";
 import {
   resolveKeyPickerSelection,
@@ -1756,6 +1756,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // emission memos below can depend on stable primitives.
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
 
@@ -1991,7 +1992,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // overlay or Phase C assignments actually change (the Set/array identities
   // are replaced immutably on every mutation, so a size/length-based key is a
   // cheap, correct proxy — same precedent as touchKey above).
-  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${phaseResults.length}`;
+  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
 
   // Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
   // removals (Phase D) + Phase C individual letter placements. Fed to
@@ -2005,6 +2006,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       deletedNodeIds,
       deletedItemIds,
       phaseResults,
+      carveChars,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseIr, modsDepsKey]);
@@ -5518,28 +5520,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [],
   );
 
-  // Tap-to-select routing: when a valid host-key-capable method is active and
-  // the user taps a key in the OSK preview, route that key id to the host key
-  // selector. Ignored for touch_inherited (no host key concept).
-  const handleKeyTap = useCallback(
-    (keyId: string) => {
-      if (!VALID_HOST_KEYS.has(keyId)) return;
-      if (
-        method === "longpress_alternates" ||
-        method === "flick_gestures" ||
-        method === "multitap" ||
-        method === "touch_key_replace"
-      ) {
-        setHostKey(keyId);
-        // Tapping a real key sets the picker to that key; clear the paired
-        // custom-char text so re-opening "Enter my own character..." starts
-        // clean instead of re-showing stale (possibly invalid) text.
-        setHostKeyCustomChar("");
-      }
-    },
-    [method],
-  );
-
   // ---------------------------------------------------------------------------
   // Shared styles — defined before guards so they can be referenced in guard renders
   // ---------------------------------------------------------------------------
@@ -7357,7 +7337,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               fontSize: 13,
               color: TEXT_DIM,
               fontFamily: FONT,
-              flex: 1,
+              // A real basis so the description wraps onto its own row when the
+              // header is too narrow, instead of squeezing to a one-word column.
+              flex: "1 1 320px",
               minWidth: 0,
             }}
           >
@@ -7374,7 +7356,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             fontSize: 13,
             color: TEXT_DIM,
             fontFamily: FONT,
-            flex: 1,
+            flex: "1 1 320px",
             minWidth: 0,
           }}
         >
@@ -7437,7 +7419,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   baseKeyboard={baseKeyboard}
                   stage={stage}
                   retry={retry}
-                  {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
                   defaultOskMode="touch"
                   heading={previewHeading}
                   warningLabel={t({

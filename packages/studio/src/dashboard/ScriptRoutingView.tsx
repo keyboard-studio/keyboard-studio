@@ -7,6 +7,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { buildScriptRouting, type ScriptRoutingRow } from "./buildScriptRouting.ts";
 import type { FlowDef } from "../survey/types.ts";
 import type { ScriptRoutingGroup } from "../lib/scriptAxes.ts";
+import { useIsNarrow } from "../hooks/useViewport.ts";
 import { MONO, SANS, Badge, COLORS } from "./tokens.tsx";
 
 function GroupChip({ group, gated }: { group: ScriptRoutingGroup | null; gated: boolean }) {
@@ -36,6 +37,11 @@ interface ScriptRoutingViewProps {
 
 export function ScriptRoutingView({ flow }: ScriptRoutingViewProps) {
   const rows: ScriptRoutingRow[] = buildScriptRouting(flow);
+  // Mobile adaptation (Phase 5): the 4-column table is too dense
+  // for 390px — narrow viewports render each row as a stacked card instead.
+  // Desktop keeps the table unchanged.
+  const narrow = useIsNarrow();
+  const { t } = useLingui();
 
   const cell: CSSProperties = {
     padding: "8px 12px",
@@ -67,6 +73,43 @@ export function ScriptRoutingView({ flow }: ScriptRoutingViewProps) {
         </Trans>
       </p>
 
+      {narrow ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rows.map((r) => (
+            <div
+              key={r.value}
+              style={{
+                background: COLORS.gray.bg,
+                border: `1px solid ${COLORS.gray.border}`,
+                borderRadius: 8,
+                padding: "10px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontFamily: MONO, fontSize: 12, color: COLORS.blue.base }}>{r.value}</div>
+                <GroupChip group={r.routingGroup} gated={r.gated} />
+              </div>
+              <div style={{ fontSize: 11, color: COLORS.gray.textDim }}>{r.label}</div>
+              <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+                <span style={{ color: COLORS.gray.textDim }}>
+                  {t({ id: "dashboard.scriptRouting.card.normalized", message: "Normalized" })}:{" "}
+                  <span style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>
+                    {r.script}
+                    {r.variant !== undefined ? `-${r.variant}` : ""}
+                  </span>
+                </span>
+                <span style={{ color: COLORS.gray.textDim }}>
+                  {t({ id: "dashboard.scriptRouting.card.a2class", message: "A2 class" })}:{" "}
+                  <span style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>{r.scriptClass}</span>
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
       <table style={{ borderCollapse: "collapse", width: "100%", background: COLORS.gray.bg, border: `1px solid ${COLORS.gray.border}`, borderRadius: 8 }}>
         <thead>
           <tr>
@@ -103,6 +146,7 @@ export function ScriptRoutingView({ flow }: ScriptRoutingViewProps) {
           ))}
         </tbody>
       </table>
+      )}
 
       <div
         style={{

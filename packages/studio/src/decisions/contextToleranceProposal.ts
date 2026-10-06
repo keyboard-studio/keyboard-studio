@@ -30,13 +30,13 @@ export function withContextToleranceProposal(
   if (decision === undefined) return fallback;
   const siteIds = [...decision.proposedSiteIds];
   const keepOnOverride = { value: "accept", siteIds };
-  return (questionId) => {
+  return (questionId, stepId) => {
     if (questionId === CONTEXT_TOLERANCE_QUESTION_ID) {
       return { value: "accept", source: "analysis", keepOnOverride };
     }
     if (questionId === CONTEXT_TOLERANCE_SITES_QUESTION_ID) {
       return { value: siteIds.join(SITE_ID_SEPARATOR), source: "analysis", keepOnOverride };
     }
-    return fallback?.(questionId);
+    return fallback?.(questionId, stepId);
   };
 }

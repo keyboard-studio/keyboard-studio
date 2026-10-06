@@ -53,8 +53,17 @@ events:
   # pb_legacy_encoding / pb_use_case / pb_additional_methods are all
   # required: false on this branch — omitted.
 
-  # --- marks / punctuation / convenience / carve / mechanisms / touch:
+  # --- marks / punctuation / carve / mechanisms / touch:
   #     no fixture events at all — see the header note above ---
+
+  # --- convenience (spec 079): NO event, by design — the negative pin
+  #     alongside bafut-end-to-end's positive one. pb_standard_letters above
+  #     is "basic-az" (the whole basic-Latin alphabet), and
+  #     confirmed_alphabet_bases below matches that exactly, so against
+  #     basic_kbdus's own a-z/A-Z produced set there is no surplus letter at
+  #     all: the gate must resolve `not-applicable`, never `applies`. If a
+  #     future regression makes the gate open anyway, journey-runner.ts's
+  #     "convenience" case fails this fixture's replay. ---
 
   # --- touch_seed_source: no event -> harness defaults to "import-adapt" ---
 
@@ -62,6 +71,12 @@ events:
   #     (No) path ---
   - { stepId: help, questionId: pf_welcome_paragraph, value: "A minimal-defaults US English keyboard." }
   - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
+
+# Matches pb_standard_letters: "basic-az" above exactly — the whole
+# basic-Latin alphabet is needed, so there is no surplus for convenience to
+# offer (see the note above).
+confirmed_alphabet_bases:
+  [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z]
 
 expected_outcomes:
   routing_group: qwerty-qwertz

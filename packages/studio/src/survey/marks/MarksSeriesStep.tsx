@@ -52,6 +52,7 @@ import {
 } from "@keyboard-studio/contracts";
 import {
   groupMarkClasses,
+  buildAttestationFold,
   proposeAttachments,
   nfcPostureOfInventory,
   resolveOutputFormProposal,
@@ -280,11 +281,6 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   const gate = useMemo(() => computeMarksGate(alphabet), [alphabetKey]);
 
   // Derived station inputs — all pure engine functions over the gate alphabet.
-  const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet), [gate.alphabet]);
-  const proposals = useMemo(
-    () => proposeAttachments(gate.alphabet, classes),
-    [gate.alphabet, classes],
-  );
   const bcp47 = surveyContext.bcp47_tag;
   // The GATE for "is this base cased at all" (spec 048 FR-006): reads the
   // working-copy IR's `casing` facet, effective-value accessor, rather than
@@ -307,6 +303,15 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // require new filtering, because that's what these primitives already do.
   const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
   const isCasedBase = casingValue === "cased" || casingValue === "mixed";
+  // Attestation is case-symmetric behind the same gate: a mark seen only on a
+  // capital must still pre-tick the lowercase row, the only one shown below,
+  // and must still group with a sibling seen only on the lowercase letter.
+  const fold = useMemo(() => buildAttestationFold(isCasedBase, bcp47), [isCasedBase, bcp47]);
+  const classes: MarkClass[] = useMemo(() => groupMarkClasses(gate.alphabet, fold), [gate.alphabet, fold]);
+  const proposals = useMemo(
+    () => proposeAttachments(gate.alphabet, classes, fold),
+    [gate.alphabet, classes, fold],
+  );
   // Marks questions offer only lowercase/caseless bases (spec 049, US1); the
   // uppercase counterpart's attachment is derived, not asked. The affordance
   // count is pinned to the folded lowercase view (SC-004), and the shared fold
@@ -372,9 +377,9 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         baseIr,
         keyBudget,
         attachments: expandedAttachments,
-        ...(bcp47 !== undefined ? { bcp47 } : {}),
+        ...fold,
       }),
-    [gate.alphabet, classes, proposals, baseIr, keyBudget, expandedAttachments, bcp47],
+    [gate.alphabet, classes, proposals, baseIr, keyBudget, expandedAttachments, fold],
   );
 
   // What each class could promote — offered on lowercase/caseless bases only.
@@ -654,8 +659,8 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
           t({
             id: "marks.contextTolerance.station.description",
             message: plural(added, {
-              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the accent is joined to the letter or stored as a separate character.`,
-              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the accent is joined to the letter or stored as a separate character.`,
+              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
+              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
             }),
           }),
       },
@@ -1151,7 +1156,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       {activeStation === "marks_context_tolerance" && toleranceProposal === null && (
         <p data-testid="context-tolerance-checking" style={mutedParaFlush}>
           <Trans id="marks.contextTolerance.station.checking">
-            Checking whether your keys also work when the letter and its accent are stored as separate characters.
+            Checking whether your keys also work when the letter and its diacritic are stored as separate characters.
             You can continue; the result will appear with the other messages.
           </Trans>
         </p>
