@@ -74,3 +74,19 @@ describe("migrateDraft", () => {
     expect(result.orphans).toEqual([]);
   });
 });
+
+describe("migrateDraft — Phase G flows (spec 085 T042)", () => {
+  it("maps track and project-name answers through the real registries", async () => {
+    const { phaseTrackRegistry, phaseProjectRegistry } = await import(
+      "../survey/questions/registry.g.ts"
+    );
+    const result = migrateDraft(
+      { track_choice: "copy", project_display_name: "My Kbd", project_keyboard_id: "my_kbd" },
+      [...Object.values(phaseTrackRegistry), ...Object.values(phaseProjectRegistry)],
+    );
+    expect(result.orphans).toEqual([]);
+    expect(result.decisions["authoring-track"]).toMatchObject({ value: "copy", provenance: "asked" });
+    expect(result.decisions["project-display-name"]).toMatchObject({ value: "My Kbd" });
+    expect(result.decisions["project-keyboard-id"]).toMatchObject({ value: "my_kbd" });
+  });
+});

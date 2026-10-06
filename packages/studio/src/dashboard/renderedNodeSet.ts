@@ -27,7 +27,7 @@
 // traversal lives in the depcruise-excluded guardrail test, not here.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { buildModularFlowGraph, buildDerivedFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes, buildLeftoverNodes } from "./buildStepGraph.ts";
+import { buildDerivedFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes, buildLeftoverNodes } from "./buildStepGraph.ts";
 import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { buildManifestProjection, attachDrillDowns, CHARACTERS_STEP_ID as _CHARACTERS_STEP_ID } from "./manifestProjection.ts";
 import type { FlowGraph, GraphNode } from "./model.ts";
@@ -71,19 +71,13 @@ function safeBuild(sourceId: string, stepId: string): BuiltFlowSource {
     };
   }
   try {
-    // Derived order when the source declares it (spec 085 T040), otherwise
-    // the thin YAML — one ordering source per flow, enforced by loadFlowSourceDef.
-    // Exactly one of derivedModules/raw is set (enforced by loadFlowSourceDef).
-    // The else branch is the legacy YAML path; raw is defined there by the
-    // invariant, and loadModularFlow fails loudly if it is not.
-    const graph =
-      source.derivedModules !== undefined
-        ? buildDerivedFlowGraph(
-            loadFlowSourceDef(source),
-            source.title,
-            source.registry,
-          )
-        : buildModularFlowGraph(source.raw ?? "", source.title, source.registry);
+    // loadFlowSourceDef resolves the ordering source (derived modules or the
+    // thin YAML) — one path for every flow, however many are migrated.
+    const graph = buildDerivedFlowGraph(
+      loadFlowSourceDef(source),
+      source.title,
+      source.registry,
+    );
     return { graph, error: null, title: source.title, stepId };
   } catch (err) {
     return {

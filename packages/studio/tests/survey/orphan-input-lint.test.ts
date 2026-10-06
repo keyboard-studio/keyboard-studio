@@ -21,7 +21,7 @@ import path from "node:path";
 import { formatIRPath, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { parseThinYaml } from "../../src/survey/loadModularFlow.ts";
 import { questionRegistry } from "../../src/survey/questions/registry.ts";
-import { phaseARegistry } from "../../src/survey/questions/registry.a.ts";
+import { flowSources } from "../../src/steps/flowSources.ts";
 import { orderDecisions } from "../../src/decisions/orderDecisions.ts";
 
 // ---------------------------------------------------------------------------
@@ -76,19 +76,22 @@ const KNOWN_PHASE_ORDER: Array<{
   { phase: "A (proposed)", filename: path.join("proposed", "phase_a_identity.modular.yaml") },
   { phase: "B", filename: "phase_b_characters.modular.yaml" },
   { phase: "F", filename: "phase_f_helpdocs.modular.yaml" },
-  // identity_lite's thin-YAML order list was deleted (spec 085 T040). Its
-  // manifest is now the derived order from the il_* modules' own
-  // provides/requires declarations — the same order the survey actually
-  // walks (see decisions/orderParity.test.ts). The il_* modules declare
-  // empty inputs/writes, so they trivially pass the orphan lint; keeping the
-  // entry preserves the "every registry module is manifested" coverage.
-  {
-    phase: "A (identity-lite)",
-    derivedIds: orderDecisions(Object.values(phaseARegistry)).map(
-      (m) => m.definition.id,
-    ),
-  },
+  // Flows whose thin-YAML order list was deleted (spec 085) are appended below,
+  // generically, from flowSources' derivedModules — the same order the survey
+  // actually walks (see decisions/orderParity.test.ts).
 ];
+
+// Every derived flow, in flowSources declaration order. The il_* / Phase G
+// modules declare empty or trivially-satisfied inputs, so they pass the lint;
+// listing them preserves the "every registry module is manifested" coverage.
+// Migrating another flow needs no edit here.
+const derivedEntries = Object.values(flowSources)
+  .filter((src) => src.derivedModules !== undefined)
+  .map((src) => ({
+    phase: `${src.phase ?? "?"} (${src.id})`,
+    derivedIds: orderDecisions(src.derivedModules ?? []).map((m) => m.definition.id),
+  }));
+KNOWN_PHASE_ORDER.push(...derivedEntries);
 
 const knownFilenames = new Set(
   KNOWN_PHASE_ORDER.map((e) => e.filename).filter((f) => f !== undefined),
@@ -216,11 +219,12 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
         `Manifest for phase '${phase}' has no questions — empty or failed to load`,
       ).toBeGreaterThan(0);
     }
-    // Confirm all four currently-known manifests are present.
+    // Confirm every known flow is linted, whether YAML-backed or derived —
+    // the total is stable as flows migrate from YAML to derived order.
     expect(
-      allModularFilenames,
-      "Expected at least 4 .modular.yaml files in content/flows/",
-    ).toSatisfy((files: string[]) => files.length >= 4);
+      phaseOrder.length,
+      "Expected at least 6 linted flows (YAML-backed + derived)",
+    ).toBeGreaterThanOrEqual(6);
   });
 
   it("questionRegistry covers all manifested questions (sanity)", () => {

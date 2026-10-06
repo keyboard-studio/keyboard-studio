@@ -11,6 +11,7 @@ import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import { phaseFRegistry } from "../survey/questions/registry.f.ts";
+import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
 import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -73,6 +74,9 @@ const ALL_FLOWS = [
   { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry },
   { raw: phaseBModularRaw, title: "Phase B", registry: phaseBRegistry },
   { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry },
+  // Phase G flows derive their order (spec 085) — built through flowSources.
+  { flowDef: loadFlowSourceDef(flowSources["track"]!), title: "Track selection", registry: phaseTrackRegistry },
+  { flowDef: loadFlowSourceDef(flowSources["project_name"]!), title: "Project name", registry: phaseProjectRegistry },
 ];
 
 describe("buildModularFlowGraph — identity_lite (fully specified)", () => {

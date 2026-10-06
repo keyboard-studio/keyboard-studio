@@ -8,6 +8,9 @@
 
 import { describe, it, expect } from "vitest";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
+import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
+import type { QuestionModule } from "../survey/types.ts";
 import { orderDecisions } from "./orderDecisions.ts";
 
 /** Frozen from the deleted content/flows/identity_lite.modular.yaml. */
@@ -30,4 +33,44 @@ describe("orderDecisions — identity_lite derived order (post-YAML)", () => {
     );
     expect(derived).toEqual([...LEGACY_IDENTITY_LITE_ORDER]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Phase G flows (spec 085 T042) — one frozen legacy order per migrated flow.
+// Add a row here when migrating the next flow (see flowSources.ts header).
+// ---------------------------------------------------------------------------
+
+const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
+  flowId: string;
+  phase: string;
+  registry: Readonly<Record<string, QuestionModule>>;
+  order: readonly string[];
+}> = [
+  // Frozen from the deleted content/flows/track.modular.yaml.
+  { flowId: "track", phase: "G", registry: phaseTrackRegistry, order: ["track_choice"] },
+  // Frozen from the deleted content/flows/project_name.modular.yaml.
+  {
+    flowId: "project_name",
+    phase: "G",
+    registry: phaseProjectRegistry,
+    order: ["project_display_name", "project_keyboard_id"],
+  },
+];
+
+describe("orderDecisions — derived flows equal their frozen legacy YAML order", () => {
+  for (const { flowId, phase, registry, order } of FROZEN_LEGACY_ORDERS) {
+    it(`${flowId}: derived order equals the frozen legacy order`, () => {
+      const derived = orderDecisions(Object.values(registry)).map((m) => m.definition.id);
+      expect(derived).toEqual([...order]);
+    });
+
+    it(`${flowId}: flowSources entry derives (no raw) with the legacy phase`, () => {
+      const source = flowSources[flowId]!;
+      expect(source.raw).toBeUndefined();
+      const flow = loadFlowSourceDef(source);
+      expect(flow.flow_id).toBe(flowId);
+      expect(flow.phase).toBe(phase);
+      expect(flow.questions.map((q) => q.id)).toEqual([...order]);
+    });
+  }
 });

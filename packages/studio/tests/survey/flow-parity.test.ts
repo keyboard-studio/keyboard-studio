@@ -25,6 +25,7 @@
 import { describe, it, expect } from "vitest";
 import { loadDerivedFlowDef, loadModularFlow } from "../../src/survey/loadModularFlow.ts";
 import { phaseARegistry } from "../../src/survey/questions/registry.a.ts";
+import { flowSources, loadFlowSourceDef } from "../../src/steps/flowSources.ts";
 
 // ---------------------------------------------------------------------------
 // ?raw YAML imports (Vite handles these; typed via src/vite-env.d.ts)
@@ -35,8 +36,6 @@ import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular
 // identity_lite.modular.yaml was deleted (spec 085 T040) — the order now
 // derives from the il_* modules' provides/requires declarations via
 // loadDerivedFlowDef below. No raw import.
-import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
-import projectNameModularRaw from "../../../../content/flows/project_name.modular.yaml?raw";
 
 // ---------------------------------------------------------------------------
 // Phase A structural integrity
@@ -273,7 +272,7 @@ describe("flow-parity: identity_lite — routing shape", () => {
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: track — questions[]", () => {
-  const modular = loadModularFlow(trackModularRaw);
+  const modular = loadFlowSourceDef(flowSources["track"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);
@@ -310,7 +309,7 @@ describe("flow-parity: track — questions[]", () => {
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: project_name — questions[]", () => {
-  const modular = loadModularFlow(projectNameModularRaw);
+  const modular = loadFlowSourceDef(flowSources["project_name"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);

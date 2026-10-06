@@ -16,12 +16,29 @@
 //                excluded from live drill-downs and from the rendered<->runtime
 //                bijection; rendered as an ordered graph in the Flow Map's Library
 //                section (spec 025, D6). Its YAML also carries `status: proposed`.
+//
+// Migrating a flow from a thin YAML order list to a DERIVED order (spec 085 Q3 /
+// SC-003 — no hand-maintained order lists). Do this once per flow:
+//   1. Give each of the flow's question modules `provides` / `requires`
+//      (DecisionId, decisions/decisionTypes.ts; add new ids there + in
+//      decisionIRPaths). Registry key order is the tie-break where the graph is
+//      silent, so keep the keys in walk order.
+//   2. Add a `<flow>DecisionIndex` beside the registry (indexProviders over the
+//      registry values — see phaseADecisionIndex / phaseTrackDecisionIndex).
+//   3. Freeze the YAML's order in a decisions/*Parity test (derived order ===
+//      frozen legacy array), then delete the YAML and its ?raw import here.
+//   4. Swap `raw: xRaw` for `derivedModules: Object.values(registry)` and set
+//      `phase` (the deleted YAML's `phase:` letter). Everything downstream
+//      (loadFlowSourceDef, dashboard graphs, rendered-node set, proposed/library
+//      flows, mirror suites) keys off derivedModules generically — no per-flow code.
+//   5. Retarget any test that imported the YAML ?raw to loadFlowSourceDef
+//      (flowSources[id]); tests/survey/orphan-input-lint picks derived flows up
+//      automatically. Conditional visibility stays single-sourced in each
+//      module's definition.next (gatedBy is derived from it, FR-005).
 
 import phaseAIdentityModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
-import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
-import projectNameModularRaw from "../../../../content/flows/project_name.modular.yaml?raw";
 
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
@@ -56,6 +73,11 @@ export interface FlowSource {
    * is absent — one ordering source per flow, never both.
    */
   derivedModules?: readonly QuestionModule[];
+  /**
+   * Phase letter of the flow (the deleted YAML's `phase:` field). Required
+   * when `derivedModules` is set; unused for YAML flows (the YAML carries it).
+   */
+  phase?: string;
   /** Human title for the Flow Map drill-down header. */
   title: string;
   /** Registry of QuestionModule definitions for this flow's questions. */
@@ -82,9 +104,10 @@ export function loadFlowSourceDef(source: FlowSource): FlowDef {
     );
   }
   if (hasDerived) {
-    // Phase comes from the deleted YAML's `phase:` field — identity_lite is A.
-    // (Only identity_lite is derived today; generalize when the next flow migrates.)
-    return loadDerivedFlowDef(source.id, "A", source.derivedModules ?? []);
+    if (source.phase === undefined) {
+      throw new Error(`flowSources: derived flow "${source.id}" must declare phase`);
+    }
+    return loadDerivedFlowDef(source.id, source.phase, source.derivedModules ?? []);
   }
   return loadModularFlow(source.raw as string);
 }
@@ -117,6 +140,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     // derived from the il_* modules' own provides/requires declarations
     // (parity with the deleted list proven by orderParity.test.ts).
     derivedModules: Object.values(phaseARegistry),
+    phase: "A",
     title: "Identity-lite",
     // phaseARegistry now holds ONLY the il_* modules (the demoted battery was
     // physically relocated to questions/reserve/), so computeReserveNodes
@@ -131,7 +155,8 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
 
   track: {
     id: "track",
-    raw: trackModularRaw,
+    derivedModules: Object.values(phaseTrackRegistry),
+    phase: "G",
     title: "Track selection",
     registry: phaseTrackRegistry,
     status: "live",
@@ -139,7 +164,8 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
 
   project_name: {
     id: "project_name",
-    raw: projectNameModularRaw,
+    derivedModules: Object.values(phaseProjectRegistry),
+    phase: "G",
     title: "Project name",
     registry: phaseProjectRegistry,
     status: "live",

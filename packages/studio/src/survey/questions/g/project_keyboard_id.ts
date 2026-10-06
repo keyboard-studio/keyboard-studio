@@ -73,5 +73,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "keyboardId")],
+  provides: ["project-keyboard-id"],
+  requires: ["project-display-name"],
 };
 export default mod;

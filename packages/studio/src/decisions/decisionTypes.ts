@@ -17,7 +17,10 @@ export type DecisionId =
   | "author-name"
   | "author-email"
   | "copyright-holder"
-  | "character-inventory";
+  | "character-inventory"
+  | "authoring-track"
+  | "project-display-name"
+  | "project-keyboard-id";
 
 /** Where a decision's value came from. */
 export type DecisionProvenance = "asked" | "extracted" | "default";
@@ -82,4 +85,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "author-email": [],
   "copyright-holder": [],
   "character-inventory": [],
+  "authoring-track": [],
+  "project-display-name": [],
+  "project-keyboard-id": [],
 };

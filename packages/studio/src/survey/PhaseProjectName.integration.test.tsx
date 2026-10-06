@@ -14,13 +14,13 @@
 //      derived by slugifyKeyboardId (the chain under test).
 //   3. onComplete fires with the confirmed {displayName, keyboardId}.
 //
-// Uses the real loadModularFlow + real project_name.modular.yaml ?raw import
-// (via the same module the production component uses). No mocks.
+// Uses the real derived flow (loadFlowSourceDef over the Phase G registries —
+// the same module the production component uses). No mocks.
 //
 // Flow-parity coverage:
-//   Both track.modular.yaml and project_name.modular.yaml are covered here
-//   (track.modular.yaml in the identity assertion block; project_name.modular.yaml
-//   by the full render/flow-through). This satisfies the flow-parity coverage
+//   Both the track and project_name derived flows are covered here
+//   (track in the identity assertion block; project_name by the full
+//   render/flow-through). This satisfies the flow-parity coverage
 //   requirement alongside the drift guardrail (driftGuardrail.test.ts) which
 //   checks the bijection over all FLOW_SOURCES.
 
@@ -29,13 +29,8 @@ import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { ProjectNameStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { loadModularFlow } from "./loadModularFlow.ts";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
-
-// ?raw imports — resolved by Vite at build/test time; vitest transforms them via
-// the vite.config.ts raw plugin (same path as the production component).
-import projectNameRaw from "../../../../content/flows/project_name.modular.yaml?raw";
-import trackRaw from "../../../../content/flows/track.modular.yaml?raw";
 
 afterEach(() => {
   cleanup();
@@ -45,9 +40,9 @@ afterEach(() => {
 // Flow-parity: both modular YAMLs parse without error
 // ---------------------------------------------------------------------------
 
-describe("flow-parity: track.modular.yaml + project_name.modular.yaml load cleanly", () => {
-  it("track.modular.yaml parses to a FlowDef with flow_id 'track' and question 'track_choice'", () => {
-    const flow = loadModularFlow(trackRaw as string);
+describe("flow-parity: track + project_name derived flows load cleanly", () => {
+  it("track derives to a FlowDef with flow_id 'track' and question 'track_choice'", () => {
+    const flow = loadFlowSourceDef(flowSources["track"]!);
     expect(flow.flow_id).toBe("track");
     expect(flow.phase).toBe("G");
     expect(flow.questions).toHaveLength(1);
@@ -56,8 +51,8 @@ describe("flow-parity: track.modular.yaml + project_name.modular.yaml load clean
     expect(flow.questions[0]?.next).toBeNull();
   });
 
-  it("project_name.modular.yaml parses to a FlowDef with flow_id 'project_name' and 2 questions", () => {
-    const flow = loadModularFlow(projectNameRaw as string);
+  it("project_name derives to a FlowDef with flow_id 'project_name' and 2 questions", () => {
+    const flow = loadFlowSourceDef(flowSources["project_name"]!);
     expect(flow.flow_id).toBe("project_name");
     expect(flow.phase).toBe("G");
     expect(flow.questions).toHaveLength(2);

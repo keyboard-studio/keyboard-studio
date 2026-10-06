@@ -6,6 +6,8 @@
 // All imports are static (not dynamic) so the registry is synchronous.
 
 import type { QuestionModule } from "../types.ts";
+import type { DecisionId } from "../../decisions/decisionTypes.ts";
+import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import trackChoiceMod from "./g/track_choice.ts";
 import projectDisplayNameMod from "./g/project_display_name.ts";
@@ -36,3 +38,16 @@ export const phaseGRegistry: Readonly<Record<string, QuestionModule>> = {
   ...phaseTrackRegistry,
   ...phaseProjectRegistry,
 } as const;
+
+/**
+ * Decision-id indexes over the Phase G flow registries (spec 085 T042) — the
+ * same derivation as `phaseADecisionIndex`: the modules' own `provides`
+ * declarations through the canonical indexer, so a duplicate provider throws.
+ */
+export const phaseTrackDecisionIndex: Readonly<
+  Partial<Record<DecisionId, QuestionModule>>
+> = Object.fromEntries(indexProviders(Object.values(phaseTrackRegistry)));
+
+export const phaseProjectDecisionIndex: Readonly<
+  Partial<Record<DecisionId, QuestionModule>>
+> = Object.fromEntries(indexProviders(Object.values(phaseProjectRegistry)));
