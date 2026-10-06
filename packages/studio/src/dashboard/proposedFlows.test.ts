@@ -2,9 +2,8 @@
 //
 // Covers:
 //   • buildProposedFlowGraph — ordered graph, kind:"proposed" / region:"library",
-//     preserves YAML ordering/routing (FR-001).
-//   • status completeness — YAML `status` == flowSources status for every YAML flow
-//     (FR-003; the binding that keeps the two representations from drifting).
+//     preserves the derived ordering/routing (FR-001).
+//   • status — flowSources is the single source of each flow's status (FR-003).
 //   • buildLibrarySection — flat reserve = in-no-flow-at-all (FR-004); only-in-proposed
 //     questions render inside the proposed graph, not as flat reserve.
 //   • dual-reference "also live" flag (FR-005) — WARN, computed + badged, never a fail.
@@ -17,7 +16,6 @@ import { describe, it, expect } from "vitest";
 
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import { manifest } from "../steps/manifest.ts";
-import { parseThinYaml } from "../survey/loadModularFlow.ts";
 import { buildProposedFlowGraphFromFlow } from "./buildStepGraph.ts";
 import {
   buildFlowSources,
@@ -70,40 +68,21 @@ describe("spec 025 — buildProposedFlowGraph (FR-001)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// FR-003 — status completeness: YAML status == flowSources status for EVERY entry.
+// FR-003 — status lives in exactly one place: the flowSources entry.
 // ---------------------------------------------------------------------------
 
-describe("spec 025 — YAML status matches flowSources status for every entry (FR-003)", () => {
+describe("spec 025 — flowSources is the single source of flow status (FR-003)", () => {
   for (const [id, source] of Object.entries(flowSources)) {
-    it(`"${id}": parseThinYaml(status) === flowSources status ("${source.status}")`, () => {
-      // Derived flows (spec 085) have no YAML — the flowSources status IS the
-      // authority; there is no separate status declaration to drift.
-      if (source.raw === undefined) {
-        expect(source.derivedModules).toBeDefined();
-        return;
-      }
-      const yamlStatus = parseThinYaml(source.raw).status; // default "live"
-      expect(yamlStatus).toBe(source.status);
+    it(`"${id}": declares derivedModules and a live/proposed status`, () => {
+      expect(source.derivedModules.length).toBeGreaterThan(0);
+      expect(["live", "proposed"]).toContain(source.status);
     });
   }
 
-  it("phase_a_identity is a derived proposed flow (no YAML to carry a status)", () => {
+  it("phase_a_identity is a derived proposed flow", () => {
     const source = flowSources["phase_a_identity"]!;
     expect(source.status).toBe("proposed");
-    expect(source.raw).toBeUndefined();
-    expect(source.derivedModules).toBeDefined();
-  });
-
-  it("a live flow YAML omits status and defaults to 'live'", () => {
-    // identity_lite is now derived (spec 085 T040) — its "live" status lives
-    // in flowSources, not in a YAML file. A remaining live YAML flow (if any)
-    // still defaults to live when the status key is omitted; once every flow
-    // derives its order there is no YAML left to bind, so the check is vacuous.
-    const liveYamlSource = Object.values(flowSources).find(
-      (s) => s.status === "live" && s.raw !== undefined,
-    );
-    if (liveYamlSource === undefined) return;
-    expect(parseThinYaml(liveYamlSource.raw!).status).toBe("live");
+    expect(source.derivedModules.length).toBeGreaterThan(0);
   });
 });
 

@@ -76,7 +76,66 @@ export type DecisionId =
   | "help-further-reading"
   | "help-project-url"
   | "help-credits"
-  | "help-contact-info";
+  | "help-contact-info"
+  // Phase B/F, reserve and parked-question answers whose modules previously
+  // carried no provides (spec 085 US4) — every answerable module now provides.
+  | "additional-methods"
+  | "azerty-qz-swap"
+  | "char-count"
+  | "co-installed-keyboards"
+  | "contact-language"
+  | "digit-set"
+  | "discovery-intro"
+  | "existing-keyboards"
+  | "help-design-rationale"
+  | "help-history-entry"
+  | "help-more-detail"
+  | "help-usage-tip-3"
+  | "help-usage-tip-4"
+  | "help-usage-tip-5"
+  | "indic-conjuncts-wanted"
+  | "indic-nukta-detail"
+  | "indic-nukta-wanted"
+  | "indic-onset-vowels-list"
+  | "indic-pre-base-vowels"
+  | "indic-virama"
+  | "indic-vowels-separate"
+  | "ip1-keep-strategies"
+  | "ip2-keep-device-targets"
+  | "ip3-keep-script-conventions"
+  | "latin-azerty-branch"
+  | "latin-digraphs-list"
+  | "latin-qwerty-branch"
+  | "legacy-encoding"
+  | "linguist-confirm"
+  | "mark-input-order"
+  | "non-roman-branch"
+  | "other-free-entry"
+  | "picker-confirm"
+  | "punctuation-list"
+  | "punctuation-wanted"
+  | "rtl-direction-confirm"
+  | "rtl-short-vowels"
+  | "rtl-special-letters"
+  | "sa1-target-script-spread"
+  | "sa2-base-script-mismatch"
+  | "sa3-latin-flavor"
+  | "sea-medials"
+  | "sea-stacked-consonants"
+  | "spare-keys-azerty"
+  | "spare-keys-qwerty"
+  | "special-letters-notes"
+  | "special-letters-wanted"
+  | "standard-letters"
+  | "syllabic-finals-list"
+  | "syllabic-grid"
+  | "syllabic-note"
+  | "text-sample-review"
+  | "tp1-confidence-threshold"
+  | "tp2-fallback-tier-prefill"
+  | "tp3-orthography-join"
+  | "typing-approach"
+  | "use-case";
 
 /** Where a decision's value came from. */
 export type DecisionProvenance = "asked" | "extracted" | "default";
@@ -197,4 +256,62 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "help-project-url": [],
   "help-credits": [],
   "help-contact-info": [],
+  // Previously provides-less Phase B/F, reserve and parked-question modules.
+  "additional-methods": [],
+  "azerty-qz-swap": [],
+  "char-count": [],
+  "co-installed-keyboards": [],
+  "contact-language": [],
+  "digit-set": [],
+  "discovery-intro": [],
+  "existing-keyboards": [],
+  "help-design-rationale": [],
+  "help-history-entry": [],
+  "help-more-detail": [],
+  "help-usage-tip-3": [],
+  "help-usage-tip-4": [],
+  "help-usage-tip-5": [],
+  "indic-conjuncts-wanted": [],
+  "indic-nukta-detail": [],
+  "indic-nukta-wanted": [],
+  "indic-onset-vowels-list": [],
+  "indic-pre-base-vowels": [],
+  "indic-virama": [],
+  "indic-vowels-separate": [],
+  "ip1-keep-strategies": [],
+  "ip2-keep-device-targets": [],
+  "ip3-keep-script-conventions": [],
+  "latin-azerty-branch": [],
+  "latin-digraphs-list": [],
+  "latin-qwerty-branch": [],
+  "legacy-encoding": [],
+  "linguist-confirm": [],
+  "mark-input-order": [],
+  "non-roman-branch": [],
+  "other-free-entry": [],
+  "picker-confirm": [],
+  "punctuation-list": [],
+  "punctuation-wanted": [],
+  "rtl-direction-confirm": [],
+  "rtl-short-vowels": [],
+  "rtl-special-letters": [],
+  "sa1-target-script-spread": [],
+  "sa2-base-script-mismatch": [],
+  "sa3-latin-flavor": [],
+  "sea-medials": [],
+  "sea-stacked-consonants": [],
+  "spare-keys-azerty": [],
+  "spare-keys-qwerty": [],
+  "special-letters-notes": [],
+  "special-letters-wanted": [],
+  "standard-letters": [],
+  "syllabic-finals-list": [],
+  "syllabic-grid": [],
+  "syllabic-note": [],
+  "text-sample-review": [],
+  "tp1-confidence-threshold": [],
+  "tp2-fallback-tier-prefill": [],
+  "tp3-orthography-join": [],
+  "typing-approach": [],
+  "use-case": [],
 };

@@ -1,15 +1,9 @@
 import { describe, it, expect } from "vitest";
 
 
-import { buildModularFlowGraph, buildDerivedFlowGraph, buildGraphFromQuestions, buildManifestStepGraph } from "./buildStepGraph.ts";
+import { buildDerivedFlowGraph, buildGraphFromQuestions, buildManifestStepGraph } from "./buildStepGraph.ts";
 import { buildScriptRouting } from "./buildScriptRouting.ts";
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../survey/questions/registry.f.ts";
-import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
-import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { manifest } from "../steps/manifest.ts";
 
@@ -18,7 +12,7 @@ import { manifest } from "../steps/manifest.ts";
 // ---------------------------------------------------------------------------
 
 function assertLiveNodeSetEqualsManifest(
-  entry: { raw?: string; flowDef?: FlowDef },
+  entry: { flowDef: FlowDef },
   registry: Readonly<Record<string, import("../survey/types.ts").QuestionModule>>,
   label: string,
 ) {
@@ -46,23 +40,24 @@ function assertLiveNodeSetEqualsManifest(
 const identityLiteFlow = loadFlowSourceDef(flowSources["identity_lite"]!);
 
 function buildGraphForEntry(entry: {
-  raw?: string;
-  flowDef?: FlowDef;
+  flowDef: FlowDef;
   title: string;
   registry: Readonly<Record<string, import("../survey/types.ts").QuestionModule>>;
 }) {
-  if (entry.flowDef !== undefined) {
-    return buildDerivedFlowGraph(entry.flowDef, entry.title, entry.registry);
-  }
-  if (entry.raw === undefined) throw new Error(`test entry "${entry.title}" has neither flowDef nor raw`);
-  return buildModularFlowGraph(entry.raw, entry.title, entry.registry);
+  return buildDerivedFlowGraph(entry.flowDef, entry.title, entry.registry);
 }
 
-function loadFlowForEntry(entry: { raw?: string; flowDef?: FlowDef }): FlowDef {
-  if (entry.flowDef !== undefined) return entry.flowDef;
-  if (entry.raw === undefined) throw new Error("test entry has neither flowDef nor raw");
-  return loadModularFlow(entry.raw);
+function loadFlowForEntry(entry: { flowDef: FlowDef }): FlowDef {
+  return entry.flowDef;
 }
+
+// Per-flow registries come from the production flowSources entries.
+const phaseARegistry = flowSources["identity_lite"]!.registry;
+const phaseBRegistry = flowSources["phase_b_characters"]!.registry;
+const phaseFRegistry = flowSources["phase_f_helpdocs"]!.registry;
+const phaseTrackRegistry = flowSources["track"]!.registry;
+const phaseProjectRegistry = flowSources["project_name"]!.registry;
+const reserveRegistry = flowSources["phase_a_identity"]!.registry;
 
 const ALL_FLOWS = [
   // identity_lite keys off the il_*-only phaseARegistry in production (steps/flowSources.ts).
@@ -71,14 +66,14 @@ const ALL_FLOWS = [
   { flowDef: loadFlowSourceDef(flowSources["phase_a_identity"]!), title: "Phase A", registry: reserveRegistry },
   // Phase B derives its order (spec 085), built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["phase_b_characters"]!), title: "Phase B", registry: phaseBRegistry },
-  // phase_f_helpdocs derives its order (spec 085) � built through flowSources.
+  // phase_f_helpdocs derives its order (spec 085) � built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["phase_f_helpdocs"]!), title: "Phase F", registry: phaseFRegistry },
   // Phase G flows derive their order (spec 085) — built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["track"]!), title: "Track selection", registry: phaseTrackRegistry },
   { flowDef: loadFlowSourceDef(flowSources["project_name"]!), title: "Project name", registry: phaseProjectRegistry },
 ];
 
-describe("buildModularFlowGraph — identity_lite (fully specified)", () => {
+describe("buildDerivedFlowGraph — identity_lite (fully specified)", () => {
   const g = buildDerivedFlowGraph(identityLiteFlow, "Identity-lite", phaseARegistry);
 
   it("uses the first question as the entry", () => {
@@ -102,7 +97,7 @@ describe("buildModularFlowGraph — identity_lite (fully specified)", () => {
   });
 });
 
-describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
+describe("buildDerivedFlowGraph — every shipped flow (INV-1)", () => {
   for (const entry of ALL_FLOWS) {
     const { title, registry } = entry;
     it(`${title}: builds with a defined entry and no dangling goto targets`, () => {
@@ -150,12 +145,12 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
 // T010/T011: Phase B honesty — derived-equality + reserve + edge snapshot
 // ---------------------------------------------------------------------------
 
-describe("buildModularFlowGraph — Phase B honesty (FR-010)", () => {
+describe("buildDerivedFlowGraph — Phase B honesty (FR-010)", () => {
   // Build the modular Phase B graph once for all assertions in this suite.
   const phaseBFlow = loadFlowSourceDef(flowSources["phase_b_characters"]!);
   const graph = buildDerivedFlowGraph(phaseBFlow, "Phase B — character discovery", phaseBRegistry);
 
-  // Resolve the live id set independently (from loadModularFlow) for the
+  // Resolve the live id set independently (from the derived flow) for the
   // derived-equality assertion (FR-010 Part A).
   const liveFlow = phaseBFlow;
   const liveIds = new Set(liveFlow.questions.map((q) => q.id));
@@ -163,7 +158,7 @@ describe("buildModularFlowGraph — Phase B honesty (FR-010)", () => {
   // Registry keys for the reserve computation (FR-010 Part B).
   const registryIds = new Set(Object.keys(phaseBRegistry));
 
-  it("FR-010 Part A — live node ids equal loadModularFlow resolved ids", () => {
+  it("FR-010 Part A — live node ids equal derived flow ids", () => {
     const liveNodeIds = new Set(
       graph.nodes.filter((n) => n.kind === "live").map((n) => n.id),
     );

@@ -2,9 +2,8 @@
 // survey's questions, their branching, and the strategy decision tree.
 //
 // Four sections, all derived from source (no hand-maintained diagram):
-//   • Survey flow    — one graph per content/flows/*.modular.yaml (loaded via
-//                      ?raw, the same source the survey runner uses via the
-//                      modular loader).
+//   • Survey flow    — one graph per flowSources entry (order derived from the
+//                      question modules, the same source the survey runner uses).
 //   • Script routing — §9 target-script → qwerty-qwertz / non-roman / azerty.
 //   • Strategy tree  — §7.2 decision tree, from the engine's exported rule tables.
 //   • Completeness   — read-only CompletenessReport (US3, T042, FR-023).
@@ -23,8 +22,8 @@ import { useScrollRestoration } from "../hooks/useScrollRestoration.ts";
 // Identity-lite is read directly here for the Script-routing section (§9). The
 // flow drill-down sources (derived from step flowRefs) and the rendered-node-id composition
 // live in the shared dashboard/renderedNodeSet.ts helper (spec 016, D2a), so
-// the Flow Map and the drift guardrail consume ONE composition. Do NOT import
-// the legacy *.yaml files here — they are retired and will be deleted.
+// the Flow Map and the drift guardrail consume ONE composition. Flow order lists
+// are gone — the order derives from the modules.
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 
 import {
@@ -534,7 +533,7 @@ export function FlowMapView({
         <span style={{ fontSize: 12.5, color: "var(--app-text-subtle)" }}>
           <Trans id="dashboard.flowMap.subtitle">
             developer view · auto-generated from{" "}
-            <code style={{ fontFamily: MONO }}>content/flows/*.modular.yaml</code> +{" "}
+            <code style={{ fontFamily: MONO }}>flowSources</code> +{" "}
             <code style={{ fontFamily: MONO }}>strategy-selector</code>
           </Trans>
         </span>
@@ -739,8 +738,8 @@ export function FlowMapView({
             <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--app-text-subtle)", maxWidth: 920 }}>
               <Trans id="dashboard.leftover.description">
                 Registered questions that no live flow currently uses — kept for reference and
-                possible reuse, never run by the live survey. Re-add an id to a live flow YAML to
-                bring it back (see{" "}
+                possible reuse, never run by the live survey. Add the module to a live flow's list in
+                the question registry to bring it back (see{" "}
                 <code style={{ fontFamily: MONO }}>content/flows/README.md</code>).
               </Trans>
             </p>

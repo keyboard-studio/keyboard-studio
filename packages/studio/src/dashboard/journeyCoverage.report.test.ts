@@ -4,8 +4,8 @@
 // "location TBD, resolved here"): computeCoverageReport() reaches
 // buildManifestStepGraph() -> steps/manifest.ts, which imports the real
 // editor-step React components (CharactersStep.tsx, IdentityLiteAdapter, …).
-// Those components import `content/flows/*.modular.yaml?raw` — a Vite asset
-// transform, not a Node-resolvable module specifier. Empirically confirmed in
+// Those components import Vite-only assets (`?raw`, `?lingui`) — not
+// Node-resolvable module specifiers. Empirically confirmed in
 // this session: `tsx` (esbuild, no Vite) cannot resolve either the `?raw`
 // suffix or this workspace's package `exports` map without a full `pnpm build`
 // first (`ERR_PACKAGE_PATH_NOT_EXPORTED` on @keyboard-studio/contracts alone,

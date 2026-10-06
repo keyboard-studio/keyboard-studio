@@ -136,5 +136,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("stores", ARRAY_INDEX)],
+  provides: ["standard-letters"],
 };
 export default mod;

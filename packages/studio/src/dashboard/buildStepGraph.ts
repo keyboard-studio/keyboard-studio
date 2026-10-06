@@ -1,16 +1,17 @@
 // Derive a FlowGraph or StepGraph from a survey flow source or the step manifest.
 //
 // Two entry points:
-//   buildModularFlowGraph(raw, title, registry) — modular path; resolves through
-//                                                  loadModularFlow so the map
-//                                                  matches the live runtime exactly.
-//                                                  The caller supplies the registry
-//                                                  for computing reserve nodes.
+//   buildDerivedFlowGraph(flow, title, registry) — flow path; takes the FlowDef
+//                                                  the loader derived from the
+//                                                  flow's modules, so the map matches
+//                                                  the live runtime exactly. The caller
+//                                                  supplies the registry for computing
+//                                                  reserve nodes.
 //   buildManifestStepGraph()                     — T031/C8: one node per
 //                                                  steps/manifest.ts entry; node
 //                                                  set == runtime step set.
 //
-// buildModularFlowGraph delegates to the loader-agnostic core
+// buildDerivedFlowGraph delegates to the loader-agnostic core
 // buildGraphFromQuestions().
 //
 // Edge extraction mirrors SurveyRunner.resolveNext(): a `next` of a plain string
@@ -19,7 +20,6 @@
 // labelled "(else)"). A goto of `null` is a terminal branch and produces no edge.
 // A goto target absent from the known id set is flagged as dangling (not dropped).
 
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import type { FlowDef, FlowQuestion, QuestionModule } from "../survey/types.ts";
 import { computeDataEdges } from "./model.ts";
 import type { FlowGraph, GraphEdge, GraphNode, NodeKind, NodeRegion, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
@@ -28,7 +28,7 @@ import { manifest } from "../steps/manifest.ts";
 import { formatIRPath } from "@keyboard-studio/contracts";
 
 /**
- * Permissive view of a goto rule as actually authored in the flow YAML. The
+ * Permissive view of a goto rule as actually authored in the question modules. The
  * declared FlowGotoRule type says `default?: true` + a required `goto`, but the
  * shipped flows use a `default: <targetId>` shorthand (and `default: null` for a
  * terminal else-branch). We read both forms so the map matches the authored
@@ -198,34 +198,10 @@ function computeReserveNodes(
 }
 
 /**
- * Build a normalized FlowGraph from a thin modular YAML string.
- *
- * Resolves questions through loadModularFlow (which uses the live consolidated
- * registry). Reserve modules — registered in the supplied registry but absent
- * from the manifest — are appended as "library-not-in-flow" nodes so the
- * reserve set is visible without claiming to be live.
- *
- * Throws (propagates loadModularFlow's error) if the manifest is empty,
- * unparseable, or references an unknown id. The caller is responsible for
- * surfacing the error rather than falling back to the legacy YAML.
- *
- * @param raw      the thin modular YAML source (Vite `?raw` import)
- * @param title    friendly section title for the map
- * @param registry the phase-appropriate registry for computing reserve nodes
- */
-export function buildModularFlowGraph(
-  raw: string,
-  title: string,
-  registry: Readonly<Record<string, QuestionModule>>,
-): FlowGraph {
-  const flow = loadModularFlow(raw);
-  return buildFlowGraph(flow, title, registry);
-}
-
-/**
  * Build a normalized FlowGraph from an already-loaded FlowDef (spec 085
- * T040) — the derived-order counterpart to buildModularFlowGraph, for flow
- * sources whose thin YAML list was deleted.
+ * T040): reserve modules — registered in the supplied registry but absent from
+ * the flow — are appended as "library-not-in-flow" nodes so the reserve set is
+ * visible without claiming to be live.
  */
 export function buildDerivedFlowGraph(
   flow: FlowDef,
@@ -249,40 +225,16 @@ function buildFlowGraph(
 // ---------------------------------------------------------------------------
 
 /**
- * Build the ORDERED graph for a proposed flow (spec 025, FR-001).
+ * Build the ORDERED graph for a proposed flow (spec 025, FR-001) from its
+ * loaded FlowDef: question nodes carry kind:"proposed" / region:"library", so the
+ * demoted battery keeps its derived sequence and branching visually rather than
+ * collapsing to a flat reserve list. No per-flow reserve nodes are appended.
  *
- * Resolves the thin YAML through loadModularFlow (same path as live flows) and
- * builds a FlowGraph whose question nodes carry kind:"proposed" / region:"library"
- * — so the demoted battery keeps its authored sequence and branching visually,
- * rather than collapsing to a flat reserve list. Unlike buildModularFlowGraph it
- * appends NO per-flow reserve nodes: a proposed graph shows only its own questions.
- *
- * FR-005 ("also live"): any question id present in `liveIds` (i.e. also listed in a
- * LIVE flow) is marked node.alsoLive = true so the Library graph can badge it. This
- * is a WARN signal, never a failure. `liveIds` must contain QUESTION ids that appear
- * in live survey YAML flows (e.g. flowQuestionIdsByStatus("live")) — NOT arbitrary
- * node ids such as manifest step ids, or the badging would be meaningless.
- *
- * Proposed-flow node ids are excluded from the rendered<->runtime bijection
- * (FR-006) — collectRenderedNodeIds never traverses these graphs.
- *
- * @param raw     the proposed thin-YAML source (Vite `?raw` import)
- * @param title   friendly section title for the Library graph
- * @param liveIds question ids that appear in any LIVE flow (for "also live" badging)
- */
-export function buildProposedFlowGraph(
-  raw: string,
-  title: string,
-  liveIds: ReadonlySet<string> = new Set(),
-): FlowGraph {
-  return buildProposedFlowGraphFromFlow(loadModularFlow(raw), title, liveIds);
-}
-
-/**
- * As buildProposedFlowGraph, but over an already-parsed FlowDef — lets a caller that
- * has already run loadModularFlow (e.g. buildLibrarySection, which also collects the
- * flow's ids) build the graph WITHOUT re-parsing the same YAML. See buildProposedFlowGraph
- * for the `liveIds` contract.
+ * FR-005 ("also live"): any question id present in `liveIds` (QUESTION ids that
+ * appear in live flows, e.g. flowQuestionIdsByStatus("live")) is marked
+ * node.alsoLive = true so the Library graph can badge it. A WARN signal, never a
+ * failure. Proposed-flow node ids are excluded from the rendered<->runtime
+ * bijection (FR-006).
  */
 export function buildProposedFlowGraphFromFlow(
   flow: FlowDef,
@@ -363,7 +315,7 @@ export function buildLeftoverNodes(
 // Boundary: this function imports manifest from ../steps/manifest.ts.
 // dashboard/ -> steps/ is allowed by the dashboard-layer depcruise rule.
 // dashboard/ -> survey/ is NOT imported here; survey data is accessed through
-// the existing buildModularFlowGraph function above (which is preserved from P3
+// the existing buildDerivedFlowGraph function above (which is preserved from P3
 // to continue rendering the flow-level question graph).
 // ---------------------------------------------------------------------------
 

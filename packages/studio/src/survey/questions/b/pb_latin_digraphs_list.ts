@@ -34,6 +34,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["latin-digraphs-list"],
   requires: ["latin-digraphs-wanted"],
 };
 export default mod;

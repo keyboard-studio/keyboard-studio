@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`buildModularFlowGraph — Phase B honesty (FR-010) > FR-010 Part C — Phase B edge/label snapshot > Phase B edges 1`] = `
+exports[`buildDerivedFlowGraph — Phase B honesty (FR-010) > FR-010 Part C — Phase B edge/label snapshot > Phase B edges 1`] = `
 [
   {
     "dangling": false,

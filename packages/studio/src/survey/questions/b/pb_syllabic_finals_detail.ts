@@ -41,6 +41,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["syllabic-finals-list"],
   requires: ["syllabic-finals-wanted"],
 };
 export default mod;

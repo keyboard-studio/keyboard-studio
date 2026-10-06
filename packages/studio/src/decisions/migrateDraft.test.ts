@@ -77,12 +77,10 @@ describe("migrateDraft", () => {
 
 describe("migrateDraft — Phase G flows (spec 085 T042)", () => {
   it("maps track and project-name answers through the real registries", async () => {
-    const { phaseTrackRegistry, phaseProjectRegistry } = await import(
-      "../survey/questions/registry.g.ts"
-    );
+    const { flowModules } = await import("../survey/questions/registry.ts");
     const result = migrateDraft(
       { track_choice: "copy", project_display_name: "My Kbd", project_keyboard_id: "my_kbd" },
-      [...Object.values(phaseTrackRegistry), ...Object.values(phaseProjectRegistry)],
+      [...flowModules.track, ...flowModules.project_name],
     );
     expect(result.orphans).toEqual([]);
     expect(result.decisions["authoring-track"]).toMatchObject({ value: "copy", provenance: "asked" });

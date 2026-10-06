@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { FlowQuestion, QuestionModule } from "../survey/types.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import { questionRegistry, flowModules } from "../survey/questions/registry.ts";
 import {
   orderDecisions,
   filterGated,
@@ -152,5 +152,61 @@ describe("gatedByFromNext", () => {
     expect(gate).toBeDefined();
     expect(gate!(withScript("Ethi"))).toBe(true);
     expect(gate!(withScript("Latn"))).toBe(false);
+  });
+});
+
+describe("gatedByFromNext - merge points (unconditional inbound edges count)", () => {
+  const withDecision = (id: DecisionId, value: unknown) => ({
+    [id]: { id, value, provenance: "asked" as const },
+  });
+
+  // gate --(value=='yes')--> opt --> join ; gate --(default)--> join
+  const gate = stubModule("gate", {
+    provides: ["target-script"],
+    next: [
+      { condition: "value == 'yes'", goto: "opt" },
+      { default: true, goto: "join" },
+    ],
+  });
+  const opt = stubModule("opt", { provides: ["language-name"], next: "join" });
+  const join = stubModule("join", { provides: ["language-code"] });
+  const modules = [gate, opt, join];
+
+  it("keeps a join reachable by both a conditional and an unconditional edge", () => {
+    const g = effectiveGatedBy(join, modules);
+    // Visible through opt (yes) and through the default edge (no): always.
+    expect(g === undefined || (g(withDecision("target-script", "yes")) && g(withDecision("target-script", "no")))).toBe(true);
+  });
+
+  it("drops a join only reachable through a hidden predecessor", () => {
+    const only = stubModule("opt2", { provides: ["language-name"], next: "tail" });
+    const tail = stubModule("tail", { provides: ["language-code"] });
+    const g2 = stubModule("g2", {
+      provides: ["target-script"],
+      next: [{ condition: "value == 'yes'", goto: "opt2" }],
+    });
+    const gate2 = effectiveGatedBy(tail, [g2, only, tail]);
+    expect(gate2).toBeDefined();
+    expect(gate2!(withDecision("target-script", "yes"))).toBe(true);
+    expect(gate2!(withDecision("target-script", "no"))).toBe(false);
+  });
+
+  it("runDecisionFlow-style filtering keeps the join for both answers", () => {
+    for (const v of ["yes", "no"]) {
+      expect(ids(filterGated(modules, withDecision("target-script", v)))).toContain("join");
+    }
+  });
+
+  it("real phase F: pf_credits survives both answers of pf_more_detail_gate", () => {
+    const f: readonly QuestionModule[] = flowModules.phase_f_helpdocs;
+    const credits = f.find((m) => m.definition.id === "pf_credits")!;
+    const detail = f.find((m) => m.definition.id === "pf_more_detail_gate")!;
+    expect(detail.provides?.length ?? 0).toBeGreaterThan(0);
+    const d = detail.provides![0]!;
+    const g = effectiveGatedBy(credits, f);
+    for (const v of ["true", "false"]) {
+      const ds = withDecision(d, v);
+      expect(g === undefined || g(ds), v).toBe(true);
+    }
   });
 });

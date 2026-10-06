@@ -21,7 +21,7 @@ import { surveyPageColumn, phaseHeading } from "./surveyStyles.ts";
 import type { FlowDef, QuestionModule, SurveyContext } from "./types.ts";
 
 export interface FlowStepHostProps {
-  /** Pre-loaded modular flow (factory calls loadModularFlow(source.raw)). */
+  /** Pre-loaded flow (factory calls loadFlowSourceDef(source)). */
   flow: FlowDef;
   /** Header text (from options.title / flowSource.title). */
   title: string;

@@ -5,7 +5,7 @@
 //   - cross-manifest-step transitions: steps/advance.ts's advance() +
 //     steps/reducer.ts's applyStepCompletion()/recordStepCompletion().
 //   - intra-step question routing: survey/SurveyRunner.tsx's exported pure
-//     evalCondition/resolveNext/advanceThrough, driving loadModularFlow()
+//     evalCondition/resolveNext/advanceThrough, driving loadFlowSourceDef()
 //     over the SAME steps/flowSources.ts registry the runtime/dashboard use
 //     (no second flow-routing source of truth).
 //

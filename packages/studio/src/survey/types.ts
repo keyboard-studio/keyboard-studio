@@ -1,5 +1,5 @@
-// TypeScript interfaces for the Phase YAML survey flow format.
-// These describe the static definition shape parsed from content/flows/*.yaml —
+// TypeScript interfaces for the survey flow shape.
+// These describe the static question-module definition shape (survey/questions/**) —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
 import type { DecisionProposalSource, IRPath, KeyboardIR } from "@keyboard-studio/contracts";
@@ -75,7 +75,7 @@ export interface FlowQuestion {
    * Only "email" exists today (a basic `local@domain.tld` check) — SurveyRunner's
    * canAdvance applies it when non-blank; blank still passes for an optional
    * field. Declarative rather than a validate() function so it survives
-   * loadModularFlow's definition-only FlowDef (validate() does not).
+   * a derived FlowDef's definition-only questions (validate() does not).
    */
   format?: "email";
   options?: FlowOption[];
@@ -88,7 +88,7 @@ export interface FlowQuestion {
   advisory?: boolean;
 }
 
-/** Top-level shape of a parsed phase_*.yaml file. */
+/** A flow as derived from its question modules (survey/loadDerivedFlow.ts). */
 export interface FlowDef {
   flow_id: string;
   phase: string;

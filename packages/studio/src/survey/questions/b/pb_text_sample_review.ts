@@ -54,6 +54,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["text-sample-review"],
   requires: ["text-sample"],
 };
 export default mod;

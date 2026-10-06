@@ -55,6 +55,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["indic-conjuncts-wanted"],
   specRef: "§8",
 };
 export default mod;

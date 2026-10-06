@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Flow-parity: both modular YAMLs parse without error
+// Flow-parity: both derived flows load without error
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: track + project_name derived flows load cleanly", () => {

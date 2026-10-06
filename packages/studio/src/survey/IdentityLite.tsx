@@ -1,5 +1,5 @@
 // Identity-lite survey step — the head of the hybrid flow (spec §8 "Workflow
-// ordering"). Loads content/flows/identity_lite.yaml, runs it through
+// ordering"). Derives the identity_lite flow from its question modules, runs it through
 // SurveyRunner, and on completion extracts the language autonym, English name,
 // and the INDEPENDENT target script, deriving the routing/A2 prefill
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.

@@ -47,5 +47,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["latin-qwerty-branch"] };
 export default mod;

@@ -23,19 +23,9 @@
 // to keep. It fails only when routing actually changes, so it is not churn.
 
 import { describe, it, expect } from "vitest";
-import { loadDerivedFlowDef } from "../../src/survey/loadModularFlow.ts";
-import { phaseARegistry } from "../../src/survey/questions/registry.a.ts";
+import { loadDerivedFlowDef } from "../../src/survey/loadDerivedFlow.ts";
+import { flowModules } from "../../src/survey/questions/registry.ts";
 import { flowSources, loadFlowSourceDef } from "../../src/steps/flowSources.ts";
-
-// ---------------------------------------------------------------------------
-// ?raw YAML imports (Vite handles these; typed via src/vite-env.d.ts)
-// ---------------------------------------------------------------------------
-
-// phase_f_helpdocs.modular.yaml was deleted (spec 085 US4) � Phase F derives its
-// order via flowSources (loadFlowSourceDef below). No raw import.
-// identity_lite.modular.yaml was deleted (spec 085 T040) — the order now
-// derives from the il_* modules' provides/requires declarations via
-// loadDerivedFlowDef below. No raw import.
 
 // ---------------------------------------------------------------------------
 // Phase A structural integrity
@@ -203,7 +193,7 @@ describe("flow-parity: identity_lite — routing shape", () => {
   const modular = loadDerivedFlowDef(
     "identity_lite",
     "A",
-    Object.values(phaseARegistry),
+    flowModules.identity_lite,
   );
 
   it("flow_id is identity_lite", () => {

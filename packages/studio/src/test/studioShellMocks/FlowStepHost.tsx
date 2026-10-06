@@ -1,7 +1,7 @@
 // Stub for survey/FlowStepHost.tsx — the seam the three converged flows
 // render through (makeFlowStepComponent imports FlowStepHost from this direct
 // path). Branches on flow.flow_id (the real flow, loaded by the factory via
-// loadModularFlow):
+// loadFlowSourceDef):
 //
 // It stands in for FlowStepHost AND the SurveyRunner inside it, so it publishes
 // the footer nav the way SurveyRunner does, under SurveyRunner's handles

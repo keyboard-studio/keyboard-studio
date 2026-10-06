@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { IRPath } from "@keyboard-studio/contracts";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
+import { flowModules } from "../survey/questions/registry.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { decisionIRPaths, type DecisionId } from "./decisionTypes.ts";
 import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
@@ -27,9 +27,8 @@ function coversPath(
 }
 
 function spikeModules(): QuestionModule[] {
-  // The thin identity_lite.modular.yaml was deleted (spec 085 T040) — the
-  // module set now comes straight from the Phase A registry.
-  return [...Object.values(phaseARegistry), pbCharacterInventory];
+  // The identity_lite module set comes straight from the flow membership table.
+  return [...flowModules.identity_lite, pbCharacterInventory];
 }
 
 describe("decisionIRPaths consistency", () => {

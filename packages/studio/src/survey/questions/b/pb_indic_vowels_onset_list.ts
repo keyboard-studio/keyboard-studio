@@ -36,6 +36,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["indic-onset-vowels-list"],
   requires: ["indic-onset-vowels-wanted"],
 };
 export default mod;

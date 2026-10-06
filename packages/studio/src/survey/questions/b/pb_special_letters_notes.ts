@@ -32,6 +32,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["special-letters-notes"],
   requires: ["special-letters"],
 };
 export default mod;

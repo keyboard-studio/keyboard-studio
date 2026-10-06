@@ -142,27 +142,30 @@ export function filterGated(
 // ---------------------------------------------------------------------------
 
 /**
- * Derive a module's inclusion gate from the conditional `next` rules that
- * route TO it — the single source for conditional routing.
+ * Derive a module's inclusion gate from the `next` graph — the single source
+ * for conditional routing.
  *
- * For every rule (in any module's `definition.next`) with `goto === target.id`,
- * the module is reached when that rule's effective condition holds: the
- * rule's own condition, if any, AND the negation of every preceding
- * condition in the same list (a default branch is taken exactly when all
- * earlier conditions failed — mirroring `SurveyRunner.resolveNext`'s
- * top-to-bottom evaluation). The target's gate is the OR over all such
- * effective conditions.
+ * A module is visible iff it has no inbound edge (a root), or at least one
+ * VISIBLE predecessor routes to it: either by a plain-string / default-only
+ * `next` (an unconditional edge — always taken once the predecessor is
+ * visible) or by a conditional rule whose effective condition holds. A rule's
+ * effective condition is its own condition, if any, AND the negation of every
+ * preceding condition in the same list (a default branch is taken exactly when
+ * all earlier conditions failed — mirroring `SurveyRunner.resolveNext`'s
+ * top-to-bottom evaluation). Visibility is therefore the OR over inbound
+ * edges, so a merge point (reachable both conditionally and unconditionally)
+ * is never wrongly dropped.
  *
  * `value` in a condition refers to the owning module's answer, i.e. one of the
- * decisions that module `provides` — so the derivation emits one clause per
- * provided decision, and the gate holds when the condition matches any of
- * them. `ctx.*` conditions have no DecisionSet equivalent and make derivation
- * impossible — as does a conditional owner with no provided decisions. In
- * both cases this returns `undefined` (fail open: the module stays ungated,
- * exactly as before).
+ * decisions that module `provides` — the edge holds when the condition matches
+ * any of them. `ctx.*` conditions have no DecisionSet equivalent, and a
+ * conditional owner with no provided decisions has no decision to read; such an
+ * edge fails open (treated as taken whenever its owner is visible), exactly as
+ * an unconditional edge is.
  *
- * Returns `undefined` when nothing routes to the target conditionally —
- * including plain-string `next` hops and terminal modules.
+ * Returns `undefined` when no edge on any path to the target is conditional
+ * (and no ancestor carries a hand-written gate) — i.e. the module is always
+ * visible.
  *
  * NOTE on the signature: a single FlowQuestion cannot see the inbound rules
  * that gate it, so the derivation necessarily takes the module set as well.
@@ -173,55 +176,80 @@ export function gatedByFromNext(
   target: FlowQuestion,
   modules: readonly QuestionModule[],
 ): ((decisions: DecisionSet) => boolean) | undefined {
-  interface Clause {
-    provides: DecisionId;
+  interface Edge {
+    from: QuestionModule;
     positive: string | null;
     negatives: string[];
   }
-  const clauses: Clause[] = [];
+  const inbound = new Map<string, Edge[]>();
+  const addEdge = (to: string, edge: Edge): void => {
+    const list = inbound.get(to);
+    if (list === undefined) inbound.set(to, [edge]);
+    else list.push(edge);
+  };
 
   for (const m of modules) {
     const next = m.definition.next;
-    if (!Array.isArray(next)) continue;
-    const seen: string[] = [];
-    for (const rule of next) {
-      if (rule.goto === target.id) {
-        // `value` in the condition is this module's answer — unmappable
-        // without provided decision ids. One clause per provided decision.
-        const provided = m.provides;
-        if (provided === undefined || provided.length === 0) return undefined;
-        for (const p of provided) {
-          clauses.push({
-            provides: p,
+    if (typeof next === "string") {
+      if (next !== m.definition.id) {
+        addEdge(next, { from: m, positive: null, negatives: [] });
+      }
+    } else if (Array.isArray(next)) {
+      const seen: string[] = [];
+      for (const rule of next) {
+        if (rule.goto !== null && rule.goto !== m.definition.id) {
+          addEdge(rule.goto, {
+            from: m,
             positive: rule.condition ?? null,
             negatives: [...seen],
           });
         }
+        if (rule.condition !== undefined) seen.push(rule.condition);
       }
-      if (rule.condition !== undefined) seen.push(rule.condition);
     }
   }
 
-  if (clauses.length === 0) return undefined;
-  if (clauses.every((c) => c.positive === null && c.negatives.length === 0)) {
-    return undefined;
-  }
+  const byId = new Map(modules.map((m) => [m.definition.id, m] as const));
+  const root = byId.get(target.id);
 
-  return (decisions: DecisionSet) => {
-    for (const c of clauses) {
-      const value = decisions[c.provides]?.value;
-      let ok: boolean;
-      if (c.positive !== null) {
-        const r = evalAgainstDecision(c.positive, value);
-        // Unmappable at runtime (validated at derivation, so defensive):
-        // fail open — never silently drop a question the author should answer.
+  // An edge is "plain" when it never needs a decision to be evaluated: no
+  // conditions at all, or conditions the DecisionSet cannot read (fail open).
+  const isPlain = (e: Edge): boolean => {
+    if (e.positive === null && e.negatives.length === 0) return true;
+    if (e.from.provides === undefined || e.from.provides.length === 0) return true;
+    const conds = [...(e.positive !== null ? [e.positive] : []), ...e.negatives];
+    return conds.some((c) => evalAgainstDecision(c, undefined) === undefined);
+  };
+
+  // Static pass: if nothing on any path to the target can hide it, no gate.
+  const visitedStatic = new Set<string>();
+  const canHide = (id: string): boolean => {
+    if (visitedStatic.has(id)) return false;
+    visitedStatic.add(id);
+    const m = byId.get(id);
+    if (m?.gatedBy !== undefined && id !== target.id) return true;
+    for (const e of inbound.get(id) ?? []) {
+      if (!isPlain(e) || canHide(e.from.definition.id)) return true;
+    }
+    return false;
+  };
+  if (root === undefined && !inbound.has(target.id)) return undefined;
+  if (!canHide(target.id)) return undefined;
+
+  const edgeHolds = (e: Edge, decisions: DecisionSet): boolean => {
+    if (isPlain(e)) return true;
+    for (const p of e.from.provides ?? []) {
+      const value = decisions[p]?.value;
+      let ok = true;
+      if (e.positive !== null) {
+        const r = evalAgainstDecision(e.positive, value);
+        // Unmappable at runtime (validated above, so defensive): fail open —
+        // never silently drop a question the author should answer.
         if (r === undefined) return true;
         ok = r;
-      } else {
-        ok = true;
       }
       if (ok) {
-        for (const n of c.negatives) {
+        for (const n of e.negatives) {
           const r = evalAgainstDecision(n, value);
           if (r === undefined) return true;
           if (r) {
@@ -233,6 +261,32 @@ export function gatedByFromNext(
       if (ok) return true;
     }
     return false;
+  };
+
+  return (decisions: DecisionSet) => {
+    const memo = new Map<string, boolean>();
+    const onStack = new Set<string>();
+    const visible = (m: QuestionModule, isTarget: boolean): boolean => {
+      const id = m.definition.id;
+      if (!isTarget && m.gatedBy !== undefined) return m.gatedBy(decisions);
+      const cached = memo.get(id);
+      if (cached !== undefined) return cached;
+      const edges = inbound.get(id);
+      if (edges === undefined || edges.length === 0) return true;
+      if (onStack.has(id)) return false;
+      onStack.add(id);
+      let result = false;
+      for (const e of edges) {
+        if (visible(e.from, false) && edgeHolds(e, decisions)) {
+          result = true;
+          break;
+        }
+      }
+      onStack.delete(id);
+      memo.set(id, result);
+      return result;
+    };
+    return root === undefined ? true : visible(root, true);
   };
 }
 

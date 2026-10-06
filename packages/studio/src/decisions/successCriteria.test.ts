@@ -6,14 +6,13 @@
 import { describe, it, expect } from "vitest";
 import { parseKmn } from "@keyboard-studio/engine";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
-import { questionRegistry } from "../survey/questions/registry.ts";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
+import { questionRegistry, flowModules } from "../survey/questions/registry.ts";
 import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
 import { buildExtractContext } from "./extractContext.ts";
 import { orderDecisions } from "./orderDecisions.ts";
 import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
-import { existsSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -175,7 +174,7 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
 
 describe("SC-002: fault injection surfaces named errors", () => {
   it("removing a provider for a required decision throws a named error", () => {
-    const modules = Object.values(phaseARegistry);
+    const modules = flowModules.identity_lite;
     // Remove il_language_english (provides language-name, required by others).
     const withoutEnglish = modules.filter(
       (m) => m.definition.id !== "il_language_english",
@@ -184,7 +183,7 @@ describe("SC-002: fault injection surfaces named errors", () => {
   });
 
   it("reordering modules never produces a silently wrong flow", () => {
-    const modules = Object.values(phaseARegistry);
+    const modules = flowModules.identity_lite;
     // Reverse the order — topological sort must still produce a valid order.
     const reversed = [...modules].reverse();
     const ordered = orderDecisions(reversed);
@@ -213,13 +212,13 @@ describe("SC-002: fault injection surfaces named errors", () => {
 // ---------------------------------------------------------------------------
 
 describe("SC-003: zero ordering artifacts + parity", () => {
-  it("identity_lite.modular.yaml is deleted (not kept as a projection)", () => {
+  it("no thin-YAML flow order list survives anywhere under content/flows", () => {
     const here = dirname(fileURLToPath(import.meta.url));
-    const yamlPath = resolve(
-      here,
-      "../../../../content/flows/identity_lite.modular.yaml",
+    const flowsDir = resolve(here, "../../../../content/flows");
+    const found = readdirSync(flowsDir, { recursive: true, encoding: "utf8" }).filter((f) =>
+      f.endsWith(".modular.yaml"),
     );
-    expect(existsSync(yamlPath)).toBe(false);
+    expect(found).toEqual([]);
   });
 
   it("derived order matches the legacy order (parity)", () => {

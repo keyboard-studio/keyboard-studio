@@ -55,5 +55,5 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["ip3-keep-script-conventions"] };
 export default mod;

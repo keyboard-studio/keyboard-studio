@@ -12,8 +12,7 @@
 //   (b) editor-action    {stepId, action_type, summary} — carve/mechanisms/touch
 //       gallery loops, recorded VERBATIM (FR-015 — no per-key decomposition).
 //
-// The parser fails loudly on a malformed fixture, mirroring loadModularFlow.ts's
-// parseThinYaml error-message style (descriptive `Error`, no silent coercion).
+// The parser fails loudly on a malformed fixture, with descriptive `Error`s and no silent coercion.
 
 import { parse } from "yaml";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -222,8 +221,7 @@ function parseBacktrackEvent(v: unknown, index: number): JourneyBacktrackEvent {
 
 /**
  * Parse a journey fixture YAML string into a validated JourneyFixture. Throws
- * descriptively on any structural violation (mirrors loadModularFlow.ts's
- * parseThinYaml error style) — a malformed fixture must fail loudly, not
+ * descriptively on any structural violation — a malformed fixture must fail loudly, not
  * silently coerce or drop fields.
  */
 export function parseJourneyFixture(raw: string): JourneyFixture {

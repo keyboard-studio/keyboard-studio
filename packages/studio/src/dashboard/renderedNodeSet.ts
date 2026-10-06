@@ -13,14 +13,14 @@
 // It re-uses the same builders the dashboard composes (do NOT re-derive):
 //   • buildManifestProjection()  — the spec-015 StepGraph -> FlowGraph adapter
 //                                   over buildManifestStepGraph() (the manifest spine).
-//   • buildModularFlowGraph()    — the per-phase modular drill-down graphs over
+//   • buildDerivedFlowGraph()    — the per-flow derived drill-down graphs over
 //                                   flowSources (from steps/flowSources.ts),
 //                                   keyed by questionRegistry.
 //
 // Boundary (.dependency-cruiser.cjs dashboard-layer rule): the rule forbids only
 // stores/ and editors/. This module imports ./manifestProjection.ts,
 // ./buildStepGraph.ts, ../steps/{flowSources,manifest}.ts, and — for the spec-025
-// Library section — ../survey/loadModularFlow.ts + ../survey/questions/registry.ts
+// Library section — ../survey/questions/registry.ts
 // (the same survey/ reach manifestProjection.ts already uses; dashboard/ -> survey/
 // is allowed). It imports NEITHER stores/ NOR editors/ — and deliberately NOT
 // resolveNext (SurveyRunner.tsx -> stores/debugPinsStore.ts): runtime-reach
@@ -34,8 +34,7 @@ import type { FlowGraph, GraphNode } from "./model.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { FlowDef } from "../survey/types.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
-import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
+import { questionRegistry, reserveModules, moduleRecord } from "../survey/questions/registry.ts";
 
 // Re-export CHARACTERS_STEP_ID so driftGuardrail and other callers don't need
 // a separate import from manifestProjection.
@@ -147,7 +146,7 @@ export function buildFlowSources(): BuiltFlowSource[] {
  * Composition (exactly what FlowMapView paints in the "flow" section):
  *   • the manifest spine projection nodes (buildManifestProjection(), the 015
  *     StepGraph -> FlowGraph adapter over buildManifestStepGraph()), UNION
- *   • the node ids of each per-phase drill-down FlowGraph (buildModularFlowGraph
+ *   • the node ids of each per-phase drill-down FlowGraph (buildDerivedFlowGraph
  *     over flowSources, attached under their respective manifest step nodes).
  *
  * Reserve / library nodes (kind:"library-not-in-flow" — registered-but-unreachable
@@ -318,13 +317,13 @@ export function buildLibrarySection(): LibrarySection {
 
 /**
  * buildLeftoverSection — every module physically relocated to the reserve
- * sub-registry (questions/reserve/, registry.reserve.ts).
+ * set (questions/reserve/, `reserveModules` in registry.ts).
  *
- * Sourced DIRECTLY from reserveRegistry — not derived by subtracting the live
+ * Sourced DIRECTLY from reserveModules — not derived by subtracting the live
  * flow ids from questionRegistry. The reserve folder/registry IS the Leftover
  * set: a module lives there if and only if it is demoted, so this always
  * matches physical reality and can never silently diverge from a live flow's
- * id list. Every reserveRegistry module renders as a kind:"library-not-in-flow"
+ * id list. Every reserve module renders as a kind:"library-not-in-flow"
  * / region:"leftover" node (via buildLeftoverNodes with an empty "in-flow" set,
  * so nothing is excluded).
  *
@@ -332,5 +331,5 @@ export function buildLibrarySection(): LibrarySection {
  * never traverses this composition (like the Library section).
  */
 export function buildLeftoverSection(): GraphNode[] {
-  return buildLeftoverNodes(reserveRegistry, new Set());
+  return buildLeftoverNodes(moduleRecord(reserveModules), new Set());
 }

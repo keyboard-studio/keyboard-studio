@@ -2,20 +2,20 @@
 //
 // "Demotion is NOT deletion." The orphaned full non-identity Phase A (plus
 // pb_mark_input_order, relocated by spec 071) is physically relocated to the
-// dedicated reserve/ folder and reserveRegistry (rendered as Leftover nodes via
+// dedicated reserve/ folder and `reserveModules` (registry.ts; rendered as Leftover nodes via
 // buildLeftoverSection — see phaseADemoteReserve.test.ts / driftGuardrail.test.ts).
 // The no-delete guardrail (migration-plan §4) requires every demoted module to
 // remain:
-//   • REGISTERED   — a key in its sub-registry (reserveRegistry) and in the merged
+//   • REGISTERED   — a member of `reserveModules` and in the merged
 //                    questionRegistry, with the key matching definition.id;
 //   • ON DISK      — its module file resolves at survey/questions/reserve/<id>.ts;
 //   • TEST-COVERED — run by the parametric reserve suite
 //                    (tests/survey/questions/reserve/reserveModules.test.ts, which
-//                    iterates reserveRegistry through the shared question-module
+//                    iterates the reserve modules through the shared question-module
 //                    contract suite) AND declaring at least one valid fixture, so
 //                    that run is not vacuous. (Amendment 2026-09-23: this replaced
 //                    one mirror file per module — see spec 022's amendment note.)
-//   • REVIVABLE    — by re-adding its id to a flow YAML / flow-source (no code
+//   • REVIVABLE    — by listing the module in a flow's `flowModules` entry (no code
 //                    change, no re-registration, no file restore — asserted
 //                    structurally: the registry entry + file + test all persist).
 //
@@ -39,23 +39,25 @@ import path from "node:path";
 
 import type { QuestionModule } from "../types.ts";
 import { RESERVE_QUESTION_MODULES } from "../../test/questionModuleContract.ts";
-import { questionRegistry } from "./registry.ts";
-import { reserveRegistry } from "./registry.reserve.ts";
+import { questionRegistry, reserveModules, moduleRecord } from "./registry.ts";
 import {
   DEMOTED_PHASE_A,
   DEMOTED_PHASE_A_IDENTITY,
   DEMOTED_PHASE_A_PROVENANCE,
 } from "./demotedPhaseA.fixture.ts";
 
+/** id-keyed view of the reserve set (the questions/reserve/ folder). */
+const reserveRegistry = moduleRecord(reserveModules);
+
 // The demoted set: the full non-identity Phase A (15 identity + 15 provenance_*),
-// derived ONCE from content/flows/phase_a_identity.modular.yaml (demotedPhaseA.fixture.ts)
+// derived ONCE from the phase_a_identity flow (demotedPhaseA.fixture.ts)
 // so this guardrail and the reserve-node assertion share a single source of truth.
 // They are demoted to the inert reserve; they MUST remain registered + on
 // disk + test-covered. NOTE: the il_* identity-lite head is the CANONICAL identity
 // experience and stays LIVE — it is NOT in the demoted set.
 
 // pb_mark_input_order (spec 071) is relocated to reserve/ too, but is NOT part of
-// DEMOTED_PHASE_A (it is not derived from phase_a_identity.modular.yaml) — cover it
+// DEMOTED_PHASE_A (it is not a member of the phase_a_identity flow) — cover it
 // separately so the reserve folder's full 31-module coverage is genuinely detected.
 const PB_MARK_INPUT_ORDER = "pb_mark_input_order";
 

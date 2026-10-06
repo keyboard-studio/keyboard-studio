@@ -7,11 +7,7 @@
 // test that compared derived vs YAML before the cutover.)
 
 import { describe, it, expect } from "vitest";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../survey/questions/registry.b.ts";
-import { phaseFFlowModules } from "../survey/questions/registry.f.ts";
-import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
-import { phaseAReserveRegistry } from "../survey/questions/registry.reserve.ts";
+import { flowModules, moduleRecord } from "../survey/questions/registry.ts";
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { orderDecisions } from "./orderDecisions.ts";
@@ -31,7 +27,7 @@ const LEGACY_IDENTITY_LITE_ORDER: readonly string[] = [
 
 describe("orderDecisions — identity_lite derived order (post-YAML)", () => {
   it("derived order equals the frozen legacy order", () => {
-    const derived = orderDecisions(Object.values(phaseARegistry)).map(
+    const derived = orderDecisions(flowModules.identity_lite).map(
       (m) => m.definition.id,
     );
     expect(derived).toEqual([...LEGACY_IDENTITY_LITE_ORDER]);
@@ -50,12 +46,12 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
   order: readonly string[];
 }> = [
   // Frozen from the deleted content/flows/track.modular.yaml.
-  { flowId: "track", phase: "G", registry: phaseTrackRegistry, order: ["track_choice"] },
+  { flowId: "track", phase: "G", registry: moduleRecord(flowModules.track), order: ["track_choice"] },
   // Frozen from the deleted content/flows/project_name.modular.yaml.
   {
     flowId: "project_name",
     phase: "G",
-    registry: phaseProjectRegistry,
+    registry: moduleRecord(flowModules.project_name),
     order: ["project_display_name", "project_keyboard_id"],
   },
   // Frozen from the deleted content/flows/phase_f_helpdocs.modular.yaml. The
@@ -64,7 +60,7 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
   {
     flowId: "phase_f_helpdocs",
     phase: "F",
-    registry: Object.fromEntries(phaseFFlowModules.map((m) => [m.definition.id, m])),
+    registry: moduleRecord(flowModules.phase_f_helpdocs),
     order: [
       "pf_welcome_paragraph",
       "pf_usage_tip_1",
@@ -93,7 +89,7 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
   {
     flowId: "phase_b_characters",
     phase: "B",
-    registry: phaseBRegistry,
+    registry: moduleRecord(flowModules.phase_b_characters),
     order: [
       "pb_existing_keyboards",
       "pb_co_installed_keyboards",
@@ -153,9 +149,8 @@ describe("orderDecisions — derived flows equal their frozen legacy YAML order"
       expect(derived).toEqual([...order]);
     });
 
-    it(`${flowId}: flowSources entry derives (no raw) with the legacy phase`, () => {
+    it(`${flowId}: flowSources entry derives with the legacy phase`, () => {
       const source = flowSources[flowId]!;
-      expect(source.raw).toBeUndefined();
       const flow = loadFlowSourceDef(source);
       expect(flow.flow_id).toBe(flowId);
       expect(flow.phase).toBe(phase);
@@ -211,7 +206,7 @@ const LEGACY_PHASE_A_PROVENANCE_ORDER: readonly string[] = [
 
 describe("orderDecisions - phase_a_identity (proposed) equals its frozen legacy YAML order", () => {
   it("derived order over all 30 modules is the legacy questions list then provenance list", () => {
-    const derived = orderDecisions(Object.values(phaseAReserveRegistry)).map(
+    const derived = orderDecisions(flowModules.phase_a_identity).map(
       (m) => m.definition.id,
     );
     expect(derived).toEqual([
@@ -220,9 +215,8 @@ describe("orderDecisions - phase_a_identity (proposed) equals its frozen legacy 
     ]);
   });
 
-  it("flowSources entry derives (no raw), keeps status proposed and the provenance_questions split", () => {
+  it("flowSources entry derives, keeps status proposed and the provenance_questions split", () => {
     const source = flowSources["phase_a_identity"]!;
-    expect(source.raw).toBeUndefined();
     expect(source.status).toBe("proposed");
     const flow = loadFlowSourceDef(source);
     expect(flow.flow_id).toBe("phase_a_identity");
