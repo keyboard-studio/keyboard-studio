@@ -242,4 +242,30 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
     renderHook(() => useContextToleranceApply(false));
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).not.toBeNull();
   });
+
+  it("drops an applied overlay once the analysis fingerprint no longer matches (key edits)", () => {
+    const store = useWorkingCopyStore.getState();
+    store.reset();
+    store.recordPhase({
+      phase: "C",
+      answers: [],
+      marksContextTolerance: { decision: "accept", acceptedSiteIds: ["k1"], proposedSiteIds: ["k1"], fingerprint: "f1" },
+    });
+    store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
+    store.setContextTolerance({
+      status: "ready",
+      runId: 2,
+      report: { findings: [], notAnalysedCount: 0 },
+      findings: [],
+      classification: {},
+      proposal: { ir: parseKmn(KMN, "x").ir, variants: [], disclosures: {} },
+      analysedIr: parseKmn(KMN, "x").ir,
+      fixableRuleIds: ["r1"],
+      siteKeys: { r1: "k1" },
+      fingerprint: "f2-after-edit",
+    });
+    const { result } = renderHook(() => useContextToleranceApply(true));
+    expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBeNull();
+    expect(result.current?.staleRuleIds).toEqual(["k1"]);
+  });
 });

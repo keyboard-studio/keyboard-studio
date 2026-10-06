@@ -74,6 +74,16 @@ export function useContextToleranceApply(enabled: boolean): ContextToleranceAppl
       return;
     }
 
+    // The applied overlay was built for the rules the analysis then saw. Once the
+    // analysis of the keyboard as it now stands disagrees (key edits changed the
+    // fingerprint, or the step's cache key), the baked rules are stale: drop
+    // them instead of replaying them into the preview and the download.
+    if (applied !== null && analysis.status === "ready" && analysis.fingerprint !== applied.fingerprint) {
+      commitOverlay(null);
+      setNotes({ staleRuleIds: [...applied.acceptedSiteIds] });
+      return;
+    }
+
     const want = decisionKey(decision);
     if (applied !== null && decisionKey(applied) === want) return; // already applied (FR-008)
     if (analysis.status !== "ready" || inFlight.current === want) return;

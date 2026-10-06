@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { emit } from "../../codec/emit.js";
+import { parse } from "../../codec/parse.js";
 import { NORMALIZATION_GROUP, NORMALIZATION_STORE_PREFIX } from "./constants.js";
 import { ALTERNATES_KMN, parseFixture } from "../__fixtures__/normalization.js";
 import { applyNormalizationStep, removeNormalizationStep } from "./insert.js";
@@ -91,5 +92,76 @@ describe("applyNormalizationStep / removeNormalizationStep", () => {
     );
     const ir = parseFixture(kmn);
     expect(removeNormalizationStep(ir)).toBe(ir);
+  });
+
+  it("keeps an implicit entryPoints.main implicit and restores header deep-equal", async () => {
+    const parsed = parseFixture(ALTERNATES_KMN);
+    const { entryPoints: _e, ...headerNoEntry } = parsed.header;
+    const ir = { ...parsed, header: headerNoEntry };
+    const step = await stepOf(parsed);
+    const back = removeNormalizationStep(applyNormalizationStep(ir, step));
+    expect(back.header).toEqual(ir.header);
+    expect("entryPoints" in back.header).toBe(false);
+    // An explicit main (what the parser always records) stays explicit.
+    const explicit = removeNormalizationStep(applyNormalizationStep(parsed, step));
+    expect(explicit.header).toEqual(parsed.header);
+    expect(back.groups).toEqual(ir.groups);
+    expect(back.stores).toEqual(ir.stores);
+    expect(back.comments).toEqual(ir.comments);
+  });
+
+  it("with no nomatch rule, main never points at the deleted group", async () => {
+    const ir = parseFixture(ALTERNATES_KMN);
+    const step = await stepOf(ir);
+    const out = applyNormalizationStep(ir, step);
+    const stripped = {
+      ...out,
+      groups: out.groups.map((g) =>
+        g.name === NORMALIZATION_GROUP
+          ? { ...g, rules: g.rules.filter((r) => r.matchKind === undefined) }
+          : g,
+      ),
+    };
+    const back = removeNormalizationStep(stripped, "main");
+    expect(back.header.entryPoints?.main).not.toBe(NORMALIZATION_GROUP);
+    expect(back.groups.some((g) => g.name === NORMALIZATION_GROUP)).toBe(false);
+    expect(emit(back)).toContain("begin Unicode > use(main)");
+    // Without a recorded entry either, it falls back to the implicit entry.
+    expect(removeNormalizationStep(stripped).header.entryPoints?.main).toBeUndefined();
+    // An explicit recorded entry that differs from the implicit one is kept.
+    const two = { ...ir, groups: [{ ...ir.groups[0]!, nodeId: "aux", name: "aux" }, ...ir.groups] };
+    const outTwo = applyNormalizationStep(two, { ...step, originalEntry: "main" });
+    const strippedTwo = {
+      ...outTwo,
+      groups: outTwo.groups.map((g) => (g.name === NORMALIZATION_GROUP ? { ...g, rules: [] } : g)),
+    };
+    expect(removeNormalizationStep(strippedTwo, "main").header.entryPoints?.main).toBe("main");
+  });
+
+  it("removes only the stores the step generated, not any generated_cn_ store", async () => {
+    const ir = parseFixture(ALTERNATES_KMN);
+    const step = await stepOf(ir);
+    const user = { nodeId: "u1", name: `${NORMALIZATION_STORE_PREFIX}mine`, items: [], isSystem: false };
+    const withUser = { ...ir, stores: [...ir.stores, user] };
+    const back = removeNormalizationStep(applyNormalizationStep(withUser, step));
+    expect(back.stores).toEqual(withUser.stores);
+  });
+
+  it("emits a generated/do-not-edit header and per-rule comments that round-trip", async () => {
+    const ir = parseFixture(ALTERNATES_KMN);
+    const step = await stepOf(ir);
+    const text = emit(applyNormalizationStep(ir, step));
+    expect(text).toMatch(/^c GENERATED group generated_context_normalize: do not edit\.$/m);
+    expect(text).toContain("Regenerate it with Keyboard Studio");
+    const lines = text.split("\n");
+    const groupAt = lines.findIndex((l) => l.startsWith(`group(${NORMALIZATION_GROUP})`));
+    const headerAt = lines.findIndex((l) => l.includes("GENERATED group"));
+    expect(headerAt).toBeGreaterThan(groupAt);
+    expect(lines.filter((l) => /^c (literal|store-indexed|hand the)/.test(l)).length).toBeGreaterThanOrEqual(step.rules.length - 2);
+
+    const reparsed = parse(text, "fixture").ir;
+    expect(reparsed.groups.map((g) => g.name)).toContain(NORMALIZATION_GROUP);
+    expect(emit(reparsed)).toBe(text);
+    expect(emit(removeNormalizationStep(reparsed))).toBe(emit(ir));
   });
 });

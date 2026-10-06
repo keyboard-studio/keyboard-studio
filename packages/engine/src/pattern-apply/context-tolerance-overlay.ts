@@ -209,8 +209,18 @@ export function applyContextToleranceOverlay(
   }
   let result: KeyboardIR = { ...ir, groups, comments };
   for (const batch of overlay.batches) {
+    if (!isNormalizationStepBatch(batch)) continue;
+    // The step hands on to the entry group it displaced. If that group is gone
+    // (the keyboard changed since the step was built) the replay would point
+    // `main` at a group that does not exist, so leave the keyboard unchanged.
+    if (!result.groups.some((g) => g.name === batch.originalEntry && g.name !== NORMALIZATION_GROUP)) {
+      warnings.push(
+        `context normalization step skipped: the entry group "${batch.originalEntry}" it was built for no longer exists`,
+      );
+      continue;
+    }
     // Replaces a step already present rather than stacking a second one.
-    if (isNormalizationStepBatch(batch)) result = applyNormalizationStep(result, stepOf(batch));
+    result = applyNormalizationStep(result, stepOf(batch));
   }
   return { ir: result, warnings };
 }
@@ -223,7 +233,8 @@ export function applyContextToleranceOverlay(
  */
 export function removeContextToleranceOverlay(source: KeyboardIR, overlay: ContextToleranceOverlay): KeyboardIR {
   if (overlay.batches.length === 0) return source;
-  const ir = overlay.batches.some(isNormalizationStepBatch) ? removeNormalizationStep(source) : source;
+  const stepBatch = overlay.batches.find(isNormalizationStepBatch);
+  const ir = stepBatch !== undefined ? removeNormalizationStep(source, stepBatch.originalEntry) : source;
   const textsByGroup = new Map<string, Set<string>>();
   const commentTexts = new Set<string>();
   for (const batch of overlay.batches) {
