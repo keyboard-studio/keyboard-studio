@@ -7,11 +7,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { loadLangtags } from "../lib/langtagsDefaults.ts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
-import { questionRegistry, flowModules } from "../survey/questions/registry.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
 import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
 import { buildExtractContext } from "./extractContext.ts";
-import { orderDecisions } from "./orderDecisions.ts";
 import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -181,44 +180,8 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// SC-002: Fault injection — 100% of violations surface as named errors
-// ---------------------------------------------------------------------------
-
-describe("SC-002: fault injection surfaces named errors", () => {
-  it("removing a provider for a required decision throws a named error", () => {
-    const modules = flowModules.identity_lite;
-    // Remove il_language_english (provides language-name, required by others).
-    const withoutEnglish = modules.filter(
-      (m) => m.definition.id !== "il_language_english",
-    );
-    expect(() => orderDecisions(withoutEnglish)).toThrow(/unresolved decision/);
-  });
-
-  it("reordering modules never produces a silently wrong flow", () => {
-    const modules = flowModules.identity_lite;
-    // Reverse the order — topological sort must still produce a valid order.
-    const reversed = [...modules].reverse();
-    const ordered = orderDecisions(reversed);
-    // The result must be a valid topological order (same as forward).
-    const reverseOrdered = ordered.map((m) => m.definition.id);
-    // Both are valid topological orders; they may differ in tie-breaks but
-    // must both respect the dependency constraints.
-    expect(ordered.length).toBe(modules.length);
-    // Verify dependencies are respected: each module comes after its requires.
-    const position = new Map(reverseOrdered.map((id, i) => [id, i]));
-    for (const m of ordered) {
-      for (const req of m.requires ?? []) {
-        const provider = modules.find((p) => p.provides?.includes(req));
-        if (provider) {
-          expect(position.get(m.definition.id)!).toBeGreaterThan(
-            position.get(provider.definition.id)!,
-          );
-        }
-      }
-    }
-  });
-});
+// SC-002 (registry-wide fault injection) lives in successCriteria.sc002.test.ts;
+// SC-004 (real submission gates) in successCriteria.sc004.test.ts + .kmp.test.ts.
 
 // ---------------------------------------------------------------------------
 // SC-003: Zero artifacts + parity
@@ -252,26 +215,3 @@ describe("SC-003: zero ordering artifacts + parity", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// SC-004: Corpus sample compiles through the unified flow
-// ---------------------------------------------------------------------------
-
-describe("SC-004: corpus sample compiles through the unified flow", () => {
-  it("5 keyboards run the full decision flow without errors", () => {
-    for (const kb of KEYBOARDS) {
-      const { ir, catalog } = loadKeyboard(kb);
-      // The unified flow: extract + order + gate.
-      const decisions = runDecisionFlow({
-        modules: IDENTITY_MODULES,
-        context: buildExtractContext(ir, catalog),
-        answers: { il_author_name: "Test Author" },
-      });
-      // Flow completes; decisions are recorded with provenance.
-      expect(Object.keys(decisions).length).toBeGreaterThan(0);
-      // An answer fills a decision no extractor covers (author-name). A
-      // decision that IS extracted (language-name) keeps its extracted value.
-      expect(decisions["author-name"]?.provenance).toBe("asked");
-      expect(decisions["language-name"]?.provenance).toBe("extracted");
-    }
-  });
-});
