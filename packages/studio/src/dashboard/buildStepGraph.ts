@@ -25,6 +25,7 @@ import { computeDataEdges } from "./model.ts";
 import type { FlowGraph, GraphEdge, GraphNode, NodeKind, NodeRegion, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
 import { ruleTarget } from "./flowUtils.ts";
 import { manifest } from "../steps/manifest.ts";
+import { deriveStepStructure } from "../steps/stepOrder.ts";
 import { formatIRPath } from "@keyboard-studio/contracts";
 
 /**
@@ -309,8 +310,8 @@ export function buildLeftoverNodes(
 //
 // Produces exactly one StepGraphNode per entry in steps/manifest.ts.
 // The node set == the runtime step set by construction: both read the same
-// `manifest` array.  Editing manifest.ts updates the dashboard automatically —
-// no second ordering source exists.
+// `manifest` array, whose order and side-trail structure are DERIVED from the
+// steps' provides/requires/gatedBy — no second ordering source exists.
 //
 // Boundary: this function imports manifest from ../steps/manifest.ts.
 // dashboard/ -> steps/ is allowed by the dashboard-layer depcruise rule.
@@ -329,9 +330,11 @@ export function buildLeftoverNodes(
  * Edges produced:
  *   "spine" — linear progression between consecutive spine steps.
  *   "fork"  — from the preceding spine step to an off-spine step.
- *   "join"  — from an off-spine step back to its joinTarget.
+ *   "join"  — from an off-spine step back to its derived join target (the
+ *             next ungated step).
  */
 export function buildManifestStepGraph(): StepGraph {
+  const trails = deriveStepStructure(manifest);
   const nodes: StepGraphNode[] = manifest.map((step, idx) => {
     const writePaths = step.writes.map(formatIRPath);
     const inputPaths = step.inputs.map(formatIRPath);
@@ -339,7 +342,7 @@ export function buildManifestStepGraph(): StepGraph {
       id: step.id,
       label: step.title,
       type: step.kind,
-      spine: step.spine === true,
+      spine: trails.get(step.id)?.spine === true,
       isEntry: idx === 0,
       isTerminal: idx === manifest.length - 1,
       writePaths,
@@ -347,32 +350,37 @@ export function buildManifestStepGraph(): StepGraph {
     };
     // exactOptionalPropertyTypes: only assign optional fields when they have a value.
     if (step.lock !== undefined) node.lock = step.lock;
-    if (step.joinTarget !== undefined) node.joinTarget = step.joinTarget;
+    const joinTarget = trails.get(step.id)?.joinTarget;
+    if (joinTarget !== undefined) node.joinTarget = joinTarget;
     return node;
   });
 
   const edges: StepGraphEdge[] = [];
 
+  const isSpine = (id: string): boolean => trails.get(id)?.spine === true;
   // Build a position map for O(1) joinTarget lookups.
   const idToIndex = new Map<string, number>(manifest.map((s, i) => [s.id, i]));
 
   for (let i = 0; i < manifest.length; i++) {
     const step = manifest[i]!;
 
-    if (step.spine === true) {
+    if (isSpine(step.id)) {
       // Spine edge: connect to the next spine step (skipping off-spine steps).
-      const nextSpineIdx = manifest.findIndex((s, idx) => idx > i && s.spine === true);
+      const nextSpineIdx = manifest.findIndex((s, idx) => idx > i && isSpine(s.id));
       if (nextSpineIdx !== -1) {
         edges.push({ from: step.id, to: manifest[nextSpineIdx]!.id, kind: "spine" });
       }
 
       // Fork edges: from this spine step to any off-spine step that immediately follows.
-      for (let k = i + 1; k < manifest.length && manifest[k]!.spine !== true; k++) {
+      for (let k = i + 1; k < manifest.length && !isSpine(manifest[k]!.id); k++) {
         edges.push({ from: step.id, to: manifest[k]!.id, kind: "fork" });
       }
-    } else if (step.joinTarget !== undefined && idToIndex.has(step.joinTarget)) {
-      // Off-spine join edge: from this step back to its joinTarget.
-      edges.push({ from: step.id, to: step.joinTarget, kind: "join" });
+    } else {
+      const joinTarget = trails.get(step.id)?.joinTarget;
+      if (joinTarget !== undefined && idToIndex.has(joinTarget)) {
+        // Off-spine join edge: from this step back to its derived join target.
+        edges.push({ from: step.id, to: joinTarget, kind: "join" });
+      }
     }
   }
 

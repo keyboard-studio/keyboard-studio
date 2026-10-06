@@ -558,7 +558,6 @@ function makeEditorStepFixture(
     kind: "editor-step",
     id,
     title: id,
-    spine: true,
     component: (() => null) as EditorStep["component"],
     inputs,
     writes,

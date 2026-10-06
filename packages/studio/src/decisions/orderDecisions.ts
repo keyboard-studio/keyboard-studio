@@ -2,16 +2,59 @@
 //
 // Derives the question walk order from modules' `provides`/`requires`
 // declarations (topological sort) instead of hand-maintained YAML lists and
-// spine flags. Pure: no React, no stores, no I/O.
+// spine flags. The same sort orders wizard steps (steps/stepOrder.ts). Pure:
+// no React, no stores, no I/O.
 
 import type { QuestionModule } from "../survey/types.ts";
 import type { FlowQuestion } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 
 /**
- * Index the providing module for each decision. Two modules providing the
- * same decision is a fail-fast error — first-wins-silent would drop one
- * provider without a trace at 50+ ids (km/decisions-spike fix 4).
+ * The ordering-relevant view of anything that declares decisions: a question
+ * module, or a wizard step. The one sort below is written against this shape,
+ * so questions and steps share a single implementation (spec 085 Q3: the
+ * registry is the single source of order for both).
+ */
+export interface DependencyNode {
+  readonly id: string;
+  readonly provides?: readonly DecisionId[] | undefined;
+  readonly requires?: readonly DecisionId[] | undefined;
+}
+
+const moduleNode = (m: QuestionModule): DependencyNode => ({
+  id: m.definition.id,
+  provides: m.provides,
+  requires: m.requires,
+});
+
+/**
+ * Index the provider of each decision. Two providers of the same decision is a
+ * fail-fast error — first-wins-silent would drop one provider without a trace
+ * at 50+ ids (km/decisions-spike fix 4). The duplicate rule lives here only.
+ */
+function indexProvidersBy<T>(
+  items: readonly T[],
+  node: (item: T) => DependencyNode,
+): Map<DecisionId, T> {
+  const providers = new Map<DecisionId, T>();
+  for (const item of items) {
+    const n = node(item);
+    for (const p of n.provides ?? []) {
+      const existing = providers.get(p);
+      if (existing !== undefined) {
+        throw new Error(
+          `duplicate provider for decision "${p}": ` +
+            `${node(existing).id}, ${n.id}`,
+        );
+      }
+      providers.set(p, item);
+    }
+  }
+  return providers;
+}
+
+/**
+ * Index the providing module for each decision (fail-fast on duplicates).
  *
  * Exported: registries build their decision-id indexes through this, so the
  * duplicate rule lives in exactly one place (spec 085 T012).
@@ -19,32 +62,20 @@ import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 export function indexProviders(
   modules: readonly QuestionModule[],
 ): Readonly<Map<DecisionId, QuestionModule>> {
-  const providers = new Map<DecisionId, QuestionModule>();
-  for (const m of modules) {
-    for (const p of m.provides ?? []) {
-      const existing = providers.get(p);
-      if (existing !== undefined) {
-        throw new Error(
-          `duplicate provider for decision "${p}": ` +
-            `${existing.definition.id}, ${m.definition.id}`,
-        );
-      }
-      providers.set(p, m);
-    }
-  }
-  return providers;
+  return indexProvidersBy(modules, moduleNode);
 }
 
 /**
- * Find one dependency cycle among `modules` (for the error message).
- * Follows requires → provider edges depth-first; returns the cycle as module
- * ids, e.g. ["a", "b", "a"].
+ * Find one dependency cycle among `items` (for the error message).
+ * Follows requires → provider edges depth-first; returns the cycle as ids,
+ * e.g. ["a", "b", "a"].
  */
-function findCycle(
-  modules: readonly QuestionModule[],
-  providers: Readonly<Map<DecisionId, QuestionModule>>,
+function findCycle<T>(
+  items: readonly T[],
+  node: (item: T) => DependencyNode,
+  providers: Readonly<Map<DecisionId, T>>,
 ): string[] {
-  const byId = new Map(modules.map((m) => [m.definition.id, m] as const));
+  const byId = new Map(items.map((m) => [node(m).id, m] as const));
   const visited = new Set<string>();
   const stack: string[] = [];
 
@@ -54,10 +85,10 @@ function findCycle(
     visited.add(id);
     stack.push(id);
     const m = byId.get(id);
-    for (const req of m?.requires ?? []) {
+    for (const req of (m === undefined ? undefined : node(m).requires) ?? []) {
       const provider = providers.get(req);
-      if (provider && byId.has(provider.definition.id)) {
-        const cycle = visit(provider.definition.id);
+      if (provider && byId.has(node(provider).id)) {
+        const cycle = visit(node(provider).id);
         if (cycle) return cycle;
       }
     }
@@ -65,61 +96,76 @@ function findCycle(
     return null;
   }
 
-  for (const m of modules) {
-    const cycle = visit(m.definition.id);
+  for (const m of items) {
+    const cycle = visit(node(m).id);
     if (cycle) return cycle;
   }
-  return modules.map((m) => m.definition.id);
+  return items.map((m) => node(m).id);
 }
 
 /**
- * Topologically sort `modules` by `requires`/`provides`.
+ * Topologically sort `items` by `requires`/`provides` — THE ordering
+ * implementation; `orderDecisions` (questions) and `orderSteps` (wizard steps,
+ * steps/stepOrder.ts) are thin adapters over it.
  *
- * Stable: among modules whose requirements are all satisfied, input order
- * wins — so a fully-annotated legacy playlist reproduces its YAML order
- * exactly (see orderParity.test.ts).
+ * Stable: among items whose requirements are all satisfied, input order wins —
+ * the input order is the documented tie-break wherever the provides/requires
+ * graph is silent (pure walk order).
  *
- * Throws `unresolved decision: "<id>" required by "<module>"` when a
- * requirement has no provider, and `dependency cycle: <a> -> <b> -> <a>`
- * naming one cycle.
+ * Throws `unresolved decision: "<id>" required by "<item>"` when a requirement
+ * has no provider, and `dependency cycle: <a> -> <b> -> <a>` naming one cycle.
  */
-export function orderDecisions(
-  modules: readonly QuestionModule[],
-): QuestionModule[] {
-  const providers = indexProviders(modules);
+export function orderByDependencies<T>(
+  items: readonly T[],
+  node: (item: T) => DependencyNode,
+): T[] {
+  const providers = indexProvidersBy(items, node);
 
-  for (const m of modules) {
-    for (const req of m.requires ?? []) {
+  for (const item of items) {
+    const n = node(item);
+    for (const req of n.requires ?? []) {
       if (!providers.has(req)) {
-        throw new Error(
-          `unresolved decision: "${req}" required by "${m.definition.id}"`,
-        );
+        throw new Error(`unresolved decision: "${req}" required by "${n.id}"`);
       }
     }
   }
 
   // Kahn's algorithm, input-order stable.
   const provided = new Set<DecisionId>();
-  const emitted = new Set<QuestionModule>();
-  const ordered: QuestionModule[] = [];
+  const emitted = new Set<T>();
+  const ordered: T[] = [];
   let progress = true;
-  while (ordered.length < modules.length && progress) {
+  while (ordered.length < items.length && progress) {
     progress = false;
-    for (const m of modules) {
-      if (emitted.has(m)) continue;
-      const ready = (m.requires ?? []).every((r) => provided.has(r));
+    for (const item of items) {
+      if (emitted.has(item)) continue;
+      const n = node(item);
+      const ready = (n.requires ?? []).every((r) => provided.has(r));
       if (!ready) continue;
-      emitted.add(m);
-      ordered.push(m);
-      for (const p of m.provides ?? []) provided.add(p);
+      emitted.add(item);
+      ordered.push(item);
+      for (const p of n.provides ?? []) provided.add(p);
       progress = true;
     }
   }
 
-  if (ordered.length < modules.length) {
-    throw new Error(`dependency cycle: ${findCycle(modules, providers).join(" -> ")}`);
+  if (ordered.length < items.length) {
+    throw new Error(
+      `dependency cycle: ${findCycle(items, node, providers).join(" -> ")}`,
+    );
   }
   return ordered;
+}
+
+/**
+ * Topologically sort question `modules` by `requires`/`provides`. Stable: a
+ * fully-annotated legacy playlist reproduces its YAML order exactly (see
+ * orderParity.test.ts).
+ */
+export function orderDecisions(
+  modules: readonly QuestionModule[],
+): QuestionModule[] {
+  return orderByDependencies(modules, moduleNode);
 }
 
 /**

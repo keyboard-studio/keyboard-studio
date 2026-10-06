@@ -135,7 +135,23 @@ export type DecisionId =
   | "tp2-fallback-tier-prefill"
   | "tp3-orthography-join"
   | "typing-approach"
-  | "use-case";
+  | "use-case"
+  // Wizard-step decisions (spec 085 US4): what an editor step settles that no
+  // question module asks for. Provided/required by steps (steps/stepDependencies.ts)
+  // and ordered by the same orderByDependencies as the questions.
+  | "windows-layout"
+  | "base-keyboard"
+  | "marks-treatment"
+  | "punctuation-inventory"
+  | "invisibles-inventory"
+  | "retained-convenience-chars"
+  | "carved-layout"
+  | "deadkeys-defined"
+  | "rule-set"
+  | "physical-layout"
+  | "touch-seed-source"
+  | "touch-layout"
+  | "help-docs";
 
 /** Where a decision's value came from. */
 export type DecisionProvenance = "asked" | "extracted" | "default";
@@ -314,4 +330,19 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "tp3-orthography-join": [],
   "typing-approach": [],
   "use-case": [],
+  // Wizard-step decisions: editor steps write through their own declared
+  // `writes` (steps/editorMutate.ts), not through a decision -> IR mapping.
+  "windows-layout": [],
+  "base-keyboard": [],
+  "marks-treatment": [],
+  "punctuation-inventory": [],
+  "invisibles-inventory": [],
+  "retained-convenience-chars": [],
+  "carved-layout": [],
+  "deadkeys-defined": [],
+  "rule-set": [],
+  "physical-layout": [],
+  "touch-seed-source": [],
+  "touch-layout": [],
+  "help-docs": [],
 };

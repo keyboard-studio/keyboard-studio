@@ -40,6 +40,7 @@ import {
 import { LayoutStep } from "../survey/layout/LayoutStep.tsx";
 import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
 import { rulesStep } from "./rulesStep.ts";
+import { stepDependencies } from "./stepDependencies.ts";
 
 /** Re-exported for the manifest (spec 082 Track A). */
 export { rulesStep };
@@ -55,7 +56,6 @@ function step(
 ): EditorStep {
   return {
     kind: "editor-step",
-    spine: true,
     inputs: [],
     writes: [],
     ...base,
@@ -74,9 +74,9 @@ function step(
  */
 export const identityStep: EditorStep = step({
   id: "identity",
+  ...stepDependencies("identity"),
   title: "Keyboard Identity",
   component: IdentityLiteAdapter,
-  flowRefs: ["identity_lite"],
   specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
   persistence: "answer-store",
 });
@@ -89,6 +89,7 @@ export const identityStep: EditorStep = step({
  */
 export const layoutStep: EditorStep = step({
   id: "layout",
+  ...stepDependencies("layout"),
   title: "Keyboard Layout",
   component: LayoutStep,
   specRef: ["specs/076-rule-behaviours"],
@@ -105,6 +106,7 @@ export const layoutStep: EditorStep = step({
  */
 export const chooseBaseStep: EditorStep = step({
   id: "choose_base",
+  ...stepDependencies("choose_base"),
   title: "Choose Base Keyboard",
   component: BaseResolutionAdapter,
   specRef: ["§8", "specs/080-documentation-completeness"],
@@ -119,28 +121,28 @@ export const chooseBaseStep: EditorStep = step({
  */
 export const trackStep: EditorStep = step({
   id: "track",
+  ...stepDependencies("track"),
   title: "Authoring Track",
   component: TrackStepFactoryComponent,
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
-  flowRefs: ["track"],
   specRef: ["§8", "specs/018-qu-wire-track"],
   persistence: "answer-store",
 });
 
 /**
  * Project name step: ProjectNameStep (copy-track only).
- * Declared spine:true here; manifest overrides to spine:false with
- * joinTarget:"characters" for the CYOA copy-only fork.
+ * Its gatedBy (stepDependencies.ts) makes it a side trail: copy takes it,
+ * adapt bypasses it, and both rejoin at the next ungated step.
  * Collects scaffold params displayName + keyboardId — no separate scaffold step.
  * FR-004: header.script is intentionally NOT declared (does not exist in KeyboardIR).
  */
 export const projectNameStep: EditorStep = step({
   id: "project_name",
+  ...stepDependencies("project_name"),
   title: "Project Name",
   component: ProjectNameStepFactoryComponent,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name"), irPath("header", "keyboardId")],
-  flowRefs: ["project_name"],
   specRef: "§8",
   persistence: "answer-store",
 });
@@ -157,6 +159,7 @@ export const projectNameStep: EditorStep = step({
  */
 export const carveStep: EditorStep = step({
   id: "carve",
+  ...stepDependencies("carve"),
   title: "Carve Keys",
   layout: "full",
   component: CarveAdapter,
@@ -178,6 +181,7 @@ export const carveStep: EditorStep = step({
  */
 export const deadkeysStep: EditorStep = step({
   id: "deadkeys",
+  ...stepDependencies("deadkeys"),
   title: "Deadkeys",
   layout: "full",
   component: DeadkeyAdapter,
@@ -195,10 +199,11 @@ export const deadkeysStep: EditorStep = step({
  * S-03 sequences build inline in MechanismGallery's method chooser (the
  * right-hand preview pane swaps for a one-character sequence builder while
  * that method is selected) — there is no separate "sequences" step; this is
- * the only spine step directly before the off-spine touch_seed_source fork.
+ * the only step directly before the touch_seed_source fork.
  */
 export const mechanismsStep: EditorStep = step({
   id: "mechanisms",
+  ...stepDependencies("mechanisms"),
   title: "Assign Mechanisms",
   layout: "full",
   component: AddPhysicalAdapter,
@@ -209,8 +214,8 @@ export const mechanismsStep: EditorStep = step({
 });
 
 /**
- * Touch seed source step: off-spine fork for choosing touch surface seed.
- * Rejoins the spine at the touch carve+add step (FR-013, M4).
+ * Touch seed source step: side-trail fork for choosing touch surface seed.
+ * Gated side trail (stepDependencies.ts); rejoins at the touch carve+add step (FR-013).
  * Renders TouchSeedSourcePanel (T014, spec 035 contracts/seed-source-fork.md) —
  * a bespoke chooser panel, NOT the surface-parameterized carve/add shell, so
  * `surface` is omitted (that field only describes the AddPhysicalAdapter /
@@ -228,10 +233,9 @@ export const mechanismsStep: EditorStep = step({
  */
 export const touchSeedSourceStep: EditorStep = step({
   id: "touch_seed_source",
+  ...stepDependencies("touch_seed_source"),
   title: "Touch Seed Source",
   layout: "full",
-  spine: false,
-  joinTarget: "touch",
   component: TouchSeedSourcePanel,
   specRef: "specs/035-mobile-touch-derivation",
   persistence: "working-copy",
@@ -245,6 +249,7 @@ export const touchSeedSourceStep: EditorStep = step({
  */
 export const touchStep: EditorStep = step({
   id: "touch",
+  ...stepDependencies("touch"),
   title: "Touch Layout",
   layout: "full",
   component: AddTouchAdapter,
@@ -275,9 +280,9 @@ export const touchStep: EditorStep = step({
  */
 export const helpStep: EditorStep = step({
   id: "help",
+  ...stepDependencies("help"),
   title: "Help & Tips",
   component: PhaseFGate,
-  flowRefs: ["phase_f_helpdocs"],
   specRef: ["§8", "specs/061-help-docs-generation", "specs/080-documentation-completeness"],
   persistence: "answer-store",
 });
@@ -288,6 +293,7 @@ export const helpStep: EditorStep = step({
  */
 export const packageStep: EditorStep = step({
   id: "package",
+  ...stepDependencies("package"),
   title: "Package (reserved)",
   component: PhaseFStepFactoryComponent,
   specRef: "§16",
@@ -298,7 +304,7 @@ export const packageStep: EditorStep = step({
 });
 
 // ---------------------------------------------------------------------------
-// Exported list (unordered pool — the manifest imposes the spine order)
+// Exported list (unordered pool — the step order is derived, see stepOrder.ts)
 //
 // Pool ↔ manifest: every step here is referenced by the manifest, and every
 // manifest step (by id) has an entry here. scaffoldStep was removed because
@@ -307,7 +313,7 @@ export const packageStep: EditorStep = step({
 
 /**
  * All editor steps as an unordered pool. The manifest picks entries by id
- * and assembles them into the spine order. This list is the canonical source
+ * and assembles them in the derived step order. This list is the canonical source
  * of editor-step descriptors.
  */
 export const registeredEditorSteps: readonly EditorStep[] = [

@@ -71,15 +71,18 @@ commit messages and PR bodies. Commit and issue titles follow
 area vocabulary in [CLAUDE.md](../../CLAUDE.md).
 
 ### IX. No user-facing survey surface outside the decision registry
-No user-facing survey surface may exist outside the decision registry. Every step declares typed
-IRPath inputs and writes via Step.inputs and Step.writes (steps/types.ts). Every IR write routes
-through the mutate() seam (specs/014-mutate-seam-touch-propagation). The derived decision registry
-(survey/questions/registry.ts, ordered by decisions/orderDecisions.ts from the modules'
-provides/requires declarations) is the single source of survey ordering (specs/085-decision-backend).
-The step manifest (steps/manifest.ts) is a projection of that ordering for step-level structure —
-it defines phases, components, and flow references, not question sequence. A
-plan proposing new survey content MUST include the registry module (with its provides/requires
-declarations) as a functional requirement.
+No user-facing survey surface may exist outside the decision registry and the step manifest. Every
+step declares typed IRPath inputs and writes via Step.inputs and Step.writes (steps/types.ts).
+Every IR write routes through the mutate() seam (specs/014-mutate-seam-touch-propagation). The
+decision registry is the single source of order, for questions AND for steps: question modules
+(survey/questions/registry.ts) and wizard steps (steps/stepDependencies.ts) both declare
+provides/requires, and one sort (decisions/orderDecisions.ts `orderByDependencies`) derives every
+order (specs/085-decision-backend). No hand-maintained order list, spine flag, or join target
+exists anywhere: a step's side-trail status derives from its `gatedBy`, and its join target from
+its next ungated successor. The step manifest (steps/manifest.ts) is an unordered set of step
+declarations (components, inputs, writes, persistence); it never states what comes before what. A
+plan proposing new survey content MUST include the registry declaration (provides/requires, and
+`gatedBy` where it is conditional) as a functional requirement.
 
 ## Authoring workflow (spec-kit ↔ KM crew)
 

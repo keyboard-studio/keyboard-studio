@@ -78,7 +78,7 @@ function bijectionViolations(
 
 /**
  * Editor-step reach (T005, FR-007): manifest ids minus findUnreachable(manifest).
- * Reachability here is the spine-or-transitive-joinTarget rule
+ * Reachability here is the spine-or-derived-join-target rule
  * (completeness.ts:475-499) — blind to FlowGotoRule by design; that is the
  * survey side's job.
  */

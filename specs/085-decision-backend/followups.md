@@ -4,23 +4,23 @@ Tracked deferred work from the km-lead review of the decision-backend
 unification. None of these blocks the unification itself; each has a
 defined trigger.
 
-## 1. Retire the remaining modular YAMLs
+## 1. Retire the remaining modular YAMLs (DONE)
 
-`identity_lite.modular.yaml` was deleted (T040); the order derives from the
-registry. The remaining thin-YAML order lists stay until their parity gates
-exist:
+Every `content/flows/*.modular.yaml` order list is deleted; each flow's order
+derives from its modules' `provides`/`requires` via `orderDecisions`, pinned by
+`decisions/orderParity.test.ts`. The wizard's step order is derived the same
+way: the manifest's hand-ordered `Step[]`, its `spine` / `joinTarget` flags and
+the `STEP_ORDER` literal are gone. Steps declare `provides` / `requires` /
+`gatedBy` in `steps/stepDependencies.ts`; `steps/stepOrder.ts` sorts them with
+the same `orderByDependencies`; side trails derive from `gatedBy` and join at
+the next ungated step. `steps/stepOrder.parity.test.ts` freezes the previous
+order, side trails, join targets, lock order and Flow Map edges as literals.
 
-- `content/flows/phase_b_characters.modular.yaml`
-- `content/flows/phase_f_helpdocs.modular.yaml`
-- `content/flows/track.modular.yaml`
-- `content/flows/project_name.modular.yaml`
-- `content/flows/proposed/phase_a_identity.modular.yaml` (proposed, not live)
-
-Trigger: a derived-order parity test per flow (same shape as
-`decisions/orderParity.test.ts`) proves the registry-derived order equals
-the YAML order; then delete the YAML and retarget its mirror suites the way
-`flow-parity.test.ts` / `orphan-input-lint.test.ts` were retargeted for
-identity_lite.
+Residual, by design: where no dependency separates two steps, the declaration
+order in `stepDependencies.ts` is the stable tie-break (like registry key order
+for walk-order flows). Those pairs (`layout` against the base/track/characters
+steps and the four pre-carve steps; `marks`/`punctuation`/`invisibles`/
+`convenience` among themselves) are frozen in the parity test.
 
 ## 2. Remove deprecated `classifyBaseScript` (DONE: deleted; posture now read via `extractBaseScriptPosture` in `il_target_script.ts`)
 

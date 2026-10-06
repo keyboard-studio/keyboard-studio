@@ -6,7 +6,7 @@
 // Five checks (C1–C7, completeness.contract.md):
 //   C1  computeStaleness(graph, reopened)  — transitive fixpoint over DATA edges
 //   C2  findCycles(graph)                  — cycle detection on DATA graph (hard error)
-//   C3  checkRejoin(manifest)              — off-spine joinTarget must reach spine
+//   C3  checkRejoin(manifest)              — every gated side trail must rejoin
 //   C4  checkSpinePrefixShippability(m,wc,findings) — structural lock-consistency
 //        proxy + REAL Layer-A validator graduation (spec-014 US5/T034)
 //   C5  checkInputsSatisfiable(graph)      — inputs with no upstream writer
@@ -24,6 +24,7 @@
 import { formatIRPath } from "@keyboard-studio/contracts";
 import type { IRPath, LintFinding } from "@keyboard-studio/contracts";
 import type { Step } from "../steps/types.ts";
+import { deriveStepStructure } from "../steps/stepOrder.ts";
 import { computeDataEdges } from "./model.ts";
 import type { StepGraph, StepGraphEdge } from "./model.ts";
 
@@ -265,46 +266,25 @@ export interface RejoinViolation {
 }
 
 /**
- * Check that every off-spine step chain has a joinTarget that reaches a spine
- * step (C3 / FR-016).
+ * Check that every side trail can rejoin the main line (C3 / FR-016).
  *
- * Flags:
- *   - spine:false step with no joinTarget.
- *   - spine:false step whose joinTarget does not resolve to a spine:true step.
- *   - spine:false step whose joinTarget resolves to another spine:false step
- *     (creating an off-spine dead-end chain).
+ * A side trail is a step with a `gatedBy`; its join target is DERIVED as the
+ * next ungated step in the (derived) manifest order, so it can only dead-end
+ * when no ungated step follows it. Flags exactly that.
  */
 export function checkRejoin(manifest: readonly Step[]): RejoinViolation[] {
-  const stepById = new Map<string, Step>(manifest.map((s) => [s.id, s]));
+  const trails = deriveStepStructure(manifest);
   const violations: RejoinViolation[] = [];
 
   for (const step of manifest) {
-    if (step.spine === true) continue;
-
-    if (step.joinTarget === undefined) {
+    const trail = trails.get(step.id);
+    if (trail === undefined || trail.spine) continue;
+    if (trail.joinTarget === undefined) {
       violations.push({
         stepId: step.id,
-        reason: `spine:false step "${step.id}" has no joinTarget`,
-      });
-      continue;
-    }
-
-    const target = stepById.get(step.joinTarget);
-    if (target === undefined) {
-      violations.push({
-        stepId: step.id,
-        reason: `spine:false step "${step.id}" joinTarget "${step.joinTarget}" does not exist in the manifest`,
-      });
-      continue;
-    }
-
-    if (target.spine !== true) {
-      violations.push({
-        stepId: step.id,
-        reason: `spine:false step "${step.id}" joinTarget "${step.joinTarget}" is also spine:false — dead-end off-spine chain`,
+        reason: `gated step "${step.id}" has no ungated successor to rejoin at`,
       });
     }
-    // If target.spine === true, the rejoin is valid — no violation.
   }
   return violations;
 }
@@ -366,7 +346,8 @@ export function checkSpinePrefixShippability(
   wc: WcForCompleteness,
   findings: readonly LintFinding[] = [],
 ): number[] {
-  const spineSteps = manifest.filter((s) => s.spine === true);
+  const trails = deriveStepStructure(manifest);
+  const spineSteps = manifest.filter((s) => trails.get(s.id)?.spine === true);
   const unshippable: number[] = [];
 
   // (c) real-validator signal: does the current working copy carry a blocking
@@ -465,38 +446,22 @@ export function checkInputsSatisfiableFromManifest(manifest: readonly Step[]): O
 // ---------------------------------------------------------------------------
 
 /**
- * Detect steps not reachable from the spine entry (the first spine step).
+ * Detect steps not reachable from the spine entry (the first ungated step).
  *
- * A step is reachable if it is a spine step, OR it is an off-spine step whose
- * joinTarget resolves (directly or transitively) to a spine step. Any step
- * that has no path to the spine is unreachable.
+ * A step is reachable if it is ungated (a spine step), OR it is a gated side
+ * trail whose derived join target is reachable. A gated step with no ungated
+ * successor has no path back to the spine and is unreachable.
  *
  * Returns the ids of unreachable steps.
  */
 export function findUnreachable(manifest: readonly Step[]): string[] {
-  const stepById = new Map<string, Step>(manifest.map((s) => [s.id, s]));
-  const reachable = new Set<string>();
-
-  for (const step of manifest) {
-    if (step.spine === true) reachable.add(step.id);
-  }
-
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const step of manifest) {
-      if (reachable.has(step.id)) continue;
-      if (step.joinTarget !== undefined) {
-        const target = stepById.get(step.joinTarget);
-        if (target !== undefined && reachable.has(target.id)) {
-          reachable.add(step.id);
-          changed = true;
-        }
-      }
-    }
-  }
-
-  return manifest.filter((s) => !reachable.has(s.id)).map((s) => s.id);
+  const trails = deriveStepStructure(manifest);
+  return manifest
+    .filter((s) => {
+      const trail = trails.get(s.id);
+      return trail === undefined || (!trail.spine && trail.joinTarget === undefined);
+    })
+    .map((s) => s.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -611,17 +576,20 @@ export interface CompletenessReport {
  * Instead, we build a minimal StepGraph inline from the manifest Step[].
  */
 function buildMinimalStepGraph(manifest: readonly Step[]): StepGraph {
+  const trails = deriveStepStructure(manifest);
   const nodes = manifest.map((step, idx) => ({
     id: step.id,
     label: step.title,
     type: step.kind as "editor-step" | "question-step",
-    spine: step.spine === true,
+    spine: trails.get(step.id)?.spine === true,
     isEntry: idx === 0,
     isTerminal: idx === manifest.length - 1,
     writePaths: step.writes.map(formatIRPath),
     inputPaths: step.inputs.map(formatIRPath),
     ...(step.lock !== undefined ? { lock: step.lock } : {}),
-    ...(step.joinTarget !== undefined ? { joinTarget: step.joinTarget } : {}),
+    ...(trails.get(step.id)?.joinTarget !== undefined
+      ? { joinTarget: trails.get(step.id)!.joinTarget as string }
+      : {}),
   }));
 
   // Order edges (spine/fork/join) — not needed by the five checks, but required

@@ -6,6 +6,7 @@ import { buildScriptRouting } from "./buildScriptRouting.ts";
 import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { manifest } from "../steps/manifest.ts";
+import { STEP_TRAILS } from "../steps/stepOrder.ts";
 
 // ---------------------------------------------------------------------------
 // INV-1 helper: assert that the live node set exactly equals the manifest ids
@@ -360,11 +361,11 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
     expect(unique.size).toBe(ids.length);
   });
 
-  it("spine steps carry spine:true; off-spine steps carry spine:false", () => {
+  it("ungated steps carry spine:true; gated (side-trail) steps carry spine:false", () => {
     for (const node of graph.nodes) {
       const step = manifest.find((s) => s.id === node.id);
       expect(step).toBeDefined();
-      expect(node.spine).toBe(step!.spine === true);
+      expect(node.spine).toBe(STEP_TRAILS.get(step!.id)?.spine === true);
     }
   });
 
@@ -376,14 +377,14 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
     }
   });
 
-  it("joinTarget is preserved for off-spine steps", () => {
+  it("the derived joinTarget is carried onto off-spine steps", () => {
     const offSpine = graph.nodes.filter((n) => !n.spine);
     // There are at least two off-spine steps (project_name + touch_seed_source).
     expect(offSpine.length).toBeGreaterThanOrEqual(2);
     for (const node of offSpine) {
       const step = manifest.find((s) => s.id === node.id);
       expect(step).toBeDefined();
-      expect(node.joinTarget).toBe(step!.joinTarget);
+      expect(node.joinTarget).toBe(STEP_TRAILS.get(step!.id)?.joinTarget);
       // Every off-spine step must have a joinTarget.
       expect(node.joinTarget, `off-spine step "${node.id}" missing joinTarget`).toBeDefined();
     }

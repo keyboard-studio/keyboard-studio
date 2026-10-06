@@ -1,14 +1,14 @@
 // advance — pure step-advance policy for the survey wizard (spec 028 Stage 5).
 //
-// Encodes the complete copy/adapt fork, joinTarget hops, terminal transitions,
-// and spine-step sequencing in a single pure function. Replaces the private
+// Encodes the complete copy/adapt fork, side-trail rejoin hops, terminal transitions,
+// and main-line step sequencing in a single pure function. Replaces the private
 // manifestIndexOf/nextSpineStepAfter helpers and the inline fork logic that
 // were scattered across SurveyView's per-step handlers before Stage 5.
 //
 // CONTRACT (advance-and-stephost.contract.md §1):
 //   - Pure: same inputs → same output. No store reads, no I/O.
 //   - Total over ActiveStepId: every manifest step id + the two terminals.
-//   - Imports ONLY ./manifest.ts + ./types.ts (depcruise: steps/ boundary clean).
+//   - Imports ONLY ./manifest.ts + ./stepOrder.ts (depcruise: steps/ boundary clean).
 //   - ActiveStepId and Track are defined locally (type mirrors) to avoid a
 //     steps/ → stores/ import that depcruise would reject.
 //
@@ -17,6 +17,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { manifest } from "./manifest.ts";
+import { STEP_TRAILS } from "./stepOrder.ts";
 
 // ---------------------------------------------------------------------------
 // Local type mirrors — defined here to avoid steps/ → stores/ import.
@@ -138,8 +139,8 @@ export function manifestIndexOf(id: string): number {
 // ---------------------------------------------------------------------------
 // nextSpineStepAfter — moved from StudioShell.tsx (was private, now exported).
 //
-// Advances to the next spine step in the manifest after currentId, skipping
-// spine:false side-trail steps. Returns "done" when "package" or
+// Advances to the next main-line step in the (derived) manifest order after
+// currentId, skipping gated side-trail steps. Returns "done" when "package" or
 // end-of-manifest is reached.
 // ---------------------------------------------------------------------------
 
@@ -151,11 +152,11 @@ export function nextSpineStepAfter(currentId: string): ActiveStepId {
   for (let i = currentIdx + 1; i < manifest.length; i++) {
     const step = manifest[i];
     if (step === undefined) break;
-    if (step.spine === false) continue;
+    if (STEP_TRAILS.get(step.id)?.spine === false) continue;
     const id = step.id;
     // "package" is the reserved terminal; reaching it means we're done.
     if (id === "package") return "done";
-    // All other spine step IDs are valid ActiveStepId values (terminals excluded).
+    // All other main-line step IDs are valid ActiveStepId values (terminals excluded).
     // The manifest only contains valid step IDs, so no exhaustive check needed.
     return id as ActiveStepId;
   }
@@ -191,10 +192,10 @@ export function advance(
 
     case "track":
       if (ctx.selectedTrack === "copy") {
-        // Copy-track: project_name side-trail (spine:false, joinTarget:"characters").
+        // Copy-track: project_name side-trail (gated on the copy track).
         return { next: "project_name" };
       } else if (ctx.selectedTrack === "adapt") {
-        // Adapt-track: skip project_name (spine:false) → characters.
+        // Adapt-track: skip the project_name side trail → characters.
         // Also signals host to call setCharactersSubStage("prefill") post-advance.
         return {
           next: nextSpineStepAfter("track"),  // characters
@@ -216,7 +217,7 @@ export function advance(
       }
 
     case "project_name":
-      // joinTarget is "characters"; advance there directly.
+      // The side trail rejoins at "characters"; advance there directly.
       // Also signals host to call setCharactersSubStage("prefill") post-advance.
       return { next: "characters", setCharactersSubStage: "prefill" };
 
@@ -280,7 +281,7 @@ export function advance(
         : { next: "touch" };
 
     case "touch_seed_source":
-      // joinTarget is "touch"; advance there directly (mirrors project_name).
+      // The side trail rejoins at "touch"; advance there directly (mirrors project_name).
       return { next: "touch" };
 
     case "touch":

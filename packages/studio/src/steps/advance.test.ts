@@ -2,15 +2,16 @@
 //
 // Covers every case in advance-and-stephost.contract.md §1:
 //   - copy/adapt fork at "track"
-//   - project_name → characters (joinTarget hop)
+//   - project_name → characters (side-trail rejoin hop)
 //   - identity supported/unsupported (terminal branch)
 //   - help → done + navigate:"output"
-//   - each spine hop (skipping spine:false steps)
+//   - each spine hop (skipping side-trail steps)
 //   - adapt-track skips project_name (US2)
 
 import { describe, it, expect } from "vitest";
 import { advance, nextSpineStepAfter, manifestIndexOf } from "./advance.ts";
 import { manifest, validateManifestShape } from "./manifest.ts";
+import { STEP_TRAILS } from "./stepOrder.ts";
 
 // ---------------------------------------------------------------------------
 // walkSpine — drive advance() from "identity" to a terminal, collecting the
@@ -86,8 +87,8 @@ describe("nextSpineStepAfter", () => {
     expect(nextSpineStepAfter("choose_base")).toBe("track");
   });
 
-  it("track → characters (skips project_name which is spine:false)", () => {
-    // project_name is spine:false so nextSpineStepAfter("track") skips it.
+  it("track → characters (skips project_name which is a derived side trail)", () => {
+    // project_name is a derived side trail so nextSpineStepAfter("track") skips it.
     expect(nextSpineStepAfter("track")).toBe("characters");
   });
 
@@ -123,8 +124,8 @@ describe("nextSpineStepAfter", () => {
     expect(nextSpineStepAfter("rules")).toBe("mechanisms");
   });
 
-  it("mechanisms → touch (skips touch_seed_source which is spine:false)", () => {
-    // touch_seed_source is spine:false so nextSpineStepAfter("mechanisms") skips it.
+  it("mechanisms → touch (skips touch_seed_source which is a derived side trail)", () => {
+    // touch_seed_source is a derived side trail so nextSpineStepAfter("mechanisms") skips it.
     expect(nextSpineStepAfter("mechanisms")).toBe("touch");
   });
 
@@ -217,7 +218,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   });
 
   it("spine ids (spine !== false) are in the locked order", () => {
-    const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
+    const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
       "identity", "layout", "choose_base", "track", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch", "help", "package",
@@ -294,11 +295,11 @@ describe("advance: track — adapt fork (US2)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — project_name step (joinTarget hop)
+// advance — project_name step (side-trail rejoin hop)
 // ---------------------------------------------------------------------------
 
 describe("advance: project_name", () => {
-  it("→ characters (joinTarget)", () => {
+  it("→ characters (side-trail rejoin)", () => {
     const { next } = advance("project_name", undefined, copyCtx);
     expect(next).toBe("characters");
   });
@@ -365,7 +366,7 @@ describe("advance: spine hops", () => {
     expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
-  it("touch_seed_source → touch (joinTarget hop, spec 035 R4)", () => {
+  it("touch_seed_source → touch (side-trail rejoin hop, spec 035 R4)", () => {
     expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
   });
 
