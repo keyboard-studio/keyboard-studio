@@ -34,7 +34,7 @@ import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { buildOutputBundle } from "../lib/buildOutputBundle.ts";
 import { useInventoryCoverageGate } from "../hooks/useInventoryCoverageGate.ts";
 import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
-import { KEYBOARDS, CORPUS, corpusPresent, runAdaptFlow } from "./sc004Harness.ts";
+import { KEYBOARDS, CORPUS, corpusPresent, runAdaptFlow } from "../test/sc004Harness.ts";
 
 const blocking = (fs: readonly LintFinding[]) =>
   fs.filter((f) => f.severity === "error" || f.severity === "fatal");
