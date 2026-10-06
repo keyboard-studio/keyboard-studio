@@ -370,7 +370,12 @@ export function scrubContext(context: CrashContext): CrashContext {
   }
   if (context.breadcrumbs !== undefined) {
     out.breadcrumbs = context.breadcrumbs.map((b) => ({
-      at: b.at,
+      // scrubText redacts secrets/emails and neutralizes mentions/images, but
+      // does NOT touch backticks or line breaks: the [`\r\n] strip is what
+      // keeps the value from closing the fenced code block buildIssueBody
+      // renders it in (security audit run-1:
+      // crash-report/unscrubbed-breadcrumb-at-markdown-injection).
+      at: scrubText(b.at).replace(/[`\r\n]+/g, " "),
       channel: b.channel,
       label: scrubText(b.label),
     }));

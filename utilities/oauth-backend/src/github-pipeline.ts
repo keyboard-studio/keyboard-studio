@@ -24,6 +24,7 @@
  */
 
 import type { ManagedPRBody } from "./managed-pr-schemas.js";
+import { isSafeTreePath } from "./managed-pr-schemas.js";
 
 // ---------------------------------------------------------------------------
 // Pipeline-local fetch abstraction -- richer than OAuthFetchResponse so we
@@ -197,6 +198,19 @@ export async function submitManagedPR(
   const { getInstallationToken, orgLogin, fetch: fetchFn } = config;
   const forkBase = `${API_BASE}/repos/${orgLogin}/${UPSTREAM_REPO}`;
   const upstreamBase = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
+
+  // Defense in depth: ManagedPRBodySchema is the validation boundary, but
+  // assert the path-confinement invariant here too — before minting the
+  // installation token — so a future caller that bypasses the schema can
+  // never drive privileged writes outside the keyboard's directory
+  // (security audit run-1:
+  // managed-pr:unvalidated-tree-path-privileged-write).
+  const treePrefix = `release/${body.keyboardId.charAt(0)}/${body.keyboardId}/`;
+  for (const f of body.sourceFiles) {
+    if (!isSafeTreePath(f.path) || !f.path.startsWith(treePrefix)) {
+      return { ok: false, status: 400, error: "invalid_request" };
+    }
+  }
 
   // Mint (or retrieve from cache) the installation token once per request.
   // If the provider throws, the outer try/catch maps it to 502 submission_unavailable.
