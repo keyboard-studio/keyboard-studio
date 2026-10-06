@@ -552,6 +552,24 @@ describe("persistWorkingCopy", () => {
   // so a bump would throw away every author's in-progress keyboard).
   // -------------------------------------------------------------------------
 
+  describe("contextNormalizationStep persistence (spec 086)", () => {
+    it("round-trips the cached step through sessionStorage without a DRAFT_VERSION bump", () => {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
+      );
+      const stored = { cacheKey: "abc|1", result: { kind: "refused", reason: "no-alternates" } } as const;
+      useWorkingCopyStore.getState().setContextNormalizationStep(stored);
+      expect(snapshotWorkingCopyData().contextNormalizationStep).toEqual(stored);
+
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().contextNormalizationStep).toEqual(stored);
+      expect(DRAFT_VERSION).toBe(1);
+    });
+  });
+
   describe("keyEditOverlay / touchEditorMode persistence (T058)", () => {
     it("DRAFT_VERSION stays 1 — these fields are additive, not a version bump", () => {
       expect(DRAFT_VERSION).toBe(1);

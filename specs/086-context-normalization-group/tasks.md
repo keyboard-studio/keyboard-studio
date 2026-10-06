@@ -86,16 +86,16 @@ description: "Task list for spec 086 context normalization group"
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] Add cache-key cases to `packages/engine/src/pattern-apply/normalization-step/index.test.ts`: same IR gives the same key; an IR with a step applied gives the same key as without (the step is stripped before hashing); a one-rule change changes the key; a mocked version change changes the key
-- [ ] T024 [P] [US2] Write `packages/studio/src/lib/normalizationStepCache.test.ts`: a hit (memory or snapshot) returns the stored result with `proposeNormalizationStep` spied and not called; a stale `cacheKey` in the snapshot is ignored and replaced; a hit resolves in under 1 s (SC-005)
+- [x] T023 [P] [US2] Add cache-key cases to `packages/engine/src/pattern-apply/normalization-step/index.test.ts`: same IR gives the same key; an IR with a step applied gives the same key as without (the step is stripped before hashing); a one-rule change changes the key; a mocked version change changes the key
+- [x] T024 [P] [US2] Write `packages/studio/src/lib/normalizationStepCache.test.ts`: a hit (memory or snapshot) returns the stored result with `proposeNormalizationStep` spied and not called; a stale `cacheKey` in the snapshot is ignored and replaced; a hit resolves in under 1 s (SC-005)
 
 ### Implementation for User Story 2
 
-- [ ] T025 [US2] Implement `normalizationStepCacheKey(ir)` in `packages/engine/src/pattern-apply/normalization-step/index.ts`: `computeSha256Hex(emit(removeNormalizationStep(ir))) + "|" + NORMALIZATION_STEP_GENERATOR_VERSION` (`packages/engine/src/codec/hash.ts`)
-- [ ] T026 [US2] Add the optional `contextNormalizationStep?: { cacheKey: string; result: NormalizationStepResult }` field to the snapshot types in `packages/studio/src/lib/draftTypes.ts` and read/write it in `packages/studio/src/lib/persistWorkingCopy.ts` next to `contextToleranceOverlay`; no `DRAFT_VERSION` bump. Add a save/load round-trip case to the existing persist tests
-- [ ] T027 [US2] Create `packages/studio/src/lib/normalizationStepCache.ts`: `getOrProposeNormalizationStep(ir, snapshot)` checks an in-memory `Map<cacheKey, result>`, then the snapshot field, then calls the generator and stores the result in both; logs a cache-hit line for the quickstart §4 check. (The plan put the Map inside `contextToleranceAnalysis.ts`; a separate module keeps it unit-testable. Same behaviour.)
-- [ ] T028 [US2] Write `packages/engine/src/pattern-apply/normalization-step/generation-time.corpus.test.ts`, opt-in via `KS_CORPUS_PERF=1`: run `proposeNormalizationStep` over every corpus keyboard that parses and assert the 95th percentile is under 5 s (SC-005); print `[WARN]` with the slowest ten. Not part of the default suite
-- [ ] T029 [US2] Gate: engine and studio tests, `pnpm typecheck`, `pnpm lint`. Commit `feat(engine): cache normalization steps by source hash and generator version (spec 086 T023-T029)` and push
+- [x] T025 [US2] Implement `normalizationStepCacheKey(ir)` in `packages/engine/src/pattern-apply/normalization-step/index.ts`: `computeSha256Hex(emit(removeNormalizationStep(ir))) + "|" + NORMALIZATION_STEP_GENERATOR_VERSION` (`packages/engine/src/codec/hash.ts`)
+- [x] T026 [US2] Add the optional `contextNormalizationStep?: { cacheKey: string; result: NormalizationStepResult }` field to the snapshot types in `packages/studio/src/lib/draftTypes.ts` and read/write it in `packages/studio/src/lib/persistWorkingCopy.ts` next to `contextToleranceOverlay`; no `DRAFT_VERSION` bump. Add a save/load round-trip case to the existing persist tests
+- [x] T027 [US2] Create `packages/studio/src/lib/normalizationStepCache.ts`: `getOrProposeNormalizationStep(ir, snapshot)` checks an in-memory `Map<cacheKey, result>`, then the snapshot field, then calls the generator and stores the result in both; logs a cache-hit line for the quickstart §4 check. (The plan put the Map inside `contextToleranceAnalysis.ts`; a separate module keeps it unit-testable. Same behaviour.)
+- [x] T028 [US2] Write `packages/engine/src/pattern-apply/normalization-step/generation-time.corpus.test.ts`, opt-in via `KS_CORPUS_PERF=1`: run `proposeNormalizationStep` over every corpus keyboard that parses and assert the 95th percentile is under 5 s (SC-005); print `[WARN]` with the slowest ten. Not part of the default suite
+- [x] T029 [US2] Gate: engine and studio tests, `pnpm typecheck`, `pnpm lint`. Commit `feat(engine): cache normalization steps by source hash and generator version (spec 086 T023-T029)` and push
 
 ---
 

@@ -215,10 +215,66 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-06T08:30:00.154Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.145Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.282Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.417Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.557Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.700Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.851Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:20:04.628Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T022",
+  "currentTask": "T029",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -371,6 +427,54 @@
       "files": [
         "specs/086-context-normalization-group/research.md"
       ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "cache-key cases in engine index.test.ts",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.test.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "studio cache hit/stale/<1s tests",
+      "files": [
+        "packages/studio/src/lib/normalizationStepCache.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "normalizationStepCacheKey already present and re-exported from Phase 3; verified",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "contextNormalizationStep store field and snapshot read/write plus round-trip test",
+      "files": [
+        "packages/studio/src/lib/persistWorkingCopy.ts",
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/persistWorkingCopy.test.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "getOrProposeNormalizationStep memory/snapshot/generator cache",
+      "files": [
+        "packages/studio/src/lib/normalizationStepCache.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "opt-in KS_CORPUS_PERF generation-time p95 corpus test",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/generation-time.corpus.test.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Gate green: engine 4691 pass, studio 7937 pass, typecheck and lint clean"
     }
   },
   "verified": [
@@ -409,7 +513,44 @@
       "what": "lint incl depcruise",
       "command": "pnpm lint",
       "result": "exit 0, 0 errors, no dependency violations"
+    },
+    {
+      "what": "engine suite",
+      "command": "pnpm --filter @keyboard-studio/engine test",
+      "result": "214 files passed, 1 skipped; 4691 tests passed"
+    },
+    {
+      "what": "studio suite",
+      "command": "pnpm --filter @keyboard-studio/studio test",
+      "result": "455 files, 7937 tests passed"
     }
   ],
-  "last_action": "Phase 3 (US1) T020-T022 closed"
+  "last_action": "Phase 4 (T023-T029) done; engine+studio suites, typecheck, lint green",
+  "decisions": [
+    {
+      "decision": "Cache lives in a separate normalizationStepCache.ts module; snapshot field typed StoredNormalizationStep and carried on the working-copy store",
+      "why": "unit-testable; reuses the existing contracts type",
+      "rejected": "Map inside contextToleranceAnalysis.ts"
+    },
+    {
+      "decision": "time-bound refusals are not cached",
+      "why": "they reflect the run budget, not the source",
+      "rejected": "caching every result"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "T028 opt-in perf run (KS_CORPUS_PERF=1) passed in the worker, but the p95 number was not captured",
+      "step": "implement"
+    }
+  ],
+  "coverage": {
+    "FR-016": {
+      "tests": [
+        "packages/engine/src/pattern-apply/normalization-step/index.test.ts",
+        "packages/studio/src/lib/normalizationStepCache.test.ts",
+        "packages/studio/src/lib/persistWorkingCopy.test.ts"
+      ]
+    }
+  }
 }

@@ -4,7 +4,12 @@ import { emit } from "../../codec/emit.js";
 import { compile } from "../../compiler/index.js";
 import { simulate } from "../../simulator/index.js";
 import { ALTERNATES_KMN, NO_ALTERNATES_KMN, parseFixture } from "../__fixtures__/normalization.js";
-import { applyNormalizationStep, proposeNormalizationStep } from "./index.js";
+import {
+  NORMALIZATION_STEP_GENERATOR_VERSION,
+  applyNormalizationStep,
+  normalizationStepCacheKey,
+  proposeNormalizationStep,
+} from "./index.js";
 
 vi.mock("../../compiler/index.js", () => ({ compile: vi.fn() }));
 vi.mock("../../simulator/index.js", () => ({ simulate: vi.fn() }));
@@ -97,5 +102,41 @@ describe("proposeNormalizationStep", () => {
     if (a.kind !== "step" || b.kind !== "step") throw new Error("expected steps");
     expect(a.step.examples).toHaveLength(5);
     expect(a.step.examples).toEqual(b.step.examples);
+  });
+});
+
+describe("normalizationStepCacheKey", () => {
+  it("is stable for the same IR and ends with the generator version", async () => {
+    const ir = parseFixture(ALTERNATES_KMN);
+    const k = await normalizationStepCacheKey(ir);
+    expect(await normalizationStepCacheKey(ir)).toBe(k);
+    expect(k.endsWith(`|${NORMALIZATION_STEP_GENERATOR_VERSION}`)).toBe(true);
+  });
+
+  it("ignores an applied step (it is stripped before hashing)", async () => {
+    const ir = parseFixture(ALTERNATES_KMN);
+    const r = await proposeNormalizationStep(ir);
+    if (r.kind !== "step") throw new Error("expected a step");
+    expect(await normalizationStepCacheKey(applyNormalizationStep(ir, r.step))).toBe(
+      await normalizationStepCacheKey(ir),
+    );
+  });
+
+  it("changes when one rule changes", async () => {
+    const a = await normalizationStepCacheKey(parseFixture(ALTERNATES_KMN));
+    const b = await normalizationStepCacheKey(parseFixture(ALTERNATES_KMN.replace("+ [K_O] > U+00F3", "+ [K_O] > U+00F2")));
+    expect(a).not.toBe(b);
+  });
+
+  it("changes when the generator version changes", async () => {
+    vi.resetModules();
+    vi.doMock("./constants.js", async (orig) => ({
+      ...(await orig<typeof import("./constants.js")>()),
+      NORMALIZATION_STEP_GENERATOR_VERSION: "test-bumped",
+    }));
+    const bumped = await import("./index.js");
+    const ir = parseFixture(ALTERNATES_KMN);
+    expect(await bumped.normalizationStepCacheKey(ir)).not.toBe(await normalizationStepCacheKey(ir));
+    vi.doUnmock("./constants.js");
   });
 });

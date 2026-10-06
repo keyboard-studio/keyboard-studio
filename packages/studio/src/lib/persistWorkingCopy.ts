@@ -127,6 +127,7 @@ export type WorkingCopySnapshot = Omit<
   // Recomputed after every preview compile (spec 078); never stored.
   | "contextTolerance"
   | "contextToleranceOverlay"
+  | "contextNormalizationStep"
   | "baseWelcomeImages"
   | "phaseAnswersByStep"
   | "disabledFamilyIds"
@@ -195,6 +196,12 @@ export type WorkingCopySnapshot = Omit<
    * "no fix applied".
    */
   contextToleranceOverlay?: WorkingCopyData["contextToleranceOverlay"];
+  /**
+   * The cached normalization step (spec 086 FR-016). Optional: older
+   * snapshots have no key, which reads as "nothing cached". Reused only when
+   * its `cacheKey` matches the current source. `DRAFT_VERSION` does not bump.
+   */
+  contextNormalizationStep?: WorkingCopyData["contextNormalizationStep"];
   /**
    * Optional (spec 079 D-4): which step recorded which phase answers. A
    * snapshot written before this field existed has none, and the store then
@@ -400,6 +407,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     deadkeyOverlay: s.deadkeyOverlay,
     touchEditorMode: s.touchEditorMode,
     contextToleranceOverlay: s.contextToleranceOverlay,
+    contextNormalizationStep: s.contextNormalizationStep,
     phaseAnswersByStep: s.phaseAnswersByStep,
   };
 }
@@ -494,6 +502,7 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     deadkeyOverlay: snapshot.deadkeyOverlay ?? { ops: [] },
     touchEditorMode: snapshot.touchEditorMode ?? "character",
     contextToleranceOverlay: snapshot.contextToleranceOverlay ?? null,
+    contextNormalizationStep: snapshot.contextNormalizationStep ?? null,
     // spec 079 D-4: absent on a pre-079 snapshot. `{}` is safe — the store
     // adopts each phase's stored answers under "legacy" when the sidecar does
     // not describe them.
