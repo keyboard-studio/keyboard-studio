@@ -85,6 +85,15 @@ const WIZARD_ROUTE = "survey";
  * membership depends on the track: the copy track walks it, the adapt track
  * skips it (steps/manifest.ts's track-routing docstring). The condition is the
  * step's own `gatedBy` (steps/stepDependencies.ts) — never re-stated here.
+ *
+ * Only the track is fed to the gate, deliberately. `touch_seed_source`'s gate
+ * ("no seed choice recorded") governs whether advance() ROUTES through the
+ * chooser, not whether the chooser is a place the author may be: spec 035
+ * R12/US2-AS4 keeps a remembered choice changeable, and
+ * `backToTouchSeedSource` lands on the chooser with the choice still set.
+ * Feeding `touchSeedSource` here would refuse that very location, grey out its
+ * progress dot, and break the decision row's jump to change the seed. A
+ * chooser the author never visited is still refused as `beyond-gate`.
  */
 function walkedByTrack(step: Step, traversal: TraversalSnapshot): boolean {
   if (step.gatedBy === undefined) return true;

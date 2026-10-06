@@ -51,14 +51,13 @@ export const fixtures: QuestionModule["fixtures"] = {
 // language subtag from the catalog entry — the same fact this question
 // confirms in ask mode. The codec leaves the IR header's bcp47 empty on real
 // catalog imports, so the catalog is the primary source; the IR header is a
-// fallback for non-catalog imports. Returns undefined when neither carries
-// language metadata.
+// fallback for non-catalog imports. Either source may carry a full tag
+// (`ha-NG`, `pa-Arab`); only the language subtag is this question's answer —
+// buildTargetBcp47 composes script and region back on in BCP 47 order.
+// Returns undefined when neither carries language metadata.
 export function extractLanguageCode(ctx: ExtractContext): string | undefined {
-  const catalogTag = ctx.catalog?.languages?.[0];
-  if (catalogTag) return catalogTag;
-  const tag = ctx.ir?.header.bcp47[0];
-  if (!tag) return undefined;
-  const subtag = tag.split("-")[0];
+  const tag = ctx.catalog?.languages?.[0] ?? ctx.ir?.header.bcp47[0];
+  const subtag = tag?.split("-")[0]?.toLowerCase();
   return subtag ? subtag : undefined;
 }
 

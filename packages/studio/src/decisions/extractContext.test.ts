@@ -82,3 +82,26 @@ describe("real catalog keyboard extraction (T020)", () => {
     expect(inventory?.value).toEqual(expect.arrayContaining(["a", "b", "ə"]));
   });
 });
+
+describe("regional catalog tags", () => {
+  it("extracts only the language subtag, so the composed tag keeps BCP 47 order", () => {
+    const { ir } = parseKmn(CAMEROON_KMN, "sil_cameroon_qwerty");
+    const regional = makeBaseKeyboard({
+      id: "sil_cameroon_qwerty",
+      script: "Latn",
+      path: "release/sil/sil_cameroon_qwerty",
+      targets: ["windows"],
+      displayName: "sil_cameroon_qwerty",
+      version: "1.0",
+      languages: ["ewo-CM", "agq"],
+    });
+
+    const decisions = runDecisionFlow({
+      modules,
+      context: buildExtractContext(ir, regional),
+      answers: { il_language_english: "Ewondo", il_author_name: "Test Author" },
+    });
+
+    expect(decisions["language-code"]).toMatchObject({ value: "ewo", provenance: "extracted" });
+  });
+});
