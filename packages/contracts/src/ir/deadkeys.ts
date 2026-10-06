@@ -70,6 +70,7 @@ import type {
   StoreItem,
 } from "../keyboard-ir.js";
 import { isPlusSeparator } from "../rule-shape.js";
+import { US_BASE_LAYOUT } from "./usBaseLayout.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -90,7 +91,7 @@ import { isPlusSeparator } from "../rule-shape.js";
  * - `"imported"` — anything else: base-keyboard and third-party deadkeys,
  *   including non-US-layout keyboards whose trigger char the US-layout
  *   lookup below cannot resolve (documented limitation — see
- *   {@link US_TRIGGER_CHAR}).
+ *   {@link US_BASE_LAYOUT}).
  *
  * A studio-minted deadkey with no name is indistinguishable from an
  * imported one until Phase 2 writes the authorship marker; that ambiguity
@@ -314,51 +315,16 @@ export function namedDeadkeyRawStoreNames(ir: KeyboardIR): Set<string> {
 // ---------------------------------------------------------------------------
 
 /**
- * Unshifted US-QWERTY character per trigger vkey — mirrors the studio's own
- * `TRIGGER_KEY_CHARS` convention (MechanismGallery.tsx `deadkeyNameFor`:
- * id = codepoint of the trigger key's character).
- *
- * Best-effort and US-layout-only: a deadkey minted by the S-02 path on a
- * non-US base layout (e.g. basic_kbdfr's `+ [K_LBRKT] > dk(005e)`, where the
- * AZERTY key produces `^`) will NOT match here and classifies as
- * `"imported"`. That is an honest display limitation, not a correctness
- * issue — grandfathering (allocateDeadkeyId) never depends on origin.
+ * True when `id` equals the codepoint of the trigger char (US layout).
+ * Best-effort and US-layout-only: a deadkey minted on a non-US base layout
+ * will not match and classifies as `"imported"` (display limitation only;
+ * grandfathering never depends on origin).
  */
-const US_TRIGGER_CHAR: Readonly<Record<string, string>> = {
-  K_QUOTE: "'",
-  K_COMMA: ",",
-  K_PERIOD: ".",
-  K_SLASH: "/",
-  K_COLON: ";",
-  K_LBRKT: "[",
-  K_RBRKT: "]",
-  K_BKQUOTE: "`",
-  K_HYPHEN: "-",
-  K_EQUAL: "=",
-  K_1: "1",
-  K_2: "2",
-  K_3: "3",
-  K_4: "4",
-  K_5: "5",
-  K_6: "6",
-  K_7: "7",
-  K_8: "8",
-  K_9: "9",
-  K_0: "0",
-  K_Q: "q", K_W: "w", K_E: "e", K_R: "r", K_T: "t",
-  K_Y: "y", K_U: "u", K_I: "i", K_O: "o", K_P: "p",
-  K_A: "a", K_S: "s", K_D: "d", K_F: "f", K_G: "g",
-  K_H: "h", K_J: "j", K_K: "k", K_L: "l",
-  K_Z: "z", K_X: "x", K_C: "c", K_V: "v", K_B: "b",
-  K_N: "n", K_M: "m",
-};
-
-/** True when `id` equals the codepoint of the trigger char (US layout). */
 function isLegacyCodepointId(id: number, triggerKey: string | null): boolean {
   if (triggerKey === null) return false;
   // A literal-char trigger carries its own character.
   const ch =
-    triggerKey.length === 1 ? triggerKey : US_TRIGGER_CHAR[triggerKey];
+    triggerKey.length === 1 ? triggerKey : US_BASE_LAYOUT.get(triggerKey);
   if (ch === undefined || [...ch].length !== 1) return false;
   return id === (ch.codePointAt(0) ?? -1);
 }

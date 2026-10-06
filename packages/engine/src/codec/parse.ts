@@ -446,6 +446,65 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
   return { items, opaqueReason: null };
 }
 
+/**
+ * Lenient sketch of a store body for an opaque store fragment: flattens
+ * `outs(name)` from previously seen stores, keeps SMP literals as char items and
+ * named deadkeys as deadkey items (ids allocated per parse via `namedDk`).
+ * Unresolvable tokens are skipped. Returns undefined when nothing resolves.
+ */
+function sketchStoreItems(
+  rawValue: string,
+  known: Map<string, StoreItem[]>,
+  namedDk: Map<string, number>
+): StoreItem[] | undefined {
+  const out: StoreItem[] = [];
+  const toks = splitTokens(rawValue);
+  for (let i = 0; i < toks.length; ) {
+    const tok = toks[i] ?? "";
+    const range = detectRangeAt(toks, i);
+    if (range !== null) {
+      if (range.kind !== "malformed" && range.from <= range.to && range.to - range.from <= 0x10000) {
+        for (let cp = range.from; cp <= range.to; cp++) out.push({ kind: "char", value: String.fromCodePoint(cp) });
+      }
+      i += range.consumed;
+      continue;
+    }
+    i++;
+    const cp = parseCodepoint(tok);
+    if (cp !== null) { out.push({ kind: "char", value: cp }); continue; }
+    if (isSmpLiteral(tok)) {
+      const m = /^U\+([0-9A-Fa-f]+)$/.exec(tok);
+      out.push({ kind: "char", value: String.fromCodePoint(parseInt(m?.[1] ?? "0", 16)) });
+      continue;
+    }
+    if (isQuoted(tok)) { for (const ch of unquote(tok)) out.push({ kind: "char", value: ch }); continue; }
+    if (isNamedDk(tok)) {
+      const name = (/^dk\s*\(\s*([^)]+?)\s*\)$/i.exec(tok)?.[1] ?? "").toLowerCase();
+      let id = namedDk.get(name);
+      if (id === undefined) { id = NAMED_DK_ID_BASE + namedDk.size; namedDk.set(name, id); }
+      out.push({ kind: "deadkey", id });
+      continue;
+    }
+    const dkId = parseDk(tok);
+    if (dkId !== null) { out.push({ kind: "deadkey", id: dkId }); continue; }
+    const ref = parseOuts(tok);
+    if (ref !== null) {
+      const key = ref.toLowerCase();
+      const items = known.get(key);
+      if (items !== undefined) out.push(...items);
+      continue;
+    }
+    const vk = parseVkeyBracket(tok);
+    if (vk !== null) {
+      out.push(vk.modifiers.length > 0 ? { kind: "raw", text: tok } : { kind: "vkey", name: vk.name });
+    }
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** Id base for named-deadkey sketch items; above any hex id a .kmn author writes. */
+const NAMED_DK_ID_BASE = 0x7f000000;
+
 // ---------------------------------------------------------------------------
 // Context / output element parsers
 // ---------------------------------------------------------------------------
@@ -889,6 +948,9 @@ export function parse(text: string, keyboardId: string): ParseResult {
   const groups: IRGroup[] = [];
   const comments: IRComment[] = [];
   const rawFragments: RawKmnFragment[] = [];
+  // Store bodies seen so far (lowercased name), for flattening outs() in sketches.
+  const knownStoreItems = new Map<string, StoreItem[]>();
+  const namedDkIds = new Map<string, number>();
 
   // Opaque feature count map.
   const opaqueCount = new Map<string, number>();
@@ -1004,9 +1066,15 @@ export function parse(text: string, keyboardId: string): ParseResult {
             reason: opaqueReason,
             sourceLine: tok.line,
           };
+          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems, namedDkIds);
+          if (sketch !== undefined) {
+            frag.storeSketch = sketch;
+            knownStoreItems.set(parsed.name.toLowerCase(), sketch);
+          }
           if (currentGroup !== null) frag.groupNodeId = currentGroup.nodeId;
           rawFragments.push(frag);
         } else {
+          knownStoreItems.set(parsed.name.toLowerCase(), items);
           const irStore: IRStore = {
             nodeId: storeNodeId,
             name: parsed.name,

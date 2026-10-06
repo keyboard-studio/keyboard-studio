@@ -5,6 +5,7 @@
 // input without importing the engine (lint-not-to-engine).
 
 import type { CompilerDiagnostic } from "./compileResult";
+import type { IRRule, IRStore } from "./keyboard-ir";
 import type { SourceLocation } from "./lintFinding";
 import type { SimKeyInput } from "./simulation";
 
@@ -120,4 +121,61 @@ export interface ContextVariant {
    * value as an empty string.
    */
   precomposedOutput?: string;
+}
+
+/** What a keyboard can produce, derived from its `KeyboardIR` alone. */
+export interface OutputRepertoire {
+  /** Exact produced forms after the closure; a superset of what the keyboard really produces. */
+  clusters: ReadonlySet<string>;
+  /** Combining marks appearing in any atom, sorted by code point. */
+  marks: readonly string[];
+  /** Non-mark atom starts, including base-layout fallback characters. */
+  bases: readonly string[];
+  /** Maximum marks per cluster used for the closure. */
+  stackDepth: 1 | 2 | 3;
+  /** Output-referenced stores that neither the IR nor a `storeSketch` resolves. */
+  unresolved: readonly { storeName: string; reason: string }[];
+}
+
+/** One alternate-form to produced-cluster mapping. */
+export interface NormalizationMap {
+  /** NFC or NFD form of a cluster, never equal to the cluster itself. */
+  from: string;
+  /** The produced cluster. */
+  to: string;
+  /** Other produced clusters with the same NFC form. */
+  ambiguous?: readonly string[];
+}
+
+/** The generated normalization group, held in IR form. */
+export interface NormalizationStep {
+  /** Fixed marker identifying the generated step. */
+  groupName: "generated_context_normalize";
+  /** `entryPoints.main` before insertion. */
+  originalEntry: string;
+  /** Stores named with the `generated_cn_` prefix. */
+  stores: IRStore[];
+  /** Packed rules, then `match > use(originalEntry)` and `nomatch > use(originalEntry)`. */
+  rules: IRRule[];
+  /** Packed rules, excluding the two `use` lines. */
+  ruleCount: number;
+  /** Up to 5 deterministic examples for the author preview. */
+  examples: { pasted: string; result: string }[];
+}
+
+export type NormalizationRefusalReason =
+  | "no-unicode-entry"
+  | "opaque-entry"
+  | "opaque-output-store"
+  | "time-bound"
+  | "no-alternates";
+
+export type NormalizationStepResult =
+  | { kind: "step"; step: NormalizationStep; cacheKey: string; maps: NormalizationMap[] }
+  | { kind: "refused"; reason: NormalizationRefusalReason; detail?: string };
+
+/** Authoring-cache entry; used only when `cacheKey` equals the current source's key. */
+export interface StoredNormalizationStep {
+  cacheKey: string;
+  result: NormalizationStepResult;
 }
