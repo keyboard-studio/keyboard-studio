@@ -1,0 +1,556 @@
+<title>Decision Spine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a single reading column that widens for diagrams; keycap-like chips carry decision ids; provenance is coded by colour AND a glyph. */
+:root {
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --sunk: #e7ebef;
+  --ink: #17212c;
+  --muted: #56636f;
+  --line: #cfd6dd;
+  --accent: #2b55c9;
+  --asked: #2b55c9;
+  --extracted: #0b7f71;
+  --default: #a86a12;
+  --derived: #7346bd;
+  --stale: #b8382f;
+  --asked-bg: #e3eafb;
+  --extracted-bg: #dcf1ee;
+  --default-bg: #f6ead6;
+  --derived-bg: #ece4f8;
+  --stale-bg: #f8e1df;
+  --display: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c; --surface: #19212a; --sunk: #222c37; --ink: #e6ebf0; --muted: #9aa7b3; --line: #33404d;
+    --accent: #7d9ef5; --asked: #7d9ef5; --extracted: #4cc5b3; --default: #e0a54a; --derived: #b393ef; --stale: #f07c72;
+    --asked-bg: #1f2c4d; --extracted-bg: #123832; --default-bg: #3a2c14; --derived-bg: #2d2343; --stale-bg: #42201d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #19212a; --sunk: #222c37; --ink: #e6ebf0; --muted: #9aa7b3; --line: #33404d;
+  --accent: #7d9ef5; --asked: #7d9ef5; --extracted: #4cc5b3; --default: #e0a54a; --derived: #b393ef; --stale: #f07c72;
+  --asked-bg: #1f2c4d; --extracted-bg: #123832; --default-bg: #3a2c14; --derived-bg: #2d2343; --stale-bg: #42201d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; display: flex; flex-direction: column; gap: 64px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.1rem, 5vw, 3.4rem); font-weight: 800; line-height: 1.05; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; line-height: 1.15; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+code, .id { font-family: var(--mono); font-size: 0.86em; }
+.eyebrow { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lead { font-size: 1.15rem; color: var(--muted); }
+section { display: flex; flex-direction: column; gap: 20px; }
+.sec-head { display: flex; flex-direction: column; gap: 8px; }
+.muted { color: var(--muted); }
+
+/* hero */
+header { display: flex; flex-direction: column; gap: 16px; }
+.formula { font-family: var(--mono); font-size: clamp(0.9rem, 2.2vw, 1.15rem); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 18px; overflow-x: auto; white-space: nowrap; }
+.formula b { color: var(--accent); font-weight: 600; }
+
+/* today vs target */
+.versus { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 22px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel.target { border-color: var(--accent); }
+.flow { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.node { border: 1px solid var(--line); border-radius: 5px; padding: 8px 12px; background: var(--sunk); font-size: 0.92rem; min-width: 0; }
+.node .id { display: block; font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+.node.hot { background: var(--asked-bg); border-color: var(--asked); }
+.arrow { text-align: center; color: var(--muted); font-family: var(--mono); font-size: 0.8rem; line-height: 1; }
+.fan { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.fan .node { background: var(--stale-bg); border-color: color-mix(in srgb, var(--stale) 45%, var(--line)); }
+.routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.88rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+.tally b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* provenance chips */
+.prov { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.prov::before { font-size: 0.8rem; }
+.p-asked { color: var(--asked); background: var(--asked-bg); } .p-asked::before { content: "\25A0"; }
+.p-extracted { color: var(--extracted); background: var(--extracted-bg); } .p-extracted::before { content: "\25B2"; }
+.p-default { color: var(--default); background: var(--default-bg); } .p-default::before { content: "\25CF"; }
+.p-derived { color: var(--derived); background: var(--derived-bg); } .p-derived::before { content: "\25C6"; }
+.p-mixed { color: var(--ink); background: var(--sunk); } .p-mixed::before { content: "\25D0"; }
+
+/* record anatomy */
+.record { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; }
+.code { font-family: var(--mono); font-size: 0.86rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; overflow-x: auto; line-height: 1.7; white-space: pre; }
+.code .k { color: var(--muted); } .code .s { color: var(--extracted); } .code .c { color: var(--muted); font-style: italic; }
+.legend { display: flex; flex-direction: column; gap: 12px; }
+.legend-row { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: baseline; }
+.legend-row p { font-size: 0.93rem; }
+.new-tag { font-family: var(--mono); font-size: 0.68rem; color: var(--derived); border: 1px solid var(--derived); border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
+
+/* implied decisions */
+.seed-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.keycap { font-family: var(--mono); font-weight: 600; background: var(--surface); border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 6px 12px; }
+.seeds { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.seed { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.seed .top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.seed .id { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+.seed .val { font-size: 0.95rem; font-weight: 500; }
+.seed .src { font-size: 0.8rem; color: var(--muted); }
+
+/* explorer */
+.explorer { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.graph-box { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 14px; }
+.graph-box svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.graph { position: relative; display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.dnode { font-family: var(--mono); font-size: 0.74rem; padding: 5px 9px; border-radius: 5px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: opacity .15s, background .15s; }
+.dnode::before { font-size: 0.72rem; }
+.dnode[data-p="asked"]::before { content: "\25A0"; color: var(--asked); }
+.dnode[data-p="extracted"]::before { content: "\25B2"; color: var(--extracted); }
+.dnode[data-p="default"]::before { content: "\25CF"; color: var(--default); }
+.dnode[data-p="derived"]::before { content: "\25C6"; color: var(--derived); }
+.dnode[data-p="mixed"]::before { content: "\25D0"; color: var(--ink); }
+.dnode:hover { border-color: var(--accent); }
+.dnode:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.graph.active .dnode { opacity: 0.32; }
+.graph.active .dnode.sel { opacity: 1; background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.graph.active .dnode.sel::before { color: var(--bg); }
+.graph.active .dnode.up { opacity: 0.75; border-style: dashed; }
+.graph.active .dnode.down { opacity: 1; border-color: var(--stale); background: var(--stale-bg); }
+.graph.active .dnode.down.keep { border-color: var(--asked); background: var(--asked-bg); }
+.edges path { fill: none; stroke: var(--line); stroke-width: 1; }
+.edges path.hot { stroke: var(--stale); stroke-width: 1.6; }
+.edges path.proposed { stroke-dasharray: 4 3; }
+.side { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+.side .counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.count { background: var(--sunk); border-radius: 5px; padding: 8px 10px; }
+.count b { display: block; font-size: 1.4rem; font-family: var(--display); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.count span { font-size: 0.74rem; color: var(--muted); }
+.impact { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+.impact li { display: grid; grid-template-columns: 1fr; gap: 2px; font-size: 0.86rem; border-left: 3px solid var(--stale); padding: 2px 0 2px 10px; }
+.impact li.keep { border-left-color: var(--asked); }
+.impact li.gate { border-left-color: var(--muted); }
+.impact .id { font-size: 0.76rem; }
+.hint { font-size: 0.86rem; color: var(--muted); }
+.key { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+
+/* replay strip */
+.strip { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 6px; }
+.step { flex: 0 0 auto; min-width: 104px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-right: none; font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px; position: relative; }
+.step:first-child { border-radius: 6px 0 0 6px; background: var(--sunk); }
+.step:last-child { border-right: 1px solid var(--line); border-radius: 0 6px 6px 0; background: var(--sunk); font-weight: 600; }
+.step .id { font-size: 0.7rem; color: var(--muted); }
+.step.cp::after { content: "checkpoint"; font-family: var(--mono); font-size: 0.62rem; color: var(--muted); letter-spacing: .04em; }
+.step.reuse { opacity: 0.55; }
+.step.redo { background: var(--stale-bg); border-color: color-mix(in srgb, var(--stale) 40%, var(--line)); }
+.step.changed { background: var(--asked-bg); border-color: var(--asked); }
+.strip-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.84rem; color: var(--muted); }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; border: 1px solid var(--line); }
+
+/* rules table + map table */
+.tbl-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.72rem; font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--sunk); }
+tr:last-child td { border-bottom: none; }
+td .id { color: var(--muted); }
+.fate { font-family: var(--mono); font-size: 0.72rem; font-weight: 600; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+.f-fold { color: var(--stale); background: var(--stale-bg); }
+.f-keep { color: var(--extracted); background: var(--extracted-bg); }
+.f-convert { color: var(--default); background: var(--default-bg); }
+.f-rekey { color: var(--asked); background: var(--asked-bg); }
+
+/* phases */
+.phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; counter-reset: ph; }
+.phase { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.phase .n { font-family: var(--mono); font-size: 0.74rem; color: var(--accent); font-weight: 600; letter-spacing: .05em; }
+.phase ul { margin: 0; padding-left: 18px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 4px; }
+.phase .unlocks { font-size: 0.86rem; border-top: 1px dashed var(--line); padding-top: 10px; color: var(--muted); }
+.phase .unlocks b { color: var(--ink); }
+.phase.new { border-color: var(--derived); }
+
+.risks { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.risk { border-top: 2px solid var(--ink); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.risk p { font-size: 0.92rem; }
+footer { font-size: 0.84rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (max-width: 820px) {
+  .versus, .record, .explorer { grid-template-columns: 1fr; }
+  .side { position: static; }
+  .legend-row { grid-template-columns: 1fr; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">keyboard-studio &middot; spec 088 proposal &middot; km/modular-decisions</span>
+  <h1>One answer, one record, one write</h1>
+  <p class="lead">Today a single answer is saved in up to four places and reaches the keyboard by one of three routes. The target has one source of truth: decisions. The keyboard is not saved at all. It is derived from the starting point and the decisions, and rebuilt whenever one of them changes.</p>
+  <div class="formula">keyboard = <b>replay</b>( starting point, apply(d<sub>1</sub>), apply(d<sub>2</sub>), &hellip; apply(d<sub>n</sub>) )&nbsp;&nbsp;&nbsp;<span class="muted">// decisions in dependency order</span></div>
+</header>
+
+<!-- TODAY VS TARGET -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">01 &middot; Where an answer goes</span>
+    <h2>Today it fans out. In the target it goes to one place.</h2>
+  </div>
+  <div class="versus">
+    <div class="panel">
+      <h3>Today</h3>
+      <div class="flow">
+        <div class="node hot">The author answers<span class="id">step code commits it: one of ~16 commit paths</span></div>
+        <div class="arrow">&darr; saved as raw answers, keyed by step id</div>
+        <div class="fan">
+          <div class="node">surveyAnswers<span class="id">steps[stepId].answers</span></div>
+          <div class="node">session fields<span class="id">selectedTrack, touchSeedSource, &hellip;</span></div>
+          <div class="node">phaseBDraft<span class="id">accept / decline</span></div>
+          <div class="node">phaseAnswersByStep<span class="id">workingCopy[phase][stepId]</span></div>
+          <div class="node">decision log<span class="id">stepId|q|questionId</span></div>
+        </div>
+        <div class="arrow">&darr; and applied separately, by step code</div>
+        <div class="routes">
+          <div class="node">IR rewritten in place<span class="id">setWorkingIR, applyMutatePatch</span></div>
+          <div class="node">Overlays replayed at output<span class="id">deleted*Ids, carveDispositions, keyEditOverlay, deadkeyOverlay</span></div>
+          <div class="node">Identity patch<span class="id">setIdentity, setAttribution</span></div>
+        </div>
+      </div>
+      <div class="tally"><span><b>5</b> saved slices</span><span><b>3</b> write routes</span><span><b>0</b> links from an answer to its effect</span></div>
+    </div>
+    <div class="panel target">
+      <h3>Target</h3>
+      <div class="flow">
+        <div class="node hot">The author answers, or the starting point implies a value<span class="id">every renderer returns a value through onDecide(value)</span></div>
+        <div class="arrow">&darr;</div>
+        <div class="node">Decision record<span class="id">decisionStore[decisionId] = { value, provenance, source }</span></div>
+        <div class="arrow">&darr; module.apply(value, ctx)</div>
+        <div class="node">Patch<span class="id">a pure description of the change, never a direct store write</span></div>
+        <div class="arrow">&darr; replayed in dependency order</div>
+        <div class="node">Keyboard<span class="id">derived: a cache rebuilt from the decisions, never saved</span></div>
+      </div>
+      <div class="tally"><span><b>1</b> thing saved: the decisions</span><span><b>1</b> write path</span><span><b>0</b> copies of any answer</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- RECORD ANATOMY -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">02 &middot; The record</span>
+    <h2>What a decision has to remember</h2>
+    <p class="muted">Recalculation depends on knowing who chose each value. A value the author typed is kept when its inputs change. A value the studio supplied gets recomputed.</p>
+  </div>
+  <div class="record">
+<div class="code"><span class="c">// decisionStore, saved in the draft per decision id</span>
+"copyright-holder": {
+  <span class="k">value:</span>      <span class="s">"Fatou Ndiaye"</span>,
+  <span class="k">provenance:</span> <span class="s">"default"</span>,
+  <span class="k">source:</span>     <span class="s">"author-name"</span>,       <span class="c">// what supplied it</span>
+  <span class="k">inputs:</span>     { <span class="s">"authoring-track"</span>: <span class="s">"copy"</span> },  <span class="c">// requires, as seen</span>
+  <span class="k">offered:</span>    <span class="s">"SIL International"</span>, <span class="c">// extracted, shown beside it</span>
+  <span class="k">step:</span>       <span class="s">"identity"</span>          <span class="c">// display only</span>
+}</div>
+    <div class="legend">
+      <div class="legend-row"><span class="prov p-asked">asked</span><p>The author typed, picked or confirmed it. It is kept when its inputs change. It is re-proposed only if it no longer fits.</p></div>
+      <div class="legend-row"><span class="prov p-extracted">extracted</span><p>Read from the starting point by the module's <code>extract</code>, and labelled "from &lt;keyboard&gt;". It is re-extracted when the starting point or an input changes.</p></div>
+      <div class="legend-row"><span class="prov p-default">default</span><p>Supplied by a rule or a lookup such as langtags or the GitHub profile. It is recomputed.</p></div>
+      <div class="legend-row"><span class="prov p-derived">derived<span class="new-tag">new</span></span><p>Computed from other decisions, such as carve proposals, suggested touch keys or generated help. It is recomputed. This would be a fourth provenance value, added in <code>packages/studio</code> only.</p></div>
+      <div class="legend-row"><span class="prov p-mixed">mixed</span><p>A collection where some items are hand-set and the rest are suggested, as with carve removals or touch keys. Each item carries its own provenance, as touch keys already do (spec 014).</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- IMPLIED DECISIONS -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">03 &middot; Choosing a starting point</span>
+    <h2>One pick seeds a dozen decisions</h2>
+    <p class="muted">Once the working copy is set up, every applicable <code>extract</code> runs, and every decision the author hasn't answered is seeded with its source named. Nothing is applied silently. Each seed is a default the author confirms, changes or overturns. The values below are an illustration of a Wolof keyboard copied from French Basic.</p>
+  </div>
+  <div class="seed-head">
+    <span class="keycap">basic_kbdfr</span><span class="muted">French Basic, chosen on the copy track</span>
+  </div>
+  <div class="seeds" id="seeds"></div>
+</section>
+
+<!-- EXPLORER -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">04 &middot; Changing a decision</span>
+    <h2>Pick a decision to change. See what recalculates.</h2>
+    <p class="muted">The graph is the real <code>requires</code> graph from <code>stepDependencies.ts</code> and the identity modules. Dashed edges are proposed: <code>copyright-holder</code> requiring <code>authoring-track</code> is the 088 acceptance test. Everything downstream of a change is revisited, and its provenance decides what happens.</p>
+  </div>
+  <div class="explorer">
+    <div class="graph-box" id="graphBox">
+      <svg class="edges" id="edges" aria-hidden="true"></svg>
+      <div class="graph" id="graph" role="group" aria-label="Decision dependency graph"></div>
+    </div>
+    <aside class="side" id="side" aria-live="polite"></aside>
+  </div>
+  <div class="key">
+    <span class="prov p-asked">asked</span><span class="prov p-extracted">extracted</span><span class="prov p-default">default</span><span class="prov p-derived">derived</span><span class="prov p-mixed">mixed</span>
+  </div>
+</section>
+
+<!-- REPLAY -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">05 &middot; Rebuilding the keyboard</span>
+    <h2>Replay from the first changed decision</h2>
+    <p class="muted">If every <code>apply</code> returns a patch, the working copy is a pure function of the starting point and the records. Keep a checkpoint of the IR after each decision. A change then replays only from its own checkpoint forward, and the earlier checkpoints are reused. This example changes the Windows layout.</p>
+  </div>
+  <div class="strip" id="strip"></div>
+  <div class="strip-legend">
+    <span><span class="sw" style="background:var(--surface)"></span>reused checkpoint</span>
+    <span><span class="sw" style="background:var(--asked-bg)"></span>changed by the author</span>
+    <span><span class="sw" style="background:var(--stale-bg)"></span>re-applied</span>
+  </div>
+</section>
+
+<!-- RULES -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">06 &middot; The recalculation rule</span>
+    <h2>Provenance decides. The author's word wins.</h2>
+    <p class="muted">This generalises the no-clobber rule that touch re-propagation already follows (<code>steps/repropagate.ts</code>, spec 014), where <code>base-derived</code> and <code>physical-suggested</code> keys are refreshed and <code>hand-set</code> keys never are.</p>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Downstream decision is&hellip;</th><th>When an input changes</th><th>What the author sees</th></tr></thead>
+    <tbody>
+      <tr><td><span class="prov p-extracted">extracted</span></td><td>Run <code>extract</code> again against the new inputs</td><td>The new value, with "from &lt;keyboard&gt;"</td></tr>
+      <tr><td><span class="prov p-default">default</span> <span class="prov p-derived">derived</span></td><td>Recompute, then <code>apply</code></td><td>The updated value, marked as recalculated</td></tr>
+      <tr><td><span class="prov p-asked">asked</span>, still valid</td><td>Keep. Run <code>validate</code> against the new inputs</td><td>Nothing changes</td></tr>
+      <tr><td><span class="prov p-asked">asked</span>, no longer fits</td><td>Keep the value, flag it, and offer the recomputed value beside it</td><td>A re-proposal (the existing <code>reproposalNoticeStore</code>), and never a silent overwrite</td></tr>
+      <tr><td><span class="prov p-mixed">mixed</span></td><td>Recompute the suggested items and keep the hand-set ones. An orphaned hand-set item is shown, not deleted</td><td>The author's edits stay, and the suggestions refresh around them</td></tr>
+      <tr><td>Gated off by the change</td><td>Keep the record and mark it inactive. It is not applied</td><td>The step disappears. Switching back restores the answer</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- MAP -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">07 &middot; What happens to each mechanism</span>
+    <h2>Everything folds into decisions</h2>
+    <p class="muted">Each fact is stored once. The decision store <em>replaces</em> the answer copies, and the overlays become the values of the decisions they record. A draft saves the starting point&rsquo;s id and the decisions, and nothing else.</p>
+  </div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Today</th><th>Fate</th><th>Becomes</th></tr></thead>
+    <tbody>
+      <tr><td>surveyAnswers <span class="id">steps[stepId].answers</span></td><td><span class="fate f-fold">fold in</span></td><td>Decision records keyed by decision id. Within-step positions stay as view state</td></tr>
+      <tr><td>session answer fields <span class="id">selectedTrack, touchSeedSource, localBase, scaffoldSpec, helpDocs</span></td><td><span class="fate f-fold">fold in</span></td><td>Ordinary decisions. <code>decisionsFromTraversal</code> is deleted, and <code>gatedBy</code> reads the store</td></tr>
+      <tr><td>phaseBDraft <span class="id">accept / decline</span></td><td><span class="fate f-fold">fold in</span></td><td>The values of the inventory decisions. Drafts that are still open stay as renderer-internal state</td></tr>
+      <tr><td>phaseAnswersByStep, phaseResults <span class="id">workingCopy</span></td><td><span class="fate f-fold">fold in</span></td><td>Removed. Readers query the decision store</td></tr>
+      <tr><td>decision log <span class="id">stepId|q|questionId</span></td><td><span class="fate f-rekey">re-key</span></td><td>The provenance history of each decision, keyed by decision id. The step id is display only</td></tr>
+      <tr><td>Overlays <span class="id">deleted*Ids, carveDispositions, keyEditOverlay, deadkeyOverlay</span></td><td><span class="fate f-fold">fold in</span></td><td>The <em>values</em> of their decisions: carve removals are the value of <code>carved-layout</code>, touch edits the value of <code>touch-layout</code>. Each item carries its own provenance. <code>apply</code> turns them into IR at rebuild time</td></tr>
+      <tr><td>In-place IR rewrites <span class="id">MARKS guards, R1 lockDesktop, R2 touch, deadkey ops</span></td><td><span class="fate f-convert">convert</span></td><td>Code inside <code>apply</code>, a function of (IR, value, inputs), so the rebuild reproduces them. This is the hard part</td></tr>
+      <tr><td>Identity patch <span class="id">setIdentity, setAttribution</span></td><td><span class="fate f-fold">fold in</span></td><td>The values of the identity and project-name decisions, applied by their <code>apply</code></td></tr>
+      <tr><td>workingCopy draft slice <span class="id">ir, irAxes, staleSteps, &hellip;</span></td><td><span class="fate f-convert">derive</span></td><td>Not saved. On load the keyboard is rebuilt from the starting point and the decisions. <code>irAxes</code> and staleness are recomputed</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- PHASES -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">08 &middot; What it would take</span>
+    <h2>Six phases, each landing green</h2>
+    <p class="muted">Phases 1 to 5 follow the 088 handoff. Phase 6 is new: recalculation needs every effect to be replayable, which the handoff does not yet require.</p>
+  </div>
+  <div class="phases">
+    <div class="phase"><span class="n">PHASE 1</span><h3>A live decision store</h3><ul><li>Every completion writes Decision records</li><li><code>gatedBy</code> reads the store, and <code>decisionsFromTraversal</code> goes</li><li>Drafts save per decision id, and old drafts migrate</li></ul><div class="unlocks"><b>Unlocks:</b> one place that knows every answer and who gave it.</div></div>
+    <div class="phase"><span class="n">PHASE 2</span><h3>Questions write through <code>apply</code></h3><ul><li>The identity, track, project_name and help writes move into modules</li><li><code>VITE_KM_MUTATE_SEAM</code> goes, and <code>apply</code> is the only path</li><li><code>apply</code> returns a patch</li></ul><div class="unlocks"><b>Unlocks:</b> question effects can be re-run.</div></div>
+    <div class="phase"><span class="n">PHASE 3</span><h3>Galleries become modules</h3><ul><li>Each <code>settles</code> name gets a module, with the existing component as its <code>renderer</code></li><li>In-place IR rewrites move into <code>apply</code></li><li>Overlays become decision values, each item with its provenance</li><li>Every decision gets a log entry (the G7 gaps)</li></ul><div class="unlocks"><b>Unlocks:</b> every effect is replayable. This is the largest phase.</div></div>
+    <div class="phase"><span class="n">PHASE 4</span><h3>Steps derived from decisions</h3><ul><li>Placement comes from <code>requires</code>, and screens are merged by <code>group</code></li><li><code>flowRefs</code> and <code>settles</code> go</li><li>The parity tests prove "same order unless a <code>requires</code> says otherwise"</li></ul><div class="unlocks"><b>Unlocks:</b> moving a decision takes one edit.</div></div>
+    <div class="phase"><span class="n">PHASE 5</span><h3>Live extraction</h3><ul><li>Extraction runs after setup and seeds unanswered decisions</li><li>Setting up the working copy requires <code>authoring-track</code> (G7)</li><li>The acceptance test runs in the live wizard</li></ul><div class="unlocks"><b>Unlocks:</b> the implied decisions in section 03.</div></div>
+    <div class="phase new"><span class="n">PHASE 6 &middot; NEW</span><h3>Recalculate on change</h3><ul><li>Find the downstream closure from <code>orderByDependencies</code>'s graph</li><li>Apply the provenance rule, generalising <code>repropagate</code></li><li>Replay from a per-decision checkpoint</li><li>Show re-proposals for asked values that no longer fit</li><li>Stop saving the working copy: drafts hold decisions only</li></ul><div class="unlocks"><b>Unlocks:</b> changing a decision updates the keyboard, and the keyboard can never disagree with its decisions.</div></div>
+  </div>
+</section>
+
+<!-- RISKS -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">09 &middot; Open questions</span>
+    <h2>Before the spec</h2>
+  </div>
+  <div class="risks">
+    <div class="risk"><h3>Rebuild cost</h3><p>Carve and mechanisms on a large starting point such as <code>sil_euro_latin</code> may be slow to rebuild, and a resumed draft rebuilds from scratch. Checkpoints cover edits. Resume may need a disposable cache that is thrown away whenever it disagrees with the decisions. Measure before phase 6.</p></div>
+    <div class="risk"><h3>Effects that aren't pure</h3><p>Some reducers read live store state while they write. Each one has to become a function of (IR, value, inputs) before it can be replayed.</p></div>
+    <div class="risk"><h3>Opaque fragments</h3><p>A <code>RawKmnFragment</code> is preserved, never edited. A replay must carry it through unchanged, not regenerate it.</p></div>
+    <div class="risk"><h3>D3 is unaffected</h3><p>Recalculation is a write, not a validation, so it adds no timer. Validation runs once on the rebuilt copy, in the existing 300&nbsp;ms cycle.</p></div>
+    <div class="risk"><h3>Changing the starting point</h3><p>This is the widest possible closure: every extracted value is re-read, and asked answers are kept and re-checked. Decide whether that is a recalculation or a new project with the answers carried over.</p></div>
+    <div class="risk"><h3>Contracts stay put</h3><p>The <code>derived</code> provenance and the patch type live in <code>packages/studio</code>. If either starts to reach <code>packages/contracts</code>, stop and check with the owner.</p></div>
+  </div>
+</section>
+
+<footer>Sources: specs/088-modular-decisions/HANDOFF.md, steps/stepDependencies.ts, lib/draftPersistence.ts, stores/workingCopyStore.ts and steps/repropagate.ts, on branch km/modular-decisions at f08e83df. The seed values in section 03 are illustrative.</footer>
+</div>
+
+<script>
+(function () {
+  // Real requires edges (stepDependencies.ts + identity modules). proposed:true = 088 acceptance-test edge.
+  var D = [
+    { id: "language-code", step: "identity", p: "asked", v: "wo" },
+    { id: "language-name", step: "identity", p: "default", v: "Wolof", src: "langtags" },
+    { id: "target-script", step: "identity", p: "default", v: "Latn", src: "langtags" },
+    { id: "author-name", step: "identity", p: "default", v: "Fatou Ndiaye", src: "GitHub profile" },
+    { id: "windows-layout", step: "layout", p: "default", v: "French (AZERTY)", src: "language-code", req: ["language-code"] },
+    { id: "base-keyboard", step: "choose_base", p: "asked", v: "basic_kbdfr", req: ["language-code", "target-script"] },
+    { id: "authoring-track", step: "track", p: "asked", v: "copy", req: ["base-keyboard"] },
+    { id: "copyright-holder", step: "identity", p: "default", v: "Fatou Ndiaye", src: "author-name", req: ["author-name", "authoring-track"], proposed: ["authoring-track"] },
+    { id: "project-keyboard-id", step: "project_name", p: "asked", v: "wolof_azerty", req: ["authoring-track"], gate: "copy track only" },
+    { id: "character-inventory", step: "characters", p: "extracted", v: "French letters + ë ñ ŋ", src: "basic_kbdfr + CLDR", req: ["target-script", "authoring-track", "project-keyboard-id"] },
+    { id: "marks-treatment", step: "marks", p: "extracted", v: "^ and ¨ as dead keys", src: "basic_kbdfr", req: ["character-inventory"] },
+    { id: "punctuation-inventory", step: "punctuation", p: "extracted", v: "« » … §", src: "basic_kbdfr", req: ["character-inventory"] },
+    { id: "invisibles-inventory", step: "invisibles", p: "default", v: "none", src: "script rule", req: ["character-inventory"] },
+    { id: "retained-convenience-chars", step: "convenience", p: "derived", v: "€ £ µ kept", src: "keyboard minus alphabet", req: ["character-inventory", "base-keyboard"] },
+    { id: "carved-layout", step: "carve", p: "mixed", v: "9 removals proposed, 2 by hand", src: "derived + asked", req: ["base-keyboard", "windows-layout", "marks-treatment", "punctuation-inventory", "invisibles-inventory", "retained-convenience-chars"] },
+    { id: "deadkeys-defined", step: "deadkeys", p: "extracted", v: "dk(^), dk(¨)", src: "basic_kbdfr", req: ["carved-layout"] },
+    { id: "rule-set", step: "rules", p: "derived", v: "rules for the retained keys", req: ["deadkeys-defined", "windows-layout"] },
+    { id: "physical-layout", step: "mechanisms", p: "mixed", v: "ŋ on AltGr+n by hand, rest suggested", req: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"] },
+    { id: "touch-seed-source", step: "touch_seed_source", p: "default", v: "from the physical layout", req: ["physical-layout"] },
+    { id: "touch-layout", step: "touch", p: "mixed", v: "suggested keys, 3 hand-set", req: ["physical-layout", "touch-seed-source"] },
+    { id: "help-docs", step: "help", p: "derived", v: "generated welcome + help", req: ["physical-layout", "touch-layout"] }
+  ];
+  var byId = {}; D.forEach(function (d) { d.req = d.req || []; byId[d.id] = d; });
+  var kids = {}; D.forEach(function (d) { kids[d.id] = []; });
+  D.forEach(function (d) { d.req.forEach(function (r) { kids[r].push(d.id); }); });
+
+  // depth = longest path from a root
+  var depth = {};
+  function dep(id) { if (depth[id] != null) return depth[id]; var d = byId[id]; var m = -1; d.req.forEach(function (r) { m = Math.max(m, dep(r)); }); return (depth[id] = m + 1); }
+  D.forEach(function (d) { dep(d.id); });
+
+  // ----- seeds section -----
+  var seedIds = ["language-name", "target-script", "windows-layout", "copyright-holder", "character-inventory", "marks-treatment", "punctuation-inventory", "invisibles-inventory", "retained-convenience-chars", "carved-layout", "deadkeys-defined", "touch-seed-source"];
+  var seedsEl = document.getElementById("seeds");
+  seedIds.forEach(function (id) {
+    var d = byId[id];
+    var p = d.p === "mixed" ? "derived" : d.p;
+    var v = id === "carved-layout" ? "9 removals proposed" : d.v;
+    var src = id === "carved-layout" ? "from basic_kbdfr's keys" : (d.src ? "from " + d.src : "");
+    if (id === "copyright-holder") src = "from author-name. basic_kbdfr's own notice is kept automatically on copy";
+    var el = document.createElement("div"); el.className = "seed";
+    el.innerHTML = '<div class="top"><span class="id"></span><span class="prov p-' + p + '">' + p + '</span></div><div class="val"></div><div class="src"></div>';
+    el.querySelector(".id").textContent = id; el.querySelector(".val").textContent = v; el.querySelector(".src").textContent = src;
+    seedsEl.appendChild(el);
+  });
+
+  // ----- graph -----
+  var graph = document.getElementById("graph"), svg = document.getElementById("edges"), box = document.getElementById("graphBox"), side = document.getElementById("side");
+  var rows = [];
+  D.forEach(function (d) { (rows[depth[d.id]] = rows[depth[d.id]] || []).push(d); });
+  var btn = {};
+  rows.forEach(function (r) {
+    var row = document.createElement("div"); row.className = "row";
+    r.forEach(function (d) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "dnode"; b.dataset.p = d.p; b.dataset.id = d.id;
+      b.textContent = d.id; b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", function () { select(sel === d.id ? null : d.id); });
+      row.appendChild(b); btn[d.id] = b;
+    });
+    graph.appendChild(row);
+  });
+
+  var sel = null;
+  function closure(id, map) { var out = {}, st = [id]; while (st.length) { var x = st.pop(); map[x].forEach(function (y) { if (!out[y]) { out[y] = 1; st.push(y); } }); } return out; }
+
+  function drawEdges(down) {
+    var bb = box.getBoundingClientRect(); var html = "";
+    D.forEach(function (d) {
+      d.req.forEach(function (r) {
+        var a = btn[r].getBoundingClientRect(), b = btn[d.id].getBoundingClientRect();
+        var x1 = a.left + a.width / 2 - bb.left, y1 = a.bottom - bb.top, x2 = b.left + b.width / 2 - bb.left, y2 = b.top - bb.top;
+        var my = (y1 + y2) / 2;
+        var cls = [];
+        if (sel && (r === sel || down[r]) && down[d.id]) cls.push("hot");
+        if (d.proposed && d.proposed.indexOf(r) >= 0) cls.push("proposed");
+        html += '<path class="' + cls.join(" ") + '" d="M' + x1 + "," + y1 + " C" + x1 + "," + my + " " + x2 + "," + my + " " + x2 + "," + y2 + '"/>';
+      });
+    });
+    svg.setAttribute("viewBox", "0 0 " + bb.width + " " + bb.height);
+    svg.innerHTML = html;
+  }
+
+  var NOTE = {
+    "base-keyboard": "This is the widest change. Every extracted value is re-read from the new keyboard, and every asked answer is kept and re-checked.",
+    "authoring-track": "Today the working copy is set up before the track is known (G7). In the target, setup requires authoring-track, so this change re-instantiates the copy. On adapt, project-keyboard-id is gated off but kept, and copyright-holder is re-extracted from the keyboard's own notice.",
+    "windows-layout": "Carve's proposals, the rules and the suggested physical keys all follow the host layout. The author's own removals and AltGr assignments are kept.",
+    "character-inventory": "Adding a letter re-runs every inventory step, carve's shielding and the physical suggestions.",
+    "copyright-holder": "A leaf, so nothing downstream recalculates. This is the cheapest kind of change.",
+    "carved-layout": "Dead keys are re-extracted for the keys that remain, and the rules and suggestions rebuild around the author's hand-set keys."
+  };
+
+  function outcome(d) {
+    if (d.id === "project-keyboard-id" && sel === "authoring-track") return { cls: "gate", t: "Gated off on adapt. The record is kept and inactive, so switching back restores it." };
+    if (d.p === "asked") return { cls: "keep", t: "Kept as “" + d.v + "”. Re-validated, and re-proposed only if it no longer fits." };
+    if (d.p === "mixed") return { cls: "", t: "Mixed. Hand-set items are kept and the suggested ones recomputed." };
+    if (d.p === "extracted") return { cls: "", t: "Re-extracted (was “" + d.v + "”)." };
+    return { cls: "", t: "Recomputed (" + d.p + ", was “" + d.v + "”)." };
+  }
+
+  function renderSide(down, up) {
+    if (!sel) {
+      side.innerHTML = '<span class="eyebrow">Nothing selected</span><h3>Choose any decision in the graph</h3><p class="hint">The decisions that depend on it light up. Red ones are recalculated. Blue ones are the author’s answers, kept and re-checked. Dashed ones are upstream and unaffected.</p><p class="hint">Try <span class="id">windows-layout</span>, <span class="id">authoring-track</span> or <span class="id">copyright-holder</span>.</p>';
+      return;
+    }
+    var d = byId[sel], ids = D.filter(function (x) { return down[x.id]; });
+    var n = { re: 0, keep: 0, mix: 0 };
+    ids.forEach(function (x) { if (x.p === "asked") n.keep++; else if (x.p === "mixed") n.mix++; else n.re++; });
+    var h = '<span class="eyebrow">Changing</span><h3 class="id" style="font-size:1rem"></h3><p class="hint" id="cur"></p>';
+    if (NOTE[sel]) h += '<p class="hint" id="note"></p>';
+    h += '<div class="counts"><div class="count"><b>' + n.re + '</b><span>recalculated</span></div><div class="count"><b>' + n.mix + '</b><span>mixed</span></div><div class="count"><b>' + n.keep + '</b><span>kept, re-checked</span></div></div>';
+    h += ids.length ? '<ul class="impact" id="impact"></ul>' : '<p class="hint">Nothing depends on it.</p>';
+    side.innerHTML = h;
+    side.querySelector("h3").textContent = sel;
+    side.querySelector("#cur").textContent = "Currently “" + d.v + "” (" + d.p + "). After the change it becomes asked.";
+    if (NOTE[sel]) side.querySelector("#note").textContent = NOTE[sel];
+    var ul = side.querySelector("#impact");
+    ids.forEach(function (x) {
+      var o = outcome(x), li = document.createElement("li"); if (o.cls) li.className = o.cls;
+      li.innerHTML = '<span class="id"></span><span></span>';
+      li.children[0].textContent = x.id; li.children[1].textContent = o.t; ul.appendChild(li);
+    });
+  }
+
+  function select(id) {
+    sel = id;
+    var down = id ? closure(id, kids) : {}, upmap = {}; D.forEach(function (d) { upmap[d.id] = d.req; });
+    var up = id ? closure(id, upmap) : {};
+    graph.classList.toggle("active", !!id);
+    D.forEach(function (d) {
+      var b = btn[d.id];
+      b.classList.toggle("sel", d.id === id); b.classList.toggle("down", !!down[d.id]); b.classList.toggle("up", !!up[d.id]);
+      b.classList.toggle("keep", !!down[d.id] && (d.p === "asked" || (d.id === "project-keyboard-id" && id === "authoring-track")));
+      b.setAttribute("aria-pressed", d.id === id ? "true" : "false");
+    });
+    drawEdges(down); renderSide(down, up);
+  }
+
+  // ----- replay strip -----
+  var order = ["language-code", "base-keyboard", "authoring-track", "character-inventory", "marks-treatment", "windows-layout", "carved-layout", "deadkeys-defined", "rule-set", "physical-layout", "touch-layout", "help-docs"];
+  var changed = "windows-layout", dn = closure(changed, kids);
+  var strip = document.getElementById("strip");
+  var s0 = document.createElement("div"); s0.className = "step"; s0.innerHTML = '<span class="id">IR</span>basic_kbdfr'; strip.appendChild(s0);
+  order.forEach(function (id) {
+    var el = document.createElement("div");
+    var c = id === changed ? "changed" : dn[id] ? "redo" : "reuse";
+    el.className = "step cp " + c;
+    el.innerHTML = '<span class="id">apply</span><span></span>'; el.children[1].textContent = id;
+    strip.appendChild(el);
+  });
+  var sN = document.createElement("div"); sN.className = "step"; sN.innerHTML = '<span class="id">output</span>working copy'; strip.appendChild(sN);
+
+  select(null);
+  var t; window.addEventListener("resize", function () { clearTimeout(t); t = setTimeout(function () { select(sel); }, 80); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { select(sel); });
+})();
+</script>

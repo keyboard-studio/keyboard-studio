@@ -325,6 +325,9 @@ coupling with no visible change.
 | help | `PhaseFGate` → flow factory | `setHelpDocs`, `setHistoryEntryState` |
 
 ## Pointers
+- Infographic of this plan: [decision-spine.html](decision-spine.html) (open it in a browser). It
+  includes an interactive graph of the real `requires` edges that shows what recalculates when a
+  decision changes. Its seed values for `basic_kbdfr` are illustrative.
 - Spec 087 docs: [spec.md](../087-decision-backend/spec.md),
   [ARCHITECTURE.md](../087-decision-backend/ARCHITECTURE.md) and
   [followups.md](../087-decision-backend/followups.md). Item 4 of the follow-ups (tie-break
