@@ -54,6 +54,7 @@ import {
   type GoogleHandlerConfig,
 } from "./google-handlers.js";
 import { ManagedPRBodySchema } from "./managed-pr-schemas.js";
+import { checkManagedPRRateLimit } from "./managed-pr-rate-limit.js";
 import {
   submitManagedPR,
   type ManagedPRPipelineConfig,
@@ -480,6 +481,17 @@ export async function buildServer(opts: {
         error: "invalid_request",
         details: parsed.error.issues.map(staticZodDetail),
       });
+    }
+
+    // Same throttle as the Vercel route (security audit run-1:
+    // managed-pr:anonymous-unbounded-installation-token-mint). Fail-open
+    // when the throttle table/DB is unavailable (dev environments).
+    const throttle = await checkManagedPRRateLimit(req.ip ?? null);
+    if (!throttle.allowed) {
+      if (throttle.retryAfterSeconds !== undefined) {
+        reply.header("Retry-After", String(throttle.retryAfterSeconds));
+      }
+      return reply.status(429).send({ error: "rate_limited" });
     }
 
     const result = await submitManagedPR(parsed.data, managedPRConfig);
