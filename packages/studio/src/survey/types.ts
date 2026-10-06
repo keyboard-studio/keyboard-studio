@@ -48,6 +48,8 @@ export interface FlowGotoRule {
   condition?: string;
   goto: string | null;
   default?: true;
+  /** Documented loop-back to an earlier question; ignored by order derivation. */
+  loopBack?: true;
 }
 
 /**

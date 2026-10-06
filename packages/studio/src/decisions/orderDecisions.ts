@@ -30,27 +30,17 @@ export interface RouteEdge {
 }
 
 /**
- * Routing edges of a module (plain, default and every conditional target). An
- * edge is a documented loop-back when its rule is `value == 'v'` and the module's
- * own fixtures annotate `v` with a "loop back ..." note (e.g. pb_additional_methods).
+ * Routing edges of a module (plain, default and every conditional target); a rule
+ * marked `loopBack: true` is a documented loop-back.
  */
 function routeEdges(m: QuestionModule): RouteEdge[] {
   const next = m.definition.next;
   if (typeof next === "string") return [{ to: next, loopBack: false }];
   if (!Array.isArray(next)) return [];
-  const loopValues = new Set(
-    (m.fixtures?.valid ?? [])
-      .filter((f) => /^loop back/i.test(f.note ?? ""))
-      .map((f) => f.value),
-  );
   const edges: RouteEdge[] = [];
   for (const rule of next) {
     if (typeof rule.goto !== "string") continue;
-    const eq = rule.condition?.match(/^value\s*==\s*'([^']*)'$/);
-    edges.push({
-      to: rule.goto,
-      loopBack: eq !== null && eq !== undefined && loopValues.has(eq[1]),
-    });
+    edges.push({ to: rule.goto, loopBack: rule.loopBack === true });
   }
   return edges;
 }
