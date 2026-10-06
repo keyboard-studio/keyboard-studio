@@ -9,8 +9,10 @@
 //   SC-003  the added rule count is within the spike's bound
 //   SC-004  compile diagnostics are equal before and after
 //
-// Skipped with a [WARN] when `../keyboards` is absent (same convention as
-// carveViaSplice.corpus.test.ts). Run locally with:
+// Skipped with a [WARN] when `../keyboards` is absent locally (same convention as
+// carveViaSplice.corpus.test.ts), but when CI is set a missing corpus is a hard
+// failure: this suite is the only proof of SC-001..SC-004, so a skip there would
+// be a silent green. Run locally with:
 //
 //   pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/parity.corpus
 
@@ -35,7 +37,16 @@ import {
 const __dir = dirname(fileURLToPath(import.meta.url));
 const RELEASE_ROOT = resolve(__dir, "../../../../../../keyboards/release");
 const available = existsSync(RELEASE_ROOT);
-if (!available) console.warn("[WARN] ../keyboards not found; skipping normalization-step parity corpus test");
+const ciRequiresCorpus = Boolean(process.env.CI);
+if (!available && !ciRequiresCorpus) {
+  console.warn("[WARN] ../keyboards not found; skipping normalization-step parity corpus test (set CI to make this fatal)");
+}
+
+describe("normalization step parity: corpus presence", () => {
+  it.skipIf(!ciRequiresCorpus)("the sibling ../keyboards corpus exists when CI is set (SC-001..SC-004 are otherwise unproven)", () => {
+    expect(available, `CI is set but ${RELEASE_ROOT} is missing; the parity corpus suite would silently skip`).toBe(true);
+  });
+});
 
 /** SC-003: added rule bounds (the spike's counts, except fv_northern_tutchone). */
 const RULE_BOUND: Record<string, number> = {

@@ -170,6 +170,16 @@ jobs:
       - name: Test (all packages)
         run: pnpm -r test
 
+      # spec 086 SC-005: the generation-time budget (p95 under 5 s over every
+      # parseable corpus keyboard) is opt-in via KS_CORPUS_PERF, so the line above
+      # never runs it. This job holds the pinned corpus, so gate it here. (The
+      # parity suite needs no flag: it fails when CI is set and the corpus is
+      # missing.)
+      - name: Test (context normalization generation-time budget, corpus)
+        run: pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/generation-time.corpus
+        env:
+          KS_CORPUS_PERF: "1"
+
       # The co-located Vercel functions under /api are intentionally outside the
       # pnpm workspace, so `pnpm -r test` does not cover them. Run their standalone
       # vitest config explicitly — otherwise these tests can rot unnoticed.
