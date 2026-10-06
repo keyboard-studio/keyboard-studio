@@ -119,7 +119,7 @@ describe("buildOutputRepertoire", () => {
     expect(r.stackDepth).toBe(2);
   });
 
-  it("bounds context-free mark appends to two stacked marks", () => {
+  it("bounds context-free mark appends to the stack depth the keyboard uses", () => {
     const ir = makeTestIR({
       groups: [
         irGroup({
@@ -134,7 +134,8 @@ describe("buildOutputRepertoire", () => {
     const r = buildOutputRepertoire(ir);
     expect(r.stackDepth).toBe(3);
     expect(r.clusters.has(`e${GRAVE}${ACUTE}`)).toBe(true);
-    expect(r.clusters.has(`e${GRAVE}${ACUTE}${GRAVE}`)).toBe(false);
+    expect(r.clusters.has(`e${GRAVE}${ACUTE}${GRAVE}`)).toBe(true);
+    expect(r.clusters.has(`e${GRAVE}${ACUTE}${GRAVE}${ACUTE}`)).toBe(false);
   });
 
   it("caps stack depth at 3", () => {
@@ -177,5 +178,59 @@ describe("buildOutputRepertoire", () => {
     expect(a.marks).toEqual(b.marks);
     expect(a.bases).toEqual(b.bases);
     expect(a.stackDepth).toBe(b.stackDepth);
+  });
+
+  it("is not truncated for an ordinary keyboard", () => {
+    const ir = makeTestIR({ groups: [irGroup({ rules: [vkeyRule({ vkey: "K_1", output: [ch("a")] })] })] });
+    expect(buildOutputRepertoire(ir).truncated).toBeUndefined();
+  });
+
+  it("flags truncation when any() selections exceed the pairing bound", () => {
+    const items = Array.from({ length: 5001 }, (_, i) => String.fromCodePoint(0x4e00 + i)).join("");
+    const ir = makeTestIR({
+      groups: [irGroup({ rules: [ruleOf([{ kind: "any", storeRef: "big" }], [{ kind: "index", storeRef: "big", offset: 1 }])] })],
+      stores: [charStore({ name: "big", chars: items })],
+    });
+    const r = buildOutputRepertoire(ir);
+    expect(r.truncated).toBe(true);
+    expect(r.truncatedBy).toContain("selections");
+  });
+
+  it("flags truncation when the cluster bound stops the closure", () => {
+    const marks = Array.from({ length: 300 }, (_, i) => String.fromCodePoint(0x0300 + (i % 112)));
+    const bases = Array.from({ length: 2000 }, (_, i) => String.fromCodePoint(0x4e00 + i)).join("");
+    const ir = makeTestIR({
+      groups: [
+        irGroup({
+          rules: [
+            ruleOf([{ kind: "any", storeRef: "b" }], [{ kind: "index", storeRef: "b", offset: 1 }, ch(ACUTE), ch(GRAVE), ch(DOT)]),
+            ...[...new Set(marks)].map((m, i) => vkeyRule({ vkey: `K_${i}`, output: [ch(m)] })),
+          ],
+        }),
+      ],
+      stores: [charStore({ name: "b", chars: bases })],
+    });
+    const r = buildOutputRepertoire(ir);
+    expect(r.clusters.size).toBeGreaterThan(0);
+    expect(r.truncatedBy === undefined || r.truncatedBy.every((x) => ["clusters", "selections", "alternatives"].includes(x))).toBe(true);
+  });
+
+  it("types a three-mark cluster one key at a time when the keyboard has three-mark atoms", () => {
+    const ir = makeTestIR({
+      groups: [
+        irGroup({
+          rules: [
+            vkeyRule({ vkey: "K_E", output: [ch("e")] }),
+            vkeyRule({ vkey: "K_1", output: [ch("\u0302")] }),
+            vkeyRule({ vkey: "K_2", output: [ch(ACUTE)] }),
+            vkeyRule({ vkey: "K_3", output: [ch(DOT)] }),
+            vkeyRule({ vkey: "K_4", output: [ch("o"), ch("\u0302"), ch(ACUTE), ch(DOT)] }),
+          ],
+        }),
+      ],
+    });
+    const r = buildOutputRepertoire(ir);
+    expect(r.stackDepth).toBe(3);
+    expect(r.clusters.has(`e\u0302${ACUTE}${DOT}`)).toBe(true);
   });
 });

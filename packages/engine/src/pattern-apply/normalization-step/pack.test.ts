@@ -130,3 +130,43 @@ describe("packNormalization safety", () => {
     expect(packNormalization(maps, r, () => true)).toBeNull();
   });
 });
+
+describe("packNormalization bounds", () => {
+  const cjk = (n: number, base = 0x4e00): string[] => Array.from({ length: n }, (_, i) => String.fromCodePoint(base + i));
+
+  it("refuses with a reason when the mark-tuple product exceeds the cap, without hanging", () => {
+    const marks = cjk(700, 0x0300).filter((c) => /^\p{M}/u.test(c)).concat(cjk(700, 0x20000));
+    const maps = [map(`h${GRAVE}${ACUTE}`, `H${GRAVE}${ACUTE}`)];
+    const t0 = performance.now();
+    const packed = packNormalization(maps, rep([], [GRAVE, ACUTE, ...marks]));
+    expect(packed).toMatchObject({ tooLarge: expect.stringContaining("combinations") });
+    expect(performance.now() - t0).toBeLessThan(2000);
+  }, 5000);
+
+  it("polls shouldStop inside the tuple enumeration", () => {
+    const marks = [GRAVE, ACUTE, ...cjk(400, 0x20000)];
+    const maps = [map(`h${GRAVE}${ACUTE}`, `H${GRAVE}${ACUTE}`)];
+    let calls = 0;
+    // Allow the per-length and per-head polls, then stop on the first in-enumeration poll.
+    const packed = packNormalization(maps, rep([], marks), () => ++calls > 2);
+    expect(packed).toBeNull();
+    expect(calls).toBeGreaterThan(2);
+  }, 5000);
+
+  it("refuses when the rule count passes the cap", () => {
+    const maps = cjk(2100).map((h, i) => map(`${h}${String.fromCodePoint(0x30000 + i)}`, String.fromCodePoint(0x40000 + i)));
+    expect(packNormalization(maps, rep([], []))).toMatchObject({ tooLarge: expect.stringContaining("rules") });
+  }, 20000);
+
+  it("refuses when the store count passes the cap", () => {
+    const maps: NormalizationMap[] = [];
+    for (let i = 0; i < 600; i++) {
+      const t1 = String.fromCodePoint(0x30000 + i);
+      const t2 = String.fromCodePoint(0x31000 + i);
+      ["\u4e00", "\u4e01"].forEach((h, j) =>
+        maps.push(map(`${h}${t1}${t2}`, `${String.fromCodePoint(0x40000 + 2 * i + j)}${String.fromCodePoint(0x50000 + 2 * i + j)}`)),
+      );
+    }
+    expect(packNormalization(maps, rep([], []))).toMatchObject({ tooLarge: expect.stringContaining("stores") });
+  }, 20000);
+});

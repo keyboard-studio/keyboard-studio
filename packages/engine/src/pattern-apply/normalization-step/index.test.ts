@@ -81,6 +81,34 @@ describe("proposeNormalizationStep", () => {
     });
   });
 
+  it("refuses with a truncation detail when the output repertoire was cut short", async () => {
+    const base = parseFixture(ALTERNATES_KMN);
+    const chars = Array.from({ length: 5001 }, (_, i) => String.fromCodePoint(0x4e00 + i));
+    const big: KeyboardIR = {
+      ...base,
+      stores: [
+        ...base.stores,
+        { nodeId: "s-big", name: "bigstore", isSystem: false, items: chars.map((value) => ({ kind: "char" as const, value })) },
+      ],
+      groups: base.groups.map((g) => ({
+        ...g,
+        rules: [
+          ...g.rules,
+          {
+            nodeId: "r-big",
+            context: [{ kind: "any" as const, storeRef: "bigstore" }],
+            output: [{ kind: "index" as const, storeRef: "bigstore", offset: 1 }],
+          },
+        ],
+      })),
+    };
+    expect(await proposeNormalizationStep(big)).toMatchObject({
+      kind: "refused",
+      reason: "time-bound",
+      detail: expect.stringContaining("truncated"),
+    });
+  });
+
   it("examples hold at most 5 entries in a stable order", async () => {
     const ir = parseFixture(ALTERNATES_KMN);
     const wide: KeyboardIR = {

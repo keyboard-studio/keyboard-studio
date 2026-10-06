@@ -55,10 +55,17 @@ const MAX_CLUSTERS = 400000;
  * reach of a two-key sequence, and patterned rules still extend further (R10).
  */
 const APPEND_STACK_CAP = 2;
+/**
+ * When some atom itself holds three marks, a cluster typed one key at a time
+ * (base, then mark, mark, mark) needs the third append too, so the cap follows
+ * the depth up to this value.
+ */
+const APPEND_STACK_CAP_DEEP = 3;
 
 const isMark = (cp: string): boolean => MARK_RE.test(cp);
 
-function cpCompare(a: string, b: string): number {
+/** Code-point-wise string order; the one comparator every repertoire and map ordering shares. */
+export function cpCompare(a: string, b: string): number {
   const x = [...a];
   const y = [...b];
   const n = Math.min(x.length, y.length);
@@ -141,6 +148,7 @@ function expandRule(
   output: readonly OutputElement[],
   stores: Map<string, StoreItem[]>,
   unresolved: Map<string, string>,
+  truncation: Set<string>,
 ): Instance[] {
   // Dimensions: one per resolvable any() element, in order.
   const dims: { pos: number; size: number }[] = [];
@@ -152,6 +160,7 @@ function expandRule(
   let total = 1;
   for (const d of dims) total = Math.min(total * d.size, MAX_SELECTIONS + 1);
   const paired = total <= MAX_SELECTIONS;
+  if (!paired) truncation.add("selections");
 
   const selections: Map<number, number>[] = [];
   if (paired) {
@@ -253,6 +262,7 @@ function expandRule(
       }
       for (const out of acc) instances.push({ pat, out });
     } else {
+      truncation.add("alternatives");
       for (const s of flat) for (const alt of s) instances.push({ pat, out: [alt] });
     }
   }
@@ -322,6 +332,7 @@ export function buildOutputRepertoire(
 ): OutputRepertoire {
   const stores = buildStoreMap(ir);
   const unresolvedRaw = new Map<string, string>();
+  const truncation = new Set<string>();
   const instances: Instance[] = [];
   const seenInst = new Set<string>();
   const pushInstances = (list: Instance[]): void => {
@@ -336,11 +347,11 @@ export function buildOutputRepertoire(
   for (const g of ir.groups) {
     for (const r of g.rules) {
       if (r.matchKind !== undefined) continue;
-      pushInstances(expandRule(splitContext(r, g.usingKeys), r.output, stores, unresolvedRaw));
+      pushInstances(expandRule(splitContext(r, g.usingKeys), r.output, stores, unresolvedRaw, truncation));
     }
   }
   for (const f of ir.raw) {
-    if (f.producedOutput !== undefined) pushInstances(expandRule([], f.producedOutput, stores, unresolvedRaw));
+    if (f.producedOutput !== undefined) pushInstances(expandRule([], f.producedOutput, stores, unresolvedRaw, truncation));
   }
 
   // Seed atoms.
@@ -407,11 +418,19 @@ export function buildOutputRepertoire(
     }
   };
 
+  const appendCap = D === 3 ? APPEND_STACK_CAP_DEEP : APPEND_STACK_CAP;
   let steps = 0;
-  for (let qi = 0; qi < queue.length && clusters.size < MAX_CLUSTERS; qi++) {
-    if (++steps % 512 === 0 && options?.shouldStop?.() === true) break;
+  for (let qi = 0; qi < queue.length; qi++) {
+    if (clusters.size >= MAX_CLUSTERS) {
+      truncation.add("clusters");
+      break;
+    }
+    if (++steps % 512 === 0 && options?.shouldStop?.() === true) {
+      truncation.add("stopped");
+      break;
+    }
     const x = queue[qi] as string;
-    if (markCount(x) < APPEND_STACK_CAP) for (const a of appends) apply(x, 0, a);
+    if (markCount(x) < appendCap) for (const a of appends) apply(x, 0, a);
     for (const e of byLast.get(lastCp(x)) ?? []) {
       if (x.endsWith(e.c)) apply(x, e.c.length, resolveOut(e.out, []));
     }
@@ -452,7 +471,9 @@ export function buildOutputRepertoire(
     for (const p of i.pat) if (p !== null) for (const cp of p) if (isMark(cp)) markSet.add(cp);
   }
 
+  const truncatedBy = [...truncation].sort();
   return {
+    ...(truncatedBy.length > 0 ? { truncated: true, truncatedBy } : {}),
     clusters: new Set(sortedClusters),
     marks: [...markSet].sort(cpCompare),
     bases: [...baseSet].sort(cpCompare),

@@ -1,15 +1,4 @@
-import type { NormalizationMap, OutputRepertoire } from "@keyboard-studio/contracts";
-
-function cpCompare(a: string, b: string): number {
-  const x = [...a];
-  const y = [...b];
-  const n = Math.min(x.length, y.length);
-  for (let i = 0; i < n; i++) {
-    const d = (x[i] as string).codePointAt(0)! - (y[i] as string).codePointAt(0)!;
-    if (d !== 0) return d;
-  }
-  return x.length - y.length;
-}
+import { cpCompare, type NormalizationMap, type OutputRepertoire } from "@keyboard-studio/contracts";
 
 /**
  * Pasted alternate -> produced cluster maps (spec 086 R3).

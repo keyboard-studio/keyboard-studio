@@ -36,4 +36,24 @@ describe("parse -- storeSketch on opaque stores", () => {
     expect(out).toContain("store(grv.all) outs(base) outs(grv)");
     expect(emit(parse(out, "store-sketch-test").ir)).toBe(out);
   });
+
+  it("drops the sketch instead of growing without bound when outs() chains multiply", () => {
+    const big = `store(&VERSION) '10.0'
+store(&NAME) 'Sketch Cap'
+store(a) U+4E00..U+9FFF
+store(small) outs(a)
+store(huge) ${"outs(small) ".repeat(8)}
+store(ok) outs(a) U+0041
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > 'a'
+`;
+    const { ir } = parse(big, "sketch-cap");
+    const sketchOf = (name: string) => ir.raw.find((r) => r.sourceText.includes(`store(${name})`))?.storeSketch;
+    expect(sketchOf("huge")).toBeUndefined();
+    expect(sketchOf("ok")).toBeDefined();
+  });
 });
