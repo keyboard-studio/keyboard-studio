@@ -40,6 +40,18 @@ export {
   type ContextToleranceOverlay,
   type ContextToleranceOverlayBatch,
 } from '../pattern-apply/context-tolerance-overlay.js';
+export {
+  applyNormalizationStep,
+  normalizationStepCacheKey,
+  NORMALIZATION_GROUP,
+  NORMALIZATION_STEP_GENERATOR_VERSION,
+  proposeNormalizationStep,
+  removeNormalizationStep,
+  type NormalizationMap,
+  type NormalizationRefusalReason,
+  type NormalizationStep,
+  type NormalizationStepResult,
+} from '../pattern-apply/normalization-step/index.js';
 export { loadCharNames } from '../character-discovery/charNames.js';
 /** For `applyFacetTransform`'s injected behavioural verification. */
 export { simulate } from '../simulator/index.js';
