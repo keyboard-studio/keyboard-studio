@@ -16,6 +16,7 @@
 // R9 (boundary).
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import { manifest } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
 
@@ -163,6 +164,33 @@ export function nextSpineStepAfter(currentId: string): ActiveStepId {
   return "done";
 }
 
+/**
+ * Does a side-trail step apply for this context? The condition is the step's
+ * own `gatedBy` (steps/stepDependencies.ts) — the single source — evaluated
+ * over the decisions the context already records.
+ */
+function stepApplies(stepId: string, ctx: AdvanceContext): boolean {
+  const gate = manifest.find((s) => s.id === stepId)?.gatedBy;
+  if (gate === undefined) return true;
+  const decisions: DecisionSet = {
+    ...(ctx.selectedTrack !== null && {
+      "authoring-track": {
+        id: "authoring-track" as const,
+        value: ctx.selectedTrack,
+        provenance: "asked" as const,
+      },
+    }),
+    ...(ctx.touchSeedSource !== null && {
+      "touch-seed-source": {
+        id: "touch-seed-source" as const,
+        value: ctx.touchSeedSource,
+        provenance: "asked" as const,
+      },
+    }),
+  };
+  return gate(decisions);
+}
+
 // ---------------------------------------------------------------------------
 // advance — the pure policy (contract §1).
 //
@@ -191,10 +219,11 @@ export function advance(
       return { next: nextSpineStepAfter("choose_base") }; // track
 
     case "track":
-      if (ctx.selectedTrack === "copy") {
-        // Copy-track: project_name side-trail (gated on the copy track).
-        return { next: "project_name" };
-      } else if (ctx.selectedTrack === "adapt") {
+      if (ctx.selectedTrack !== null) {
+        if (stepApplies("project_name", ctx)) {
+          // Copy-track: project_name side-trail (gated on the copy track).
+          return { next: "project_name" };
+        }
         // Adapt-track: skip the project_name side trail → characters.
         // Also signals host to call setCharactersSubStage("prefill") post-advance.
         return {
@@ -276,7 +305,7 @@ export function advance(
       // sequences now build inline in the Mechanism Gallery's method
       // chooser — there is no separate "sequences" step to route through
       // first; this fork check used to live on that step's completion.)
-      return ctx.touchSeedSource === null
+      return stepApplies("touch_seed_source", ctx)
         ? { next: "touch_seed_source" }
         : { next: "touch" };
 

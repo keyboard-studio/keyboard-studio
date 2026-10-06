@@ -38,7 +38,7 @@ export function runDecisionFlow(input: DecisionFlowInput): DecisionSet {
   const decisions: Record<string, Decision<unknown>> = {};
 
   for (const m of orderDecisions(modules)) {
-    // Gate: hand-written gatedBy wins, otherwise derived from conditional
+    // Gate: derived from conditional
     // `next` routing. A throwing gate aborts the run — wrapped with the
     // module id so the failure names its source.
     const gate = effectiveGatedBy(m, modules);

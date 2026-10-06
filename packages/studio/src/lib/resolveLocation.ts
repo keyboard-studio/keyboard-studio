@@ -10,6 +10,7 @@
 // arrives in `ResolveContext`, which is what makes the resolution table a unit
 // test matrix rather than a DOM test (contract §4).
 
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import type { Step } from "../steps/types.ts";
 import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
@@ -82,13 +83,22 @@ const WIZARD_ROUTE = "survey";
 /**
  * Steps the active track walks. `project_name` is the one off-spine step whose
  * membership depends on the track: the copy track walks it, the adapt track
- * skips it (steps/manifest.ts's track-routing docstring). Everything else on
- * the manifest is track-independent, so this is a single named exception
- * rather than a second traversal model.
+ * skips it (steps/manifest.ts's track-routing docstring). The condition is the
+ * step's own `gatedBy` (steps/stepDependencies.ts) — never re-stated here.
  */
-function walkedByTrack(stepId: string, traversal: TraversalSnapshot): boolean {
-  if (stepId !== "project_name") return true;
-  return traversal.selectedTrack === "copy";
+function walkedByTrack(step: Step, traversal: TraversalSnapshot): boolean {
+  if (step.gatedBy === undefined) return true;
+  const decisions: DecisionSet =
+    traversal.selectedTrack === null
+      ? {}
+      : {
+          "authoring-track": {
+            id: "authoring-track",
+            value: traversal.selectedTrack,
+            provenance: "asked",
+          },
+        };
+  return step.gatedBy(decisions);
 }
 
 /**
@@ -194,7 +204,7 @@ export function resolveLocation(loc: Location, ctx: ResolveContext): LocationRes
   if (step === undefined) {
     return refuse(loc, "step-not-in-build", ctx);
   }
-  if (!walkedByTrack(step.id, ctx.traversal)) {
+  if (!walkedByTrack(step, ctx.traversal)) {
     return refuse(loc, "skipped-by-track", ctx);
   }
   if (!isReached(loc.step, ctx.traversal)) {

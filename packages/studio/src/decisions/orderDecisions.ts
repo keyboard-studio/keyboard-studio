@@ -170,9 +170,8 @@ export function orderDecisions(
 
 /**
  * Drop modules whose gate rejects the decisions resolved so far. Absent gate
- * = always include. The gate is the hand-written `gatedBy` when present,
- * otherwise derived from conditional `next` routing (see `gatedByFromNext`) —
- * one source for conditional routing, never both by hand.
+ * = always include. The gate is derived from conditional `next` routing (see
+ * `gatedByFromNext`) — the one source for conditional routing.
  */
 export function filterGated(
   modules: readonly QuestionModule[],
@@ -204,14 +203,16 @@ export function filterGated(
  *
  * `value` in a condition refers to the owning module's answer, i.e. one of the
  * decisions that module `provides` — the edge holds when the condition matches
- * any of them. `ctx.*` conditions have no DecisionSet equivalent, and a
- * conditional owner with no provided decisions has no decision to read; such an
- * edge fails open (treated as taken whenever its owner is visible), exactly as
- * an unconditional edge is.
+ * any of them. Fail-open is per condition: a `ctx.*` (or otherwise unmappable)
+ * positive condition counts as "may be taken", and an unmappable earlier
+ * condition excludes nothing, while every mappable condition on the same edge
+ * is still enforced. A conditional owner with no provided decisions has no
+ * decision to read, so its edges are treated as unconditional. Visibility is
+ * the set reachable from the roots through holding edges (a forward fixpoint),
+ * so cycles cannot make the result depend on evaluation order.
  *
- * Returns `undefined` when no edge on any path to the target is conditional
- * (and no ancestor carries a hand-written gate) — i.e. the module is always
- * visible.
+ * Returns `undefined` when no edge on any path to the target can hide it — i.e.
+ * the module is always visible.
  *
  * NOTE on the signature: a single FlowQuestion cannot see the inbound rules
  * that gate it, so the derivation necessarily takes the module set as well.
@@ -259,12 +260,13 @@ export function gatedByFromNext(
   const root = byId.get(target.id);
 
   // An edge is "plain" when it never needs a decision to be evaluated: no
-  // conditions at all, or conditions the DecisionSet cannot read (fail open).
+  // conditions, an owner with no decision to read, or only conditions the
+  // DecisionSet cannot read (all fail open).
   const isPlain = (e: Edge): boolean => {
     if (e.positive === null && e.negatives.length === 0) return true;
     if (e.from.provides === undefined || e.from.provides.length === 0) return true;
     const conds = [...(e.positive !== null ? [e.positive] : []), ...e.negatives];
-    return conds.some((c) => evalAgainstDecision(c, undefined) === undefined);
+    return conds.every((c) => evalAgainstDecision(c, undefined) === undefined);
   };
 
   // Static pass: if nothing on any path to the target can hide it, no gate.
@@ -272,8 +274,6 @@ export function gatedByFromNext(
   const canHide = (id: string): boolean => {
     if (visitedStatic.has(id)) return false;
     visitedStatic.add(id);
-    const m = byId.get(id);
-    if (m?.gatedBy !== undefined && id !== target.id) return true;
     for (const e of inbound.get(id) ?? []) {
       if (!isPlain(e) || canHide(e.from.definition.id)) return true;
     }
@@ -282,70 +282,67 @@ export function gatedByFromNext(
   if (root === undefined && !inbound.has(target.id)) return undefined;
   if (!canHide(target.id)) return undefined;
 
+  // Per-condition fail-open, mirroring the runner's top-to-bottom walk: an
+  // unmappable positive is "may be taken"; an unmappable earlier condition
+  // cannot be shown to have failed-or-held, so it excludes nothing. Mappable
+  // conditions are always enforced.
+  const holdsFor = (e: Edge, value: unknown): boolean => {
+    if (e.positive !== null && evalAgainstDecision(e.positive, value) === false) {
+      return false;
+    }
+    for (const n of e.negatives) {
+      if (evalAgainstDecision(n, value) === true) return false;
+    }
+    return true;
+  };
   const edgeHolds = (e: Edge, decisions: DecisionSet): boolean => {
     if (isPlain(e)) return true;
     for (const p of e.from.provides ?? []) {
-      const value = decisions[p]?.value;
-      let ok = true;
-      if (e.positive !== null) {
-        const r = evalAgainstDecision(e.positive, value);
-        // Unmappable at runtime (validated above, so defensive): fail open —
-        // never silently drop a question the author should answer.
-        if (r === undefined) return true;
-        ok = r;
-      }
-      if (ok) {
-        for (const n of e.negatives) {
-          const r = evalAgainstDecision(n, value);
-          if (r === undefined) return true;
-          if (r) {
-            ok = false;
-            break;
-          }
-        }
-      }
-      if (ok) return true;
+      if (holdsFor(e, decisions[p]?.value)) return true;
     }
     return false;
   };
 
   return (decisions: DecisionSet) => {
-    const memo = new Map<string, boolean>();
-    const onStack = new Set<string>();
-    const visible = (m: QuestionModule, isTarget: boolean): boolean => {
-      const id = m.definition.id;
-      if (!isTarget && m.gatedBy !== undefined) return m.gatedBy(decisions);
-      const cached = memo.get(id);
-      if (cached !== undefined) return cached;
-      const edges = inbound.get(id);
-      if (edges === undefined || edges.length === 0) return true;
-      if (onStack.has(id)) return false;
-      onStack.add(id);
-      let result = false;
+    // Least fixpoint: visible = reachable from the roots (modules with no
+    // inbound edge) through holding edges. A single forward pass, so cycles
+    // need no on-stack bookkeeping and the result cannot depend on order.
+    const outbound = new Map<string, Edge[]>();
+    const toOf = new Map<Edge, string>();
+    for (const [to, edges] of inbound) {
       for (const e of edges) {
-        if (visible(e.from, false) && edgeHolds(e, decisions)) {
-          result = true;
-          break;
-        }
+        toOf.set(e, to);
+        const list = outbound.get(e.from.definition.id);
+        if (list === undefined) outbound.set(e.from.definition.id, [e]);
+        else list.push(e);
       }
-      onStack.delete(id);
-      memo.set(id, result);
-      return result;
-    };
-    return root === undefined ? true : visible(root, true);
+    }
+    const reached = new Set<string>();
+    const queue: string[] = modules
+      .map((m) => m.definition.id)
+      .filter((id) => (inbound.get(id)?.length ?? 0) === 0);
+    while (queue.length > 0) {
+      const id = queue.pop()!;
+      if (reached.has(id)) continue;
+      reached.add(id);
+      for (const e of outbound.get(id) ?? []) {
+        if (edgeHolds(e, decisions)) queue.push(toOf.get(e)!);
+      }
+    }
+    return root === undefined ? true : reached.has(root.definition.id);
   };
 }
 
 /**
- * The gate actually used for a module: an explicit hand-written `gatedBy`
- * wins as an override; otherwise the gate is derived from conditional
- * `next` routing via `gatedByFromNext`.
+ * The gate actually used for a module: derived from conditional `next`
+ * routing via `gatedByFromNext` — the only source of conditional visibility
+ * (FR-005); modules carry no hand-written gate.
  */
 export function effectiveGatedBy(
   m: QuestionModule,
   modules: readonly QuestionModule[],
 ): ((decisions: DecisionSet) => boolean) | undefined {
-  return m.gatedBy ?? gatedByFromNext(m.definition, modules);
+  return gatedByFromNext(m.definition, modules);
 }
 
 /** Stringify a decision value the way SurveyRunner stringifies answers. */

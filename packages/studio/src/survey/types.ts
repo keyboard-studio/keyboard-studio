@@ -3,7 +3,7 @@
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
 import type { DecisionProposalSource, IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
+import type { DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../decisions/extractContext.ts";
 
 /**
@@ -307,14 +307,6 @@ export interface QuestionModule {
 
   /** Decisions that must be resolved before this module can run. */
   requires?: readonly DecisionId[];
-
-  /**
-   * Conditional-routing preservation: when present, the module is only asked
-   * if this returns true for the decisions resolved so far. This is the
-   * decision-level equivalent of `definition.next` FlowGotoRule conditions —
-   * without it, conditional branches would silently become unconditional.
-   */
-  gatedBy?: (decisions: DecisionSet) => boolean;
 
   /**
    * Base-keyboard probe: read this module's decisions from the import bundle

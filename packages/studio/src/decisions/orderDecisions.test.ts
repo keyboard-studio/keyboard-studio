@@ -16,7 +16,6 @@ function stubModule(
   opts: {
     provides?: DecisionId[];
     requires?: readonly DecisionId[];
-    gatedBy?: (decisions: Parameters<NonNullable<QuestionModule["gatedBy"]>>[0]) => boolean;
     next?: FlowQuestion["next"];
   } = {},
 ): QuestionModule {
@@ -76,15 +75,28 @@ describe("orderDecisions", () => {
 });
 
 describe("filterGated", () => {
-  it("drops gated-out modules and keeps the rest", () => {
-    const a = stubModule("a");
-    const gated = stubModule("g", {
-      gatedBy: (decisions) => decisions["target-script"]?.value === "Ethi",
+  it("drops modules whose derived gate rejects the decisions, keeps the rest", () => {
+    const src = stubModule("src", {
+      provides: ["target-script"],
+      next: [{ condition: "value == 'Ethi'", goto: "g" }, { default: true, goto: "a" }],
     });
-    expect(ids(filterGated([a, gated], {}))).toEqual(["a"]);
-    expect(ids(filterGated([a, gated], {
+    const g = stubModule("g");
+    const a = stubModule("a");
+    expect(ids(filterGated([src, g, a], {
+      "target-script": { id: "target-script", value: "Latn", provenance: "asked" },
+    }))).toEqual(["src", "a"]);
+    expect(ids(filterGated([src, g, a], {
       "target-script": { id: "target-script", value: "Ethi", provenance: "asked" },
-    }))).toEqual(["a", "g"]);
+    }))).toEqual(["src", "g"]);
+  });
+});
+
+describe("FR-005: no module-level gatedBy override", () => {
+  it("no registry module declares gatedBy (conditional visibility comes from next only)", () => {
+    const offenders = Object.values(questionRegistry)
+      .filter((m) => "gatedBy" in m)
+      .map((m) => m.definition.id);
+    expect(offenders).toEqual([]);
   });
 });
 
@@ -136,22 +148,99 @@ describe("gatedByFromNext", () => {
     expect(gatedByFromNext(languageRegion.definition, modules)).toBeUndefined();
   });
 
-  it("a hand-written gatedBy wins as an explicit override", () => {
-    const handWritten = () => true;
-    const m = stubModule("x", { provides: ["language-code"], gatedBy: handWritten });
-    // x is also the target of a conditional rule — the override still wins.
-    const source = stubModule("s", {
-      provides: ["target-script"],
-      next: [{ condition: "value == 'Ethi'", goto: "x" }],
-    });
-    expect(effectiveGatedBy(m, [source, m])).toBe(handWritten);
-  });
-
   it("effectiveGatedBy derives when no hand-written gate is present", () => {
     const gate = effectiveGatedBy(scriptNotSupported, modules);
     expect(gate).toBeDefined();
     expect(gate!(withScript("Ethi"))).toBe(true);
     expect(gate!(withScript("Latn"))).toBe(false);
+  });
+});
+
+describe("gatedByFromNext - per-condition fail-open (ctx.* mixed with value)", () => {
+  const withScript = (value: unknown) => ({
+    "target-script": { id: "target-script" as const, value, provenance: "asked" as const },
+  });
+  // src: ctx rule first (unmappable), then a value rule, then the default.
+  const src = stubModule("src", {
+    provides: ["target-script"],
+    next: [
+      { condition: "ctx.flag == 'x'", goto: "a" },
+      { condition: "value == 'q'", goto: "b" },
+      { default: true, goto: "c" },
+    ],
+  });
+  const a = stubModule("a");
+  const b = stubModule("b");
+  const c = stubModule("c");
+  const modules = [src, a, b, c];
+
+  it("a ctx.* positive fails open (always visible)", () => {
+    expect(gatedByFromNext(a.definition, modules)).toBeUndefined();
+  });
+
+  it("a mappable positive stays enforced despite an unmappable earlier ctx.* negative", () => {
+    const g = gatedByFromNext(b.definition, modules);
+    expect(g).toBeDefined();
+    expect(g!(withScript("q"))).toBe(true);
+    expect(g!(withScript("other"))).toBe(false);
+  });
+
+  it("the default branch still honours mappable negatives despite a ctx.* negative", () => {
+    const g = gatedByFromNext(c.definition, modules);
+    expect(g).toBeDefined();
+    expect(g!(withScript("other"))).toBe(true);
+    expect(g!(withScript("q"))).toBe(false);
+  });
+});
+
+describe("gatedByFromNext - cycles are order independent (no cache poisoning)", () => {
+  const ds = {
+    "target-script": { id: "target-script" as const, value: "go", provenance: "asked" as const },
+    "language-name": { id: "language-name" as const, value: "zzz", provenance: "asked" as const },
+    "language-code": { id: "language-code" as const, value: "x", provenance: "asked" as const },
+  };
+  const mk = () => ({
+    r: stubModule("R", {
+      provides: ["target-script"],
+      next: [{ condition: "value == 'go'", goto: "A" }],
+    }),
+    a: stubModule("A", {
+      provides: ["language-name"],
+      next: [
+        { condition: "value == 'never'", goto: "T" },
+        { default: true, goto: "B" },
+      ],
+    }),
+    b: stubModule("B", {
+      provides: ["language-code"],
+      next: [
+        { condition: "value == 'x'", goto: "T" },
+        { default: true, goto: "A" },
+      ],
+    }),
+    t: stubModule("T"),
+  });
+
+  const permutations = <X,>(xs: X[]): X[][] =>
+    xs.length <= 1
+      ? [xs]
+      : xs.flatMap((x, i) =>
+          permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((p) => [x, ...p]),
+        );
+
+  it("T is visible under every module order", () => {
+    const { r, a, b, t } = mk();
+    for (const order of permutations([r, a, b, t])) {
+      const g = gatedByFromNext(t.definition, order);
+      expect(g, ids(order).join()).toBeDefined();
+      expect(g!(ds), ids(order).join()).toBe(true);
+    }
+  });
+
+  it("a cycle with no entry from a visible root stays hidden", () => {
+    const { r, a, b, t } = mk();
+    const g = gatedByFromNext(t.definition, [r, a, b, t]);
+    expect(g!({ ...ds, "target-script": { ...ds["target-script"], value: "stop" } })).toBe(false);
   });
 });
 

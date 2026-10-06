@@ -16,6 +16,10 @@ import { flowSources } from "../steps/flowSources.ts";
 import { evalCondition } from "../survey/SurveyRunner.tsx";
 import type { QuestionModule } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
+import {
+  demotedPhaseFModules,
+  reserveModules,
+} from "../survey/questions/registry.ts";
 import { effectiveGatedBy, orderDecisions } from "./orderDecisions.ts";
 
 const MAX_COMBOS = 300;
@@ -129,26 +133,50 @@ function combos(branching: readonly QuestionModule[]): Map<string, string | unde
   return out;
 }
 
+/** Modules outside every flowSources flow that may still carry a `next` graph. */
+const extraGroups: Record<string, readonly QuestionModule[]> = {
+  demotedPhaseF: demotedPhaseFModules,
+  reserve: reserveModules,
+};
+
+function checkParity(modules: readonly QuestionModule[]): void {
+  const branching = modules.filter(isBranching);
+  const all = combos(branching);
+  // A collapse to one combination must fail: every branching module
+  // contributes at least two candidate values.
+  const total = branching
+    .map((m) => candidateValues(m).length)
+    .reduce((n, c) => n * c, 1);
+  expect(all.length).toBeGreaterThanOrEqual(Math.min(total, 10));
+  const sizes = new Set<number>();
+  for (const answers of all) {
+    const walked = walk(modules, answers);
+    sizes.add(walked.size);
+    const visible = visibleByGates(modules, answers);
+    const diff = {
+      onlyWalked: [...walked].filter((x) => !visible.has(x)),
+      onlyVisible: [...visible].filter((x) => !walked.has(x)),
+    };
+    expect(diff, JSON.stringify([...answers])).toEqual({ onlyWalked: [], onlyVisible: [] });
+  }
+  // Guard against a vacuous pass: a flow with gates must actually vary.
+  if (branching.length > 0) expect(sizes.size).toBeGreaterThan(1);
+}
+
 describe("derived gates agree with walking definition.next", () => {
   for (const [flowId, source] of Object.entries(flowSources)) {
     const modules = source.derivedModules;
     if (modules === undefined) continue;
     it(`${flowId}: visible set equals walked set for every sampled answer combination`, () => {
       orderDecisions(modules); // the flow derives at all
-      const branching = modules.filter(isBranching);
-      const sizes = new Set<number>();
-      for (const answers of combos(branching)) {
-        const walked = walk(modules, answers);
-        sizes.add(walked.size);
-        const visible = visibleByGates(modules, answers);
-        const diff = {
-          onlyWalked: [...walked].filter((x) => !visible.has(x)),
-          onlyVisible: [...visible].filter((x) => !walked.has(x)),
-        };
-        expect(diff, JSON.stringify([...answers])).toEqual({ onlyWalked: [], onlyVisible: [] });
-      }
-      // Guard against a vacuous pass: a flow with gates must actually vary.
-      if (branching.length > 0) expect(sizes.size).toBeGreaterThan(1);
+      checkParity(modules);
+    });
+  }
+
+  for (const [groupId, modules] of Object.entries(extraGroups)) {
+    it(`${groupId} (outside flowSources): visible set equals walked set`, () => {
+      expect(modules.length).toBeGreaterThan(0);
+      checkParity(modules);
     });
   }
 });
