@@ -5,20 +5,22 @@
 // gap list: not a failure, but the named work ahead. The DecisionId vocabulary
 // is complete when the gap list is empty.
 //
-// Severity: @keymanapp/keyboard-lint ships NO error-severity checks. Layer C
-// findings are "warning" or "hint" (a first error-severity Layer C row would be
-// a layer-boundary change), so none of these gates is a hard submission
-// blocker on its own; the one hard gate in the studio is the inventory-coverage
-// download gate (useInventoryCoverageGate), which consumes the 18.6 results.
-// "Gate" here means "a lint check a submission is measured against".
+// Severity: almost every @keymanapp/keyboard-lint check emits "warning" or
+// "hint". The one known exception is KM_WARN_LONGPRESS_OVERSIZE
+// (checks/check-18-1-longpress.ts), whose severity is computed and becomes
+// "error" above 10 longpress options. So these gates are almost never a hard
+// submission blocker on their own; the one hard gate in the studio is the
+// inventory-coverage download gate (useInventoryCoverageGate), which consumes
+// the 18.6 results. "Gate" here means "a lint check a submission is measured
+// against".
 //
 // Layers NOT exercised by the SC-004 harness (successCriteria.sc004.test.ts):
 // Layer B (no rule set exists in engine/src/validator yet) and Layer A'
 // import-fidelity I1-I6 (engine/src/validator/layer-a-prime.ts; import-side
 // checks, not on the engine's public API). Layer C checks listed here do run in
-// SC-004 (G7/G8) but, being warning/hint severity, G7/G8's "no error finding"
-// assertion cannot fail on them; that is a known weakness of the evidence, not
-// of the flow.
+// SC-004 (G7/G8), but G7/G8 only fail on "error"/"fatal" findings, so apart from
+// the longpress case above they cannot fail on a lint finding; that is a known
+// weakness of the evidence, not of the flow.
 //
 // The mapping is curated (a human read each check's criteria), not inferred:
 // a wrong automatic mapping would be worse than an honest gap. Completeness is
