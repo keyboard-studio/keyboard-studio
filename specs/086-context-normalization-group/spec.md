@@ -174,7 +174,7 @@ As a maintainer, I want the corpus harness to check every generated step by simu
 
 - **SC-001**: On the seven spike keyboards, typed output is byte-identical to the unmodified keyboard for every key sequence of up to two keys over the full key set (35,532 sequences each).
 - **SC-002**: On the same keyboards, 100% of pasted-alternate probes for producible clusters give the same result as the produced form.
-- **SC-003**: Added rule counts do not exceed the spike's: `el_dinka` 1, `fv_northern_tutchone` 1, `fv_tlingit` 6, `sil_yoruba8` 9, `el_pan_sahelian` 12, `sil_cameroon_qwerty` 23, `sil_tchad` 49.
+- **SC-003**: Added rule counts do not exceed these bounds (the spike's counts, except `fv_northern_tutchone`): `el_dinka` 1, `fv_northern_tutchone` 19, `fv_tlingit` 6, `sil_yoruba8` 9, `el_pan_sahelian` 12, `sil_cameroon_qwerty` 23, `sil_tchad` 49. The spike measured 1 for `fv_northern_tutchone`, but its two-key simulation never saw the three-key clusters that keyboard types (a diaeresis or ogonek prefix, then an accent prefix, then the letter, such as `A` + U+0308 + U+0300). Their NFC alternates are legitimate maps, so the bound is 19 ([research R10](research.md#r10-risks)).
 - **SC-004**: `sil_yoruba8` with the step reports the same compile diagnostics as without it (9 errors, all pre-existing), against 66 under the spec 062 generator.
 - **SC-005**: Requesting the step for an already-processed keyboard source returns in under 1 second with no keystroke simulation. First generation completes in under 5 seconds for 95% of the corpus.
 - **SC-006**: Across the harness corpus, no keyboard with an accepted step shows any typed-output difference (zero tolerance), and the harness reports pasted-probe pass rates per keyboard.
