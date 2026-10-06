@@ -2,7 +2,8 @@
 // dev-only, so none of its code may appear in a production bundle.
 //
 // Slow (a full `vite build`, about a minute), so it is NOT part of the normal
-// vitest run. Run it explicitly:
+// vitest run. CI runs it as an explicit step in the build job (ci.yml); run it
+// locally with:
 //
 //   pnpm --filter @keyboard-studio/studio run verify:prod-bundle
 //

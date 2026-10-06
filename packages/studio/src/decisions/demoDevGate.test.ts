@@ -16,7 +16,8 @@ const mainTsx = readFileSync(resolve(here, "../main.tsx"), "utf-8");
 
 // The authoritative proof is build-output based and too slow for this suite:
 // `pnpm --filter @keyboard-studio/studio run verify:prod-bundle` builds for
-// production and fails if any demo marker string lands in the output.
+// production and fails if any demo marker string lands in the output. CI runs
+// it as an explicit step in the build job (ci.yml).
 
 describe("FR-009: decisions demo is loaded lazily, only under the DEV gate", () => {
   it("main.tsx has no static import of DecisionsDemo", () => {
