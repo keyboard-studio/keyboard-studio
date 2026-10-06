@@ -155,7 +155,15 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
   form the keyboard produces, then passes the keystroke on unchanged. It is derived without
   simulation, cached per keyboard source (`normalizationStepCache.ts`), and replayed through
   the same overlay. A refused step, or a keyboard the committed verification record marks
-  `regressed`, falls back to the spec 062 per-rule proposal.
+  `regressed`, falls back to the spec 062 per-rule proposal. That fallback is temporary:
+  it retires when desktop engines and the paste premise are verified and no corpus keyboard
+  is `regressed` (criteria in
+  [the 086 engine contract](../specs/086-context-normalization-group/contracts/engine-normalization-step.md#062-per-rule-path-retirement-criteria)).
+  The step lives only in the projection replay; the working IR stays step-free, so the
+  debounced TS Layer A pass does not see it and only the compile and the WASM oracle do.
+  Desktop-engine verification and the paste premise (paste runs no keyboard rules; the
+  rewrite happens on the next keystroke) are not yet verified, and gate making the step
+  the default over 062.
 - **Async compute, synchronous write (spec 078, research D8).** A fix that must
   compile and simulate to be generated is computed asynchronously, outside any
   step. It is committed in two places. The working IR takes it through
