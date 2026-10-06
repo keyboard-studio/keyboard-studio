@@ -7,7 +7,7 @@
 // it is a full-height `overflowY: auto` container that holds the (tall) body.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { screen, cleanup, act } from "@testing-library/react";
+import { screen, cleanup, act, fireEvent } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 import type { ActiveStepId } from "../../src/stores/surveySessionStore.ts";
@@ -23,7 +23,19 @@ vi.mock("../../src/components/rules/DemoPane.tsx", () => ({ DemoPane: TallBody }
 vi.mock("../../src/components/rules/RuleListMount.tsx", () => ({ RuleListMount: () => null }));
 vi.mock("../../src/components/rules/GuardSuggestions.tsx", () => ({ GuardSuggestions: () => null }));
 vi.mock("../../src/components/rules/RuleBuilderMount.tsx", () => ({ RuleBuilderMount: () => null }));
-vi.mock("../../src/editors/deadkey/DeadkeyInventory.tsx", () => ({ DeadkeyInventory: TallBody }));
+// The inventory stand-in exposes an edit trigger so the edit tab is reachable.
+vi.mock("../../src/editors/deadkey/DeadkeyInventory.tsx", () => ({
+  DeadkeyInventory: ({ onEdit }: { onEdit: (info: { id: number }) => void }) => (
+    <>
+      <button type="button" onClick={() => onEdit({ id: 0 })}>
+        open-edit
+      </button>
+      <TallBody />
+    </>
+  ),
+}));
+vi.mock("../../src/editors/deadkey/DeadkeyDefineForm.tsx", () => ({ DeadkeyDefineForm: TallBody }));
+vi.mock("../../src/editors/deadkey/DeadkeyDetailEditor.tsx", () => ({ DeadkeyDetailEditor: TallBody }));
 vi.mock("../../src/lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
 
 import { StepHost } from "../../src/components/StepHost.tsx";
@@ -48,6 +60,14 @@ async function mountAt(stepId: ActiveStepId) {
   await act(async () => {
     render(<StepHost reducerDeps={noopReducerDeps} onStartOver={() => undefined} />);
   });
+}
+
+/** Deadkeys renders its tabs only once a working IR exists. */
+async function mountDeadkeysStep() {
+  act(() => {
+    useWorkingCopyStore.setState({ ir: makeTestIR() });
+  });
+  await mountAt("deadkeys");
 }
 
 afterEach(() => {
@@ -76,10 +96,23 @@ describe("full-layout document steps scroll inside StepHost's clipped shell", ()
   });
 
   it("deadkeys step (inventory tab)", async () => {
-    act(() => {
-      useWorkingCopyStore.setState({ ir: makeTestIR() });
-    });
-    await mountAt("deadkeys");
+    await mountDeadkeysStep();
+    expectScrollsInsideShell("deadkey-step");
+  });
+
+  it("deadkeys step (define tab)", async () => {
+    await mountDeadkeysStep();
+    fireEvent.click(screen.getByRole("tab", { name: "Define new deadkey" }));
+    // The inventory has been swapped out, so the tall body is this tab's.
+    expect(screen.queryByRole("button", { name: "open-edit" })).toBeNull();
+    expectScrollsInsideShell("deadkey-step");
+  });
+
+  it("deadkeys step (edit tab)", async () => {
+    await mountDeadkeysStep();
+    fireEvent.click(screen.getByRole("button", { name: "open-edit" }));
+    // The inventory has been swapped out, so the tall body is this tab's.
+    expect(screen.queryByRole("button", { name: "open-edit" })).toBeNull();
     expectScrollsInsideShell("deadkey-step");
   });
 });
