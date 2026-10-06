@@ -9,6 +9,8 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act, within } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
+import { setViewport } from "./test/viewport.ts";
+import { advanceToCharactersStep } from "./test/advanceToCharactersStep.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 
 vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
@@ -36,20 +38,8 @@ import { SurveyView } from "./StudioShell.tsx";
 
 const ORIGINAL_WIDTH = window.innerWidth;
 
-function setViewportWidth(width: number): void {
-  Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
-}
-
-function advanceToCharactersStep(): void {
-  fireEvent.click(screen.getByTestId("survey-advance")); // identity -> layout
-  fireEvent.click(screen.getByTestId("layout-continue")); // layout -> base
-  fireEvent.click(screen.getByTestId("base-preview"));
-  fireEvent.click(screen.getByTestId("base-confirm")); // base -> track
-  fireEvent.click(screen.getByTestId("track-adapt")); // track -> characters
-}
-
-async function mountNarrow(): Promise<void> {
-  setViewportWidth(412);
+async function mountAtWidth(width: number): Promise<void> {
+  setViewport(width);
   await act(async () => {
     render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
   });
@@ -63,12 +53,12 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   localStorage.clear();
-  setViewportWidth(ORIGINAL_WIDTH);
+  setViewport(ORIGINAL_WIDTH);
 });
 
 describe("SurveyView — narrow preview trigger on the characters step", () => {
   it("build-list: the trigger is the character map and opens the map sheet", async () => {
-    await mountNarrow();
+    await mountAtWidth(412);
     advanceToCharactersStep();
     act(() => {
       useSurveySessionStore.getState().setDiscoveryMethod("build-list");
@@ -83,7 +73,7 @@ describe("SurveyView — narrow preview trigger on the characters step", () => {
   });
 
   it("build-list with no base keyboard chosen yet: the character map trigger still renders", async () => {
-    await mountNarrow();
+    await mountAtWidth(412);
     advanceToCharactersStep();
     act(() => {
       useSurveySessionStore.getState().setLocalBase(null);
@@ -94,7 +84,7 @@ describe("SurveyView — narrow preview trigger on the characters step", () => {
   });
 
   it("intro chooser with a base chosen: the trigger opens the keyboard preview", async () => {
-    await mountNarrow();
+    await mountAtWidth(412);
     advanceToCharactersStep();
     expect(useSurveySessionStore.getState().discoveryMethod).toBeNull();
 
@@ -103,5 +93,18 @@ describe("SurveyView — narrow preview trigger on the characters step", () => {
 
     fireEvent.click(trigger);
     expect(within(screen.getByTestId("survey-preview-sheet")).getByLabelText("Keyboard preview")).toBeTruthy();
+  });
+
+  it("desktop width: no trigger, the right pane shows the content inline", async () => {
+    await mountAtWidth(1280);
+    advanceToCharactersStep();
+    act(() => {
+      useSurveySessionStore.getState().setDiscoveryMethod("build-list");
+    });
+
+    expect(screen.queryByTestId("survey-show-preview")).toBeNull();
+    // Reached the characters step: the map renders inline, not in a sheet.
+    expect(screen.getByLabelText("Character map")).toBeTruthy();
+    expect(screen.queryByTestId("survey-preview-sheet")).toBeNull();
   });
 });

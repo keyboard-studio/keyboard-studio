@@ -64,19 +64,7 @@ vi.mock("./lib/navigate.ts", () => import("./test/studioShellMocks/navigate.ts")
 // ---------------------------------------------------------------------------
 
 import { SurveyView } from "./StudioShell.tsx";
-
-// ---------------------------------------------------------------------------
-// Helper: drive from "identity" to the "characters" step (prefill substage)
-// via the SHORTEST path — track-adapt skips project_name entirely.
-// ---------------------------------------------------------------------------
-
-function advanceToCharactersStep(): void {
-  fireEvent.click(screen.getByTestId("survey-advance")); // identity -> layout
-  fireEvent.click(screen.getByTestId("layout-continue")); // confirm layout -> base
-  fireEvent.click(screen.getByTestId("base-preview")); // preview (separate click)
-  fireEvent.click(screen.getByTestId("base-confirm")); // commit -> track
-  fireEvent.click(screen.getByTestId("track-adapt")); // track -> characters (prefill substage)
-}
+import { advanceToCharactersStep } from "./test/advanceToCharactersStep.ts";
 
 // ---------------------------------------------------------------------------
 // Teardown

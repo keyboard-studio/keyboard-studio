@@ -6,11 +6,12 @@
 // working copy exists. Desktop keeps the two-pane row.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { screen, cleanup, act } from "@testing-library/react";
+import { screen, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
+import { setViewport } from "../test/viewport.ts";
 
 const READY_STAGE: Stage = {
   kind: "ready",
@@ -36,13 +37,6 @@ vi.mock("./BaseKeyboardPicker.tsx", () => ({
 vi.mock("./KmnEditor.tsx", () => ({ KmnEditor: () => <div data-testid="kmn-editor-stub" /> }));
 vi.mock("./SignUpPanel.tsx", () => ({ SignUpPanel: () => null }));
 vi.mock("./ManagedPRSubmitPanel.tsx", () => ({ ManagedPRSubmitPanel: () => null }));
-
-function setViewport(width: number): void {
-  Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
-  act(() => {
-    window.dispatchEvent(new Event("resize"));
-  });
-}
 
 beforeEach(() => setViewport(390));
 afterEach(() => {
