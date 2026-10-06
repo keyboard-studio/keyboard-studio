@@ -58,8 +58,9 @@ one persistent working copy.
   declares each step; `StepHost` resolves `manifest.find(activeStepId)`, renders
   the declared `component` in the chrome its `layout` selects, and runs a single
   centralized completion path (`applyStepCompletion → advance → session.advance`).
-  Adding, reordering, or re-laying-out a step is a manifest edit, not a shell
-  edit. The three bespoke survey wrappers converged onto a single `FlowStepHost`
+  Adding or re-laying-out a step is a manifest edit, not a shell edit; step
+  *order* is not stated in the manifest but derived from each step's
+  `provides`/`requires` (`steps/stepDependencies.ts`, spec 087). The three bespoke survey wrappers converged onto a single `FlowStepHost`
   + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
   the extension mechanism for new flows; existing flows keep their
   `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
@@ -88,8 +89,8 @@ one persistent working copy.
   modelled as component lifetime; content was not.
   → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/AS-BUILT.md)
 
-- **Phase-B spine steps between `characters` and `carve`.** Four survey steps
-  sit on the manifest spine after the alphabet is confirmed and before the carve
+- **Phase-B steps between `characters` and `carve`.** Four survey steps
+  run (by derived step order) after the alphabet is confirmed and before the carve
   gallery, in this order: `marks` (spec 071, computed S0 gate), `punctuation`,
   `invisibles`, `convenience` (spec 051, computed gate). Since
   [specs/075](../specs/075-punctuation-defaults/AS-BUILT.md) the punctuation step
