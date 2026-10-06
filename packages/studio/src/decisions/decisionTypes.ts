@@ -20,7 +20,63 @@ export type DecisionId =
   | "character-inventory"
   | "authoring-track"
   | "project-display-name"
-  | "project-keyboard-id";
+  | "project-keyboard-id"
+  // Proposed full-identity (reserve) flow answers (spec 085 US4) — distinct from the live il_* ids
+  // so the two flows never double-provide a decision.
+  | "reserve-desktop-notice"
+  | "reserve-language-name"
+  | "reserve-language-autonym"
+  | "reserve-language-code"
+  | "reserve-language-region"
+  | "reserve-primary-script"
+  | "reserve-writing-direction"
+  | "reserve-layout-family"
+  | "reserve-script-family"
+  | "reserve-primary-target"
+  | "reserve-author-name"
+  | "reserve-author-email"
+  | "reserve-copyright-holder"
+  | "reserve-provenance-opt-in"
+  | "reserve-requester-name"
+  | "reserve-requester-contact"
+  | "reserve-requester-affiliation"
+  | "reserve-requester-relation"
+  | "reserve-community-rep-name"
+  | "reserve-community-rep-role"
+  | "reserve-community-rep-email"
+  | "reserve-speaker-count"
+  | "reserve-regions"
+  | "reserve-language-status"
+  | "reserve-existing-tools"
+  | "reserve-orthography-url"
+  | "reserve-community-involvement"
+  | "reserve-casing-notes"
+  | "reserve-additional-notes"
+  // Phase B character-discovery answers (spec 085 US4)
+  | "text-sample"
+  | "special-letters"
+  | "latin-digraphs-wanted"
+  | "indic-onset-vowels-wanted"
+  | "syllabic-finals-wanted"
+  // Phase F help-doc answers (spec 085 US4)
+  | "help-welcome-paragraph"
+  | "help-usage-tip-1"
+  | "help-usage-tip-2"
+  | "help-history-bullets"
+  | "help-doc-language"
+  | "help-font-guidance"
+  | "help-scope-variety"
+  | "help-provenance-basis"
+  | "help-canonical-order"
+  | "help-script-glossary"
+  | "help-example-words"
+  | "help-troubleshooting"
+  | "help-related-keyboards"
+  | "help-known-limitations"
+  | "help-further-reading"
+  | "help-project-url"
+  | "help-credits"
+  | "help-contact-info";
 
 /** Where a decision's value came from. */
 export type DecisionProvenance = "asked" | "extracted" | "default";
@@ -88,4 +144,57 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "authoring-track": [],
   "project-display-name": [],
   "project-keyboard-id": [],
+  "reserve-desktop-notice": [],
+  "reserve-language-name": [],
+  "reserve-language-autonym": [],
+  "reserve-language-code": [],
+  "reserve-language-region": [],
+  "reserve-primary-script": [],
+  "reserve-writing-direction": [],
+  "reserve-layout-family": [],
+  "reserve-script-family": [],
+  "reserve-primary-target": [],
+  "reserve-author-name": [],
+  "reserve-author-email": [],
+  "reserve-copyright-holder": [],
+  "reserve-provenance-opt-in": [],
+  "reserve-requester-name": [],
+  "reserve-requester-contact": [],
+  "reserve-requester-affiliation": [],
+  "reserve-requester-relation": [],
+  "reserve-community-rep-name": [],
+  "reserve-community-rep-role": [],
+  "reserve-community-rep-email": [],
+  "reserve-speaker-count": [],
+  "reserve-regions": [],
+  "reserve-language-status": [],
+  "reserve-existing-tools": [],
+  "reserve-orthography-url": [],
+  "reserve-community-involvement": [],
+  "reserve-casing-notes": [],
+  "reserve-additional-notes": [],
+  "text-sample": [],
+  "special-letters": [],
+  "latin-digraphs-wanted": [],
+  "indic-onset-vowels-wanted": [],
+  "syllabic-finals-wanted": [],
+  // Phase F help-doc answers: package-descriptor / help output, no IR writes.
+  "help-welcome-paragraph": [],
+  "help-usage-tip-1": [],
+  "help-usage-tip-2": [],
+  "help-history-bullets": [],
+  "help-doc-language": [],
+  "help-font-guidance": [],
+  "help-scope-variety": [],
+  "help-provenance-basis": [],
+  "help-canonical-order": [],
+  "help-script-glossary": [],
+  "help-example-words": [],
+  "help-troubleshooting": [],
+  "help-related-keyboards": [],
+  "help-known-limitations": [],
+  "help-further-reading": [],
+  "help-project-url": [],
+  "help-credits": [],
+  "help-contact-info": [],
 };

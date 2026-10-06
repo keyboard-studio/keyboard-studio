@@ -3,7 +3,7 @@
 // Covers:
 //   • buildProposedFlowGraph — ordered graph, kind:"proposed" / region:"library",
 //     preserves YAML ordering/routing (FR-001).
-//   • status completeness — YAML `status` == flowSources status for EVERY entry
+//   • status completeness — YAML `status` == flowSources status for every YAML flow
 //     (FR-003; the binding that keeps the two representations from drifting).
 //   • buildLibrarySection — flat reserve = in-no-flow-at-all (FR-004); only-in-proposed
 //     questions render inside the proposed graph, not as flat reserve.
@@ -15,10 +15,10 @@
 
 import { describe, it, expect } from "vitest";
 
-import { flowSources } from "../steps/flowSources.ts";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import { manifest } from "../steps/manifest.ts";
 import { parseThinYaml } from "../survey/loadModularFlow.ts";
-import { buildProposedFlowGraph } from "./buildStepGraph.ts";
+import { buildProposedFlowGraphFromFlow } from "./buildStepGraph.ts";
 import {
   buildFlowSources,
   buildLibrarySection,
@@ -32,7 +32,8 @@ import { DEMOTED_PHASE_A } from "../survey/questions/demotedPhaseA.fixture.ts";
 
 describe("spec 025 — buildProposedFlowGraph (FR-001)", () => {
   const source = flowSources["phase_a_identity"]!;
-  const graph = buildProposedFlowGraph(source.raw, source.title);
+  const flowDef = loadFlowSourceDef(source);
+  const graph = buildProposedFlowGraphFromFlow(flowDef, source.title);
 
   it("builds one node per demoted Phase A question (15 + 15 provenance = 30)", () => {
     // Literal count was fragile; derived from the source collection instead.
@@ -50,7 +51,7 @@ describe("spec 025 — buildProposedFlowGraph (FR-001)", () => {
     }
   });
 
-  it("preserves the YAML ordering (first node is the flow entry) and has edges", () => {
+  it("preserves the derived ordering (first node is the flow entry) and has edges", () => {
     expect(graph.entryId).toBe("desktop_first_notice");
     expect(graph.nodes[0]!.id).toBe("desktop_first_notice");
     expect(graph.nodes[0]!.isEntry).toBe(true);
@@ -60,7 +61,7 @@ describe("spec 025 — buildProposedFlowGraph (FR-001)", () => {
 
   it("FR-005: marks node.alsoLive when a question id is also in a live flow", () => {
     // Synthetic live-id set forces the dual-reference path (real data has none).
-    const withDual = buildProposedFlowGraph(source.raw, source.title, new Set(["iso_code"]));
+    const withDual = buildProposedFlowGraphFromFlow(flowDef, source.title, new Set(["iso_code"]));
     const iso = withDual.nodes.find((n) => n.id === "iso_code");
     expect(iso?.alsoLive).toBe(true);
     const other = withDual.nodes.find((n) => n.id === "region");
@@ -86,19 +87,23 @@ describe("spec 025 — YAML status matches flowSources status for every entry (F
     });
   }
 
-  it("phase_a_identity YAML carries status: proposed", () => {
-    expect(parseThinYaml(flowSources["phase_a_identity"]!.raw!).status).toBe("proposed");
+  it("phase_a_identity is a derived proposed flow (no YAML to carry a status)", () => {
+    const source = flowSources["phase_a_identity"]!;
+    expect(source.status).toBe("proposed");
+    expect(source.raw).toBeUndefined();
+    expect(source.derivedModules).toBeDefined();
   });
 
   it("a live flow YAML omits status and defaults to 'live'", () => {
     // identity_lite is now derived (spec 085 T040) — its "live" status lives
-    // in flowSources, not in a YAML file. A remaining live YAML flow still
-    // defaults to live when the status key is omitted.
+    // in flowSources, not in a YAML file. A remaining live YAML flow (if any)
+    // still defaults to live when the status key is omitted; once every flow
+    // derives its order there is no YAML left to bind, so the check is vacuous.
     const liveYamlSource = Object.values(flowSources).find(
       (s) => s.status === "live" && s.raw !== undefined,
     );
-    expect(liveYamlSource).toBeDefined();
-    expect(parseThinYaml(liveYamlSource!.raw!).status).toBe("live");
+    if (liveYamlSource === undefined) return;
+    expect(parseThinYaml(liveYamlSource.raw!).status).toBe("live");
   });
 });
 

@@ -23,7 +23,7 @@
 // to keep. It fails only when routing actually changes, so it is not churn.
 
 import { describe, it, expect } from "vitest";
-import { loadDerivedFlowDef, loadModularFlow } from "../../src/survey/loadModularFlow.ts";
+import { loadDerivedFlowDef } from "../../src/survey/loadModularFlow.ts";
 import { phaseARegistry } from "../../src/survey/questions/registry.a.ts";
 import { flowSources, loadFlowSourceDef } from "../../src/steps/flowSources.ts";
 
@@ -31,8 +31,8 @@ import { flowSources, loadFlowSourceDef } from "../../src/steps/flowSources.ts";
 // ?raw YAML imports (Vite handles these; typed via src/vite-env.d.ts)
 // ---------------------------------------------------------------------------
 
-import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
+// phase_f_helpdocs.modular.yaml was deleted (spec 085 US4) � Phase F derives its
+// order via flowSources (loadFlowSourceDef below). No raw import.
 // identity_lite.modular.yaml was deleted (spec 085 T040) — the order now
 // derives from the il_* modules' provides/requires declarations via
 // loadDerivedFlowDef below. No raw import.
@@ -42,7 +42,7 @@ import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: phase_a_identity — questions[]", () => {
-  const modular = loadModularFlow(phaseAModularRaw);
+  const modular = loadFlowSourceDef(flowSources["phase_a_identity"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);
@@ -67,7 +67,7 @@ describe("flow-parity: phase_a_identity — questions[]", () => {
 });
 
 describe("flow-parity: phase_a_identity — provenance_questions[]", () => {
-  const modular = loadModularFlow(phaseAModularRaw);
+  const modular = loadFlowSourceDef(flowSources["phase_a_identity"]!);
 
   it("has provenance_questions", () => {
     expect(modular.provenance_questions).toBeDefined();
@@ -88,7 +88,7 @@ describe("flow-parity: phase_a_identity — provenance_questions[]", () => {
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: phase_f_helpdocs — questions[]", () => {
-  const modular = loadModularFlow(phaseFModularRaw);
+  const modular = loadFlowSourceDef(flowSources["phase_f_helpdocs"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);

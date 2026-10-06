@@ -10,6 +10,8 @@
 // One import + one entry per question module. Key MUST match definition.id exactly.
 
 import type { QuestionModule } from "../types.ts";
+import type { DecisionId } from "../../decisions/decisionTypes.ts";
+import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import desktop_first_notice from "./reserve/desktop_first_notice.ts";
 import language_name_autonym from "./reserve/language_name_autonym.ts";
@@ -44,15 +46,18 @@ import provenance_additional_notes from "./reserve/provenance_additional_notes.t
 import pb_mark_input_order from "./reserve/pb_mark_input_order.ts";
 
 /**
- * Synchronous Reserve question registry.
- * Consumed by the consolidated registry.ts (merged in) and directly by
- * steps/flowSources.ts (the phase_a_identity proposed-flow entry) and the
- * Flow Map's Leftover section (dashboard/renderedNodeSet.ts).
+ * The 30 demoted Phase A modules — the proposed phase_a_identity flow's module
+ * set (spec 085 US4: its order derives from their provides/requires).
+ *
+ * KEY ORDER IS MEANINGFUL: it is the stable tie-break for `orderDecisions`
+ * where the provides/requires graph is silent, so keep the keys in the
+ * proposed walk sequence (decisions/orderParity.test.ts pins the result).
+ * pb_mark_input_order is deliberately NOT here — it belongs to no flow.
  */
-export const reserveRegistry: Readonly<Record<string, QuestionModule>> = {
+export const phaseAReserveRegistry: Readonly<Record<string, QuestionModule>> = {
   desktop_first_notice,
-  language_name_autonym,
   language_name_english,
+  language_name_autonym,
   iso_code,
   region,
   primary_script,
@@ -80,5 +85,25 @@ export const reserveRegistry: Readonly<Record<string, QuestionModule>> = {
   provenance_community_involvement,
   provenance_casing_notes,
   provenance_additional_notes,
+} as const;
+
+/**
+ * Synchronous Reserve question registry.
+ * Consumed by the consolidated registry.ts (merged in) and directly by
+ * steps/flowSources.ts (the phase_a_identity proposed-flow entry) and the
+ * Flow Map's Leftover section (dashboard/renderedNodeSet.ts).
+ */
+export const reserveRegistry: Readonly<Record<string, QuestionModule>> = {
+  ...phaseAReserveRegistry,
   pb_mark_input_order,
 } as const;
+
+/**
+ * Decision-id index over the reserve modules (spec 085 US4) — the modules' own
+ * `provides` declarations through the canonical indexer, so a duplicate
+ * provider throws. The reserve decisions use `reserve-*` ids, distinct from the
+ * live il_* ids, so this registry never double-provides against registry.a.ts.
+ */
+export const reserveDecisionIndex: Readonly<
+  Partial<Record<DecisionId, QuestionModule>>
+> = Object.fromEntries(indexProviders(Object.values(reserveRegistry)));

@@ -7,6 +7,8 @@
 // All imports are static (not dynamic) so the registry is synchronous.
 
 import type { QuestionModule } from "../types.ts";
+import type { DecisionId } from "../../decisions/decisionTypes.ts";
+import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import pbExistingKeyboardsMod from "./b/pb_existing_keyboards.ts";
 import pbCoInstalledKeyboardsMod from "./b/pb_co_installed_keyboards.ts";
@@ -113,3 +115,12 @@ export const phaseBRegistry: Readonly<Record<string, QuestionModule>> = {
   pb_use_case: pbUseCaseMod,
   pb_additional_methods: pbAdditionalMethodsMod,
 } as const;
+
+/**
+ * Decision-id index over the Phase B registry (spec 085 US4) — the modules' own
+ * `provides` declarations through the canonical indexer, so a duplicate
+ * provider throws.
+ */
+export const phaseBDecisionIndex: Readonly<
+  Partial<Record<DecisionId, QuestionModule>>
+> = Object.fromEntries(indexProviders(Object.values(phaseBRegistry)));

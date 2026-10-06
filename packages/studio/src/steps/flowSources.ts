@@ -15,7 +15,9 @@
 //   "proposed" — known to the registry but NOT referenced by any manifest step;
 //                excluded from live drill-downs and from the rendered<->runtime
 //                bijection; rendered as an ordered graph in the Flow Map's Library
-//                section (spec 025, D6). Its YAML also carries `status: proposed`.
+//                section (spec 025, D6). The `status` here is the single source
+//                of that marker (the YAML flow descriptors that once mirrored it
+//                are deleted).
 //
 // Migrating a flow from a thin YAML order list to a DERIVED order (spec 085 Q3 /
 // SC-003 — no hand-maintained order lists). Do this once per flow:
@@ -36,15 +38,12 @@
 //      automatically. Conditional visibility stays single-sourced in each
 //      module's definition.next (gatedBy is derived from it, FR-005).
 
-import phaseAIdentityModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../survey/questions/registry.f.ts";
+import { phaseFRegistry, phaseFFlowModules } from "../survey/questions/registry.f.ts";
 import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
-import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
+import { reserveRegistry, phaseAReserveRegistry } from "../survey/questions/registry.reserve.ts";
 
 import type { QuestionModule } from "../survey/types.ts";
 import type { FlowDef } from "../survey/types.ts";
@@ -78,6 +77,12 @@ export interface FlowSource {
    * when `derivedModules` is set; unused for YAML flows (the YAML carries it).
    */
   phase?: string;
+  /**
+   * Subset of `derivedModules` that forms the supplemental
+   * `provenance_questions` list (Phase A). Membership only � order still
+   * derives from the single provides/requires pass over `derivedModules`.
+   */
+  provenanceModules?: readonly QuestionModule[];
   /** Human title for the Flow Map drill-down header. */
   title: string;
   /** Registry of QuestionModule definitions for this flow's questions. */
@@ -107,7 +112,12 @@ export function loadFlowSourceDef(source: FlowSource): FlowDef {
     if (source.phase === undefined) {
       throw new Error(`flowSources: derived flow "${source.id}" must declare phase`);
     }
-    return loadDerivedFlowDef(source.id, source.phase, source.derivedModules ?? []);
+    return loadDerivedFlowDef(
+      source.id,
+      source.phase,
+      source.derivedModules ?? [],
+      source.provenanceModules,
+    );
   }
   return loadModularFlow(source.raw as string);
 }
@@ -173,7 +183,8 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
 
   phase_b_characters: {
     id: "phase_b_characters",
-    raw: phaseBModularRaw,
+    derivedModules: Object.values(phaseBRegistry),
+    phase: "B",
     title: "Character discovery",
     registry: phaseBRegistry,
     status: "live",
@@ -181,7 +192,8 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
 
   phase_f_helpdocs: {
     id: "phase_f_helpdocs",
-    raw: phaseFModularRaw,
+    derivedModules: phaseFFlowModules,
+    phase: "F",
     title: "Help docs",
     registry: phaseFRegistry,
     status: "live",
@@ -197,7 +209,16 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   // survey and never clogging the live identity_lite drill-down.
   phase_a_identity: {
     id: "phase_a_identity",
-    raw: phaseAIdentityModularRaw,
+    // spec 085 US4: order derives from the reserve modules' provides/requires
+    // (reserve-* decision ids, distinct from the live il_* ones). The 15
+    // provenance_* modules keep the supplemental provenance_questions list.
+    derivedModules: Object.values(phaseAReserveRegistry),
+    phase: "A",
+    provenanceModules: Object.values(phaseAReserveRegistry).filter(
+      (m) =>
+        m.definition.id.startsWith("provenance_") &&
+        m.definition.id !== "provenance_opt_in",
+    ),
     title: "Full identity (reserve/library)",
     registry: reserveRegistry,
     status: "proposed",

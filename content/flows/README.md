@@ -218,23 +218,20 @@ fields in the template. The example also shows the `routing_group` and
 
 ---
 
-## Proposed flows (`proposed/`) and the Library section (spec 025, D6)
+## Proposed flows and the Library section (spec 025, D6)
 
 A **proposed flow** is a flow that is *not* run by the live survey but is kept as a
 browsable, promotable ordered graph in the Flow Map's **Library** section. It is how
 demoted-but-not-deleted content (e.g. the full non-identity Phase A battery) keeps its
 intended sequence visible instead of collapsing to a flat reserve list.
 
-A proposed flow is declared in **two** places (belt-and-suspenders, per
-[ADR-0001](../../docs/adr/0001-flow-map-derived-from-one-source.md) — "no second list to
-drift"):
-
-1. **Location + header** — the YAML lives under `content/flows/proposed/` and carries a
-   `status: proposed` header field (read by `parseThinYaml`; absent means `"live"`).
-2. **Catalogue** — its `steps/flowSources.ts` entry carries `status: "proposed"`.
-
-A completeness test (`dashboard/proposedFlows.test.ts`) asserts these two agree for every
-entry, so they cannot diverge silently.
+A proposed flow is a `steps/flowSources.ts` entry carrying `status: "proposed"` -- that
+field is the single source of the marker (there is no YAML header to mirror it; see
+[ADR-0001](../../docs/adr/0001-flow-map-derived-from-one-source.md) -- "no second list to
+drift"). Its question order is **derived** from its modules' `provides` / `requires`
+declarations (spec 085), not from a hand-maintained list: the entry names `derivedModules`
+and a `phase` (and, for Phase A, `provenanceModules` -- the subset that forms the
+supplemental `provenance_questions` list). `phase_a_identity` is the current example.
 
 Proposed-flow node ids are **excluded from the rendered↔runtime bijection** (like reserve).
 A question appearing in **both** a live and a proposed flow is flagged with an "also live"
@@ -243,14 +240,15 @@ entry is a **hard failure** — promotion must be explicit.
 
 ### Promotion runbook (proposed → live)
 
-1. `git mv content/flows/proposed/<flow>.modular.yaml content/flows/<flow>.modular.yaml`
-   and **delete the `status: proposed` line** from the YAML header. (Update its `?raw`
-   import path in `steps/flowSources.ts`.)
-2. Flip the `flowSources` entry's `status` from `"proposed"` to `"live"`.
-3. Add `flowRefs: ["<flow_id>"]` to a manifest step. For a **new** step, also give it a
+1. Flip the `flowSources` entry's `status` from `"proposed"` to `"live"`.
+2. Add `flowRefs: ["<flow_id>"]` to a manifest step. For a **new** step, also give it a
    component (custom React or `makeFlowStepComponent`).
-4. The completeness checks (`flowSources.test.ts` D2b/D2c) + the drift guardrail then
+3. The completeness checks (`flowSources.test.ts` D2b/D2c) + the drift guardrail then
    enforce it as live automatically.
+
+(A flow that still has a thin `*.modular.yaml` instead of `derivedModules` additionally
+needs the file moved out of `proposed/` and any `status: proposed` header line deleted --
+but no proposed flow is YAML-backed today.)
 
 **Demotion** is the exact reverse. Either direction, the spec-022 no-delete guardrail keeps
 every module registered + on-disk + test-covered — demotion is never deletion.

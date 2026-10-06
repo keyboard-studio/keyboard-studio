@@ -13,6 +13,8 @@
 // re-adding an id to the YAML revives the question with no code change.
 
 import type { QuestionModule } from "../types.ts";
+import type { DecisionId } from "../../decisions/decisionTypes.ts";
+import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import pfDocLanguageMod from "./f/pf_doc_language.ts";
 import pfWelcomeParagraphMod from "./f/pf_welcome_paragraph.ts";
@@ -44,15 +46,14 @@ import pfContactInfoMod from "./f/pf_contact_info.ts";
  * Merged into the main registry by the team lead after all phase agents return.
  */
 export const phaseFRegistry: Readonly<Record<string, QuestionModule>> = {
-  // --- Core (always asked) ---
-  pf_doc_language: pfDocLanguageMod,
-  pf_welcome_paragraph: pfWelcomeParagraphMod,
-  pf_font_guidance: pfFontGuidanceMod,
-  pf_usage_tip_1: pfUsageTip1Mod,
-  pf_usage_tip_2: pfUsageTip2Mod,
+  // Keys are in WALK order: orderDecisions uses registry order as the tie-break
+  // where provides/requires are silent (spec 085 Q3).
 
-  // --- HISTORY proposal (spec 079 US5): confirm / edit / dismiss, spliced in
-  // via pf_usage_tip_1's `next` (last default-path screen before the gate) ---
+  // --- Default path ---
+  pf_welcome_paragraph: pfWelcomeParagraphMod,
+  pf_usage_tip_1: pfUsageTip1Mod,
+  // HISTORY proposal (spec 079 US5): confirm / edit / dismiss, spliced in
+  // via pf_usage_tip_1's `next` (last default-path screen before the gate).
   pf_history_entry: pfHistoryEntryMod,
   pf_history_entry_bullets: pfHistoryEntryBulletsMod,
 
@@ -60,6 +61,9 @@ export const phaseFRegistry: Readonly<Record<string, QuestionModule>> = {
   pf_more_detail_gate: pfMoreDetailGateMod,
 
   // --- Optional battery (reached only when the gate is Yes) ---
+  pf_doc_language: pfDocLanguageMod,
+  pf_font_guidance: pfFontGuidanceMod,
+  pf_usage_tip_2: pfUsageTip2Mod,
   pf_scope_variety: pfScopeVarietyMod,
   pf_provenance_basis: pfProvenanceBasisMod,
   pf_design_rationale: pfDesignRationaleMod,
@@ -77,8 +81,32 @@ export const phaseFRegistry: Readonly<Record<string, QuestionModule>> = {
   pf_credits: pfCreditsMod,
   pf_contact_info: pfContactInfoMod,
 
-  // --- Demoted: registered + on disk + test-covered, but not in the live YAML ---
+  // --- Demoted: registered + on disk + test-covered, but not in the live flow ---
   pf_usage_tip_3: pfUsageTip3Mod,
   pf_usage_tip_4: pfUsageTip4Mod,
   pf_usage_tip_5: pfUsageTip5Mod,
 } as const;
+
+/** Demoted tip slots: registered but deliberately absent from the live flow. */
+const DEMOTED_FLOW_IDS: ReadonlySet<string> = new Set([
+  "pf_usage_tip_3",
+  "pf_usage_tip_4",
+  "pf_usage_tip_5",
+]);
+
+/**
+ * The live Phase F flow's modules — the registry minus the demoted tip slots.
+ * This is the `derivedModules` input for flowSources (spec 085 Q3).
+ */
+export const phaseFFlowModules: readonly QuestionModule[] = Object.entries(phaseFRegistry)
+  .filter(([id]) => !DEMOTED_FLOW_IDS.has(id))
+  .map(([, mod]) => mod);
+
+/**
+ * Decision-id index over the live Phase F flow (spec 085 US4) — the same
+ * derivation as `phaseADecisionIndex`: the modules' own `provides`
+ * declarations through the canonical indexer, so a duplicate provider throws.
+ */
+export const phaseFDecisionIndex: Readonly<
+  Partial<Record<DecisionId, QuestionModule>>
+> = Object.fromEntries(indexProviders(phaseFFlowModules));

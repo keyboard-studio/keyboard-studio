@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 
 import { buildModularFlowGraph, buildDerivedFlowGraph, buildGraphFromQuestions, buildManifestStepGraph } from "./buildStepGraph.ts";
 import { buildScriptRouting } from "./buildScriptRouting.ts";
@@ -71,9 +68,11 @@ const ALL_FLOWS = [
   // identity_lite keys off the il_*-only phaseARegistry in production (steps/flowSources.ts).
   { flowDef: identityLiteFlow, title: "Identity-lite", registry: phaseARegistry },
   // phase_a_identity (the demoted battery) keys off reserveRegistry in production.
-  { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry },
-  { raw: phaseBModularRaw, title: "Phase B", registry: phaseBRegistry },
-  { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry },
+  { flowDef: loadFlowSourceDef(flowSources["phase_a_identity"]!), title: "Phase A", registry: reserveRegistry },
+  // Phase B derives its order (spec 085), built through flowSources.
+  { flowDef: loadFlowSourceDef(flowSources["phase_b_characters"]!), title: "Phase B", registry: phaseBRegistry },
+  // phase_f_helpdocs derives its order (spec 085) � built through flowSources.
+  { flowDef: loadFlowSourceDef(flowSources["phase_f_helpdocs"]!), title: "Phase F", registry: phaseFRegistry },
   // Phase G flows derive their order (spec 085) — built through flowSources.
   { flowDef: loadFlowSourceDef(flowSources["track"]!), title: "Track selection", registry: phaseTrackRegistry },
   { flowDef: loadFlowSourceDef(flowSources["project_name"]!), title: "Project name", registry: phaseProjectRegistry },
@@ -121,8 +120,8 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
   }
 
   const reserveTestCases = [
-    { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry, includeProvenance: true },
-    { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry, includeProvenance: false },
+    { flowDef: loadFlowSourceDef(flowSources["phase_a_identity"]!), title: "Phase A", registry: reserveRegistry, includeProvenance: true },
+    { flowDef: loadFlowSourceDef(flowSources["phase_f_helpdocs"]!), title: "Phase F", registry: phaseFRegistry, includeProvenance: false },
     // identity-lite keys off the il_*-only phaseARegistry in production, so its
     // reserve set is empty (the demoted battery is Leftover, not drill-down clog —
     // spec 022 / phaseADemoteReserve.test.ts). expectedReserve computes to {} here.
@@ -153,11 +152,12 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
 
 describe("buildModularFlowGraph — Phase B honesty (FR-010)", () => {
   // Build the modular Phase B graph once for all assertions in this suite.
-  const graph = buildModularFlowGraph(phaseBModularRaw, "Phase B — character discovery", phaseBRegistry);
+  const phaseBFlow = loadFlowSourceDef(flowSources["phase_b_characters"]!);
+  const graph = buildDerivedFlowGraph(phaseBFlow, "Phase B — character discovery", phaseBRegistry);
 
   // Resolve the live id set independently (from loadModularFlow) for the
   // derived-equality assertion (FR-010 Part A).
-  const liveFlow = loadModularFlow(phaseBModularRaw);
+  const liveFlow = phaseBFlow;
   const liveIds = new Set(liveFlow.questions.map((q) => q.id));
 
   // Registry keys for the reserve computation (FR-010 Part B).

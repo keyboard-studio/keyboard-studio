@@ -91,14 +91,14 @@
   "pb_use_case": [
     "§8"
   ],
-  "pf_doc_language": [
-    "specs/061-help-docs-generation"
-  ],
   "pf_history_entry": [
     "specs/080-documentation-completeness"
   ],
   "pf_history_entry_bullets": [
     "specs/080-documentation-completeness"
+  ],
+  "pf_doc_language": [
+    "specs/061-help-docs-generation"
   ],
   "pf_contact_info": [
     "specs/064-keyboard-attribution"

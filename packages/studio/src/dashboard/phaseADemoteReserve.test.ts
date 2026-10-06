@@ -23,14 +23,13 @@
 
 import { describe, it, expect } from "vitest";
 
-import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 import { buildDerivedFlowGraph } from "./buildStepGraph.ts";
 import { buildLeftoverSection } from "./renderedNodeSet.ts";
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
+import { phaseAReserveRegistry } from "../survey/questions/registry.reserve.ts";
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-// The demoted-Phase-A id list is derived ONCE from phase_a_identity.modular.yaml
-// (shared with noDeleteGuardrail.test.ts) — single source of truth.
+// The demoted-Phase-A id list is derived ONCE from the derived phase_a_identity
+// flow (shared with noDeleteGuardrail.test.ts) — single source of truth.
 import { DEMOTED_PHASE_A } from "../survey/questions/demotedPhaseA.fixture.ts";
 
 describe("spec 022 — demoted Phase A is Leftover, not clog (FR-001/FR-003/SC-001)", () => {
@@ -81,13 +80,8 @@ describe("spec 022 — demoted Phase A is Leftover, not clog (FR-001/FR-003/SC-0
     }
   });
 
-  it("the demoted set covers exactly the 30 non-identity Phase A modules in phase_a_identity.modular.yaml", () => {
-    const flow = loadModularFlow(phaseAModularRaw);
-    const yamlIds = new Set([
-      ...flow.questions.map((q) => q.id),
-      ...(flow.provenance_questions ?? []).map((q) => q.id),
-    ]);
-    expect(new Set(DEMOTED_PHASE_A)).toEqual(yamlIds);
+  it("the demoted set covers exactly the 30 non-identity Phase A modules in the proposed phase_a_identity flow", () => {
+    expect(new Set(DEMOTED_PHASE_A)).toEqual(new Set(Object.keys(phaseAReserveRegistry)));
     expect(DEMOTED_PHASE_A.length).toBe(30);
   });
 });

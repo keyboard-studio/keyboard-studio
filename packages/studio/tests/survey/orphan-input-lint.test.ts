@@ -69,13 +69,6 @@ const KNOWN_PHASE_ORDER: Array<{
   filename?: string;
   derivedIds?: readonly string[];
 }> = [
-  // spec 025: phase_a_identity is a PROPOSED flow, relocated to content/flows/proposed/.
-  // It is still linted for orphan inputs (path is joined onto flowsDir below); the
-  // readdirSync auto-discovery only scans the top level, so proposed flows are listed
-  // explicitly here.
-  { phase: "A (proposed)", filename: path.join("proposed", "phase_a_identity.modular.yaml") },
-  { phase: "B", filename: "phase_b_characters.modular.yaml" },
-  { phase: "F", filename: "phase_f_helpdocs.modular.yaml" },
   // Flows whose thin-YAML order list was deleted (spec 085) are appended below,
   // generically, from flowSources' derivedModules — the same order the survey
   // actually walks (see decisions/orderParity.test.ts).
@@ -84,9 +77,13 @@ const KNOWN_PHASE_ORDER: Array<{
 // Every derived flow, in flowSources declaration order. The il_* / Phase G
 // modules declare empty or trivially-satisfied inputs, so they pass the lint;
 // listing them preserves the "every registry module is manifested" coverage.
-// Migrating another flow needs no edit here.
+// Migrating another flow needs no edit here. Proposed flows sort first: the
+// proposed phase_a_identity battery is the producer of header.bcp47 (iso_code /
+// primary_script) that later phases' inputs resolve against, exactly as it was
+// when it led the YAML list.
 const derivedEntries = Object.values(flowSources)
   .filter((src) => src.derivedModules !== undefined)
+  .sort((a, b) => Number(b.status === "proposed") - Number(a.status === "proposed"))
   .map((src) => ({
     phase: `${src.phase ?? "?"} (${src.id})`,
     derivedIds: orderDecisions(src.derivedModules ?? []).map((m) => m.definition.id),

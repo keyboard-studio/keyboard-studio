@@ -40,6 +40,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["help-history-bullets"],
   specRef: "specs/080-documentation-completeness",
 };
 export default mod;
