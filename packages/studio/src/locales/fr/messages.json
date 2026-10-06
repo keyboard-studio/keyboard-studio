@@ -988,6 +988,7 @@
   "marks.context_tolerance.step.fallback.reason.opaque_output_store": "",
   "marks.context_tolerance.step.fallback.reason.time_bound": "",
   "marks.context_tolerance.step.fallback.reason.verification_regressed": "",
+  "marks.context_tolerance.step.heading": "",
   "marks.context_tolerance.step.intro": "",
   "marks.context_tolerance.step.prior.accepted": "",
   "marks.contextTolerance.disclosure.markOrder": "{0}: {note}",

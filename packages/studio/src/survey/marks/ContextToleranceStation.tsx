@@ -198,7 +198,7 @@ export function ContextToleranceStation({
             ? prior.decision === "accept"
               ? t({
                   id: "marks.context_tolerance.step.prior.accepted",
-                  message: "You chose to add the step that converts pasted text to this keyboard's own form.",
+                  message: "You chose to add the step that converts pasted letters and diacritics to the form this keyboard produces.",
                 })
               : t({
                   id: "marks.contextTolerance.station.prior.declined",
@@ -242,7 +242,7 @@ export function ContextToleranceStation({
           heading={
             <>
               <h3 style={{ margin: 0 }}>
-                <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
+                <Trans id="marks.context_tolerance.step.heading">Letters and diacritics written in a different form</Trans>
               </h3>
               <p style={mutedParaFlush}>
                 {t({
@@ -266,7 +266,7 @@ export function ContextToleranceStation({
           <NormalizationExamples examples={step.examples} {...(loadNames !== undefined ? { loadNames } : {})} />
           <p style={mutedParaFlush}>
             <Trans id="marks.context_tolerance.step.disclosure.rewrite">
-              Text pasted next to the cursor is converted to this keyboard's own form when you type.
+              When you type, pasted text next to the cursor is converted if it is a joined or separate form of a letter this keyboard can produce. Other pasted text is left as it is.
             </Trans>
           </p>
         </FacetTransformPanel>
