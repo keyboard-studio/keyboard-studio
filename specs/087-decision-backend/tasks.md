@@ -67,7 +67,7 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 **⟶ Wait for Wave 1 to finish, then:**
 - [x] **T042** [US4] Manifest spine → derived projection, last (Article IX names it; the constitution is amended to name the registry when this lands) · packages/studio/src/steps/manifest.ts
 
-**Checkpoint:** zero ordering artifacts outside the registry; in-flight drafts migrate automatically.
+**Checkpoint:** zero ordering artifacts outside the registry; `migrateDraft` is in place (live drafts need no migration today; wiring into draft load waits for the decision-flow runtime).
 
 ## Phase 7: US5 — Coverage proof (P3)
 

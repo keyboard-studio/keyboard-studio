@@ -48,7 +48,7 @@ Source: the existing `workingCopyStore` slots (`baseIr`, `baseKeyboard`) — no 
 
 ## DraftMigration (Q5)
 
-Static, registry-versioned table `oldAnswerKey → DecisionId`. At load: map answers onto decisions; unmappable answers surface visibly for re-answer — never silently dropped.
+Static, registry-versioned table `oldAnswerKey → DecisionId`. `migrateDraft` maps answers onto decisions; unmappable answers surface visibly for re-answer — never silently dropped. Live survey drafts persist answers keyed by question id, and no existing question id changed in this work, so they need no migration. `migrateDraft` maps question-id answers onto decisions for the decision-flow runtime, which is today reachable only through the DEV-gated demo; it will be wired into draft load when that runtime goes live.
 
 ## Relationships
 

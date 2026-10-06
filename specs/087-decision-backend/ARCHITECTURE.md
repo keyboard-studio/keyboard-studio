@@ -76,7 +76,7 @@ All four waves have landed (see tasks.md Phase 9), each gated by its parity test
 3. `classifyBaseScript` → deleted, folded into extraction
 4. `steps/manifest.ts` spine → not a projection: the `spine`/`joinTarget` flags and `STEP_ORDER` literal are deleted and the order is derived from `stepDependencies.ts` (constitution Article IX rewritten to name the registry)
 
-In-flight drafts migrate automatically: `migrateDraft` maps old answer-keys onto decisions through a versioned table; unmappable answers surface visibly for re-answer, never silently dropped.
+`migrateDraft` maps old answer-keys onto decisions through a versioned table; unmappable answers surface visibly for re-answer, never silently dropped. Live survey drafts persist answers keyed by question id, and no existing question id changed in this work, so they need no migration. `migrateDraft` maps question-id answers onto decisions for the decision-flow runtime, which is today reachable only through the DEV-gated demo; it will be wired into draft load when that runtime goes live.
 
 ## Completing the vocabulary
 

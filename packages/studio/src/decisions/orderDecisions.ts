@@ -7,6 +7,7 @@
 
 import type { QuestionModule } from "../survey/types.ts";
 import type { FlowQuestion } from "../survey/types.ts";
+import { evalConditionGrammar } from "../survey/conditionGrammar.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 
 /**
@@ -429,7 +430,7 @@ function decisionValueString(value: unknown): string {
 }
 
 /**
- * Mirror of `SurveyRunner.evalCondition`, but `value` comes from a
+ * Same grammar as `SurveyRunner.evalCondition` (shared evaluator), but `value` comes from a
  * DecisionSet entry instead of a live answer. Supports the same grammar
  * (`==` / `!=` against 'quoted' literals, `or` / `and`); `ctx.*` has no
  * DecisionSet equivalent and yields `undefined` (unmappable), as does any
@@ -439,33 +440,9 @@ function evalAgainstDecision(
   condition: string,
   value: unknown,
 ): boolean | undefined {
-  const orClauses = condition.split(" or ");
-  if (orClauses.length > 1) {
-    const results = orClauses.map((c) => evalAgainstDecision(c.trim(), value));
-    if (results.some((r) => r === undefined)) return undefined;
-    return results.some((r) => r === true);
-  }
-
-  const andClauses = condition.split(" and ");
-  if (andClauses.length > 1) {
-    const results = andClauses.map((c) =>
-      evalAgainstDecision(c.trim(), value),
-    );
-    if (results.some((r) => r === undefined)) return undefined;
-    return results.every((r) => r === true);
-  }
-
-  const eq = condition.match(/^(value|ctx\.\w+)\s*==\s*'([^']*)'$/);
-  if (eq !== null) {
-    if (eq[1] !== "value") return undefined;
-    return decisionValueString(value) === eq[2];
-  }
-
-  const ne = condition.match(/^(value|ctx\.\w+)\s*!=\s*'([^']*)'$/);
-  if (ne !== null) {
-    if (ne[1] !== "value") return undefined;
-    return decisionValueString(value) !== ne[2];
-  }
-
-  return undefined;
+  return evalConditionGrammar(
+    condition,
+    (lhs) => (lhs === "value" ? decisionValueString(value) : undefined),
+    true,
+  );
 }

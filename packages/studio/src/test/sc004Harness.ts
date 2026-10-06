@@ -161,7 +161,7 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
     for (const m of orderDecisions(ADAPT_MODULES)) {
       if (m.mutate === undefined || m.writes === undefined) continue;
       const pid = m.provides?.[0];
-    const d = pid === undefined ? undefined : decisions[pid];
+      const d = pid === undefined ? undefined : decisions[pid];
       if (d === undefined || d.value === undefined) continue;
       const req: MutateRequest = {
         kind: "mutate",
@@ -190,5 +190,5 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
       answers: [{ questionId: "b_inventory", answerType: "char-list", value: inventory }],
     };
     store.getState().recordPhase(phaseB);
-  return decisions;
+    return decisions;
 }

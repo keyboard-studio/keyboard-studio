@@ -104,7 +104,9 @@ module.exports = {
     {
       name: 'decisions-layer',
       comment:
-        'decisions/ is the studio half of the per-keyboard decision audit (spec 053). It ' +
+        'decisions/ hosts two features: the studio half of the per-keyboard decision audit ' +
+        '(spec 053) and the spec 087 decision backend (Decision/DecisionId/DecisionSet, ordering, ' +
+        'extraction). The audit ' +
         'reads the step manifest, question registry, and mutate-seam flag to attribute a ' +
         'boundary diff to a decision, and renders the author-facing trail. It may depend on ' +
         'steps/, survey/questions/, contracts, ui/, and flags/. ' +

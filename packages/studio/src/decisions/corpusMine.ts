@@ -13,6 +13,7 @@
 import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
 import type { Decision, DecisionId } from "./decisionTypes.ts";
+import { deepEqual } from "./deepEqual.ts";
 import { buildExtractContext } from "./extractContext.ts";
 
 /** One keyboard in the mining sample: the import pipeline's output. */
@@ -45,29 +46,6 @@ export interface MinedCorpus {
    * names the mining run as its source — the value was observed, not asked.
    */
   defaults: Array<Decision<unknown>>;
-}
-
-/** Deep-equality for extracted values (primitives, arrays, plain objects). */
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a !== typeof b) return false;
-  if (a === null || b === null) return a === b;
-  if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    return a.every((v, i) => deepEqual(v, (b as unknown[])[i]));
-  }
-  if (typeof a === "object") {
-    const ka = Object.keys(a as Record<string, unknown>);
-    const kb = Object.keys(b as Record<string, unknown>);
-    if (ka.length !== kb.length) return false;
-    return ka.every((k) =>
-      deepEqual(
-        (a as Record<string, unknown>)[k],
-        (b as Record<string, unknown>)[k],
-      ),
-    );
-  }
-  return false;
 }
 
 /**
