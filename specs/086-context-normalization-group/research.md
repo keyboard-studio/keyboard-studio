@@ -158,3 +158,19 @@ The overlay (`context-tolerance-overlay.ts`) gains a `kind: "normalization-step"
 - **Superset soundness.** If the closure misses a produced cluster whose alternate is also produced, typed output can change. The harness (R8) fails the keyboard (SC-006); the authoring path still offers the step. *Mitigation:* the verification record marks such a keyboard `regressed`, and the studio does not propose the step for a keyboard whose record says so.
 - **Other engines.** Only KeymanWeb was simulated (spec Open questions). Context-only groups chained through `match`/`nomatch` are standard Keyman, documented on help.keyman.com (`group`, `use`, `match`). Desktop verification is a release gate, not a planning blocker.
 - **Large keyboards.** `vietnamese_telex` (about 72,000 rules) may blow the time bound. The generator enforces a budget (SC-005) and refuses with `time-bound` past it.
+
+**Measured on the seven spike keyboards (T021/T022).**
+
+| Keyboard | SC-003 bound | Closure unbounded | After R10 mitigation | Bound met |
+|---|---|---|---|---|
+| `el_dinka` | 1 | 1 | 1 | yes |
+| `fv_northern_tutchone` | 1 | 21 | 19 | **no** (see below) |
+| `fv_tlingit` | 6 | 6 | 6 | yes |
+| `sil_yoruba8` | 9 | 9 | 9 | yes |
+| `el_pan_sahelian` | 12 | 53 | 8 | yes |
+| `sil_cameroon_qwerty` | 23 | 26 | 15 | yes |
+| `sil_tchad` | 49 | 23 | 23 | yes |
+
+Mitigations applied, in order: (1) context-free mark appends (`+ [K_X] > U+0301`) extend only clusters holding fewer than two marks, so one standalone mark on every base no longer stacks three deep (`el_pan_sahelian`: 43,219 clusters down to 6,152); (2) the packer learns the single-mark pass set for shape P instead of passing the whole repertoire mark set, which lets one rule cover a head whose full mark set would collide with a produced cluster.
+
+**`fv_northern_tutchone` stays above its bound (19 against 1).** The excess is not closure over-approximation: with the closure switched off the count is unchanged. The keyboard really types three-key clusters (a diaeresis or ogonek prefix key, then an accent prefix key, then the letter gives `A` + U+0308 + U+0300), so those clusters are produced and their NFC alternates (`Ä` + U+0300) are legitimate maps. The spike's 1 rule came from a repertoire built by two-key simulation, which never saw them. Dropping them would leave pasted `Ä` + U+0300 behaving differently from typed text, so the generator keeps them and the parity test pins this keyboard to 19. This needs a spec decision (restate SC-003 for this keyboard, or accept the spike's narrower repertoire).
