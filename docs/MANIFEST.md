@@ -63,7 +63,7 @@ registering the fourth).
 | [`docs/design-notes/question-unification-findings.md`](design-notes/question-unification-findings.md) | Root-cause trace + reachability matrix for the question-unification migration | Superseded once the migration plan fully lands | live |
 | [`docs/design-notes/question-unification-migration-plan.md`](design-notes/question-unification-migration-plan.md) | Migration plan for the question-unification rework | Migration phase changes | live |
 | [`docs/design-notes/mechanism-gallery-flow.md`](design-notes/mechanism-gallery-flow.md) | Mechanism gallery flow investigation | Mechanism gallery rework | live |
-| [`docs/design-notes/survey-flow-rework.md`](design-notes/survey-flow-rework.md) | Proposed 8-act rework of the studio survey flow (Discovery/Inventory/Approve-strategies split); `pb_*` → act ledger, strategy-card inputs/writes ledger, facet-catalog gaps | Survey manifest spine changes; `content/flows/phase_b_characters.modular.yaml` reorders; `orth.inventory-delta` wiring | live |
+| [`docs/design-notes/survey-flow-rework.md`](design-notes/survey-flow-rework.md) | Proposed 8-act rework of the studio survey flow (Discovery/Inventory/Approve-strategies split); `pb_*` → act ledger, strategy-card inputs/writes ledger, facet-catalog gaps | Survey manifest spine changes; phase_b_characters flow reorders (membership in `packages/studio/src/survey/questions/registry.ts`; the `.modular.yaml` file was retired per spec 087); `orth.inventory-delta` wiring | live |
 
 ## Corpus-derived artifacts
 

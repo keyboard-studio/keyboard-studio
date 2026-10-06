@@ -1696,7 +1696,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     advanceToTrack();
     expect(screen.getByTestId("stage-track")).toBeTruthy();
 
-    // adapt-track: nextSpineStepAfter("track") skips project_name (side trail).
+    // adapt-track: nextMainLineStepAfter("track") skips project_name (side trail).
     fireEvent.click(screen.getByTestId("track-adapt"));
 
     // Must land on prefill (characters step), not project-name.

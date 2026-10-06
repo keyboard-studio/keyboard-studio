@@ -44,10 +44,12 @@ const KEYBOARDS = [
   },
   {
     id: "basic_kbdgr",
-    languageName: "Greek",
+    // langtags englishName for `de` is "German, Standard" (the extractor's
+    // exact output); the keyboard is German Basic, not Greek.
+    languageName: "German, Standard",
     kmnPath: "../../tests/fixtures/scKeyboards/basic_kbdgr.kmn",
-    script: "Grek",
-    languages: ["el"],
+    script: "Latn",
+    languages: ["de"],
     copyright: "(c) 2009-2019 SIL International",
   },
   {
@@ -144,7 +146,7 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
       expect((inventory?.value as unknown[]).length).toBeGreaterThan(0);
       expect(inventory?.source).toContain(kb.id);
 
-      // Hand-checked English name of the primary tag (en/ru/el/ar).
+      // Hand-checked English name of the primary tag (en/ru/de/ar).
       expect(decisions["language-name"]?.provenance).toBe("extracted");
       expect(decisions["language-name"]?.value).toBe(kb.languageName);
       expect(decisions["language-name"]?.source).toContain(kb.id);

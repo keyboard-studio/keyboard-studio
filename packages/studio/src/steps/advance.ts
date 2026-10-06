@@ -2,7 +2,7 @@
 //
 // Encodes the complete copy/adapt fork, side-trail rejoin hops, terminal transitions,
 // and main-line step sequencing in a single pure function. Replaces the private
-// manifestIndexOf/nextSpineStepAfter helpers and the inline fork logic that
+// manifestIndexOf/nextMainLineStepAfter helpers and the inline fork logic that
 // were scattered across SurveyView's per-step handlers before Stage 5.
 //
 // CONTRACT (advance-and-stephost.contract.md §1):
@@ -139,14 +139,14 @@ export function manifestIndexOf(id: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// nextSpineStepAfter — moved from StudioShell.tsx (was private, now exported).
+// nextMainLineStepAfter — moved from StudioShell.tsx (was private, now exported).
 //
 // Advances to the next main-line step in the (derived) manifest order after
 // currentId, skipping gated side-trail steps. Returns "done" when "package" or
 // end-of-manifest is reached.
 // ---------------------------------------------------------------------------
 
-export function nextSpineStepAfter(currentId: string): ActiveStepId {
+export function nextMainLineStepAfter(currentId: string): ActiveStepId {
   const currentIdx = manifestIndexOf(currentId);
   // Guard: unknown id returns -1; scanning from index 0 would return the first
   // spine step ("identity") which is incorrect. Return "done" instead.
@@ -195,17 +195,17 @@ export function advance(
   switch (completedStepId) {
     case "identity":
       return ctx.identitySupported
-        ? { next: nextSpineStepAfter("identity") }   // layout
+        ? { next: nextMainLineStepAfter("identity") }   // layout
         : { next: "unsupported" };
 
     case "layout":
       // The community-layout question (spec 076 A4). Answers persist per
       // question in the answer store; no reducer side effects, so it is absent
       // from STEPS_WITH_APPLY_COMPLETION.
-      return { next: nextSpineStepAfter("layout") }; // choose_base
+      return { next: nextMainLineStepAfter("layout") }; // choose_base
 
     case "choose_base":
-      return { next: nextSpineStepAfter("choose_base") }; // track
+      return { next: nextMainLineStepAfter("choose_base") }; // track
 
     case "track":
       if (ctx.selectedTrack !== null) {
@@ -216,7 +216,7 @@ export function advance(
         // Adapt-track: skip the project_name side trail → characters.
         // Also signals host to call setCharactersSubStage("prefill") post-advance.
         return {
-          next: nextSpineStepAfter("track"),  // characters
+          next: nextMainLineStepAfter("track"),  // characters
           setCharactersSubStage: "prefill",
         };
       } else {
@@ -240,10 +240,10 @@ export function advance(
       return { next: "characters", setCharactersSubStage: "prefill" };
 
     case "characters":
-      return { next: nextSpineStepAfter("characters") }; // marks (spec 071)
+      return { next: nextMainLineStepAfter("characters") }; // marks (spec 071)
 
     case "marks":
-      return { next: nextSpineStepAfter("marks") }; // punctuation
+      return { next: nextMainLineStepAfter("marks") }; // punctuation
 
     case "punctuation":
       // The punctuation-selection page (clone of the Phase B build-list,
@@ -251,7 +251,7 @@ export function advance(
       // effects — its SurveyPhaseResult reaches the session through StepHost's
       // generic recordPhase path (confirmedInventory union). Absent from
       // STEPS_WITH_APPLY_COMPLETION for that reason.
-      return { next: nextSpineStepAfter("punctuation") }; // invisibles
+      return { next: nextMainLineStepAfter("punctuation") }; // invisibles
 
     case "invisibles":
       // The invisible-characters step (spec 075): always renders, no reducer
@@ -259,38 +259,38 @@ export function advance(
       // character plus the shared phase-C confirmedInventory union) reaches
       // the session through StepHost's generic recordPhase path. Absent from
       // STEPS_WITH_APPLY_COMPLETION for that reason.
-      return { next: nextSpineStepAfter("invisibles") }; // convenience
+      return { next: nextMainLineStepAfter("invisibles") }; // convenience
 
     case "convenience":
       // The pre-carve "keep these letters?" question. No reducer side effects —
       // its SurveyPhaseResult reaches the session through StepHost's generic
       // recordPhase path, and the carve gallery reads it off the merged
       // session. Absent from STEPS_WITH_APPLY_COMPLETION for that reason.
-      return { next: nextSpineStepAfter("convenience") }; // carve
+      return { next: nextMainLineStepAfter("convenience") }; // carve
 
     case "carve":
-      return { next: nextSpineStepAfter("carve") }; // deadkeys
+      return { next: nextMainLineStepAfter("carve") }; // deadkeys
 
     case "deadkeys":
       // Spec 083: the deadkeys surface saves every lifecycle edit to the
       // working copy immediately — no reducer side effects, no
       // applyStepCompletion. Absent from STEPS_WITH_APPLY_COMPLETION for
       // that reason (same as convenience).
-      return { next: nextSpineStepAfter("deadkeys") }; // rules
+      return { next: nextMainLineStepAfter("deadkeys") }; // rules
 
     case "rules":
       // The before/after rule demo (spec 082): a read-only view of the
       // working copy's compiled rules — no reducer side effects, so absent
       // from STEPS_WITH_APPLY_COMPLETION (same as convenience above).
-      return { next: nextSpineStepAfter("rules") }; // mechanisms
+      return { next: nextMainLineStepAfter("rules") }; // mechanisms
 
     case "mechanisms":
       // Spec 035 R4/R12: route into the off-spine seed-source fork — but only
       // when no valid choice is recorded yet. A remembered choice goes
       // straight to "touch" so back-and-forth over mechanisms doesn't re-ask.
-      // nextSpineStepAfter("mechanisms") would skip the off-spine
+      // nextMainLineStepAfter("mechanisms") would skip the off-spine
       // touch_seed_source step entirely, so the fork check happens here
-      // explicitly rather than delegating to nextSpineStepAfter. (S-03
+      // explicitly rather than delegating to nextMainLineStepAfter. (S-03
       // sequences now build inline in the Mechanism Gallery's method
       // chooser — there is no separate "sequences" step to route through
       // first; this fork check used to live on that step's completion.)
@@ -303,7 +303,7 @@ export function advance(
       return { next: "touch" };
 
     case "touch":
-      return { next: nextSpineStepAfter("touch") }; // help
+      return { next: nextMainLineStepAfter("touch") }; // help
 
     case "help":
       // Hard gate (the Phase F hard gate): stay on "help" — no navigate signal — until every

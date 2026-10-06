@@ -30,7 +30,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const KEYBOARDS = [
   { id: "basic_kbdus", group: "basic", script: "Latn", languages: ["en"] },
   { id: "basic_kbdru", group: "basic", script: "Cyrl", languages: ["ru"] },
-  { id: "basic_kbdgr", group: "basic", script: "Grek", languages: ["el"] },
+  { id: "basic_kbdgr", group: "basic", script: "Latn", languages: ["de"] },
   { id: "arabic_izza", group: "a", script: "Arab", languages: ["ar"] },
   { id: "basic_kbduk", group: "basic", script: "Latn", languages: ["en"] },
 ] as const;

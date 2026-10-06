@@ -316,7 +316,7 @@ validateManifestShape();
 // manifest shape guard so a phase/manifest drift is caught before any render.
 validatePhaseMap();
 
-// manifestIndexOf and nextSpineStepAfter have moved to steps/advance.ts
+// manifestIndexOf and nextMainLineStepAfter have moved to steps/advance.ts
 // (spec 028 Stage 5, T006). They are no longer needed in SurveyView.
 
 interface SurveyViewProps {
