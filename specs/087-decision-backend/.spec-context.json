@@ -483,10 +483,10 @@
     },
     "T041": {
       "status": "DONE",
-      "did": "New decisions/migrateDraft.ts: migrateDraft(answers, modules) maps saved questionId-keyed answers onto decisions via the modules' provides declarations (one answer fans out to all provided decisions, provenance asked); unknown questions and provide-less modules surface as orphans with values intact for visible re-answer, never dropped. Versioned with DRAFT_MIGRATION_VERSION. 4 tests green.",
+      "did": "Investigated draft compatibility: persisted drafts are keyed by step id and question id, neither changed, so old drafts load unchanged. Removed the unwired migrateDraft; added a pre-change draft fixture test proving loadDraft restores it.",
       "files": [
-        "packages/studio/src/decisions/migrateDraft.ts",
-        "packages/studio/src/decisions/migrateDraft.test.ts"
+        "packages/studio/src/lib/draftPersistence.prePrDraft.test.ts",
+        "packages/studio/src/lib/__fixtures__/prePrDraft.json"
       ]
     },
     "T042": {
