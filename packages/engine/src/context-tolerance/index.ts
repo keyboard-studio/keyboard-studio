@@ -31,10 +31,15 @@ export {
   buildContextToleranceOutputDiffPreview,
   createContextToleranceMigrationRule,
 } from '../facet-transform/migrations/context-tolerance.js';
+export { createNormalizationStepMigrationRule } from '../facet-transform/migrations/normalization-step.js';
 export { toleranceFingerprint, toleranceSiteKeys } from '../pattern-apply/tolerance-fingerprint.js';
 export {
   applyContextToleranceOverlay,
   buildContextToleranceOverlay,
+  buildNormalizationStepOverlay,
+  isNormalizationStepBatch,
+  NORMALIZATION_STEP_SITE_ID,
+  overlayHasNormalizationStep,
   presentContextToleranceSites,
   removeContextToleranceOverlay,
   type ContextToleranceOverlay,

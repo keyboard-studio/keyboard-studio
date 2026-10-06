@@ -50,8 +50,13 @@ const KMN = [
 
 type Ready = Extract<ContextToleranceState, { status: "ready" }>;
 
+// These cases cover the per-rule variants (spec 062/078). Spec 086 proposes the
+// normalization step first, so a verification record reporting `regressed`
+// forces the variants fallback here.
+const FORCE_VARIANTS = { verificationLookup: () => "regressed" as const };
+
 async function analyse(ir: KeyboardIR): Promise<Ready> {
-  const result = await analyseContextTolerance(ir, () => true);
+  const result = await analyseContextTolerance(ir, () => true, null, FORCE_VARIANTS);
   if (result === null) throw new Error("analysis was superseded");
   return { status: "ready", runId: 1, ...result };
 }
@@ -93,7 +98,7 @@ describe("applyContextToleranceDecision — real engine (spec 078)", () => {
       fingerprint: analysis.fingerprint,
       acceptedSiteIds: siteKeys,
       overlay: outcome.overlay,
-    });
+    }, FORCE_VARIANTS);
     expect(again?.fingerprint).toBe(analysis.fingerprint);
     expect(Object.values(again?.classification ?? {})).toContain("made-tolerant");
   }, 60_000);

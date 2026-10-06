@@ -29,6 +29,12 @@ export interface FacetTransformPanelProps {
   cancelLabel?: ReactNode;
   /** Extra preview content (e.g. per-site disclosures), shown above the site controls. */
   children?: ReactNode;
+  /**
+   * Omit the per-site tick list. For a proposal that is one all-or-nothing
+   * choice (the normalization step), where the single confirm is the decision.
+   * Dispositions stay as the proposal set them.
+   */
+  hideSiteControls?: boolean;
 }
 
 export function FacetTransformPanel({
@@ -39,6 +45,7 @@ export function FacetTransformPanel({
   confirmLabel,
   cancelLabel,
   children,
+  hideSiteControls = false,
 }: FacetTransformPanelProps): JSX.Element {
   const idPrefix = useId();
   // Local per-site disposition state (partial acceptance, FR-012).
@@ -139,7 +146,7 @@ export function FacetTransformPanel({
 
       {preview.previewKind === "ux-description" && (
         <div className="preview ux-description">
-          <p>{preview.uxDescription}</p>
+          {preview.uxDescription !== "" && <p>{preview.uxDescription}</p>}
           {proposal.namedLosses.length > 0 && (
             <ul className="named-losses">
               {proposal.namedLosses.map((loss, i) => (
@@ -213,7 +220,7 @@ export function FacetTransformPanel({
       {children}
 
       {/* Per-site disposition controls (FR-005 / FR-012). */}
-      {proposal.affectedSites.length > 0 && (
+      {!hideSiteControls && proposal.affectedSites.length > 0 && (
         <fieldset className="affected-sites">
           <legend><Trans id="facetTransform.exceptionSites">Exception sites</Trans></legend>
           {proposal.affectedSites.map((site, i) => {

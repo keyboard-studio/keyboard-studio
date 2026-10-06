@@ -487,12 +487,26 @@ export function useKeyboardArtifact(
     // Analyse what the preview actually compiled: the IR parsed from the
     // projected .kmn. The store's working IR is never emitted into the
     // artifact (see projectWorkingCopyVfs), so it can lag what the author runs.
-    const { ir: workingIr, setContextTolerance, contextToleranceOverlay } = useWorkingCopyStore.getState();
+    const {
+      ir: workingIr,
+      setContextTolerance,
+      contextToleranceOverlay,
+      contextNormalizationStep,
+      setContextNormalizationStep,
+    } = useWorkingCopyStore.getState();
     const ir = parsedIr ?? workingIr;
     if (ir === null) return;
     const isCurrent = (): boolean => runId.current === thisRunId;
     setContextTolerance({ status: "analysing", runId: thisRunId });
-    analyseContextTolerance(ir, isCurrent, contextToleranceOverlay).then(
+    analyseContextTolerance(ir, isCurrent, contextToleranceOverlay, {
+      normalizationSnapshot: contextNormalizationStep,
+      onNormalizationStored: (stored) => {
+        // Persist only a changed entry (spec 086 FR-016): a cache hit re-stores nothing.
+        if (isCurrent() && stored.cacheKey !== contextNormalizationStep?.cacheKey) {
+          setContextNormalizationStep(stored);
+        }
+      },
+    }).then(
       (result) => {
         if (result === null || !isCurrent()) return;
         useWorkingCopyStore.getState().setContextTolerance({ status: "ready", runId: thisRunId, ...result });

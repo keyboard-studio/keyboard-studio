@@ -271,10 +271,122 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-06T09:20:04.628Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:26.526Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:26.832Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.116Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.346Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.538Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.730Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.902Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.070Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.281Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.520Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.700Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.888Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T10:01:14.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T10:13:40.642Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T029",
+  "currentTask": "T043",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -475,6 +587,116 @@
     "T029": {
       "status": "DONE",
       "did": "Gate green: engine 4691 pass, studio 7937 pass, typecheck and lint clean"
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Overlay tests for the normalization-step batch: replay, removal, no stacking, reparsed removal",
+      "files": [
+        "packages/engine/src/pattern-apply/context-tolerance-overlay.step.test.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Projection test: accepted step projects as the begin entry with original rules unchanged",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.contextTolerance.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Analysis tests: step proposed, fallback with reason, no-alternates proposes nothing, regressed lookup forces fallback",
+      "files": [
+        "packages/studio/src/lib/contextToleranceAnalysis.test.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "NormalizationExamples tests: semantic ul of at most 5 rows, code-point-name accessible text",
+      "files": [
+        "packages/studio/src/survey/marks/NormalizationExamples.test.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Overlay batch kind normalization-step with replay/removal via apply/removeNormalizationStep; projection replays unchanged; removal now reads raw use(X) from reparsed text",
+      "files": [
+        "packages/engine/src/pattern-apply/context-tolerance-overlay.ts",
+        "packages/engine/src/pattern-apply/normalization-step/insert.ts",
+        "packages/engine/src/index.ts",
+        "packages/engine/src/context-tolerance/index.ts",
+        "packages/engine/src/facet-transform/migrations/normalization-step.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Analysis proposes the step from the cache on gap findings, falls back to 062 on refusal, optional verificationLookup defaulting to unknown",
+      "files": [
+        "packages/studio/src/lib/contextToleranceAnalysis.ts",
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Single-site step apply through the facet-transform gate writing the overlay batch; working IR left untouched",
+      "files": [
+        "packages/studio/src/lib/contextToleranceApply.ts",
+        "packages/studio/src/lib/contextToleranceApply.step.test.ts",
+        "packages/studio/src/survey/marks/contextToleranceProposal.ts",
+        "packages/studio/src/components/facet-transform/FacetTransformPanel.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Decision trail for a step is accept or decline only on unchanged question ids; trail tests added",
+      "files": [
+        "packages/studio/src/decisions/contextToleranceProposal.ts",
+        "packages/studio/src/decisions/contextToleranceTrail.test.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "NormalizationExamples component using the notice naming helper",
+      "files": [
+        "packages/studio/src/survey/marks/NormalizationExamples.tsx"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Station step branch with ICU intro, examples, disclosure, accept/decline, fallback reason line",
+      "files": [
+        "packages/studio/src/survey/marks/ContextToleranceStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Message ids added to en and fr catalogs through lingui extract",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Station tests for step intro, examples, accept, decline, prior view and fallback reason",
+      "files": [
+        "packages/studio/src/survey/marks/ContextToleranceStation.step.test.tsx"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Playwright CLI walk of quickstart 4 and 5: station intro Adds 9 rules, accept export begins with generated_context_normalize, reload snapshot cache hit, decline export byte-identical, opaque-output-store fallback via patched fixture",
+      "files": [
+        "C:/Temp/walk086.mjs"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Gate green: engine 4696 pass, studio 7958 pass, typecheck clean, lint 0 errors",
+      "files": [
+        "-"
+      ]
     }
   },
   "verified": [
@@ -523,9 +745,14 @@
       "what": "studio suite",
       "command": "pnpm --filter @keyboard-studio/studio test",
       "result": "455 files, 7937 tests passed"
+    },
+    {
+      "what": "Playwright walk quickstart 4-5 (T042)",
+      "command": "C:/Temp/walk086.mjs",
+      "result": "sil_yoruba8 intro Adds 9 rules; accept gives begin Unicode > use(generated_context_normalize); reload cache hit; decline byte-identical; fallback reason shown on patched opaque-output-store input"
     }
   ],
-  "last_action": "Phase 4 (T023-T029) done; engine+studio suites, typecheck, lint green",
+  "last_action": "Phase 5 (T030-T043) done; gates green",
   "decisions": [
     {
       "decision": "Cache lives in a separate normalizationStepCache.ts module; snapshot field typed StoredNormalizationStep and carried on the working-copy store",
@@ -536,11 +763,33 @@
       "decision": "time-bound refusals are not cached",
       "why": "they reflect the run budget, not the source",
       "rejected": "caching every result"
+    },
+    {
+      "decision": "Step is applied via the overlay only; working IR untouched",
+      "why": "existing write seam forbids entryPoints changes; the projection is what ships",
+      "rejected": "mutating the working IR entry point"
+    },
+    {
+      "decision": "verification-regressed added as a studio-side fallback reason",
+      "why": "regressed lookup needs a user-facing reason line",
+      "rejected": "reusing an engine refusal reason"
     }
   ],
   "concerns": [
     {
       "note": "T028 opt-in perf run (KS_CORPUS_PERF=1) passed in the worker, but the p95 number was not captured",
+      "step": "implement"
+    },
+    {
+      "note": "Quickstart example row e+U+0323 then ] -> ẹ́ is not among the 5 examples the generator picks for sil_yoruba8 (picker prefers shortest alternates); picker left unchanged",
+      "step": "implement"
+    },
+    {
+      "note": "opaque-output-store fallback walked on a route-patched sil_yoruba8, not a purpose-built fixture; no corpus keyboard refuses that way",
+      "step": "implement"
+    },
+    {
+      "note": "Fixed a phase 1-4 bug: removeNormalizationStep could not restore the entry from a reparsed IR (use(main) kept as raw output)",
       "step": "implement"
     }
   ],

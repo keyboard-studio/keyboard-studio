@@ -32,6 +32,8 @@ import type {
   KeyboardIR,
   LintFinding,
   RemovalCapability,
+  NormalizationRefusalReason,
+  NormalizationStep,
   StoredNormalizationStep,
   ToleranceReport,
   VirtualFS,
@@ -246,6 +248,14 @@ export type ContextToleranceState =
       fixableRuleIds: string[];
       siteKeys: Record<string, string>;
       fingerprint: string;
+      /**
+       * The proposed normalization step (spec 086). When present it is the
+       * proposal: `fixableRuleIds` is the single site `normalization-step`
+       * and `proposal` carries no variants.
+       */
+      normalizationStep?: NormalizationStep;
+      /** Why the step was not offered and the 062 variants were proposed instead (FR-019). */
+      fallbackReason?: NormalizationRefusalReason | "verification-regressed";
     }
   | { status: "failed"; runId: number; reason: string };
 

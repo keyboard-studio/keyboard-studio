@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn, type ContextToleranceOverlay } from "@keyboard-studio/engine";
+import { buildNormalizationStepOverlay, proposeNormalizationStep } from "@keyboard-studio/engine/context-tolerance";
 
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 
@@ -84,5 +85,21 @@ describe("projectWorkingCopyVfs — context-tolerance replay (spec 078)", () => 
     const { kmn, warnings } = project(overlay("+ 'x' > 'y'"));
     expect(kmn).not.toContain(COMMENT);
     expect(warnings.some((w) => w.includes("context-tolerance rules skipped"))).toBe(true);
+  });
+});
+
+describe("projectWorkingCopyVfs — normalization step replay (spec 086)", () => {
+  it("projects an accepted step as the entry point, with the original rules unchanged", async () => {
+    const result = await proposeNormalizationStep(parseKmn(KMN, "projected").ir);
+    if (result.kind !== "step") throw new Error(`expected a step, got ${result.reason}`);
+    const { kmn, warnings } = project(buildNormalizationStepOverlay(result.step));
+    expect(warnings).toEqual([]);
+    expect(kmn).toContain("begin Unicode > use(generated_context_normalize)");
+    expect(kmn).not.toContain("begin Unicode > use(main)");
+    // The original group and its rules are carried over unchanged.
+    expect(kmn).toContain("group(main) using keys");
+    expect(kmn).toContain("U+00E0 + ");
+    expect(kmn).toContain("+ U+005D > U+00B4");
+    expect(kmn).toContain("group(generated_context_normalize)");
   });
 });

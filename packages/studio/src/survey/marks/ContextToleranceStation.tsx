@@ -16,8 +16,11 @@ import { plural } from "@lingui/core/macro";
 import type { MarksContextToleranceDecision } from "@keyboard-studio/contracts";
 import type { TransformProposal } from "@keyboard-studio/engine";
 
+import type { NormalizationRefusalReason } from "@keyboard-studio/contracts";
+
 import { FacetTransformPanel } from "../../components/facet-transform/FacetTransformPanel.tsx";
 import { mutedParaFlush } from "../surveyStyles.ts";
+import { NormalizationExamples, type NormalizationExample } from "./NormalizationExamples.tsx";
 
 /** What FR-006 discloses for one site (engine `VariantDisclosure`, aggregated per rule). */
 export interface SiteDisclosure {
@@ -28,6 +31,15 @@ export interface SiteDisclosure {
 
 export type ContextToleranceDecisionInput = Omit<MarksContextToleranceDecision, "appliedFingerprint">;
 
+/** What the station shows for a generated normalization step (spec 086). */
+export interface NormalizationStepView {
+  ruleCount: number;
+  examples: readonly NormalizationExample[];
+}
+
+/** Why the 062 variants were proposed instead of the step. */
+export type FallbackReason = NormalizationRefusalReason | "verification-regressed";
+
 export interface ContextToleranceStationProps {
   /** Built from the analysis; every site accepted. */
   proposal: TransformProposal;
@@ -37,6 +49,12 @@ export interface ContextToleranceStationProps {
   ruleLines: Record<string, number>;
   fingerprint: string;
   prior?: MarksContextToleranceDecision;
+  /** Present when the proposal is a normalization step: one confirm, no per-site ticks. */
+  step?: NormalizationStepView;
+  /** Present when the proposal is the 062 fallback: one line naming why. */
+  fallbackReason?: FallbackReason;
+  /** Injected in tests; forwarded to the examples' name lookup. */
+  loadNames?: () => Promise<ReadonlyMap<number, string>>;
   onDecide: (decision: ContextToleranceDecisionInput) => void;
 }
 
@@ -47,6 +65,15 @@ export function decisionFromProposal(confirmed: TransformProposal, fingerprint: 
   const decision =
     acceptedSiteIds.length === proposedSiteIds.length ? "accept" : acceptedSiteIds.length === 0 ? "decline" : "partial";
   return { decision, acceptedSiteIds, proposedSiteIds, fingerprint };
+}
+
+function declineDecision(proposal: TransformProposal, fingerprint: string): ContextToleranceDecisionInput {
+  return {
+    decision: "decline",
+    acceptedSiteIds: [],
+    proposedSiteIds: proposal.affectedSites.map((s) => s.siteId),
+    fingerprint,
+  };
 }
 
 function DisclosureRows({
@@ -108,12 +135,50 @@ function DisclosureRows({
   );
 }
 
+function FallbackReasonLine({ reason }: { reason: FallbackReason }) {
+  const { t } = useLingui();
+  const text = {
+    "no-unicode-entry": t({
+      id: "marks.context_tolerance.step.fallback.reason.no_unicode_entry",
+      message: "The one-step fix was not offered because this keyboard does not start in Unicode mode.",
+    }),
+    "opaque-entry": t({
+      id: "marks.context_tolerance.step.fallback.reason.opaque_entry",
+      message: "The one-step fix was not offered because this keyboard's first group could not be read in full.",
+    }),
+    "opaque-output-store": t({
+      id: "marks.context_tolerance.step.fallback.reason.opaque_output_store",
+      message: "The one-step fix was not offered because some of this keyboard's output characters could not be read in full.",
+    }),
+    "time-bound": t({
+      id: "marks.context_tolerance.step.fallback.reason.time_bound",
+      message: "The one-step fix was not offered because working it out took too long for this keyboard.",
+    }),
+    "no-alternates": t({
+      id: "marks.context_tolerance.step.fallback.reason.no_alternates",
+      message: "The one-step fix was not offered because this keyboard has no characters that can be written two ways.",
+    }),
+    "verification-regressed": t({
+      id: "marks.context_tolerance.step.fallback.reason.verification_regressed",
+      message: "The one-step fix was not offered because checking it against this keyboard changed what typing produces.",
+    }),
+  }[reason];
+  return (
+    <p data-testid="context-tolerance-fallback-reason" style={mutedParaFlush}>
+      {text}
+    </p>
+  );
+}
+
 export function ContextToleranceStation({
   proposal,
   disclosures,
   ruleLines,
   fingerprint,
   prior,
+  step,
+  fallbackReason,
+  loadNames,
   onDecide,
 }: ContextToleranceStationProps) {
   const { t } = useLingui();
@@ -129,7 +194,17 @@ export function ContextToleranceStation({
           <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
         </h3>
         <p style={mutedParaFlush}>
-          {prior.decision === "accept"
+          {step !== undefined
+            ? prior.decision === "accept"
+              ? t({
+                  id: "marks.context_tolerance.step.prior.accepted",
+                  message: "You chose to add the step that converts pasted text to this keyboard's own form.",
+                })
+              : t({
+                  id: "marks.contextTolerance.station.prior.declined",
+                  message: "You chose to leave your keyboard as it is.",
+                })
+            : prior.decision === "accept"
             ? t({
                 id: "marks.contextTolerance.station.prior.accepted",
                 message: plural(accepted, {
@@ -157,6 +232,48 @@ export function ContextToleranceStation({
     );
   }
 
+  if (step !== undefined) {
+    const { ruleCount } = step;
+    return (
+      <div data-testid="context-tolerance-station" data-kind="normalization-step" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <FacetTransformPanel
+          proposal={proposal}
+          hideSiteControls
+          heading={
+            <>
+              <h3 style={{ margin: 0 }}>
+                <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
+              </h3>
+              <p style={mutedParaFlush}>
+                {t({
+                  id: "marks.context_tolerance.step.intro",
+                  message: plural(ruleCount, {
+                    one: "Adds # rule. None of your rules change.",
+                    other: "Adds # rules. None of your rules change.",
+                  }),
+                })}
+              </p>
+            </>
+          }
+          confirmLabel={<Trans id="marks.context_tolerance.step.action.accept">Add this step</Trans>}
+          cancelLabel={<Trans id="marks.contextTolerance.station.decline">Leave my keyboard as it is</Trans>}
+          onConfirm={(confirmed) => onDecide(decisionFromProposal(confirmed, fingerprint))}
+          onCancel={() => onDecide(declineDecision(proposal, fingerprint))}
+        >
+          <h4 style={{ margin: "4px 0 0 0", fontSize: 13 }}>
+            <Trans id="marks.context_tolerance.step.examples.heading">Examples of text it converts</Trans>
+          </h4>
+          <NormalizationExamples examples={step.examples} {...(loadNames !== undefined ? { loadNames } : {})} />
+          <p style={mutedParaFlush}>
+            <Trans id="marks.context_tolerance.step.disclosure.rewrite">
+              Text pasted next to the cursor is converted to this keyboard's own form when you type.
+            </Trans>
+          </p>
+        </FacetTransformPanel>
+      </div>
+    );
+  }
+
   return (
     <div data-testid="context-tolerance-station" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <FacetTransformPanel
@@ -180,15 +297,9 @@ export function ContextToleranceStation({
         confirmLabel={<Trans id="marks.contextTolerance.station.confirm">Add these rules</Trans>}
         cancelLabel={<Trans id="marks.contextTolerance.station.decline">Leave my keyboard as it is</Trans>}
         onConfirm={(confirmed) => onDecide(decisionFromProposal(confirmed, fingerprint))}
-        onCancel={() =>
-          onDecide({
-            decision: "decline",
-            acceptedSiteIds: [],
-            proposedSiteIds: proposal.affectedSites.map((s) => s.siteId),
-            fingerprint,
-          })
-        }
+        onCancel={() => onDecide(declineDecision(proposal, fingerprint))}
       >
+        {fallbackReason !== undefined && <FallbackReasonLine reason={fallbackReason} />}
         <DisclosureRows proposal={proposal} disclosures={disclosures} ruleLines={ruleLines} />
       </FacetTransformPanel>
     </div>
