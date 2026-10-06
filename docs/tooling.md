@@ -469,3 +469,30 @@ pnpm run spec-search "layer A validity" --json
 - `specs/_archive/**` (retired feature docs) is skipped unless `--scope` starts with
   `specs/_archive`, so shipped specs' working docs don't crowd out live ones. The root `.ignore`
   does the same for ripgrep-based search.
+
+## Unattended spec-kit rounds
+
+After specify and clarify, `scripts/speckit_rounds.py` drives the rest of a feature (plan, tasks,
+then one `tasks.md` phase at a time) with **one fresh `claude -p` session per round**. Each
+round runs the `speckit-round` skill
+([.claude/skills/speckit-round/SKILL.md](../.claude/skills/speckit-round/SKILL.md)). The
+driver keeps no chat context. Between rounds it reads state from `.spec-context.json` and the
+`tasks.md` checkboxes.
+
+```
+python3 scripts/speckit_rounds.py specs/086-context-normalization-group --dry-run
+python3 scripts/speckit_rounds.py specs/086-context-normalization-group --max-budget-usd 20
+```
+
+- **Where rounds run.** Each round runs in the worktree whose branch is named for the feature
+  (`NNN-slug`, or `*/NNN-slug`). That branch must contain the skill: merge `main` into it
+  first, or the driver refuses to start.
+- **Commits per phase.** Each implement round runs the phase's gates, then commits and pushes
+  that phase on the feature branch with an explicit `HEAD:refs/heads/<branch>` refspec. A red
+  phase ends the round `BLOCKED` with nothing pushed.
+- **Spec-folder sync.** After every round the driver commits and pushes `specs/<feature>/`
+  alone (`scripts/speckit_git.py`). Round logs in `specs/<feature>/rounds/` stay local.
+- **When it stops.** The driver stops when the pipeline is complete, when a round ends
+  `BLOCKED`, after two rounds with no recorded progress, or at `--max-rounds` (default 25).
+- **The last round** runs implement's wrap-up, which fires the `after_implement` hooks (km-lead
+  review, km-archivist PR). Nothing ever merges.
