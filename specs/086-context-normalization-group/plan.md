@@ -107,7 +107,8 @@ packages/contracts/src/
 packages/engine/src/
 ├── codec/parse.ts                    # EDIT lenient storeSketch for store-level opaque fragments
 ├── pattern-apply/normalization-step/ # NEW
-│   ├── index.ts                      #   propose / apply / remove / cacheKey / version constant
+│   ├── index.ts                      #   propose / apply / remove / cacheKey
+│   ├── constants.ts                  #   group name, generator version
 │   ├── maps.ts                       #   repertoire -> NormalizationMap[] (R3)
 │   ├── pack.ts                       #   greedy safe set cover, shapes P0/T/H/P/P2 (R5)
 │   ├── insert.ts                     #   group + stores + entryPoints.main redirect (R6)
@@ -118,6 +119,8 @@ packages/engine/src/
 
 packages/studio/src/
 ├── lib/contextToleranceAnalysis.ts   # EDIT cache lookup -> step -> 062 fallback
+├── lib/normalizationStepCache.ts     # NEW  in-memory cache keyed by cacheKey
+├── lib/normalizationVerification.ts  # NEW  regressed lookup by keyboard id
 ├── lib/contextToleranceApply.ts      # EDIT single-site apply for the step
 ├── lib/persistWorkingCopy.ts         # EDIT optional contextNormalizationStep field
 ├── survey/marks/ContextToleranceStation.tsx    # EDIT step intro, examples, single confirm
@@ -125,9 +128,11 @@ packages/studio/src/
 └── locales/*                         # EDIT marks.context_tolerance.step.* ids
 
 utilities/nfd-tolerance-corpus/
-├── src/normalization-step.ts         # NEW  mode: typed + pasted checks, record writer
-├── src/cli.ts                        # EDIT --mode, --jobs, --incremental, --check
-└── src/analyze.ts                    # EDIT simulate builds that emit JS despite errors
+├── normalization-step.ts             # NEW  mode: typed + pasted checks, record writer
+├── cli.ts                            # EDIT --mode, --jobs, --incremental, --check
+└── analyze.ts                        # EDIT simulate builds that emit JS despite errors
+
+scripts/codegen-normalization-regressed.mjs     # NEW  prebuild: regressed ids for the studio
 
 docs/context-normalization-verification.json    # NEW (generated, committed)
 .github/workflows/ci.yml              # EDIT add --check step; drop duplicate harness test step

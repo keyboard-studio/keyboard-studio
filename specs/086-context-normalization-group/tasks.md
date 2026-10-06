@@ -115,7 +115,7 @@ description: "Task list for spec 086 context normalization group"
 ### Implementation for User Story 3
 
 - [x] T034 [US3] Add the `{ kind: "normalization-step"; groupName; originalEntry; stores; rules }` batch to `packages/engine/src/pattern-apply/context-tolerance-overlay.ts`; implement replay and removal through `applyNormalizationStep` / `removeNormalizationStep`. Confirm `packages/studio/src/lib/projectWorkingCopyVfs.ts` (around lines 841–851) replays it with no further change, or extend it there
-- [x] T035 [US3] Wire `packages/studio/src/lib/contextToleranceAnalysis.ts` per [contracts/studio-normalization-proposal.md](contracts/studio-normalization-proposal.md): keep `removeContextToleranceOverlay` → `computeContextTolerance`; on gap findings call `getOrProposeNormalizationStep`; fall back to `proposeContextVariants` on refusal (FR-019); accept an optional `verificationLookup(keyboardId, sourceHash)` that defaults to "unknown" (wired to the committed record in T046)
+- [x] T035 [US3] Wire `packages/studio/src/lib/contextToleranceAnalysis.ts` per [contracts/studio-normalization-proposal.md](contracts/studio-normalization-proposal.md): keep `removeContextToleranceOverlay` → `computeContextTolerance`; on gap findings call `getOrProposeNormalizationStep`; fall back to `proposeContextVariants` on refusal (FR-019); accept an optional `verificationLookup(keyboardId, sourceHash)` that defaults to "unknown" (wired to the committed record in T051)
 - [x] T036 [US3] Add the single-site apply in `packages/studio/src/lib/contextToleranceApply.ts` (and `packages/studio/src/hooks/useContextToleranceApply.ts` if it gates sites): one affected site `siteId = "normalization-step"`, emitted through `FacetTransformPanel` so acceptance is all-or-nothing, writing the overlay batch
 - [x] T037 [US3] Update `packages/studio/src/decisions/contextToleranceProposal.ts`: for a step, `acceptedSiteIds` is `["normalization-step"]` or `[]` and the decision is `accept` or `decline`, never `partial`; question ids stay `marks.context_tolerance` and `marks.context_tolerance.sites`
 - [x] T038 [P] [US3] Create `packages/studio/src/survey/marks/NormalizationExamples.tsx`: up to 5 `pasted → result` rows, names from the naming helper in `packages/studio/src/lint/ContextToleranceNotice.tsx` (extract it to a shared export if it is private)
@@ -154,9 +154,9 @@ description: "Task list for spec 086 context normalization group"
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T055 [P] Make sure all seven spike keyboards and the `vietnamese_telex` keyboard have rows in [docs/keyboard-index.md](../../docs/keyboard-index.md) (mandatory phonebook rule); add any missing row from the keyboard's `.kps`
-- [ ] T056 [P] Document the harness mode and flags in `utilities/nfd-tolerance-corpus/README.md` and [docs/tooling.md](../../docs/tooling.md#standalone-utilities); add the normalization step to the context-tolerance paragraph of [docs/architecture.md](../../docs/architecture.md) and the engine entry in [docs/packages.md](../../docs/packages.md)
-- [ ] T057 [P] Record the two follow-ups in [spec.md](spec.md) Open questions: desktop-engine verification as a release gate before this replaces 062 by default, and replacing the 078 simulated diagnostic with a static check (R7)
+- [x] T055 [P] Make sure all seven spike keyboards and the `vietnamese_telex` keyboard have rows in [docs/keyboard-index.md](../../docs/keyboard-index.md) (mandatory phonebook rule); add any missing row from the keyboard's `.kps`
+- [x] T056 [P] Document the harness mode and flags in `utilities/nfd-tolerance-corpus/README.md` and [docs/tooling.md](../../docs/tooling.md#standalone-utilities); add the normalization step to the context-tolerance paragraph of [docs/architecture.md](../../docs/architecture.md) and the engine entry in [docs/packages.md](../../docs/packages.md)
+- [x] T057 [P] Record the two follow-ups in [spec.md](spec.md) Open questions: desktop-engine verification as a release gate before this replaces 062 by default, and replacing the 078 simulated diagnostic with a static check (R7)
 - [ ] T058 Run `pnpm typecheck`, `pnpm -r test`, `pnpm lint` from the repo root; all green
 - [ ] T059 Run `/speckit-analyze` over spec.md, plan.md and tasks.md and resolve any finding before `/speckit-implement` closes
 

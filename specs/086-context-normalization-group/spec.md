@@ -84,9 +84,9 @@ As an author, when the studio reports that my keyboard breaks on decomposed or c
 
 ### User Story 4 - The corpus harness verifies each generated step once (Priority: P2)
 
-As a maintainer, I want the corpus harness to check every generated step by simulation, typed output unchanged and pasted alternates tolerated, once per keyboard version. I want the result stored with the step so regressions are caught in CI and never re-measured in the authoring path.
+As a maintainer, I want the corpus harness to check every generated step by simulation, typed output unchanged and pasted alternates tolerated, once per keyboard version. I want the result kept in a committed verification record so regressions are caught in CI and never re-measured in the authoring path.
 
-**Why this priority**: The no-simulation authoring path is only trustworthy if a simulated check stands behind it.
+**Why this priority**: The no-simulation authoring path is only trustworthy if a simulated check stands behind it. A keyboard the harness could not verify (`harness-error`) is still offered the step, as unverified ([research R8](research.md)).
 
 **Independent Test**: Run the harness on the seven spike keyboards: each reports typed output identical and 100% of pasted probes passing. Rerunning without source changes reuses the stored results.
 
@@ -138,7 +138,7 @@ As a maintainer, I want the corpus harness to check every generated step by simu
 
   The shapes MUST be chosen to minimize rule count. A shape that passes marks through MUST be admitted for a letter only if it can never match a produced cluster and agrees with every known mapping it covers.
 - **FR-009**: The step MUST NOT include backspace rules. Backspace after a pasted alternate MUST behave as after the produced form, by virtue of the rewrite.
-- **FR-010**: Adding the step MUST NOT add compile errors or warnings beyond those of the unmodified keyboard, for any target the keyboard declares.
+- **FR-010**: Adding the step MUST NOT add compile errors or warnings beyond those of the unmodified keyboard in the KeymanWeb build. Other targets are not yet checked (see Open questions).
 - **FR-011**: Generation MUST be idempotent. Regenerating replaces a previously generated step (identified as generated), and removing the step restores the keyboard's original entry point exactly.
 - **FR-012**: When the step cannot be generated, the system MUST refuse with a stated reason and generate nothing, never a partial step. Cases include no Unicode entry point, an entry point that cannot be redirected, or the time bound exceeded.
 
@@ -158,7 +158,7 @@ As a maintainer, I want the corpus harness to check every generated step by simu
 - **FR-018**: The step MUST run on every keystroke, rewriting pasted text adjacent to the cursor into the produced form whatever key is pressed. Pasted `a◌́` followed by `b` becomes `áb`. That is NFC-equal to the pasted text, and it is what lets backspace work without rules (FR-009).
 - **FR-019**: The normalization step MUST be the default proposal. The spec 062 per-rule variant generator MUST remain available only as a fallback, offered for keyboards the step refuses under FR-012.
 - **FR-020**: Through the spec 078 surface, the proposal MUST state the added rule count, that no existing rule changes, and representative before/after examples. Acceptance MUST be one decision for the whole step, recorded in the decision trail. Declining leaves the source unchanged.
-- **FR-021**: The step MUST coexist with an output-side reorder group (076 US3). Produced forms are those *after* any output reordering, and the step and reorder group MUST NOT be merged or duplicated.
+- **FR-021**: The step MUST coexist with an output-side reorder group (076 US3). Produced forms are those *after* any output reordering, and the step and reorder group MUST NOT be merged or duplicated. Measuring produced forms after reordering is not yet verified by a test (see Open questions).
 
 ### Key Entities
 
@@ -166,7 +166,7 @@ As a maintainer, I want the corpus harness to check every generated step by simu
 - **Alternate**: The NFC or NFD form of a produced cluster, when it differs from the produced form. What arrives from paste, other keyboards, or host re-normalization.
 - **Normalization map**: Alternate to produced form, with the deterministic choice recorded for ambiguous cases.
 - **Normalization step**: The generated block of compact rules plus the redirected entry point. Identified as generated, so it can be replaced or removed.
-- **Stored step**: The step, keyed by keyboard source content and generator version, with its rule count and, once the harness has run, its verification result.
+- **Stored step**: The step, keyed by keyboard source content and generator version, with its rule count. Harness verification is a separate committed record ([docs/context-normalization-verification.json](../../docs/context-normalization-verification.json)) keyed by keyboard id and file hash; the studio consults it by keyboard id.
 
 ## Success Criteria *(mandatory)*
 
@@ -175,7 +175,7 @@ As a maintainer, I want the corpus harness to check every generated step by simu
 - **SC-001**: On the seven spike keyboards, typed output is byte-identical to the unmodified keyboard for every key sequence of up to two keys over the full key set (35,532 sequences each).
 - **SC-002**: On the same keyboards, 100% of pasted-alternate probes for producible clusters give the same result as the produced form.
 - **SC-003**: Added rule counts do not exceed these bounds (the spike's counts, except `fv_northern_tutchone`): `el_dinka` 1, `fv_northern_tutchone` 19, `fv_tlingit` 6, `sil_yoruba8` 9, `el_pan_sahelian` 12, `sil_cameroon_qwerty` 23, `sil_tchad` 49. The spike measured 1 for `fv_northern_tutchone`, but its two-key simulation never saw the three-key clusters that keyboard types (a diaeresis or ogonek prefix, then an accent prefix, then the letter, such as `A` + U+0308 + U+0300). Their NFC alternates are legitimate maps, so the bound is 19 ([research R10](research.md#r10-risks)).
-- **SC-004**: `sil_yoruba8` with the step reports the same compile diagnostics as without it (9 errors, all pre-existing), against 66 under the spec 062 generator.
+- **SC-004**: `sil_yoruba8` with the step reports the same compile diagnostics as without it (9 errors, all pre-existing), against 66 diagnostics under the spec 062 generator.
 - **SC-005**: Requesting the step for an already-processed keyboard source returns in under 1 second with no keystroke simulation. First generation completes in under 5 seconds for 95% of the corpus.
 - **SC-006**: Across the harness corpus, no keyboard with an accepted step shows any typed-output difference (zero tolerance), and the harness reports pasted-probe pass rates per keyboard.
 
@@ -223,5 +223,10 @@ The spike scripts and per-keyboard generated steps are kept outside the reposito
 ## Open questions
 
 - **Other engines.** Does the step behave identically on Keyman for Windows, macOS, Linux, iOS and Android? Verification on at least one desktop engine is needed before this replaces the 062 mechanism by default.
+- **Follow-up: desktop-engine release gate.** Only KeymanWeb has verified the step. Before it replaces the 062 mechanism by default, verify it on at least one desktop engine and make that verification a release gate.
+- **Follow-up: static diagnostic.** The spec 078 diagnostic `computeContextTolerance` still simulates after each preview compile; this feature left it unchanged ([research R7](research.md#r7-authoring-path-and-caching)). Replace it with a static check derived from the normalization maps, such as "the step would change N clusters".
 - **Reorder group ordering.** If a keyboard carries both this step and a 076 output reorder group, is the measured produced form stable across engines?
-- **Cache home.** Where does the stored step live: alongside the working copy, in the harness output, or both? This is a planning decision; FR-016 only requires that it exists and is keyed correctly.
+- **Cache home** (resolved, [research R7](research.md#r7-authoring-path-and-caching)). An in-memory map plus the working-copy snapshot field `contextNormalizationStep`; harness results live in [docs/context-normalization-verification.json](../../docs/context-normalization-verification.json).
+- **Supplementary-plane clusters.** 11 corpus keyboards (for example `easy_chakma`, `takri`, `todhri`) are recorded `regressed` on pasted probes only, all with supplementary-plane code points; the failing probes duplicate the preceding character, which points at a context-position bug with surrogate pairs. The studio withholds the step for them and falls back to the 062 proposal until the generator is fixed.
+- **Reorder group coexistence (FR-021).** No test yet builds a keyboard with a 076 output reorder group and checks the maps are measured after reordering.
+- **Other targets (FR-010).** Diagnostics are compared on the KeymanWeb build only; desktop and mobile targets are not compiled by the harness.
