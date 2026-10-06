@@ -6,7 +6,7 @@ import type {
   OutputElement,
   OutputRepertoire,
 } from "@keyboard-studio/contracts";
-import { NORMALIZATION_STORE_PREFIX } from "./constants.js";
+import { MAX_GENERATED_RULES, MAX_GENERATED_STORES, MAX_MARK_TUPLES, NORMALIZATION_STORE_PREFIX } from "./constants.js";
 
 /**
  * Rule packing (spec 086 R5): a greedy safe set cover of the maps over five
@@ -48,16 +48,22 @@ export interface PackedRules {
   rules: IRRule[];
 }
 
+/** Packing refused because a size bound was exceeded; `detail` names the bound. */
+export interface PackTooLarge {
+  tooLarge: string;
+}
+
 /**
- * Returns `null` when `shouldStop` fired before packing finished. Generated
- * store names skip `reservedStoreNames` (lowercased), the keyboard's own stores.
+ * Returns `null` when `shouldStop` fired before packing finished, or
+ * `PackTooLarge` past a size bound. Generated store names skip
+ * `reservedStoreNames` (lowercased), the keyboard's own stores.
  */
 export function packNormalization(
   mapList: readonly NormalizationMap[],
   repertoire: OutputRepertoire,
   shouldStop: () => boolean = () => false,
   reservedStoreNames: ReadonlySet<string> = new Set(),
-): PackedRules | null {
+): PackedRules | PackTooLarge | null {
   const maps: Map1[] = mapList.map((m) => ({ a: [...m.from], e: [...m.to] }));
   const M = [...repertoire.marks];
   const Mset = new Set(M);
@@ -91,6 +97,18 @@ export function packNormalization(
   };
 
   const bySrc = new Map(maps.map((m) => [m.a.join(""), m] as const));
+  // Every k-mark string, built once per k. Callers check `tupleCount` first.
+  const tupleCount = (k: number): number => Math.pow(M.length, k);
+  const tupleMemo = new Map<number, string[]>();
+  const tuples = (k: number): string[] => {
+    const have = tupleMemo.get(k);
+    if (have !== undefined) return have;
+    const built = k === 0 ? [""] : tuples(k - 1).flatMap((t) => M.map((m) => t + m));
+    tupleMemo.set(k, built);
+    return built;
+  };
+  let tooLarge: string | null = null;
+  let stopped = false;
   const byLen = new Map<number, Map1[]>();
   for (const m of maps) byLen.set(m.a.length, [...(byLen.get(m.a.length) ?? []), m]);
 
@@ -120,8 +138,25 @@ export function packNormalization(
       sets.reduce<string[][]>((acc, set) => acc.flatMap((t) => set.map((x) => [...t, x])), [[]]);
     const safeOver = (prefix: string, sets: string[][], f: string): boolean =>
       product(sets).every((t) => covers(prefix + t.join(""), f + t.join("")));
-    const safe = (prefix: string, k: number, f: string): boolean =>
-      safeOver(prefix, Array.from({ length: k }, () => M), f);
+    // Full-repertoire coverage over the memoized mark tuples: refused past
+    // the tuple cap, and `shouldStop` is polled inside the enumeration so a
+    // large repertoire cannot hang packing.
+    const safe = (prefix: string, k: number, f: string): boolean => {
+      if (tupleCount(k) > MAX_MARK_TUPLES) {
+        tooLarge ??= `${M.length} marks over ${k} positions exceeds ${MAX_MARK_TUPLES} combinations`;
+        return false;
+      }
+      const ts = tuples(k);
+      for (let i = 0; i < ts.length; i++) {
+        if (i % 1024 === 1023 && shouldStop()) {
+          stopped = true;
+          return false;
+        }
+        const t = ts[i] as string;
+        if (!covers(prefix + t, f + t)) return false;
+      }
+      return true;
+    };
     // Learned pass sets: per pass-through position, only the marks the member maps show there.
     const learned = (pm: Map1[], from: number): string[][] =>
       Array.from({ length: L - from }, (_, j) => [...new Set(pm.map((m) => m.a[from + j] as string))].sort());
@@ -129,7 +164,8 @@ export function packNormalization(
     const heads = new Map<string, Map1[]>();
     for (const m of all) heads.set(m.a[0] as string, [...(heads.get(m.a[0] as string) ?? []), m]);
     for (const [h, hm] of heads) {
-      if (shouldStop()) return null;
+      if (shouldStop() || stopped) return null;
+      if (tooLarge !== null) return { tooLarge };
       if (L >= 2) {
         const pm = hm.filter((m) => m.a.slice(1).every((c) => Mset.has(c)) && m.e.slice(-(L - 1)).join("") === m.a.slice(1).join(""));
         if (pm.length > 0) {
@@ -161,6 +197,8 @@ export function packNormalization(
         }
       }
     }
+    if (stopped) return null;
+    if (tooLarge !== null) return { tooLarge };
     if (L === 3) {
       const byLast = new Map<string, Map1[]>();
       for (const m of all) if (m.e[m.e.length - 1] === m.a[1]) byLast.set(m.a[2] as string, [...(byLast.get(m.a[2] as string) ?? []), m]);
@@ -185,6 +223,9 @@ export function packNormalization(
 
     const covered = new Set<Map1>();
     while (covered.size < all.length) {
+      if (shouldStop()) return null;
+      if (stores.length > MAX_GENERATED_STORES) return { tooLarge: `more than ${MAX_GENERATED_STORES} stores` };
+      if (rules.length > MAX_GENERATED_RULES) return { tooLarge: `more than ${MAX_GENERATED_RULES} rules` };
       let best: Cand | null = null;
       let bestN = 0;
       for (const c of cands.values()) {
@@ -240,5 +281,7 @@ export function packNormalization(
       }
     }
   }
+  if (stores.length > MAX_GENERATED_STORES) return { tooLarge: `more than ${MAX_GENERATED_STORES} stores` };
+  if (rules.length > MAX_GENERATED_RULES) return { tooLarge: `more than ${MAX_GENERATED_RULES} rules` };
   return { stores, rules };
 }
