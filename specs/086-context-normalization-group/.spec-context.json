@@ -111,10 +111,114 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-06T07:30:41.361Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:43:22.723Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:43:22.901Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.199Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.424Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.605Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.782Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:02.567Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:03.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:03.573Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:04.063Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:57:13.793Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T08:30:00.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T08:30:00.154Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T008",
+  "currentTask": "T022",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -176,6 +280,97 @@
       "files": [
         "packages/engine/src/codec/parse.ts"
       ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "repertoire tests (char/index/outs, echo, producedOutput, touch ids, base fallback, postfix closure, depth cap, unresolved, order-independence)",
+      "files": [
+        "packages/contracts/src/ir/outputRepertoire.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "buildOutputRepertoire implemented and exported from contracts index",
+      "files": [
+        "packages/contracts/src/ir/outputRepertoire.ts packages/contracts/src/index.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "maps tests (produced form, no-map, ambiguous, conflict drop, NFC equality)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/maps.test.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "buildNormalizationMaps implemented per R3",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/maps.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "pack tests (shapes P0/T/H/P/P2, safety rejections, no if/bksp, greedy bound)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/pack.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "greedy safe-cover packer P0/T/H/P/P2 over generated_cn_* stores",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/pack.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "insert tests (G3, G4, G5, entryPoints.main entry, tail use rules, remove no-op)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/insert.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "index tests (G1 spies, G2, G6 refusals, G7 time-bound, examples<=5)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.test.ts packages/engine/src/pattern-apply/normalization-step/../__fixtures__/normalization.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "apply/remove insertion from entryPoints.main",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/insert.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "proposeNormalizationStep/apply/remove/cacheKey in module index",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.ts packages/engine/src/pattern-apply/normalization-step/constants.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Re-exports confirmed in engine context-tolerance subpath; depcruise clean, normalization-step imports only codec + contracts",
+      "files": [
+        "packages/engine/src/context-tolerance/index.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Parity corpus test over the seven spike keyboards passes at corpus pin 435f82d6: 7/7 (SC-001..SC-004), 686 s",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/parity.corpus.test.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Gate green: quickstart s1/s2, pnpm typecheck, pnpm lint (depcruise clean); R10 counts already recorded, all bounds met",
+      "files": [
+        "specs/086-context-normalization-group/research.md"
+      ]
     }
   },
   "verified": [
@@ -194,6 +389,27 @@
       "exitCode": 0,
       "durationSeconds": 69.2,
       "result": "> keyboard-studio@0.1.0 spec-number-lint C:\\Github\\keyboard-studio-086 · > node utilities/spec-number-lint/index.js · [OK] spec-number-lint: 82 spec folder(s), no number collisions"
+    },
+    {
+      "what": "normalization-step unit tests",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/ --exclude **/*.corpus.test.ts",
+      "result": "28 passed"
+    },
+    {
+      "what": "contracts ir tests",
+      "command": "pnpm --filter @keyboard-studio/contracts exec vitest run src/ir",
+      "result": "186 passed"
+    },
+    {
+      "what": "spike parity corpus (SC-001..SC-004)",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/parity.corpus",
+      "result": "7 passed, corpus at CI pin 435f82d6"
+    },
+    {
+      "what": "lint incl depcruise",
+      "command": "pnpm lint",
+      "result": "exit 0, 0 errors, no dependency violations"
     }
-  ]
+  ],
+  "last_action": "Phase 3 (US1) T020-T022 closed"
 }
