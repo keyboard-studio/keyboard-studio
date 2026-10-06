@@ -93,8 +93,7 @@ export const fixtures: QuestionModule["fixtures"] = {
 // composed tag the descriptor declares.
 // Decision spike (km/decisions-spike): base-keyboard probe AND the single
 // system answering "what script did the base decide" (spec 085 Q2 — the
-// adaptation catalog's parallel classifyBaseScript is deprecated in favor
-// of this). Reads the script from the catalog entry — the codec leaves the
+// adaptation catalog reads posture via extractBaseScriptPosture below). Reads the script from the catalog entry — the codec leaves the
 // IR header's bcp47 empty on real catalog imports, so the catalog is
 // primary and the IR header is a fallback. Only ISO 15924 script codes
 // this question offers are extractable — "romanization-Latn", "fonipa",
@@ -116,6 +115,48 @@ export function extractTargetScript(ctx: ExtractContext): string | undefined {
   if (!tag) return undefined;
   const script = tag.split("-").find((s) => /^[A-Z][a-z]{3}$/.test(s));
   return script !== undefined && EXTRACTABLE_SCRIPTS.has(script) ? script : undefined;
+}
+
+/**
+ * The base's script posture, as read by every consumer (the adaptation
+ * catalog's q_sa2 predicate, the default posture builder). This is extraction
+ * provenance of the target-script decision: the one place a script
+ * distribution becomes "single-script" or "mixed".
+ */
+export interface BaseScriptPosture {
+  posture: "single-script" | "mixed";
+  /** Largest-share script subtag ("" when the distribution is empty). */
+  dominantScript: string;
+  dominantShare: number;
+  /** Human-readable provenance that NAMES the threshold policy. */
+  provenance: string;
+}
+
+/**
+ * Classify a base's script distribution against the single-script threshold.
+ * The sole implementation of that policy: a dominant share at or above
+ * `singleScriptThreshold` is single-script, anything below is mixed. Pure.
+ */
+export function extractBaseScriptPosture(
+  distribution: Record<string, number>,
+  singleScriptThreshold: number,
+): BaseScriptPosture {
+  let dominantScript = "";
+  let dominantShare = 0;
+  for (const [script, share] of Object.entries(distribution)) {
+    if (share > dominantShare) {
+      dominantScript = script;
+      dominantShare = share;
+    }
+  }
+  const posture = dominantShare >= singleScriptThreshold ? "single-script" : "mixed";
+  const pct = Math.round(singleScriptThreshold * 100);
+  const sharePct = Math.round(dominantShare * 100);
+  const provenance =
+    posture === "single-script"
+      ? `${dominantScript} is ${sharePct}% of base rules, at or above the single-script threshold (${pct}%)`
+      : `no script reaches the single-script threshold (${pct}%)`;
+  return { posture, dominantScript, dominantShare, provenance };
 }
 
 const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "bcp47" }],

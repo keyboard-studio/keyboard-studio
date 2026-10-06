@@ -17,7 +17,7 @@
 // question (Q-TP2).
 
 import type { AdaptationEvidence } from "./evidence.ts";
-import { dominantEntry } from "./evidence.ts";
+import { extractBaseScriptPosture } from "../survey/questions/a/il_target_script.ts";
 import type { TrustPolicy } from "./trustPolicy.ts";
 import { adaptationCatalog, type QuestionRecord } from "./catalog.ts";
 
@@ -30,41 +30,6 @@ export interface FiredQuestion {
   provenanceLabel: string;
   /** The tier that produced the evidence — carried so chips stay distinguishable (FR-006). */
   provenanceTier: AdaptationEvidence["provenanceTier"];
-}
-
-/** The base's script posture under the current threshold — a §3c classification. */
-export interface ScriptClassification {
-  posture: "single-script" | "mixed";
-  dominantScript: string;
-  dominantShare: number;
-  /** Human-readable provenance that NAMES the threshold policy (US3 / FR-006). */
-  provenance: string;
-}
-
-/**
- * Classify the base's script posture under the trust policy. Lowering the
- * threshold reclassifies a "mixed" base to "single-script" (and the provenance
- * names the threshold that decided it); raising it does the reverse. Pure.
- *
- * @deprecated (spec 085 Q2) — the target-script decision's extraction
- * (`il_target_script`'s `extract`) is the single system answering "what
- * script did the base decide". New code must read the decision; this
- * remains only for the q_sa2 predicate until the adaptation catalog is
- * retired (spec 085 US4).
- */
-export function classifyBaseScript(
-  evidence: AdaptationEvidence,
-  policy: TrustPolicy,
-): ScriptClassification {
-  const [dominantScript, dominantShare] = dominantEntry(evidence.baseScriptDistribution);
-  const posture = dominantShare >= policy.singleScriptThreshold ? "single-script" : "mixed";
-  const pct = Math.round(policy.singleScriptThreshold * 100);
-  const sharePct = Math.round(dominantShare * 100);
-  const provenance =
-    posture === "single-script"
-      ? `${dominantScript} is ${sharePct}% of base rules, at or above the single-script threshold (${pct}%)`
-      : `no script reaches the single-script threshold (${pct}%)`;
-  return { posture, dominantScript, dominantShare, provenance };
 }
 
 /** A firing predicate: does this question fire, and what is its prefill value. */
@@ -84,7 +49,7 @@ const PREDICATES: Record<string, Predicate> = {
 
   // "dominant-script-disagreement OR base-script == mixed".
   q_sa2_base_script_mismatch: (evidence, policy) => {
-    const cls = classifyBaseScript(evidence, policy);
+    const cls = extractBaseScriptPosture(evidence.baseScriptDistribution, policy.singleScriptThreshold);
     const disagreement = cls.dominantScript !== "" && cls.dominantScript !== evidence.targetScript;
     return { fires: cls.posture === "mixed" || disagreement, prefilledValue: evidence.targetScript };
   },

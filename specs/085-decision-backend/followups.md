@@ -22,7 +22,7 @@ the YAML order; then delete the YAML and retarget its mirror suites the way
 `flow-parity.test.ts` / `orphan-input-lint.test.ts` were retargeted for
 identity_lite.
 
-## 2. Remove deprecated `classifyBaseScript`
+## 2. Remove deprecated `classifyBaseScript` (DONE: deleted; posture now read via `extractBaseScriptPosture` in `il_target_script.ts`)
 
 `adaptation/firing.ts::classifyBaseScript` is deprecated but still exported
 (T022 folded target-script classification into decision extraction
