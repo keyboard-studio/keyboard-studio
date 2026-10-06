@@ -43,10 +43,14 @@ const RULE_BOUND: Record<string, number> = {
   // The spike's 1 came from a two-key simulated repertoire. This keyboard really types
   // 3-key clusters (e.g. A + U+0308 + U+0300 via two prefix keys), which the static
   // repertoire correctly includes, so SC-003 restates its bound to 19 (research R10).
-  fv_northern_tutchone: 19,
+  // Restated again to 22 when pass-through shapes stopped matching unmapped mark
+  // combinations (FR-003), which splits some wildcard rules (research R10).
+  fv_northern_tutchone: 22,
   fv_tlingit: 6,
   sil_yoruba8: 9,
-  el_pan_sahelian: 12,
+  // Restated to 22: keys bound only behind a deadkey still type their base-layout
+  // letter (FR-001), adding legitimate maps, plus the FR-003 split (research R10).
+  el_pan_sahelian: 22,
   sil_cameroon_qwerty: 23,
   sil_tchad: 49,
 };

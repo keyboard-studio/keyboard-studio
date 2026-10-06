@@ -5,6 +5,7 @@ import { compile } from "../../compiler/index.js";
 import { simulate } from "../../simulator/index.js";
 import { ALTERNATES_KMN, NO_ALTERNATES_KMN, parseFixture } from "../__fixtures__/normalization.js";
 import {
+  NORMALIZATION_GROUP,
   NORMALIZATION_STEP_GENERATOR_VERSION,
   applyNormalizationStep,
   normalizationStepCacheKey,
@@ -71,6 +72,11 @@ describe("proposeNormalizationStep", () => {
       kind: "refused",
       reason: "no-alternates",
     });
+
+    const userGroup = parseFixture(
+      ALTERNATES_KMN.replace("group(main) using keys\n", `group(${NORMALIZATION_GROUP})\n\n'x' > 'y'\n\ngroup(main) using keys\n`),
+    );
+    expect(await proposeNormalizationStep(userGroup)).toMatchObject({ kind: "refused", reason: "name-collision" });
     expect(JSON.stringify(base)).toBe(snapshot);
   });
 

@@ -297,8 +297,9 @@ function boundKeys(ir: KeyboardIR, stores: Map<string, StoreItem[]>): Set<string
       if (r.matchKind !== undefined) continue;
       const ctx = splitContext(r, true);
       const keyEls = ctx.filter((c) => c.isKey);
-      // A rule with text context can fall through when the context is absent.
-      if (ctx.some((c) => !c.isKey && c.el.kind !== "deadkey" && c.el.kind !== "baselayout")) continue;
+      // Any preceding context (text, deadkey, baselayout, option) is a condition:
+      // without it the key falls through to its base-layout character.
+      if (ctx.some((c) => !c.isKey)) continue;
       for (const { el } of keyEls) {
         if (el.kind === "vkey") {
           const p = layer(el.modifiers);

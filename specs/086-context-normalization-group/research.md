@@ -177,13 +177,18 @@ The overlay (`context-tolerance-overlay.ts`) gains a `kind: "normalization-step"
 | Keyboard | SC-003 bound | Closure unbounded | After R10 mitigation | Bound met |
 |---|---|---|---|---|
 | `el_dinka` | 1 | 1 | 1 | yes |
-| `fv_northern_tutchone` | 19 | 21 | 19 | yes (bound restated to 19, see below) |
+| `fv_northern_tutchone` | 22 | 21 | 22 | yes (bound restated to 19, then 22, see below) |
 | `fv_tlingit` | 6 | 6 | 6 | yes |
 | `sil_yoruba8` | 9 | 9 | 9 | yes |
-| `el_pan_sahelian` | 12 | 53 | 8 | yes |
+| `el_pan_sahelian` | 22 | 53 | 22 | yes (bound restated to 22, see below) |
 | `sil_cameroon_qwerty` | 23 | 26 | 15 | yes |
 | `sil_tchad` | 49 | 23 | 23 | yes |
 
 Mitigations applied, in order: (1) context-free mark appends (`+ [K_X] > U+0301`) extend only clusters holding fewer than two marks, so one standalone mark on every base no longer stacks three deep (`el_pan_sahelian`: 43,219 clusters down to 6,152); (2) the packer learns the single-mark pass set for shape P instead of passing the whole repertoire mark set, which lets one rule cover a head whose full mark set would collide with a produced cluster.
 
 **`fv_northern_tutchone` exceeds the spike's count (19 against 1).** The excess is not closure over-approximation: with the closure switched off the count is unchanged. The keyboard really types three-key clusters (a diaeresis or ogonek prefix key, then an accent prefix key, then the letter gives `A` + U+0308 + U+0300), so those clusters are produced and their NFC alternates (`Ä` + U+0300) are legitimate maps. The spike's 1 rule came from a repertoire built by two-key simulation, which never saw them. Dropping them would leave pasted `Ä` + U+0300 behaving differently from typed text, so the generator keeps them and the parity test pins this keyboard to 19. Decision (2026-10-06, user): SC-003 is restated to 19 for this keyboard; the wider repertoire stays.
+
+**Review fixes raise two counts (2026-10-06).** Two soundness fixes from code review cost rules, and the bounds follow them. Decision (2026-10-06, user): SC-003 is restated to 22 for `fv_northern_tutchone` and `el_pan_sahelian`.
+
+- *Deadkey-gated keys keep their fallback letter (FR-001).* A rule such as `dk(1) + [K_A] > U+00E1` used to mark `K_A` as bound, so its base-layout `a` was left out of the repertoire. Without the deadkey the key still types `a`, and a standalone mark key can follow it, so `a` + U+0301 is typed text the step must not rewrite. Any preceding context now makes a rule conditional. `el_pan_sahelian` rises from 12 to 16 from this alone.
+- *Pass-through rules match only mapped clusters (FR-003).* A P0/P/P2 shape used to be admitted when no tuple it matched was a produced cluster or a conflicting map, so it also matched mark combinations with no map at all and rewrote pasted text the keyboard cannot produce. Every matched combination must now be a map's alternate with exactly that map's target. The packer learns a pass set per position when the full mark set fails, which keeps the wildcard shapes where the maps support them. This takes `el_pan_sahelian` to 22 and `fv_northern_tutchone` from 19 to 22; the other five counts are unchanged.

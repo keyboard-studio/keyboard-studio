@@ -168,7 +168,8 @@ export type NormalizationRefusalReason =
   | "opaque-entry"
   | "opaque-output-store"
   | "time-bound"
-  | "no-alternates";
+  | "no-alternates"
+  | "name-collision";
 
 export type NormalizationStepResult =
   | { kind: "step"; step: NormalizationStep; cacheKey: string; maps: NormalizationMap[] }

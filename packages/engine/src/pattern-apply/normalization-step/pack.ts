@@ -20,8 +20,9 @@ import { NORMALIZATION_STORE_PREFIX } from "./constants.js";
  * | P  | `any(H) m1 any(M)...` (fixed first mark, the rest pass through) |
  * | P2 | `any(H) any(Mid) m2` -> `index(F,1) index(Mid,2)` |
  *
- * A pass-through shape is admitted for a head only if it can never match a
- * cluster the keyboard produces and agrees with every known map it covers.
+ * A pass-through shape is admitted for a head only if every cluster it can
+ * match is a known map's alternate, rewritten to exactly that map's target:
+ * it never matches a produced cluster or an unmapped one.
  * No rule contains `if()` or a backspace key.
  */
 
@@ -38,8 +39,8 @@ interface Cand {
   key: string;
   members: Map1[];
   lit1?: string;
-  /** A learned single-mark pass set (P0/P with one pass-through mark); absent means "every repertoire mark". */
-  pass?: string[];
+  /** Learned pass sets, one per pass-through position (P0/P); absent means "every repertoire mark" at each. */
+  pass?: string[][];
 }
 
 export interface PackedRules {
@@ -47,11 +48,15 @@ export interface PackedRules {
   rules: IRRule[];
 }
 
-/** Returns `null` when `shouldStop` fired before packing finished. */
+/**
+ * Returns `null` when `shouldStop` fired before packing finished. Generated
+ * store names skip `reservedStoreNames` (lowercased), the keyboard's own stores.
+ */
 export function packNormalization(
   mapList: readonly NormalizationMap[],
   repertoire: OutputRepertoire,
   shouldStop: () => boolean = () => false,
+  reservedStoreNames: ReadonlySet<string> = new Set(),
 ): PackedRules | null {
   const maps: Map1[] = mapList.map((m) => ({ a: [...m.from], e: [...m.to] }));
   const M = [...repertoire.marks];
@@ -61,11 +66,13 @@ export function packNormalization(
   const stores: IRStore[] = [];
   const rules: IRRule[] = [];
   const storeByContent = new Map<string, string>();
+  let nextName = 0;
   const store = (vals: string[]): string => {
     const key = vals.join("\u0000");
     const have = storeByContent.get(key);
     if (have !== undefined) return have;
-    const name = `${NORMALIZATION_STORE_PREFIX}${stores.length}`;
+    let name = `${NORMALIZATION_STORE_PREFIX}${nextName++}`;
+    while (reservedStoreNames.has(name.toLowerCase())) name = `${NORMALIZATION_STORE_PREFIX}${nextName++}`;
     stores.push({
       nodeId: `${NORMALIZATION_STORE_PREFIX}store_${stores.length}`,
       name,
@@ -84,14 +91,13 @@ export function packNormalization(
   };
 
   const bySrc = new Map(maps.map((m) => [m.a.join(""), m] as const));
-  const tuples = (k: number): string[][] => (k === 0 ? [[]] : tuples(k - 1).flatMap((t) => M.map((m) => [...t, m])));
   const byLen = new Map<number, Map1[]>();
   for (const m of maps) byLen.set(m.a.length, [...(byLen.get(m.a.length) ?? []), m]);
 
   for (const [L, all] of [...byLen].sort((x, y) => x[0] - y[0])) {
     if (shouldStop()) return null;
     const cands = new Map<string, Cand>();
-    const addTo = (kind: CandKind, key: string, m: Map1, lit1?: string, pass?: string[]): void => {
+    const addTo = (kind: CandKind, key: string, m: Map1, lit1?: string, pass?: string[][]): void => {
       const k = `${kind}|${key}`;
       let c = cands.get(k);
       if (c === undefined) {
@@ -102,23 +108,24 @@ export function packNormalization(
       }
       c.members.push(m);
     };
-    // Pass-through safety: prefix (fixed part) + every tuple of k marks.
+    // Pass-through coverage: every cluster the shape can match must be a known
+    // map's alternate with exactly the shape's output. A match with no map
+    // would rewrite pasted text the keyboard cannot produce (FR-003).
+    const covers = (str: string, out: string): boolean => {
+      if (produced.has(str)) return false;
+      const m = bySrc.get(str);
+      return m !== undefined && m.e.join("") === out;
+    };
+    const product = (sets: string[][]): string[][] =>
+      sets.reduce<string[][]>((acc, set) => acc.flatMap((t) => set.map((x) => [...t, x])), [[]]);
+    const safeOver = (prefix: string, sets: string[][], f: string): boolean =>
+      product(sets).every((t) => covers(prefix + t.join(""), f + t.join("")));
     const safe = (prefix: string, k: number, f: string): boolean =>
-      tuples(k).every((t) => {
-        const str = prefix + t.join("");
-        if (produced.has(str)) return false;
-        const m = bySrc.get(str);
-        return m === undefined || m.e.join("") === f + t.join("");
-      });
-    const safeOver = (prefix: string, marks: string[], f: string): boolean =>
-      marks.every((t) => {
-        const str = prefix + t;
-        if (produced.has(str)) return false;
-        const m = bySrc.get(str);
-        return m === undefined || m.e.join("") === f + t;
-      });
-    // Learned pass sets: only the single marks the member maps actually show.
-    const learned = (pm: Map1[]): string[] => [...new Set(pm.map((m) => m.a[m.a.length - 1] as string))].sort();
+      safeOver(prefix, Array.from({ length: k }, () => M), f);
+    // Learned pass sets: per pass-through position, only the marks the member maps show there.
+    const learned = (pm: Map1[], from: number): string[][] =>
+      Array.from({ length: L - from }, (_, j) => [...new Set(pm.map((m) => m.a[from + j] as string))].sort());
+    const passKey = (pass: string[][]): string => pass.map((set) => set.join("")).join(",");
     const heads = new Map<string, Map1[]>();
     for (const m of all) heads.set(m.a[0] as string, [...(heads.get(m.a[0] as string) ?? []), m]);
     for (const [h, hm] of heads) {
@@ -128,6 +135,12 @@ export function packNormalization(
         if (pm.length > 0) {
           const f = (pm[0] as Map1).e.slice(0, (pm[0] as Map1).e.length - (L - 1)).join("");
           if (safe(h, L - 1, f)) for (const m of pm) addTo("P0", String([...f].length), m);
+          else {
+            const pass = learned(pm, 1);
+            if (safeOver(h, pass, f)) {
+              for (const m of pm) addTo("P0", `${[...f].length}|${passKey(pass)}`, m, undefined, pass);
+            }
+          }
         }
       }
       if (L >= 3) {
@@ -138,10 +151,10 @@ export function packNormalization(
           if (pm.length > 0) {
             const f = (pm[0] as Map1).e.slice(0, (pm[0] as Map1).e.length - (L - 2)).join("");
             if (safe(h + m1, L - 2, f)) for (const m of pm) addTo("P", `${m1}|${[...f].length}`, m, m1);
-            else if (L === 3) {
-              const pass = learned(pm);
+            else {
+              const pass = learned(pm, 2);
               if (safeOver(h + m1, pass, f)) {
-                for (const m of pm) addTo("P", `${m1}|${[...f].length}|${pass.join("")}`, m, m1, pass);
+                for (const m of pm) addTo("P", `${m1}|${[...f].length}|${passKey(pass)}`, m, m1, pass);
               }
             }
           }
@@ -152,19 +165,16 @@ export function packNormalization(
       const byLast = new Map<string, Map1[]>();
       for (const m of all) if (m.e[m.e.length - 1] === m.a[1]) byLast.set(m.a[2] as string, [...(byLast.get(m.a[2] as string) ?? []), m]);
       for (const [m2, mm] of byLast) {
-        const mids = [...new Set(mm.map((m) => m.a[1] as string))];
         const hs = new Map<string, Map1[]>();
         for (const m of mm) hs.set(m.a[0] as string, [...(hs.get(m.a[0] as string) ?? []), m]);
         for (const [h, pm] of hs) {
           const f = (pm[0] as Map1).e.slice(0, -1).join("");
           if (!pm.every((m) => m.e.slice(0, -1).join("") === f)) continue;
-          const ok = mids.every((t) => {
-            const str = h + t + m2;
-            if (produced.has(str)) return false;
-            const m = bySrc.get(str);
-            return m === undefined || m.e.join("") === f + t;
-          });
-          if (ok) for (const m of pm) addTo("P2", `${m2}|${[...f].length}|${mids.join("")}`, m, m2);
+          // This head's own middle marks, so the shape matches only mapped clusters.
+          const mids = [...new Set(pm.map((m) => m.a[1] as string))].sort();
+          if (mids.every((t) => covers(h + t + m2, f + t))) {
+            for (const m of pm) addTo("P2", `${m2}|${[...f].length}|${mids.join("")}`, m, m2);
+          }
         }
       }
     }
@@ -204,10 +214,10 @@ export function packNormalization(
         const u = uniqBy((m) => m.a[0] as string);
         const h = store(u.map((m) => m.a[0] as string));
         const pre = Array.from({ length: Le - pass }, (_, j) => idx(store(u.map((m) => m.e[j] as string)), 1));
-        const mStore = store(best.pass ?? M);
+        const mStores = Array.from({ length: pass }, (_, j) => store(best.pass?.[j] ?? M));
         rule(
-          [any(h), ...(fixed === 2 ? lits([best.lit1 as string]) : []), ...Array.from({ length: pass }, () => any(mStore))],
-          [...pre, ...Array.from({ length: pass }, (_, j) => idx(mStore, j + fixed + 1))],
+          [any(h), ...(fixed === 2 ? lits([best.lit1 as string]) : []), ...mStores.map(any)],
+          [...pre, ...mStores.map((ms, j) => idx(ms, j + fixed + 1))],
         );
       } else if (best.kind === "P2") {
         const u = uniqBy((m) => m.a[0] as string);

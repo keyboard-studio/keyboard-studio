@@ -982,6 +982,7 @@
   "marks.context_tolerance.step.disclosure.rewrite": "",
   "marks.context_tolerance.step.examples.heading": "",
   "marks.context_tolerance.step.examples.row": "",
+  "marks.context_tolerance.step.fallback.reason.name_collision": "",
   "marks.context_tolerance.step.fallback.reason.no_alternates": "",
   "marks.context_tolerance.step.fallback.reason.no_unicode_entry": "",
   "marks.context_tolerance.step.fallback.reason.opaque_entry": "",

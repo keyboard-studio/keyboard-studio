@@ -93,6 +93,25 @@ describe("buildOutputRepertoire", () => {
     expect(r.bases).toContain("b");
   });
 
+  it("keeps the fallback for keys bound only behind a deadkey or baselayout context", () => {
+    const ir = makeTestIR({
+      groups: [
+        irGroup({
+          rules: [
+            ruleOf([{ kind: "deadkey", id: 1 }, PLUS, key("K_A")], [ch("á")]),
+            ruleOf([{ kind: "baselayout", value: "en-US" }, PLUS, key("K_B")], [ch("ß")]),
+            vkeyRule({ vkey: "K_X", output: ACUTE }),
+          ],
+        }),
+      ],
+    });
+    const r = buildOutputRepertoire(ir);
+    expect(r.clusters.has("a")).toBe(true);
+    expect(r.clusters.has("b")).toBe(true);
+    // The fallback letter plus a standalone mark key is a typed cluster.
+    expect(r.clusters.has(`a${ACUTE}`)).toBe(true);
+  });
+
   it("closes postfix rules: any(dot) + any(key) > index(dot,1) index(ac,2)", () => {
     const ir = makeTestIR({
       groups: [

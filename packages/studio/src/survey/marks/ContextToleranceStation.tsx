@@ -158,6 +158,10 @@ function FallbackReasonLine({ reason }: { reason: FallbackReason }) {
       id: "marks.context_tolerance.step.fallback.reason.no_alternates",
       message: "The one-step fix was not offered because this keyboard has no characters that can be written two ways.",
     }),
+    "name-collision": t({
+      id: "marks.context_tolerance.step.fallback.reason.name_collision",
+      message: "The one-step fix was not offered because this keyboard already has its own group with the name the fix would use.",
+    }),
     "verification-regressed": t({
       id: "marks.context_tolerance.step.fallback.reason.verification_regressed",
       message: "The one-step fix was not offered because when checked against this keyboard, it did not give the same result as the keyboard's own rules.",

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ContextElement, IRRule, NormalizationMap, OutputRepertoire } from "@keyboard-studio/contracts";
-import { packNormalization } from "./pack.js";
+import { packNormalization, type PackedRules } from "./pack.js";
 
 const GRAVE = "\u0300";
 const ACUTE = "\u0301";
@@ -15,6 +15,44 @@ const map = (from: string, to: string): NormalizationMap => ({ from, to });
 /** Coarse shape of a rule: the kinds of its context elements, any() as "A", literal as "c". */
 function shape(r: IRRule): string {
   return r.context.map((c: ContextElement) => (c.kind === "any" ? "A" : c.kind === "char" ? "c" : c.kind)).join("");
+}
+
+/** Every context each rule can match, with the text it writes back. */
+function rewrites(packed: PackedRules): Map<string, string> {
+  const items = new Map(packed.stores.map((s) => [s.name, s.items.map((i) => (i.kind === "char" ? i.value : ""))]));
+  const out = new Map<string, string>();
+  for (const r of packed.rules) {
+    if (r.matchKind !== undefined) continue;
+    // Each context position's options, as store indexes (a literal has one).
+    const opts = r.context.map((c) => (c.kind === "any" ? (items.get(c.storeRef) ?? []).map((_, i) => i) : [0]));
+    const picks = opts.reduce<number[][]>((acc, o) => acc.flatMap((t) => o.map((x) => [...t, x])), [[]]);
+    for (const pick of picks) {
+      const at = (j: number): string => {
+        const c = r.context[j] as ContextElement;
+        if (c.kind === "any") return items.get(c.storeRef)?.[pick[j] as number] ?? "";
+        return c.kind === "char" ? c.value : "";
+      };
+      const from = r.context.map((_, j) => at(j)).join("");
+      const to = r.output
+        .map((o) => {
+          if (o.kind === "char") return o.value;
+          if (o.kind === "index") return items.get(o.storeRef)?.[pick[o.offset - 1] as number] ?? "";
+          return "";
+        })
+        .join("");
+      if (!out.has(from)) out.set(from, to);
+    }
+  }
+  return out;
+}
+
+/** The FR-003 invariant: rules match only map alternates, writing exactly each map's target. */
+function expectOnlyMappedRewrites(maps: NormalizationMap[], r: OutputRepertoire): void {
+  const targets = new Map(maps.map((m) => [m.from, m.to]));
+  for (const [from, to] of rewrites(packNormalization(maps, r) as PackedRules)) {
+    expect(targets.has(from), `rewrites unmapped ${JSON.stringify(from)}`).toBe(true);
+    expect(to).toBe(targets.get(from));
+  }
 }
 
 function pack(maps: NormalizationMap[], r: OutputRepertoire): IRRule[] {
@@ -93,15 +131,35 @@ describe("packNormalization safety", () => {
   ];
   const base = [`e${DOT}${ACUTE}`, `e${DOT}${GRAVE}`];
 
-  it("rejects a pass-through shape that could match a repertoire cluster", () => {
-    const rules = pack(maps, rep([...base, `\u1eb9${DOT}`], [GRAVE, ACUTE, DOT]));
-    expect(rules.map(shape)).not.toContain("AA");
+  it("never matches a repertoire cluster", () => {
+    const r = rep([...base, `\u1eb9${DOT}`], [GRAVE, ACUTE, DOT]);
+    expect([...rewrites(packNormalization(maps, r) as PackedRules).keys()]).not.toContain(`\u1eb9${DOT}`);
+    expectOnlyMappedRewrites(maps, r);
   });
 
-  it("rejects a pass-through shape that disagrees with a covered map", () => {
+  it("never disagrees with a covered map", () => {
     const bad = [...maps, map(`\u1eb9${DOT}`, "Q")];
-    const rules = pack(bad, rep([...base, "Q"], [GRAVE, ACUTE, DOT]));
-    expect(rules.map(shape)).not.toContain("AA");
+    expectOnlyMappedRewrites(bad, rep([...base, "Q"], [GRAVE, ACUTE, DOT]));
+  });
+
+  it("never rewrites a cluster with no map, even when its marks are repertoire marks (FR-003)", () => {
+    // DOT is a repertoire mark, but pasted U+1EB9 + DOT has no map: it is left as is.
+    const r = rep(base, [GRAVE, ACUTE, DOT]);
+    const matched = [...rewrites(packNormalization(maps, r) as PackedRules).keys()].sort();
+    expect(matched).toEqual(maps.map((m) => m.from).sort());
+    expectOnlyMappedRewrites(maps, r);
+  });
+
+  it("learns a pass-through set per position for three-character alternates", () => {
+    const three = [
+      map(`\u1eb9${ACUTE}${GRAVE}`, `e${DOT}${ACUTE}${GRAVE}`),
+      map(`\u1eb9${GRAVE}${ACUTE}`, `e${DOT}${GRAVE}${ACUTE}`),
+      map(`\u1eb9${ACUTE}${ACUTE}`, `e${DOT}${ACUTE}${ACUTE}`),
+      map(`\u1eb9${GRAVE}${GRAVE}`, `e${DOT}${GRAVE}${GRAVE}`),
+    ];
+    const r = rep(three.map((m) => m.to), [GRAVE, ACUTE, DOT, RING]);
+    expect(pack(three, r).map(shape)).toEqual(["AAA"]);
+    expectOnlyMappedRewrites(three, r);
   });
 
   it("emits no if() and no backspace rule, only char/any/index elements", () => {

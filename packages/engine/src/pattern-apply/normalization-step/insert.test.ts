@@ -64,4 +64,32 @@ describe("applyNormalizationStep / removeNormalizationStep", () => {
     const ir = parseFixture(ALTERNATES_KMN);
     expect(removeNormalizationStep(ir)).toBe(ir);
   });
+
+  it("keeps a user store that shares the generated prefix, through apply and replay", async () => {
+    const kmn = ALTERNATES_KMN.replace(
+      "group(main) using keys\n",
+      "store(generated_cn_0) 'ae'\nstore(out) 'AE'\n\ngroup(main) using keys\n\nany(generated_cn_0) + 'q' > index(out,1)\n",
+    );
+    const ir = parseFixture(kmn);
+    const step = await stepOf(ir);
+    expect(step.stores.map((s) => s.name)).not.toContain("generated_cn_0");
+    const once = applyNormalizationStep(ir, step);
+    // Overlay replay: the projection is re-parsed, then the step applied again.
+    const replayed = applyNormalizationStep(parseFixture(emit(once)), step);
+    for (const out of [once, replayed, removeNormalizationStep(replayed)]) {
+      expect(out.stores.find((s) => s.name === "generated_cn_0")?.items).toEqual(
+        ir.stores.find((s) => s.name === "generated_cn_0")?.items,
+      );
+    }
+    expect(emit(removeNormalizationStep(replayed))).toBe(emit(ir));
+  });
+
+  it("leaves a user group that only shares the generated name", () => {
+    const kmn = ALTERNATES_KMN.replace(
+      "group(main) using keys\n",
+      `group(${NORMALIZATION_GROUP})\n\n'x' > 'y'\n\ngroup(main) using keys\n`,
+    );
+    const ir = parseFixture(kmn);
+    expect(removeNormalizationStep(ir)).toBe(ir);
+  });
 });

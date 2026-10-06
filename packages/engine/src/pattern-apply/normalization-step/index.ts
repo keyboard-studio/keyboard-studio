@@ -59,6 +59,8 @@ export async function proposeNormalizationStep(
     return refused("no-unicode-entry", `begin ${ir.header.encoding}`);
   }
   const base = removeNormalizationStep(ir);
+  // The keyboard's own group already holds the generated name.
+  if (base.groups.some((g) => g.name === NORMALIZATION_GROUP)) return refused("name-collision", NORMALIZATION_GROUP);
   const entry = entryNameOf(base);
   const entryGroup = base.groups.find((g) => g.name === entry);
   if (entryGroup === undefined || entryGroup.readonly) {
@@ -75,7 +77,8 @@ export async function proposeNormalizationStep(
   if (maps.length === 0) return refused("no-alternates");
   if (expired()) return refused("time-bound");
 
-  const packed = packNormalization(maps, repertoire, expired);
+  const reserved = new Set(base.stores.map((s) => s.name.toLowerCase()));
+  const packed = packNormalization(maps, repertoire, expired, reserved);
   if (packed === null || expired()) return refused("time-bound");
 
   const delegateTo = (matchKind: "match" | "nomatch", n: number) => ({

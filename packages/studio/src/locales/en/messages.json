@@ -982,6 +982,7 @@
   "marks.context_tolerance.step.disclosure.rewrite": "Text pasted next to the cursor is converted to this keyboard's own form when you type.",
   "marks.context_tolerance.step.examples.heading": "Examples of text it converts",
   "marks.context_tolerance.step.examples.row": "{pasted} becomes {result}",
+  "marks.context_tolerance.step.fallback.reason.name_collision": "The one-step fix was not offered because this keyboard already has its own group with the name the fix would use.",
   "marks.context_tolerance.step.fallback.reason.no_alternates": "The one-step fix was not offered because this keyboard has no characters that can be written two ways.",
   "marks.context_tolerance.step.fallback.reason.no_unicode_entry": "The one-step fix was not offered because this keyboard does not start in Unicode mode.",
   "marks.context_tolerance.step.fallback.reason.opaque_entry": "The one-step fix was not offered because this keyboard's first group could not be read in full.",
