@@ -1,13 +1,14 @@
 # Journey fixture — Bafut, Track 1 (copy), full spine identity -> package.
 #
 # spec 032 FR-009(a). Assembled from the hypothetical-Bafut completed-instance
-# examples in content/flows/_examples/phase_{a,b,f}_bafut.yaml, re-expressed
-# against the CURRENT live question registry (identity_lite.modular.yaml,
-# phase_b_characters.modular.yaml, phase_f_helpdocs.modular.yaml) — the
-# _examples files predate the identity-lite / marks-series migrations (spec
-# 030/064/071) and use question ids (layout_family, pb_accent_marks_gate, ...)
-# that are no longer live; see journey-runner.ts's module header and research
-# R1 in specs/032-journey-corpus/research.md for why.
+# examples (the former content/flows/_examples/phase_{a,b,f}_bafut.yaml, since
+# deleted), re-expressed against the CURRENT live question registry
+# (identity_lite, phase_b_characters and phase_f_helpdocs flows; question
+# modules under packages/studio/src/survey/questions). Those example files
+# predated the identity-lite / marks-series migrations (spec 030/064/071) and
+# used question ids (layout_family, pb_accent_marks_gate, ...) that are no
+# longer live; see journey-runner.ts's module header and research R1 in
+# specs/032-journey-corpus/research.md for why.
 #
 # Every survey-answer event's {stepId, questionId, value} was verified against
 # the live question module's `next` routing (packages/studio/src/survey/questions/{a,b,f}/*.ts)
@@ -22,7 +23,7 @@ persona:
   routing_group: qwerty-qwertz
 
 events:
-  # --- identity (identity_lite.modular.yaml) ---
+  # --- identity (identity_lite flow) ---
   - { stepId: identity, questionId: il_language_english, value: "Bafut" }
   - { stepId: identity, questionId: il_language_autonym, value: "Faʼ" }
   - { stepId: identity, questionId: il_language_code, value: "bfd" }
@@ -34,14 +35,14 @@ events:
   # --- choose_base (Track 1: copy from basic_kbdus) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
 
-  # --- track (track.modular.yaml) ---
+  # --- track (track flow) ---
   - { stepId: track, questionId: track_choice, value: "copy" }
 
-  # --- project_name (project_name.modular.yaml, copy-track only) ---
+  # --- project_name (project_name flow, copy-track only) ---
   - { stepId: project_name, questionId: project_display_name, value: "Bafut" }
   - { stepId: project_name, questionId: project_keyboard_id, value: "bafut" }
 
-  # --- characters (phase_b_characters.modular.yaml) ---
+  # --- characters (phase_b_characters flow) ---
   - { stepId: characters, questionId: pb_existing_keyboards, value: "" }
   - { stepId: characters, questionId: pb_co_installed_keyboards, value: "" }
   - { stepId: characters, questionId: pb_discovery_intro, value: "manual" }
@@ -78,13 +79,13 @@ events:
   # --- mechanisms (Phase C — gallery loop, recorded verbatim) ---
   - { stepId: mechanisms, action_type: mechanism_edit, summary: "assigned ŋ Ŋ ɨ Ɨ ə Ə ɔ Ɔ ɛ Ɛ via deadkey composition (S-02); combining tone marks (acute, grave, macron, circumflex) chained per S-04" }
 
-  # --- touch_seed_source (off-spine fork) ---
+  # --- touch_seed_source (side-trail fork) ---
   - { stepId: touch_seed_source, questionId: touch_seed_source, value: "import-adapt" }
 
   # --- touch (Phase E — gallery loop, recorded verbatim) ---
   - { stepId: touch, action_type: touch_edit, summary: "seeded touch layout from the desktop assignments; no manual touch-only edits" }
 
-  # --- help (phase_f_helpdocs.modular.yaml, default 5-screen path) ---
+  # --- help (phase_f_helpdocs flow, default 5-screen path) ---
   - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Bafut (Fa') on any computer. It includes all the tone marks and special letters used in the Bafut alphabet." }
   - { stepId: help, questionId: pf_usage_tip_1, value: "Press the backtick key (`) followed by a vowel to add a grave accent." }
   - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
@@ -102,8 +103,8 @@ confirmed_alphabet_bases:
 expected_outcomes:
   routing_group: qwerty-qwertz
   # §7.2 rule 7 (A4=stacking-combining AND A1 ∈ {small,medium}) -> S-02 + [S-04],
-  # per content/flows/_examples/phase_b_bafut.yaml's own worked strategy
-  # resolution. `axes` lets the harness verify this for real via
+  # per the worked strategy resolution in the former phase_b_bafut example
+  # (since deleted). `axes` lets the harness verify this for real via
   # @keyboard-studio/engine's selectStrategy() rather than asserting a
   # hand-typed string nothing re-derives.
   strategy: S-02

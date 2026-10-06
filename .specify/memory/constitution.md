@@ -148,4 +148,4 @@ Amendments to this file follow the change that prompted them: when a spec
 amendment lands (e.g. a new vX.Y.0 recorded in spec-signoff), the relevant
 Article is updated in the same change and the version footer below is bumped.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-08-17
+**Version**: 1.2.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-10-06

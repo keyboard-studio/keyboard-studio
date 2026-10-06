@@ -65,7 +65,7 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 - [x] **T041** [P] [US4] Draft compatibility: prove a pre-change draft loads unchanged (no migration needed; `migrateDraft` removed as dead weight) · packages/studio/src/lib/draftPersistence.prePrDraft.test.ts (new), packages/studio/src/lib/__fixtures__/prePrDraft.json (new)
 
 **⟶ Wait for Wave 1 to finish, then:**
-- [x] **T042** [US4] Manifest spine → derived projection, last (Article IX names it; the constitution is amended to name the registry when this lands) · packages/studio/src/steps/manifest.ts
+- [x] **T042** [US4] Manifest spine → derived projection, last (Article IX named it; Article IX has since been rewritten to name the decision registry, see T075 — the manifest's `spine`/`joinTarget` flags were deleted rather than kept as a projection) · packages/studio/src/steps/manifest.ts
 
 **Checkpoint:** zero ordering artifacts outside the registry; a pre-change draft fixture loads unchanged (no migration layer exists; add one only when a persisted key actually changes).
 
@@ -84,7 +84,7 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 - [x] **T060** [P] Demo page runs on `decisionFlow` instead of the fixture runner · packages/studio/src/decisions/ (demo, `?demo=decisions`)
 - [x] **T061** [P] FR-009 regression: the management UI never renders in a production build (still `import.meta.env.DEV`-gated) · packages/studio/src/decisions/ (demo test)
 - [x] **T062** Success-criteria validation: SC-001 (≥80% pre-fill on 5 real keyboards), SC-002 (fault-injection suite), SC-003 (zero artifacts + parity), SC-004 (corpus sample compiles through the unified flow) · specs/087-decision-backend/
-- [x] **T063** [P] PR #1938 description refresh: spike framing → the real unification scope · (PR body, via gh)
+- [x] **T063** [P] PR #1938 description refresh: spike framing → the real unification scope · (PR body, via gh; a point-in-time edit, so re-check the body against Phase 9 before merge)
 
 **Checkpoint:** the streamlining is complete, measured, and PRed.
 
@@ -95,7 +95,7 @@ Work that landed after the original 21 tasks, closing the residual ordering arti
 - [x] **T070** Fold base-script posture into target-script extraction; `classifyBaseScript` deleted, single classifier `extractBaseScriptPosture` · packages/studio/src/survey/questions/a/il_target_script.ts (d31bfaaa)
 - [x] **T071** Derive track + project_name order; derived-flow machinery generalized (`FlowSource.phase`, recipe in the `steps/flowSources.ts` header) (abcdfc97)
 - [x] **T072** Derive phase B, F and proposed phase A order; all `content/flows/*.modular.yaml` deleted (45a2c8f5)
-- [x] **T073** Single registry: `flowModules` becomes `questionRegistry` + `decisionIndex` in `survey/questions/registry.ts`; per-phase `registry.{a,b,f,g,reserve}.ts` and the thin-YAML loader (`survey/loadDerivedFlow.ts`) deleted; `gatedByFromNext` rewritten as graph visibility (merge-point bug fixed); `gateWalkParity` test added (7af9f942)
+- [x] **T073** Single registry: `flowModules` becomes `questionRegistry` + `decisionIndex` in `survey/questions/registry.ts`; per-phase `registry.{a,b,f,g,reserve}.ts` and the thin-YAML loader (`loadModularFlow`) deleted; `survey/loadDerivedFlow.ts` now holds only `loadDerivedFlowDef`, the generic derived-flow builder (provides/requires order via `orderDecisions`), consumed by `steps/flowSources.ts`; `gatedByFromNext` rewritten as graph visibility (merge-point bug fixed); `gateWalkParity` test added (7af9f942)
 - [x] **T074** DecisionsDemo uses design tokens instead of raw hex (58db4c41)
 - [x] **T075** Wizard step order derived: `steps/stepDependencies.ts`, `steps/stepOrder.ts`, generic `orderByDependencies`; `spine` / `joinTarget` flags deleted; constitution Article IX rewritten; 14 unconstrained step pairs frozen in `stepOrder.parity.test.ts` (ac12b6d0)
 - [x] **T076** Renumber the spec folder 085 to 087 (96df49cc)
