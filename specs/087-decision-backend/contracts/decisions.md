@@ -40,7 +40,7 @@ interface DecisionRendererProps<T> {
 
 ## Draft migration (Q5)
 
-- `migrateDraft(answers: Record<string, unknown>): { decisions: DecisionSet; orphans: string[] }` — old answer-keys mapped through the versioned table; orphans returned for visible surfacing, never dropped.
+- No migration function: persisted drafts are keyed by step id and question id, which did not change; old drafts load unchanged (see `lib/draftPersistence.prePrDraft.test.ts`).
 
 ## DecisionId ↔ IRPath relation
 

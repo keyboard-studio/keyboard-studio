@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "savedAt": 1791298328493,
+  "projectKey": "basic_kbdfr",
+  "displayName": "Pre-PR Fixture",
+  "languageTag": null,
+  "workingCopy": {
+    "instantiationMode": "new-from-base",
+    "baseKeyboard": {
+      "id": "basic_kbdfr",
+      "displayName": "Pre-PR Fixture",
+      "languages": []
+    },
+    "baseVfsEntries": [],
+    "baseIr": {
+      "origin": "scaffolded",
+      "header": {
+        "keyboardId": "test",
+        "name": "test",
+        "bcp47": [],
+        "copyright": "",
+        "version": "10.0",
+        "targets": [],
+        "storeDirectives": []
+      },
+      "stores": [],
+      "groups": [],
+      "comments": [],
+      "raw": [],
+      "recognizedPatterns": [],
+      "facets": {
+        "casing": {
+          "provenance": "undetermined"
+        }
+      }
+    },
+    "identity": null,
+    "attribution": null,
+    "licenseUnparseable": null,
+    "baseHolderOverride": null,
+    "baseLicenseText": null,
+    "helpDocs": null,
+    "baseWelcomeHtmText": null,
+    "baseHelpPhpText": null,
+    "baseReadmeMdText": null,
+    "baseHistoryMdText": null,
+    "baseWelcomeConvention": null,
+    "baseWelcomeImagesDropped": false,
+    "historyEntryState": null,
+    "chartPreference": null,
+    "baseDocProfile": null,
+    "baselineDocFindings": null,
+    "ir": {
+      "origin": "scaffolded",
+      "header": {
+        "keyboardId": "test",
+        "name": "test",
+        "bcp47": [],
+        "copyright": "",
+        "version": "10.0",
+        "targets": [],
+        "storeDirectives": []
+      },
+      "stores": [],
+      "groups": [],
+      "comments": [],
+      "raw": [],
+      "recognizedPatterns": [],
+      "facets": {
+        "casing": {
+          "provenance": "undetermined"
+        }
+      }
+    },
+    "deletedNodeIds": [],
+    "deletedItemIds": [],
+    "deletedTouchKeyIds": [],
+    "disabledFamilyIds": [],
+    "keptGuardRuleIds": [],
+    "dismissedMissingGroups": [],
+    "narrowedGuardQuestions": [],
+    "carveChars": [],
+    "undoStack": [],
+    "phaseResults": [],
+    "irAxes": {},
+    "desktopLocked": false,
+    "sequenceFlaggedChars": [],
+    "touchLayoutJson": null,
+    "touchDraft": null,
+    "galleryIntrosSeen": {
+      "mechanism": false,
+      "touch": false
+    },
+    "staleSteps": [],
+    "validatorFindings": [],
+    "axisFills": [],
+    "closedKeyboardCard": null,
+    "carveDispositions": [],
+    "carveTouchKeepInert": [],
+    "keyEditOverlay": {
+      "ops": []
+    },
+    "deadkeyOverlay": {
+      "ops": []
+    },
+    "touchEditorMode": "character",
+    "contextToleranceOverlay": null,
+    "phaseAnswersByStep": {}
+  },
+  "traversal": {
+    "activeStepId": "marks",
+    "history": [
+      "identity",
+      "layout",
+      "choose_base",
+      "track",
+      "project_name",
+      "characters"
+    ],
+    "visited": [
+      "identity",
+      "layout",
+      "choose_base",
+      "track",
+      "project_name",
+      "characters",
+      "marks"
+    ],
+    "lastNavigation": "advance",
+    "marksMigrationNeeded": false,
+    "identityResult": null,
+    "identityPhaseResult": null,
+    "surveyContext": {},
+    "selectedTrack": null,
+    "scaffoldSpec": null,
+    "localBase": null,
+    "baseConfirmed": false,
+    "charactersSubStage": "prefill",
+    "touchSeedSource": null,
+    "discoveryMethod": null,
+    "markedForLaterDesktop": [],
+    "markedForLaterTouch": []
+  },
+  "phaseBDraft": {
+    "chars": [],
+    "declaredRoles": {},
+    "provenance": {},
+    "exemplarDigraphs": [],
+    "loanwordChars": [],
+    "rejected": [],
+    "proposalConfidence": {},
+    "exemplarMethodDeclined": false,
+    "seededProposals": [],
+    "invisibleDecisions": {},
+    "selectedFont": "noto-sans"
+  },
+  "decisionRecord": {
+    "format": "keyboard-studio.decision-record",
+    "version": 2,
+    "keyboardId": null,
+    "entries": [],
+    "truncated": null
+  },
+  "surveyAnswers": {
+    "steps": {
+      "identity": {
+        "answers": {
+          "language_name": {
+            "value": "French",
+            "answerType": "text",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "identity_lite",
+            "savedAt": 1791298328492
+          },
+          "script_family": {
+            "value": "latin",
+            "answerType": "select",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "identity_lite",
+            "savedAt": 1791298328492
+          }
+        },
+        "position": null,
+        "status": {
+          "kind": "finished"
+        },
+        "lastRecorded": {}
+      },
+      "characters": {
+        "answers": {
+          "pb_char_count": {
+            "value": "42",
+            "answerType": "text",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "characters",
+            "savedAt": 1791298328492
+          },
+          "pb_alphabet": {
+            "value": [
+              "a",
+              "b",
+              "é"
+            ],
+            "answerType": "char-list",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "characters",
+            "savedAt": 1791298328492
+          }
+        },
+        "position": null,
+        "status": {
+          "kind": "in-progress"
+        },
+        "lastRecorded": {}
+      },
+      "marks": {
+        "answers": {
+          "pb_mark_input_order": {
+            "value": "mark_first",
+            "answerType": "select",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "marks",
+            "savedAt": 1791298328492
+          }
+        },
+        "position": "pb_mark_input_order",
+        "status": {
+          "kind": "in-progress"
+        },
+        "lastRecorded": {}
+      },
+      "punctuation": {
+        "answers": {
+          "pf_canonical_order": {
+            "value": true,
+            "answerType": "boolean",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "punctuation",
+            "savedAt": 1791298328492
+          }
+        },
+        "position": null,
+        "status": {
+          "kind": "in-progress"
+        },
+        "lastRecorded": {}
+      }
+    },
+    "recordedScreenOf": {}
+  }
+}

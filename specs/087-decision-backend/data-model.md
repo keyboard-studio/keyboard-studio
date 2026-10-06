@@ -46,9 +46,9 @@ Source: the existing `workingCopyStore` slots (`baseIr`, `baseKeyboard`) — no 
 | `status` | `"confirmed"` \| `"changed"` \| `"missing"` | confirmed = extracted and never overridden (or overridden with an equal value, deep-equal) |
 | `provenance` | `Provenance` | of the winning value |
 
-## DraftMigration (Q5)
+## Draft compatibility (Q5)
 
-Static, registry-versioned table `oldAnswerKey → DecisionId`. `migrateDraft` maps answers onto decisions; unmappable answers surface visibly for re-answer — never silently dropped. Live survey drafts persist answers keyed by question id, and no existing question id changed in this work, so they need no migration. `migrateDraft` maps question-id answers onto decisions for the decision-flow runtime, which is today reachable only through the DEV-gated demo; it will be wired into draft load when that runtime goes live.
+Persisted drafts are keyed by step id and answer (question) id, never by order, and neither set changed in this work, so old drafts load unchanged; `lib/draftPersistence.prePrDraft.test.ts` pins this with a pre-change fixture. No migration layer exists. If a persisted key is ever renamed, add a versioned migration at that point, with explicit (never fan-out) mappings and a visible failure on duplicate ids.
 
 ## Relationships
 
