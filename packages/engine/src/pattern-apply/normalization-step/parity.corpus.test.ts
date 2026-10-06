@@ -46,7 +46,9 @@ const RULE_BOUND: Record<string, number> = {
   fv_northern_tutchone: 19,
   fv_tlingit: 6,
   sil_yoruba8: 9,
-  el_pan_sahelian: 12,
+  // Raised from 12: three-key clusters (depth 3) are now in the static repertoire, so the
+  // pass-through rules cover them too.
+  el_pan_sahelian: 51,
   sil_cameroon_qwerty: 23,
   sil_tchad: 49,
 };
