@@ -15,6 +15,7 @@ import { MechanismGallery } from "./MechanismGallery.tsx";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { installMechanismGalleryHooks } from "../../test/mechanismGallery/mocks.tsx";
 import { seedInventory } from "../../test/mechanismGallery/harness.ts";
+import { setViewport } from "../../test/viewport.ts";
 
 vi.mock("../../lib/services.ts", () => import("../../test/mechanismGallery/mocks.tsx"));
 vi.mock("../../hooks/useKeyboardArtifact.ts", () => import("../../test/mechanismGallery/mocks.tsx"));
@@ -26,14 +27,6 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) =>
 vi.mock("../../components/OSKFrame.tsx", () => import("../../test/mechanismGallery/mocks.tsx"));
 
 installMechanismGalleryHooks();
-
-function setViewport(width: number, height: number): void {
-  Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
-  Object.defineProperty(window, "innerHeight", { value: height, configurable: true });
-  act(() => {
-    window.dispatchEvent(new Event("resize"));
-  });
-}
 
 beforeEach(() => {
   setViewport(1280, 800);
