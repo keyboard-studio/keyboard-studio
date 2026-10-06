@@ -55,7 +55,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  provides: ["indic-conjuncts-wanted"],
+  provides: ["indic-conjuncts-wanted"], requires: ["non-roman-branch"],
   specRef: "§8",
 };
 export default mod;

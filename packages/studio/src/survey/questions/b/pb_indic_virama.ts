@@ -31,5 +31,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["indic-virama"] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["indic-virama"], requires: ["indic-conjuncts-wanted"] };
 export default mod;

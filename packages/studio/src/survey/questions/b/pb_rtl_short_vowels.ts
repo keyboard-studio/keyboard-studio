@@ -73,5 +73,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["rtl-short-vowels"] };
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["rtl-short-vowels"], requires: ["non-roman-branch"] };
 export default mod;

@@ -54,6 +54,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  provides: ["syllabic-finals-wanted"],
+  provides: ["syllabic-finals-wanted"], requires: ["non-roman-branch"],
 };
 export default mod;

@@ -201,10 +201,11 @@ export interface DecisionRendererProps<T = unknown> {
  * a declared write). The `Record` type makes the map exhaustive at compile
  * time: a new DecisionId cannot be added without declaring its IR relation.
  *
- * Today every spike decision reaches its artifact through `outputs`
- * (package-descriptor), not IR writes, so all entries are `[]` — the map is
- * the declared relation, and the lint enforces coverage as later phases give
- * decisions real IR writes.
+ * Most decisions reach their artifact through `outputs` (package-descriptor)
+ * or a step's own `writes`, so their entry is `[]`; the test pins that set as
+ * an explicit allowlist. A decision whose provider declares IR `writes` must
+ * map to those paths instead (the test fails on `[]` there, and on a mapped
+ * path the provider never writes).
  */
 export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "language-name": [],
@@ -217,21 +218,21 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "copyright-holder": [],
   "character-inventory": [],
   "authoring-track": [],
-  "project-display-name": [],
-  "project-keyboard-id": [],
+  "project-display-name": [["header", "name"]],
+  "project-keyboard-id": [["header", "keyboardId"]],
   "reserve-desktop-notice": [],
-  "reserve-language-name": [],
+  "reserve-language-name": [["header", "name"]],
   "reserve-language-autonym": [],
-  "reserve-language-code": [],
+  "reserve-language-code": [["header", "bcp47"]],
   "reserve-language-region": [],
-  "reserve-primary-script": [],
+  "reserve-primary-script": [["header", "bcp47"]],
   "reserve-writing-direction": [],
   "reserve-layout-family": [],
   "reserve-script-family": [],
   "reserve-primary-target": [],
   "reserve-author-name": [],
   "reserve-author-email": [],
-  "reserve-copyright-holder": [],
+  "reserve-copyright-holder": [["header", "copyright"]],
   "reserve-provenance-opt-in": [],
   "reserve-requester-name": [],
   "reserve-requester-contact": [],
@@ -320,7 +321,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "spare-keys-qwerty": [],
   "special-letters-notes": [],
   "special-letters-wanted": [],
-  "standard-letters": [],
+  "standard-letters": [["stores", { kind: "[]" }]],
   "syllabic-finals-list": [],
   "syllabic-grid": [],
   "syllabic-note": [],

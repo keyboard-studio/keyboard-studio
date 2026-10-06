@@ -7,8 +7,8 @@
 // literal) so content/adaptation-questions/q_sa1_target_script_spread.yaml
 // (renders: true) and the lineage.siblings / community.multi-orthography facet
 // `consumers.prefills` entries resolve. It is intentionally NOT registered in
-// registry.b.ts nor listed in the Phase B flow: forcing it into the linear
-// `questions:` list would make it edge-reachable (drift-guardrail bijection) and
+// questions/registry.ts nor listed in the Phase B flow: forcing it into the linear
+// flow module list would make it edge-reachable (drift-guardrail bijection) and
 // therefore render on EVERY character walk, violating the feature's headline
 // non-interruption bar (SC-002 / SC-003). It fires only when related keyboards
 // span more than one script.

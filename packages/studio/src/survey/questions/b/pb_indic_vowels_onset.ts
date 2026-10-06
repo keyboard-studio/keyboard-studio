@@ -53,6 +53,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  provides: ["indic-onset-vowels-wanted"],
+  provides: ["indic-onset-vowels-wanted"], requires: ["non-roman-branch"],
 };
 export default mod;

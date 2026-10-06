@@ -81,5 +81,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["typing-approach"] };
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["typing-approach"], requires: ["standard-letters"] };
 export default mod;

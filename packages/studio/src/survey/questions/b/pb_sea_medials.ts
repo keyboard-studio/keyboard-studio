@@ -44,5 +44,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["sea-medials"] };
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["sea-medials"], requires: ["non-roman-branch"] };
 export default mod;

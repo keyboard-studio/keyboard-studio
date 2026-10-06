@@ -28,7 +28,7 @@ import ilScriptNotSupported from "../survey/questions/a/il_script_not_supported.
 import ilTargetScript from "../survey/questions/a/il_target_script.ts";
 
 const ALL_MODULES: readonly QuestionModule[] = [
-  // Legacy identity_lite.modular.yaml order (see orderParity.test.ts) — the
+  // Legacy identity_lite order (frozen in orderParity.test.ts) — the
   // derived topological order reproduces this exactly (parity badge, §1).
   ilLanguageEnglish,
   ilLanguageRegion,
@@ -41,7 +41,7 @@ const ALL_MODULES: readonly QuestionModule[] = [
   ilCopyrightHolder,
 ];
 const MODULE_IDS = ALL_MODULES.map((m) => m.definition.id);
-// Frozen from the deleted content/flows/identity_lite.modular.yaml (spec 087
+// Frozen from the deleted identity_lite YAML order list (spec 087
 // T040) — the parity badge compares the derived order against this.
 const LEGACY_IDS: readonly string[] = [
   "il_language_english",
@@ -341,7 +341,7 @@ export function DecisionsDemo() {
             {parity ? "PARITY: MATCH" : "PARITY: MISMATCH"}
           </span>{" "}
           <span style={mono}>orderDecisions()</span> output {parity ? "equals" : "differs from"}{" "}
-          the frozen legacy question list (identity_lite.modular.yaml, deleted spec 087 T040) — reordering is derived from{" "}
+          the frozen legacy question list (the deleted identity_lite YAML order list, spec 087 T040) — reordering is derived from{" "}
           <span style={mono}>provides</span>/<span style={mono}>requires</span>, not declared.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>

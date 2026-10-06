@@ -34,5 +34,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["picker-confirm"] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["picker-confirm"], requires: ["discovery-intro"] };
 export default mod;

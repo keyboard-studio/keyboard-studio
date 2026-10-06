@@ -50,7 +50,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  provides: ["help-project-url"],
+  provides: ["help-project-url"], requires: ["help-more-detail"],
   outputs: [{ target: "package-descriptor", field: "websiteUrl" }],
 };
 export default mod;

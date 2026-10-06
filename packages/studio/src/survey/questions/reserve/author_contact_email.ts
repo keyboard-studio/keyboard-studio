@@ -6,7 +6,7 @@
 // for a basic structural check (local@domain.tld) on top of the non-empty check
 // below — the two are independent: this module's own validate() only enforces
 // required, since `format` is what actually reaches the live "Continue" gate
-// (loadModularFlow's FlowDef carries `definition` only, not `validate`).
+// (the derived FlowDef carries `definition` only, not `validate`).
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 

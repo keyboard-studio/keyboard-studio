@@ -76,7 +76,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  provides: ["help-doc-language"],
+  provides: ["help-doc-language"], requires: ["help-more-detail"],
   specRef: "specs/061-help-docs-generation",
 };
 export default mod;

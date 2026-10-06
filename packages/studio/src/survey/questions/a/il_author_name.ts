@@ -2,8 +2,8 @@
 //
 // WHY A NEW ID RATHER THAN REVIVING author_display_name
 // -----------------------------------------------------
-// Routing lives in each module's `definition.next` (loadModularFlow ROUTING
-// DECISION B), so a module can belong to exactly ONE flow chain. The demoted
+// Routing lives in each module's `definition.next` (the derived flow loader, loadDerivedFlowDef,
+// follows `next` edges), so a module can belong to exactly ONE flow chain. The demoted
 // `author_display_name` continues to `author_contact_email` and then
 // `pa_copyright_holder` -> `provenance_opt_in`, and `provenance_opt_in` is not a
 // member of identity_lite. Adding those ids to identity_lite would therefore

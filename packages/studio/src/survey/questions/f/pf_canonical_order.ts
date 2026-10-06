@@ -53,5 +53,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-canonical-order"] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-canonical-order"], requires: ["help-more-detail"] };
 export default mod;

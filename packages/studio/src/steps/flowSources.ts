@@ -31,7 +31,7 @@
 
 import {
   flowModules,
-  demotedPhaseFModules,
+  phaseFLibraryModules,
   reserveModules,
   moduleRecord,
 } from "../survey/questions/registry.ts";
@@ -155,7 +155,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     title: "Help docs",
     // Includes the demoted tip slots: registered but not flow members, so they
     // surface as library-not-in-flow nodes in this drill-down.
-    registry: moduleRecord([...flowModules.phase_f_helpdocs, ...demotedPhaseFModules]),
+    registry: moduleRecord(phaseFLibraryModules),
     status: "live",
   },
 

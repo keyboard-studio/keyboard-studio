@@ -328,6 +328,16 @@ export const demotedPhaseFModules: readonly QuestionModule[] = [
   pfUsageTip5Mod,
 ];
 
+/**
+ * Every Phase F module: the live flow plus the demoted tip slots. The demoted
+ * ones are registered but not flow members, so they surface as
+ * library-not-in-flow nodes in the Phase F drill-down.
+ */
+export const phaseFLibraryModules: readonly QuestionModule[] = [
+  ...flowModules.phase_f_helpdocs,
+  ...demotedPhaseFModules,
+];
+
 /** Registered modules that belong to no flow (relocated out of a live battery). */
 export const reserveOnlyModules: readonly QuestionModule[] = [
   pb_mark_input_order,
@@ -346,15 +356,14 @@ export const reserveModules: readonly QuestionModule[] = [
 /**
  * Synchronous registry: { [questionId]: QuestionModule }
  *
- * Populated at module-init time; the map never grows at runtime. Object key
- * order is flow order (A, B, F, G, reserve), preserved from the retired
- * per-phase registries.
+ * Populated at module-init time; the map never grows at runtime. Key order is
+ * simply the concatenation below; it carries no meaning (flow order derives
+ * from each flow's provides/requires, not from this record).
  */
 export const questionRegistry: Readonly<Record<string, QuestionModule>> = moduleRecord([
   ...flowModules.identity_lite,
   ...flowModules.phase_b_characters,
-  ...flowModules.phase_f_helpdocs,
-  ...demotedPhaseFModules,
+  ...phaseFLibraryModules,
   ...flowModules.track,
   ...flowModules.project_name,
   ...reserveModules,

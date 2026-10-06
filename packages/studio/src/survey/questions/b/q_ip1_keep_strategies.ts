@@ -7,7 +7,7 @@
 // adaptation-catalog-lint / facet-lint (which key off the raw `id` literal)
 // resolve content/adaptation-questions/q_ip1_keep_strategies.yaml (renders: true)
 // and the lineage.strategy-fingerprint facet `consumers.prefills` entry. It is
-// intentionally NOT registered in registry.b.ts nor listed in the Phase B flow:
+// intentionally NOT registered in questions/registry.ts nor listed in the Phase B flow:
 // forcing it into the linear `questions:` list would make it render on every
 // character walk, violating the non-interruption bar (SC-002 / SC-003). It fires
 // only when the base has a recognized strategy fingerprint.
