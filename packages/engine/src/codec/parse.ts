@@ -452,6 +452,9 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
  * named deadkeys as deadkey items (ids allocated per parse via `namedDk`).
  * Unresolvable tokens are skipped. Returns undefined when nothing resolves.
  */
+/** Largest sketch (in items) kept for one opaque store; past it the sketch is dropped, never truncated. */
+const MAX_SKETCH_ITEMS = 0x20000;
+
 function sketchStoreItems(
   rawValue: string,
   known: Map<string, StoreItem[]>,
@@ -464,6 +467,7 @@ function sketchStoreItems(
     const range = detectRangeAt(toks, i);
     if (range !== null) {
       if (range.kind !== "malformed" && range.from <= range.to && range.to - range.from <= 0x10000) {
+        if (out.length + (range.to - range.from + 1) > MAX_SKETCH_ITEMS) return undefined;
         for (let cp = range.from; cp <= range.to; cp++) out.push({ kind: "char", value: String.fromCodePoint(cp) });
       }
       i += range.consumed;
@@ -477,7 +481,7 @@ function sketchStoreItems(
       out.push({ kind: "char", value: String.fromCodePoint(parseInt(m?.[1] ?? "0", 16)) });
       continue;
     }
-    if (isQuoted(tok)) { for (const ch of unquote(tok)) out.push({ kind: "char", value: ch }); continue; }
+    if (isQuoted(tok)) { for (const ch of unquote(tok)) out.push({ kind: "char", value: ch }); if (out.length > MAX_SKETCH_ITEMS) return undefined; continue; }
     if (isNamedDk(tok)) {
       const name = (/^dk\s*\(\s*([^)]+?)\s*\)$/i.exec(tok)?.[1] ?? "").toLowerCase();
       let id = namedDk.get(name);
@@ -491,7 +495,10 @@ function sketchStoreItems(
     if (ref !== null) {
       const key = ref.toLowerCase();
       const items = known.get(key);
-      if (items !== undefined) out.push(...items);
+      if (items !== undefined) {
+        if (out.length + items.length > MAX_SKETCH_ITEMS) return undefined;
+        for (const it of items) out.push(it);
+      }
       continue;
     }
     const vk = parseVkeyBracket(tok);

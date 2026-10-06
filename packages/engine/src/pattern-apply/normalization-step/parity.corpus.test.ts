@@ -48,9 +48,9 @@ const RULE_BOUND: Record<string, number> = {
   fv_northern_tutchone: 22,
   fv_tlingit: 6,
   sil_yoruba8: 9,
-  // Restated to 22: keys bound only behind a deadkey still type their base-layout
-  // letter (FR-001), adding legitimate maps, plus the FR-003 split (research R10).
-  el_pan_sahelian: 22,
+  // Raised from 12: three-key clusters (depth 3) are now in the static repertoire, so the
+  // pass-through rules cover them too.
+  el_pan_sahelian: 51,
   sil_cameroon_qwerty: 23,
   sil_tchad: 49,
 };

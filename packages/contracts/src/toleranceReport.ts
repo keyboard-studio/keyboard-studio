@@ -135,6 +135,13 @@ export interface OutputRepertoire {
   stackDepth: 1 | 2 | 3;
   /** Output-referenced stores that neither the IR nor a `storeSketch` resolves. */
   unresolved: readonly { storeName: string; reason: string }[];
+  /**
+   * Set when a size bound cut the closure short, so `clusters` may be missing
+   * forms the keyboard produces. Consumers that need completeness must refuse.
+   */
+  truncated?: boolean;
+  /** Which bounds fired, in a fixed order; present exactly when `truncated` is. */
+  truncatedBy?: readonly string[];
 }
 
 /** One alternate-form to produced-cluster mapping. */

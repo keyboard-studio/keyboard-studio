@@ -70,6 +70,9 @@ export async function proposeNormalizationStep(
 
   const repertoire = buildOutputRepertoire(base, { shouldStop: expired });
   if (expired()) return refused("time-bound");
+  if (repertoire.truncated === true) {
+    return refused("time-bound", `output repertoire truncated: ${(repertoire.truncatedBy ?? []).join(", ")}`);
+  }
   if (repertoire.unresolved.length > 0) {
     return refused("opaque-output-store", repertoire.unresolved.map((u) => u.storeName).join(", "));
   }
@@ -80,6 +83,7 @@ export async function proposeNormalizationStep(
   const reserved = new Set(base.stores.map((s) => s.name.toLowerCase()));
   const packed = packNormalization(maps, repertoire, expired, reserved);
   if (packed === null || expired()) return refused("time-bound");
+  if ("tooLarge" in packed) return refused("time-bound", `too large: ${packed.tooLarge}`);
 
   const delegateTo = (matchKind: "match" | "nomatch", n: number) => ({
     nodeId: `generated_cn_rule_${n}`,
