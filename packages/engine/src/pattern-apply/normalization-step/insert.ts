@@ -1,4 +1,4 @@
-import type { IRGroup, KeyboardIR, NormalizationStep } from "@keyboard-studio/contracts";
+import type { IRGroup, IRRule, KeyboardIR, NormalizationStep } from "@keyboard-studio/contracts";
 import { NORMALIZATION_GROUP, NORMALIZATION_STORE_PREFIX } from "./constants.js";
 
 /**
@@ -12,6 +12,22 @@ export function entryNameOf(ir: KeyboardIR): string {
 }
 
 /**
+ * The group a rule's `use(X)` names. A step built here carries a `useGroup`
+ * output; a step read back from emitted text carries the parser's raw
+ * `use(X)` output, so both spellings are recognised.
+ */
+function groupNamedByUse(output: readonly IRRule["output"][number][]): string | undefined {
+  for (const o of output) {
+    if (o.kind === "useGroup") return o.groupName;
+    if (o.kind === "raw") {
+      const m = /^use\(\s*([^)\s]+)\s*\)$/.exec(o.text.trim());
+      if (m?.[1] !== undefined) return m[1];
+    }
+  }
+  return undefined;
+}
+
+/**
  * Remove a previously applied step: restores `entryPoints.main` from the
  * group's `nomatch > use(X)` target and deletes the group and its stores.
  * Returns `ir` itself when no step is present.
@@ -20,9 +36,9 @@ export function removeNormalizationStep(ir: KeyboardIR): KeyboardIR {
   const group = ir.groups.find((g) => g.name === NORMALIZATION_GROUP);
   if (group === undefined) return ir;
   const nomatch = group.rules.find((r) => r.matchKind === "nomatch");
-  const target = nomatch?.output.find((o) => o.kind === "useGroup");
   const entryPoints = { ...ir.header.entryPoints };
-  if (target?.kind === "useGroup") entryPoints.main = target.groupName;
+  const target = nomatch === undefined ? undefined : groupNamedByUse(nomatch.output);
+  if (target !== undefined) entryPoints.main = target;
   return {
     ...ir,
     header: { ...ir.header, entryPoints },
