@@ -14,7 +14,7 @@
 // today's behaviour is unchanged until the attribution producer exists.
 //
 // Walks the real DEFAULT Phase F path (gate answered No), using the real
-// loadModularFlow + real phase_f_helpdocs.modular.yaml ?raw import. No mocks.
+// the real derived phase_f_helpdocs flow. No mocks.
 
 import { describe, it, expect, afterEach } from "vitest";
 import { screen, fireEvent, act, cleanup } from "@testing-library/react";

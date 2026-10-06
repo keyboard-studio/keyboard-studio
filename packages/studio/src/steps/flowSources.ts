@@ -1,13 +1,16 @@
-// steps/flowSources.ts — the ONE module holding static ?raw flow imports.
+// steps/flowSources.ts — the single authoritative registry of all known survey
+// flows, keyed by flow_id.
 //
-// Spec 024 (ADR-0001): FLOW_SOURCES is retired; the Flow Map derives drill-downs
-// from the step flowRefs declared in the manifest. This file is the single
-// authoritative registry of all known survey flows, keyed by their flow_id.
+// Spec 024 (ADR-0001): the Flow Map derives drill-downs from the step flowRefs
+// declared in the manifest. Spec 087: every flow's membership is the module list
+// registered for it in survey/questions/registry.ts (`flowModules`) and its ORDER
+// is derived from those modules' provides/requires — there are no hand-maintained
+// order lists. This file only adds per-flow metadata (title, phase letter,
+// status) on top of that single membership table.
 //
 // Boundary (.dependency-cruiser.cjs steps-layer rule): steps/ MAY import
-// survey/ (registries), content ?raw, and contracts — but NOT dashboard/,
-// stores/, lib/, or components/. This file imports only content ?raw + the
-// phase registries from survey/questions. dashboard/ reads it via flowRefs.
+// survey/ (registry) and contracts — but NOT dashboard/, stores/, lib/, or
+// components/. dashboard/ reads this file via flowRefs.
 //
 // Status semantics:
 //   "live"     — referenced by at least one manifest step via flowRefs;
@@ -15,22 +18,27 @@
 //   "proposed" — known to the registry but NOT referenced by any manifest step;
 //                excluded from live drill-downs and from the rendered<->runtime
 //                bijection; rendered as an ordered graph in the Flow Map's Library
-//                section (spec 025, D6). Its YAML also carries `status: proposed`.
+//                section (spec 025, D6). The `status` here is the single source
+//                of that marker.
+//
+// Adding a flow: give its question modules `provides` / `requires` (DecisionId,
+// decisions/decisionTypes.ts), list them under a new key in `flowModules`
+// (registry.ts) in walk order, freeze the intended order in a decisions/*Parity
+// test, and add an entry below. Everything downstream (loadFlowSourceDef,
+// dashboard graphs, rendered-node set, library flows, mirror suites) keys off
+// `derivedModules` generically. Conditional visibility stays single-sourced in
+// each module's definition.next (gatedBy is derived from it, FR-005).
 
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAIdentityModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
-import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
-import projectNameModularRaw from "../../../../content/flows/project_name.modular.yaml?raw";
-
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../survey/questions/registry.f.ts";
-import { phaseTrackRegistry, phaseProjectRegistry } from "../survey/questions/registry.g.ts";
-import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
+import {
+  flowModules,
+  phaseFLibraryModules,
+  reserveModules,
+  moduleRecord,
+} from "../survey/questions/registry.ts";
 
 import type { QuestionModule } from "../survey/types.ts";
+import type { FlowDef } from "../survey/types.ts";
+import { loadDerivedFlowDef } from "../survey/loadDerivedFlow.ts";
 
 // ---------------------------------------------------------------------------
 // FlowSource shape
@@ -38,23 +46,48 @@ import type { QuestionModule } from "../survey/types.ts";
 
 /**
  * A single survey flow registered in this catalogue.
- * Keyed by the flow's flow_id (matches the YAML `flow_id:` field).
+ * Keyed by the flow's flow_id.
  */
 export interface FlowSource {
-  /** Stable id — equals the YAML flow_id field. */
+  /** Stable id — equals the flow_id. */
   id: string;
-  /** The ?raw import of the thin modular YAML descriptor. */
-  raw: string;
+  /**
+   * Question modules whose provides/requires declarations supply this flow's
+   * order via `orderDecisions` (the flow's `flowModules` entry).
+   */
+  derivedModules: readonly QuestionModule[];
+  /** Phase letter of the flow (the per-flow A-G scheme, see steps/phases.ts). */
+  phase: string;
+  /**
+   * Subset of `derivedModules` that forms the supplemental
+   * `provenance_questions` list (Phase A). Membership only — order still
+   * derives from the single provides/requires pass over `derivedModules`.
+   */
+  provenanceModules?: readonly QuestionModule[];
   /** Human title for the Flow Map drill-down header. */
   title: string;
-  /** Registry of QuestionModule definitions for this flow's questions. */
+  /**
+   * id-keyed modules for the Flow Map's reserve-node computation: the flow's
+   * own modules plus registered-but-unused siblings that surface as
+   * "library-not-in-flow" nodes in this drill-down.
+   */
   registry: Readonly<Record<string, QuestionModule>>;
   /**
    * "live"     — referenced by >=1 manifest step; appears in live drill-downs.
-   * "proposed" — not yet referenced by any manifest step; Stage 2 will build
-   *              full ordered graphs; Stage 1 renders a flat Library list only.
+   * "proposed" — not yet referenced by any manifest step; rendered as an
+   *              ordered graph in the Library section.
    */
   status: "live" | "proposed";
+}
+
+/** Load a flow source's FlowDef: the order derives from its modules. */
+export function loadFlowSourceDef(source: FlowSource): FlowDef {
+  return loadDerivedFlowDef(
+    source.id,
+    source.phase,
+    source.derivedModules,
+    source.provenanceModules,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -69,76 +102,84 @@ export interface FlowSource {
  * are explicitly excluded from live drill-down rendering.
  *
  * phase_a_identity is intentionally status:"proposed" and referenced by NO
- * manifest step — this realises the spec-022 demotion through the new mechanism.
- * Its modules are physically relocated to questions/reserve/ and registered in
- * reserveRegistry (no-delete guardrail) and are visible as the ordered
- * proposed-flow graph in the Flow Map's Library section and as flat entries in
- * its Leftover section — never as reserve clog inside the live identity_lite
- * drill-down (which keys off the il_*-only phaseARegistry).
+ * manifest step — this realises the spec-022 demotion. Its modules are
+ * physically relocated to questions/reserve/ (no-delete guardrail) and are
+ * visible as the ordered proposed-flow graph in the Flow Map's Library section
+ * and as flat entries in its Leftover section — never as reserve clog inside
+ * the live identity_lite drill-down (whose registry holds only the il_*
+ * modules).
  */
 export const flowSources: Readonly<Record<string, FlowSource>> = {
   // --- Live flows (referenced by manifest step flowRefs) ---
 
   identity_lite: {
     id: "identity_lite",
-    raw: identityLiteModularRaw,
+    derivedModules: flowModules.identity_lite,
+    phase: "A",
     title: "Identity-lite",
-    // phaseARegistry now holds ONLY the il_* modules (the demoted battery was
-    // physically relocated to questions/reserve/), so computeReserveNodes
-    // yields nothing here: the demoted Phase A battery is not surfaced as
-    // reserve clog under the live identity flow. Those demoted modules are
-    // registered in reserveRegistry (no-delete guardrail) and surface in the
-    // Flow Map's dedicated Leftover section instead (kept for reference /
-    // future reuse, never run by the live survey).
-    registry: phaseARegistry,
+    registry: moduleRecord(flowModules.identity_lite),
     status: "live",
   },
 
   track: {
     id: "track",
-    raw: trackModularRaw,
+    derivedModules: flowModules.track,
+    phase: "G",
     title: "Track selection",
-    registry: phaseTrackRegistry,
+    registry: moduleRecord(flowModules.track),
     status: "live",
   },
 
   project_name: {
     id: "project_name",
-    raw: projectNameModularRaw,
+    derivedModules: flowModules.project_name,
+    phase: "G",
     title: "Project name",
-    registry: phaseProjectRegistry,
+    registry: moduleRecord(flowModules.project_name),
     status: "live",
   },
 
   phase_b_characters: {
     id: "phase_b_characters",
-    raw: phaseBModularRaw,
+    derivedModules: flowModules.phase_b_characters,
+    phase: "B",
     title: "Character discovery",
-    registry: phaseBRegistry,
+    registry: moduleRecord(flowModules.phase_b_characters),
     status: "live",
   },
 
   phase_f_helpdocs: {
     id: "phase_f_helpdocs",
-    raw: phaseFModularRaw,
+    derivedModules: flowModules.phase_f_helpdocs,
+    phase: "F",
     title: "Help docs",
-    registry: phaseFRegistry,
+    // Includes the demoted tip slots: registered but not flow members, so they
+    // surface as library-not-in-flow nodes in this drill-down.
+    registry: moduleRecord(phaseFLibraryModules),
     status: "live",
   },
 
   // --- Proposed flows (NOT referenced by any manifest step) ---
 
   // Spec 022 demotion: the full non-identity Phase A battery is excluded from
-  // live drill-downs. Its modules are physically relocated to questions/reserve/
-  // and registered in reserveRegistry (no-delete guardrail), appearing as the
-  // ordered proposed-flow graph in the Library section plus flat entries in the
-  // Leftover section — kept for reference / future reuse, never run by the live
-  // survey and never clogging the live identity_lite drill-down.
+  // live drill-downs. Its modules live in questions/reserve/ (no-delete
+  // guardrail), appearing as the ordered proposed-flow graph in the Library
+  // section plus flat entries in the Leftover section — kept for reference /
+  // future reuse, never run by the live survey.
   phase_a_identity: {
     id: "phase_a_identity",
-    raw: phaseAIdentityModularRaw,
+    // Order derives from the reserve modules' provides/requires (reserve-*
+    // decision ids, distinct from the live il_* ones). The 15 provenance_*
+    // modules keep the supplemental provenance_questions list.
+    derivedModules: flowModules.phase_a_identity,
+    phase: "A",
+    provenanceModules: flowModules.phase_a_identity.filter(
+      (m) =>
+        m.definition.id.startsWith("provenance_") &&
+        m.definition.id !== "provenance_opt_in",
+    ),
     title: "Full identity (reserve/library)",
-    registry: reserveRegistry,
+    registry: moduleRecord(reserveModules),
     status: "proposed",
   },
 } as const;

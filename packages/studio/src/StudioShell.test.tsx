@@ -1542,6 +1542,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 //   3. applyStepCompletion is called (side effects fire) for mechanisms/touch.
 
 import { manifest } from "./steps/manifest.ts";
+import { STEP_TRAILS } from "./steps/stepOrder.ts";
 import * as StudioShellModule from "./StudioShell.tsx";
 
 describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () => {
@@ -1553,9 +1554,9 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
   });
 
   it("manifest spine order is: identity → layout → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → help → package (M2, spec 071/075, spec 082, spec 083)", () => {
-    // track is now a real manifest step (P0 fix); project_name is spine:false.
+    // track is now a real manifest step (P0 fix); project_name is a derived side trail.
     const spineIds = manifest
-      .filter((s) => s.spine !== false)
+      .filter((s) => STEP_TRAILS.get(s.id)?.spine !== false)
       .map((s) => s.id);
     expect(spineIds).toEqual([
       "identity",
@@ -1577,11 +1578,11 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     ]);
   });
 
-  it("manifest project_name is spine:false with joinTarget 'characters' (M4b, P0 fix)", () => {
+  it("project_name is a derived side trail (gated) rejoining at 'characters' (M4b, P0 fix)", () => {
     const projName = manifest.find((s) => s.id === "project_name");
     expect(projName).toBeDefined();
-    expect(projName?.spine).toBe(false);
-    expect(projName?.joinTarget).toBe("characters");
+    expect(projName?.gatedBy).toBeDefined();
+    expect(STEP_TRAILS.get("project_name")).toEqual({ spine: false, joinTarget: "characters" });
   });
 
   it("manifest has exactly one lock:physical and one lock:touch, in that order (M3)", () => {
@@ -1593,11 +1594,11 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(locks[1]).toMatchObject({ lock: "touch" });
   });
 
-  it("manifest touch_seed_source is spine:false with joinTarget 'touch' (M4)", () => {
+  it("touch_seed_source is a derived side trail (gated) rejoining at 'touch' (M4)", () => {
     const seedSource = manifest.find((s) => s.id === "touch_seed_source");
     expect(seedSource).toBeDefined();
-    expect(seedSource?.spine).toBe(false);
-    expect(seedSource?.joinTarget).toBe("touch");
+    expect(seedSource?.gatedBy).toBeDefined();
+    expect(STEP_TRAILS.get("touch_seed_source")).toEqual({ spine: false, joinTarget: "touch" });
   });
 
   it("all manifest step ids are unique (M5)", () => {
@@ -1608,7 +1609,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1633,12 +1634,12 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-track")).toBeTruthy();
     expect(screen.queryByTestId("stage-base")).toBeNull();
 
-    // → project_name (manifest step: spine:false, copy-track CYOA fork)
+    // → project_name (manifest step: gated side trail, copy-track CYOA fork)
     fireEvent.click(screen.getByTestId("track-copy"));
     expect(screen.getByTestId("stage-project-name")).toBeTruthy();
     expect(screen.queryByTestId("stage-track")).toBeNull();
 
-    // → characters / prefill sub-stage (project_name joinTarget = "characters")
+    // → characters / prefill sub-stage (project_name rejoins at "characters")
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
 
@@ -1678,7 +1679,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
-    // touch_seed_source → touch (joinTarget hop; mocked TouchGallery stub, stage-E)
+    // touch_seed_source → touch (side-trail rejoin hop; mocked TouchGallery stub, stage-E)
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
@@ -1687,7 +1688,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-F")).toBeTruthy();
   });
 
-  it("adapt-track skips project_name (spine:false) and lands directly on characters (P0 fix)", async () => {
+  it("adapt-track skips project_name (side trail) and lands directly on characters (P0 fix)", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1695,7 +1696,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     advanceToTrack();
     expect(screen.getByTestId("stage-track")).toBeTruthy();
 
-    // adapt-track: nextSpineStepAfter("track") skips project_name (spine:false).
+    // adapt-track: nextMainLineStepAfter("track") skips project_name (side trail).
     fireEvent.click(screen.getByTestId("track-adapt"));
 
     // Must land on prefill (characters step), not project-name.

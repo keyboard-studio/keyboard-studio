@@ -23,24 +23,16 @@
 // to keep. It fails only when routing actually changes, so it is not churn.
 
 import { describe, it, expect } from "vitest";
-import { loadModularFlow } from "../../src/survey/loadModularFlow.ts";
-
-// ---------------------------------------------------------------------------
-// ?raw YAML imports (Vite handles these; typed via src/vite-env.d.ts)
-// ---------------------------------------------------------------------------
-
-import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import trackModularRaw from "../../../../content/flows/track.modular.yaml?raw";
-import projectNameModularRaw from "../../../../content/flows/project_name.modular.yaml?raw";
+import { loadDerivedFlowDef } from "../../src/survey/loadDerivedFlow.ts";
+import { flowModules } from "../../src/survey/questions/registry.ts";
+import { flowSources, loadFlowSourceDef } from "../../src/steps/flowSources.ts";
 
 // ---------------------------------------------------------------------------
 // Phase A structural integrity
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: phase_a_identity — questions[]", () => {
-  const modular = loadModularFlow(phaseAModularRaw);
+  const modular = loadFlowSourceDef(flowSources["phase_a_identity"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);
@@ -65,7 +57,7 @@ describe("flow-parity: phase_a_identity — questions[]", () => {
 });
 
 describe("flow-parity: phase_a_identity — provenance_questions[]", () => {
-  const modular = loadModularFlow(phaseAModularRaw);
+  const modular = loadFlowSourceDef(flowSources["phase_a_identity"]!);
 
   it("has provenance_questions", () => {
     expect(modular.provenance_questions).toBeDefined();
@@ -86,7 +78,7 @@ describe("flow-parity: phase_a_identity — provenance_questions[]", () => {
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: phase_f_helpdocs — questions[]", () => {
-  const modular = loadModularFlow(phaseFModularRaw);
+  const modular = loadFlowSourceDef(flowSources["phase_f_helpdocs"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);
@@ -187,14 +179,22 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 });
 
 // ---------------------------------------------------------------------------
-// identity_lite structural integrity (T017)
-// Order + derivation are covered insertion-tolerantly in IdentityLite.test.ts;
-// here we keep the routing-shape invariants (gate / terminal / branch / options)
-// that are unique to this harness.
+// identity_lite structural integrity (T017, retargeted spec 087 T040)
+// The thin-YAML order list was deleted — the FlowDef now comes from
+// loadDerivedFlowDef over the il_* modules' own declarations. Order +
+// derivation are covered insertion-tolerantly in IdentityLite.test.ts and
+// pinned by decisions/orderParity.test.ts; here we keep the routing-shape
+// invariants (gate / terminal / branch / options) that are unique to this
+// harness. Module definitions (including definition.next routing) are
+// registry-sourced either way, so the assertions are unchanged.
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: identity_lite — routing shape", () => {
-  const modular = loadModularFlow(identityLiteModularRaw);
+  const modular = loadDerivedFlowDef(
+    "identity_lite",
+    "A",
+    flowModules.identity_lite,
+  );
 
   it("flow_id is identity_lite", () => {
     expect(modular.flow_id).toBe("identity_lite");
@@ -262,7 +262,7 @@ describe("flow-parity: identity_lite — routing shape", () => {
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: track — questions[]", () => {
-  const modular = loadModularFlow(trackModularRaw);
+  const modular = loadFlowSourceDef(flowSources["track"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);
@@ -299,7 +299,7 @@ describe("flow-parity: track — questions[]", () => {
 // ---------------------------------------------------------------------------
 
 describe("flow-parity: project_name — questions[]", () => {
-  const modular = loadModularFlow(projectNameModularRaw);
+  const modular = loadFlowSourceDef(flowSources["project_name"]!);
 
   it("has questions", () => {
     expect(modular.questions.length).toBeGreaterThan(0);

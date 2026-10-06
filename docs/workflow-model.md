@@ -235,9 +235,8 @@ character has ≥1 reachable mechanism. This is the workflow-graph dead-end test
 
 ## 4. Survey-question inventory — what each question targets
 
-Read from [phase_a_identity.yaml](../content/flows/phase_a_identity.yaml),
-[phase_b_characters.yaml](../content/flows/phase_b_characters.yaml),
-[phase_f_helpdocs.yaml](../content/flows/phase_f_helpdocs.yaml). Each question is
+Read from the question modules under `packages/studio/src/survey/questions/` (flows
+listed in [content/flows/README.md](../content/flows/README.md)). Each question is
 tagged by the *job* it does — and critically, by whether its answer is **derivable
 from a chosen base keyboard** (because that determines whether it should be asked
 or merely confirmed).

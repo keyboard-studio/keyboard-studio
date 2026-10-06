@@ -17,6 +17,7 @@
 // free text, so a typed/blank value is preserved.
 
 import type { QuestionModule } from "../../types.ts";
+import type { ExtractContext } from "../../../decisions/extractContext.ts";
 
 export const definition = {
   id: "il_language_code",
@@ -46,6 +47,20 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
+// Decision spike (km/decisions-spike): base-keyboard probe. Reads the BCP 47
+// language subtag from the catalog entry — the same fact this question
+// confirms in ask mode. The codec leaves the IR header's bcp47 empty on real
+// catalog imports, so the catalog is the primary source; the IR header is a
+// fallback for non-catalog imports. Either source may carry a full tag
+// (`ha-NG`, `pa-Arab`); only the language subtag is this question's answer —
+// buildTargetBcp47 composes script and region back on in BCP 47 order.
+// Returns undefined when neither carries language metadata.
+export function extractLanguageCode(ctx: ExtractContext): string | undefined {
+  const tag = ctx.catalog?.languages?.[0] ?? ctx.ir?.header.bcp47[0];
+  const subtag = tag?.split("-")[0]?.toLowerCase();
+  return subtag ? subtag : undefined;
+}
+
 // Output reach (spec 059 FR-016): `writes` stays `[]` — this question writes no
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the answer contributes the language subtag to the
@@ -57,5 +72,9 @@ const mod: QuestionModule = {
   writes: [],
   outputs: [{ target: "package-descriptor", field: "bcp47" }],
   specRef: "specs/030-langtags-identity-autocomplete",
+  // Decision spike (km/decisions-spike).
+  provides: ["language-code"],
+  requires: ["language-name"],
+  extract: extractLanguageCode,
 };
 export default mod;

@@ -73,5 +73,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [irPath("header", "copyright")],
+  provides: ["reserve-copyright-holder"],
+  requires: ["reserve-author-name"],
 };
 export default mod;

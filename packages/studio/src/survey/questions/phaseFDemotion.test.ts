@@ -13,13 +13,13 @@
 // instead of hard-coding a count.
 //
 // The demoted modules MUST remain:
-//   • REGISTERED   — a key in phaseFRegistry and in the merged questionRegistry,
+//   • REGISTERED   — registered with the Phase F modules and in the merged questionRegistry,
 //                    with the key matching definition.id;
 //   • ON DISK      — resolvable at survey/questions/f/<id>.ts;
 //   • TEST-COVERED — run by the live question-module contract suite
 //                    (questionModules.test.ts iterates LIVE_QUESTION_MODULES) with
 //                    at least one valid fixture, so the run is not vacuous;
-//   • REVIVABLE    — re-adding the id to content/flows/phase_f_helpdocs.modular.yaml
+//   • REVIVABLE    — moving the module into flowModules.phase_f_helpdocs (registry.ts)
 //                    restores it with no code change, no re-registration, no file
 //                    restore.
 
@@ -29,8 +29,15 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { LIVE_QUESTION_MODULES } from "../../test/questionModuleContract.ts";
-import { questionRegistry } from "./registry.ts";
-import { phaseFRegistry } from "./registry.f.ts";
+import {
+  questionRegistry,
+  flowModules,
+  demotedPhaseFModules,
+  moduleRecord,
+} from "./registry.ts";
+
+/** id-keyed Phase F modules: the live flow plus the demoted tip slots. */
+const phaseFRegistry = moduleRecord([...flowModules.phase_f_helpdocs, ...demotedPhaseFModules]);
 
 /** The demoted Phase F tip slots. */
 export const DEMOTED_PHASE_F: readonly string[] = [
@@ -83,7 +90,7 @@ describe("Phase F demotion — no-delete guardrail", () => {
   });
 
   // REVIVABLE, asserted structurally: the demoted chain still resolves to real
-  // ids, so re-adding tip 3 to the YAML restores a coherent tip3 -> tip4 -> tip5
+  // ids, so adding tip 3 to flowModules.phase_f_helpdocs restores a coherent tip3 -> tip4 -> tip5
   // -> pf_credits run without editing any module.
   it("the demoted chain still resolves to registered ids (revivable)", () => {
     expect(phaseFRegistry["pf_usage_tip_3"]?.definition.next).toBe("pf_usage_tip_4");

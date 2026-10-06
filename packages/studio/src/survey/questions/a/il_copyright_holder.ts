@@ -11,6 +11,7 @@
 // so an author who is also the rights holder confirms one field instead of two.
 
 import type { QuestionModule } from "../../types.ts";
+import type { ExtractContext } from "../../../decisions/extractContext.ts";
 import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 
 // help_text extends the demoted module's rather than replacing it (HANDOFF-CONTENT
@@ -77,6 +78,15 @@ export const definition = {
 // No validate(): required:false, because a blank means "same as the author"
 // (D1 / effectiveHolder), not a missing answer.
 
+// Decision spike (km/decisions-spike): base-keyboard probe. Reads the
+// copyright from the imported keyboard's IR header — the same fact this
+// question confirms in ask mode. Returns undefined when the header carries
+// none.
+export function extractCopyrightHolder(ctx: ExtractContext): string | undefined {
+  const copyright = ctx.ir?.header.copyright;
+  return copyright ? copyright : undefined;
+}
+
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
     ...paCopyrightHolder.fixtures.valid,
@@ -86,5 +96,14 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  // Decision spike (km/decisions-spike).
+  provides: ["copyright-holder"],
+  requires: ["author-name"],
+  extract: extractCopyrightHolder,
+};
 export default mod;

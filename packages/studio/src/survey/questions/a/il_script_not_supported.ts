@@ -35,5 +35,15 @@ export const fixtures: QuestionModule["fixtures"] = {
 // inputs: [] — this notice's help_text is fully static; there is no BCP47
 // interpolation here (unlike script_not_supported_stub which reads
 // irPath("header","bcp47")).  The empty array is intentional.
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  // Decision spike (km/decisions-spike): only reached for not-yet-supported
+  // scripts. No hand-written gatedBy: the gate is DERIVED from
+  // il_target_script's conditional `next` via gatedByFromNext (single source
+  // for conditional routing — never both by hand).
+  requires: ["target-script"],
+};
 export default mod;

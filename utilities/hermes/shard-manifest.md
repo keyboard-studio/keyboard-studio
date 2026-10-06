@@ -51,7 +51,7 @@ studio → api → oauth-backend. A shard never crosses a package boundary.
 | S31 | studio-steps | studio | `src/steps/` | 1951 |
 | S32 | studio-stores-lint | studio | `src/stores/` (incl. workingCopyStore.ts 882) + `src/lint/` | 1777 |
 | S33 | studio-survey-runner-phases | studio | `src/survey/{PhaseB.tsx, SurveyRunner.tsx, QuestionField.tsx, PhaseA.tsx, IdentityLite.tsx}` | 2476 |
-| S34 | studio-survey-flow-fg | studio | rest of `src/survey/*.tsx|ts` root (constants, charNormUtils, index, CharactersStep, FlowStepHost, Prefill, loadModularFlow, types, placementSeeds) + `src/survey/questions/{f,g}/` + `src/survey/questions/*.ts` (registry.*, drillDownDeclarations, demotedPhaseA.fixture) | 1973 |
+| S34 | studio-survey-flow-fg | studio | rest of `src/survey/*.tsx|ts` root (constants, charNormUtils, index, CharactersStep, FlowStepHost, Prefill, loadDerivedFlow, types, placementSeeds) + `src/survey/questions/{f,g}/` + `src/survey/questions/*.ts` (registry.*, drillDownDeclarations, demotedPhaseA.fixture) | 1973 |
 | S35 | studio-survey-questions-a | studio | `src/survey/questions/a/` | 1671 |
 | S36 | studio-survey-questions-b1 | studio | `src/survey/questions/b/` — files `pb_accent_marks_gate.ts` … `pb_mark_input_order.ts` (alphabetical first half) | 1449 |
 | S37 | studio-survey-questions-b2 | studio | `src/survey/questions/b/` — files `pb_mark_style.ts` … `pb_use_case.ts` (alphabetical second half) | 1516 |

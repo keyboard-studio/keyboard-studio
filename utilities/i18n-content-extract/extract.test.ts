@@ -10,11 +10,19 @@ import {
   extractPatternStrings,
   slugifyIdSegment,
 } from "./extract.js";
-import { phaseARegistry } from "../../packages/studio/src/survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../../packages/studio/src/survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../../packages/studio/src/survey/questions/registry.f.ts";
-import { phaseGRegistry } from "../../packages/studio/src/survey/questions/registry.g.ts";
-import { reserveRegistry } from "../../packages/studio/src/survey/questions/registry.reserve.ts";
+import {
+  flowModules,
+  demotedPhaseFModules,
+  reserveModules,
+  moduleRecord,
+} from "../../packages/studio/src/survey/questions/registry.ts";
+
+// Live module groups per phase (the F group includes the registered demoted tips).
+const phaseARegistry = moduleRecord(flowModules.identity_lite);
+const phaseBRegistry = moduleRecord(flowModules.phase_b_characters);
+const phaseFRegistry = moduleRecord([...flowModules.phase_f_helpdocs, ...demotedPhaseFModules]);
+const phaseGRegistry = moduleRecord([...flowModules.track, ...flowModules.project_name]);
+const reserveRegistry = moduleRecord(reserveModules);
 
 const dirs: string[] = [];
 function tempDir(): string {
@@ -431,7 +439,7 @@ describe("extractFlowQuestionStrings", () => {
     expect("content.flowQuestion.il_language_code.label" in strings).toBe(false);
   });
 
-  it("excludes registry.reserve.ts's demoted modules (spec 050 D2; US2 forward-guard)", () => {
+  it("excludes the reserve modules (spec 050 D2; US2 forward-guard)", () => {
     const strings = extractFlowQuestionStrings();
     const keys = Object.keys(strings);
     expect(keys.some((k) => k.includes("language_name_english"))).toBe(false);
@@ -480,7 +488,7 @@ describe("extractFlowQuestionStrings", () => {
     );
   });
 
-  it("emits no key for any registry.reserve.ts module id (D2 — full reserve sweep)", () => {
+  it("emits no key for any reserve module id (D2 — full reserve sweep)", () => {
     const strings = extractFlowQuestionStrings();
     const idsWithKeys = new Set(
       Object.keys(strings).map((k) =>

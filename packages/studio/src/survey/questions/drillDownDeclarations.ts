@@ -13,9 +13,8 @@
 // modular-YAML flow nodes. Declaring them here (rather than in questionRegistry)
 // is deliberate and load-bearing for the Phase-1 invariants:
 //   - questionRegistry membership would trip the orphan-input-lint "no
-//     non-manifested registry modules" gate (every registry id must appear in a
-//     .modular.yaml manifest), and
-//   - a modular-YAML flow node would require a runtime-reach edge or the spec-016
+//     non-manifested registry modules" gate (every registry id must be a member of a flow), and
+//   - a flow node would require a runtime-reach edge or the spec-016
 //     rendered<->runtime bijection (exact set equality) goes RED.
 // A separate descriptor table carries the declared contract WITHOUT touching
 // either gate, keeping behaviour byte-identical (flag off, no mutate(), no

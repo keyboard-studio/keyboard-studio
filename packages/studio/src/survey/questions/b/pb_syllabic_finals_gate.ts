@@ -48,5 +48,12 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [],
+  provides: ["syllabic-finals-wanted"], requires: ["non-roman-branch"],
+};
 export default mod;

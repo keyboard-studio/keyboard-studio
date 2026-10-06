@@ -48,6 +48,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["rtl-direction-confirm"], requires: ["non-roman-branch"],
   specRef: "§8",
 };
 export default mod;

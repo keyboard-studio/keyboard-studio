@@ -15,82 +15,28 @@
 // Comparison key: formatIRPath(path) — stable dot-bracket display string.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 import { formatIRPath, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { parseThinYaml } from "../../src/survey/loadModularFlow.ts";
 import { questionRegistry } from "../../src/survey/questions/registry.ts";
+import { flowSources } from "../../src/steps/flowSources.ts";
+import { orderDecisions } from "../../src/decisions/orderDecisions.ts";
 
 // ---------------------------------------------------------------------------
-// Resolve paths
+// Flow order: every flow in flowSources, in declaration order, with each flow's
+// question order DERIVED from its modules' provides/requires — the same order
+// the survey actually walks (see decisions/orderParity.test.ts). Ordering
+// matters for the orphan analysis because a producer must precede its consumer.
+// Adding a flow to flowSources needs no edit here, so it is never silently
+// skipped by this lint. Proposed flows sort first: the proposed phase_a_identity
+// battery is the producer of header.bcp47 (iso_code / primary_script) that later
+// phases' inputs resolve against.
 // ---------------------------------------------------------------------------
 
-const thisFile = fileURLToPath(import.meta.url);
-const pkgRoot = path.resolve(path.dirname(thisFile), "../..");
-const repoRoot = path.resolve(pkgRoot, "../..");
-const flowsDir = path.join(repoRoot, "content", "flows");
-
-// ---------------------------------------------------------------------------
-// Discover all *.modular.yaml files in content/flows/ via readdirSync.
-// Load them using the canonical validated parser from loadModularFlow.ts.
-// ---------------------------------------------------------------------------
-
-function loadManifest(filename: string) {
-  const raw = readFileSync(path.join(flowsDir, filename), "utf-8");
-  return parseThinYaml(raw);
-}
-
-// All .modular.yaml filenames found in the flows directory — automatically
-// includes any future additions without requiring a manual edit here.
-const allModularFilenames = readdirSync(flowsDir).filter((f) =>
-  f.endsWith(".modular.yaml"),
-);
-
-// All question IDs referenced by any manifest, in phase order.
-// provenance_questions are part of phase A flow and run after main questions.
-function allIds(manifest: ReturnType<typeof parseThinYaml>): string[] {
-  const ids = [...manifest.questions];
-  if (manifest.provenance_questions) {
-    ids.push(...manifest.provenance_questions);
-  }
-  return ids;
-}
-
-// Known phase-ordered manifests (A before B before F) — ordering matters for
-// the orphan analysis because a producer must precede its consumer.
-// Any .modular.yaml file not in this list is appended at the end with its
-// filename as the phase label, ensuring future additions are never silently
-// skipped by this lint.
-const KNOWN_PHASE_ORDER: Array<{ phase: string; filename: string }> = [
-  // spec 025: phase_a_identity is a PROPOSED flow, relocated to content/flows/proposed/.
-  // It is still linted for orphan inputs (path is joined onto flowsDir below); the
-  // readdirSync auto-discovery only scans the top level, so proposed flows are listed
-  // explicitly here.
-  { phase: "A (proposed)", filename: path.join("proposed", "phase_a_identity.modular.yaml") },
-  { phase: "B", filename: "phase_b_characters.modular.yaml" },
-  { phase: "F", filename: "phase_f_helpdocs.modular.yaml" },
-  // identity_lite is the short hybrid head (spec §8); its 5 il_* modules
-  // all declare empty inputs/writes so they trivially pass the orphan lint.
-  { phase: "A (identity-lite)", filename: "identity_lite.modular.yaml" },
-];
-
-const knownFilenames = new Set(KNOWN_PHASE_ORDER.map((e) => e.filename));
-
-// Build the final ordered list: known phases first (in spec order), then any
-// newly discovered files appended alphabetically so they are linted and not
-// silently exempt.
-const orderedEntries: Array<{ phase: string; filename: string }> = [
-  ...KNOWN_PHASE_ORDER,
-  ...allModularFilenames
-    .filter((f) => !knownFilenames.has(f))
-    .sort()
-    .map((f) => ({ phase: f, filename: f })),
-];
-
-const phaseOrder: Array<{ phase: string; ids: string[] }> = orderedEntries.map(
-  ({ phase, filename }) => ({ phase, ids: allIds(loadManifest(filename)) }),
-);
+const phaseOrder: Array<{ phase: string; ids: string[] }> = Object.values(flowSources)
+  .sort((a, b) => Number(b.status === "proposed") - Number(a.status === "proposed"))
+  .map((src) => ({
+    phase: `${src.phase} (${src.id})`,
+    ids: orderDecisions(src.derivedModules).map((m) => m.definition.id),
+  }));
 
 // Build the set of all manifested IDs for exemption check.
 const manifestedIds = new Set<string>(
@@ -99,7 +45,7 @@ const manifestedIds = new Set<string>(
 
 // Explicit reserve allowlist: modules that are intentionally REGISTERED but not
 // referenced by any manifest. "Demotion is not deletion" — they stay registered,
-// on disk, and test-covered so re-adding an id to a flow YAML revives them with
+// on disk, and test-covered so listing the module in a flow revives them with
 // no code change (see src/survey/questions/phaseFDemotion.test.ts).
 //
 // pf_usage_tip_3/4/5 — the Phase F documentation revision replaced five fixed
@@ -185,7 +131,7 @@ function analyzeOrphans(
 
 describe("orphan-input lint — every manifested input has a prior producer", () => {
   it("manifests loaded successfully (sanity)", () => {
-    // Every discovered .modular.yaml must have at least one question.
+    // Every flow must have at least one question.
     // This catches empty or unloadable manifests early.
     for (const { phase, ids } of phaseOrder) {
       expect(
@@ -193,11 +139,11 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
         `Manifest for phase '${phase}' has no questions — empty or failed to load`,
       ).toBeGreaterThan(0);
     }
-    // Confirm all four currently-known manifests are present.
+    // Confirm every known flow is linted.
     expect(
-      allModularFilenames,
-      "Expected at least 4 .modular.yaml files in content/flows/",
-    ).toSatisfy((files: string[]) => files.length >= 4);
+      phaseOrder.length,
+      "Expected at least 6 linted flows",
+    ).toBeGreaterThanOrEqual(6);
   });
 
   it("questionRegistry covers all manifested questions (sanity)", () => {

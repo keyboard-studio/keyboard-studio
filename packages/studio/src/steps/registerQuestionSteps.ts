@@ -15,7 +15,7 @@ import { questionRegistry } from "../survey/questions/registry.ts";
  * All registered QuestionModules adapted to QuestionStep descriptors.
  *
  * Order within the list mirrors the registry insertion order (A → B → F).
- * The manifest imposes the final spine order; this list is an unordered pool
+ * Step order is derived (stepOrder.ts); this list is an unordered pool
  * the manifest picks from by id.
  *
  * `inputs` and `writes` default to [] when the module omits them (legacy
@@ -30,7 +30,6 @@ export const registeredQuestionSteps: readonly QuestionStep[] = Object.entries(
   kind: "question-step",
   id,
   title: mod.definition.prompt ?? mod.definition.label ?? id,
-  spine: true,
   inputs: mod.inputs ?? [],
   writes: mod.writes ?? [],
   questionId: mod.definition.id,

@@ -1679,7 +1679,6 @@ function makeEditorStep(id: string, writes: typeof PATH_GROUPS_FIXTURE[], inputs
     kind: "editor-step",
     id,
     title: id,
-    spine: true,
     component: (() => null) as EditorStep["component"],
     inputs,
     writes,

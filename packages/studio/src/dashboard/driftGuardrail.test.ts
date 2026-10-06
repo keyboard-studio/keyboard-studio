@@ -41,7 +41,7 @@ import { buildManifestStepGraph } from "./buildStepGraph.ts";
 import { findUnreachable } from "./completeness.ts";
 import { resolveNext } from "../survey/SurveyRunner.tsx";
 import { ruleTarget } from "./flowUtils.ts";
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
+import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { FlowQuestion } from "../survey/types.ts";
@@ -78,7 +78,7 @@ function bijectionViolations(
 
 /**
  * Editor-step reach (T005, FR-007): manifest ids minus findUnreachable(manifest).
- * Reachability here is the spine-or-transitive-joinTarget rule
+ * Reachability here is the spine-or-derived-join-target rule
  * (completeness.ts:475-499) — blind to FlowGotoRule by design; that is the
  * survey side's job.
  */
@@ -136,7 +136,7 @@ function computeSurveyReach(): Set<string> {
   for (const source of liveSources) {
     let flow;
     try {
-      flow = loadModularFlow(source.raw);
+      flow = loadFlowSourceDef(source);
     } catch {
       continue; // a parse failure surfaces in the rendered-side error path
     }
@@ -177,11 +177,11 @@ describe("drift guardrail — rendered <-> runtime bijection (spec 016)", () => 
   const runtimeReach = new Set<string>([...editorReach, ...surveyReach]);
 
   // Asymmetry note (correct as-is, non-obvious): the RENDERED live set includes
-  // every question DECLARED in each YAML's `questions:` list (buildModularFlowGraph
+  // every question DECLARED in each flow's derived `questions` list (buildDerivedFlowGraph
   // maps over flow.questions), whereas computeSurveyReach includes only questions
   // edge-reachable by BFS from the entry. The bijection below therefore ALSO
   // silently asserts "every declared question is edge-reachable from its entry" —
-  // a real, useful invariant: a declared-but-edge-orphaned YAML question would go
+  // a real, useful invariant: a declared-but-edge-orphaned question would go
   // RED here as orphanRendered. It holds on real data (109==109).
   it("SC-001 / FR-001: rendered node set is bijective with runtime-reachable ids", () => {
     const { orphanRendered, uncovered } = bijectionViolations(rendered, runtimeReach);
@@ -263,7 +263,7 @@ describe("drift guardrail — rendered <-> runtime bijection (spec 016)", () => 
     // originally named `pb_build_list`, but that is the BuildListView React branch
     // (survey/PhaseB.tsx:535), NOT a questionRegistry id — no `pb_build_list` id
     // exists. The reachable registry id at that boundary is `pb_discovery_intro`
-    // (the IntroChooser/discovery gate, registry.b.ts:74, reached as a string-next
+    // (the IntroChooser/discovery gate, questions/b/pb_discovery_intro.ts, reached as a string-next
     // target from pb_co_installed_keyboards.ts:17). FR-008/SC-005 were amended to
     // name it. It MUST be found via the survey/resolveNext reach (the QUESTION
     // graph), and MUST NOT appear in the manifest/findUnreachable reach (the
@@ -303,7 +303,7 @@ describe("drift guardrail — negative tests (injection RED, removal GREEN)", ()
 
   it("N1 (FR-004 / T013): a runtime step with no rendered node turns it RED", () => {
     // A synthetic manifest step that is reachable (in the runtime set) but has no
-    // registry/YAML coverage and no rendered drill-down -> uncovered.
+    // registry coverage and no rendered drill-down -> uncovered.
     const SYNTH = "__synthetic_uncovered_manifest_step__";
     const injectedRuntime = new Set(runtimeReach);
     injectedRuntime.add(SYNTH);

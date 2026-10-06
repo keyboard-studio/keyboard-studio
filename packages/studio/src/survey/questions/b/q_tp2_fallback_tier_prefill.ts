@@ -53,5 +53,5 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["tp2-fallback-tier-prefill"] };
 export default mod;

@@ -11,7 +11,7 @@
 # invoke the engine codec against the ../keyboards checkout.
 #
 # Phase B routes through the syllabic (Canadian Aboriginal Syllabics) branch
-# of phase_b_characters.modular.yaml (pb_non_roman_branch -> pb_syllabic_* ->
+# of the phase_b_characters flow (pb_non_roman_branch -> pb_syllabic_* ->
 # the shared universal tail) — a genuinely different branch than
 # bafut-end-to-end's qwerty-qwertz walk, verified against each question
 # module's `next` routing the same way.
@@ -25,7 +25,7 @@ persona:
   source_keyboard: bj_cree_woods
 
 events:
-  # --- identity (identity_lite.modular.yaml) ---
+  # --- identity (identity_lite flow) ---
   - { stepId: identity, questionId: il_language_english, value: "Cree" }
   - { stepId: identity, questionId: il_language_autonym, value: "Nîhithawîwin" }
   - { stepId: identity, questionId: il_language_code, value: "cr" }
@@ -37,10 +37,10 @@ events:
   # --- choose_base (Track 2: adapt bj_cree_woods) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "bj_cree_woods" }
 
-  # --- track (adapt — project_name is skipped, spine:false CYOA fork) ---
+  # --- track (adapt — project_name is skipped, side-trail CYOA fork, derived from gatedBy) ---
   - { stepId: track, questionId: track_choice, value: "adapt" }
 
-  # --- characters (phase_b_characters.modular.yaml, syllabic branch) ---
+  # --- characters (phase_b_characters flow, syllabic branch) ---
   - { stepId: characters, questionId: pb_existing_keyboards, value: "Legacy font-encoded Cree typewriter layout" }
   - { stepId: characters, questionId: pb_co_installed_keyboards, value: "" }
   - { stepId: characters, questionId: pb_discovery_intro, value: "manual" }
@@ -73,13 +73,13 @@ events:
   # --- mechanisms (Phase C — carve.spec.ts's confirmMechanismsEmpty walk) ---
   - { stepId: mechanisms, action_type: mechanism_edit, summary: "no new characters to add — empty mechanisms diff (all discovered characters already on the adapted base)" }
 
-  # --- touch_seed_source (off-spine fork) ---
+  # --- touch_seed_source (side-trail fork) ---
   - { stepId: touch_seed_source, questionId: touch_seed_source, value: "import-adapt" }
 
   # --- touch (Phase E — carve.spec.ts's driveTouchGallery walk) ---
   - { stepId: touch, action_type: touch_edit, summary: "touch layout carried over from the adapted desktop assignments; no additional touch-only characters" }
 
-  # --- help (phase_f_helpdocs.modular.yaml, default 5-screen path) ---
+  # --- help (phase_f_helpdocs flow, default 5-screen path) ---
   - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Woods Cree (Nîhithawîwin) in Canadian Aboriginal Syllabics on any computer." }
   - { stepId: help, questionId: pf_usage_tip_1, value: "" }
   - { stepId: help, questionId: pf_more_detail_gate, value: "false" }

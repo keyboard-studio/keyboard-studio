@@ -41,7 +41,6 @@ export { evaluateFiringConditions } from "./firing.ts";
 export type { FiredQuestion } from "./firing.ts";
 export { buildPosture, postureFor, reconcilePostureOnBaseSwitch } from "./posture.ts";
 export type { InheritancePosture, PostureEntry, PostureFacet } from "./posture.ts";
-export { classifyBaseScript } from "./firing.ts";
-export type { ScriptClassification } from "./firing.ts";
+export type { BaseScriptPosture } from "../survey/questions/a/il_target_script.ts";
 export { InheritancePostureStep, governedEntries } from "./InheritancePostureStep.tsx";
 export type { InheritancePostureStepProps } from "./InheritancePostureStep.tsx";

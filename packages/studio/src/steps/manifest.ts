@@ -1,24 +1,24 @@
-// manifest — the single ordered list of all survey steps.
+// manifest — the survey steps, in DERIVED order (not a hand-ordered list).
 //
-// T024 (P4b foundation). This is the ONE source of survey ordering (FR-008,
-// FR-012). The runtime (T028) and the dashboard (T031) both read this array.
-// Editing this file changes the order in both places simultaneously —
-// "map == runtime by construction" (FR-010).
+// The decision registry is the single source of order (spec 087 Q3, SC-003).
+// Each step below is a declaration — component, inputs, writes, persistence —
+// held in an unordered pool. Its provides / requires / gatedBy come from
+// steps/stepDependencies.ts, and `manifest` is the pool sorted by the same
+// sort that orders questions (steps/stepOrder.ts → decisions/orderDecisions.ts).
+// Nothing in this file says what comes before what.
 //
-// SPINE ORDER (FR-012, M2):
-//   Identity → layout → choose base → Track → [project_name (spine:false)] →
-//   Characters (Phase A/B questions) → Marks → Punctuation → Invisibles →
-//   Convenience → Carve → Mechanisms → [lock: "physical"] →
-//   touch_seed_source (spine:false) → touch →
-//   [lock: "touch"] → Help → Package (reserved)
+// The runtime (T028) and the dashboard (T031) both read `manifest`. Editing a
+// step's declarations changes the step structure in both places
+// simultaneously — "map == runtime by construction" (FR-010).
+//
+// Side trails are DERIVED: a step with a `gatedBy` is a side trail and rejoins
+// at the next ungated step (project_name -> characters, touch_seed_source ->
+// touch). The resulting main line is pinned, as frozen literals, by
+// stepOrder.parity.test.ts.
 //
 // S-03 sequences build inline in MechanismGallery's method chooser (the
 // right-hand preview pane swaps for a one-character sequence builder while
-// that method is selected) — there is no separate "sequences" spine step.
-//
-// Side-trail steps (spine:false) in position order:
-//   project_name — copy-track only; joinTarget: "characters"
-//   touch_seed_source — touch-seed fork; joinTarget: "touch"
+// that method is selected) — there is no separate "sequences" step.
 //
 // Boundary: steps/ -> editors/ and steps/ -> survey/ are allowed.
 // steps/ -> stores/, lib/, components/ are forbidden.
@@ -28,6 +28,8 @@ import type { Step } from "./types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
 import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
+import { stepDependencies } from "./stepDependencies.ts";
+import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
 import { PunctuationStep } from "../survey/punctuation/PunctuationStep.tsx";
 import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
 import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
@@ -59,12 +61,12 @@ import {
 // for its internal routing — these are legitimately intra-phase screens.
 // ---------------------------------------------------------------------------
 
-/** Spine placeholder for the Phase A/B character-inventory question battery. */
+/** Placeholder step for the Phase A/B character-inventory question battery. */
 const charactersStep: Step = {
   kind: "editor-step",
   id: "characters",
+  ...stepDependencies("characters"),
   title: "Characters",
-  spine: true,
   inputs: [],
   // DEC-D1 (subsumption, Matt 2026-06-29): the opaque charactersStep subsumes the
   // Phase A/B questions, including iso_code (iso_code.ts:80) which writes
@@ -79,8 +81,8 @@ const charactersStep: Step = {
   // CharactersStep component — self-contained prefill/PhaseB substage adapter
   // (spec 027 Stage 4; first runtime use of step.component).
   component: CharactersStep,
-  // phase_b_characters runs inside the characters step (spec 024, Stage 1).
-  flowRefs: ["phase_b_characters"],
+  // phase_b_characters runs inside the characters step (spec 024, Stage 1);
+  // its flowRefs come from stepDependencies.
   // Right pane swaps from the live OSK preview to the interactive character
   // map for the Phase B build-list screen only (SurveyView further gates this
   // on discoveryMethod === "build-list" — the manual step-by-step path and the
@@ -95,25 +97,27 @@ const charactersStep: Step = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Manifest: the ordered Step[] (FR-008, FR-012)
+// Step declarations: an UNORDERED pool (FR-008)
 //
-// Rules encoded here:
-//   M2 — spine order: Identity → layout → choose_base → track → Characters → Marks →
-//         Punctuation → Invisibles → Convenience → Carve → Mechanisms → (lock physical) →
-//         touch → (lock touch) → Help → Package
+// Nothing here says what comes before what. Order, side-trail membership and
+// join targets are derived from provides/requires/gatedBy
+// (steps/stepDependencies.ts -> steps/stepOrder.ts). The comments on individual
+// steps describe WHY a step needs what it needs, not where it sits.
+//
+// Rules still validated on the derived order (validateManifestShape):
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
-//   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
-//   M4b — project_name is spine:false with joinTarget:"characters" (copy-track fork).
+//   M5 — unique ids.
+//   plus: the pool and the dependency table name exactly the same steps.
 // ---------------------------------------------------------------------------
 
-export const manifest: readonly Step[] = [
+const stepPool: readonly Step[] = [
   // --- Identity panel ---
   identityStep,
 
   // --- Community keyboard layout (spec 076 A4) ---
-  // Right after Identity, before any base or carve work: which Windows layout
-  // the community's typists use. Proposed from the identity language tag and
-  // confirmed by the author; feeds the FR-023 likely-host resolution.
+  // Which Windows layout the community's typists use. Proposed from the
+  // identity language tag and confirmed by the author; feeds the FR-023
+  // likely-host resolution that carve, the rules demo and mechanisms read.
   layoutStep,
 
   // --- Base selection (base picker only) ---
@@ -122,30 +126,26 @@ export const manifest: readonly Step[] = [
   // --- Track selection (copy vs adapt) ---
   trackStep,
 
-  // --- Project name (off-spine, copy-track only; adapt-track skips to characters) ---
-  // spine:false — CYOA fork: copy-track takes this step, adapt-track bypasses it.
-  // joinTarget: "characters" — both branches reconverge at the characters spine step.
-  {
-    ...projectNameStep,
-    spine: false,
-    joinTarget: "characters",
-  } satisfies Step,
+  // --- Project name (copy-track only) ---
+  // Gated side trail (stepDependencies): copy-track takes this step, adapt-track
+  // bypasses it, and both reconverge at the next ungated step.
+  projectNameStep,
 
   // --- Character inventory (Phase A / Phase B question battery) ---
   charactersStep,
 
   // --- Marks series (spec 071: S0-S5 accent/mark question series) ---
-  // Runs immediately after alphabet confirmation, BEFORE carve: how the author
+  // Needs the confirmed alphabet, and carve needs its answer: how the author
   // thinks of the combined letters must be known before any key work begins.
   // S0 is a computed gate INSIDE the step component: a marks-free alphabet
-  // completes the step immediately (no render), so the spine hop is invisible
+  // completes the step immediately (no render), so the hop is invisible
   // for the no-diacritic majority case (FR-005). Emits the PlacementWorklist
   // the mechanism gallery consumes (session.marksWorklist).
   {
     kind: "editor-step",
     id: "marks",
+    ...stepDependencies("marks"),
     title: "Accents & marks",
-    spine: true,
     inputs: [],
     // spec 078: the step's own write is the context-tolerance decision; these
     // are the paths the separate apply effect commits the accepted rules to.
@@ -171,8 +171,8 @@ export const manifest: readonly Step[] = [
   {
     kind: "editor-step",
     id: "punctuation",
+    ...stepDependencies("punctuation"),
     title: "Punctuation",
-    spine: true,
     inputs: [],
     writes: [],
     component: PunctuationStep,
@@ -199,8 +199,8 @@ export const manifest: readonly Step[] = [
   {
     kind: "editor-step",
     id: "invisibles",
+    ...stepDependencies("invisibles"),
     title: "Invisible characters",
-    spine: true,
     inputs: [],
     writes: [],
     component: InvisiblesStep,
@@ -215,14 +215,14 @@ export const manifest: readonly Step[] = [
   // need A-Z for borrowed words, email addresses, and web addresses" answer
   // has to exist BEFORE the recommendations are computed. Like the marks
   // series' S0, the gate is computed INSIDE the step component: a base with no
-  // surplus basic-Latin letters completes immediately (no render), so the spine
+  // surplus basic-Latin letters completes immediately (no render), so the
   // hop is invisible whenever there is nothing to ask. Emits the retained list
   // the carve gallery shields (session.retainedConvenienceChars).
   {
     kind: "editor-step",
     id: "convenience",
+    ...stepDependencies("convenience"),
     title: "Convenience letters",
-    spine: true,
     inputs: [],
     writes: [],
     component: ConvenienceCharsStep,
@@ -238,15 +238,14 @@ export const manifest: readonly Step[] = [
   carveStep,
 
   // --- Deadkeys (spec 083: deadkey lifecycle, beside carve) ---
-  // Placement: immediately after carve — the deadkeys surface is the trim
-  // track's deadkey companion (define deadkeys for carve-retained keys,
-  // manage existing/imported ones), before physical mechanism assignment
-  // (Phase C), which consumes deadkeys via the accented-char flow.
+  // The deadkeys surface is the trim track's deadkey companion (define
+  // deadkeys for carve-retained keys, manage existing/imported ones); physical
+  // mechanism assignment (Phase C) consumes deadkeys via the accented-char flow.
   deadkeysStep,
 
   // --- Rules (Phase E: before/after rule demo + rule list/builder) ---
-  // Placement: after deadkeys — the demo pane + rule builder show what the
-  // working copy's rules do before the author assigns mechanisms.
+  // The demo pane + rule builder show what the working copy's rules do,
+  // including the deadkeys just defined, before the author assigns mechanisms.
   rulesStep,
 
   // --- Mechanisms (Phase C: physical key assignment) ---
@@ -256,10 +255,9 @@ export const manifest: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
-  // --- Touch seed source (off-spine fork, FR-013, M4) ---
-  // spine:false — side trail that lets the author choose the touch seed.
-  // joinTarget: "touch" — rejoins the spine at the touch carve+add step.
-  // Both branches converge on the same touch carve/add shell.
+  // --- Touch seed source (gated side-trail fork, FR-013) ---
+  // Lets the author choose the touch seed while no choice is recorded; both
+  // branches converge on the same touch carve/add shell.
   touchSeedSourceStep,
 
   // --- Touch carve+add (Phase E: touch key assignment) ---
@@ -274,10 +272,30 @@ export const manifest: readonly Step[] = [
 
   // --- Package (reserved, out of scope for v1) ---
   packageStep,
-] as const;
+];
+
+/**
+ * The steps in derived order: the pool sorted by STEP_ORDER (which is derived
+ * from each step's provides/requires, never listed by hand). A pool/table
+ * mismatch is a hard error at module load.
+ */
+export const manifest: readonly Step[] = ((): readonly Step[] => {
+  if (stepPool.length !== STEP_ORDER.length) {
+    throw new Error(
+      `[manifest] ${stepPool.length} steps declared but ${STEP_ORDER.length} in stepDependencies`,
+    );
+  }
+  return STEP_ORDER.map((id) => {
+  const found = stepPool.find((s) => s.id === id);
+  if (found === undefined) {
+    throw new Error(`[manifest] step "${id}" is declared in stepDependencies but has no step`);
+  }
+  return found;
+  });
+})();
 
 // ---------------------------------------------------------------------------
-// validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4, M4b, M5).
+// validateManifestShape — throw-on-mismatch structural guard (M3, M5, layout).
 //
 // The ONE structural invariant check over the manifest. Called once at module
 // load by StudioShell (a misshapen manifest is a hard error, not a logged
@@ -285,46 +303,31 @@ export const manifest: readonly Step[] = [
 // the invariant is directly unit-testable (spec 034 T003 / SR-1, SR-2, SR-5)
 // without importing the whole SPA shell; it depends only on `manifest`, so it
 // stays boundary-clean here in steps/.
+//
+// The order itself is not asserted here: it is derived, and stepOrder.parity
+// .test.ts pins the derivation against a frozen literal. What stays here are
+// validations ON the derived order.
 // ---------------------------------------------------------------------------
 
 export function validateManifestShape(): void {
   const ids = manifest.map((s) => s.id);
-  const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
 
-  // M2 — spine order.
-  const expectedSpine = [
-    "identity", "layout", "choose_base", "track", "characters",
-    "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch", "help", "package",
-  ];
-  for (let i = 0; i < expectedSpine.length; i++) {
-    const expected = expectedSpine[i];
-    if (expected === undefined) break;
-    const actual = spineIds[i];
-    if (actual !== expected) {
-      throw new Error(
-        `[manifest] spine[${i}] expected "${expected}", got "${actual ?? "(none)"}"`,
-      );
+  // The array is the derived order, and every derived side trail can rejoin.
+  if (ids.length !== STEP_ORDER.length || ids.some((id, i) => id !== STEP_ORDER[i])) {
+    throw new Error(`[manifest] manifest order is not the derived STEP_ORDER`);
+  }
+  for (const [id, trail] of STEP_TRAILS) {
+    if (!trail.spine && trail.joinTarget === undefined) {
+      throw new Error(`[manifest] gated step "${id}" has no ungated successor to rejoin at`);
     }
   }
 
-  // M3 — exactly one lock:physical and one lock:touch, in that order.
+  // M3 — exactly one lock:physical and one lock:touch, in that (derived) order.
   const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
   if (locks[0] !== "physical" || locks[1] !== "touch" || locks.length !== 2) {
     throw new Error(
       `[manifest] locks expected ["physical","touch"], got [${locks.join(",")}]`,
     );
-  }
-
-  // M4 — touch_seed_source is spine:false with joinTarget "touch".
-  const seedSource = manifest.find((s) => s.id === "touch_seed_source");
-  if (seedSource === undefined || seedSource.spine !== false || seedSource.joinTarget !== "touch") {
-    throw new Error(`[manifest] touch_seed_source missing or misconfigured`);
-  }
-
-  // M4b — project_name is spine:false with joinTarget "characters".
-  const projName = manifest.find((s) => s.id === "project_name");
-  if (projName === undefined || projName.spine !== false || projName.joinTarget !== "characters") {
-    throw new Error(`[manifest] project_name missing or misconfigured (must be spine:false, joinTarget:"characters")`);
   }
 
   // M5 — unique ids.

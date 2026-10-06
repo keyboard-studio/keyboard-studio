@@ -88,3 +88,6 @@ lib/ucd/*
 !lib/ucd/Blocks.txt
 !lib/ucd/DerivedAge.txt
 !lib/ucd/UnicodeData.txt
+
+.vercel
+.env*

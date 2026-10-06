@@ -12,7 +12,7 @@
 // posture-entry mutator.
 
 import type { AdaptationEvidence } from "./evidence.ts";
-import { dominantEntry } from "./evidence.ts";
+import { extractBaseScriptPosture } from "../survey/questions/a/il_target_script.ts";
 import { TRUST_POLICY_DEFAULTS, type TrustPolicy } from "./trustPolicy.ts";
 
 export type PostureFacet = "script" | "input-strategies" | "device-targets" | "script-conventions";
@@ -48,18 +48,18 @@ export function buildPosture(
 ): InheritancePosture {
   const { distribution, residue } = evidence.strategyFingerprint;
   const hasFingerprint = residue < 1 && Object.keys(distribution).length > 0;
-  const [domScript, domShare] = dominantEntry(evidence.baseScriptDistribution);
+  const script = extractBaseScriptPosture(evidence.baseScriptDistribution, policy.singleScriptThreshold);
   const deviceMatch = sameSet(evidence.baseTargetMix, evidence.statedDeviceMix);
 
   const entries: PostureEntry[] = [
     {
       facet: "script",
-      // Re-derive for the chosen target unless the base is at or above the same
-      // single-script threshold classifyBaseScript (firing.ts) uses — the two
+      // Re-derive for the chosen target unless the base is single-script under
+      // the same extraction (extractBaseScriptPosture) q_sa2 reads — the two
       // paths must agree on what counts as "cleanly single-script".
-      posture: domShare >= policy.singleScriptThreshold ? "keep" : "propose",
+      posture: script.posture === "single-script" ? "keep" : "propose",
       source: "default",
-      provenance: `base script: ${domScript || "unknown"} (${Math.round(domShare * 100)}% of rules)`,
+      provenance: `base script: ${script.dominantScript || "unknown"} (${Math.round(script.dominantShare * 100)}% of rules)`,
     },
     {
       facet: "input-strategies",

@@ -250,21 +250,22 @@ function useRoute(): RouteId {
 // ---------------------------------------------------------------------------
 // SurveyView — manifest-driven survey runtime (T028, FR-009, M1)
 //
-// Step order, spine membership, lock placement, and branching all derive from
-// steps/manifest.ts. No SurveyStage union remains — the active step is tracked
+// Step order, spine membership and side-trail join targets are DERIVED from the
+// steps' provides/requires/gatedBy (steps/stepDependencies.ts, steps/stepOrder.ts);
+// lock placement comes from steps/manifest.ts. No SurveyStage union remains — the active step is tracked
 // as a manifest step id (ActiveStepId) with one sub-stage for the "characters"
 // step (which contains an internal prefill→B flow — intra-phase routing handled
 // by the SurveyRunner, legitimately not promoted to manifest steps).
 //
-// Manifest spine order (FR-012, M2):
-//   identity → choose_base → track → characters → marks → punctuation →
-//   invisibles → convenience → carve → mechanisms[lock:physical] →
-//   touch[lock:touch] → help → package[reserved]
+// Derived main line (FR-012; pinned by steps/stepOrder.parity.test.ts):
+//   identity → layout → choose_base → track → characters → marks →
+//   punctuation → invisibles → convenience → carve → deadkeys → rules →
+//   mechanisms[lock:physical] → touch[lock:touch] → help → package[reserved]
 //   (sequences build inline in the mechanism gallery — no spine step)
 //
-// Off-spine (spine:false) steps in array order:
-//   project_name  — copy-track CYOA fork; joinTarget:"characters"
-//   touch_seed_source — touch-seed fork; joinTarget:"touch"
+// Gated side-trail steps (derived: a step with a gatedBy):
+//   project_name  — copy-track CYOA fork; rejoins at "characters"
+//   touch_seed_source — touch-seed fork; rejoins at "touch"
 //
 // Track/project_name routing:
 //   copy-track:  choose_base → track → project_name → characters
@@ -315,7 +316,7 @@ validateManifestShape();
 // manifest shape guard so a phase/manifest drift is caught before any render.
 validatePhaseMap();
 
-// manifestIndexOf and nextSpineStepAfter have moved to steps/advance.ts
+// manifestIndexOf and nextMainLineStepAfter have moved to steps/advance.ts
 // (spec 028 Stage 5, T006). They are no longer needed in SurveyView.
 
 interface SurveyViewProps {

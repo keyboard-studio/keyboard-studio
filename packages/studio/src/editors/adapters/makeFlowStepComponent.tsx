@@ -5,7 +5,8 @@
 //   makeFlowStepComponent(options) returns React.ComponentType<EditorStepProps>.
 //   The produced component:
 //     C2.2  Resolves flowSources[options.flowRef] — throws descriptive Error if absent.
-//     C2.3  loadModularFlow(source.raw) once, memoised via useMemo.
+//     C2.3  loadFlowSourceDef(source) once, memoised via useMemo (derived
+//           order when the source declares it, otherwise the thin YAML).
 //     C2.4  On completion: extract(result) → if undefined stay on step → onCommit?.(x,deps)
 //           → props.onComplete(result) — the UNTOUCHED SurveyPhaseResult, not the
 //           extracted x. This is the R7 ordering the golden-walk asserts. extract()/x exist
@@ -39,7 +40,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { FlowStepHost } from "../../survey/FlowStepHost.tsx";
-import { loadModularFlow } from "../../survey/loadModularFlow.ts";
+import { loadFlowSourceDef } from "../../steps/flowSources.ts";
 import { flowSources } from "../../steps/flowSources.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -233,9 +234,10 @@ export function makeFlowStepComponent<Extracted>(
   // ---------------------------------------------------------------------------
 
   function FlowStepComponent({ onComplete, onBack }: EditorStepProps): React.ReactElement | null {
-    // C2.3 — load the flow once, memoised.
+    // C2.3 — load the flow once, memoised. Derived order when the source
+    // declares it (spec 087 T040), otherwise the thin YAML.
     // capturedSource is bound at factory-call time; stable for this component's lifetime.
-    const flow = useMemo(() => loadModularFlow(capturedSource.raw), []);
+    const flow = useMemo(() => loadFlowSourceDef(capturedSource), []);
 
     // Resolve the heading for the active locale (Tier A chrome). Falls back to
     // the plain English title when this flow has no catalog entry.

@@ -1,6 +1,7 @@
 // Derive the §9 script → routing-group table from the survey's own data.
 //
-// The script choices come from identity_lite.modular.yaml's `il_target_script`
+// The script choices come from the identity_lite flow's `il_target_script`
+// question (order derived, spec 087 — the thin YAML list was deleted).
 // options; each is run through the same scriptAxes helpers the engine uses
 // (normalizeTargetScript, routingGroupOf, scriptClassOf), and the "not yet
 // supported" gate is read back out of that question's own branching (a script
@@ -8,7 +9,7 @@
 // hand-typed per script, so adding a script option to the YAML adds a row to
 // the map.
 
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
+import type { FlowDef } from "../survey/types.ts";
 import type { FlowGotoRule, FlowQuestion } from "../survey/types.ts";
 import {
   normalizeTargetScript,
@@ -54,11 +55,10 @@ function resolveGoto(next: FlowQuestion["next"], value: string): string | null {
 }
 
 /**
- * Build the script-routing table from the identity-lite modular flow manifest.
- * @param raw the `?raw` identity_lite.modular.yaml source.
+ * Build the script-routing table from the identity-lite flow.
+ * @param flow the loaded identity-lite FlowDef (derived order, spec 087).
  */
-export function buildScriptRouting(raw: string): ScriptRoutingRow[] {
-  const flow = loadModularFlow(raw);
+export function buildScriptRouting(flow: FlowDef): ScriptRoutingRow[] {
   const byId = new Map(flow.questions.map((q) => [q.id, q]));
   const target = byId.get(ID_TARGET_SCRIPT);
   if (target === undefined || !Array.isArray(target.options)) return [];

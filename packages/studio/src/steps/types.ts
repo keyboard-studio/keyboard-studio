@@ -7,6 +7,7 @@
 
 import type { IRPath } from "@keyboard-studio/contracts";
 import type { SurveyContext } from "../survey/types.ts";
+import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { EvidenceKeyFnId } from "./evidence.ts";
 
 // Re-export SurveyContext so consumers can import from one place.
@@ -53,19 +54,26 @@ export interface StepBase {
   /** Human label (dashboard + chrome). */
   title: string;
   /**
-   * true = on the main spine; false / absent = side trail (needs joinTarget).
-   * Default: false (side trail).
+   * Decisions this step settles: its flows' question decisions plus any it
+   * settles itself. Step order is DERIVED from provides/requires by the same
+   * sort that orders questions (steps/stepOrder.ts); there is no hand-ordered
+   * list. Declared in steps/stepDependencies.ts and spread onto the step.
    */
-  spine?: boolean;
+  provides?: readonly DecisionId[];
+  /** Decisions that must be settled before this step runs (real preconditions only). */
+  requires?: readonly DecisionId[];
+  /**
+   * Present when the step is asked only for some answers. A gated step is a
+   * side trail; it rejoins the main line at the next ungated step in the
+   * derived order (steps/stepOrder.ts `deriveStepStructure`).
+   */
+  gatedBy?: (decisions: DecisionSet) => boolean;
   /**
    * Lock gate placed AFTER this step completes. Only two locks exist in the flow
-   * (spec §3.5): "physical" and "touch". Spine steps only.
+   * (spec §3.5): "physical" and "touch". A validation on the derived order
+   * (manifest M3), never an ordering input.
    */
   lock?: "physical" | "touch";
-  /**
-   * Required when spine === false. The spine step id this side trail rejoins.
-   */
-  joinTarget?: string;
   /** IR locations this step reads — reused from the P2 QuestionModule contract (G5). */
   inputs: readonly IRPath[];
   /** IR locations this step will populate — declared now, executed in P5 (G5). */

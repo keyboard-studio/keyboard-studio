@@ -24,6 +24,7 @@
 // il_language_autonym.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { ExtractContext } from "../../../decisions/extractContext.ts";
 
 export const definition = {
   id: "il_language_english",
@@ -61,6 +62,23 @@ export function validate(
   return { ok: true };
 }
 
+// Decision spike (km/decisions-spike): base-keyboard probe. The catalog entry
+// carries language TAGS, not names, so the primary (first) tag — the same one
+// il_language_code extracts — is resolved to its English name through the
+// langtags dataset via ctx.resolveLanguageName (question modules may not import
+// lib/). The dataset loads lazily (FR-011) and extract() is synchronous, so the
+// resolver reads the already-loaded module; undefined (author is asked) when it
+// has not loaded or the tag is absent. The IR's
+// &NAME is the KEYBOARD's name, not the language's, so it is deliberately not
+// used as a fallback. The result must pass this module's own validate().
+export function extractLanguageName(ctx: ExtractContext): string | undefined {
+  const tag = ctx.catalog?.languages?.[0] ?? ctx.ir?.header.bcp47[0];
+  const subtag = tag?.split("-")[0]?.toLowerCase();
+  if (!subtag) return undefined;
+  const name = ctx.resolveLanguageName?.(subtag)?.trim();
+  return name && validate(name).ok ? name : undefined;
+}
+
 // mutate: STUB — KeyboardIR mutation surface is not yet a real contract.
 
 export const fixtures: QuestionModule["fixtures"] = {
@@ -90,5 +108,8 @@ const mod: QuestionModule = {
   writes: [],
   outputs: [{ target: "package-descriptor", field: "languageName" }],
   specRef: "specs/030-langtags-identity-autocomplete",
+  // Decision spike (km/decisions-spike): anchor of the dependency chain.
+  provides: ["language-name"],
+  extract: extractLanguageName,
 };
 export default mod;

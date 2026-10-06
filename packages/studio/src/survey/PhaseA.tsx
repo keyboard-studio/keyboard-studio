@@ -1,6 +1,6 @@
 // Phase A survey wrapper — Identity + routing (spec §8 step 3).
 //
-// Loads phase_a_identity.yaml, runs it through SurveyRunner, and on completion
+// Loads the phase_a_identity flow (derived order), runs it through SurveyRunner, and on completion
 // derives KeyboardProvenance + routing_group / script_family from the answers.
 //
 // Outputs:
@@ -19,7 +19,7 @@ import type {
   LangtagsProvenance,
 } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
-import { loadModularFlow } from "./loadModularFlow.ts";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { SurveyContext } from "./types.ts";
 import { phaseContainer, phaseHeading } from "./surveyStyles.ts";
 import {
@@ -28,10 +28,6 @@ import {
 } from "../lib/langtagsDefaults.ts";
 import { primarySubtag } from "../lib/suggestBase.ts";
 import { answerString } from "./answerString.ts";
-
-// Vite ?raw import — YAML source as a plain string, no network request.
-// Typed via the `*.yaml?raw` module declaration in src/vite-env.d.ts.
-import phaseARaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
 
 // Shared caption descriptor for every langtags-derived seed (spec 030
 // FR-010), mirroring IdentityLite.tsx's LANGTAGS_CAPTION. Resolved to a plain
@@ -210,7 +206,7 @@ export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId 
   const i18nRef = useRef(i18n);
   i18nRef.current = i18n;
 
-  const flow = useMemo(() => loadModularFlow(phaseARaw as string), []);
+  const flow = useMemo(() => loadFlowSourceDef(flowSources["phase_a_identity"]!), []);
 
   // ---------------------------------------------------------------------------
   // Langtags seeding for Phase A (T019 / T020 / US2)

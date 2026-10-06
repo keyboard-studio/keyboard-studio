@@ -32,6 +32,7 @@ import type {
   LanguageSummary,
 } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
+import { evalConditionGrammar } from "./conditionGrammar.ts";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import {
@@ -79,38 +80,13 @@ export function evalCondition(
   ctx: SurveyContext,
 ): boolean {
   const strVal = typeof value === "string" ? value : Array.isArray(value) ? value.join(",") : "";
-
-  // Split on " or " (lowest precedence) — any sub-clause matching means true
-  const orClauses = condition.split(" or ");
-  if (orClauses.length > 1) {
-    return orClauses.some((c) => evalCondition(c.trim(), value, ctx));
-  }
-
-  // Split on " and " — all sub-clauses must match
-  const andClauses = condition.split(" and ");
-  if (andClauses.length > 1) {
-    return andClauses.every((c) => evalCondition(c.trim(), value, ctx));
-  }
-
-  const eq = condition.match(/^(value|ctx\.\w+)\s*==\s*'([^']*)'$/);
-  if (eq !== null) {
-    // lhs is guaranteed by the regex capture group — non-null assertion is safe
-    const lhs = eq[1]!;
-    const rhs = eq[2]!;
-    const lhsVal = lhs === "value" ? strVal : ctx[lhs.slice(4)] ?? "";
-    return lhsVal === rhs;
-  }
-
-  const ne = condition.match(/^(value|ctx\.\w+)\s*!=\s*'([^']*)'$/);
-  if (ne !== null) {
-    // lhs is guaranteed by the regex capture group — non-null assertion is safe
-    const lhs = ne[1]!;
-    const rhs = ne[2]!;
-    const lhsVal = lhs === "value" ? strVal : ctx[lhs.slice(4)] ?? "";
-    return lhsVal !== rhs;
-  }
-
-  return false;
+  return (
+    evalConditionGrammar(
+      condition,
+      (lhs) => (lhs === "value" ? strVal : ctx[lhs.slice(4)] ?? ""),
+      false,
+    ) === true
+  );
 }
 
 // ---------------------------------------------------------------------------

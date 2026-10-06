@@ -51,5 +51,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [irPath("header", "bcp47")],
   writes: [],
+  provides: ["reserve-layout-family"],
+  requires: ["reserve-primary-script"],
 };
 export default mod;

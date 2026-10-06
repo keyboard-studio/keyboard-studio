@@ -52,5 +52,5 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["sa2-base-script-mismatch"] };
 export default mod;

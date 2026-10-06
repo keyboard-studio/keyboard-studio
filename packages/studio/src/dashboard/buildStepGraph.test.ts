@@ -1,31 +1,24 @@
 import { describe, it, expect } from "vitest";
 
-import identityLiteModularRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
-import phaseAModularRaw from "../../../../content/flows/proposed/phase_a_identity.modular.yaml?raw";
-import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
-import phaseFModularRaw from "../../../../content/flows/phase_f_helpdocs.modular.yaml?raw";
 
-import { buildModularFlowGraph, buildGraphFromQuestions, buildManifestStepGraph } from "./buildStepGraph.ts";
+import { buildDerivedFlowGraph, buildGraphFromQuestions, buildManifestStepGraph } from "./buildStepGraph.ts";
 import { buildScriptRouting } from "./buildScriptRouting.ts";
-import { loadModularFlow } from "../survey/loadModularFlow.ts";
-import { phaseARegistry } from "../survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../survey/questions/registry.f.ts";
-import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
+import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { manifest } from "../steps/manifest.ts";
+import { STEP_TRAILS } from "../steps/stepOrder.ts";
 
 // ---------------------------------------------------------------------------
 // INV-1 helper: assert that the live node set exactly equals the manifest ids
 // ---------------------------------------------------------------------------
 
 function assertLiveNodeSetEqualsManifest(
-  modularRaw: string,
+  entry: { flowDef: FlowDef },
   registry: Readonly<Record<string, import("../survey/types.ts").QuestionModule>>,
   label: string,
 ) {
-  const graph = buildModularFlowGraph(modularRaw, label, registry);
-  const liveFlow = loadModularFlow(modularRaw);
+  const graph = buildGraphForEntry({ ...entry, title: label, registry });
+  const liveFlow = loadFlowForEntry(entry);
   // Include provenance_questions in the expected live ids (buildGraphFromQuestions
   // includes them so goto targets resolve).
   const expectedIds = new Set([
@@ -43,17 +36,46 @@ function assertLiveNodeSetEqualsManifest(
 // All-flows modular table
 // ---------------------------------------------------------------------------
 
+// identity_lite now derives its order (spec 087 T040) — the test builds the
+// FlowDef through the production flowSources entry, exercising the real path.
+const identityLiteFlow = loadFlowSourceDef(flowSources["identity_lite"]!);
+
+function buildGraphForEntry(entry: {
+  flowDef: FlowDef;
+  title: string;
+  registry: Readonly<Record<string, import("../survey/types.ts").QuestionModule>>;
+}) {
+  return buildDerivedFlowGraph(entry.flowDef, entry.title, entry.registry);
+}
+
+function loadFlowForEntry(entry: { flowDef: FlowDef }): FlowDef {
+  return entry.flowDef;
+}
+
+// Per-flow registries come from the production flowSources entries.
+const phaseARegistry = flowSources["identity_lite"]!.registry;
+const phaseBRegistry = flowSources["phase_b_characters"]!.registry;
+const phaseFRegistry = flowSources["phase_f_helpdocs"]!.registry;
+const phaseTrackRegistry = flowSources["track"]!.registry;
+const phaseProjectRegistry = flowSources["project_name"]!.registry;
+const reserveRegistry = flowSources["phase_a_identity"]!.registry;
+
 const ALL_FLOWS = [
   // identity_lite keys off the il_*-only phaseARegistry in production (steps/flowSources.ts).
-  { raw: identityLiteModularRaw, title: "Identity-lite", registry: phaseARegistry },
+  { flowDef: identityLiteFlow, title: "Identity-lite", registry: phaseARegistry },
   // phase_a_identity (the demoted battery) keys off reserveRegistry in production.
-  { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry },
-  { raw: phaseBModularRaw, title: "Phase B", registry: phaseBRegistry },
-  { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry },
+  { flowDef: loadFlowSourceDef(flowSources["phase_a_identity"]!), title: "Phase A", registry: reserveRegistry },
+  // Phase B derives its order (spec 087), built through flowSources.
+  { flowDef: loadFlowSourceDef(flowSources["phase_b_characters"]!), title: "Phase B", registry: phaseBRegistry },
+  // phase_f_helpdocs derives its order (spec 087) � built through flowSources.
+  { flowDef: loadFlowSourceDef(flowSources["phase_f_helpdocs"]!), title: "Phase F", registry: phaseFRegistry },
+  // Phase G flows derive their order (spec 087) — built through flowSources.
+  { flowDef: loadFlowSourceDef(flowSources["track"]!), title: "Track selection", registry: phaseTrackRegistry },
+  { flowDef: loadFlowSourceDef(flowSources["project_name"]!), title: "Project name", registry: phaseProjectRegistry },
 ];
 
-describe("buildModularFlowGraph — identity_lite (fully specified)", () => {
-  const g = buildModularFlowGraph(identityLiteModularRaw, "Identity-lite", phaseARegistry);
+describe("buildDerivedFlowGraph — identity_lite (fully specified)", () => {
+  const g = buildDerivedFlowGraph(identityLiteFlow, "Identity-lite", phaseARegistry);
 
   it("uses the first question as the entry", () => {
     // spec 030 FR-009: the English-name picker (il_language_english) is the
@@ -76,10 +98,11 @@ describe("buildModularFlowGraph — identity_lite (fully specified)", () => {
   });
 });
 
-describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
-  for (const { raw, title, registry } of ALL_FLOWS) {
+describe("buildDerivedFlowGraph — every shipped flow (INV-1)", () => {
+  for (const entry of ALL_FLOWS) {
+    const { title, registry } = entry;
     it(`${title}: builds with a defined entry and no dangling goto targets`, () => {
-      const g = buildModularFlowGraph(raw, title, registry);
+      const g = buildGraphForEntry(entry);
       expect(g.nodes.length).toBeGreaterThan(0);
       expect(g.entryId).not.toBeNull();
       // Every goto must resolve to a real question — a dangling target is an
@@ -88,23 +111,24 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
     });
 
     it(`${title}: INV-1 — live node ids equal manifest question ids`, () => {
-      assertLiveNodeSetEqualsManifest(raw, registry, title);
+      assertLiveNodeSetEqualsManifest(entry, registry, title);
     });
   }
 
   const reserveTestCases = [
-    { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry, includeProvenance: true },
-    { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry, includeProvenance: false },
+    { flowDef: loadFlowSourceDef(flowSources["phase_a_identity"]!), title: "Phase A", registry: reserveRegistry, includeProvenance: true },
+    { flowDef: loadFlowSourceDef(flowSources["phase_f_helpdocs"]!), title: "Phase F", registry: phaseFRegistry, includeProvenance: false },
     // identity-lite keys off the il_*-only phaseARegistry in production, so its
     // reserve set is empty (the demoted battery is Leftover, not drill-down clog —
     // spec 022 / phaseADemoteReserve.test.ts). expectedReserve computes to {} here.
-    { raw: identityLiteModularRaw, title: "identity-lite", registry: phaseARegistry, includeProvenance: false },
+    { flowDef: identityLiteFlow, title: "identity-lite", registry: phaseARegistry, includeProvenance: false },
   ];
 
-  for (const { raw, title, registry, includeProvenance } of reserveTestCases) {
+  for (const entry of reserveTestCases) {
+    const { title, registry, includeProvenance } = entry;
     it(`${title} exposes reserve nodes: registry modules not in the manifest show as library-not-in-flow`, () => {
-      const g = buildModularFlowGraph(raw, title, registry);
-      const liveFlow = loadModularFlow(raw);
+      const g = buildGraphForEntry(entry);
+      const liveFlow = loadFlowForEntry(entry);
       const liveIds = new Set([
         ...liveFlow.questions.map((q) => q.id),
         ...(includeProvenance && liveFlow.provenance_questions ? liveFlow.provenance_questions.map((q) => q.id) : []),
@@ -122,19 +146,20 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
 // T010/T011: Phase B honesty — derived-equality + reserve + edge snapshot
 // ---------------------------------------------------------------------------
 
-describe("buildModularFlowGraph — Phase B honesty (FR-010)", () => {
+describe("buildDerivedFlowGraph — Phase B honesty (FR-010)", () => {
   // Build the modular Phase B graph once for all assertions in this suite.
-  const graph = buildModularFlowGraph(phaseBModularRaw, "Phase B — character discovery", phaseBRegistry);
+  const phaseBFlow = loadFlowSourceDef(flowSources["phase_b_characters"]!);
+  const graph = buildDerivedFlowGraph(phaseBFlow, "Phase B — character discovery", phaseBRegistry);
 
-  // Resolve the live id set independently (from loadModularFlow) for the
+  // Resolve the live id set independently (from the derived flow) for the
   // derived-equality assertion (FR-010 Part A).
-  const liveFlow = loadModularFlow(phaseBModularRaw);
+  const liveFlow = phaseBFlow;
   const liveIds = new Set(liveFlow.questions.map((q) => q.id));
 
   // Registry keys for the reserve computation (FR-010 Part B).
   const registryIds = new Set(Object.keys(phaseBRegistry));
 
-  it("FR-010 Part A — live node ids equal loadModularFlow resolved ids", () => {
+  it("FR-010 Part A — live node ids equal derived flow ids", () => {
     const liveNodeIds = new Set(
       graph.nodes.filter((n) => n.kind === "live").map((n) => n.id),
     );
@@ -255,10 +280,10 @@ describe("buildModularFlowGraph — Phase B honesty (FR-010)", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildScriptRouting — §9 split (INV-2: modular loader parity)", () => {
-  // INV-2: buildScriptRouting now uses identity_lite.modular.yaml via
-  // loadModularFlow. The routing rows must be identical to what the legacy
-  // loader produced — same script options, same gating decisions.
-  const rows = buildScriptRouting(identityLiteModularRaw);
+  // INV-2: buildScriptRouting now uses the derived identity_lite flow. The
+  // routing rows must be identical to what the legacy loader produced —
+  // same script options, same gating decisions.
+  const rows = buildScriptRouting(identityLiteFlow);
   const byValue = (v: string) => rows.find((r) => r.value === v);
 
   it("INV-2: produces a non-empty routing table from the modular manifest", () => {
@@ -336,11 +361,11 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
     expect(unique.size).toBe(ids.length);
   });
 
-  it("spine steps carry spine:true; off-spine steps carry spine:false", () => {
+  it("ungated steps carry spine:true; gated (side-trail) steps carry spine:false", () => {
     for (const node of graph.nodes) {
       const step = manifest.find((s) => s.id === node.id);
       expect(step).toBeDefined();
-      expect(node.spine).toBe(step!.spine === true);
+      expect(node.spine).toBe(STEP_TRAILS.get(step!.id)?.spine === true);
     }
   });
 
@@ -352,14 +377,14 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
     }
   });
 
-  it("joinTarget is preserved for off-spine steps", () => {
+  it("the derived joinTarget is carried onto off-spine steps", () => {
     const offSpine = graph.nodes.filter((n) => !n.spine);
     // There are at least two off-spine steps (project_name + touch_seed_source).
     expect(offSpine.length).toBeGreaterThanOrEqual(2);
     for (const node of offSpine) {
       const step = manifest.find((s) => s.id === node.id);
       expect(step).toBeDefined();
-      expect(node.joinTarget).toBe(step!.joinTarget);
+      expect(node.joinTarget).toBe(STEP_TRAILS.get(step!.id)?.joinTarget);
       // Every off-spine step must have a joinTarget.
       expect(node.joinTarget, `off-spine step "${node.id}" missing joinTarget`).toBeDefined();
     }

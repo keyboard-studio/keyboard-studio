@@ -23,5 +23,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["reserve-community-rep-role"], requires: ["reserve-community-rep-name"] };
 export default mod;
