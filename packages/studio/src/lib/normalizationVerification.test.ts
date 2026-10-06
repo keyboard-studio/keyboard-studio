@@ -27,7 +27,8 @@ describe("lookupNormalizationVerification", () => {
 });
 
 describe("generated regressed list", () => {
-  it.skipIf(!existsSync(RECORD))("matches the committed verification record", async () => {
+  it("matches the committed verification record", async () => {
+    expect(existsSync(RECORD), `committed verification record missing: ${RECORD}`).toBe(true);
     const codegen = (await import(pathToFileURL(join(REPO_ROOT, "scripts", "codegen-normalization-regressed.mjs")).href)) as {
       deriveRegressedList: (record: unknown) => unknown;
     };
