@@ -46,7 +46,7 @@ export interface ContextToleranceAnalysisOptions {
   /** Called with the entry to persist after the cache is consulted. */
   onNormalizationStored?: (stored: StoredNormalizationStep) => void;
   /** Looks up the committed verification record; defaults to `"unknown"`. */
-  verificationLookup?: (keyboardId: string, sourceHash: string) => NormalizationVerification | Promise<NormalizationVerification>;
+  verificationLookup?: (keyboardId: string) => NormalizationVerification | Promise<NormalizationVerification>;
 }
 
 /**
@@ -84,8 +84,7 @@ export async function analyseContextTolerance(
     if (lookup.stored !== null) options.onNormalizationStored?.(lookup.stored);
     stepCacheKey = lookup.cacheKey;
     if (lookup.result.kind === "step") {
-      const sourceHash = stepCacheKey.split("|")[0] ?? "";
-      const verdict = await (options.verificationLookup?.(analysedIr.header.keyboardId, sourceHash) ?? "unknown");
+      const verdict = await (options.verificationLookup?.(analysedIr.header.keyboardId) ?? "unknown");
       if (!isCurrent()) return null;
       if (verdict === "regressed") fallbackReason = "verification-regressed";
       else {

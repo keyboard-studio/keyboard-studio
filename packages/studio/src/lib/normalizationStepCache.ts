@@ -13,7 +13,35 @@ import type { KeyboardIR, NormalizationStepResult, StoredNormalizationStep } fro
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { normalizationStepCacheKey, proposeNormalizationStep } from "@keyboard-studio/engine/context-tolerance";
 
+/** Small LRU: an author edits one keyboard, so only the latest few sources are worth holding. */
+export const NORMALIZATION_STEP_MEMORY_LIMIT = 4;
+
 const memory = new Map<string, NormalizationStepResult>();
+/** Generator runs in flight, so concurrent requests on one key share a single run. */
+const inFlight = new Map<string, Promise<NormalizationStepResult>>();
+/**
+ * Time-bound refusals, per session. The refusal reflects this run's budget, not the
+ * source, so it is never persisted; remembering it here stops a pathological keyboard
+ * from re-running the generator for its full budget after every unrelated request.
+ * Any edit changes the key, which lifts the refusal.
+ */
+const timeBoundRefusals = new Map<string, NormalizationStepResult>();
+
+function remember(key: string, result: NormalizationStepResult): void {
+  memory.delete(key);
+  memory.set(key, result);
+  while (memory.size > NORMALIZATION_STEP_MEMORY_LIMIT) {
+    const oldest = memory.keys().next();
+    if (oldest.done === true) break;
+    memory.delete(oldest.value);
+  }
+}
+
+function recall(key: string): NormalizationStepResult | undefined {
+  const hit = memory.get(key);
+  if (hit !== undefined) remember(key, hit);
+  return hit;
+}
 
 export interface NormalizationStepLookup {
   result: NormalizationStepResult;
@@ -29,28 +57,48 @@ export async function getOrProposeNormalizationStep(
 ): Promise<NormalizationStepLookup> {
   const cacheKey = await normalizationStepCacheKey(ir);
 
-  const inMemory = memory.get(cacheKey);
+  const inMemory = recall(cacheKey);
   if (inMemory !== undefined) {
     devLog.info("[OK] normalization step cache hit (memory)");
     return { result: inMemory, cacheKey, stored: { cacheKey, result: inMemory }, source: "memory" };
   }
   if (snapshot != null && snapshot.cacheKey === cacheKey) {
-    memory.set(cacheKey, snapshot.result);
+    remember(cacheKey, snapshot.result);
     devLog.info("[OK] normalization step cache hit (snapshot)");
     return { result: snapshot.result, cacheKey, stored: snapshot, source: "snapshot" };
   }
 
-  const result = await proposeNormalizationStep(ir);
+  const refused = timeBoundRefusals.get(cacheKey);
+  if (refused !== undefined) {
+    return { result: refused, cacheKey, stored: null, source: "memory" };
+  }
+
+  let pending = inFlight.get(cacheKey);
+  if (pending === undefined) {
+    pending = proposeNormalizationStep(ir).finally(() => {
+      inFlight.delete(cacheKey);
+    });
+    inFlight.set(cacheKey, pending);
+  }
+  const result = await pending;
   // A time-bound refusal is a property of this run's budget, not of the source,
-  // so it is cached neither in memory nor in the snapshot: a later request may succeed.
+  // so it is never persisted in the snapshot; it is held for the session only.
   if (result.kind === "refused" && result.reason === "time-bound") {
+    timeBoundRefusals.set(cacheKey, result);
     return { result, cacheKey, stored: null, source: "generated" };
   }
-  memory.set(cacheKey, result);
+  remember(cacheKey, result);
   return { result, cacheKey, stored: { cacheKey, result }, source: "generated" };
 }
 
-/** Test-only: clear the in-memory map. */
+/** Test-only: number of entries in the memory LRU. */
+export function normalizationStepMemorySizeForTests(): number {
+  return memory.size;
+}
+
+/** Test-only: clear every in-memory structure. */
 export function resetNormalizationStepCacheForTests(): void {
   memory.clear();
+  inFlight.clear();
+  timeBoundRefusals.clear();
 }

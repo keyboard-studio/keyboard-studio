@@ -87,7 +87,7 @@ describe("analyseContextTolerance with the normalization step (spec 086)", () =>
   it("forces the fallback when the injected verification lookup reports regressed", async () => {
     const lookup = vi.fn(() => "regressed" as const);
     const result = await analyse({ verificationLookup: lookup });
-    expect(lookup).toHaveBeenCalledWith("analysis_fixture", expect.stringMatching(/^[0-9a-f]{64}$/));
+    expect(lookup).toHaveBeenCalledWith("analysis_fixture");
     expect(result.normalizationStep).toBeUndefined();
     expect(result.fallbackReason).toBe("verification-regressed");
     expect(result.proposal.variants.length).toBeGreaterThan(0);

@@ -259,6 +259,27 @@ export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
  */
 export const BASE_WELCOME_IMAGES_BUDGET_BYTES = 2 * 1024 * 1024;
 
+/**
+ * Size budget for the persisted normalization step (JSON characters). The step
+ * duplicates the overlay's stores and rules, so a large keyboard could push the
+ * draft past the localStorage quota and lose the whole write; over budget, the
+ * step is dropped and regenerated on demand (it is a cache, not state).
+ */
+export const NORMALIZATION_STEP_PERSIST_BUDGET_CHARS = 512 * 1024;
+
+/**
+ * The step entry as persisted: `maps` (large, used only while generating) is
+ * dropped. A draft written before this carried `maps` and still loads; one
+ * written now reads back with an empty `maps`, which no consumer reads.
+ */
+export function serializeNormalizationStep(
+  step: WorkingCopyData["contextNormalizationStep"],
+): WorkingCopyData["contextNormalizationStep"] {
+  if (step === null || step === undefined) return null;
+  const slim = step.result.kind === "step" ? { ...step, result: { ...step.result, maps: [] } } : step;
+  return JSON.stringify(slim).length > NORMALIZATION_STEP_PERSIST_BUDGET_CHARS ? null : slim;
+}
+
 /** Base64 the images for the snapshot, or `undefined` when over budget. */
 function serializeWelcomeImages(
   images: WelcomeFolderImage[] | null,
@@ -407,7 +428,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     deadkeyOverlay: s.deadkeyOverlay,
     touchEditorMode: s.touchEditorMode,
     contextToleranceOverlay: s.contextToleranceOverlay,
-    contextNormalizationStep: s.contextNormalizationStep,
+    contextNormalizationStep: serializeNormalizationStep(s.contextNormalizationStep),
     phaseAnswersByStep: s.phaseAnswersByStep,
   };
 }
