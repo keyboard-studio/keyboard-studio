@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { FlowQuestion, QuestionModule } from "../survey/types.ts";
+import { flowModules } from "../survey/questions/registry.ts";
 import { orderDecisions } from "./orderDecisions.ts";
 
 /** Every goto target of a question's `next` (string, default, conditional rules). */
@@ -104,6 +105,50 @@ describe("derived order respects definition.next", () => {
       });
     });
   }
+});
+
+// Independent of any frozen list and of declaration order: take the DERIVED
+// order of each registry flow and require every `next` edge to point forward,
+// except edges the module itself marks `loopBack: true`.
+describe("derived order: every next edge goes forward except loopBack", () => {
+  for (const [flowId, mods] of Object.entries(flowModules)) {
+    it(flowId, () => {
+      const derived = orderDecisions(mods as readonly QuestionModule[]);
+      const pos = new Map(derived.map((m, i) => [m.definition.id, i]));
+      const violations: string[] = [];
+      for (const m of derived) {
+        const next = m.definition.next;
+        const rules =
+          typeof next === "string"
+            ? [{ goto: next, loopBack: false }]
+            : Array.isArray(next)
+              ? next.map((r) => ({ goto: r.goto, loopBack: r.loopBack === true }))
+              : [];
+        for (const r of rules) {
+          if (typeof r.goto !== "string" || r.loopBack) continue;
+          const from = pos.get(m.definition.id)!;
+          const to = pos.get(r.goto);
+          if (to !== undefined && to <= from) {
+            violations.push(`${m.definition.id}@${from} -> ${r.goto}@${to}`);
+          }
+        }
+      }
+      expect(violations, violations.join("\n")).toEqual([]);
+    });
+  }
+
+  it("the documented back-edges are marked loopBack in the modules", () => {
+    const marked: string[] = [];
+    for (const mods of Object.values(flowModules)) {
+      for (const m of mods as readonly QuestionModule[]) {
+        if (!Array.isArray(m.definition.next)) continue;
+        for (const r of m.definition.next) {
+          if (r.loopBack === true) marked.push(`phase_b_characters:${m.definition.id}->${r.goto}`);
+        }
+      }
+    }
+    expect(new Set(marked)).toEqual(DOCUMENTED_BACK_EDGES);
+  });
 });
 
 describe("orderDecisions routing cycles", () => {

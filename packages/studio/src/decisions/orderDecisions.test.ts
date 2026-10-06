@@ -32,6 +32,14 @@ function stubModule(
 const ids = (mods: QuestionModule[]) => mods.map((m) => m.definition.id);
 
 describe("orderDecisions", () => {
+  it("stable tie-break: a later ready item never jumps ahead of an earlier one", () => {
+    const a = stubModule("a", { requires: ["language-name"] });
+    const b = stubModule("b", { provides: ["language-name"] });
+    const c = stubModule("c");
+    // Stable Kahn: b is the only ready item, then a (index 0) beats c (index 2).
+    expect(ids(orderDecisions([a, b, c]))).toEqual(["b", "a", "c"]);
+  });
+
   it("sorts a dependency chain regardless of input order", () => {
     const a = stubModule("a", { provides: ["language-name"] });
     const b = stubModule("b", { provides: ["language-code"], requires: ["language-name"] });
@@ -296,6 +304,66 @@ describe("gatedByFromNext - merge points (unconditional inbound edges count)", (
     for (const v of ["true", "false"]) {
       const ds = withDecision(d, v);
       expect(g === undefined || g(ds), v).toBe(true);
+    }
+  });
+});
+
+describe("routing index: loop-back edges and single-pass filterGated", () => {
+  it("a loopBack edge to a flow's first module does not hide it", () => {
+    const first = stubModule("first", { next: "last" });
+    const last = stubModule("last", {
+      provides: ["target-script"],
+      next: [
+        { condition: "value == 'again'", goto: "first", loopBack: true },
+        { default: true, goto: null },
+      ],
+    });
+    for (const value of ["done", "again"]) {
+      const decisions = {
+        "target-script": { id: "target-script" as const, value, provenance: "asked" as const },
+      };
+      expect(ids(filterGated([first, last], decisions)), value).toEqual(["first", "last"]);
+      const gate = gatedByFromNext(first.definition, [first, last]);
+      expect(gate === undefined || gate(decisions), value).toBe(true);
+    }
+  });
+
+  it("an edge conditioned purely on ctx.* fails open (module is shown)", () => {
+    const src = stubModule("src", {
+      provides: ["target-script"],
+      next: [{ condition: "ctx.flag == 'x'", goto: "t" }, { default: true, goto: null }],
+    });
+    const t = stubModule("t");
+    expect(ids(filterGated([src, t], {}))).toEqual(["src", "t"]);
+  });
+
+  it("filterGated matches the per-module effectiveGatedBy on every registry flow", () => {
+    const literals = new Set<string>([""]);
+    const collect = (c: string | undefined): void => {
+      for (const m of c?.matchAll(/'([^']*)'/g) ?? []) literals.add(m[1]!);
+    };
+    for (const mods of Object.values(flowModules)) {
+      for (const m of mods as readonly QuestionModule[]) {
+        const next = m.definition.next;
+        if (Array.isArray(next)) for (const r of next) collect(r.condition);
+      }
+    }
+    for (const [flowId, mods] of Object.entries(flowModules)) {
+      const modules = mods as readonly QuestionModule[];
+      const provided = [...new Set(modules.flatMap((m) => m.provides ?? []))];
+      for (const lit of literals) {
+        const decisions: Record<string, { id: string; value: unknown; provenance: "asked" }> = {};
+        for (const p of provided) decisions[p] = { id: p, value: lit, provenance: "asked" };
+        const ds = decisions as unknown as Parameters<typeof filterGated>[1];
+        const expected = modules.filter((m) => effectiveGatedBy(m, modules)?.(ds) ?? true);
+        expect(
+          ids(filterGated(modules, ds)),
+          `flow ${flowId}, every decision = '${lit}'`,
+        ).toEqual(ids(expected));
+      }
+      expect(ids(filterGated(modules, {})), `flow ${flowId}, no decisions`).toEqual(
+        ids(modules.filter((m) => effectiveGatedBy(m, modules)?.({}) ?? true)),
+      );
     }
   });
 });
