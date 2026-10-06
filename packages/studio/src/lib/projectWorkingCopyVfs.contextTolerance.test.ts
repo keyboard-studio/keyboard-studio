@@ -102,4 +102,20 @@ describe("projectWorkingCopyVfs — normalization step replay (spec 086)", () =>
     expect(kmn).toContain("+ U+005D > U+00B4");
     expect(kmn).toContain("group(generated_context_normalize)");
   });
+
+  it("does not project a stale step whose original entry group is gone", async () => {
+    const result = await proposeNormalizationStep(parseKmn(KMN, "projected").ir);
+    if (result.kind !== "step") throw new Error(`expected a step, got ${result.reason}`);
+    const stale = buildNormalizationStepOverlay({ ...result.step, originalEntry: "renamed_away" });
+    const { kmn, warnings } = project(stale);
+    expect(kmn).toContain("begin Unicode > use(main)");
+    expect(kmn).not.toContain("generated_context_normalize");
+    expect(warnings.some((w) => w.includes("normalization step skipped"))).toBe(true);
+  });
+
+  it("projects the generated group with its do-not-edit header", async () => {
+    const result = await proposeNormalizationStep(parseKmn(KMN, "projected").ir);
+    if (result.kind !== "step") throw new Error(`expected a step, got ${result.reason}`);
+    expect(project(buildNormalizationStepOverlay(result.step)).kmn).toContain("do not edit");
+  });
 });
