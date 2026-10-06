@@ -40,7 +40,9 @@ function postReq(body: unknown): Request {
  * Build a stub ManagedPRPipelineConfig whose fetch function returns the given
  * sequence of responses in order (one per pipeline step). Under the same-repo
  * staging model there is no fork-check step, so a success run makes 6 calls:
- * master-ref, parent-commit, tree, commit, branch-ref, PR.
+ * master-ref, parent-commit, tree, commit, branch-ref, PR. The global-cap
+ * probe (GET /pulls?...) is answered with an empty list outside the sequence
+ * and not counted, so these indices stay one-per-pipeline-step.
  */
 function stubConfig(
   responses: Array<Partial<GitHubPipelineFetchResponse> & { body?: unknown }>,
@@ -50,8 +52,11 @@ function stubConfig(
   return {
     getInstallationToken: () => Promise.resolve(tokenOverride),
     orgLogin: "test-org",
-    fetch: async (_url, _init) => {
-      const r = responses[callIndex++] ?? { ok: true, status: 200, body: {} };
+    fetch: async (url, init) => {
+      const probe = url.includes("/pulls?") && init.method === "GET";
+      const r = probe
+        ? { ok: true, status: 200, body: [] }
+        : (responses[callIndex++] ?? { ok: true, status: 200, body: {} });
       const body = r.body ?? {};
       return {
         ok: r.ok ?? true,

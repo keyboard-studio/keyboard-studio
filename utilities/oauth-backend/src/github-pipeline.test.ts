@@ -15,6 +15,9 @@ import {
   normalizePrTitle,
   buildPrBody,
   UPSTREAM_OWNER,
+  MANAGED_PR_CREATE_CAP,
+  MANAGED_PR_CREATE_PROBE_PER_PAGE,
+  MANAGED_PR_CREATE_WINDOW_MS,
   type ManagedPRPipelineConfig,
   type GitHubPipelineFetchResponse,
   type GitHubPipelineFetchFn,
@@ -50,6 +53,8 @@ interface StepOverrides {
   commit?: Partial<GitHubPipelineFetchResponse>;
   branch?: Partial<GitHubPipelineFetchResponse>;
   pr?: Partial<GitHubPipelineFetchResponse>;
+  /** The global-cap probe (GET /pulls?...). Defaults to an empty PR list. */
+  capProbe?: Partial<GitHubPipelineFetchResponse>;
 }
 
 /** Build a minimal GitHubPipelineFetchResponse stub. */
@@ -87,6 +92,7 @@ function makeStub(overrides: StepOverrides = {}): {
       ov?: Partial<GitHubPipelineFetchResponse>
     ) => (ov ? { ...base, ...ov } : base);
 
+    if (url.includes("/pulls?") && method === "GET") return apply(res([]), overrides.capProbe);
     if (url.includes("/git/ref/heads/master")) return apply(res({ object: { sha: "masterSha111" } }), overrides.masterRef);
     if (url.includes("/git/commits/masterSha111")) return apply(res({ tree: { sha: "treeShaBase" } }), overrides.parentCommit);
     if (url.endsWith("/git/blobs") && method === "POST") return apply(res({ sha: "blobSha123" }), overrides.blob);
@@ -473,6 +479,87 @@ describe("submitManagedPR() -- error mapping", () => {
     if (result.ok) throw new Error("unreachable");
     expect(result.status).toBe(502);
     expect(result.error).toBe("submission_unavailable");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// submitManagedPR -- global creation cap (stateless, from the repo's PR list)
+// ---------------------------------------------------------------------------
+
+describe("submitManagedPR() -- global creation cap", () => {
+  const NOW = Date.parse("2026-10-05T12:00:00Z");
+  const minsAgo = (m: number) => new Date(NOW - m * 60_000).toISOString();
+
+  /** A PR the bot would have opened: add/ branch on the org repo. */
+  const botPr = (createdAt: string) => ({
+    created_at: createdAt,
+    head: { ref: "add/some_kbd-1234567", repo: { owner: { login: ORG_LOGIN } } },
+  });
+
+  const configAt = (fetchFn: GitHubPipelineFetchFn): ManagedPRPipelineConfig => ({
+    ...makeConfig(fetchFn),
+    now: () => NOW,
+  });
+
+  it("429s before any write once the cap is reached inside the window", async () => {
+    const prs = Array.from({ length: MANAGED_PR_CREATE_CAP }, (_, i) => botPr(minsAgo(i)));
+    const { fetch, calls } = makeStub({ capProbe: res(prs) });
+    const result = await submitManagedPR(VALID_BODY, configAt(fetch));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(429);
+    expect(result.error).toBe("rate_limited");
+    expect(result.retryAfterSeconds).toBe(MANAGED_PR_CREATE_WINDOW_MS / 1000);
+    expect(calls.filter((c) => c.method === "POST")).toEqual([]);
+  });
+
+  it("proceeds one below the cap", async () => {
+    const prs = Array.from({ length: MANAGED_PR_CREATE_CAP - 1 }, (_, i) => botPr(minsAgo(i)));
+    const { fetch } = makeStub({ capProbe: res(prs) });
+    expect((await submitManagedPR(VALID_BODY, configAt(fetch))).ok).toBe(true);
+  });
+
+  it("ignores PRs outside the window, from other repos, and on non-add/ branches", async () => {
+    const n = MANAGED_PR_CREATE_CAP;
+    const prs = [
+      ...Array.from({ length: n }, () => botPr(minsAgo(61))),
+      ...Array.from({ length: n }, () => ({
+        created_at: minsAgo(1),
+        head: { ref: "add/x-1234567", repo: { owner: { login: "someone-else" } } },
+      })),
+      ...Array.from({ length: n }, () => ({
+        created_at: minsAgo(1),
+        head: { ref: "fix/typo", repo: { owner: { login: ORG_LOGIN } } },
+      })),
+      { created_at: minsAgo(1), head: { ref: "add/y-1234567", repo: null } },
+    ];
+    const { fetch } = makeStub({ capProbe: res(prs) });
+    expect((await submitManagedPR(VALID_BODY, configAt(fetch))).ok).toBe(true);
+  });
+
+  it("fails open when the probe errors, returns a non-array, or throws", async () => {
+    for (const capProbe of [
+      { ok: false, status: 500 },
+      res({ message: "not a list" }),
+      { json: async () => { throw new Error("bad json"); } },
+    ] as Partial<GitHubPipelineFetchResponse>[]) {
+      const { fetch } = makeStub({ capProbe });
+      expect((await submitManagedPR(VALID_BODY, configAt(fetch))).ok).toBe(true);
+    }
+  });
+
+  it("probes the staging repo's PR list newest-first at the full page size", async () => {
+    const { fetch, calls } = makeStub();
+    await submitManagedPR(VALID_BODY, configAt(fetch));
+    const probe = calls.find((c) => c.url.includes("/pulls?"));
+    expect(probe?.method).toBe("GET");
+    expect(probe?.url).toBe(
+      `https://api.github.com/repos/${UPSTREAM_OWNER}/keyboards/pulls?state=all&sort=created&direction=desc&per_page=${MANAGED_PR_CREATE_PROBE_PER_PAGE}`,
+    );
+  });
+
+  it("keeps the cap reachable from a single probe page", () => {
+    expect(MANAGED_PR_CREATE_CAP).toBeLessThan(MANAGED_PR_CREATE_PROBE_PER_PAGE);
   });
 });
 

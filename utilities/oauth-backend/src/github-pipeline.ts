@@ -69,6 +69,8 @@ export interface ManagedPRPipelineConfig {
    */
   orgLogin: string;
   fetch: GitHubPipelineFetchFn;
+  /** Clock for the global creation cap; injected by tests. Defaults to Date.now. */
+  now?: () => number;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +106,17 @@ const API_BASE = "https://api.github.com";
 // Exported so tests can pin the same-repo topology to the real constant.
 export const UPSTREAM_OWNER = "keyboard-studio";
 const UPSTREAM_REPO = "keyboards";
+
+/** Rolling window for the global managed-PR creation cap. */
+export const MANAGED_PR_CREATE_WINDOW_MS = 3_600_000;
+/**
+ * Most managed PRs the org bot may open per window, across every caller.
+ * Must stay below MANAGED_PR_CREATE_PROBE_PER_PAGE: the probe reads one page,
+ * so a cap above the page size could never trip.
+ */
+export const MANAGED_PR_CREATE_CAP = 30;
+/** Page size of the cap probe (GitHub's maximum). */
+export const MANAGED_PR_CREATE_PROBE_PER_PAGE = 100;
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit testing)
@@ -165,6 +178,66 @@ export function buildManagedBranchName(keyboardId: string, commitSha: string): s
   return `add/${keyboardId}-${commitSha.slice(0, 7)}`;
 }
 
+/**
+ * Decide whether the org bot may open another managed PR, from the staging
+ * repo's own recent PR list.
+ *
+ * STATELESS, like the crash pipeline's checkGlobalCreateCap: the state is the
+ * repo itself, so it holds across cold-started serverless instances with no
+ * database. It complements the Postgres-backed per-IP limiter in
+ * managed-pr-rate-limit.ts, which fails open when no database is provisioned;
+ * this cap still applies then, and bounds distributed floods the per-IP
+ * window cannot.
+ *
+ * Counts PRs created inside the window whose head is an `add/` branch on the
+ * org's repo — the shape submitManagedPR creates (buildManagedBranchName), so
+ * PRs opened by people do not count against it. Returns null when creation
+ * may proceed. A failed probe also returns null (fails open, matching the
+ * per-IP limiter): the cap exists to stop a flood, not to drop genuine
+ * submissions when GitHub hiccups.
+ */
+export async function checkManagedPRCreateCap(
+  call: (url: string) => Promise<GitHubPipelineFetchResponse>,
+  upstreamBase: string,
+  orgLogin: string,
+  now: number,
+): Promise<ManagedPRHandlerResult | null> {
+  const windowStart = now - MANAGED_PR_CREATE_WINDOW_MS;
+  let prs: unknown;
+  try {
+    const res = await call(
+      `${upstreamBase}/pulls?state=all&sort=created&direction=desc&per_page=${MANAGED_PR_CREATE_PROBE_PER_PAGE}`,
+    );
+    if (!res.ok) return null;
+    prs = await res.json();
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(prs)) return null;
+
+  const created = prs.filter((p) => {
+    const pr = p as {
+      created_at?: string;
+      head?: { ref?: string; repo?: { owner?: { login?: string } } | null };
+    };
+    const at = Date.parse(pr.created_at ?? "");
+    return (
+      Number.isFinite(at) &&
+      at >= windowStart &&
+      (pr.head?.ref ?? "").startsWith("add/") &&
+      pr.head?.repo?.owner?.login === orgLogin
+    );
+  }).length;
+
+  if (created < MANAGED_PR_CREATE_CAP) return null;
+  return {
+    ok: false,
+    status: 429,
+    error: "rate_limited",
+    retryAfterSeconds: Math.ceil(MANAGED_PR_CREATE_WINDOW_MS / 1000),
+  };
+}
+
 function buildHeaders(token: string): Record<string, string> {
   return {
     Accept: "application/vnd.github+json",
@@ -188,6 +261,7 @@ function buildHeaders(token: string): Record<string, string> {
  *  - Network throw                 -> 502 submission_unavailable
  *  - GitHub 401/403 (org token)    -> 502 submission_unavailable (server misconfig)
  *  - GitHub 429                    -> 429 rate_limited (+ retryAfterSeconds from header)
+ *  - Global creation cap hit       -> 429 rate_limited (+ retryAfterSeconds = window)
  *  - Branch already exists (422)   -> 409 branch_exists (+ branchName)
  *  - Any other non-ok              -> 502 upstream_error
  */
@@ -245,6 +319,15 @@ export async function submitManagedPR(
   // Compute the normalized title once; it is used as both the PR title and the
   // commit message subject (divergences 3 and 4 from Option A).
   const normalizedTitle = normalizePrTitle(body.keyboardId, body.prTitle);
+
+  // 0. Global creation cap, before any write (stateless; fails open).
+  const capped = await checkManagedPRCreateCap(
+    (url) => call(url),
+    upstreamBase,
+    orgLogin,
+    (config.now ?? Date.now)(),
+  );
+  if (capped !== null) return capped;
 
   try {
     // (No "ensure the fork exists" step: under the same-repo model
