@@ -1,12 +1,12 @@
 # Backend Streamlining: Decisions as the Only Unit
 
 **Feature:** specs/087-decision-backend
-**Status:** specifying
+**Status:** implemented — full retirement landed (tasks.md Phases 1-9 complete; all success criteria met, see Success Criteria status)
 **Branch:** km/decisions-spike (PR #1938)
 
-The studio asks authors questions, imports base keyboards, and builds new keyboards — but today those are three separate machineries (question lists, a spine manifest, phase registries, an adaptation catalog) that all describe the same flow and must be kept consistent by hand. This spec defines the backend simplification: **one unit — the Decision** — from base-keyboard import through to a compilable new keyboard. A decision is a typed fact about the keyboard (target script, character set, a behavior). Questions ask for decisions, import extracts the same decisions from a base keyboard, and answers write decisions into the new keyboard. Ordering is derived from declared dependencies, never hand-maintained.
+The studio asked authors questions, imported base keyboards, and built new keyboards through three separate machineries (question lists, a spine manifest, phase registries, an adaptation catalog) that all describe the same flow and must be kept consistent by hand. This spec defines the backend simplification: **one unit — the Decision** — from base-keyboard import through to a compilable new keyboard. A decision is a typed fact about the keyboard (target script, character set, a behavior). Questions ask for decisions, import extracts the same decisions from a base keyboard, and answers write decisions into the new keyboard. Ordering is derived from declared dependencies, never hand-maintained.
 
-Built on the spike (PR #1938), which proved the mechanism with pure functions and a demo page. This spec covers making it real.
+The spike (PR #1938) proved the mechanism with pure functions and a demo page; this spec made it real. As built, the spike is no longer a parallel layer: the decision registry is the only source of question and step order, and the old order lists, spine flags, per-phase registries and thin-YAML loader are deleted (see [tasks.md](tasks.md) Phase 9 and [ARCHITECTURE.md](ARCHITECTURE.md)).
 
 ## Clarifications
 
