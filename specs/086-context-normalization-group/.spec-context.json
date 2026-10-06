@@ -1,0 +1,16 @@
+{
+  "workflow": "speckit",
+  "specName": "Context normalization group",
+  "branch": "086-context-normalization-group",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-06T06:58:28.492Z"
+    }
+  ]
+}
