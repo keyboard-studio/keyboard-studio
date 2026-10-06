@@ -67,7 +67,7 @@ The pieces:
 |---|---|---|
 | I. Pattern schema locked | PASS | No `Pattern` change. New types are additive in `toleranceReport.ts`. The IR gains an optional `RawKmnFragment.storeSketch` (an IR type, not the Pattern contract). |
 | II. KeyboardIR spine | PASS | The step is built as an IR group plus stores, and emitted by the codec. Opaque fragments are preserved; a keyboard with an opaque entry is refused, never partially handled ([R6](research.md#r6-inserting-and-removing-the-step)). |
-| III. Single working copy | PASS | The step is applied through the existing overlay replay onto the one working copy. No second copy. |
+| III. Single working copy | PASS | The step lives only in the overlay batch the projection replays; the working IR is never mutated with it. No second copy. |
 | IV. Validator layering, one 300 ms cycle | PASS | No new timer. The generator runs inside the existing unawaited `launchContextTolerance` launch, behind a cache. No new validator layer. |
 | V. VirtualFS only | PASS | The cache lives in memory and the snapshot. The committed verification file is written by the CI harness, not by the studio. |
 | VI. Team boundaries | PASS | **Engine** owns the whole change: engine, studio, utility and CI. No content-team artifact (patterns, survey text, prompts) changes. The new UI strings are engine-owned studio chrome under `marks.context_tolerance.step.*`. |

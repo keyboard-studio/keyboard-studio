@@ -10,7 +10,9 @@
    2. Otherwise call `proposeNormalizationStep(ir)` and store the result.
    3. If the result is `step`, that is the proposal.
    4. If the result is `refused` and not `no-alternates`, call `proposeContextVariants(ir, report)`, the 062 fallback (FR-019), and record the refusal reason for display.
-3. If the committed verification record exists for this keyboard source and is `regressed`, do not propose the step. Use the fallback.
+3. If the step is generated, look the keyboard up by keyboard id in the prebuild-generated regressed list (`scripts/codegen-normalization-regressed.mjs`, derived from the committed record; the source hash is not compared). On a hit, do not propose the step: use the fallback, with reason `verification-regressed`.
+
+   **Known limitation.** The lookup is by keyboard id only, so a Track 1 copy given a new keyboard id is not matched by it, even when the copied keyboard is recorded `regressed`.
 
 ## Station (`survey/marks/ContextToleranceStation.tsx`)
 

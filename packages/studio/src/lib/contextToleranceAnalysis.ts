@@ -81,8 +81,8 @@ export async function analyseContextTolerance(
   if (gapRuleIds.size > 0) {
     const lookup = await getOrProposeNormalizationStep(analysedIr, options.normalizationSnapshot);
     if (!isCurrent()) return null;
-    options.onNormalizationStored?.(lookup.stored);
-    stepCacheKey = lookup.stored.cacheKey;
+    if (lookup.stored !== null) options.onNormalizationStored?.(lookup.stored);
+    stepCacheKey = lookup.cacheKey;
     if (lookup.result.kind === "step") {
       const sourceHash = stepCacheKey.split("|")[0] ?? "";
       const verdict = await (options.verificationLookup?.(analysedIr.header.keyboardId, sourceHash) ?? "unknown");

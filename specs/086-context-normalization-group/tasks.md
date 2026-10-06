@@ -13,8 +13,6 @@ description: "Task list for spec 086 context normalization group"
 
 **Organization**: One phase per user story. Each phase is committed and pushed to `086-context-normalization-group` when its gate goes green (CLAUDE.md, commit cadence). Commit messages name the tasks they close: `spec 086 TNNN-TNNN`.
 
-**Path correction vs. plan.md**: the corpus harness has no `src/` folder. Its files sit flat in `utilities/nfd-tolerance-corpus/` (`cli.ts`, `analyze.ts`, `run.mjs`). Tasks below use the real paths.
-
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependency on an incomplete task)
@@ -92,7 +90,7 @@ description: "Task list for spec 086 context normalization group"
 ### Implementation for User Story 2
 
 - [x] T025 [US2] Implement `normalizationStepCacheKey(ir)` in `packages/engine/src/pattern-apply/normalization-step/index.ts`: `computeSha256Hex(emit(removeNormalizationStep(ir))) + "|" + NORMALIZATION_STEP_GENERATOR_VERSION` (`packages/engine/src/codec/hash.ts`)
-- [x] T026 [US2] Add the optional `contextNormalizationStep?: { cacheKey: string; result: NormalizationStepResult }` field to the snapshot types in `packages/studio/src/lib/draftTypes.ts` and read/write it in `packages/studio/src/lib/persistWorkingCopy.ts` next to `contextToleranceOverlay`; no `DRAFT_VERSION` bump. Add a save/load round-trip case to the existing persist tests
+- [x] T026 [US2] Add the optional `contextNormalizationStep?: { cacheKey: string; result: NormalizationStepResult }` field to the snapshot types in `packages/studio/src/stores/workingCopyStore.ts` and read/write it in `packages/studio/src/lib/persistWorkingCopy.ts` next to `contextToleranceOverlay`; no `DRAFT_VERSION` bump. Add a save/load round-trip case to the existing persist tests
 - [x] T027 [US2] Create `packages/studio/src/lib/normalizationStepCache.ts`: `getOrProposeNormalizationStep(ir, snapshot)` checks an in-memory `Map<cacheKey, result>`, then the snapshot field, then calls the generator and stores the result in both; logs a cache-hit line for the quickstart §4 check. (The plan put the Map inside `contextToleranceAnalysis.ts`; a separate module keeps it unit-testable. Same behaviour.)
 - [x] T028 [US2] Write `packages/engine/src/pattern-apply/normalization-step/generation-time.corpus.test.ts`, opt-in via `KS_CORPUS_PERF=1`: run `proposeNormalizationStep` over every corpus keyboard that parses and assert the 95th percentile is under 5 s (SC-005); print `[WARN]` with the slowest ten. Not part of the default suite
 - [x] T029 [US2] Gate: engine and studio tests, `pnpm typecheck`, `pnpm lint`. Commit `feat(engine): cache normalization steps by source hash and generator version (spec 086 T023-T029)` and push
@@ -157,8 +155,8 @@ description: "Task list for spec 086 context normalization group"
 - [x] T055 [P] Make sure all seven spike keyboards and the `vietnamese_telex` keyboard have rows in [docs/keyboard-index.md](../../docs/keyboard-index.md) (mandatory phonebook rule); add any missing row from the keyboard's `.kps`
 - [x] T056 [P] Document the harness mode and flags in `utilities/nfd-tolerance-corpus/README.md` and [docs/tooling.md](../../docs/tooling.md#standalone-utilities); add the normalization step to the context-tolerance paragraph of [docs/architecture.md](../../docs/architecture.md) and the engine entry in [docs/packages.md](../../docs/packages.md)
 - [x] T057 [P] Record the two follow-ups in [spec.md](spec.md) Open questions: desktop-engine verification as a release gate before this replaces 062 by default, and replacing the 078 simulated diagnostic with a static check (R7)
-- [ ] T058 Run `pnpm typecheck`, `pnpm -r test`, `pnpm lint` from the repo root; all green
-- [ ] T059 Run `/speckit-analyze` over spec.md, plan.md and tasks.md and resolve any finding before `/speckit-implement` closes
+- [x] T058 Run `pnpm typecheck`, `pnpm -r test`, `pnpm lint` from the repo root; all green
+- [x] T059 Run `/speckit-analyze` over spec.md, plan.md and tasks.md and resolve any finding before `/speckit-implement` closes
 
 ---
 

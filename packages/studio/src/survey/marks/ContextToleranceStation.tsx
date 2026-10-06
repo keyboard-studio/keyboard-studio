@@ -160,7 +160,7 @@ function FallbackReasonLine({ reason }: { reason: FallbackReason }) {
     }),
     "verification-regressed": t({
       id: "marks.context_tolerance.step.fallback.reason.verification_regressed",
-      message: "The one-step fix was not offered because checking it against this keyboard changed what typing produces.",
+      message: "The one-step fix was not offered because when checked against this keyboard, it did not give the same result as the keyboard's own rules.",
     }),
   }[reason];
   return (

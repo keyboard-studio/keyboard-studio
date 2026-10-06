@@ -46,9 +46,10 @@ describe("getOrProposeNormalizationStep", () => {
     propose.mockClear();
     const t0 = performance.now();
     const hit = await getOrProposeNormalizationStep(ir, seeded.stored);
+    expect(seeded.stored).not.toBeNull();
     expect(performance.now() - t0).toBeLessThan(1000);
     expect(hit.source).toBe("snapshot");
-    expect(hit.result).toBe(seeded.stored.result);
+    expect(hit.result).toBe(seeded.stored?.result);
     expect(propose).not.toHaveBeenCalled();
   });
 
@@ -61,7 +62,18 @@ describe("getOrProposeNormalizationStep", () => {
     const out = await getOrProposeNormalizationStep(ir, stale);
     expect(out.source).toBe("generated");
     expect(propose).toHaveBeenCalledTimes(1);
-    expect(out.stored.cacheKey).toBe(seeded.stored.cacheKey);
-    expect(out.stored.cacheKey).not.toBe(stale.cacheKey);
+    expect(out.stored?.cacheKey).toBe(seeded.cacheKey);
+    expect(out.cacheKey).not.toBe(stale.cacheKey);
+  });
+
+  it("caches a time-bound refusal neither in memory nor in the snapshot", async () => {
+    const ir = parseKmn(KMN).ir;
+    propose.mockResolvedValueOnce({ kind: "refused", reason: "time-bound" });
+    const refused = await getOrProposeNormalizationStep(ir, null);
+    expect(refused.result).toEqual({ kind: "refused", reason: "time-bound" });
+    expect(refused.stored).toBeNull();
+    const retry = await getOrProposeNormalizationStep(ir, null);
+    expect(retry.source).toBe("generated");
+    expect(propose).toHaveBeenCalledTimes(2);
   });
 });

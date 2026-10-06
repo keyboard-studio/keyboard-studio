@@ -387,6 +387,14 @@ vendored pre-fix/post-fix fixtures for the two keyboards a human hand-fixed for 
 `haroi` and `sil_kcho`, plus pure classification unit tests. The full sweep is the CLI, never a
 test. Detail: [utilities/nfd-tolerance-corpus/README.md](../utilities/nfd-tolerance-corpus/README.md).
 
+`--mode normalization-step` verifies the spec 086 normalization step instead: typed output
+unchanged, every pasted NFC/NFD probe passing, compile diagnostics unchanged. It writes the
+committed record [docs/context-normalization-verification.json](context-normalization-verification.json),
+keyed by source hash. `--jobs <n>` parallelises, `--incremental` re-simulates only keyboards
+whose source or generator version changed, `--budget-minutes <n>` caps each keyboard, and
+`--check` (run in CI after the corpus gate) fails on any stale or missing record without
+simulating.
+
 ### facet-index
 
 [spec 070](../specs/070-keyboard-facet-index/) scans the sibling `../keyboards` corpus (the

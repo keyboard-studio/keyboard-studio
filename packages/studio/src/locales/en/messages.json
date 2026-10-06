@@ -987,7 +987,7 @@
   "marks.context_tolerance.step.fallback.reason.opaque_entry": "The one-step fix was not offered because this keyboard's first group could not be read in full.",
   "marks.context_tolerance.step.fallback.reason.opaque_output_store": "The one-step fix was not offered because some of this keyboard's output characters could not be read in full.",
   "marks.context_tolerance.step.fallback.reason.time_bound": "The one-step fix was not offered because working it out took too long for this keyboard.",
-  "marks.context_tolerance.step.fallback.reason.verification_regressed": "The one-step fix was not offered because checking it against this keyboard changed what typing produces.",
+  "marks.context_tolerance.step.fallback.reason.verification_regressed": "The one-step fix was not offered because when checked against this keyboard, it did not give the same result as the keyboard's own rules.",
   "marks.context_tolerance.step.intro": "{ruleCount, plural, one {Adds # rule. None of your rules change.} other {Adds # rules. None of your rules change.}}",
   "marks.context_tolerance.step.prior.accepted": "You chose to add the step that converts pasted text to this keyboard's own form.",
   "marks.contextTolerance.disclosure.markOrder": "{0}: {note}",

@@ -59,6 +59,8 @@ The generated block, held in IR form.
 
 `no-alternates` means nothing to normalize: the keyboard produces no cluster whose NFC and NFD forms differ. The studio then offers neither the step nor the 062 fallback.
 
+The studio adds one non-engine fallback reason, `verification-regressed`, used when the committed record marks the keyboard `regressed`. Message ids replace hyphens with underscores: `fallback.reason.no_alternates`, `fallback.reason.verification_regressed`.
+
 ## StoredStep (authoring cache)
 
 | Field | Type | Notes |
@@ -68,7 +70,7 @@ The generated block, held in IR form.
 
 It lives in memory per session, and in the working-copy snapshot as the optional field `contextNormalizationStep`.
 
-**Rules.** A stored entry is used only when its `cacheKey` equals the key computed for the current source (FR-016).
+**Rules.** A stored entry is used only when its `cacheKey` equals the key computed for the current source (FR-016). A `time-bound` refusal is never stored, in memory or in the snapshot: it reflects the run's budget, not the source.
 
 ## VerificationRecord (harness, committed)
 
@@ -79,16 +81,18 @@ The file is `docs/context-normalization-verification.json`, format `context-norm
 | `manifest.corpusCommit` | `string` | The `keyboard-studio/keyboards` SHA the run used |
 | `manifest.generatorVersion` | `string` | `NORMALIZATION_STEP_GENERATOR_VERSION` |
 | `keyboards[id].sourceHash` | `string` | sha256 of the `.kmn` (plus the touch layout if present) |
-| `keyboards[id].outcome` | `"verified" \| "regressed" \| "refused" \| "harness-error"` | `regressed` = any typed-output difference |
+| `keyboards[id].outcome` | `"verified" \| "regressed" \| "refused" \| "harness-error"` | `regressed` = any typed-output difference, compile-diagnostic mismatch, or failing pasted probe |
+| `keyboards[id].reason` | `string?` | Refusal reason (`refused`) or a human-readable cause (`regressed`, `harness-error`) |
+| `keyboards[id].detail` | `string?` | Extra context, such as the first failing pasted probes or the harness error message |
 | `keyboards[id].ruleCount` | `number?` | For `verified` and `regressed` |
 | `keyboards[id].typed` | `{ sequences: number; differ: number }` | |
 | `keyboards[id].pasted` | `{ probes: number; exact: number; nfcEqual: number; fail: number }` | |
-| `keyboards[id].compileDiagnostics` | `{ before: number; after: number }` | FR-010: must be equal |
+| `keyboards[id].compileDiagnostics` | `{ before: number; after: number }` | Error counts, FR-010: must be equal. The full diagnostic text is compared separately and a mismatch also yields `regressed` |
 
 **Rules.**
 - A record is fresh when its `sourceHash` and `generatorVersion` match the current source and generator.
 - `--check` fails on any stale record.
-- The studio does not propose a step for a keyboard whose fresh record is `regressed` ([research R10](research.md#r10-risks)).
+- The studio does not propose a step for a keyboard whose record, looked up by keyboard id with no freshness check, is `regressed` ([research R10](research.md#r10-risks)).
 
 ## Overlay batch (studio replay)
 

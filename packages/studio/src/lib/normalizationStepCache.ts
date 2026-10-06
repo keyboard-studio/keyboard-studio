@@ -6,7 +6,7 @@
 // generator. A stored entry is used only when its `cacheKey` equals the
 // current source's key, so a stale snapshot is ignored and replaced.
 //
-// The caller persists the returned `stored` entry through
+// The caller persists the returned `stored` entry (when non-null) through
 // `useWorkingCopyStore.setContextNormalizationStep`.
 
 import type { KeyboardIR, NormalizationStepResult, StoredNormalizationStep } from "@keyboard-studio/contracts";
@@ -17,8 +17,9 @@ const memory = new Map<string, NormalizationStepResult>();
 
 export interface NormalizationStepLookup {
   result: NormalizationStepResult;
-  /** The entry to persist in the snapshot (`contextNormalizationStep`). */
-  stored: StoredNormalizationStep;
+  cacheKey: string;
+  /** The entry to persist in the snapshot (`contextNormalizationStep`); null when it must not be cached. */
+  stored: StoredNormalizationStep | null;
   source: "memory" | "snapshot" | "generated";
 }
 
@@ -31,19 +32,22 @@ export async function getOrProposeNormalizationStep(
   const inMemory = memory.get(cacheKey);
   if (inMemory !== undefined) {
     devLog.info("[OK] normalization step cache hit (memory)");
-    return { result: inMemory, stored: { cacheKey, result: inMemory }, source: "memory" };
+    return { result: inMemory, cacheKey, stored: { cacheKey, result: inMemory }, source: "memory" };
   }
   if (snapshot != null && snapshot.cacheKey === cacheKey) {
     memory.set(cacheKey, snapshot.result);
     devLog.info("[OK] normalization step cache hit (snapshot)");
-    return { result: snapshot.result, stored: snapshot, source: "snapshot" };
+    return { result: snapshot.result, cacheKey, stored: snapshot, source: "snapshot" };
   }
 
   const result = await proposeNormalizationStep(ir);
   // A time-bound refusal is a property of this run's budget, not of the source,
-  // so it is not cached: a later request may succeed.
-  if (!(result.kind === "refused" && result.reason === "time-bound")) memory.set(cacheKey, result);
-  return { result, stored: { cacheKey, result }, source: "generated" };
+  // so it is cached neither in memory nor in the snapshot: a later request may succeed.
+  if (result.kind === "refused" && result.reason === "time-bound") {
+    return { result, cacheKey, stored: null, source: "generated" };
+  }
+  memory.set(cacheKey, result);
+  return { result, cacheKey, stored: { cacheKey, result }, source: "generated" };
 }
 
 /** Test-only: clear the in-memory map. */
