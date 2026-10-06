@@ -42,6 +42,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
+| Easy Chakma | `easy_chakma` | `ccp` | Bivuti Chakma | `../keyboards/release/e/easy_chakma` |
 | Thuɔŋjäŋ | `el_dinka` | `din-Latn`, `dip-Latn`, `diw-Latn`, `dib-Latn`, `dks-Latn`, `dik-Latn` | © 2015-2018 Enabling Languages | `../keyboards/release/el/el_dinka` |
 | Naija NFD | `el_naija` | `abn-Latn`, `bky-Latn`, `bwr-Latn`, `deg-Latn`, `igb-Latn`, `bin-Latn`, `efi-Latn`, `eka-Latn`, `ekp-Latn`, `elm-Latn`, `enn-Latn`, `ish-Latn`, `gbr-Latn`, `aaa-Latn`, `gkn-Latn` … (+37 more) | Andrew Cunningham and Chinedu Uchechukwu | `../keyboards/release/el/el_naija` |
 | pan-Sahelian | `el_pan_sahelian` | `fub` | © Enabling Languages | `../keyboards/release/el/el_pan_sahelian` |
@@ -111,10 +112,12 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Yorùbá with Dot | `sil_yoruba_dot` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba_dot` |
 | Yorùbá 8 | `sil_yoruba8` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba8` |
 | Sorani Behdini (Qwerty) | `sorani_behdini_arab_qwerty` | `ku-Arab`, `kmr-Arab`, `ku-Arab-TR`, `ckb` | © SIL Global | `../keyboards/release/s/sorani_behdini_arab_qwerty` |
+| Takri | `takri` | `xnr-Takr` | (c) manik | `../keyboards/release/t/takri` |
 | Tamil 99 | `tamil99` | `ta` | Muthu Nedumaran | `../keyboards/release/tamil/tamil99` |
 | த99-விரிவு \| ta99 Extended | `thamizha_tamil99_ext` | `ta` | Umar(csd_one@yahoo.com), Mugunth (mugunth@gmail.com) and K. Sethu (skhome@gmail.com) | `../keyboards/release/t/thamizha_tamil99_ext` |
 | சுரதா-பாமுனி \| Suratha Bamini | `thamizha_bamini` | `ta` | © thamizha.com and SIL Global | `../keyboards/release/t/thamizha_bamini` |
 | புதிய தட்டெழுதி \| New Typewriter | `thamizha_new_typewriter` | `ta` | Mugunth (mugunth@gmail.com), Umar (csd_one@yahoo.com) and K. Sethu (skhome@gmail.com) | `../keyboards/release/t/thamizha_new_typewriter` |
+| Todhri | `todhri` | `sq-Todr`, `als-Todr` | © SIL Global | `../keyboards/release/t/todhri` |
 | Triqui Itunyoso | `triqui_itunyoso` | `trq` | Kayla Shames | `../keyboards/release/t/triqui_itunyoso` |
 | Unifon | `unifon` | `en` | SIL International | `../keyboards/experimental/u/unifon` |
 | Vietnamese Telex | `vietnamese_telex` | `vi` | Mike Vo | `../keyboards/release/v/vietnamese_telex` |
