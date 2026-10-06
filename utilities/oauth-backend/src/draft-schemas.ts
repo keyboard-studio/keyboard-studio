@@ -38,6 +38,19 @@ export const MAX_DRAFT_BYTES = 4 * 1024 * 1024;
  */
 export const DEFAULT_DRAFT_ID = "default";
 
+/**
+ * A draftId becomes a storage key segment (`drafts/<userId>/<draftId>.json` in
+ * Vercel Blob), so it is allowlisted rather than merely length-bounded: no `/`,
+ * `\`, `.` or `..` can reach the pathname and step outside the caller's own
+ * prefix. The client's keys are Keyman keyboard ids (`[a-z0-9_]`) plus the
+ * `default` / `__pending__` sentinels, all of which pass.
+ */
+export const DraftIdSchema = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
 // ---------------------------------------------------------------------------
 // Draft metadata — the small denormalized row the resume banner reads without
 // fetching the full blob. The SPA derives these fields and sends them on save.
@@ -59,7 +72,7 @@ export const DraftMetaSchema = z.object({
    * un-upgraded single-draft client (which never sends this field) still
    * validates — it lands in the {@link DEFAULT_DRAFT_ID} slot.
    */
-  draftId: z.string().min(1).max(80).default(DEFAULT_DRAFT_ID),
+  draftId: DraftIdSchema.default(DEFAULT_DRAFT_ID),
   /** Draft lifecycle; defaults to "draft" for clients that predate submission tracking. */
   status: z.enum(["draft", "submitted"]).default("draft"),
   /** URL of the PR opened from this draft, once submitted, or null. */

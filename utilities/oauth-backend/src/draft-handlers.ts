@@ -12,6 +12,7 @@
 
 import {
   DEFAULT_DRAFT_ID,
+  DraftIdSchema,
   MAX_DRAFT_BYTES,
   PutDraftBodySchema,
   type DraftMeta,
@@ -65,6 +66,16 @@ async function authenticate(
   return config.verifyUser(parseBearer(authHeader));
 }
 
+/**
+ * Query-string draftIds bypass PutDraftBodySchema, so the read/delete paths
+ * apply the same allowlist before the id reaches a store pathname.
+ */
+function isValidDraftId(draftId: string): boolean {
+  return DraftIdSchema.safeParse(draftId).success;
+}
+
+const INVALID_DRAFT_ID = { ok: false, status: 400, error: "invalid_request" } as const;
+
 // ---------------------------------------------------------------------------
 // GET /drafts — metadata only
 // ---------------------------------------------------------------------------
@@ -76,6 +87,7 @@ export async function getDraftMeta(
 ): Promise<DraftResult<GetDraftMetaResponse>> {
   const user = await authenticate(authHeader, config);
   if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+  if (!isValidDraftId(draftId)) return INVALID_DRAFT_ID;
 
   const meta = await config.store.getMeta(user.id, draftId);
   return { ok: true, status: 200, data: { meta } };
@@ -107,6 +119,7 @@ export async function getDraftContent(
 ): Promise<DraftResult<GetDraftContentResponse>> {
   const user = await authenticate(authHeader, config);
   if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+  if (!isValidDraftId(draftId)) return INVALID_DRAFT_ID;
 
   const stored = await config.store.getDraft(user.id, draftId);
   if (stored === null) return { ok: true, status: 200, data: { draft: null, meta: null } };
@@ -161,6 +174,7 @@ export async function deleteDraft(
 ): Promise<DraftResult<{ ok: true }>> {
   const user = await authenticate(authHeader, config);
   if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+  if (!isValidDraftId(draftId)) return INVALID_DRAFT_ID;
 
   await config.store.deleteDraft(user.id, draftId);
   return { ok: true, status: 200, data: { ok: true } };
