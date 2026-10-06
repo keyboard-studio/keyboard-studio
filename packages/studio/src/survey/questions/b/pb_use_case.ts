@@ -58,6 +58,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["use-case"],
   specRef: "§8",
 };
 export default mod;

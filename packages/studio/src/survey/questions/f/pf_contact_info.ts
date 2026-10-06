@@ -51,6 +51,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["help-contact-info"],
   specRef: "specs/064-keyboard-attribution",
 };
 export default mod;

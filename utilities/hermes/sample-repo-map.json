@@ -412,20 +412,6 @@
       ]
     },
     {
-      "module": "packages/contracts/src/mocks/mockCompiler.ts",
-      "package": "contracts",
-      "exports": [
-        "mockCompiler"
-      ]
-    },
-    {
-      "module": "packages/contracts/src/mocks/mockLintEngine.ts",
-      "package": "contracts",
-      "exports": [
-        "mockLintEngine"
-      ]
-    },
-    {
       "module": "packages/contracts/src/mocks/mockOutputService.ts",
       "package": "contracts",
       "exports": [
@@ -444,13 +430,6 @@
       "package": "contracts",
       "exports": [
         "mockScaffolder"
-      ]
-    },
-    {
-      "module": "packages/contracts/src/mocks/mockValidator.ts",
-      "package": "contracts",
-      "exports": [
-        "mockValidator"
       ]
     },
     {
@@ -1836,20 +1815,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/components/PreviewScreen.tsx",
-      "package": "studio",
-      "exports": [
-        "PreviewScreen"
-      ]
-    },
-    {
-      "module": "packages/studio/src/components/PreviewShell.tsx",
-      "package": "studio",
-      "exports": [
-        "PreviewShell"
-      ]
-    },
-    {
       "module": "packages/studio/src/components/ProfileScreen.tsx",
       "package": "studio",
       "exports": [
@@ -2048,14 +2013,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/dashboard/tokens.ts",
-      "package": "studio",
-      "exports": [
-        "MONO",
-        "SANS"
-      ]
-    },
-    {
       "module": "packages/studio/src/editors/adapters/addPhysicalAdapter.tsx",
       "package": "studio",
       "exports": [
@@ -2148,47 +2105,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/editors/assignLoop/parts/DepBanner.tsx",
-      "package": "studio",
-      "exports": [
-        "DepBanner",
-        "DepNode"
-      ]
-    },
-    {
-      "module": "packages/studio/src/editors/assignLoop/parts/GlyphCell.tsx",
-      "package": "studio",
-      "exports": [
-        "GlyphCell"
-      ]
-    },
-    {
-      "module": "packages/studio/src/editors/assignLoop/parts/InfoView.tsx",
-      "package": "studio",
-      "exports": [
-        "InfoContent",
-        "InfoView",
-        "capabilityHint",
-        "infoFor",
-        "keyHint"
-      ]
-    },
-    {
-      "module": "packages/studio/src/editors/assignLoop/parts/Inspector.tsx",
-      "package": "studio",
-      "exports": [
-        "Inspector",
-        "storePairDescription"
-      ]
-    },
-    {
-      "module": "packages/studio/src/editors/assignLoop/parts/KeyCap.tsx",
-      "package": "studio",
-      "exports": [
-        "KeyCap"
-      ]
-    },
-    {
       "module": "packages/studio/src/editors/assignLoop/parts/KeySeq.tsx",
       "package": "studio",
       "exports": [
@@ -2204,32 +2120,11 @@
       ]
     },
     {
-      "module": "packages/studio/src/editors/assignLoop/parts/Rail.tsx",
-      "package": "studio",
-      "exports": [
-        "Rail"
-      ]
-    },
-    {
       "module": "packages/studio/src/editors/assignLoop/parts/StatusBar.tsx",
       "package": "studio",
       "exports": [
         "RemovedItem",
         "StatusBar"
-      ]
-    },
-    {
-      "module": "packages/studio/src/editors/assignLoop/parts/StoreChip.tsx",
-      "package": "studio",
-      "exports": [
-        "StoreChip"
-      ]
-    },
-    {
-      "module": "packages/studio/src/editors/assignLoop/parts/ToggleBox.tsx",
-      "package": "studio",
-      "exports": [
-        "ToggleBox"
       ]
     },
     {
@@ -2256,13 +2151,6 @@
       "exports": [
         "promoteKeyToHandSet",
         "promoteOnManualEdit"
-      ]
-    },
-    {
-      "module": "packages/studio/src/editors/carve/CarveGallery.tsx",
-      "package": "studio",
-      "exports": [
-        "CarveGallery"
       ]
     },
     {
@@ -2418,13 +2306,6 @@
         "ResizablePanesOptions",
         "ResizablePanesResult",
         "useResizablePanes"
-      ]
-    },
-    {
-      "module": "packages/studio/src/hooks/useTouchLint.ts",
-      "package": "studio",
-      "exports": [
-        "useTouchLint"
       ]
     },
     {
@@ -2759,14 +2640,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/lib/publishPRErrorMessage.ts",
-      "package": "studio",
-      "exports": [
-        "isPublishPRError",
-        "publishPRErrorMessage"
-      ]
-    },
-    {
       "module": "packages/studio/src/lib/rankBases.ts",
       "package": "studio",
       "exports": [
@@ -3025,14 +2898,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/stores/hoverInfoStore.ts",
-      "package": "studio",
-      "exports": [
-        "HoverInfo",
-        "useHoverInfoStore"
-      ]
-    },
-    {
       "module": "packages/studio/src/stores/surveySessionStore.ts",
       "package": "studio",
       "exports": [
@@ -3137,13 +3002,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/survey/constants.ts",
-      "package": "studio",
-      "exports": [
-        "VALID_PHASES"
-      ]
-    },
-    {
       "module": "packages/studio/src/survey/index.ts",
       "package": "studio",
       "exports": [
@@ -3161,16 +3019,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/survey/loadModularFlow.ts",
-      "package": "studio",
-      "exports": [
-        "FlowStatus",
-        "ThinFlowYaml",
-        "loadModularFlow",
-        "parseThinYaml"
-      ]
-    },
-    {
       "module": "packages/studio/src/survey/placementSeeds.ts",
       "package": "studio",
       "exports": [
@@ -3179,32 +3027,6 @@
         "buildPlacementSeeds",
         "extractSeedEntries",
         "getSuggestionForChar"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/author_contact_email.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/author_display_name.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/desktop_first_notice.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
       ]
     },
     {
@@ -3251,244 +3073,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/survey/questions/a/iso_code.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "mutate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/language_name_autonym.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "mutate",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/language_name_english.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "mutate",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/layout_family.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/pa_copyright_holder.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "mutate",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/pa_primary_target.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/primary_script.ts",
-      "package": "studio",
-      "exports": [
-        "VALID_SCRIPT_VALUES",
-        "definition",
-        "fixtures",
-        "mutate",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_additional_notes.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_casing_notes.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_community_involvement.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_community_rep_email.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_community_rep_name.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_community_rep_role.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_existing_tools.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_language_status.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_opt_in.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_orthography_url.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_regions.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_requester_affiliation.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_requester_contact.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_requester_name.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_requester_relation.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/provenance_speaker_count.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/region.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/script_family.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/script_not_supported_stub.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/a/writing_direction.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/b/pb_accent_marks_gate.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
       "module": "packages/studio/src/survey/questions/b/pb_additional_methods.ts",
       "package": "studio",
       "exports": [
@@ -3502,15 +3086,6 @@
       "exports": [
         "definition",
         "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/b/pb_capitals_marks.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
       ]
     },
     {
@@ -3536,15 +3111,6 @@
       "exports": [
         "definition",
         "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/b/pb_diacritic_select.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
       ]
     },
     {
@@ -3693,24 +3259,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/survey/questions/b/pb_mark_input_order.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/b/pb_mark_style.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
-      ]
-    },
-    {
       "module": "packages/studio/src/survey/questions/b/pb_non_roman_branch.ts",
       "package": "studio",
       "exports": [
@@ -3766,22 +3314,6 @@
         "definition",
         "fixtures",
         "validate"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/b/pb_rtl_direction_marks.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/b/pb_rtl_direction_marks_detail.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures"
       ]
     },
     {
@@ -3858,15 +3390,6 @@
       "exports": [
         "definition",
         "fixtures"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/b/pb_stacking_marks.ts",
-      "package": "studio",
-      "exports": [
-        "definition",
-        "fixtures",
-        "validate"
       ]
     },
     {
@@ -4064,36 +3587,6 @@
       ]
     },
     {
-      "module": "packages/studio/src/survey/questions/registry.a.ts",
-      "package": "studio",
-      "exports": [
-        "phaseARegistry"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/registry.b.ts",
-      "package": "studio",
-      "exports": [
-        "phaseBRegistry"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/registry.f.ts",
-      "package": "studio",
-      "exports": [
-        "phaseFRegistry"
-      ]
-    },
-    {
-      "module": "packages/studio/src/survey/questions/registry.g.ts",
-      "package": "studio",
-      "exports": [
-        "phaseGRegistry",
-        "phaseProjectRegistry",
-        "phaseTrackRegistry"
-      ]
-    },
-    {
       "module": "packages/studio/src/survey/questions/registry.ts",
       "package": "studio",
       "exports": [
@@ -4124,15 +3617,6 @@
       "module": "packages/studio/src/test-setup.ts",
       "package": "studio",
       "exports": []
-    },
-    {
-      "module": "packages/studio/src/ui/Autocomplete.tsx",
-      "package": "studio",
-      "exports": [
-        "Autocomplete",
-        "AutocompleteOption",
-        "AutocompleteProps"
-      ]
     },
     {
       "module": "packages/studio/src/ui/Badge.tsx",
@@ -4166,15 +3650,6 @@
       "exports": [
         "Checkbox",
         "CheckboxProps"
-      ]
-    },
-    {
-      "module": "packages/studio/src/ui/Dropdown.tsx",
-      "package": "studio",
-      "exports": [
-        "Dropdown",
-        "DropdownOption",
-        "DropdownProps"
       ]
     },
     {

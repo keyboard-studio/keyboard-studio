@@ -131,6 +131,8 @@ Three items noted in the spec's Revision policy (Sec 18) — Risk/dependencies s
 
 ---
 
+- **2026-10-06 (constitution Article IX evolution, spec 087):** Not a `spec.md` change and no `Pattern` schema change; recorded here because the constitution is amended in the same change as the spec that prompted it. Article IX previously named `steps/manifest.ts` as the single source of survey ordering (spec 012). Spec 087 ([`specs/087-decision-backend/`](../specs/087-decision-backend/spec.md)) retired the hand-ordered manifest, so Article IX now names the decision registry (`provides`/`requires`, one `orderByDependencies` sort) as the single ordering authority and the manifest as an unordered step pool. The article's intent (exactly one ordering authority, declared `inputs`/`writes`, every survey surface declared) is unchanged; its existing "a plan proposing new survey content MUST include the manifest entry" gate is restated as "the registry declaration", not a new requirement. Constitution version 1.1.0 -> 1.2.0. Does not reopen any resolved decision (D1-D14). **Date:** 2026-10-06.
+
 ## Sign-Off
 
 Approved for v1.0 release.

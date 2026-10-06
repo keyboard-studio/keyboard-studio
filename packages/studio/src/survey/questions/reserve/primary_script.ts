@@ -161,5 +161,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [irPath("header", "bcp47")],
+  provides: ["reserve-primary-script"],
+  requires: ["reserve-language-code"],
 };
 export default mod;

@@ -1,8 +1,10 @@
-// TypeScript interfaces for the Phase YAML survey flow format.
-// These describe the static definition shape parsed from content/flows/*.yaml —
+// TypeScript interfaces for the survey flow shape.
+// These describe the static question-module definition shape (survey/questions/**) —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
 import type { DecisionProposalSource, IRPath, KeyboardIR } from "@keyboard-studio/contracts";
+import type { DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
+import type { ExtractContext } from "../decisions/extractContext.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -46,6 +48,8 @@ export interface FlowGotoRule {
   condition?: string;
   goto: string | null;
   default?: true;
+  /** Documented loop-back to an earlier question; ignored by order derivation. */
+  loopBack?: true;
 }
 
 /**
@@ -73,7 +77,7 @@ export interface FlowQuestion {
    * Only "email" exists today (a basic `local@domain.tld` check) — SurveyRunner's
    * canAdvance applies it when non-blank; blank still passes for an optional
    * field. Declarative rather than a validate() function so it survives
-   * loadModularFlow's definition-only FlowDef (validate() does not).
+   * a derived FlowDef's definition-only questions (validate() does not).
    */
   format?: "email";
   options?: FlowOption[];
@@ -86,7 +90,7 @@ export interface FlowQuestion {
   advisory?: boolean;
 }
 
-/** Top-level shape of a parsed phase_*.yaml file. */
+/** A flow as derived from its question modules (survey/loadDerivedFlow.ts). */
 export interface FlowDef {
   flow_id: string;
   phase: string;
@@ -287,6 +291,47 @@ export interface QuestionModule {
    * unlike the manifest requirement, question modules may omit it.
    */
   specRef?: string | readonly string[];
+
+  // -------------------------------------------------------------------------
+  // Decision-spike seam (km/decisions-spike). All optional: absent = no
+  // decision wiring, so every existing module and the contract suite compile
+  // unchanged.
+  // -------------------------------------------------------------------------
+
+  /**
+   * The typed decisions this module provides once answered. `orderDecisions()`
+   * derives the walk order from `provides`/`requires` instead of
+   * hand-maintained YAML lists and spine flags. One module may provide
+   * several decisions (spec 087 Q4); the duplicate-provider rule applies
+   * per decision, not per module.
+   */
+  provides?: DecisionId[];
+
+  /** Decisions that must be resolved before this module can run. */
+  requires?: readonly DecisionId[];
+
+  /**
+   * Base-keyboard probe: read this module's decisions from the import bundle
+   * (spec 087 Q1) instead of asking the author. Return `undefined` when the
+   * bundle carries no evidence for the decision. The result runs through
+   * `validate()` before acceptance — a rejected extract falls through to
+   * asked/default.
+   */
+  extract?: (ctx: ExtractContext) => unknown;
+
+  /**
+   * Custom renderer for bulk decisions (e.g. a character-inventory picker).
+   * Absent (or "default") = the standard question field; a component dissolves
+   * a large editor panel into the same module registry. Size lives in the
+   * renderer, not the module system.
+   *
+   * Typed as DecisionRendererProps<any>: modules in one registry carry
+   * different answer types T, so the field is heterogeneous by design — the
+   * same pattern as EditorStepProps in steps/types.ts. Each component
+   * declares its own T (e.g. DecisionRendererProps<string[]>).
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  renderer?: "default" | React.ComponentType<DecisionRendererProps<any>>;
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {

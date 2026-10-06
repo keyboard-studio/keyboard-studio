@@ -12,21 +12,15 @@
 // listed in UNPHASED_STEP_IDS rather than silently missing from every phase.
 //
 // -----------------------------------------------------------------------
-// THIS IS NOT survey/constants.ts's VALID_PHASES.
+// THIS IS NOT the per-flow phase letter.
 //
-// survey/constants.ts defines a DIFFERENT, older, flow-YAML-scoped A-G
-// letter scheme consumed by loadModularFlow.ts's per-question `phase` field
-// (see survey/questions/g/*.ts, "Phase G — Authoring Track" / "Phase G —
-// Project Name"). In THAT scheme:
-//   - `track` and `project_name` are phase "G", not part of this file's B.
-//   - "C-prime" is an empty reserved slot for a future Reorder question,
-//     with no analogue here.
-// The two schemes share some letters (A, B, C, F) but do not share meaning,
-// membership, or count (that scheme has 8 letters — A, B, C, C-prime, D, E,
-// F, G; this one has exactly 6 — A-F). Do not cross-reference the two, and
-// do not let a future edit collapse them into one — they answer different
-// questions ("which flow-YAML phase does this question belong to" vs. "which
-// stepper pill does this manifest step light up").
+// Each flow carries its own older A-G letter (flowSources `phase`, see
+// survey/questions/g/*.ts "Phase G — Authoring Track"). In THAT scheme `track`
+// and `project_name` are phase "G", not part of this file's B. The two schemes
+// share some letters (A, B, F) but not meaning, membership, or count (this one
+// has exactly 6 — A-F). Do not cross-reference the two: they answer different
+// questions ("which flow does this question belong to" vs. "which stepper pill
+// does this manifest step light up").
 // -----------------------------------------------------------------------
 
 import type { MessageDescriptor } from "@lingui/core";

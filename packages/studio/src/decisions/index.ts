@@ -1,5 +1,9 @@
-// decisions — the studio's half of the per-keyboard decision audit
-// (specs/053-decision-audit).
+// decisions — home of two features:
+//   - the studio's half of the per-keyboard decision audit
+//     (specs/053-decision-audit), described below; and
+//   - the decision backend (specs/087-decision-backend): Decision / DecisionId /
+//     DecisionSet, ordering, and extraction. Its modules are imported by path and
+//     are not re-exported from this barrel.
 //
 // Split of responsibilities with the engine: the engine owns what is PURE and
 // shared (the differ, the serializer, the tolerant reader, the shed pass — see

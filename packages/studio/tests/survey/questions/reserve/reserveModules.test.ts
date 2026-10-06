@@ -16,7 +16,9 @@ import {
   describeQuestionModules,
   type ValidateProbe,
 } from "../../../../src/test/questionModuleContract.ts";
-import { reserveRegistry } from "../../../../src/survey/questions/registry.reserve.ts";
+import { reserveModules, moduleRecord } from "../../../../src/survey/questions/registry.ts";
+
+const reserveRegistry = moduleRecord(reserveModules);
 
 // Hand-written validate() cases that are not in a module's own fixtures,
 // carried over from the per-module reserve tests this suite replaced.

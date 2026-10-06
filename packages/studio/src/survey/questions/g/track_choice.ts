@@ -74,5 +74,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
+  provides: ["authoring-track"],
 };
 export default mod;

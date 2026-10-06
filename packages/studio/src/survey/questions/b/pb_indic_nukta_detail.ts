@@ -30,5 +30,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["indic-nukta-detail"], requires: ["indic-nukta-wanted"] };
 export default mod;

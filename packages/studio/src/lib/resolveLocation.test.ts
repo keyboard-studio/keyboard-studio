@@ -165,6 +165,46 @@ describe("reason precedence", () => {
     expect(resolveLocation({ route: "survey", step: "project_name" }, ctx).kind).toBe("reachable");
   });
 
+  // The touch-seed gate steers advance() past the chooser once a choice is
+  // recorded; it does not make the chooser unaddressable (spec 035 R12 keeps
+  // the choice changeable). Reachability tracks the walk alone.
+  it("an unvisited touch seed chooser is beyond-gate", () => {
+    const ctx = ctxWith({
+      traversal: {
+        ...traversal({ activeStepId: "mechanisms", history: ["identity", "choose_base", "track"], selectedTrack: "adapt" }),
+        touchSeedSource: null,
+      } as TraversalSnapshot,
+    });
+    expect(resolveLocation({ route: "survey", step: "touch_seed_source" }, ctx)).toMatchObject({
+      kind: "degraded",
+      reason: "beyond-gate",
+    });
+  });
+
+  it("a visited touch seed chooser stays reachable once a choice is remembered", () => {
+    const ctx = ctxWith({
+      traversal: {
+        ...traversal({
+          activeStepId: "touch",
+          history: ["identity", "choose_base", "track", "mechanisms", "touch_seed_source"],
+          selectedTrack: "adapt",
+        }),
+        touchSeedSource: "import-adapt",
+      } as TraversalSnapshot,
+    });
+    expect(resolveLocation({ route: "survey", step: "touch_seed_source" }, ctx).kind).toBe("reachable");
+  });
+
+  it("the chooser is reachable while the author is on it with a remembered choice", () => {
+    const ctx = ctxWith({
+      traversal: {
+        ...traversal({ activeStepId: "touch_seed_source", history: ["identity", "mechanisms"], selectedTrack: "adapt" }),
+        touchSeedSource: "import-adapt",
+      } as TraversalSnapshot,
+    });
+    expect(resolveLocation({ route: "survey", step: "touch_seed_source" }, ctx).kind).toBe("reachable");
+  });
+
   it("a step carried on a non-wizard route is a no-project refusal, not a step lookup", () => {
     const ctx = ctxWith();
     const result = resolveLocation({ route: "trail", step: "characters" }, ctx);

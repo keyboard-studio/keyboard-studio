@@ -24,5 +24,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["reserve-speaker-count"], requires: ["reserve-provenance-opt-in"] };
 export default mod;

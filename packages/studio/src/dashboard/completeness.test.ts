@@ -38,6 +38,7 @@ import type { WcForCompleteness } from "./completeness.ts";
 import { buildManifestStepGraph } from "./buildStepGraph.ts";
 import type { StepGraph } from "./model.ts";
 import { manifest } from "../steps/manifest.ts";
+import { deriveStepStructure } from "../steps/stepOrder.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Step, EditorStep } from "../steps/types.ts";
 import { irPath, ARRAY_INDEX, formatIRPath } from "@keyboard-studio/contracts";
@@ -77,21 +78,22 @@ function makeSpineStep(id: string, writes: typeof PATH_GROUPS[] = [], inputs: ty
     kind: "editor-step",
     id,
     title: id,
-    spine: true,
     component: (() => null) as EditorStep["component"],
     inputs,
     writes,
   };
 }
 
-/** Build a minimal off-spine EditorStep for test fixtures. */
-function makeOffSpineStep(id: string, joinTarget: string, writes: typeof PATH_GROUPS[] = [], inputs: typeof PATH_GROUPS[] = []): EditorStep {
+/**
+ * Build a minimal side-trail EditorStep for test fixtures. A step with a
+ * `gatedBy` is a side trail; it rejoins at the next ungated step (derived).
+ */
+function makeOffSpineStep(id: string, writes: typeof PATH_GROUPS[] = [], inputs: typeof PATH_GROUPS[] = []): EditorStep {
   return {
     kind: "editor-step",
     id,
     title: id,
-    spine: false,
-    joinTarget,
+    gatedBy: () => true,
     component: (() => null) as EditorStep["component"],
     inputs,
     writes,
@@ -109,17 +111,20 @@ const WC_CLEAN: WcForCompleteness = { desktopLocked: false, touchLayoutJson: nul
  * tests don't depend on a private function.
  */
 function makeStepGraph(steps: readonly Step[]): StepGraph {
+  const trails = deriveStepStructure(steps);
   const nodes = steps.map((step, idx) => ({
     id: step.id,
     label: step.title,
     type: step.kind as "editor-step" | "question-step",
-    spine: step.spine === true,
+    spine: trails.get(step.id)?.spine === true,
     isEntry: idx === 0,
     isTerminal: idx === steps.length - 1,
     writePaths: step.writes.map(formatIRPath),
     inputPaths: step.inputs.map(formatIRPath),
     ...(step.lock !== undefined ? { lock: step.lock } : {}),
-    ...(step.joinTarget !== undefined ? { joinTarget: step.joinTarget } : {}),
+    ...(trails.get(step.id)?.joinTarget !== undefined
+      ? { joinTarget: trails.get(step.id)!.joinTarget as string }
+      : {}),
   }));
   const dataEdges: StepGraph["dataEdges"] = [];
   for (const producer of nodes) {
@@ -238,58 +243,47 @@ describe("C2 — findCycles: A→B→A graph yields a cycle", () => {
 // C3 — side-trail rejoin check
 // ---------------------------------------------------------------------------
 
-describe("C3 — checkRejoin: off-spine dead-ends flagged, rejoins not flagged", () => {
-  it("off-spine step with no joinTarget is flagged", () => {
+describe("C3 — checkRejoin: gated dead-ends flagged, derived rejoins not flagged", () => {
+  it("a gated step with no ungated successor is flagged", () => {
     const mfest: readonly Step[] = [
       makeSpineStep("spine_a"),
-      // Off-spine with no joinTarget — violation.
-      {
-        kind: "editor-step",
-        id: "off_no_join",
-        title: "off_no_join",
-        spine: false,
-        // No joinTarget
-        component: (() => null) as EditorStep["component"],
-        inputs: [],
-        writes: [],
-      },
-      makeSpineStep("spine_b"),
+      makeOffSpineStep("off_last"),
     ];
     const violations = checkRejoin(mfest);
-    expect(violations.some((v) => v.stepId === "off_no_join")).toBe(true);
+    expect(violations.some((v) => v.stepId === "off_last")).toBe(true);
   });
 
-  it("off-spine step whose joinTarget points to another spine:false step is flagged (dead-end chain)", () => {
+  it("consecutive gated steps all rejoin at the first ungated step: none flagged", () => {
     const mfest: readonly Step[] = [
       makeSpineStep("spine_a"),
-      makeOffSpineStep("off_a", "off_b"), // joinTarget is off_b which is also off-spine
-      makeOffSpineStep("off_b", "spine_b"), // this one is fine
+      makeOffSpineStep("off_a"),
+      makeOffSpineStep("off_b"),
       makeSpineStep("spine_b"),
     ];
-    const violations = checkRejoin(mfest);
-    // off_a's joinTarget is off_b (off-spine) — dead-end chain violation.
-    expect(violations.some((v) => v.stepId === "off_a")).toBe(true);
-    // off_b's joinTarget is spine_b (spine:true) — valid, no violation.
-    expect(violations.some((v) => v.stepId === "off_b")).toBe(false);
+    expect(checkRejoin(mfest)).toEqual([]);
+    const trails = deriveStepStructure(mfest);
+    expect(trails.get("off_a")).toEqual({ spine: false, joinTarget: "spine_b" });
+    expect(trails.get("off_b")).toEqual({ spine: false, joinTarget: "spine_b" });
   });
 
-  it("off-spine step whose joinTarget points to a spine:true step is NOT flagged", () => {
+  it("a gated step followed by an ungated step is NOT flagged", () => {
     const mfest: readonly Step[] = [
       makeSpineStep("spine_a"),
-      makeOffSpineStep("off_good", "spine_b"),
+      makeOffSpineStep("off_good"),
       makeSpineStep("spine_b"),
     ];
     const violations = checkRejoin(mfest);
     expect(violations.some((v) => v.stepId === "off_good")).toBe(false);
   });
 
-  it("off-spine step whose joinTarget does not exist is flagged", () => {
+  it("every trailing gated step is flagged when the manifest ends in a gated chain", () => {
     const mfest: readonly Step[] = [
       makeSpineStep("spine_a"),
-      makeOffSpineStep("off_missing", "nonexistent"),
+      makeOffSpineStep("off_x"),
+      makeOffSpineStep("off_y"),
     ];
     const violations = checkRejoin(mfest);
-    expect(violations.some((v) => v.stepId === "off_missing")).toBe(true);
+    expect(violations.map((v) => v.stepId).sort()).toEqual(["off_x", "off_y"]);
   });
 
   it("spine-only manifest has no rejoin violations", () => {
@@ -577,30 +571,21 @@ describe("C6 — real manifest passes all five checks with empty stale set", () 
 // ---------------------------------------------------------------------------
 
 describe("C7 — findUnreachable: step not reachable from spine entry is surfaced", () => {
-  it("a step with spine:false and no joinTarget is unreachable", () => {
+  it("a gated step with no ungated successor is unreachable", () => {
     const mfest: readonly Step[] = [
       makeSpineStep("spine_a"),
       makeSpineStep("spine_b"),
-      // off-spine with no joinTarget — neither spine nor reachable via joinTarget
-      {
-        kind: "editor-step",
-        id: "orphan_step",
-        title: "orphan",
-        spine: false,
-        // No joinTarget
-        component: (() => null) as EditorStep["component"],
-        inputs: [],
-        writes: [],
-      },
+      // gated and last: no ungated step follows, so nothing to rejoin at
+      makeOffSpineStep("orphan_step"),
     ];
     const unreachable = findUnreachable(mfest);
     expect(unreachable).toContain("orphan_step");
   });
 
-  it("a step with spine:false and a joinTarget that resolves to spine is reachable", () => {
+  it("a gated step with an ungated successor is reachable", () => {
     const mfest: readonly Step[] = [
       makeSpineStep("spine_a"),
-      makeOffSpineStep("side_trail", "spine_b"),
+      makeOffSpineStep("side_trail"),
       makeSpineStep("spine_b"),
     ];
     const unreachable = findUnreachable(mfest);
@@ -619,15 +604,7 @@ describe("C7 — findUnreachable: step not reachable from spine entry is surface
   it("unreachable step appears in runCompleteness report", () => {
     const mfest: readonly Step[] = [
       makeSpineStep("s"),
-      {
-        kind: "editor-step",
-        id: "ghost",
-        title: "ghost",
-        spine: false,
-        component: (() => null) as EditorStep["component"],
-        inputs: [],
-        writes: [],
-      },
+      makeOffSpineStep("ghost"),
     ];
     const report = runCompleteness(mfest, WC_CLEAN);
     expect(report.unreachable).toContain("ghost");

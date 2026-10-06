@@ -26,7 +26,7 @@ import { msg, plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap, BaseKeyboard } from "@keyboard-studio/contracts";
 import { composeStack } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
-import { loadModularFlow } from "./loadModularFlow.ts";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
@@ -82,9 +82,6 @@ import {
   FONT_OPTIONS,
   phaseBFontStack,
 } from "./surveyStyles.ts";
-
-// Vite ?raw import — typed via the `*.yaml?raw` declaration in src/vite-env.d.ts.
-import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modular.yaml?raw";
 
 // Question id that begins the manual step-by-step path.
 // makeManualOnlyFlow routes pb_discovery_intro straight here.
@@ -1425,7 +1422,7 @@ export interface PhaseBProps {
 }
 
 export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId, placementMap }: PhaseBProps) {
-  const flow = useMemo(() => loadModularFlow(phaseBModularRaw as string), []);
+  const flow = useMemo(() => loadFlowSourceDef(flowSources["phase_b_characters"]!), []);
   // discoveryMethod lives in surveySessionStore (not component state) so
   // StudioShell's SurveyView can gate the right-pane character map on it —
   // the map only shows for the build-list path (see steps/manifest.ts's

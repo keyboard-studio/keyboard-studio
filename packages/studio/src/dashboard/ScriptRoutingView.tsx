@@ -5,6 +5,7 @@
 import { type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { buildScriptRouting, type ScriptRoutingRow } from "./buildScriptRouting.ts";
+import type { FlowDef } from "../survey/types.ts";
 import type { ScriptRoutingGroup } from "../lib/scriptAxes.ts";
 import { useIsNarrow } from "../hooks/useViewport.ts";
 import { MONO, SANS, Badge, COLORS } from "./tokens.tsx";
@@ -31,11 +32,11 @@ function GroupChip({ group, gated }: { group: ScriptRoutingGroup | null; gated: 
 }
 
 interface ScriptRoutingViewProps {
-  identityLiteRaw: string;
+  flow: FlowDef;
 }
 
-export function ScriptRoutingView({ identityLiteRaw }: ScriptRoutingViewProps) {
-  const rows: ScriptRoutingRow[] = buildScriptRouting(identityLiteRaw);
+export function ScriptRoutingView({ flow }: ScriptRoutingViewProps) {
+  const rows: ScriptRoutingRow[] = buildScriptRouting(flow);
   // Mobile adaptation (Phase 5): the 4-column table is too dense
   // for 390px — narrow viewports render each row as a stacked card instead.
   // Desktop keeps the table unchanged.

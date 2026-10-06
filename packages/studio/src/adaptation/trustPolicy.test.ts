@@ -14,7 +14,8 @@ import {
   recordPolicyResolution,
   TRUST_POLICY_DEFAULTS,
 } from "./trustPolicy.ts";
-import { classifyBaseScript, evaluateFiringConditions } from "./firing.ts";
+import { evaluateFiringConditions } from "./firing.ts";
+import { extractBaseScriptPosture } from "../survey/questions/a/il_target_script.ts";
 import type { AdaptationEvidence } from "./evidence.ts";
 import type { QuestionRecord } from "./catalog.ts";
 import { readConfirmationEvents, resetConfirmationEvents } from "./confirmationEvents.ts";
@@ -61,7 +62,7 @@ describe("trust threshold reclassifies and routes (US3)", () => {
   it("lowering the threshold reclassifies mixed → single-script, naming the policy in provenance", () => {
     const evidence = borderlineBase();
     const lenient = resolveTrustPolicy({ singleScriptThreshold: 0.6 });
-    const cls = classifyBaseScript(evidence, lenient);
+    const cls = extractBaseScriptPosture(evidence.baseScriptDistribution, lenient.singleScriptThreshold);
     expect(cls.posture).toBe("single-script");
     expect(cls.provenance).toContain("60%"); // the threshold that decided it is named
   });

@@ -1,5 +1,5 @@
 // Identity-lite survey step — the head of the hybrid flow (spec §8 "Workflow
-// ordering"). Loads content/flows/identity_lite.yaml, runs it through
+// ordering"). Derives the identity_lite flow from its question modules, runs it through
 // SurveyRunner, and on completion extracts the language autonym, English name,
 // and the INDEPENDENT target script, deriving the routing/A2 prefill
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
@@ -9,7 +9,6 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, DecisionProposalSource, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
-import { loadModularFlow } from "./loadModularFlow.ts";
 import { surveyPageColumn, phaseHeading, leadParagraph } from "./surveyStyles.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
 import { deriveScriptPrefill } from "../lib/scriptAxes.ts";
@@ -22,8 +21,7 @@ import {
 import { buildTargetBcp47, normalizeRegionSubtag } from "./targetBcp47.ts";
 import { answerString } from "./answerString.ts";
 import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
-
-import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
+import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 
 // Scripts gated out of v1 (spec §9). When the target is one of these the flow
 // ends on the "not supported" notice and the slice should not proceed.
@@ -170,7 +168,7 @@ export function IdentityLite({
   const i18nRef = useRef(i18n);
   i18nRef.current = i18n;
 
-  const flow = useMemo(() => loadModularFlow(identityLiteRaw as string), []);
+  const flow = useMemo(() => loadFlowSourceDef(flowSources["identity_lite"]!), []);
   // Held in a ref to match this file's seeding idiom: getSeedValue has an empty
   // dep array by design (see its comment), so it must read through refs.
   const authorSeedRef = useRef(authorSeed);

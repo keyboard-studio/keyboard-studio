@@ -60,5 +60,6 @@ const mod: QuestionModule = {
   inputs: [],
   writes: [],
   specRef: "specs/050-text-sample-prefill",
+  provides: ["text-sample"], requires: ["discovery-intro"],
 };
 export default mod;

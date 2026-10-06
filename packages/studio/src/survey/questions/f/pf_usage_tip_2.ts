@@ -3,11 +3,11 @@
 //
 // ROUTING CHANGE (Phase F revisions): next was "pf_usage_tip_3".
 // Tips 3-5 are demoted out of the live flow membership (see
-// content/flows/phase_f_helpdocs.modular.yaml) because a fixed five required
+// `demotedPhaseFModules` in questions/registry.ts) because a fixed five required
 // tip slots fit neither end of the shipped corpus — 54% of help pages are one
 // paragraph, while complex-script keyboards document 14-30 rule sections.
-// Tips 3-5 remain registered, on disk, and test-covered so re-adding their ids
-// to the YAML revives them (repo convention: demotion is not deletion).
+// Tips 3-5 remain registered, on disk, and test-covered so moving them into
+// `flowModules.phase_f_helpdocs` revives them (repo convention: demotion is not deletion).
 //
 // This second tip now sits INSIDE the opt-in battery, past pf_more_detail_gate —
 // the default path asks for at most one tip.
@@ -37,5 +37,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-usage-tip-2"], requires: ["help-more-detail"] };
 export default mod;

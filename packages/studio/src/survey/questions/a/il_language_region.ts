@@ -53,5 +53,8 @@ const mod: QuestionModule = {
   writes: [],
   outputs: [{ target: "package-descriptor", field: "bcp47" }],
   specRef: "specs/030-langtags-identity-autocomplete",
+  // Decision spike (km/decisions-spike).
+  provides: ["language-region"],
+  requires: ["language-name"],
 };
 export default mod;

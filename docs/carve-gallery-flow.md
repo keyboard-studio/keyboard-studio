@@ -1,6 +1,6 @@
 # Carve Gallery — workflow & data-flow map
 
-> Phase D of the authoring spine: *"Review your keyboard's rules."* The author
+> Phase D of the authoring flow: *"Review your keyboard's rules."* The author
 > tours the base keyboard's recognised patterns, groups, stores and raw
 > fragments and **removes** what they don't want. Carve is a **remove-only**
 > editor — the add galleries (Mechanisms, Touch) are its mirror.
@@ -22,33 +22,35 @@ Primary files:
 
 ---
 
-## 1. Where Carve sits in the spine
+## 1. Where Carve sits in the flow
 
-Carve is one spine step in the step manifest
+Step order and side-trail membership are **derived**, not declared: order comes from each step's `provides`/`requires` ([stepDependencies.ts](../packages/studio/src/steps/stepDependencies.ts), spec 087), a step is a side trail when it has a `gatedBy`, and its join target (`joinTarget` on the derived `StepTrail`) is its next ungated successor. The `spine`/`joinTarget` flags are no longer manifest fields.
+
+Carve is one step in the step manifest
 ([packages/studio/src/steps/manifest.ts](../packages/studio/src/steps/manifest.ts)).
 It runs **after** the character inventory and **before** the add galleries — the
 author removes from the base, then adds onto what survives.
 
 ```mermaid
 flowchart LR
-  identity["identity<br/>(spine)"]
-  base["choose_base<br/>(spine)"]
+  identity["identity"]
+  base["choose_base"]
   track["track<br/>copy vs adapt"]
-  pname["project_name<br/>(off-spine · copy only)"]
+  pname["project_name<br/>(side-trail · copy only)"]
   chars["characters<br/>Phase A/B questions"]
   marks["marks<br/>spec 071 series<br/>(S0 auto-skip)"]
   conv["convenience<br/>keep surplus A-Z?<br/>(auto-skip)"]
   carve["carve ◆<br/>Phase D · remove"]:::here
   mech["mechanisms<br/>Phase C · +physical<br/>lock: physical"]
-  tseed["touch_seed_source<br/>(off-spine fork)"]
+  tseed["touch_seed_source<br/>(side-trail fork)"]
   touch["touch<br/>Phase E · +touch<br/>lock: touch"]
   help["help<br/>Phase F"]
   pkg["package<br/>(reserved)"]
 
   identity --> base --> track --> chars
-  track -. copy-track .-> pname -. joinTarget .-> chars
+  track -. copy-track .-> pname -. derived join .-> chars
   chars --> marks --> conv --> carve --> mech --> touch --> help --> pkg
-  mech -. seed fork .-> tseed -. joinTarget .-> touch
+  mech -. seed fork .-> tseed -. derived join .-> touch
 
   classDef here fill:#fde68a,stroke:#b45309,stroke-width:2px,color:#000;
 ```
@@ -64,7 +66,7 @@ declares `writes: groups[] / stores[] / raw[]` (`CARVE_WRITES`) and `inputs: []`
 ### The needed-set, and the two steps that shape it
 
 Carve's removal recommendations are the complement of a **needed-set**: what the
-orthography actually requires. Two immediately-preceding spine steps shape it,
+orthography actually requires. Two immediately-preceding steps shape it,
 and both have a computed gate that skips without rendering when they have
 nothing to ask, so the common path is invisible.
 

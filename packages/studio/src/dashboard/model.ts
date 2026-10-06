@@ -157,12 +157,13 @@ export interface StepGraphNode {
   label: string;
   /** Step kind: "editor-step" (gallery/panel) or "question-step" (survey question). */
   type: StepNodeType;
-  /** True when spine === true in the manifest. */
+  /** True when the step is on the main line (derived: it has no gatedBy). */
   spine: boolean;
   /** Lock gate placed after this step ("physical" | "touch" | undefined). */
   lock?: "physical" | "touch";
   /**
-   * For off-spine steps: the spine step id this side trail rejoins.
+   * For off-spine steps: the spine step id this side trail rejoins (derived:
+   * the next ungated step in step order).
    * Undefined for spine steps.
    */
   joinTarget?: string;

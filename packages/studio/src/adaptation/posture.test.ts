@@ -54,7 +54,7 @@ describe("buildPosture", () => {
     expect(postureFor(p, "device-targets").posture).toBe("propose");
   });
 
-  it("threads the live TrustPolicy threshold for the script facet — agrees with classifyBaseScript", () => {
+  it("threads the live TrustPolicy threshold for the script facet — agrees with extractBaseScriptPosture", () => {
     // A base whose dominant script is 70% straddles the default 0.80 threshold.
     const ev = evidence({ baseScriptDistribution: { Latn: 0.7, Cyrl: 0.3 } });
     // Default policy (0.80): 0.7 < 0.80 → propose.

@@ -15,12 +15,13 @@
 // seam intercepts it.
 
 import type { DecisionProposalSource, LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { useCallback } from "react";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { surveyPageColumn, phaseHeading } from "./surveyStyles.ts";
-import type { FlowDef, SurveyContext } from "./types.ts";
+import type { FlowDef, QuestionModule, SurveyContext } from "./types.ts";
 
 export interface FlowStepHostProps {
-  /** Pre-loaded modular flow (factory calls loadModularFlow(source.raw)). */
+  /** Pre-loaded flow (factory calls loadFlowSourceDef(source)). */
   flow: FlowDef;
   /** Header text (from options.title / flowSource.title). */
   title: string;
@@ -43,6 +44,22 @@ export interface FlowStepHostProps {
   getRequiredOverride?: (questionId: string) => boolean | undefined;
   /** Optional per-question lint findings (phase_f). Forwarded to SurveyRunner. */
   findingsByQuestionId?: Record<string, LintFinding[]>;
+  /**
+   * Decision-model write seam (spec 087 T031). When provided, FlowStepHost
+   * routes each committed answer through its question module's `mutate()`
+   * (when the module defines one) via the injected `applyAnswer` — the
+   * factory owns the store and the `applyMutatePatch` containment check.
+   * Absent = legacy behavior (answers only reach onAnswerCommit).
+   * FlowStepHost stays pure (C1.3): no store imports, no steps/ imports —
+   * the seam is injected, never imported.
+   */
+  mutateDeps?: {
+    modules: readonly QuestionModule[];
+    applyAnswer: (
+      module: QuestionModule,
+      value: string | string[] | undefined,
+    ) => void;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +77,25 @@ export function FlowStepHost({
   onAnswerCommit,
   findingsByQuestionId,
   getRequiredOverride,
+  mutateDeps,
 }: FlowStepHostProps) {
+  // Decision-model write path (spec 087 T031): a committed answer whose
+  // module defines `mutate()` is routed through the injected seam. The
+  // factory's applyAnswer runs mutate() + applyMutatePatch against the
+  // working copy; containment violations throw there (M3) and the working
+  // copy is left unchanged. Legacy onAnswerCommit still fires first.
+  const handleAnswerCommit = useCallback(
+    (questionId: string, value: string | string[] | undefined) => {
+      onAnswerCommit?.(questionId, value);
+      const deps = mutateDeps;
+      if (deps === undefined) return;
+      const mod = deps.modules.find((m) => m.definition.id === questionId);
+      if (mod?.mutate === undefined) return;
+      deps.applyAnswer(mod, value);
+    },
+    [onAnswerCommit, mutateDeps],
+  );
+
   return (
     <div style={surveyPageColumn}>
       <h2 style={phaseHeading}>{title}</h2>
@@ -72,7 +107,9 @@ export function FlowStepHost({
         {...(onBack !== undefined ? { onBack } : {})}
         {...(getSeedValue !== undefined ? { getSeedValue } : {})}
         {...(getSeedSource !== undefined ? { getSeedSource } : {})}
-        {...(onAnswerCommit !== undefined ? { onAnswerCommit } : {})}
+        {...(onAnswerCommit !== undefined || mutateDeps !== undefined
+          ? { onAnswerCommit: handleAnswerCommit }
+          : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
         {...(getRequiredOverride !== undefined ? { getRequiredOverride } : {})}
       />

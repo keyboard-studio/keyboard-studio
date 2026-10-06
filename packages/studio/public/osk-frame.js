@@ -61,6 +61,17 @@
   // or stomping the newer keyboard's activation. Mirrors the host-side runId
   // supersession in useKeyboardArtifact.ts.
   var loadToken = 0;
+  // Loads are also SERIALIZED: at most one addKeyboards() chain runs at a time,
+  // and a request that arrives meanwhile is parked here (newest wins) until the
+  // running chain settles. The token alone is not enough. KMW tracks an
+  // in-flight fetch by keyboard id, and every recompile reuses the same id, so
+  // overlapping loads share that record. When one load fails or is removed,
+  // KMW drops the record while the newer script is still loading. That
+  // script's KR() then looks unsolicited, so KMW discards the keyboard it just
+  // registered and reports "Error registering the <id> keyboard ... may contain
+  // an error" for a perfectly valid script.
+  var loadInFlight = false;
+  var queuedLoad = null;
 
   // [SCAFFOLD] Device profiles cribbed from Keyman Developer test.js.
   // desktop + touch cover the gallery's Desktop/Mobile toggle; tablet is a
@@ -351,13 +362,42 @@
       postError("KMW engine missing addKeyboards()");
       return;
     }
+    // Claim the token at REQUEST time, so a load parked behind a running one
+    // already marks that running chain as superseded (it then neither
+    // activates nor reports its failure).
+    var myToken = ++loadToken;
+    if (loadInFlight) {
+      queuedLoad = {
+        jsUrl: jsUrl,
+        keyboardId: keyboardId,
+        fontFaceUrl: fontFaceUrl,
+        fontFaceFamily: fontFaceFamily,
+        keyboardCssUrls: keyboardCssUrls,
+        bcp47: bcp47,
+        token: myToken,
+      };
+      return;
+    }
+    startLoad(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily, keyboardCssUrls, bcp47, myToken);
+  }
+
+  // Run the queued request, if any, once the running chain has settled.
+  function finishLoad() {
+    loadInFlight = false;
+    if (queuedLoad === null) return;
+    var q = queuedLoad;
+    queuedLoad = null;
+    startLoad(q.jsUrl, q.keyboardId, q.fontFaceUrl, q.fontFaceFamily, q.keyboardCssUrls, q.bcp47, q.token);
+  }
+
+  function startLoad(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily, keyboardCssUrls, bcp47, myToken) {
+    loadInFlight = true;
     // Inject font and per-keyboard CSS BEFORE registering the keyboard
     // so the compiled CSS can resolve the family name and the keyboard's
     // own `.kmw-keyboard-<id>` rules are present when the keyboard JS
     // executes.
     injectFontFace(fontFaceFamily, fontFaceUrl);
     injectKeyboardCss(keyboardCssUrls);
-    var myToken = ++loadToken;
     setStatus("registering keyboard: " + keyboardId);
     var kmwId = "Keyboard_" + keyboardId;
     // Remove any stale registration before re-adding. KMW caches keyboards by
@@ -407,7 +447,8 @@
       .catch(function (err) {
         if (myToken !== loadToken) return;        // a superseded load's failure (e.g. a blob the host already revoked) — ignore
         postError("keyboard load failed for '" + kmwId + "': " + (err && err.message || err));
-      });
+      })
+      .then(finishLoad, finishLoad);
   }
 
   function initEngine() {

@@ -61,5 +61,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name")],
+  provides: ["project-display-name"],
 };
 export default mod;

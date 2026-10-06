@@ -1,11 +1,14 @@
 // manifest.test.ts — T025 (P4b foundation, updated for P4b review P0 fix).
 //
-// Asserts M2–M6 from the manifest-reducer contract:
-//   M2 — spine order matches FR-012 functional order (now includes track).
+// Asserts M2–M6 from the manifest-reducer contract. Spine membership and join
+// targets are DERIVED (steps/stepOrder.ts): a gated step is a side trail and
+// rejoins at the next ungated step. The frozen-literal parity oracle lives in
+// stepOrder.parity.test.ts; these tests assert the contract's M-rules on top.
+//   M2 — main-line order matches FR-012 functional order (now includes track).
 //   M3 — exactly one lock:"physical" then one lock:"touch".
-//   M4 — touch_seed_source is spine:false with a joinTarget resolving to an
-//         existing spine:true step.
-//   M4b — project_name is spine:false with joinTarget:"characters" (CYOA fork).
+//   M4 — touch_seed_source is a side trail whose derived join target is an
+//         existing spine step.
+//   M4b — project_name is a side trail rejoining at "characters" (CYOA fork).
 //   M5 — all ids unique.
 //   M6 — no A–G phase-letter vocabulary in ids or titles.
 //
@@ -14,6 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { manifest } from "./manifest.ts";
 import type { Step } from "./types.ts";
+import { STEP_TRAILS } from "./stepOrder.ts";
 import { assertUniqueIds } from "./types.test.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 
@@ -21,14 +25,20 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Derived (not declared) trail membership — see steps/stepOrder.ts. */
+const spineOf = (s: Step | undefined): boolean | undefined =>
+  s === undefined ? undefined : STEP_TRAILS.get(s.id)?.spine;
+const joinOf = (s: Step | undefined): string | undefined =>
+  s === undefined ? undefined : STEP_TRAILS.get(s.id)?.joinTarget;
+
 const spineSteps = (steps: readonly Step[]): Step[] =>
-  steps.filter((s) => s.spine === true);
+  steps.filter((s) => spineOf(s) === true);
 
 const lockedSteps = (steps: readonly Step[]): Step[] =>
   steps.filter((s) => s.lock !== undefined);
 
 const offSpineSteps = (steps: readonly Step[]): Step[] =>
-  steps.filter((s) => s.spine === false);
+  steps.filter((s) => spineOf(s) === false);
 
 /** Finds the index of a step by id; returns -1 if not found. */
 const findStepIndex = (steps: readonly Step[], id: string): number =>
@@ -86,7 +96,7 @@ describe("M5 — all step ids are unique", () => {
 //         Rules → Mechanisms → (lock:physical on mechanisms) →
 //         touch carve+add → (lock:touch) → Help → Package
 //
-// track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
+// track is a real spine step (P0 fix). project_name is a derived side trail (CYOA fork).
 // Sequences (S-03) build inline in the Mechanism Gallery's method chooser —
 // there is no separate "sequences" spine step.
 // Rules (spec 082) sits between carve and mechanisms: the before/after rule
@@ -212,10 +222,10 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
     expect(locks[1]?.lock).toBe("touch");
   });
 
-  it("all lock-carrying steps are spine:true steps (not side trails)", () => {
+  it("all lock-carrying steps are spine steps (not side trails)", () => {
     const locked = lockedSteps(manifest);
     for (const s of locked) {
-      expect(s.spine).toBe(true);
+      expect(spineOf(s)).toBe(true);
     }
   });
 });
@@ -230,31 +240,31 @@ describe("M4 — touch_seed_source fork", () => {
     expect(found?.id).toBe("touch_seed_source");
   });
 
-  it("touch_seed_source has spine:false", () => {
+  it("touch_seed_source is a derived side trail", () => {
     const found = manifest.find((s) => s.id === "touch_seed_source");
-    expect(found?.spine).toBe(false);
+    expect(spineOf(found)).toBe(false);
   });
 
   it("touch_seed_source has a joinTarget declared", () => {
     const found = manifest.find((s) => s.id === "touch_seed_source");
-    expect(found?.joinTarget).toBeDefined();
-    expect(typeof found?.joinTarget).toBe("string");
-    expect((found?.joinTarget?.length ?? 0) > 0).toBe(true);
+    expect(joinOf(found)).toBeDefined();
+    expect(typeof joinOf(found)).toBe("string");
+    expect((joinOf(found)?.length ?? 0) > 0).toBe(true);
   });
 
   it("touch_seed_source.joinTarget resolves to a step that exists in the manifest", () => {
     const seedStep = manifest.find((s) => s.id === "touch_seed_source");
-    const joinTarget = seedStep?.joinTarget;
+    const joinTarget = joinOf(seedStep);
     expect(joinTarget).toBeDefined();
     const targetStep = manifest.find((s) => s.id === joinTarget);
     expect(targetStep).toBeDefined();
   });
 
-  it("touch_seed_source.joinTarget resolves to a spine:true step", () => {
+  it("touch_seed_source.joinTarget resolves to a spine step", () => {
     const seedStep = manifest.find((s) => s.id === "touch_seed_source");
-    const joinTarget = seedStep?.joinTarget;
+    const joinTarget = joinOf(seedStep);
     const targetStep = manifest.find((s) => s.id === joinTarget);
-    expect(targetStep?.spine).toBe(true);
+    expect(spineOf(targetStep)).toBe(true);
   });
 
   it("touch_seed_source appears in the manifest before the touch spine step", () => {
@@ -265,7 +275,7 @@ describe("M4 — touch_seed_source fork", () => {
 // ---------------------------------------------------------------------------
 // M4b — project_name CYOA fork (copy-track only)
 //
-// project_name must be spine:false with joinTarget:"characters" — it is the
+// project_name must be a derived side trail with join target:"characters" — it is the
 // CYOA branch for the copy track. The adapt track skips it entirely.
 // ---------------------------------------------------------------------------
 
@@ -275,20 +285,20 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
     expect(found).toBeDefined();
   });
 
-  it("project_name has spine:false", () => {
+  it("project_name is a derived side trail", () => {
     const found = manifest.find((s) => s.id === "project_name");
-    expect(found?.spine).toBe(false);
+    expect(spineOf(found)).toBe(false);
   });
 
   it("project_name.joinTarget is 'characters'", () => {
     const found = manifest.find((s) => s.id === "project_name");
-    expect(found?.joinTarget).toBe("characters");
+    expect(joinOf(found)).toBe("characters");
   });
 
-  it("project_name.joinTarget resolves to a spine:true step", () => {
+  it("project_name.joinTarget resolves to a spine step", () => {
     const found = manifest.find((s) => s.id === "project_name");
-    const targetStep = manifest.find((s) => s.id === found?.joinTarget);
-    expect(targetStep?.spine).toBe(true);
+    const targetStep = manifest.find((s) => s.id === joinOf(found));
+    expect(spineOf(targetStep)).toBe(true);
   });
 
   it("project_name appears in the manifest between track and characters", () => {
@@ -302,24 +312,24 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
 // ---------------------------------------------------------------------------
 
 describe("Off-spine step inventory", () => {
-  it("exactly two spine:false steps exist (project_name and touch_seed_source)", () => {
+  it("exactly two derived side-trail steps exist (project_name and touch_seed_source)", () => {
     const offSpine = offSpineSteps(manifest);
     expect(offSpine).toHaveLength(2);
     const ids = offSpine.map((s) => s.id).sort();
     expect(ids).toEqual(["project_name", "touch_seed_source"]);
   });
 
-  it("all spine:false steps have a joinTarget declared", () => {
+  it("all derived side-trail steps have a derived join target", () => {
     for (const step of offSpineSteps(manifest)) {
-      expect(step.joinTarget).toBeDefined();
-      expect(typeof step.joinTarget).toBe("string");
+      expect(joinOf(step)).toBeDefined();
+      expect(typeof joinOf(step)).toBe("string");
     }
   });
 
-  it("all spine:false joinTargets resolve to spine:true steps in the manifest", () => {
+  it("all derived join targets resolve to spine steps in the manifest", () => {
     for (const step of offSpineSteps(manifest)) {
-      const target = manifest.find((s) => s.id === step.joinTarget);
-      expect(target?.spine).toBe(true);
+      const target = manifest.find((s) => s.id === joinOf(step));
+      expect(spineOf(target)).toBe(true);
     }
   });
 });

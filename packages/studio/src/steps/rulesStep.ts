@@ -8,13 +8,14 @@
 // inputs, and persists as `working-copy` like the other working-copy steps.
 
 import type { EditorStep } from "./types.ts";
+import { stepDependencies } from "./stepDependencies.ts";
 import RulesStep from "../survey/rules/RulesStep.tsx";
 
 export const rulesStep: EditorStep = {
   kind: "editor-step",
   id: "rules",
+  ...stepDependencies("rules"),
   title: "Rules",
-  spine: true,
   layout: "full",
   component: RulesStep,
   inputs: [],

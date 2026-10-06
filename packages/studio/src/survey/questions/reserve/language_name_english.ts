@@ -79,5 +79,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [irPath("header", "name")],
+  provides: ["reserve-language-name"],
 };
 export default mod;

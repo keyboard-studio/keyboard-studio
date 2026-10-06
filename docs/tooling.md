@@ -253,8 +253,8 @@ its manifest edge coverage.
   `packages/studio/src/survey/__fixtures__/journeyCorpus.ts`, so a new journey is added there.
   The command is a `vitest run` invocation of one spec
   (`src/dashboard/journeyCoverage.report.test.ts`), not a bare `tsx` script — the manifest's
-  editor-step components transitively import `content/flows/*.modular.yaml?raw`, a Vite asset
-  transform `tsx`/Node cannot resolve; Vitest already runs on Vite's own transform pipeline, so
+  editor-step components transitively import Vite-only assets (`?raw`, `?lingui`) that
+  `tsx`/Node cannot resolve; Vitest already runs on Vite's own transform pipeline, so
   reusing it avoids a second, Vite-unaware code path onto the same manifest. See that file's
   header comment for the empirically-confirmed failure mode this sidesteps.
 

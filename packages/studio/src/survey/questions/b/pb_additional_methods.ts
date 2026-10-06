@@ -24,9 +24,9 @@ export const definition = {
     { value: "done", label: "Done -- go straight to the review" },
   ],
   next: [
-    { condition: "value == 'text-sample'", goto: "pb_text_sample" },
-    { condition: "value == 'linguist'", goto: "pb_linguist_confirm" },
-    { condition: "value == 'picker'", goto: "pb_picker_confirm" },
+    { condition: "value == 'text-sample'", goto: "pb_text_sample", loopBack: true as const },
+    { condition: "value == 'linguist'", goto: "pb_linguist_confirm", loopBack: true as const },
+    { condition: "value == 'picker'", goto: "pb_picker_confirm", loopBack: true as const },
     { default: true, goto: null },
   ],
 } satisfies import("../../types.ts").FlowQuestion;
@@ -45,5 +45,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["additional-methods"] };
 export default mod;

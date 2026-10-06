@@ -2,15 +2,16 @@
 //
 // Covers every case in advance-and-stephost.contract.md §1:
 //   - copy/adapt fork at "track"
-//   - project_name → characters (joinTarget hop)
+//   - project_name → characters (side-trail rejoin hop)
 //   - identity supported/unsupported (terminal branch)
 //   - help → done + navigate:"output"
-//   - each spine hop (skipping spine:false steps)
+//   - each spine hop (skipping side-trail steps)
 //   - adapt-track skips project_name (US2)
 
 import { describe, it, expect } from "vitest";
-import { advance, nextSpineStepAfter, manifestIndexOf } from "./advance.ts";
+import { advance, nextMainLineStepAfter, manifestIndexOf } from "./advance.ts";
 import { manifest, validateManifestShape } from "./manifest.ts";
+import { STEP_TRAILS } from "./stepOrder.ts";
 
 // ---------------------------------------------------------------------------
 // walkSpine — drive advance() from "identity" to a terminal, collecting the
@@ -70,70 +71,70 @@ describe("manifestIndexOf", () => {
 });
 
 // ---------------------------------------------------------------------------
-// nextSpineStepAfter
+// nextMainLineStepAfter
 // ---------------------------------------------------------------------------
 
-describe("nextSpineStepAfter", () => {
+describe("nextMainLineStepAfter", () => {
   it("identity → layout (spec 076 A4: the community-layout step)", () => {
-    expect(nextSpineStepAfter("identity")).toBe("layout");
+    expect(nextMainLineStepAfter("identity")).toBe("layout");
   });
 
   it("layout → choose_base", () => {
-    expect(nextSpineStepAfter("layout")).toBe("choose_base");
+    expect(nextMainLineStepAfter("layout")).toBe("choose_base");
   });
 
   it("choose_base → track", () => {
-    expect(nextSpineStepAfter("choose_base")).toBe("track");
+    expect(nextMainLineStepAfter("choose_base")).toBe("track");
   });
 
-  it("track → characters (skips project_name which is spine:false)", () => {
-    // project_name is spine:false so nextSpineStepAfter("track") skips it.
-    expect(nextSpineStepAfter("track")).toBe("characters");
+  it("track → characters (skips project_name which is a derived side trail)", () => {
+    // project_name is a derived side trail so nextMainLineStepAfter("track") skips it.
+    expect(nextMainLineStepAfter("track")).toBe("characters");
   });
 
   it("characters → marks (spec 071)", () => {
-    expect(nextSpineStepAfter("characters")).toBe("marks");
+    expect(nextMainLineStepAfter("characters")).toBe("marks");
   });
 
   it("marks → punctuation", () => {
-    expect(nextSpineStepAfter("marks")).toBe("punctuation");
+    expect(nextMainLineStepAfter("marks")).toBe("punctuation");
   });
 
   it("punctuation → invisibles", () => {
-    expect(nextSpineStepAfter("punctuation")).toBe("invisibles");
+    expect(nextMainLineStepAfter("punctuation")).toBe("invisibles");
   });
 
   it("invisibles → convenience", () => {
-    expect(nextSpineStepAfter("invisibles")).toBe("convenience");
+    expect(nextMainLineStepAfter("invisibles")).toBe("convenience");
   });
 
   it("convenience → carve", () => {
-    expect(nextSpineStepAfter("convenience")).toBe("carve");
+    expect(nextMainLineStepAfter("convenience")).toBe("carve");
   });
 
   it("carve → deadkeys (spec 083: Deadkeys step sits between carve and mechanisms)", () => {
-    expect(nextSpineStepAfter("carve")).toBe("deadkeys");
+    expect(nextMainLineStepAfter("carve")).toBe("deadkeys");
   });
 
   it("deadkeys → rules (spec 082: rules step follows deadkeys)", () => {
-    expect(nextSpineStepAfter("deadkeys")).toBe("rules");
+    expect(nextMainLineStepAfter("deadkeys")).toBe("rules");
   });
 
   it("rules → mechanisms", () => {
-    expect(nextSpineStepAfter("rules")).toBe("mechanisms");
+    expect(nextMainLineStepAfter("rules")).toBe("mechanisms");
   });
 
-  it("mechanisms → touch (skips touch_seed_source which is spine:false)", () => {
-    // touch_seed_source is spine:false so nextSpineStepAfter("mechanisms") skips it.
-    expect(nextSpineStepAfter("mechanisms")).toBe("touch");
+  it("mechanisms → touch (skips touch_seed_source which is a derived side trail)", () => {
+    // touch_seed_source is a derived side trail so nextMainLineStepAfter("mechanisms") skips it.
+    expect(nextMainLineStepAfter("mechanisms")).toBe("touch");
   });
 
   it("touch → help", () => {
-    expect(nextSpineStepAfter("touch")).toBe("help");
+    expect(nextMainLineStepAfter("touch")).toBe("help");
   });
 
   it("help → done (package is reserved)", () => {
-    expect(nextSpineStepAfter("help")).toBe("done");
+    expect(nextMainLineStepAfter("help")).toBe("done");
   });
 });
 
@@ -217,7 +218,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   });
 
   it("spine ids (spine !== false) are in the locked order", () => {
-    const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
+    const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
       "identity", "layout", "choose_base", "track", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch", "help", "package",
@@ -294,11 +295,11 @@ describe("advance: track — adapt fork (US2)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — project_name step (joinTarget hop)
+// advance — project_name step (side-trail rejoin hop)
 // ---------------------------------------------------------------------------
 
 describe("advance: project_name", () => {
-  it("→ characters (joinTarget)", () => {
+  it("→ characters (side-trail rejoin)", () => {
     const { next } = advance("project_name", undefined, copyCtx);
     expect(next).toBe("characters");
   });
@@ -365,7 +366,7 @@ describe("advance: spine hops", () => {
     expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
-  it("touch_seed_source → touch (joinTarget hop, spec 035 R4)", () => {
+  it("touch_seed_source → touch (side-trail rejoin hop, spec 035 R4)", () => {
     expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
   });
 
@@ -453,14 +454,14 @@ describe("advance: track — null selectedTrack recovery", () => {
 });
 
 // ---------------------------------------------------------------------------
-// nextSpineStepAfter — unknown id guard (P2-D)
+// nextMainLineStepAfter — unknown id guard (P2-D)
 // ---------------------------------------------------------------------------
 
-describe("nextSpineStepAfter: unknown id", () => {
+describe("nextMainLineStepAfter: unknown id", () => {
   it("returns 'done' for an unknown step id (not 'identity')", () => {
     // Before the guard, manifestIndexOf returned -1 causing the scan to start
     // at index 0 and return the first spine step. Now it returns "done".
-    expect(nextSpineStepAfter("completely_unknown_step_id")).toBe("done");
+    expect(nextMainLineStepAfter("completely_unknown_step_id")).toBe("done");
   });
 });
 

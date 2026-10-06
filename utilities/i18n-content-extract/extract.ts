@@ -11,10 +11,10 @@ import { extname, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ALL_CRITERIA, RawPatternSchema, toPattern } from "@keyboard-studio/contracts";
 import type { Pattern } from "@keyboard-studio/contracts";
-import { phaseARegistry } from "../../packages/studio/src/survey/questions/registry.a.ts";
-import { phaseBRegistry } from "../../packages/studio/src/survey/questions/registry.b.ts";
-import { phaseFRegistry } from "../../packages/studio/src/survey/questions/registry.f.ts";
-import { phaseGRegistry } from "../../packages/studio/src/survey/questions/registry.g.ts";
+import {
+  flowModules,
+  demotedPhaseFModules,
+} from "../../packages/studio/src/survey/questions/registry.ts";
 import type { QuestionModule } from "../../packages/studio/src/survey/types.ts";
 
 export type ContentCatalog = Record<string, string>;
@@ -157,56 +157,57 @@ export function extractCriteriaStrings(): ContentCatalog {
  * Flow-question prose: `prompt`, `label`, `body`, `help_text`, `audit_label`,
  * `options[].label`, `options[].note` (spec 050 research.md D4; `audit_label`
  * per spec 055 contracts/catalog-audit-label.contract.md §2). Read only from
- * `mod.definition` of the four LIVE phase sub-registries (a/b/f/g) —
+ * `mod.definition` of every LIVE module (identity-lite, B, F incl. the demoted tip
+ * slots, and the G flows) —
  * `mod.fixtures` (test vectors) and every control field (id, type, required,
  * next, options_source, engine_resolved, advisory, option.value) are never
  * read. `option.note` is rendered prose, not control: RadioField paints it as
  * the per-option helper line (QuestionField.tsx), so it is extracted like
- * `option.label`. `registry.reserve.ts`'s demoted modules are excluded per D2 —
+ * `option.label`. The reserve modules (`reserveModules` in registry.ts) are excluded per D2 —
  * no live flow renders them. `audit_label` is declared directly on
  * `FlowQuestion` (packages/studio/src/survey/types.ts, spec 055 T016).
  */
 export function extractFlowQuestionStrings(): ContentCatalog {
   const out: ContentCatalog = {};
   const seenIds = new Set<string>();
-  const registries: ReadonlyArray<Readonly<Record<string, QuestionModule>>> = [
-    phaseARegistry,
-    phaseBRegistry,
-    phaseFRegistry,
-    phaseGRegistry,
+  const liveModules: readonly QuestionModule[] = [
+    ...flowModules.identity_lite,
+    ...flowModules.phase_b_characters,
+    ...flowModules.phase_f_helpdocs,
+    ...demotedPhaseFModules,
+    ...flowModules.track,
+    ...flowModules.project_name,
   ];
 
-  for (const registry of registries) {
-    for (const mod of Object.values(registry)) {
-      const { definition } = mod;
-      const id = slugifyIdSegment(definition.id);
-      if (seenIds.has(id)) {
-        console.warn(`[i18n-content-extract] skipping duplicate flow-question id "${id}" (first occurrence kept)`);
-        continue;
-      }
-      seenIds.add(id);
+  for (const mod of liveModules) {
+    const { definition } = mod;
+    const id = slugifyIdSegment(definition.id);
+    if (seenIds.has(id)) {
+      console.warn(`[i18n-content-extract] skipping duplicate flow-question id "${id}" (first occurrence kept)`);
+      continue;
+    }
+    seenIds.add(id);
 
-      const base = `content.flowQuestion.${id}`;
-      const fields: Array<["prompt" | "label" | "body" | "help_text" | "audit_label", string | undefined]> = [
-        ["prompt", definition.prompt],
-        ["label", definition.label],
-        ["body", definition.body],
-        ["help_text", definition.help_text],
-        ["audit_label", definition.audit_label],
-      ];
-      for (const [field, value] of fields) {
-        if (typeof value === "string" && value.trim().length > 0) {
-          out[`${base}.${field}`] = value;
-        }
+    const base = `content.flowQuestion.${id}`;
+    const fields: Array<["prompt" | "label" | "body" | "help_text" | "audit_label", string | undefined]> = [
+      ["prompt", definition.prompt],
+      ["label", definition.label],
+      ["body", definition.body],
+      ["help_text", definition.help_text],
+      ["audit_label", definition.audit_label],
+    ];
+    for (const [field, value] of fields) {
+      if (typeof value === "string" && value.trim().length > 0) {
+        out[`${base}.${field}`] = value;
       }
-      for (const option of definition.options ?? []) {
-        const optionId = slugifyIdSegment(option.value);
-        if (option.label.trim().length > 0) {
-          out[`${base}.option.${optionId}.label`] = option.label;
-        }
-        if (typeof option.note === "string" && option.note.trim().length > 0) {
-          out[`${base}.option.${optionId}.note`] = option.note;
-        }
+    }
+    for (const option of definition.options ?? []) {
+      const optionId = slugifyIdSegment(option.value);
+      if (option.label.trim().length > 0) {
+        out[`${base}.option.${optionId}.label`] = option.label;
+      }
+      if (typeof option.note === "string" && option.note.trim().length > 0) {
+        out[`${base}.option.${optionId}.note`] = option.note;
       }
     }
   }

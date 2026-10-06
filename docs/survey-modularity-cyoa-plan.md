@@ -1,5 +1,15 @@
 # Survey Modularity + CYOA Refactor — Plan / RFC
 
+> **Superseded in part by [spec 087](../specs/087-decision-backend/spec.md)** (decision backend). This is a
+> historical plan; the machinery it describes for ordering has since been deleted. Today: there are no
+> `*.modular.yaml` manifests, no `content/flows/_examples/*`, no `loadModularFlow`, and no per-phase
+> `registry.{a,b,f}.ts` (one `flowModules` table plus `questionRegistry`/`decisionIndex` live in
+> `survey/questions/registry.ts`); question and step order are derived from `provides`/`requires`; and
+> `spine` / `joinTarget` are no longer hand-written manifest flags but fields **derived** on the `StepTrail`
+> (a step is a side trail when it has a `gatedBy`; its join target is its next ungated successor). Read the
+> rest of this document as design history; where it names those files or flags, the spec 087 as-built
+> text wins.
+
 > **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) MERGED (branch `km/modular-loader-cutover`) — E2E lane 1 (copy-edit) unblocked via #906, lane 2 (import-improve) conditional on Track 2 import liveness; P3(b) MERGED via #781 (`km/retire-legacy-flow-loader`) — legacy `loadFlow.ts` + the four legacy full-flow YAMLs deleted, `flow-parity.test.ts` converted to standalone modular structural-integrity assertions; P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778, P4b via #780); P0–P1, P5 remain proposals.**
 > P2 shipped: `IRPath` typed key-path algebra exported from `@keyboard-studio/contracts`
 > 0.11.0 (breaking bump, §18-ratified); `QuestionModule.inputs`/`writes` declared across
@@ -413,7 +423,7 @@ is what makes P4 a real rewrite of `SurveyView` rather than a config swap (see
   template, **every prefix of the spine is a valid stopping point** (you always
   have a shippable keyboard).
 - **SIDE TRAILS** — branch on an answer and **must rejoin the spine**. Encoded by
-  `definition.next` routing plus `spine: false` on the step.
+  `definition.next` routing; since spec 087 the side-trail status is derived from the step's `gatedBy` (formerly a hand-written `spine: false`).
 - **LOCK gates** — reversible checkpoints. Breaking a lock marks
   **downstream-derived state stale** via the `inputs`/`writes` dependency graph
   (§3.3).
@@ -435,10 +445,10 @@ defined by three distinct invariants:
    **acyclic**. Completeness logic therefore checks acyclicity explicitly and
    reports a cycle as a hard error (a cycle means "A depends on B depends on A",
    which has no valid staleness ordering).
-3. **Side-trail rejoin invariant (`joinTarget`).** `definition.next`
+3. **Side-trail rejoin invariant (`joinTarget`, now derived).** `definition.next`
    (`string | null | FlowGotoRule[]`) alone **cannot** guarantee that a side trail
-   returns to the spine. So every `spine: false` chain carries an explicit
-   `joinTarget` (the spine step it rejoins), and a **reachability check** verifies
+   returns to the spine. So every side-trail chain carries a
+   `joinTarget` (the spine step it rejoins; originally hand-written, now derived as the next ungated successor), and a **reachability check** verifies
    that the terminal `next` of every side-trail chain lands on a `spine: true`
    step — no side trail may dead-end or leak off-spine.
 
@@ -549,7 +559,7 @@ Both branches **seed from a physical-derived layout** (consistent with Decision 
 and **converge on the SAME carve/add shell.** They differ only in (a) the initial
 touch IR state (seed) and (b) whether the mapper *generates* the layout vs.
 *proposes changes* onto an existing one. **Don't fork the UI, just the seed.** As
-a `spine: false` fork it carries a `joinTarget` back to the touch
+a side-trail fork it carries a (derived) `joinTarget` back to the touch
 carve/add spine step (§3.5 rejoin invariant).
 
 #### Per-key provenance
@@ -847,7 +857,7 @@ remove-mode component**, sharing only `ui/`.
 Galleries register as **`editor-step`s** (with `surface`) via
 `steps/registerEditorSteps.ts`; physical carve/add and touch carve/add are four
 manifest entries around the two lock gates. The `touch_seed_source` fork (§3.6)
-adds a `spine: false` step at the touch-phase entry that rejoins via `joinTarget`.
+adds a side-trail step (originally `spine: false`, now derived from `gatedBy`) at the touch-phase entry that rejoins via its derived `joinTarget`.
 
 ### survey/questions reshape (flat default, folder opt-in)
 
