@@ -19,13 +19,91 @@ export interface DependencyNode {
   readonly id: string;
   readonly provides?: readonly DecisionId[] | undefined;
   readonly requires?: readonly DecisionId[] | undefined;
+  /** Routing successors (`definition.next` targets): each precedes its target. */
+  readonly routesTo?: readonly RouteEdge[] | undefined;
+}
+
+/** One routing edge; `loopBack` marks a documented loop-back (may point upstream). */
+export interface RouteEdge {
+  readonly to: string;
+  readonly loopBack: boolean;
+}
+
+/**
+ * Routing edges of a module (plain, default and every conditional target). An
+ * edge is a documented loop-back when its rule is `value == 'v'` and the module's
+ * own fixtures annotate `v` with a "loop back ..." note (e.g. pb_additional_methods).
+ */
+function routeEdges(m: QuestionModule): RouteEdge[] {
+  const next = m.definition.next;
+  if (typeof next === "string") return [{ to: next, loopBack: false }];
+  if (!Array.isArray(next)) return [];
+  const loopValues = new Set(
+    (m.fixtures?.valid ?? [])
+      .filter((f) => /^loop back/i.test(f.note ?? ""))
+      .map((f) => f.value),
+  );
+  const edges: RouteEdge[] = [];
+  for (const rule of next) {
+    if (typeof rule.goto !== "string") continue;
+    const eq = rule.condition?.match(/^value\s*==\s*'([^']*)'$/);
+    edges.push({
+      to: rule.goto,
+      loopBack: eq !== null && eq !== undefined && loopValues.has(eq[1]),
+    });
+  }
+  return edges;
 }
 
 const moduleNode = (m: QuestionModule): DependencyNode => ({
   id: m.definition.id,
   provides: m.provides,
   requires: m.requires,
+  routesTo: routeEdges(m),
 });
+
+/**
+ * Routing predecessors per node id, after dropping loop-backs. Back-edges are
+ * found by DFS from the roots (nodes with no inbound route) in declaration
+ * order; a back-edge that is not a documented loop-back is a named error.
+ */
+function routingPredecessors<T>(
+  items: readonly T[],
+  node: (item: T) => DependencyNode,
+): Map<string, Set<string>> {
+  const ids = items.map((i) => node(i).id);
+  const idSet = new Set(ids);
+  const out = new Map<string, RouteEdge[]>();
+  const hasInbound = new Set<string>();
+  for (const item of items) {
+    const n = node(item);
+    const edges = (n.routesTo ?? []).filter((e) => idSet.has(e.to) && e.to !== n.id);
+    out.set(n.id, edges);
+    for (const e of edges) if (!e.loopBack) hasInbound.add(e.to);
+  }
+  const preds = new Map<string, Set<string>>(ids.map((id) => [id, new Set<string>()]));
+  const state = new Map<string, 1 | 2>();
+  const stack: string[] = [];
+  const visit = (u: string): void => {
+    state.set(u, 1);
+    stack.push(u);
+    for (const e of out.get(u) ?? []) {
+      if (state.get(e.to) === 1) {
+        if (e.loopBack) continue;
+        const cycle = [...stack.slice(stack.indexOf(e.to)), e.to];
+        throw new Error(`routing cycle (not a documented loop-back): ${cycle.join(" -> ")}`);
+      }
+      if (e.loopBack) continue;
+      preds.get(e.to)!.add(u);
+      if (!state.has(e.to)) visit(e.to);
+    }
+    stack.pop();
+    state.set(u, 2);
+  };
+  for (const id of ids) if (!hasInbound.has(id) && !state.has(id)) visit(id);
+  for (const id of ids) if (!state.has(id)) visit(id);
+  return preds;
+}
 
 /**
  * Index the provider of each decision. Two providers of the same decision is a
@@ -130,6 +208,9 @@ export function orderByDependencies<T>(
     }
   }
 
+  const routePreds = routingPredecessors(items, node);
+  const emittedIds = new Set<string>();
+
   // Kahn's algorithm, input-order stable.
   const provided = new Set<DecisionId>();
   const emitted = new Set<T>();
@@ -142,7 +223,10 @@ export function orderByDependencies<T>(
       const n = node(item);
       const ready = (n.requires ?? []).every((r) => provided.has(r));
       if (!ready) continue;
+      const routed = [...(routePreds.get(n.id) ?? [])].every((p) => emittedIds.has(p));
+      if (!routed) continue;
       emitted.add(item);
+      emittedIds.add(n.id);
       ordered.push(item);
       for (const p of n.provides ?? []) provided.add(p);
       progress = true;

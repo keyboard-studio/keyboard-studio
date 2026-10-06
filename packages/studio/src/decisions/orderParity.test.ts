@@ -85,6 +85,11 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
       "pf_contact_info",
     ],
   },
+  // Order is a topological order of routing (`next`) too: the legacy YAML listed
+  // pb_special_letters (the shared-tail join that eight non-roman/Indic/SEA/RTL/
+  // syllabic modules route INTO) at index 10, before those modules. The derived order
+  // places the join after every module that routes into it; the earlier frozen copy
+  // of the legacy order violated routing.
   // Frozen from the deleted content/flows/phase_b_characters.modular.yaml.
   {
     flowId: "phase_b_characters",
@@ -101,20 +106,6 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
       "pb_routing_branch",
       "pb_standard_letters",
       "pb_typing_approach",
-      "pb_special_letters",
-      "pb_special_letters_list",
-      "pb_special_letters_notes",
-      "pb_latin_digraphs_gate",
-      "pb_latin_digraphs_list",
-      "pb_punctuation_gate",
-      "pb_punctuation_list",
-      "pb_digit_set",
-      "pb_char_count",
-      "pb_latin_qwerty_branch",
-      "pb_spare_keys_qwerty",
-      "pb_latin_azerty_branch",
-      "pb_azerty_qz_swap",
-      "pb_spare_keys_azerty",
       "pb_non_roman_branch",
       "pb_indic_conjuncts",
       "pb_indic_virama",
@@ -134,6 +125,20 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
       "pb_syllabic_finals_gate",
       "pb_syllabic_finals_detail",
       "pb_other_free_entry",
+      "pb_special_letters",
+      "pb_special_letters_list",
+      "pb_special_letters_notes",
+      "pb_latin_digraphs_gate",
+      "pb_latin_digraphs_list",
+      "pb_punctuation_gate",
+      "pb_punctuation_list",
+      "pb_digit_set",
+      "pb_char_count",
+      "pb_latin_qwerty_branch",
+      "pb_spare_keys_qwerty",
+      "pb_latin_azerty_branch",
+      "pb_azerty_qz_swap",
+      "pb_spare_keys_azerty",
       "pb_contact_language",
       "pb_legacy_encoding",
       "pb_use_case",
