@@ -38,6 +38,23 @@ export const KEYBOARDS = [
 export const CORPUS = resolve(here, "../../../../../keyboards/release");
 export const corpusPresent = existsSync(CORPUS);
 
+/**
+ * Gates run when the corpus is present, or unconditionally in CI (where an absent
+ * corpus must FAIL via the presence assertion, not skip). Locally without the
+ * sibling ../keyboards checkout they skip -- never silently: see announceSc004Skip.
+ */
+export const sc004GatesEnabled = corpusPresent || Boolean(process.env.CI);
+
+/** Make a local skip visible: a console warning plus a clearly named skipped test. */
+export function announceSc004Skip(label: string, skipTest: (name: string) => void): void {
+  if (sc004GatesEnabled) return;
+  console.warn(
+    `[WARN] ${label}: SKIPPED -- keyboards corpus not found at ${CORPUS}. ` +
+      "The SC-004 submission gates did NOT run. Check out ../keyboards (or set CI=1 to fail instead).",
+  );
+  skipTest(`${label} NOT RUN: keyboards corpus absent at ${CORPUS}`);
+}
+
 /** The package's files as the base browser would hand them over (no build/ output). */
 function loadVfs(kb: (typeof KEYBOARDS)[number]): VirtualFS {
   const rootDir = join(CORPUS, kb.group, kb.id);
