@@ -232,3 +232,38 @@ describe("orderDecisions - phase_a_identity (proposed) equals its frozen legacy 
     ]);
   });
 });
+
+// The REAL legacy Phase B list, recovered from git history (the deleted
+// content/flows/phase_b_characters.modular.yaml, as of the commit before the
+// derive cutover). Unlike FROZEN_LEGACY_ORDERS above this was not adjusted to
+// match derived output.
+const REAL_LEGACY_PHASE_B_ORDER: readonly string[] = [
+  "pb_existing_keyboards", "pb_co_installed_keyboards", "pb_discovery_intro",
+  "pb_text_sample", "pb_text_sample_review", "pb_linguist_confirm", "pb_picker_confirm",
+  "pb_routing_branch", "pb_standard_letters", "pb_typing_approach",
+  "pb_special_letters", "pb_special_letters_list", "pb_special_letters_notes",
+  "pb_latin_digraphs_gate", "pb_latin_digraphs_list", "pb_punctuation_gate",
+  "pb_punctuation_list", "pb_digit_set", "pb_char_count", "pb_latin_qwerty_branch",
+  "pb_spare_keys_qwerty", "pb_latin_azerty_branch", "pb_azerty_qz_swap",
+  "pb_spare_keys_azerty", "pb_non_roman_branch", "pb_indic_conjuncts",
+  "pb_indic_virama", "pb_indic_vowels_separate", "pb_indic_pre_base_vowels",
+  "pb_indic_nukta_gate", "pb_indic_nukta_detail", "pb_indic_vowels_onset",
+  "pb_indic_vowels_onset_list", "pb_sea_medials", "pb_sea_stacked_consonants",
+  "pb_rtl_direction_confirm", "pb_rtl_short_vowels", "pb_rtl_special_letters",
+  "pb_syllabic_note", "pb_syllabic_grid", "pb_syllabic_finals_gate",
+  "pb_syllabic_finals_detail", "pb_other_free_entry", "pb_contact_language",
+  "pb_legacy_encoding", "pb_use_case", "pb_additional_methods",
+];
+
+describe("phase_b_characters: only difference from the real legacy order", () => {
+  it("is the pb_special_letters shared-tail block moving after pb_other_free_entry", () => {
+    const start = REAL_LEGACY_PHASE_B_ORDER.indexOf("pb_special_letters");
+    const end = REAL_LEGACY_PHASE_B_ORDER.indexOf("pb_non_roman_branch");
+    const block = REAL_LEGACY_PHASE_B_ORDER.slice(start, end);
+    const rest = REAL_LEGACY_PHASE_B_ORDER.filter((id) => !block.includes(id));
+    const at = rest.indexOf("pb_contact_language");
+    const expected = [...rest.slice(0, at), ...block, ...rest.slice(at)];
+    const derived = orderDecisions(flowModules.phase_b_characters).map((m) => m.definition.id);
+    expect(derived).toEqual(expected);
+  });
+});
