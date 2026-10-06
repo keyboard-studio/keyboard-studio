@@ -925,7 +925,7 @@
     },
     "specs/086-context-normalization-group": {
       "title": "Feature Specification: Context normalization group",
-      "hash": "sha256:a4345b844a6e9520",
+      "hash": "sha256:e941c0d01dbc2742",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

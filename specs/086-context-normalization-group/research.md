@@ -180,7 +180,7 @@ The overlay (`context-tolerance-overlay.ts`) gains a `kind: "normalization-step"
 | `fv_northern_tutchone` | 22 | 21 | 22 | yes (bound restated to 19, then 22, see below) |
 | `fv_tlingit` | 6 | 6 | 6 | yes |
 | `sil_yoruba8` | 9 | 9 | 9 | yes |
-| `el_pan_sahelian` | 22 | 53 | 22 | yes (bound restated to 22, see below) |
+| `el_pan_sahelian` | 90 | 53 | 90 | yes (bound restated to 22, then 90, see below) |
 | `sil_cameroon_qwerty` | 23 | 26 | 15 | yes |
 | `sil_tchad` | 49 | 23 | 23 | yes |
 
@@ -192,3 +192,5 @@ Mitigations applied, in order: (1) context-free mark appends (`+ [K_X] > U+0301`
 
 - *Deadkey-gated keys keep their fallback letter (FR-001).* A rule such as `dk(1) + [K_A] > U+00E1` used to mark `K_A` as bound, so its base-layout `a` was left out of the repertoire. Without the deadkey the key still types `a`, and a standalone mark key can follow it, so `a` + U+0301 is typed text the step must not rewrite. Any preceding context now makes a rule conditional. `el_pan_sahelian` rises from 12 to 16 from this alone.
 - *Pass-through rules match only mapped clusters (FR-003).* A P0/P/P2 shape used to be admitted when no tuple it matched was a produced cluster or a conflicting map, so it also matched mark combinations with no map at all and rewrote pasted text the keyboard cannot produce. Every matched combination must now be a map's alternate with exactly that map's target. The packer learns a pass set per position when the full mark set fails, which keeps the wildcard shapes where the maps support them. This takes `el_pan_sahelian` to 22 and `fv_northern_tutchone` from 19 to 22; the other five counts are unchanged.
+
+**Depth-3 append stacking lands on top (2026-10-06, #1964).** The generator-bounds fix lets context-free mark appends stack to the keyboard's own stack depth (up to 3), measured on its own branch as taking `el_pan_sahelian` from 8 to 51 under the pre-FR-003 pass-through semantics. Merged with FR-001 and FR-003 above, the three compound on this open-matrix keyboard: 109,879 clusters (133 bases × 9 marks), 14,653 maps, of which 12,479 have three-codepoint alternates with 67 distinct two-mark tails. A tail rule per distinct tail is the floor for the current shape family — full pass-through shapes fail FR-003 wherever a mark pair does not compose — and the packer lands at 90 (63 tail rules + 27 pass-through/head rules). Measured identically in CI (run 37520753270, the one failing assertion) and in a local reproduction; typed parity, pasted probes and diagnostics all still pass, and the other six keyboards meet their existing bounds in the same CI run. SC-003 is restated to 90 for `el_pan_sahelian`. The R10 alternative — tightening the closure with context reachability before relaxing the criterion — remains available, but the depth-3 clusters are genuinely typed text (a base key followed by three mark keys), so their alternates are legitimate maps, not closure over-approximation.

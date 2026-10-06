@@ -60,8 +60,12 @@ const RULE_BOUND: Record<string, number> = {
   fv_tlingit: 6,
   sil_yoruba8: 9,
   // Raised from 12: three-key clusters (depth 3) are now in the static repertoire, so the
-  // pass-through rules cover them too.
-  el_pan_sahelian: 51,
+  // pass-through rules cover them too. Restated to 90 once depth-3 stacking landed
+  // together with the FR-001 fallback letters and the FR-003 strict coverage: the
+  // three compound on this open-matrix keyboard (133 bases x 9 marks, 14,653 maps),
+  // and 67 distinct two-mark tails set a floor the pass-through shapes cannot go
+  // under. Measured on the merged generator: CI run 37520753270 and locally.
+  el_pan_sahelian: 90,
   sil_cameroon_qwerty: 23,
   sil_tchad: 49,
 };
