@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import regressedList from "./generated/normalizationRegressed.generated.json";
 import { lookupNormalizationVerification } from "./normalizationVerification.ts";
+import { NORMALIZATION_STEP_GENERATOR_VERSION } from "@keyboard-studio/engine/context-tolerance";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..", "..", "..");
@@ -32,5 +33,11 @@ describe("generated regressed list", () => {
     };
     const record: unknown = JSON.parse(readFileSync(RECORD, "utf8"));
     expect(regressedList).toEqual(codegen.deriveRegressedList(record));
+  });
+});
+
+describe("generated regressed list generator version", () => {
+  it("was derived under the generator version the studio runs", () => {
+    expect(regressedList.generatorVersion).toBe(NORMALIZATION_STEP_GENERATOR_VERSION);
   });
 });

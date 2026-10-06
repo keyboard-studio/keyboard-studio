@@ -15,6 +15,8 @@ import {
   snapshotWorkingCopyData,
   prepareWorkingCopySnapshot,
   BASE_WELCOME_IMAGES_BUDGET_BYTES,
+  NORMALIZATION_STEP_PERSIST_BUDGET_CHARS,
+  serializeNormalizationStep,
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
 import { DRAFT_VERSION } from "./draftPersistence.ts";
@@ -567,6 +569,46 @@ describe("persistWorkingCopy", () => {
       expect(rehydrateWorkingCopyFromSession()).toBe(true);
       expect(useWorkingCopyStore.getState().contextNormalizationStep).toEqual(stored);
       expect(DRAFT_VERSION).toBe(1);
+    });
+  });
+
+  describe("contextNormalizationStep size policy", () => {
+    const step = (ruleCount: number, maps: number) =>
+      ({
+        cacheKey: "abc|1",
+        result: {
+          kind: "step",
+          cacheKey: "abc|1",
+          step: { groupName: "generated_context_normalize", originalEntry: "main", stores: [], rules: [], ruleCount, examples: [] },
+          maps: Array.from({ length: maps }, (_, i) => ({ from: `f${i}`, to: `t${i}` })),
+        },
+      }) as unknown as NonNullable<Parameters<typeof serializeNormalizationStep>[0]>;
+
+    it("drops maps when persisting, and leaves the store entry untouched", () => {
+      const full = step(3, 50);
+      const out = serializeNormalizationStep(full);
+      expect(out?.result.kind === "step" ? out.result.maps : null).toEqual([]);
+      expect(out?.result.kind === "step" ? out.result.step.ruleCount : null).toBe(3);
+      expect(full.result.kind === "step" ? full.result.maps.length : 0).toBe(50);
+    });
+
+    it("drops a step over the size budget instead of risking the whole draft write", () => {
+      const huge = step(1, 0);
+      if (huge.result.kind !== "step") throw new Error("fixture");
+      huge.result.step.examples = [{ pasted: "x".repeat(NORMALIZATION_STEP_PERSIST_BUDGET_CHARS), result: "y" }];
+      expect(serializeNormalizationStep(huge)).toBeNull();
+    });
+
+    it("loads an old draft that persisted maps", () => {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
+      );
+      const old = step(2, 5);
+      useWorkingCopyStore.getState().setContextNormalizationStep(old);
+      const snap = JSON.parse(JSON.stringify(snapshotWorkingCopyData())) as WorkingCopySnapshot;
+      snap.contextNormalizationStep = old;
+      expect(prepareWorkingCopySnapshot(snap)).toBeTruthy();
     });
   });
 

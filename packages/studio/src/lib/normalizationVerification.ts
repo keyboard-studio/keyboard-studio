@@ -10,7 +10,8 @@
 // file as shipped, whereas the studio analyses the author's current working
 // copy, so a hash comparison would almost never match; a keyboard the harness
 // found regressed is treated as regressed whatever the author has since edited,
-// which errs towards the spec 062 fallback.
+// which errs towards the spec 062 fallback. The list is trusted only while its
+// generator version is the one the studio runs (see the test pinning the two).
 
 import regressedList from "./generated/normalizationRegressed.generated.json";
 import type { NormalizationVerification } from "./contextToleranceAnalysis.ts";
