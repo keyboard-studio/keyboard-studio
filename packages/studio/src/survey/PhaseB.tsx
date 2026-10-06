@@ -1093,6 +1093,11 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         />
       </section>
 
+      {/* Section 2a: the exemplar loanword tier — shown, never pre-selected.
+          Sits directly under the alphabet it extends, ahead of the other fill
+          affordances and the breakdown. */}
+      <LoanwordsSection bcp47={context.bcp47_tag} />
+
       {/* Section 2b: the other two ways to fill the alphabet. All three
           affordances stay present regardless of the page-1 choice (spec 044
           FR-016b / obligation P1b) — declining the offer must not remove a
@@ -1104,9 +1109,6 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           spec-047 category sections — renders once the alphabet implies marks,
           accented letters, or any non-letter category. */}
       <AlphabetBreakdown bcp47={context.bcp47_tag} />
-
-      {/* Section 3b: the exemplar loanword tier — shown, never pre-selected. */}
-      <LoanwordsSection bcp47={context.bcp47_tag} />
 
       {/* The character grid has moved to the right pane —
           see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}

@@ -495,6 +495,25 @@ describe("loanword letters section", () => {
     expect(chars).toContain("h");
   });
 
+  it("sits directly under the type-in alphabet, ahead of the fill affordances and the breakdown", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const loanwords = await screen.findByTestId("alphabet-loanwords");
+    const typeIn = screen.getByRole("region", { name: "Type your alphabet" });
+    const textSample = screen.getByTestId("text-sample-placeholder");
+    const breakdown = screen.getByRole("region", { name: "How your alphabet breaks down" });
+
+    expect(typeIn.nextElementSibling).toBe(loanwords);
+    expect(
+      loanwords.compareDocumentPosition(textSample) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      loanwords.compareDocumentPosition(breakdown) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("draws the breakdown chips and the loanword chips in the selected glyph font", async () => {
     getSourcedExemplars.set(bafutInventory());
     usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
