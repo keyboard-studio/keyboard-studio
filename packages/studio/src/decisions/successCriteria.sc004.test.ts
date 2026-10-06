@@ -21,6 +21,18 @@
 //        G8  Layer C documentation checks (useDocumentationFindings) no error
 //
 // A failing gate is a product finding: nothing here is weakened to pass.
+//
+// Validator layers NOT covered by this harness (documented, not silent; see also
+// decisions/gateCoverage.ts):
+//   - Layer B (style): no Layer B rule set exists in engine/src/validator yet
+//     (spec Phase 3 "Style mode"); there is nothing to run.
+//   - Layer A' import-fidelity I1-I6 (engine/src/validator/layer-a-prime.ts):
+//     deliberately not exported from the engine's public index (it must stay out
+//     of the runAllChecks path) and it validates the Track 2 IMPORT of an
+//     existing keyboard, not an adapt-flow output. Exposing it here would need an
+//     engine API change, which is out of scope for this harness.
+// The gates are skipped locally (visibly) when ../keyboards is absent; in CI an
+// absent corpus fails the presence test below.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
@@ -34,14 +46,16 @@ import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { buildOutputBundle } from "../lib/buildOutputBundle.ts";
 import { useInventoryCoverageGate } from "../hooks/useInventoryCoverageGate.ts";
 import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
-import { KEYBOARDS, CORPUS, corpusPresent, runAdaptFlow } from "../test/sc004Harness.ts";
+import { KEYBOARDS, CORPUS, corpusPresent, runAdaptFlow, sc004GatesEnabled, announceSc004Skip } from "../test/sc004Harness.ts";
 
 const blocking = (fs: readonly LintFinding[]) =>
   fs.filter((f) => f.severity === "error" || f.severity === "fatal");
 const fmt = (fs: readonly LintFinding[]) =>
   fs.map((f) => `${f.code}: ${f.message}`).join("\n");
 
-describe.skipIf(!corpusPresent && !process.env.CI)("SC-004: a completed adapt flow passes the studio's submission gates", () => {
+announceSc004Skip("SC-004 submission gates", (name) => it.skip(name, () => {}));
+
+describe.skipIf(!sc004GatesEnabled)("SC-004: a completed adapt flow passes the studio's submission gates", () => {
   it("the pinned keyboards corpus is present", () => {
     expect(corpusPresent, `corpus at ${CORPUS}`).toBe(true);
   });
