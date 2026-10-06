@@ -46,7 +46,10 @@ describe("ContextToleranceStation, normalization step", () => {
     expect(screen.getByText("Adds 9 rules. None of your rules change.")).toBeTruthy();
     expect(screen.getByRole("list")).toBeTruthy();
     await screen.findByText(/U\+0323 COMBINING DOT BELOW/);
-    expect(screen.getByText(/converted to this keyboard's own form when you type/)).toBeTruthy();
+    expect(screen.getByText(/joined or separate form of a letter this keyboard can produce/)).toBeTruthy();
+    expect(screen.getByText(/Other pasted text is left as it is/)).toBeTruthy();
+    // Direction-neutral heading: the step maps in both directions.
+    expect(screen.getByRole("heading", { name: "Letters and diacritics written in a different form" })).toBeTruthy();
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     // One confirm and one decline, both native buttons.
     expect(screen.getByRole("button", { name: "Add this step" }).tagName).toBe("BUTTON");
@@ -99,7 +102,7 @@ describe("ContextToleranceStation, normalization step", () => {
       proposedSiteIds: ["normalization-step"],
       fingerprint: FINGERPRINT,
     });
-    expect(screen.getByText(/step that converts pasted text/)).toBeTruthy();
+    expect(screen.getByText(/step that converts pasted letters/)).toBeTruthy();
     expect(screen.getByTestId("context-tolerance-change")).toBeTruthy();
   });
 });

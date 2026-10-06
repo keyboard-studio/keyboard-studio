@@ -112,6 +112,11 @@ As a maintainer, I want the corpus harness to check every generated step by simu
 - **A keyboard already containing a generated step.** Regeneration replaces it, never stacks a second.
 - **Very large keyboards** (`vietnamese_telex`, about 72,000 rules). Generation must stay within the time bound, or the keyboard is refused with a reason.
 - **Pasted text next to the cursor is rewritten on any key**, even a plain letter (`a◌́` then `b` gives `áb`). The result is NFC-equal but not byte-equal to the pasted text. Accepted (FR-018).
+- **Hangul jamo composition.** Clusters are split on `\p{M}` only, so conjoining jamo that compose into syllables are not treated as alternates. Out of scope for v1.
+- **Singleton decompositions** (U+212B, U+2126, U+0340/U+0341, U+037E). Their canonical forms differ from the character itself, so a paste of one is not mapped. Out of scope for v1.
+- **Pastes in a partial form**, neither the NFC nor the NFD of a produced cluster (for example `ê` plus an acute accent against a keyboard that produces U+1EBF). Not mapped; left as is. Out of scope for v1.
+- **Non-US base layouts.** Keys no rule binds are seeded with US characters, so the repertoire can differ from what the typist's layout really produces. Out of scope for v1.
+- **Ambiguous alternates are not shown in the station.** When an alternate maps to more than one produced cluster, the engine picks one deterministically (code-point-first). The `ambiguous` list on each map does not reach the studio (the step carries only its rule count and examples), so the station does not surface it. Deferred; it needs an engine-side change to expose the list.
 
 ## Requirements *(mandatory)*
 
