@@ -16,9 +16,10 @@
 // R9 (boundary).
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import { decisionsFromTraversal } from "./decisionsFromTraversal.ts";
 import { manifest } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
+import type { Step } from "./types.ts";
 
 // ---------------------------------------------------------------------------
 // Local type mirrors — defined here to avoid steps/ → stores/ import.
@@ -169,26 +170,14 @@ export function nextSpineStepAfter(currentId: string): ActiveStepId {
  * own `gatedBy` (steps/stepDependencies.ts) — the single source — evaluated
  * over the decisions the context already records.
  */
-function stepApplies(stepId: string, ctx: AdvanceContext): boolean {
-  const gate = manifest.find((s) => s.id === stepId)?.gatedBy;
+function stepApplies(step: Step | undefined, ctx: AdvanceContext): boolean {
+  const gate = step?.gatedBy;
   if (gate === undefined) return true;
-  const decisions: DecisionSet = {
-    ...(ctx.selectedTrack !== null && {
-      "authoring-track": {
-        id: "authoring-track" as const,
-        value: ctx.selectedTrack,
-        provenance: "asked" as const,
-      },
-    }),
-    ...(ctx.touchSeedSource !== null && {
-      "touch-seed-source": {
-        id: "touch-seed-source" as const,
-        value: ctx.touchSeedSource,
-        provenance: "asked" as const,
-      },
-    }),
-  };
-  return gate(decisions);
+  return gate(decisionsFromTraversal(ctx.selectedTrack, ctx.touchSeedSource));
+}
+
+function stepById(stepId: string): Step | undefined {
+  return manifest.find((s) => s.id === stepId);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +209,7 @@ export function advance(
 
     case "track":
       if (ctx.selectedTrack !== null) {
-        if (stepApplies("project_name", ctx)) {
+        if (stepApplies(stepById("project_name"), ctx)) {
           // Copy-track: project_name side-trail (gated on the copy track).
           return { next: "project_name" };
         }
@@ -305,7 +294,7 @@ export function advance(
       // sequences now build inline in the Mechanism Gallery's method
       // chooser — there is no separate "sequences" step to route through
       // first; this fork check used to live on that step's completion.)
-      return stepApplies("touch_seed_source", ctx)
+      return stepApplies(stepById("touch_seed_source"), ctx)
         ? { next: "touch_seed_source" }
         : { next: "touch" };
 

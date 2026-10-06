@@ -10,7 +10,7 @@
 // arrives in `ResolveContext`, which is what makes the resolution table a unit
 // test matrix rather than a DOM test (contract §4).
 
-import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import { decisionsFromTraversal } from "../steps/decisionsFromTraversal.ts";
 import type { Step } from "../steps/types.ts";
 import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
@@ -97,17 +97,8 @@ const WIZARD_ROUTE = "survey";
  */
 function walkedByTrack(step: Step, traversal: TraversalSnapshot): boolean {
   if (step.gatedBy === undefined) return true;
-  const decisions: DecisionSet =
-    traversal.selectedTrack === null
-      ? {}
-      : {
-          "authoring-track": {
-            id: "authoring-track",
-            value: traversal.selectedTrack,
-            provenance: "asked",
-          },
-        };
-  return step.gatedBy(decisions);
+  // No touch-seed argument, deliberately (see above).
+  return step.gatedBy(decisionsFromTraversal(traversal.selectedTrack));
 }
 
 /**
