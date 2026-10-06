@@ -62,6 +62,14 @@ async function mountAt(stepId: ActiveStepId) {
   });
 }
 
+/** Deadkeys renders its tabs only once a working IR exists. */
+async function mountDeadkeysStep() {
+  act(() => {
+    useWorkingCopyStore.setState({ ir: makeTestIR() });
+  });
+  await mountAt("deadkeys");
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -88,18 +96,12 @@ describe("full-layout document steps scroll inside StepHost's clipped shell", ()
   });
 
   it("deadkeys step (inventory tab)", async () => {
-    act(() => {
-      useWorkingCopyStore.setState({ ir: makeTestIR() });
-    });
-    await mountAt("deadkeys");
+    await mountDeadkeysStep();
     expectScrollsInsideShell("deadkey-step");
   });
 
   it("deadkeys step (define tab)", async () => {
-    act(() => {
-      useWorkingCopyStore.setState({ ir: makeTestIR() });
-    });
-    await mountAt("deadkeys");
+    await mountDeadkeysStep();
     fireEvent.click(screen.getByRole("tab", { name: "Define new deadkey" }));
     // The inventory has been swapped out, so the tall body is this tab's.
     expect(screen.queryByRole("button", { name: "open-edit" })).toBeNull();
@@ -107,10 +109,7 @@ describe("full-layout document steps scroll inside StepHost's clipped shell", ()
   });
 
   it("deadkeys step (edit tab)", async () => {
-    act(() => {
-      useWorkingCopyStore.setState({ ir: makeTestIR() });
-    });
-    await mountAt("deadkeys");
+    await mountDeadkeysStep();
     fireEvent.click(screen.getByRole("button", { name: "open-edit" }));
     // The inventory has been swapped out, so the tall body is this tab's.
     expect(screen.queryByRole("button", { name: "open-edit" })).toBeNull();
