@@ -12,6 +12,12 @@
 // found regressed is treated as regressed whatever the author has since edited,
 // which errs towards the spec 062 fallback. The list is trusted only while its
 // generator version is the one the studio runs (see the test pinning the two).
+//
+// Callers also look up the id of the base keyboard the working copy was
+// scaffolded from (see `verificationLineage` in contextToleranceAnalysis):
+// copy-a-keyboard instantiation rewrites the keyboard id, so without the
+// lineage lookup a copy of a regressed keyboard — same rules, same conjunct
+// behaviour — would be offered the step the harness proved regresses it.
 
 import regressedList from "./generated/normalizationRegressed.generated.json";
 import type { NormalizationVerification } from "./contextToleranceAnalysis.ts";

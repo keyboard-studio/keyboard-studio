@@ -47,6 +47,14 @@ export interface ContextToleranceAnalysisOptions {
   onNormalizationStored?: (stored: StoredNormalizationStep) => void;
   /** Looks up the committed verification record; defaults to `"unknown"`. */
   verificationLookup?: (keyboardId: string) => NormalizationVerification | Promise<NormalizationVerification>;
+  /**
+   * Ids the analysed keyboard was derived from (the base keyboard the working
+   * copy was scaffolded from). Copy-a-keyboard instantiation rewrites
+   * `header.keyboardId` (resetIdentity), so a copy of a regressed keyboard
+   * would escape the id-keyed record; the lineage ids are looked up as well
+   * and a `regressed` verdict on any of them vetoes the step.
+   */
+  verificationLineage?: readonly string[];
 }
 
 /**
@@ -84,7 +92,15 @@ export async function analyseContextTolerance(
     if (lookup.stored !== null) options.onNormalizationStored?.(lookup.stored);
     stepCacheKey = lookup.cacheKey;
     if (lookup.result.kind === "step") {
-      const verdict = await (options.verificationLookup?.(analysedIr.header.keyboardId) ?? "unknown");
+      let verdict: NormalizationVerification = "unknown";
+      if (options.verificationLookup !== undefined) {
+        for (const id of [analysedIr.header.keyboardId, ...(options.verificationLineage ?? [])]) {
+          if ((await options.verificationLookup(id)) === "regressed") {
+            verdict = "regressed";
+            break;
+          }
+        }
+      }
       if (!isCurrent()) return null;
       if (verdict === "regressed") fallbackReason = "verification-regressed";
       else {

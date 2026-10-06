@@ -490,6 +490,7 @@ export function useKeyboardArtifact(
     // artifact (see projectWorkingCopyVfs), so it can lag what the author runs.
     const {
       ir: workingIr,
+      baseKeyboard,
       setContextTolerance,
       contextToleranceOverlay,
       contextNormalizationStep,
@@ -502,6 +503,9 @@ export function useKeyboardArtifact(
     analyseContextTolerance(ir, isCurrent, contextToleranceOverlay, {
       normalizationSnapshot: contextNormalizationStep,
       verificationLookup: lookupNormalizationVerification,
+      // A copy-a-keyboard project carries a new keyboard id, but its rules are
+      // the base's: the base's verification verdict applies to it (spec 086).
+      verificationLineage: baseKeyboard === null ? [] : [baseKeyboard.id],
       onNormalizationStored: (stored) => {
         // Persist only a changed entry (spec 086 FR-016): a cache hit re-stores nothing.
         if (isCurrent() && stored.cacheKey !== contextNormalizationStep?.cacheKey) {

@@ -93,6 +93,18 @@ describe("analyseContextTolerance with the normalization step (spec 086)", () =>
     expect(result.proposal.variants.length).toBeGreaterThan(0);
   }, 60_000);
 
+  it("forces the fallback when a lineage id reports regressed, even though the keyboard id does not", async () => {
+    // Copy-a-keyboard: the working copy's id is new, but it was scaffolded
+    // from a regressed base (tirhuta), so the base's verdict vetoes the step.
+    const lookup = vi.fn((id: string) => (id === "tirhuta" ? ("regressed" as const) : ("unknown" as const)));
+    const result = await analyse({ verificationLookup: lookup, verificationLineage: ["tirhuta"] });
+    expect(lookup).toHaveBeenCalledWith("analysis_fixture");
+    expect(lookup).toHaveBeenCalledWith("tirhuta");
+    expect(result.normalizationStep).toBeUndefined();
+    expect(result.fallbackReason).toBe("verification-regressed");
+    expect(result.proposal.variants.length).toBeGreaterThan(0);
+  }, 60_000);
+
   it("keeps the step when the lookup reports verified or unknown", async () => {
     for (const verdict of ["verified", "unknown"] as const) {
       const result = await analyse({ verificationLookup: () => verdict });
