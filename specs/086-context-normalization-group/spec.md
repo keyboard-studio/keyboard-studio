@@ -151,7 +151,7 @@ As a maintainer, I want the corpus harness to check every generated step by simu
 
 - **FR-015**: Generation MUST be deterministic: the same keyboard source and generator version always produce a byte-identical step.
 - **FR-016**: The generated step MUST be stored, keyed by the keyboard source content and the generator version, and reused until either changes.
-- **FR-017**: Keystroke simulation MUST NOT run in the authoring path. It runs only in the corpus harness (User Story 4), once per keyboard version, with results stored alongside the step.
+- **FR-017**: Deriving, generating, or retrieving the step MUST NOT run keystroke simulation. Simulation of the step runs only in the corpus harness (User Story 4), once per keyboard version, with results stored alongside it. The existing spec 078 tolerance diagnostic, which simulates in the background after each preview compile, is unchanged by this feature (see [research.md R7](research.md#r7-authoring-path-and-caching)).
 
 **Author path and coexistence**
 
