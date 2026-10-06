@@ -25,6 +25,8 @@ import {
   removeContextToleranceOverlay,
   type ContextToleranceOverlay,
 } from "./context-tolerance-overlay.js";
+import { proposeNormalizationStep } from "./normalization-step/index.js";
+import { buildNormalizationStepOverlay } from "./context-tolerance-overlay.js";
 import { proposeContextVariants } from "./context-variants.js";
 import { toleranceFingerprint, toleranceSiteKeys } from "./tolerance-fingerprint.js";
 
@@ -153,5 +155,22 @@ describe("context-tolerance overlay (spec 078)", () => {
     const again = applyContextToleranceOverlay(removeContextToleranceOverlay(once.ir, overlay), overlay).ir;
     expect(ruleTexts(again)).toEqual(ruleTexts(once.ir));
     expect(emit(again)).toContain("Accept the diacritic typed as a separate character");
+  });
+
+  it("a step batch whose originalEntry no longer exists is skipped with a warning, and removal restores the entry", async () => {
+    const ir = parse("store(&VERSION) '10.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_A] > U+00E1\n+ [K_E] > U+0065 U+0301\n", "k").ir;
+    const r = await proposeNormalizationStep(ir);
+    if (r.kind !== "step") throw new Error("expected a step");
+    const overlay = buildNormalizationStepOverlay(r.step);
+    const ok = applyContextToleranceOverlay(ir, overlay);
+    expect(ok.warnings).toEqual([]);
+    expect(ok.ir.header.entryPoints?.main).toBe("generated_context_normalize");
+    expect(emit(removeContextToleranceOverlay(ok.ir, overlay))).toBe(emit(ir));
+
+    const stale = buildNormalizationStepOverlay({ ...r.step, originalEntry: "gone" });
+    const out = applyContextToleranceOverlay(ir, stale);
+    expect(out.warnings).toHaveLength(1);
+    expect(out.ir.groups.map((g) => g.name)).toEqual(["main"]);
+    expect(out.ir.header.entryPoints?.main).toBe("main");
   });
 });
