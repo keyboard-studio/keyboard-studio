@@ -502,12 +502,16 @@ describe("loanword letters section", () => {
 
     const loanwords = await screen.findByTestId("alphabet-loanwords");
     const typeIn = screen.getByRole("region", { name: "Type your alphabet" });
-    const follows = (a: Element, b: Element): boolean =>
-      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    const textSample = screen.getByTestId("text-sample-placeholder");
+    const breakdown = screen.getByRole("region", { name: "How your alphabet breaks down" });
 
     expect(typeIn.nextElementSibling).toBe(loanwords);
-    expect(follows(loanwords, screen.getByTestId("text-sample-placeholder"))).toBe(true);
-    expect(follows(loanwords, screen.getByRole("region", { name: "How your alphabet breaks down" }))).toBe(true);
+    expect(
+      loanwords.compareDocumentPosition(textSample) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      loanwords.compareDocumentPosition(breakdown) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("draws the breakdown chips and the loanword chips in the selected glyph font", async () => {
