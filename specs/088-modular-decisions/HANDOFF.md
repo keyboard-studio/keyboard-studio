@@ -15,6 +15,12 @@ starting point, how it validates, how it writes its effect, how it is stored and
 A **step** is only where a decision is displayed, and its position is derived from the decisions'
 dependencies. Moving a decision should take one edit to its `requires` and nothing else.
 
+**Decisions are the only stored state. The keyboard is derived from them.** Eliminate duplication
+as far as possible: every fact is stored once, as a decision. The working copy is
+`replay(starting point, apply(d1), …, apply(dn))`, a cache rebuilt whenever a decision changes,
+never saved and never edited directly. Changing a decision recalculates the parts of the keyboard
+that depend on it.
+
 **The acceptance test for the whole effort.** Add `requires: ["authoring-track"]` to
 `il_copyright_holder` and change nothing else. The question then appears after the track choice.
 On the adapt track it arrives pre-filled from the keyboard's own copyright, labelled
@@ -107,6 +113,31 @@ harness results do not count.
   flow.
 - Nothing reads `module.renderer` at runtime.
 
+### G6a. One answer is stored up to four times, and reaches the keyboard three ways
+The draft envelope (`lib/draftPersistence.ts:776-792`) saves five slices from five stores:
+
+| slice | store | holds |
+|---|---|---|
+| `surveyAnswers` | `surveyAnswerStore` | raw answers, `steps[stepId].answers[answerId]` |
+| `traversal` | `surveySessionStore` | answers as named fields: `selectedTrack`, `touchSeedSource`, `identityResult`, `localBase`, `scaffoldSpec`, help docs |
+| `phaseBDraft` | `phaseBDraftStore` | accept/decline for characters, punctuation, invisibles |
+| `decisionRecord` | `decisionLogStore` | the spec 053 log, keyed `stepId\|q\|questionId` |
+| `workingCopy` | `workingCopyStore` | the keyboard, plus answer copies in `phaseResults` and `phaseAnswersByStep` |
+
+Inside the working copy, answers reach the keyboard by three routes:
+1. **In-place IR rewrites:** `setWorkingIR` from reducer handlers (MARKS guards, R1 `lockDesktop`,
+   R2 touch) and `applyMutatePatch` (deadkeys, context tolerance, `pb_standard_letters`).
+2. **Overlays replayed at output:** `deletedNodeIds`, `deletedItemIds`, `deletedTouchKeyIds`,
+   `disabledFamilyIds`, `carveChars`, `carveDispositions`, `keyEditOverlay`, `deadkeyOverlay`,
+   `touchDraft`/`touchLayoutJson`, `closedKeyboardCard`. They are applied in
+   `projectWorkingCopyVfs`, not at commit.
+3. **Identity patch:** `setIdentity` / `setAttribution`.
+
+Nothing links an answer to the effect it produced, so changing an answer cannot recalculate the
+keyboard. The one precedent for recalculation is touch re-propagation (`steps/repropagate.ts`,
+spec 014). It refreshes `base-derived` and `physical-suggested` keys and never overwrites
+`hand-set` ones.
+
 ### G7. Related defects found while mapping (verify, then fix inside 088)
 - **The track is chosen after the keyboard is already set up.** `choose_base` comes before
   `track`, so the first `doCommit` always sees `selectedTrack === null` and sets up the working
@@ -142,12 +173,51 @@ the store writes now in the adapters and `onCommit`s move into `apply`. Some gal
 internal draft state while open, such as the working-copy overlay for carve. That is fine, but
 their *commit* must go through `apply`.
 
-### A live decision store
+### A live decision store, and nothing else saved
 - `decisionStore` holds the `DecisionSet` and the provenance of each decision. It is the only
   thing `gatedBy` reads, which retires `decisionsFromTraversal`.
 - `selectedTrack` and `touchSeedSource` become ordinary decisions, not session fields.
-- Drafts save per decision id. The decision-log slot key becomes the decision id; the step id is
-  kept only as display metadata.
+- The decision-log slot key becomes the decision id; the step id is kept only as display
+  metadata. The log becomes each decision's provenance history.
+- **A draft saves the starting point's id and the decisions. Nothing else.** Every G6a mechanism
+  is replaced, not supplemented:
+
+| today | fate |
+|---|---|
+| `surveyAnswers`, session answer fields, `phaseBDraft`, `phaseAnswersByStep`/`phaseResults` | folded into decision records |
+| decision log | re-keyed by decision id |
+| overlays (`deleted*Ids`, `carveDispositions`, `keyEditOverlay`, `deadkeyOverlay`, touch draft) | become the **values** of their decisions: carve removals are the value of `carved-layout`, touch edits the value of `touch-layout` |
+| in-place IR rewrites | move into the owning module's `apply` |
+| identity patch | the values of the identity/project-name decisions |
+| the `workingCopy` draft slice (`ir`, `irAxes`, `staleSteps`, …) | not saved; rebuilt on load |
+
+Renderer-internal state while a gallery is open (an unsaved draft) is fine. It is not saved and
+never read by anything else.
+
+### Provenance
+`Decision.provenance` is `asked | extracted | default` today. Recalculation needs to know who
+chose a value:
+- Add **`derived`**: computed from other decisions (carve proposals, suggested touch keys,
+  generated help). This lives in `packages/studio`, not contracts.
+- **Collection values carry provenance per item** (a carve removal or touch key is hand-set or
+  suggested), as touch keys already do.
+- A record also keeps the `inputs` it was computed from and, when the author overrode an
+  extraction, the `offered` value to show beside it.
+
+### Recalculation on change
+- **`apply` is a function of (IR, value, inputs).** It reads no live store state and writes no
+  store, so the keyboard can be rebuilt from decisions alone.
+- When a decision changes, walk its downstream closure in the `requires` graph (the graph
+  `orderByDependencies` already builds). For each dependent:
+  - `extracted` → run `extract` again; `default`/`derived` → recompute;
+  - `asked` → keep, run `validate` against the new inputs; if it no longer fits, keep it and
+    re-propose (`reproposalNoticeStore`), never overwrite;
+  - collections → recompute suggested items, keep hand-set ones; an orphaned hand-set item is
+    shown, not deleted (generalises `repropagate` R2/R6);
+  - gated off by the change → keep the record, mark it inactive; switching back restores it.
+- Rebuild the keyboard by replaying from the first changed decision. Keep a checkpoint of the IR
+  after each decision so earlier ones are reused. Validation runs once on the result, inside the
+  existing D3 cycle; recalculation adds no timer.
 
 ### Steps are derived
 - **Placement rule:** each decision goes into the earliest slot after everything it `requires` is
@@ -198,6 +268,8 @@ their *commit* must go through `apply`.
 3. **Custom-UI decisions become modules.**
    - Give each `settles` name a module whose `renderer` is the existing component, and turn its
      store writes into `apply`.
+   - Overlays become the decision's value, with per-item provenance. In-place IR rewrites (MARKS
+     guards, R1, R2, deadkey ops) move into `apply`. This is the largest part of the effort.
    - Start with the small ones (`layout`, `touch_seed_source`, `track`, `choose_base`), then
      `marks`, `punctuation`, `invisibles` and `convenience`, then `carve`, `deadkeys`, `rules`,
      `mechanisms` and `touch`.
@@ -215,6 +287,17 @@ their *commit* must go through `apply`.
      `authoring-track`.
    - Add `requires: ["authoring-track"]` to `il_copyright_holder` and walk both tracks in the
      live wizard with Playwright.
+6. **Recalculate on change; the keyboard is derived.**
+   - Downstream closure plus the provenance rule above, with re-proposals for `asked` values
+     that no longer fit.
+   - Replay from per-decision checkpoints.
+   - Stop saving the working copy: drafts hold the starting point id and decisions only, and the
+     keyboard is rebuilt on load.
+   - Live test: change `windows-layout` after carve and mechanisms. The suggested removals and
+     keys refresh, and the author's hand-set ones survive.
+   - **Measure first:** rebuild time on a large starting point such as `sil_euro_latin`, both per
+     edit and on resume. If resume is too slow, a disposable cache is allowed, provided it is
+     thrown away whenever it disagrees with the decisions.
 
 Phases 1 and 2 are worth landing as their own PR if the effort runs long. They remove most of the
 coupling with no visible change.
