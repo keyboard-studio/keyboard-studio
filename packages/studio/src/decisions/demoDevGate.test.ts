@@ -14,6 +14,24 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const mainTsx = readFileSync(resolve(here, "../main.tsx"), "utf-8");
 
+// The authoritative proof is build-output based and too slow for this suite:
+// `pnpm --filter @keyboard-studio/studio run verify:prod-bundle` builds for
+// production and fails if any demo marker string lands in the output.
+
+describe("FR-009: decisions demo is loaded lazily, only under the DEV gate", () => {
+  it("main.tsx has no static import of DecisionsDemo", () => {
+    expect(mainTsx).not.toMatch(/^\s*import\s[^;]*DecisionsDemo[^;]*from/m);
+  });
+
+  it("the only reference to the demo module is a dynamic import() inside an import.meta.env.DEV branch", () => {
+    const refs = mainTsx.match(/DecisionsDemo\.tsx/g) ?? [];
+    expect(refs).toHaveLength(1);
+    expect(mainTsx).toMatch(
+      /import\.meta\.env\.DEV\s*\?\s*lazy\(\(\)\s*=>\s*import\(\s*"\.\/decisions\/DecisionsDemo\.tsx"\s*\)/,
+    );
+  });
+});
+
 describe("FR-009: decisions demo is DEV-gated", () => {
   it("main.tsx gates ?demo=decisions behind import.meta.env.DEV", () => {
     // The decisions demo gate must include the DEV check. We assert on the

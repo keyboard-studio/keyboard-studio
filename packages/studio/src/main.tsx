@@ -1,10 +1,9 @@
 import './index.css';
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { AppRoot } from "./AppRoot.tsx";
 import { StudioShell } from "./StudioShell.tsx";
 import { LintDemo } from "./lint/index.ts";
-import { DecisionsDemo } from "./decisions/DecisionsDemo.tsx";
 import { OAuthCallbackScreen } from "./components/OAuthCallbackScreen.tsx";
 import {
   detectOAuthCallback,
@@ -144,10 +143,37 @@ async function mountApp(): Promise<void> {
     import.meta.env.DEV &&
     typeof window !== "undefined" &&
     window.location.search.includes("demo=decisions");
+  // Loaded by dynamic import() inside the DEV-only branch: in a production
+  // build `import.meta.env.DEV` is the literal `false`, the branch is dead
+  // code, and the demo chunk is never emitted. Never import DecisionsDemo
+  // statically anywhere reachable from main.tsx.
+  const LazyDecisionsDemo = import.meta.env.DEV
+    ? lazy(() =>
+        import("./decisions/DecisionsDemo.tsx").then((m) => ({
+          default: m.DecisionsDemo,
+        })),
+      )
+    : null;
 
   createRoot(rootEl).render(
     <StrictMode>
-      <AppRoot>{isDemoLint ? <LintDemo /> : isDemoDecisions ? <DecisionsDemo /> : <StudioShell />}</AppRoot>
+      <AppRoot>
+        {isDemoLint ? (
+          <LintDemo />
+        ) : isDemoDecisions && LazyDecisionsDemo ? (
+          <Suspense
+            fallback={
+              <div role="status" aria-live="polite">
+                Loading decisions demo
+              </div>
+            }
+          >
+            <LazyDecisionsDemo />
+          </Suspense>
+        ) : (
+          <StudioShell />
+        )}
+      </AppRoot>
     </StrictMode>,
   );
 }
