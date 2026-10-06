@@ -5,8 +5,7 @@
 // spine flags. The same sort orders wizard steps (steps/stepOrder.ts). Pure:
 // no React, no stores, no I/O.
 
-import type { QuestionModule } from "../survey/types.ts";
-import type { FlowQuestion } from "../survey/types.ts";
+import type { FlowQuestion, QuestionModule } from "../survey/types.ts";
 import { evalConditionGrammar } from "../survey/conditionGrammar.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 
@@ -273,8 +272,11 @@ export function filterGated(
   modules: readonly QuestionModule[],
   decisions: DecisionSet,
 ): QuestionModule[] {
+  // One routing index and one visibility pass for the whole module set.
+  const index = buildRoutingIndex(modules);
+  const visible = visibleIds(index, decisions);
   return modules.filter(
-    (m) => effectiveGatedBy(m, modules)?.(decisions) ?? true,
+    (m) => !canHide(index, m.definition.id) || visible.has(m.definition.id),
   );
 }
 
@@ -319,114 +321,146 @@ export function gatedByFromNext(
   target: FlowQuestion,
   modules: readonly QuestionModule[],
 ): ((decisions: DecisionSet) => boolean) | undefined {
-  interface Edge {
-    from: QuestionModule;
-    positive: string | null;
-    negatives: string[];
-  }
-  const inbound = new Map<string, Edge[]>();
-  const addEdge = (to: string, edge: Edge): void => {
-    const list = inbound.get(to);
-    if (list === undefined) inbound.set(to, [edge]);
-    else list.push(edge);
+  const index = buildRoutingIndex(modules);
+  if (!index.byId.has(target.id) && !index.inbound.has(target.id)) return undefined;
+  if (!canHide(index, target.id)) return undefined;
+  return (decisions: DecisionSet) => {
+    if (!index.byId.has(target.id)) return true;
+    return visibleIds(index, decisions).has(target.id);
+  };
+}
+
+interface RouteGateEdge {
+  from: QuestionModule;
+  to: string;
+  positive: string | null;
+  negatives: string[];
+  /** A documented loop-back: still a route the runner can take, but never what makes a module a root. */
+  loopBack: boolean;
+}
+
+/** Inbound/outbound routing edges of a module set, built once. */
+interface RoutingIndex {
+  readonly modules: readonly QuestionModule[];
+  readonly byId: ReadonlyMap<string, QuestionModule>;
+  readonly inbound: ReadonlyMap<string, readonly RouteGateEdge[]>;
+  readonly outbound: ReadonlyMap<string, readonly RouteGateEdge[]>;
+}
+
+/**
+ * Build the routing index. Loop-back edges stay in the index (the runner can
+ * walk them, so they can make a module reachable) but do not count toward
+ * "has an inbound edge" when picking roots: a back-edge to a flow's first
+ * module must not make it look gated.
+ */
+function buildRoutingIndex(modules: readonly QuestionModule[]): RoutingIndex {
+  const inbound = new Map<string, RouteGateEdge[]>();
+  const outbound = new Map<string, RouteGateEdge[]>();
+  const addEdge = (edge: RouteGateEdge): void => {
+    const inList = inbound.get(edge.to);
+    if (inList === undefined) inbound.set(edge.to, [edge]);
+    else inList.push(edge);
+    const fromId = edge.from.definition.id;
+    const outList = outbound.get(fromId);
+    if (outList === undefined) outbound.set(fromId, [edge]);
+    else outList.push(edge);
   };
 
   for (const m of modules) {
     const next = m.definition.next;
     if (typeof next === "string") {
       if (next !== m.definition.id) {
-        addEdge(next, { from: m, positive: null, negatives: [] });
+        addEdge({ from: m, to: next, positive: null, negatives: [], loopBack: false });
       }
     } else if (Array.isArray(next)) {
       const seen: string[] = [];
       for (const rule of next) {
         if (rule.goto !== null && rule.goto !== m.definition.id) {
-          addEdge(rule.goto, {
+          addEdge({
             from: m,
+            to: rule.goto,
             positive: rule.condition ?? null,
             negatives: [...seen],
+            loopBack: rule.loopBack === true,
           });
         }
         if (rule.condition !== undefined) seen.push(rule.condition);
       }
     }
   }
-
-  const byId = new Map(modules.map((m) => [m.definition.id, m] as const));
-  const root = byId.get(target.id);
-
-  // An edge is "plain" when it never needs a decision to be evaluated: no
-  // conditions, an owner with no decision to read, or only conditions the
-  // DecisionSet cannot read (all fail open).
-  const isPlain = (e: Edge): boolean => {
-    if (e.positive === null && e.negatives.length === 0) return true;
-    if (e.from.provides === undefined || e.from.provides.length === 0) return true;
-    const conds = [...(e.positive !== null ? [e.positive] : []), ...e.negatives];
-    return conds.every((c) => evalAgainstDecision(c, undefined) === undefined);
+  return {
+    modules,
+    byId: new Map(modules.map((m) => [m.definition.id, m] as const)),
+    inbound,
+    outbound,
   };
+}
 
-  // Static pass: if nothing on any path to the target can hide it, no gate.
-  const visitedStatic = new Set<string>();
-  const canHide = (id: string): boolean => {
-    if (visitedStatic.has(id)) return false;
-    visitedStatic.add(id);
-    for (const e of inbound.get(id) ?? []) {
-      if (!isPlain(e) || canHide(e.from.definition.id)) return true;
+// An edge is "plain" when it never needs a decision to be evaluated: no
+// conditions, an owner with no decision to read, or only conditions the
+// DecisionSet cannot read (all fail open).
+function isPlain(e: RouteGateEdge): boolean {
+  if (e.positive === null && e.negatives.length === 0) return true;
+  if (e.from.provides === undefined || e.from.provides.length === 0) return true;
+  const conds = [...(e.positive !== null ? [e.positive] : []), ...e.negatives];
+  return conds.every((c) => evalAgainstDecision(c, undefined) === undefined);
+}
+
+/** Static pass: can any edge on any path to `id` hide it? False = always visible. */
+function canHide(index: RoutingIndex, id: string): boolean {
+  const visited = new Set<string>();
+  const walk = (cur: string): boolean => {
+    if (visited.has(cur)) return false;
+    visited.add(cur);
+    for (const e of index.inbound.get(cur) ?? []) {
+      if (!isPlain(e) || walk(e.from.definition.id)) return true;
     }
     return false;
   };
-  if (root === undefined && !inbound.has(target.id)) return undefined;
-  if (!canHide(target.id)) return undefined;
+  return walk(id);
+}
 
-  // Per-condition fail-open, mirroring the runner's top-to-bottom walk: an
-  // unmappable positive is "may be taken"; an unmappable earlier condition
-  // cannot be shown to have failed-or-held, so it excludes nothing. Mappable
-  // conditions are always enforced.
-  const holdsFor = (e: Edge, value: unknown): boolean => {
-    if (e.positive !== null && evalAgainstDecision(e.positive, value) === false) {
-      return false;
-    }
-    for (const n of e.negatives) {
-      if (evalAgainstDecision(n, value) === true) return false;
-    }
-    return true;
-  };
-  const edgeHolds = (e: Edge, decisions: DecisionSet): boolean => {
-    if (isPlain(e)) return true;
-    for (const p of e.from.provides ?? []) {
-      if (holdsFor(e, decisions[p]?.value)) return true;
-    }
+// Per-condition fail-open, mirroring the runner's top-to-bottom walk: an
+// unmappable positive is "may be taken"; an unmappable earlier condition
+// cannot be shown to have failed-or-held, so it excludes nothing. Mappable
+// conditions are always enforced.
+function holdsFor(e: RouteGateEdge, value: unknown): boolean {
+  if (e.positive !== null && evalAgainstDecision(e.positive, value) === false) {
     return false;
-  };
+  }
+  for (const n of e.negatives) {
+    if (evalAgainstDecision(n, value) === true) return false;
+  }
+  return true;
+}
 
-  return (decisions: DecisionSet) => {
-    // Least fixpoint: visible = reachable from the roots (modules with no
-    // inbound edge) through holding edges. A single forward pass, so cycles
-    // need no on-stack bookkeeping and the result cannot depend on order.
-    const outbound = new Map<string, Edge[]>();
-    const toOf = new Map<Edge, string>();
-    for (const [to, edges] of inbound) {
-      for (const e of edges) {
-        toOf.set(e, to);
-        const list = outbound.get(e.from.definition.id);
-        if (list === undefined) outbound.set(e.from.definition.id, [e]);
-        else list.push(e);
-      }
+function edgeHolds(e: RouteGateEdge, decisions: DecisionSet): boolean {
+  if (isPlain(e)) return true;
+  for (const p of e.from.provides ?? []) {
+    if (holdsFor(e, decisions[p]?.value)) return true;
+  }
+  return false;
+}
+
+/**
+ * Least fixpoint: visible = reachable from the roots (modules with no inbound
+ * edge) through holding edges. A single forward pass, so cycles need no
+ * on-stack bookkeeping and the result cannot depend on order.
+ */
+function visibleIds(index: RoutingIndex, decisions: DecisionSet): Set<string> {
+  const reached = new Set<string>();
+  const queue: string[] = index.modules
+    .map((m) => m.definition.id)
+    .filter((id) => !(index.inbound.get(id) ?? []).some((e) => !e.loopBack));
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (reached.has(id)) continue;
+    reached.add(id);
+    for (const e of index.outbound.get(id) ?? []) {
+      if (edgeHolds(e, decisions)) queue.push(e.to);
     }
-    const reached = new Set<string>();
-    const queue: string[] = modules
-      .map((m) => m.definition.id)
-      .filter((id) => (inbound.get(id)?.length ?? 0) === 0);
-    while (queue.length > 0) {
-      const id = queue.pop()!;
-      if (reached.has(id)) continue;
-      reached.add(id);
-      for (const e of outbound.get(id) ?? []) {
-        if (edgeHolds(e, decisions)) queue.push(toOf.get(e)!);
-      }
-    }
-    return root === undefined ? true : reached.has(root.definition.id);
-  };
+  }
+  return reached;
 }
 
 /**
