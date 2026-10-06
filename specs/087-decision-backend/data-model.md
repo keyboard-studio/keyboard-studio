@@ -19,7 +19,7 @@ Closed string union. Governance: grows only via corpus mining (US5); never ad-ho
 |---|---|---|
 | `provides` | `DecisionId[]` | one or more (Q4 — widened from singular as a plan consequence) |
 | `requires` | `DecisionId[]` | must resolve first; drives the topological order (FR-001) |
-| `gatedBy` | `((d: DecisionSet) => boolean)?` | derived via `gatedByFromNext` unless hand-overridden (FR-005) |
+| (gate) | no module field | `QuestionModule.gatedBy` was deleted; the gate is derived via `gatedByFromNext` (graph visibility, FR-005). Wizard steps keep their own `gatedBy` in `steps/stepDependencies.ts` |
 | `extract` | `(ctx: ExtractContext) => unknown` | reads the import bundle; result runs through `validate()` (FR-004) |
 | `renderer` | `ComponentType<DecisionRendererProps<unknown>>?` | single typed props contract (FR-011) |
 
@@ -55,7 +55,7 @@ Static, registry-versioned table `oldAnswerKey → DecisionId`. At load: map ans
 - Module **1..n** Decisions (`provides`); Decision **exactly 1** provider (load-time enforced).
 - `requires` edges form a DAG; unresolved ids, duplicate providers, and cycles are named load-time errors (FR-002).
 - DecisionId ↔ IRPath: the declared `decisionIRPaths` relation; the consistency lint keeps the ordering DAG and the data-flow DAG from diverging.
-- **Influence** (Q4): answering one decision may change others' visibility or defaults — expressed only through `gatedBy` and derived ordering, never through module size.
+- **Influence** (Q4): answering one decision may change others' visibility or defaults — expressed only through derived gating (`gatedByFromNext`) and derived ordering, never through module size.
 
 ## Validation rules (from the FRs)
 

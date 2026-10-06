@@ -2,7 +2,7 @@
 
 ## R1 — Condition evaluation for derived gating (settled in Phase 1)
 
-**Decision:** `gatedByFromNext(target, modules)` inverts the routing graph: for a target question it collects every `FlowGotoRule` across modules whose `goto` names the target, building clauses of (provider decision, positive condition, preceding negative conditions). At runtime each clause evaluates its condition string against the provider decision's value via `evalAgainstDecision`; a clause whose condition can't be mapped fails **open** (the question is shown — never silently dropped). Hand-written `gatedBy` remains as an explicit override.
+**Decision:** `gatedByFromNext(target, modules)` inverts the routing graph: for a target question it collects every `FlowGotoRule` across modules whose `goto` names the target, building clauses of (provider decision, positive condition, preceding negative conditions). At runtime each clause evaluates its condition string against the provider decision's value via `evalAgainstDecision`; an unmappable condition fails **open** per condition (the question is shown — never silently dropped). Update after review: the clause model was rewritten as graph visibility (visible iff a root or a visible predecessor's edge holds, forward fixpoint so cycles are safe), and the hand-written `gatedBy` override was deleted.
 
 **Rationale:** FR-005 demands one routing source; reusing the runner's condition language (rather than inventing a DecisionId-keyed DSL) keeps exactly one condition semantics. Fail-open is the safe direction for a question the author should answer.
 
@@ -28,7 +28,7 @@
 
 ## R4 — Retirement sequencing (US4)
 
-**Decision:** retire in risk order — (1) per-phase registry fan-out → registration by decision id (mechanical), (2) thin YAML order lists → deleted (Q3), (3) `adaptation/firing.ts` classification → folded into target-script extraction provenance (Q2), (4) manifest spine → derived projection, last. Each wave ships only with its parity test green.
+**Decision:** retire in risk order — (1) per-phase registry fan-out → registration by decision id (mechanical), (2) thin YAML order lists → deleted (Q3), (3) `adaptation/firing.ts` classification → folded into target-script extraction provenance (Q2), (4) manifest spine → derived from step `provides`/`requires` (the flags deleted, not kept as a projection), last. Each wave ships only with its parity test green. All four waves have landed (tasks.md Phase 9).
 
 **Rationale:** smallest blast radius first; the constitution-named manifest (Article IX) moves last, after the replacement has proven itself running alongside.
 

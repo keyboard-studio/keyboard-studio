@@ -13,10 +13,10 @@ packages/studio/src/decisions/        # decisionTypes, orderDecisions, extract r
                                       # decisionIRPaths lint, draft migration, dev-only demo (?demo=decisions)
 packages/studio/src/survey/questions/ # module annotations: provides[]/requires/extract (per Q4)
 packages/studio/src/survey/           # SurveyRunner/FlowStepHost integration of the derived flow
-packages/studio/src/steps/            # manifest spine retirement (last, constitution-named), advance.ts
-packages/studio/src/adaptation/       # firing.ts classifyBaseScript folded into target-script extraction (Q2)
+packages/studio/src/steps/            # derived step order (stepDependencies/stepOrder), advance.ts; spine flags deleted
+                                      # classifyBaseScript deleted; folded into target-script extraction (Q2)
 packages/studio/src/stores/           # workingCopyStore baseIr/baseKeyboard slots — the extract bundle source (no change)
-content/flows/                        # thin YAML order lists deleted (Q3)
+content/flows/                        # all *.modular.yaml order lists deleted (Q3)
 specs/087-decision-backend/           # spec, plan, research, data-model, contracts
 ```
 
@@ -34,6 +34,6 @@ specs/087-decision-backend/           # spec, plan, research, data-model, contra
 | VI — Team boundaries | PASS — Engine owns the registry, ordering, extraction, and write path. Content boundary respected: question prompt/help copy stays content-owned (i18n catalogs); the adaptation catalog remains content data whose classification the engine consumes. |
 | VII — Out of scope | PASS — no CJK/Ethiopic reorder, no LDML, no opaque-fragment survey editing, no byte-identical round-trip. Behavior extraction degrades gracefully on opaque constructs per Article II. |
 | VIII — House conventions | PASS — commits use the locked `<prefix>(<area>)` vocabulary; no issue numbers in code; no emoji in console output. |
-| IX — Single source of survey ordering | EVOLUTION, justified — the article names `steps/manifest.ts` as the single source. This plan moves that single source to the derived decision registry: the article's *intent* (exactly one ordering authority; declared inputs/writes; every survey surface declared) is preserved and strengthened — derived, not hand-maintained. The constitution should be amended to name the registry once US4 lands; until then the manifest remains the shipped authority and the registry runs alongside under parity tests. New survey content still declares its manifest entry per the article until the retirement wave lands. |
+| IX — Single source of survey ordering | EVOLUTION, justified — the article names `steps/manifest.ts` as the single source. This plan moved that single source to the derived decision registry: the article's *intent* (exactly one ordering authority; declared inputs/writes; every survey surface declared) is preserved and strengthened — derived, not hand-maintained. US4 has landed and the constitution Article IX has been rewritten to name the registry and the derived step order (`steps/stepDependencies.ts`). |
 
 No unjustified violations; no Complexity Tracking table needed.

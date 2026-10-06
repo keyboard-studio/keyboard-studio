@@ -88,6 +88,22 @@ Blocks all stories: the extraction bundle and the real (non-fixture) flow runner
 
 **Checkpoint:** the streamlining is complete, measured, and PRed.
 
+## Phase 9 — Full retirement (post-review)
+
+Work that landed after the original 21 tasks, closing the residual ordering artifacts and the review findings.
+
+- [x] **T070** Fold base-script posture into target-script extraction; `classifyBaseScript` deleted, single classifier `extractBaseScriptPosture` · packages/studio/src/survey/questions/a/il_target_script.ts (d31bfaaa)
+- [x] **T071** Derive track + project_name order; derived-flow machinery generalized (`FlowSource.phase`, recipe in the `steps/flowSources.ts` header) (abcdfc97)
+- [x] **T072** Derive phase B, F and proposed phase A order; all `content/flows/*.modular.yaml` deleted (45a2c8f5)
+- [x] **T073** Single registry: `flowModules` becomes `questionRegistry` + `decisionIndex` in `survey/questions/registry.ts`; per-phase `registry.{a,b,f,g,reserve}.ts` and the thin-YAML loader (`survey/loadDerivedFlow.ts`) deleted; `gatedByFromNext` rewritten as graph visibility (merge-point bug fixed); `gateWalkParity` test added (7af9f942)
+- [x] **T074** DecisionsDemo uses design tokens instead of raw hex (58db4c41)
+- [x] **T075** Wizard step order derived: `steps/stepDependencies.ts`, `steps/stepOrder.ts`, generic `orderByDependencies`; `spine` / `joinTarget` flags deleted; constitution Article IX rewritten; 14 unconstrained step pairs frozen in `stepOrder.parity.test.ts` (ac12b6d0)
+- [x] **T076** Renumber the spec folder 085 to 087 (96df49cc)
+- [x] **T077** Gate derivation per-condition fail-open and cycle-safe reachability; `QuestionModule.gatedBy` deleted; step gates single-sourced (`advance.ts` and `lib/resolveLocation.ts` call the step `gatedBy`) (503eb3f3)
+- [x] **T078** Real gate-to-gated `requires` edges (phase F 15, phase B 24); exhaustive `decisionIRConsistency` (7 mismatches fixed); stale references cleaned (cb0f6237)
+
+**Checkpoint:** no YAML order lists, per-phase registries, spine flags or module-level `gatedBy` remain. Residual: adjacent pairs with no dependency between them are ordered by declaration order (see followups.md item 4).
+
 ## Dependencies & Execution Order
 
 - **Phase 1 (Setup)** → **Phase 2 (Foundational)** → Phases 3–7 (stories, in priority order; US1 before US2 before US3 before US4 before US5 — each builds on the last) → **Phase 8 (Polish)**.

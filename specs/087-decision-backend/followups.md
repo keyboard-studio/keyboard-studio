@@ -22,11 +22,14 @@ for walk-order flows). Those pairs (`layout` against the base/track/characters
 steps and the four pre-carve steps; `marks`/`punctuation`/`invisibles`/
 `convenience` among themselves) are frozen in the parity test.
 
-## 2. Remove deprecated `classifyBaseScript` (DONE: deleted; posture now read via `extractBaseScriptPosture` in `il_target_script.ts`)
+Commits: d31bfaaa, abcdfc97, 45a2c8f5, 7af9f942, ac12b6d0, 503eb3f3, cb0f6237
+(tasks T070-T078).
 
-`adaptation/firing.ts::classifyBaseScript` is deprecated but still exported
-(T022 folded target-script classification into decision extraction
-provenance). Trigger: confirm no remaining importers, then delete.
+## 2. Remove deprecated `classifyBaseScript` (DONE, d31bfaaa)
+
+`classifyBaseScript` is deleted. Base-script posture is folded into
+target-script extraction; the single classifier is `extractBaseScriptPosture`
+in `survey/questions/a/il_target_script.ts`.
 
 ## 3. SC-001: close the gap to the spec's 80% pre-fill bar
 
@@ -40,4 +43,16 @@ The spec's SC-001 bar is ≥80%. One more extractor on the identity set
 (e.g. language-name from catalog displayName/language metadata, or
 author-name from package metadata) takes the set to 5/6 = 83% and meets
 the bar. The test pins the current 4/6 floor; raising it is a deliberate
-follow-up, not a silent bar-lowering.
+follow-up, not a silent bar-lowering. Status: OPEN (67%, below the 80% bar).
+
+## 4. Declaration-order tie-breaks still decide many adjacent pairs
+
+Order is derived from `provides`/`requires`, but where no dependency separates
+two neighbours the declaration order is the stable tie-break. Counts of
+adjacent pairs decided that way: phase F 18/20, phase B 34/46,
+identity_lite 4/8, phase_a_identity 22/29, plus 14 wizard step pairs. This is
+honest (no hidden list) and frozen by the parity tests
+(`decisions/orderParity.test.ts`, `steps/stepOrder.parity.test.ts`), but those
+pairs are not dependency-derived. Trigger: a real ordering constraint between
+a pair should be added as a `requires` edge, and the frozen literal updated
+deliberately.
