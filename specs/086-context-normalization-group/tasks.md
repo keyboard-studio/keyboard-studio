@@ -26,8 +26,8 @@ description: "Task list for spec 086 context normalization group"
 
 **Purpose**: Environment and the new module's skeleton.
 
-- [ ] T001 Check `../keyboards` is at the CI pin (`KEYBOARDS_CORPUS_SHA` in `.github/workflows/ci.yml`) and that `pnpm install && pnpm build` (prebuild included) succeeds; note the SHA for the parity and harness tasks
-- [ ] T002 Create `packages/engine/src/pattern-apply/normalization-step/index.ts` exporting only `NORMALIZATION_STEP_GENERATOR_VERSION = "1"` and `NORMALIZATION_GROUP = "generated_context_normalize"`, plus the store prefix constant `"generated_cn_"`, per [contracts/engine-normalization-step.md](contracts/engine-normalization-step.md)
+- [x] T001 Check `../keyboards` is at the CI pin (`KEYBOARDS_CORPUS_SHA` in `.github/workflows/ci.yml`) and that `pnpm install && pnpm build` (prebuild included) succeeds; note the SHA for the parity and harness tasks
+- [x] T002 Create `packages/engine/src/pattern-apply/normalization-step/index.ts` exporting only `NORMALIZATION_STEP_GENERATOR_VERSION = "1"` and `NORMALIZATION_GROUP = "generated_context_normalize"`, plus the store prefix constant `"generated_cn_"`, per [contracts/engine-normalization-step.md](contracts/engine-normalization-step.md)
 
 ---
 

@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Context normalization group",
   "branch": "086-context-normalization-group",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -32,6 +32,62 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-10-06T07:12:10.662Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-06T07:20:03.460Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:24:15.667Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:24:37.276Z"
+    }
+  ],
+  "unattended": true,
+  "currentTask": "T002",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "../keyboards at CI pin 435f82d6; pnpm install + pnpm build (prebuild incl.) exit 0 on Node 22.23.1"
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Created normalization-step/index.ts with generator version, group name and generated_cn_ store prefix constants",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.ts"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "typecheck",
+      "command": "pnpm typecheck",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 20.1,
+      "result": "utilities/oauth-backend typecheck: Done · packages/studio typecheck$ tsc --noEmit · packages/studio typecheck: Done"
+    },
+    {
+      "what": "lint",
+      "command": "pnpm lint",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 69.2,
+      "result": "> keyboard-studio@0.1.0 spec-number-lint C:\\Github\\keyboard-studio-086 · > node utilities/spec-number-lint/index.js · [OK] spec-number-lint: 82 spec folder(s), no number collisions"
     }
   ]
 }
