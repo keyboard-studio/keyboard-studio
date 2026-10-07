@@ -56,6 +56,67 @@ Unblocks when: the same 090 US3/US4 conversions land. The v3 work
 then proceeds exactly as tasked (fixture, envelope, boot-scan
 migration with .v2/.v1 key chaining, replay resume, SC-003 walk).
 
+## T026 — full verification record (2026-10-07, tree @ 9add4260 + docs)
+
+Gates: `tsc --noEmit` (studio) exit 0. eslint (studio) 0 errors / 397
+warnings, exit 0. depcruise (root config): 142 violations — 134
+no-circular (zero through any 093-authored file; upstream stack state),
+6 decisions-layer (see the dedicated section below), 2
+question-modules-no-bypass (Phase F modules, upstream).
+
+Vitest (studio, 503 files): verdicts for 502 files. Method, for the
+record: two full runs stalled deterministically at file 354 (a
+non-terminating file blocks the serial schedule — identified below)
+and were killed; the first 353 files' accounting was reproduced
+EXACTLY by both runs (6,568 tests, 52 failed, same 17 files), and the
+remaining 150 files were covered in timeout-bounded batches and
+singles. **68 failed tests total, every one classified; no failure is
+a 093 regression** (093's own suites — decisions/*, the StepHost
+rebuild suites, startingPointChange — are green):
+
+- **47 tests — the named screenRequires item** (lead-ruled 2026-10-07:
+  092's copyright `requires` edge converts from module `requires` to
+  `screenRequires` at the 092 restack pass after 091 completes; not
+  dropped, not 093's to fix). Every one traces to the exact throw
+  `unresolved decision: "authoring-track" required by
+  "il_copyright_holder"` on this intermediate stack (091 partial flow +
+  092 edge): StudioShell.previewCommitGating 8, IdentityLite.attribution
+  8, IdentityLite.resume 5, journey-runner 5, panelAdapters 4,
+  IdentityLite.codeMismatchWarning 4, IdentityLite.provenance 3,
+  IdentityLite.autoAdvance 2, viewStateRestoration 2, DashboardView 1,
+  gateWalkParity 1, orderParity 1, successCriteria 1, sc002 1,
+  IdentityLite.autonymDedup 1 — plus IdentityLite.test.ts failing at
+  collection (0 tests) on the same throw.
+- **4 tests — the standing SC-004 local-corpus budget**
+  (successCriteria.sc004 2 + sc004.kmp 2; basic_kbdru / arabic_izza).
+- **2 tests — goldenWalk fixture delta** (089/090-owned; see T023).
+- **2 tests — renderSmoke touch_seed_source** (upstream partial state).
+- **8 tests — DecisionsDemo** (retired demo surface).
+- **1 test — drillDownDeclarations FR-014 anchor reachability**
+  (091/092 identity-walk seam; not the throw, same restack family).
+- **4 tests — registry/module drift on the intermediate stack**:
+  registry inventory 128 vs the verified 114 (091's added modules) +
+  flow-membership, questionModules marksTreatment definition snapshot,
+  windowsLayout renderer recorded-value test (090/091 surfaces; 093
+  touched none of them).
+
+**Non-terminating files (2)** — `survey/PhaseFAdaptiveDescription.
+integration.test.tsx` and `survey/PhaseFContactSeed.integration.
+test.tsx` burn CPU indefinitely on this stack (killed at 90s/150s
+timeouts; they are what stalls a full-suite run at file ~354). Their
+drivers walk the Phase F flow, which cannot render while the identity
+flow throws — same named-item family; expect termination when the
+restack lands the conversion. Flagged for the lead: until then, any
+full-suite run on this branch needs these two files excluded or a
+timeout.
+
+**Environment-blocked (1)** — `tests/steps/stepHost.fullStepScroll.
+test.tsx`: no code verdict. Collection failed ENOSPC (the 512 MB /tmp
+tmpfs under parallel crew load), then two single-file retries were
+OOM-killed (137) with 090's suites running concurrently. Its sibling
+mirror-coverage passed 140/140 under the same conditions. Re-run on a
+quiet machine / in CI.
+
 ## T017 — core LANDED; live wire-in STOPPED (needs a lead/owner call)
 
 Landed: `decisions/startingPointChange.ts` —

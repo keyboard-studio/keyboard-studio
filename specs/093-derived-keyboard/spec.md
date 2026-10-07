@@ -3,7 +3,17 @@
 **Feature:** specs/093-derived-keyboard
 **Branch:** cut from `main` after 092 merges (`km/derived-keyboard`)
 **Created:** 2026-10-06
-**Status:** Draft
+**Status:** Implemented with held items (2026-10-07) — the replay engine,
+the StepHost/StudioShell rebuild wiring (T009), starting-point
+recalculation (T017, core), determinism (SC-002) and the replay-path
+perf re-measurement (T021) are landed; the touch/repropagate retirement
+(T010/T011) and the decisions-only draft (US2: T014–T016, T018) are
+HELD on spec 090's US3/US4 landing on this stack, with evidence in
+[followups.md](followups.md). Owner decisions stand as ruled 2026-10-06:
+(a) starting-point change = recalculation; (b) perf budgets
+measure-first — the <300 ms / <2 s numbers remain PROPOSED (T021
+evidence: warm edit median 7.20 ms, cold resume median 9.58 ms on
+sil_euro_latin), never converted to a gate here.
 **Series:** 6 of 6. The plan is [088 HANDOFF.md](../088-modular-decisions/HANDOFF.md)
 (sections "Recalculation on change" and phase 6).
 **Depends on:** 090 (pure `apply`, overlays as decision values) and 092 (setup as a decision).
@@ -87,6 +97,19 @@ a single edit quick on a large starting point.
 | identity patch and overlays held as working-copy state | **deleted**; produced by replay |
 
 After 093, the decisions are the only stored state.
+
+**Ledger state at close-out (T024, measured 2026-10-07 @ 9add4260,
+packages/studio/src):** the first and third rows are realised for every
+surface replay now produces (the rebuilt IR + overlay channels install
+over the incremental applies at every completion; the identity patch
+and overlays are folded by the replay accumulator). The deletions
+themselves are HELD with their tasks (followups.md): `staleSteps` 71
+references and `repropagate` 25 references stand while T010/T011 wait
+on 090 US3/US4, and the saved `workingCopy` slice (31 references across
+lib/persistWorkingCopy.ts + lib/draftPersistence.ts) stands while US2
+waits on the same landing — on this tree those slices still carry
+author work that is not yet decision-derived, and dropping them would
+lose it silently.
 
 ## Success Criteria
 - **SC-001** The US1 walk passes in `pnpm dev`.
