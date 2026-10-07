@@ -151,8 +151,8 @@ the group/screen-key seeding keeps the author's visible vocabulary stable.
 
 ## The `package` screen has no decision
 
-**Decision (plan-level, flagged as an open question for implementation
-kickoff):** `package` settles nothing and, after 090, still has no decision
+**Decision (RULED — owner ruling 2026-10-06, km-lead proposals Q9):**
+`package` settles nothing and, after 090, still has no decision
 module (it is not among 090's fourteen). It is treated as a **terminal
 screen**: declared in the manifest pool as a component declaration with no
 ordering fields, appended after the last derived screen — the same status
@@ -163,8 +163,9 @@ structural, not decision-placed.
 **Rationale:** inventing a `packaging` decision to satisfy the partition
 would create a decision nobody asks, extracts or defaults — against the
 series rule that every decision is asked/extracted/defaulted with provenance.
-If the owner prefers a real module, that is a one-line change to this
-decision at kickoff, before tasks are dispatched.
+The alternative — a real `packaging` module — was considered and not adopted;
+the terminal-screen treatment above is the confirmed design (owner ruling
+2026-10-06, km-lead proposals Q9).
 
 ## The parity rewrite (FR-005)
 

@@ -164,7 +164,7 @@ arranged by the derived screen order.
 - **Parity (FR-005)** is a rewrite, not a regeneration: baseline literals from `main`@18e63aa4
   stay as data; the assertions become baseline-equality *modulo* requires-edge explanations,
   plus the kept adversarial-input property over screens (research.md).
-- **Open question carried to implementation kickoff** (research.md): the `package` screen has
-  no decision module; the plan treats it as a terminal screen appended after the last derived
-  screen. Confirm or replace with a real module before dispatch — everything else in this plan
-  is independent of that choice.
+- **`package` screen treatment — RULED/confirmed** (research.md; owner ruling 2026-10-06,
+  km-lead proposals Q9): the `package` screen has no decision module; it is a terminal screen
+  appended after the last derived screen. This is settled, not an open question — no
+  confirmation at implementation kickoff is needed.
