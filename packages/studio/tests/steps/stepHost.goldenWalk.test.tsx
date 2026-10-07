@@ -11,13 +11,18 @@
 //
 //   1. `applyStepCompletion` from `steps/reducer.ts` — spy via vi.spyOn after
 //      import.  Records which step IDs flow through the reducer.
-//   2. `surveySessionStore` mutators (advance, popHistory, setIdentityResult,
-//      setSurveyContext, setSelectedTrack, setScaffoldSpec, setLocalBase,
-//      setCharactersSubStage) — injected via useSurveySessionStore.setState so
+//   2. `surveySessionStore` mutators (advance, popHistory, setLocalBase,
+//      setBaseConfirmed, setCharactersSubStage) AND `decisionStore` mutators
+//      (record, recordAll, forget) — injected via the stores' setState so
 //      the spy still executes the real logic.  Records call order.
-//   3. `workingCopyStore` mutators (recordPhase, setIdentity, lockDesktop,
-//      setTouchLayoutJson) — injected via useWorkingCopyStore.setState in the
-//      same way.  Captures the host-level working-copy writes that the Stage 5
+//      Spec 089: the identity/track/project effects that used to be session
+//      setters (setIdentityResult, setSurveyContext, setSelectedTrack,
+//      setScaffoldSpec — deleted in T017) now appear here as decision
+//      records, and their working-copy landings as overlay setters (seam 3).
+//   3. `workingCopyStore` mutators (recordPhase, setIdentity, setAttribution,
+//      setHelpDocs, setHistoryEntryState, lockDesktop, setTouchLayoutJson)
+//      — injected via useWorkingCopyStore.setState in the same way.
+//      Captures the host-level working-copy writes that the Stage 5
 //      refactor centralises into StepHost (research R7, contract §2).
 //   4. `navigateTo` from `lib/navigate.ts` — a vi.mock fn; captures top-level
 //      route transitions.
@@ -35,13 +40,14 @@
 //     the same reducerDeps-injected closures via useWorkingCopyStore.setState),
 //     but their presence here is redundant with the reducer entry — it is belt-
 //     and-suspenders coverage.
-//   - `routeAnswersThroughMutate` is a private (non-exported) function in
-//     StudioShell.tsx.  A direct spy is impractical without production-code
-//     changes.  Its effect (routing in-scope question answers through question-
-//     module `mutate()` helpers) is delegated to reducerDeps closures and is
-//     therefore INDIRECTLY covered by the `applyStepCompletion` entries for the
-//     steps that call it (identity, characters/B, help).  The refactor must
-//     preserve its call site by code inspection, not by this oracle.
+//   - Spec 089 replaced `routeAnswersThroughMutate` with the exported
+//     `applyDecisionEffects` (steps/reducer.ts), run by StepHost after
+//     recordAnswersAsDecisions.  Its observable effects are exactly seams 2
+//     and 3: the decision records written at completion and the working-copy
+//     overlay setters the runner's sink calls (setIdentity / setAttribution /
+//     setHelpDocs / setHistoryEntryState + the checked IR merge).  Both are
+//     captured DIRECTLY, so the apply path is covered by this oracle, not
+//     merely by code inspection as its predecessor was.
 //
 // WHY THIS SEAM IS REFACTOR-STABLE:
 //   - No SurveyView internal function names appear in the fixture shape.
@@ -76,6 +82,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 
 // ---------------------------------------------------------------------------
 // Mock child survey components — the shared StudioShell harness
@@ -220,14 +227,21 @@ interface WalkEntry {
 const SESSION_MUTATOR_NAMES = [
   "advance",
   "popHistory",
-  "setIdentityResult",
-  "setSurveyContext",
-  "setSelectedTrack",
-  "setScaffoldSpec",
   "setLocalBase",
   "setBaseConfirmed",
   "setCharactersSubStage",
 ] as const;
+
+// Spec 089: decision-store mutators, captured into the same storeMutations
+// list (interleaved by invocation order) — a completion's decision records
+// are the successor of the deleted session setters.
+const DECISION_MUTATOR_NAMES = [
+  "record",
+  "recordAll",
+  "forget",
+] as const;
+
+const STORE_MUTATOR_NAMES = [...SESSION_MUTATOR_NAMES, ...DECISION_MUTATOR_NAMES] as const;
 
 // ---------------------------------------------------------------------------
 // Working-copy store mutator names to spy on
@@ -242,6 +256,9 @@ const SESSION_MUTATOR_NAMES = [
 const WC_MUTATOR_NAMES = [
   "recordPhase",
   "setIdentity",
+  "setAttribution",
+  "setHelpDocs",
+  "setHistoryEntryState",
   "lockDesktop",
   "setTouchLayoutJson",
 ] as const;
@@ -277,6 +294,19 @@ function createRecorder() {
     }
   }
 
+  // 3b. Decision-store mutator spies — same pattern (spec 089).
+  const decisionSpies: Record<string, ReturnType<typeof vi.fn>> = {};
+  {
+    const store = useDecisionStore.getState();
+    for (const name of DECISION_MUTATOR_NAMES) {
+      const original = store[name] as (...args: unknown[]) => void;
+      const spy = vi.fn((...args: unknown[]) => original(...args));
+      useDecisionStore.setState({ [name]: spy } as Partial<typeof store>);
+      decisionSpies[name] = spy;
+    }
+  }
+  const storeSpies = { ...sessionSpies, ...decisionSpies };
+
   // 4. Working-copy store mutator spies — same pattern.
   const wcSpies: Record<string, ReturnType<typeof vi.fn>> = {};
   {
@@ -293,7 +323,7 @@ function createRecorder() {
   function clearAll() {
     applyStepCompletionSpy.mockClear();
     navigateToMock.mockClear();
-    for (const spy of Object.values(sessionSpies)) spy.mockClear();
+    for (const spy of Object.values(storeSpies)) spy.mockClear();
     for (const spy of Object.values(wcSpies)) spy.mockClear();
   }
 
@@ -335,7 +365,7 @@ function createRecorder() {
       current.applyStepCompletion.push(String(call[0]));
     }
 
-    current.storeMutations = collectOrdered(sessionSpies, SESSION_MUTATOR_NAMES);
+    current.storeMutations = collectOrdered(storeSpies, STORE_MUTATOR_NAMES);
     current.workingCopyMutations = collectOrdered(wcSpies, WC_MUTATOR_NAMES);
 
     for (const call of navigateToMock.mock.calls) {

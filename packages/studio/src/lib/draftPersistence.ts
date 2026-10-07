@@ -59,7 +59,8 @@ import {
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 import { alphabetKeyOf } from "../steps/evidence.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import { applyDecisionSnapshot, getDecisionSnapshot } from "../stores/decisionStore.ts";
+import { applyDecisionSnapshot, getDecisionSnapshot, peekDecision } from "../stores/decisionStore.ts";
+import { deriveIdentityResult, deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { stepHasSettles } from "../steps/stepDependencies.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
@@ -729,7 +730,9 @@ export function listDrafts(): ProjectIndexEntry[] {
 export function hasMeaningfulProgress(): boolean {
   const session = useSurveySessionStore.getState();
   return (
-    session.identityResult !== null ||
+    // Spec 089: "identity completed" is the target-script decision existing
+    // (the same condition deriveIdentityResult keys on).
+    peekDecision("target-script") !== undefined ||
     session.history.length > 0 ||
     session.activeStepId !== "identity" ||
     session.localBase !== null
@@ -773,8 +776,6 @@ export function saveDraft(projectKey: string): void {
     return; // VR-2 (relaxed for the pending slot per the F6 doc comment above)
   }
 
-  const session = useSurveySessionStore.getState();
-
   // displayName: Track-1 scaffoldSpec (project_name step) first, then the
   // identity patch's displayName (Track 2 / post-Phase-A Track 1), then the
   // base keyboard's own display name as a last resort.
@@ -784,8 +785,9 @@ export function saveDraft(projectKey: string): void {
   // deriveProjectLabel implements exactly the precedence that was inlined here
   // (with the addition of a blank-string skip, which the `??` chain could not
   // express).
+  const decisions = getDecisionSnapshot();
   const displayName = deriveProjectLabel({
-    scaffoldSpec: session.scaffoldSpec,
+    scaffoldSpec: deriveScaffoldSpec(decisions),
     identity: wc.identity,
     baseKeyboard: wc.baseKeyboard,
   });
@@ -793,7 +795,7 @@ export function saveDraft(projectKey: string): void {
   // languageTag: identity-lite's computed BCP47 tag first (may be "" if the
   // step hasn't completed or the language subtag was left blank — normalize
   // that to null), then the identity patch's own bcp47 field.
-  const rawLanguageTag = session.identityResult?.bcp47 ?? wc.identity?.bcp47 ?? null;
+  const rawLanguageTag = deriveIdentityResult(decisions)?.bcp47 ?? wc.identity?.bcp47 ?? null;
   const languageTag = rawLanguageTag !== null && rawLanguageTag !== "" ? rawLanguageTag : null;
 
   const envelope: DurableDraft = {
@@ -928,7 +930,8 @@ function stringArray(v: unknown): string[] {
 function stampPre079Alphabet(): void {
   const draft = usePhaseBDraftStore.getState();
   if (draft.alphabetEvidenceKey !== undefined || draft.chars.length === 0) return;
-  const { identityResult, localBase } = useSurveySessionStore.getState();
+  const { localBase } = useSurveySessionStore.getState();
+  const identityResult = deriveIdentityResult(getDecisionSnapshot());
   if (identityResult === null || localBase === null) return;
   draft.setAlphabetEvidenceKey(alphabetKeyOf(identityResult, localBase));
 }
@@ -1429,14 +1432,18 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     // re-proposed every character the author had removed and flattened every
     // proposed chip to "author". Each field is validated individually and
     // degrades to its empty default, never discarding the record.
-    applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
-    stampPre079Alphabet();
-
     // decisions (spec 088 FR-007): the decision store is restored from the
     // envelope's `decisions` slice — for a migrated v1 envelope, the records
     // the migration built. Applied even when absent ({}), so a project
     // switch never inherits another project's decisions.
+    // Spec 089: applied BEFORE the phase-B restore + stamp below —
+    // stampPre079Alphabet derives the identity it stamps from the decision
+    // store (it read the traversal-restored session field before T017, which
+    // is why this ordering used to be safe).
     applyDecisionSnapshot(envelope.decisions ?? {});
+
+    applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
+    stampPre079Alphabet();
 
     // surveyAnswers (spec 079 R-01, FR-032): optional/additive, restored the
     // same tolerant way. Applied even when absent, so a pre-079 draft (or a

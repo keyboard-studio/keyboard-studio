@@ -4,17 +4,18 @@
 //   (a) resolve → run → extract → complete for the "track" flow ref (US3).
 //   (b) stay-on-step when extract returns undefined.
 //   (c) loud throw for an unknown flowRef (FR-010 / "no default is a defect").
-//   (d) onCommit fires BEFORE onComplete (R7 ordering).
+//   (d) completion forwards the UNTOUCHED result to onComplete after the
+//       extract guard — the factory performs no store writes on completion
+//       (spec 089: effects live in the modules' applies, run by StepHost).
 //
 // The test mocks survey/index.ts so that FlowStepHost renders a controllable
 // stub (matching the golden-walk pattern). Store deps are injected via
 // vi.mock so the factory's useSurveySessionStore / useWorkingCopyStore selectors
 // return deterministic values.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
-import type { EditorStepProps } from "../../src/steps/types.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted refs for mock callbacks
@@ -82,31 +83,39 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock stores — return deterministic values; spy on setSelectedTrack
+// Mock stores — return deterministic values. Spec 089: the factory reads
+// localBase (session), the decision set (decision store), and the working
+// copy's history-entry state + validator findings. It writes NOTHING.
 // ---------------------------------------------------------------------------
-
-const mockSetSelectedTrack = vi.fn();
-const mockSetScaffoldSpec = vi.fn();
-const mockSetIdentity = vi.fn();
 
 vi.mock("../../src/stores/surveySessionStore.ts", () => ({
   useSurveySessionStore: (selector: (s: unknown) => unknown) => {
     const store = {
       localBase: { displayName: "Test Base" },
-      identityResult: { autonym: "Hausa", english: "Hausa" },
-      surveyContext: {},
-      setSelectedTrack: mockSetSelectedTrack,
-      setScaffoldSpec: mockSetScaffoldSpec,
     };
     return selector(store);
   },
+}));
+
+vi.mock("../../src/stores/decisionStore.ts", () => ({
+  useDecisionStore: (selector: (s: unknown) => unknown) => {
+    const store = {
+      decisions: {
+        "language-name": { id: "language-name", value: "Hausa", provenance: "asked" },
+        "language-autonym": { id: "language-autonym", value: "Hausa", provenance: "asked" },
+        "target-script": { id: "target-script", value: "Latn", provenance: "asked" },
+      },
+    };
+    return selector(store);
+  },
+  selectTrack: () => null,
 }));
 
 vi.mock("../../src/stores/workingCopyStore.ts", () => ({
   useWorkingCopyStore: (selector: (s: unknown) => unknown) => {
     const store = {
       validatorFindings: [],
-      setIdentity: mockSetIdentity,
+      historyEntryState: null,
     };
     return selector(store);
   },
@@ -144,9 +153,6 @@ function buildTrackOptions(overrides?: Partial<FlowStepOptions<TrackPayload>>): 
           : undefined;
       if (v === "copy" || v === "adapt") return { track: v };
       return undefined;
-    },
-    onCommit(extracted, deps) {
-      deps.setSelectedTrack(extracted.track);
     },
     ...overrides,
   };
@@ -199,20 +205,10 @@ describe("makeFlowStepComponent", () => {
       expect(screen.getByTestId("flow-step-title").textContent).toBe("Authoring Track");
     });
 
-    it("fires setSelectedTrack('copy') BEFORE onComplete when extract succeeds (R7 ordering)", async () => {
-      const callOrder: string[] = [];
+    it("forwards the UNTOUCHED SurveyPhaseResult to onComplete when extract succeeds (spec 089)", async () => {
+      const onCompleteSpy = vi.fn();
 
-      const onCommitSpy = vi.fn((extracted: TrackPayload, deps: FlowStepDeps) => {
-        callOrder.push("onCommit");
-        deps.setSelectedTrack(extracted.track);
-      });
-      const onCompleteSpy = vi.fn(() => {
-        callOrder.push("onComplete");
-      });
-
-      const TrackComponent = makeFlowStepComponent(
-        buildTrackOptions({ onCommit: onCommitSpy }),
-      );
+      const TrackComponent = makeFlowStepComponent(buildTrackOptions());
 
       await act(async () => {
         render(<TrackComponent onComplete={onCompleteSpy} />);
@@ -222,15 +218,15 @@ describe("makeFlowStepComponent", () => {
         fireEvent.click(screen.getByTestId("fsh-complete"));
       });
 
-      // R7: onCommit fires before onComplete (state mutations before navigation).
-      expect(callOrder).toEqual(["onCommit", "onComplete"]);
-      expect(mockSetSelectedTrack).toHaveBeenCalledWith("copy");
       // onComplete receives the UNTOUCHED SurveyPhaseResult, not the extracted
       // `{ track: "copy" }` — StepHost's generic completion path (recordPhase /
       // recordStepCompletion / advance) needs the real, answers-bearing result.
-      // `extract()`'s reshaping is for this factory's own onCommit effects only
-      // (see the mock FlowStepHost's "fsh-complete" button above for the exact
-      // shape the real runner hands back).
+      // `extract()`'s reshaping exists for the no-advance guard only; the
+      // completion's store effects are the modules' applies, run by StepHost's
+      // applyDecisionEffects — never by this factory (see the mock
+      // FlowStepHost's "fsh-complete" button above for the exact shape the
+      // real runner hands back).
+      expect(onCompleteSpy).toHaveBeenCalledTimes(1);
       expect(onCompleteSpy).toHaveBeenCalledWith({
         phase: "G",
         answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
@@ -245,7 +241,6 @@ describe("makeFlowStepComponent", () => {
       const TrackComponent = makeFlowStepComponent(
         buildTrackOptions({
           extract: extractReturnsUndefined,
-          onCommit: vi.fn(),
         }),
       );
 

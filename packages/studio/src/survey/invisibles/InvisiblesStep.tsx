@@ -50,7 +50,8 @@ import { parseUPlusNotation } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { usePhaseBDraftStore } from "../../stores/phaseBDraftStore.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 import { isFormatChar } from "../charNormUtils.ts";
@@ -194,7 +195,8 @@ function CandidateRow({ candidate, checked, onToggle }: CandidateRowProps) {
 const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   const direction = useMemo(
     () => writingDirectionFrom(phaseResults, surveyContext),
     [phaseResults, surveyContext],

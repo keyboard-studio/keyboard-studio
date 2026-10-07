@@ -26,6 +26,7 @@ import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
 import { buildTargetBcp47, normalizeRegionSubtag } from "../survey/targetBcp47.ts";
 import { deriveScriptPrefill } from "../lib/scriptAxes.ts";
+import { identityLanguagePatch } from "../lib/identityLanguagePatch.ts";
 import type { SurveyContext } from "../survey/types.ts";
 
 /**
@@ -105,6 +106,30 @@ export function deriveScaffoldSpec(
   const displayName = decisionString(decisions, "project-display-name");
   if (keyboardId === "" || displayName === "") return null;
   return { keyboardId, displayName };
+}
+
+/**
+ * The working copy's identity slice for the project_name completion,
+ * derived from decisions — the exact composition the deleted
+ * `projectNameOptions.onCommit` performed (spec 059 FR-001/FR-002):
+ * `{ keyboardId, displayName, ...identityLanguagePatch(identityResult) }`,
+ * with the language overlay composed by the ONE shared rule in
+ * lib/identityLanguagePatch.ts. Null until both project-name answers are
+ * recorded. Lives here (not in the question module) because question
+ * modules may not import lib/ — the depcruise question-modules rule — and
+ * this file already composes the identity derivations.
+ */
+export function deriveProjectIdentity(
+  decisions: DecisionSet,
+): ({ keyboardId: string; displayName: string } & ReturnType<typeof identityLanguagePatch>) | null {
+  const keyboardId = decisionString(decisions, "project-keyboard-id");
+  const displayName = decisionString(decisions, "project-display-name");
+  if (keyboardId === "" || displayName === "") return null;
+  return {
+    keyboardId,
+    displayName,
+    ...identityLanguagePatch(deriveIdentityResult(decisions)),
+  };
 }
 
 /**

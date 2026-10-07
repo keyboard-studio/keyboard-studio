@@ -78,6 +78,7 @@ import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useStepNavStore } from "./stores/stepNavStore.ts";
 import { useSurveyAnswerStore, peekStepAnswers } from "./stores/surveyAnswerStore.ts";
 import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/decisionStore.ts";
+import { deriveScaffoldSpec, deriveSurveyContext } from "./decisions/identitySelectors.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import {
   useKeyboardArtifact,
@@ -337,9 +338,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // (for the compile pipeline) and localBase (for the OSK right pane).
   // ---------------------------------------------------------------------------
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
-  const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
+  // Spec 089 FR-005: scaffoldSpec + surveyContext are derived from the
+  // decision store, not held as session fields.
+  const decisions = useDecisionStore((s) => s.decisions);
+  const scaffoldSpec = deriveScaffoldSpec(decisions);
   const localBase = useSurveySessionStore((s) => s.localBase);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const surveyContext = deriveSurveyContext(decisions);
 
   // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList /
   // ManagedPRSubmitPanel) so SurveyView can start/stop the signed-in cloud

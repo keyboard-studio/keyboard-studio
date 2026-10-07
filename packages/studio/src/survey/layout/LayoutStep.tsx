@@ -13,7 +13,8 @@ import type { ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { WindowsLayoutPicker } from "../../components/WindowsLayoutPicker.tsx";
 import { proposeWindowsLayout, windowsLayoutById } from "../../lib/windowsLayouts.ts";
@@ -52,7 +53,7 @@ function WhyLine({ basis, tag }: { basis: LayoutProposalBasis; tag: string }) {
 
 const LayoutStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
-  const bcp47 = useSurveySessionStore((s) => s.surveyContext.bcp47_tag);
+  const bcp47 = useDecisionStore((s) => deriveSurveyContext(s.decisions).bcp47_tag);
   const savedValue = useSurveyAnswerStore(
     (s) => s.steps[LAYOUT_FAMILY_STEP_ID]?.answers[HOST_LAYOUT_ANSWER_ID]?.value,
   );

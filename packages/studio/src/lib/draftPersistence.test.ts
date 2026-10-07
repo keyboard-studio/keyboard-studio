@@ -25,6 +25,7 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore, getSurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
 import {
   getDecisionSnapshot,
@@ -38,7 +39,6 @@ import {
   resetPhaseBDraftDecisions,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
-import type { IdentityLiteResult } from "../survey/index.ts";
 
 // serverDraftStore's fetch-based transport is mocked at the module boundary
 // (P1-2) so startCloudSync/recordProjectSubmission tests below never touch
@@ -1396,18 +1396,16 @@ describe("draftPersistence", () => {
     it("a pre-079 draft (built alphabet, no key) is stamped on load from its restored identity and base (FR-032)", () => {
       const pk = "phaseb-alphabet-key-pre079";
       instantiateMinimal(pk);
+      // Spec 089: the stamp derives the identity from the recorded
+      // decisions (saved into the draft envelope, restored on load).
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "language-name", value: "Test", provenance: "asked" });
+        record({ id: "language-autonym", value: "Test", provenance: "asked" });
+        record({ id: "language-code", value: "tl", provenance: "asked" });
+        record({ id: "target-script", value: "Latn", provenance: "asked" });
+      }
       useSurveySessionStore.setState({
-        identityResult: {
-          autonym: "Test",
-          english: "Test",
-          languageSubtag: "tl",
-          region: "",
-          targetScriptRaw: "Latn",
-          bcp47: "tl-Latn",
-          supported: true,
-          attribution: null,
-          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-        } as never,
         localBase: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
       });
       usePhaseBDraftStore.getState().add("a");
@@ -1415,6 +1413,7 @@ describe("draftPersistence", () => {
       expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
       usePhaseBDraftStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
 
       expect(loadDraft(pk)).toBe(true);
       expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
@@ -1668,20 +1667,18 @@ describe("draftPersistence", () => {
         ir: makeScaffoldedIR(),
       });
 
-      useSurveySessionStore.getState().setScaffoldSpec({
-        keyboardId: "proj_x",
-        displayName: "My Custom Keyboard",
-      });
-      useSurveySessionStore.getState().setIdentityResult({
-        autonym: "Test",
-        english: "Test",
-        languageSubtag: "yo",
-        region: "",
-        targetScriptRaw: "Latn",
-        bcp47: "yo-Latn",
-        supported: true,
-        prefill: {} as unknown as IdentityLiteResult["prefill"],
-      });
+      // Spec 089: the envelope's displayName/languageTag derive from the
+      // recorded decisions (project + identity), not session fields.
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "authoring-track", value: "copy", provenance: "asked" });
+        record({ id: "project-display-name", value: "My Custom Keyboard", provenance: "asked" });
+        record({ id: "project-keyboard-id", value: "proj_x", provenance: "asked" });
+        record({ id: "language-name", value: "Test", provenance: "asked" });
+        record({ id: "language-autonym", value: "Test", provenance: "asked" });
+        record({ id: "language-code", value: "yo", provenance: "asked" });
+        record({ id: "target-script", value: "Latn", provenance: "asked" });
+      }
 
       saveDraft("proj_x");
 
@@ -1693,21 +1690,22 @@ describe("draftPersistence", () => {
     });
 
     // #1578: a same-session switch (no intervening reload) between a
-    // Track-1 scaffolded project (A, whose label comes from
-    // surveySessionStore.scaffoldSpec — deriveProjectLabel's tier 1) and a
-    // plain adapted project (B, whose label falls back to the base's own
-    // displayName) must not let A's scaffoldSpec leak into B's derived
-    // label. `envelope.traversal` (snapshotTraversal/applyTraversalSnapshot)
-    // already carries `scaffoldSpec` as part of its broader
-    // SurveySessionData snapshot and fully overwrites it on every
-    // `loadDraft` call — this pins that behavior so it can't silently
-    // regress.
+    // Track-1 scaffolded project (A, whose label comes from the derived
+    // scaffoldSpec — deriveProjectLabel's tier 1) and a plain adapted
+    // project (B, whose label falls back to the base's own displayName)
+    // must not let A's scaffoldSpec leak into B's derived label.
+    // Spec 089: the scaffoldSpec is derived from the decision set, and the
+    // envelope's per-project decision snapshot (088) is applied wholesale
+    // on every `loadDraft` call — this pins that behavior so it can't
+    // silently regress.
     it("switching FROM a Track-1 scaffolded project TO a plain one, in one session, does not leak the former's scaffoldSpec into the latter's label", () => {
       instantiateMinimal("proj_a");
-      useSurveySessionStore.getState().setScaffoldSpec({
-        keyboardId: "proj_a",
-        displayName: "Testish Keyboard",
-      });
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "authoring-track", value: "copy", provenance: "asked" });
+        record({ id: "project-display-name", value: "Testish Keyboard", provenance: "asked" });
+        record({ id: "project-keyboard-id", value: "proj_a", provenance: "asked" });
+      }
       saveDraft("proj_a");
       expect(
         (JSON.parse(localStorage.getItem(draftKey("proj_a"))!) as DurableDraft).displayName,
@@ -1715,6 +1713,7 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
       const baseB = {
         id: "proj_b",
         displayName: "French Basic",
@@ -1732,12 +1731,12 @@ describe("draftPersistence", () => {
       // The same-session switch: resume A, then resume B — as "My
       // keyboards"'s Resume action does, with no reload in between.
       expect(loadDraft("proj_a")).toBe(true);
-      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+      expect(deriveScaffoldSpec(getDecisionSnapshot())?.displayName).toBe("Testish Keyboard");
 
       expect(loadDraft("proj_b")).toBe(true);
-      // B never scaffolded — its own record has no scaffoldSpec, so resuming
-      // it must clear A's leftover, not leave it standing.
-      expect(useSurveySessionStore.getState().scaffoldSpec).toBeNull();
+      // B never scaffolded — its own decision snapshot has no project
+      // records, so resuming it must clear A's leftover, not leave it standing.
+      expect(deriveScaffoldSpec(getDecisionSnapshot())).toBeNull();
 
       saveDraft("proj_b");
       expect(
@@ -1746,7 +1745,7 @@ describe("draftPersistence", () => {
 
       // Switching back confirms A's own record was never touched either.
       expect(loadDraft("proj_a")).toBe(true);
-      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+      expect(deriveScaffoldSpec(getDecisionSnapshot())?.displayName).toBe("Testish Keyboard");
     });
   });
 

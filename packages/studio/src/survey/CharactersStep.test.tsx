@@ -17,6 +17,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../stores/phaseBDraftStore.ts";
@@ -135,12 +136,25 @@ const fakeBase = {
 /** alphabetKey (steps/evidence.ts) of fakeIdentity + fakeBase: bcp47|script|variant|baseId. */
 const CURRENT_KEY = "tl-Latn|Latn|Latn|basic_kbdus";
 
-/** Seed surveySessionStore with identity + base so prefill guard passes. */
+/** The identity decisions a completed identity step records for `identity`
+ * (spec 089: CharactersStep derives the identity result + survey context
+ * from these — the derived context for the fake identity is exactly the
+ * { language_name: "Test Language", routing_group: "qwerty-qwertz",
+ * script_family: "Latn" } the session store used to be seeded with). */
+function seedIdentity(identity: typeof fakeIdentity & { region?: string }): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: identity.english, provenance: "asked" });
+  record({ id: "language-autonym", value: identity.autonym, provenance: "asked" });
+  record({ id: "language-code", value: identity.languageSubtag, provenance: "asked" });
+  record({ id: "language-region", value: identity.region ?? "", provenance: "asked" });
+  record({ id: "target-script", value: identity.targetScriptRaw, provenance: "asked" });
+}
+
+/** Seed identity decisions + session base so the prefill guard passes. */
 function seedSessionStore() {
+  seedIdentity(fakeIdentity);
   useSurveySessionStore.setState({
-    identityResult: fakeIdentity,
     localBase: fakeBase,
-    surveyContext: { language_name: "Test Language", routing_group: "qwerty-qwertz", script_family: "Latn" },
     charactersSubStage: "prefill",
   });
 }
@@ -513,11 +527,14 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
     },
   );
 
+  // Spec 089: the identity cases re-record the identity decisions with one
+  // fact changed (the derived identity follows); the base case still patches
+  // the session's localBase.
   it.each([
-    ["bcp47", { identityResult: { ...fakeIdentity, bcp47: "tm-Latn" } }],
-    ["script", { identityResult: { ...fakeIdentity, prefill: { ...fakeIdentity.prefill, script: "Cyrl" } } }],
-    ["variant", { identityResult: { ...fakeIdentity, targetScriptRaw: "fonipa" } }],
-    ["base", { localBase: { ...fakeBase, id: "basic_kbdfr" } }],
+    ["bcp47", () => seedIdentity({ ...fakeIdentity, languageSubtag: "tm" })],
+    ["script", () => seedIdentity({ ...fakeIdentity, targetScriptRaw: "Cyrl" })],
+    ["variant", () => seedIdentity({ ...fakeIdentity, targetScriptRaw: "fonipa" })],
+    ["base", () => useSurveySessionStore.setState({ localBase: { ...fakeBase, id: "basic_kbdfr" } })],
   ])(
     "(T039/T059) a changed %s takes the changed branch: proposal chars cleared, old punctuation seeds cleared, new stamp, author addition carried over (R-07)",
     (_what, patch) => {
@@ -527,7 +544,7 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
 
       render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
       fireEvent.click(screen.getByTestId("phaseB-back"));
-      act(() => useSurveySessionStore.setState(patch));
+      act(patch);
       fireEvent.click(screen.getByTestId("prefill-confirm"));
 
       const s = usePhaseBDraftStore.getState();
@@ -589,15 +606,10 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
 
     render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
-    act(() =>
-      useSurveySessionStore.setState({
-        identityResult: {
-          ...fakeIdentity,
-          bcp47: "tl-Cyrl",
-          prefill: { ...fakeIdentity.prefill, script: "Cyrl" },
-        },
-      }),
-    );
+    // Re-record the identity decisions with the Cyrillic target script —
+    // the derived identity composes bcp47 "tl-Cyrl" with prefill.script
+    // "Cyrl", the shape this test used to patch into the session store.
+    act(() => seedIdentity({ ...fakeIdentity, targetScriptRaw: "Cyrl" }));
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     const s = usePhaseBDraftStore.getState();

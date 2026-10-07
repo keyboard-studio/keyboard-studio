@@ -46,7 +46,8 @@ import {
   type ActiveStepId,
 } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { getDecisionSnapshot, selectTouchSeedSource, selectTrack } from "../stores/decisionStore.ts";
+import { getDecisionSnapshot, selectTouchSeedSource, selectTrack, useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { EditorStep } from "../steps/types.ts";
 import {
@@ -188,8 +189,10 @@ const DEEP_LINK_CONTINUE_BUTTON_STYLE: CSSProperties = {
 export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): ReactNode {
   const { t, i18n } = useLingui();
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
-  // identityResult is read here only for the terminal panels (unsupported stub).
-  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  // The identity result is read here only for the terminal panels
+  // (unsupported stub) — derived from the decision store (spec 089 FR-005).
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityResult = deriveIdentityResult(decisions);
   const sessionAdvance = useSurveySessionStore((s) => s.advance);
   // Subscribed (not snapshotted once) so the Back affordance's gating below
   // stays live across advance/pop/reset — F7 defect 2: a stale "always show
@@ -337,9 +340,9 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
 
   if (activeStepId === "unsupported") {
     // Always render a visible panel (spec 028 edge case + FR): never null.
-    // identityResult may be null if the session is in an unexpected state —
-    // fall back to a generic "Script not supported" panel so there is no
-    // invisible failure.
+    // The derived identity result may be null if the session is in an
+    // unexpected state — fall back to a generic "Script not supported"
+    // panel so there is no invisible failure.
     if (identityResult !== null) {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
@@ -461,12 +464,10 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     recordStepCompletion(resolvedStep.id, result, reducerDeps);
 
     // 3. Pure advance policy → next step + optional signals.
-    //    Read selectedTrack and identityResult from getState() — NOT from the
-    //    render-time closure. Adapters (e.g. TrackStepAdapter) call setSelectedTrack()
-    //    synchronously BEFORE invoking onComplete, so the Zustand store already holds
-    //    the post-mutation value; but the React selector closure still holds the
-    //    pre-mutation snapshot. getState() returns the current committed store value.
-    const postMutationState = useSurveySessionStore.getState();
+    //    Read the track and identity support from the decision snapshot —
+    //    NOT from a render-time closure: the completion above has just
+    //    recorded this step's decisions, so the snapshot already holds the
+    //    post-completion values.
     // Spec 088 FR-004/FR-005: routing reads the decision store. The track
     // and seed values are selectors over the store snapshot (the session
     // fields they used to be read from are deleted), and the snapshot
@@ -480,7 +481,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     const outcome = advance(resolvedStep.id as Parameters<typeof advance>[0], result, {
       decisions,
       selectedTrack: selectTrack(decisions),
-      identitySupported: postMutationState.identityResult?.supported ?? true,
+      identitySupported: deriveIdentityResult(decisions)?.supported ?? true,
       touchSeedSource: selectTouchSeedSource(decisions),
       allCharactersImplemented,
     });

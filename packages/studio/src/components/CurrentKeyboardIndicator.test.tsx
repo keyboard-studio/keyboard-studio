@@ -23,7 +23,7 @@ import {
   type ProjectIndexEntry,
 } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { makeScaffoldedIR } from "../test/irFixtures.ts";
 
 vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
@@ -101,6 +101,17 @@ afterEach(() => {
 // Visibility / label
 // ---------------------------------------------------------------------------
 
+/**
+ * Record the project decisions a completed project_name step records
+ * (spec 089: the scaffoldSpec the indicator reads is derived from these).
+ */
+function seedProjectDecisions(displayName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "authoring-track", value: "copy", provenance: "asked" });
+  record({ id: "project-display-name", value: displayName, provenance: "asked" });
+  record({ id: "project-keyboard-id", value: "current-kbd", provenance: "asked" });
+}
+
 describe("CurrentKeyboardIndicator — visibility and label", () => {
   // The control is present for the WHOLE survey, including the Phase A
   // questions that run before a base keyboard exists — see the component's
@@ -132,9 +143,7 @@ describe("CurrentKeyboardIndicator — visibility and label", () => {
 
   it("prefers the project_name scaffoldSpec name over the base keyboard's name (FR-041)", () => {
     instantiateAsCurrent("current-kbd", "French");
-    useSurveySessionStore
-      .getState()
-      .setScaffoldSpec({ keyboardId: "current-kbd", displayName: "Bambara Latin" });
+    seedProjectDecisions("Bambara Latin");
     render(<CurrentKeyboardIndicator />);
     expect(screen.getByRole("button").textContent).toContain("Bambara Latin");
     expect(screen.getByRole("button").textContent).not.toContain("French");
@@ -146,9 +155,7 @@ describe("CurrentKeyboardIndicator — visibility and label", () => {
     expect(screen.getByRole("button").textContent).toContain("French");
 
     act(() => {
-      useSurveySessionStore
-        .getState()
-        .setScaffoldSpec({ keyboardId: "current-kbd", displayName: "Renamed" });
+      seedProjectDecisions("Renamed");
     });
 
     expect(screen.getByRole("button").textContent).toContain("Renamed");

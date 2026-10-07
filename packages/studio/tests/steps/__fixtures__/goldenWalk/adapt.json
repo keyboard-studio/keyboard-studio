@@ -3,12 +3,12 @@
     "stepId": "identity",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setIdentityResult",
-      "setSurveyContext",
+      "recordAll",
       "advance"
     ],
     "workingCopyMutations": [
-      "recordPhase"
+      "recordPhase",
+      "setAttribution"
     ],
     "navigateTo": []
   },
@@ -37,8 +37,7 @@
     "stepId": "track",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setSelectedTrack",
-      "setScaffoldSpec",
+      "recordAll",
       "advance",
       "setCharactersSubStage"
     ],
@@ -156,7 +155,8 @@
       "advance"
     ],
     "workingCopyMutations": [
-      "setTouchLayoutJson"
+      "setTouchLayoutJson",
+      "setHistoryEntryState"
     ],
     "navigateTo": []
   },

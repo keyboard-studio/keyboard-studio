@@ -15,6 +15,26 @@ export const fakeIdentity = {
 /** Empty SurveyPhaseResult the phase stubs complete with. */
 export const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
 
+/**
+ * The identity phase result the IdentityLite stub completes with — the seven
+ * identity answers matching fakeIdentity, so the decisions recorded at
+ * completion derive the same identity result (spec 089: nothing stores the
+ * identity object itself anymore; it is derived from these answers' records).
+ */
+export const fakeIdentityPhaseResult = {
+  phase: "A" as const,
+  answers: [
+    { questionId: "il_language_autonym", answerType: "text" as const, value: "English" },
+    { questionId: "il_language_english", answerType: "text" as const, value: "English" },
+    { questionId: "il_language_code", answerType: "text" as const, value: "en" },
+    { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
+    { questionId: "il_author_name", answerType: "text" as const, value: "Test Author" },
+    { questionId: "il_author_email", answerType: "text" as const, value: "author@example.org" },
+    { questionId: "il_copyright_holder", answerType: "text" as const, value: "Test Author" },
+  ],
+  confirmedInventory: [],
+};
+
 /** The base keyboard the BaseResolution stub previews. */
 export const fakeBase = {
   id: "basic_kbdus",

@@ -44,6 +44,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
@@ -80,7 +82,8 @@ export function StudioFooter() {
   // ---------------------------------------------------------------------------
   // Project label — the ONE precedence (FR-041). No fourth derivation.
   // ---------------------------------------------------------------------------
-  const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const scaffoldSpec = deriveScaffoldSpec(decisions);
   const identity = useWorkingCopyStore((s) => s.identity);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const projectLabel = useMemo(

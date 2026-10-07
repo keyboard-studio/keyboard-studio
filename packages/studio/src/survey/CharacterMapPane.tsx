@@ -32,7 +32,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { buildProducedSet, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { casePairOf, isFoldedUppercase, isFormatChar } from "./charNormUtils.ts";
@@ -107,7 +108,8 @@ export function CharacterMapPane({
   const { t } = useLingui();
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = deriveSurveyContext(decisions);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 

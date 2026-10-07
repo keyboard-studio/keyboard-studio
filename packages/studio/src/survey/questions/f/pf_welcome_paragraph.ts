@@ -1,7 +1,11 @@
 // Per-question module: pf_welcome_paragraph (Phase F)
 // Ported verbatim from content/flows/phase_f_helpdocs.yaml.
 
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import {
+  helpDocsFromDecisions,
+  historyEntryStateFromDecisions,
+} from "../../../decisions/helpDocsFromDecisions.ts";
 
 export const definition = {
   id: "pf_welcome_paragraph",
@@ -90,5 +94,29 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["help-welcome-paragraph"] };
+/**
+ * Decision apply (spec 089 T014): the Phase F completion's help-docs (and
+ * HISTORY-entry) effects land on the working copy from the recorded
+ * `help-*` decisions, composed by decisions/helpDocsFromDecisions.ts —
+ * the successor to phaseFOptions.onCommit's extractHelpDocs write. A blank
+ * welcome paragraph composes to no patch at all (the working copy's
+ * help-docs slice is left exactly as it was, spec 061 D-01). This module
+ * is the authorized writer for both the helpDocs and historyEntryState
+ * channels (apply-contract A3); the history channel appears only when a
+ * `help-history-entry` decision exists.
+ */
+export function apply(_value: string | string[] | undefined, ctx: ApplyContext): WorkingCopyPatch {
+  const helpDocs = helpDocsFromDecisions(ctx.decisions);
+  if (helpDocs === undefined) return {};
+  const historyEntryState = historyEntryStateFromDecisions(
+    ctx.decisions,
+    ctx.currentHistoryEntryState,
+  );
+  return {
+    helpDocs,
+    ...(historyEntryState !== undefined ? { historyEntryState } : {}),
+  };
+}
+
+const mod: QuestionModule = { definition, validate, apply, fixtures, inputs: [], writes: [], provides: ["help-welcome-paragraph"] };
 export default mod;

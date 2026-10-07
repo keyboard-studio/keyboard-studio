@@ -17,6 +17,8 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../steps/types.ts";
 import { alphabetKeyOf, graphemeFitsScript } from "../steps/evidence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveIdentityResult, deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { usePhaseBDraftStore, draftConfirmedAlphabet } from "../stores/phaseBDraftStore.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
@@ -146,9 +148,11 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
   onBack,
 }: EditorStepProps) => {
   // --- store reads (selectors) ---
-  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  // Spec 089 FR-005: identity + context are derived from the decision store.
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityResult = deriveIdentityResult(decisions);
   const localBase = useSurveySessionStore((s) => s.localBase);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const surveyContext = deriveSurveyContext(decisions);
   const charactersSubStage = useSurveySessionStore((s) => s.charactersSubStage);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);

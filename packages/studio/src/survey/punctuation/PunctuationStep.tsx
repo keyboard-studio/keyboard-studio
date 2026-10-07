@@ -54,7 +54,8 @@ import {
 } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePhaseBDraftStore, type DraftProvenance } from "../../stores/phaseBDraftStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
@@ -230,7 +231,8 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   { onComplete, onBack }: EditorStepProps,
 ) => {
   const { t, i18n } = useLingui();
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 
