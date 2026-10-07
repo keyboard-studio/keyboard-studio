@@ -2,9 +2,17 @@
 // These describe the static question-module definition shape (survey/questions/**) —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
-import type { DecisionProposalSource, IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
+import type {
+  Attribution,
+  DecisionProposalSource,
+  HelpDocsAnswers,
+  HistoryEntryState,
+  IRPath,
+  KeyboardIR,
+} from "@keyboard-studio/contracts";
+import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../decisions/extractContext.ts";
+import type { IdentityPatch } from "../stores/workingCopyStore.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -175,19 +183,67 @@ export interface OutputWrite {
 /**
  * Context passed to a module's `mutate()` (spec-014, mutate-seam.contract.md).
  *
+ * SUPERSEDED by {@link ApplyContext} (spec 089): `apply()` is the write seam
+ * now — it sees the recorded decisions and returns a multi-channel
+ * {@link WorkingCopyPatch}. This type and `QuestionModule.mutate` are deleted
+ * in spec 089 T020, once the last consumer has migrated.
+ *
  * The contract leaves the exact field set to the reducer apply site (gated task
  * T014); kept deliberately minimal here — the read-only current `KeyboardIR`
  * snapshot plus the module's own declared `writes` containment set, which the
  * reducer asserts the returned patch stays within.
- *
- * TODO(P5): extend with whatever the reducer apply path (steps/mutateApply.ts)
- * needs once T014 lands — do NOT over-build the shape ahead of that gate.
  */
 export interface MutateContext {
   /** Read-only snapshot of the working-copy IR at apply time. `mutate()` MUST NOT mutate it. */
   readonly ir: KeyboardIR;
   /** The module's declared `writes` paths — the only IR locations the returned patch may touch. */
   readonly writes: readonly IRPath[];
+}
+
+/**
+ * Context passed to a module's `apply()` (spec 089, contracts/apply-contract.md).
+ *
+ * Everything an apply may read, and nothing it may write directly: the
+ * working copy's current IR (null before instantiation), the module's own
+ * declared `writes` containment set, the FULL decision set as recorded
+ * before this completion's applies run (the completion's own records
+ * included — recording precedes applying, contract A6), and the working
+ * copy's current HISTORY-entry state (the one channel whose next value is
+ * a function of its previous value).
+ */
+export interface ApplyContext {
+  /** Current working-copy IR, or null before instantiation. `apply()` MUST NOT mutate it. */
+  readonly ir: KeyboardIR | null;
+  /** The module's declared `writes` paths — the only IR locations the patch's `ir` channel may touch. */
+  readonly writes: readonly IRPath[];
+  /** The recorded decisions, including this completion's (A6: record, then apply). */
+  readonly decisions: DecisionSet;
+  /** The working copy's current HISTORY-entry state, or null before it is first derived. */
+  readonly currentHistoryEntryState: HistoryEntryState | null;
+}
+
+/**
+ * The multi-channel result of a module's `apply()` (spec 089 FR-001).
+ *
+ * Every channel is optional; absence means "no write on this channel".
+ * Channels are whole-value replaces — the apply builds the complete next
+ * slice value from `ctx.decisions` (plus `ctx.currentHistoryEntryState`
+ * for the history channel), never a diff. Which channels a module may
+ * return is fixed by the authorization table in contracts/apply-contract.md
+ * (A3): the runner rejects an unauthorized channel with `ApplyChannelError`
+ * and applies nothing.
+ */
+export interface WorkingCopyPatch {
+  /** IR patch, merged under the module's declared `writes` via the checked merge (A4). */
+  ir?: Partial<KeyboardIR>;
+  /** The working copy's identity slice (whole-value replace). */
+  identity?: IdentityPatch;
+  /** The working copy's attribution slice (whole-value replace). */
+  attribution?: Attribution;
+  /** The working copy's help-docs slice (whole-value replace). */
+  helpDocs?: HelpDocsAnswers;
+  /** The working copy's HISTORY-entry state slice (whole-value replace). */
+  historyEntryState?: HistoryEntryState;
 }
 
 /**
@@ -260,8 +316,25 @@ export interface QuestionModule {
   outputs?: readonly OutputWrite[];
 
   /**
+   * The question module's decision-effect hook (spec 089 FR-001,
+   * contracts/apply-contract.md). PURE: computes the completion's effect on
+   * the working copy from the recorded decisions and returns it as a
+   * {@link WorkingCopyPatch}; MUST NOT mutate `ctx` or perform side effects.
+   * The runner (`applyDecisionEffects` in steps/reducer.ts) executes it
+   * unconditionally for every answered module that declares it, after the
+   * completion's decisions are recorded (A6). Channel authorization is
+   * fixed by the contract's table (A3) — returning an unauthorized channel
+   * throws `ApplyChannelError` and applies nothing. An empty patch `{}` is
+   * valid and writes nothing. Modules whose decisions have no working-copy
+   * effect omit `apply` entirely.
+   */
+  apply?: (value: string | string[] | undefined, ctx: ApplyContext) => WorkingCopyPatch;
+
+  /**
    * Optional IR mutation hook — the question-module IR write seam (spec-014,
-   * mutate-seam.contract.md). RATIFIED SIGNATURE; the implementation in any
+   * mutate-seam.contract.md). SUPERSEDED by `apply` above (spec 089): the
+   * remaining implementations migrate in T008/T020, and this member is
+   * deleted there. RATIFIED SIGNATURE; the implementation in any
    * module and the reducer apply path remain GATED (task T014) — modules keep
    * their stubs and nothing calls this yet.
    *
