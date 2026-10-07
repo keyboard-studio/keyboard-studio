@@ -120,14 +120,20 @@ keyboard's own copyright, labelled "from <keyboard>"; copy: defaults to the auth
   with T010); the disposition itself is declared on `il_copyright_holder`
   (`authoring-track === "adapt"`), unit-tested both ways in
   liveExtraction.test.ts.
-- [ ] **T023** [US1] Run T020's walk: both tracks pass in `pnpm dev`. If a second edit
+- [x] **T023** [US1] Run T020's walk: both tracks pass in `pnpm dev`. If a second edit
   appears necessary, stop and report per the series rule above ·
   packages/studio/e2e/live-extraction-acceptance.spec.ts
-  — STOPPED AND REPORTED (plan.md G-8): the walk is CI-gated in-sandbox,
-  and a second change WOULD be necessary on the intermediate base (the
-  per-flow ordering throw) — that change is 091's already-planned unified
-  flow, not a 092 edit. Awaiting the lead's ruling among G-8's options
-  (a)/(b)/(c).
+  — DONE (restack pass, 2026-10-07): the G-8 stop is discharged. The
+  per-flow ordering throw is gone — healed by the lead-ruled G-14/A2
+  declaration change (the copyright edge leaves `requires` for the
+  `snapshotInputs` channel), not by any edit to the flow machinery.
+  Both-tracks acceptance re-run at StepHost level against the real
+  stores + registry: liveExtraction.stepHost.test.ts 4/4 green (adapt
+  seeds from the base, copy never seeds/offers, answered keeps +
+  `offered`, missing value writes nothing). The Playwright walk
+  lists both tracks on the completed stack (2 tests); its live
+  verdict is CI-gated per the owner's ruling and rides this spec's
+  PR.
 
 **Checkpoint:** the series acceptance test passes with exactly one declaration edit.
 
@@ -168,8 +174,15 @@ acceptance scenarios + the missing-value edge case, and the live walk's seeding 
   `getSeedProvenance` / `getSeedSource` write path. Preserve the deliberate exclusions:
   no profile name → no seed (never the login handle); `il_copyright_holder` is not
   seeded here · packages/studio/src/survey/IdentityLite.tsx
-  — PARTIAL (plan.md G-12): the five lookup defaults are declared on the il_* modules + `ExtractContext.identity` inputs + the runner's record-driven langtags caption; IdentityLite's seed refs/write path NOT deleted and no ask-time evaluation wired yet. Deliberate exclusions preserved in the declarations.
-- [ ] **T034** ⛔ STOPPED — premise gap (plan.md G-10): the firing path is dormant on this base (no live caller, no live AdaptationEvidenceProvider); converting it means building the evidence pipeline, a different feature. Not landed. [P] [US2] `Prefill.tsx` (FR-002): the script-alignment prefill values
+  — DONE (restack pass, 2026-10-07, plan.md G-12 LANDED): the declarations
+  landed in the first pass; the remainder — ask-time evaluation in
+  IdentityLite's resolutions recording `default` records
+  (seed-if-absent via the store, restored asked records never offered
+  a lookup default), seed refs and the
+  `getSeedValue`/`getSeedProvenance`/`getSeedSource` props DELETED —
+  landed as commit 82f23aba. Deliberate exclusions preserved (they
+  live in the declarations themselves).
+- [x] **T034** ✔ CLOSED AS DORMANT (restack pass, 2026-10-07; evidence plan.md G-10, re-verified this pass: `adaptation/firing.ts` still has no live caller and the `AdaptationEvidenceProvider` seam's live implementation still does not exist — "tests and the current studio inject a mock"). The script-alignment firing path is dormant; there is no live prefill write path to convert and no evidence source an extract could read. Converting it means building the evidence pipeline — the follow-up feature the seam names, not a 092 conversion. `Prefill.tsx`'s live rows (buildPrefillRows) untouched. [P] [US2] `Prefill.tsx` (FR-002): the script-alignment prefill values
   (`sa1-target-script-spread`, `sa2-base-script-mismatch`, `sa3-latin-flavor`, from
   `adaptation/firing.ts`) become `extract`s on their modules; `Prefill` renders its
   confirmation rows from decision records (value + provenance label + tier) and
@@ -192,12 +205,21 @@ acceptance scenarios + the missing-value edge case, and the live walk's seeding 
   packages/studio/src/editors/adapters/flowStepOptions.tsx,
   packages/studio/src/survey/questions/f/
   — DONE: all seven entries converted (3 extracts, 4 lookup defaults; pf_credits untouched); PHASE_F_SEEDS + its readers deleted; phaseFOptions keeps only getRequiredOverride; FlowStepOptions.getSeedValue made optional. flowStepOptions.test.ts rewritten to the record mechanism (94 green); Phase F integration suites green via the pass + G-9.
-- [ ] **T037** ⏸ PENDING-PREDECESSOR [US2] `prefillCarveDispositions` (FR-002): the bulk-default pre-fill
+- [x] **T037** [US2] `prefillCarveDispositions` (FR-002): the bulk-default pre-fill
   becomes per-item `derived` entries in the `carved-layout` decision value (090's
   shape), written by the pass/recompute path — never over a combo that already has a
   disposition; delete the `workingCopyStore` action and the `CarveGalleryV2` effect
   that called it · packages/studio/src/stores/workingCopyStore.ts,
   packages/studio/src/editors/carve/CarveGalleryV2.tsx
+  — CLOSED satisfied-by-landed-shape (restack pass, 2026-10-07, plan.md
+  G-15), NO code change: on 090's landed shape the per-item entries
+  already ride the `carved-layout` value (recorded decisionId-keyed
+  by the CarveAdapter via `currentCarvedLayoutValue()`), the
+  never-overwrite rule lives in the action, and the action + effect
+  are spec-076 FR-022's overlay lifecycle over session-derived
+  inputs the setup pass cannot compute — deleting them would delete
+  the bulk-default behaviour, not convert a seeder (the G-11/T035
+  pattern).
 
 **Checkpoint:** every FR-002 seeder is a module declaration; T030 green; both renderers label sources.
 

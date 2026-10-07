@@ -304,6 +304,19 @@ gallery).
   sight-unseen in this pass; the declarations are unit-pinned so the
   remaining wiring is mechanical. The lead may schedule it as a
   follow-up on this branch or fold it into the 091 restack work.
+  **LANDED (restack pass, 2026-10-07, commit 82f23aba):** the ask-time
+  evaluation is wired in IdentityLite — every resolution (profile
+  known, entry resolved, Q1 committed, region variant chosen, entry
+  cleared) re-evaluates the five declarations against the accumulated
+  `IdentityLookupInputs` and records each result as a `default`
+  decision record (seed-if-absent / replace-own-seed / never touch an
+  author-shaped record, so a restored asked record is neither
+  overwritten nor offered a lookup default); a re-resolution forgets
+  the superseded entry's `default` records first. SurveyRunner's
+  record-first seeding (T031) renders the records identically to the
+  host props, so IdentityLite's `getSeedValue` / `getSeedProvenance` /
+  `getSeedSource` props and the seed refs behind them are DELETED.
+  All ten IdentityLite / runner / StepHost identity suites green.
 
 - **G-13 (T050 satisfied by position + T013, no move needed):**
   `recordBaseContribution` is invoked from `createDecisionRecorder`'s
@@ -399,35 +412,81 @@ gallery).
   `inputs` snapshots may name decisions sourced from a module's
   `snapshotInputs` declaration, not only `requires`.
 
+- **G-15 (restack pass, 2026-10-07 — T037's premise is falsified by
+  090's LANDED carve shape; closed as satisfied-by-landed-shape, the
+  G-11/T035 pattern, NO code change):** T037 imagined the bulk-default
+  pre-fill as a starting-point seed the pass could own: write per-item
+  `derived` entries into the `carved-layout` value and delete the
+  `workingCopyStore` action + the `CarveGalleryV2` effect that call
+  it. On the landed shape every element of that picture is otherwise:
+  (1) The per-item entries already exist in the decision value —
+  `CarvedLayoutValue.dispositions` rides the overlay's
+  `CarveDisposition[]` verbatim (comboId + disposition + the
+  contracts type's own spec-076 per-item provenance, incl.
+  `bulk-default`), snapshotted by `currentCarvedLayoutValue()` and
+  recorded decisionId-keyed by the CarveAdapter at completion
+  (`carved-layout` ← the landed recording shape). The one vocabulary
+  difference from T037's text: the per-item provenance is spec-076's
+  (`bulk-default` / `author-override` / `deadkey-requirement`), not
+  the decision-provenance `derived` — deliberate per carveValue.ts
+  (research R8), since dispositions predate the decision record.
+  (2) The action + effect are not a seed write path; they are spec
+  076 FR-022's overlay lifecycle. Their inputs are SESSION-derived —
+  `recommendedComboIds` from the gallery's carve analysis of the
+  current IR, deadkey combos scanned from the current IR, the
+  closed-keyboard card answer — none of which exist at setup, so the
+  extraction pass (setup-time, starting-point bundle) cannot compute
+  them; and the lifecycle continues all session (new combos take the
+  current bulk default; prune on un-carve; read on every recompile).
+  The never-over-a-combo-with-a-disposition rule T037 demands is
+  implemented inside the action itself. (3) Deleting them would
+  delete FR-022's bulk-default behaviour, not convert a seeder — and
+  would contradict the lead-ratified record-from-working-copy design
+  for editor-backed steps (D-090-31): the overlay stays canonical,
+  the decision value snapshots it at completion, and 093's carve
+  fold reconstructs the overlay from that value. T037 is therefore
+  closed with its intent met by the landed architecture: the
+  bulk-default pre-fill IS per-item entries in the carved-layout
+  decision value, recorded with its value, never over an existing
+  disposition.
+
 ## Implementation outcome (Phase 7, T060–T063)
 
 - **SC-001 (FR-005):** the one-line `requires` edit + both-tracks
   acceptance walk are landed; the walk is CI-gated (sandbox Chromium
   cannot navigate localhost). Store-level: T030 proves the seeding,
   offered, copy-track, and no-source behaviours against the real stores.
-  Caveat G-8: on the intermediate stack the live identity step cannot
-  render (cross-flow ordering throws) — the walk's live verdict lands
-  with the completed stack; lead ruling requested on the interim state.
+  Caveat G-8 (CLOSED by the restack pass): the interim cross-flow
+  ordering throw is resolved by the G-14/A2 ruling — the edge left
+  the ordering graph for the `snapshotInputs` channel; the manifest
+  loads, the frozen 17 screens derive with identity whole, and the
+  both-tracks StepHost acceptance re-run is green (T023). The walk's
+  live verdict rides this spec's PR CI.
 - **SC-002 (seed mechanisms):** after this spec, live seed VALUES are
   computed by exactly one engine — the extraction pass — for: the
   copyright holder (extract), all seven Phase F entries (extracts +
   lookup defaults), and every module declaring extract/lookupDefault.
-  Remaining non-pass seed surfaces, honestly counted: (1)
-  `IdentityLite`'s langtags/profile seeders still compute values at
-  render — their lookup defaults are DECLARED on the modules (T033)
-  but the ask-time evaluation is not wired (G-12); (2) the
+  Remaining non-pass seed surfaces, honestly counted: (1) the
   SurveyRunner host-proposal channel remains as the fallback for
   flows this spec did not convert (gallery/mechanism steps are 090's
-  decision modules with their own proposal path). SC-002's "exactly
-  one" is therefore met for every surface this spec converted, with
-  (1) the named remainder.
+  decision modules with their own proposal path). The former second
+  remainder — `IdentityLite`'s render-time langtags/profile seeders —
+  is CLOSED by the restack pass (G-12 landed): the ask-time
+  evaluation records the declared lookup defaults as decision
+  records and IdentityLite's seed write path is deleted, so every
+  seed value on every surface this spec owns is computed by exactly
+  one mechanism — a module declaration, evaluated by the pass at
+  setup or by the identity resolution at ask time.
 - **SC-003 (write paths deleted):** the PHASE_F_SEEDS table is deleted
   (remaining mentions are comments recording its removal);
-  `prefillCarveDispositions` still exists — its deletion is T037,
-  PENDING-PREDECESSOR on 090's carve migration (G-2); the Phase B
-  seeding write (`seedPhaseBFromPrefill`) was already deleted by 090
-  and the character-inventory decision is pass-seeded (T035/G-11);
-  IdentityLite's seed write path remains per G-12.
+  `prefillCarveDispositions` still exists BY DESIGN — G-15: on 090's
+  landed shape it is spec-076 FR-022's overlay lifecycle, not a seed
+  write path, and its output already lands per-item in the
+  carved-layout decision value (T037 closed satisfied-by-landed-
+  shape); the Phase B seeding write (`seedPhaseBFromPrefill`) was
+  already deleted by 090 and the character-inventory decision is
+  pass-seeded (T035/G-11); IdentityLite's seed write path is DELETED
+  (restack pass, G-12 landed).
 - **SC-004:** the walk's adapt leg runs from track choice to prefill
   confirmation with no reload (T042); the mode is asserted at store
   level (T051).
