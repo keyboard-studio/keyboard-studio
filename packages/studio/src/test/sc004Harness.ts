@@ -10,7 +10,6 @@ import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
 import type { VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
 import { runDecisionFlow } from "../decisions/decisionFlow.ts";
 import { buildExtractContext } from "../decisions/extractContext.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -130,7 +129,15 @@ const ADAPT_MODULES = [
   "il_copyright_holder",
   "track_choice",
   "pb_standard_letters",
-].map(mod).concat([pbCharacterInventory]);
+  // The character-inventory provider is the gallery module (spec 090 T021
+  // retired the pb_character_inventory spike into it); it is in the
+  // registry, so it joins by id like the others. Its declared requires
+  // pull in the project-name modules (project-keyboard-id, which requires
+  // project-display-name) — the live adapt flow's set includes them.
+  "characterInventory",
+  "project_keyboard_id",
+  "project_display_name",
+].map(mod);
 
 /** Instantiate Track 1, run the decision flow, apply answers. Returns the decisions. */
 export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
@@ -214,7 +221,8 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
       copyrightHolder: String(decisions["copyright-holder"]?.value ?? ""),
     });
     store.getState().setIdentity({ displayName: base.displayName, ...identityLanguagePatch(language) });
-    const inventory = (decisions["character-inventory"]?.value ?? []) as string[];
+    const inventory =
+      (decisions["character-inventory"]?.value as { chars?: string[] } | undefined)?.chars ?? [];
     const phaseB: SurveyPhaseResult = {
       phase: "B",
       answers: [{ questionId: "b_inventory", answerType: "char-list", value: inventory }],

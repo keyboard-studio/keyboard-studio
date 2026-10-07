@@ -536,3 +536,65 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   booleans. Carve's read is unchanged, per the task. The answer-store
   record that disappears is the second record; the session field
   remains a derivation, now of the decision.
+
+- **D-090-13 — T021 implementation deltas (recorded at the T021
+  checkpoint, 2026-10-07).** Five findings while landing the
+  character-inventory module, none blocking, two structural:
+  (a) **The draft accumulator pattern (D-090-10) shipped as designed:**
+  pure ops in `survey/phaseBDraftOps.ts` (the old store logic ported
+  behaviour-verbatim, including the pick reconstruction from
+  `chars`+`declaredRoles` the snapshot-restore path relied on), the
+  shared hook in `survey/useInventoryDraft.ts` recording through
+  `decideGalleryValue` under the editing step's attribution, and — as an
+  **interim bridge only** — `stores/phaseBDraftStore.ts` became a
+  zustand facade over the decision records so the not-yet-migrated
+  consumers (Phase C steps, hooks, draft persistence) keep compiling
+  against the old interface. The facade and the store file are deleted
+  in T025; `lastPick` moved to a local UI store in the hook module
+  (renderer-internal transient, per D-090-10(c)).
+  (b) **Module↔renderer cycle, third form (extends D-090-7/D-090-8):**
+  the registry now imports CharactersStep (the module's renderer),
+  whose static PhaseB import closes
+  registry → characterInventory → CharactersStep → PhaseB → flowSources
+  → registry; registry-first entries (the decisions suites) crashed at
+  module evaluation (`flowModules` mid-evaluation). CharactersStep
+  therefore imports Prefill/PhaseB by file (not the survey barrel —
+  the barrel closes the same cycle through IdentityLite) and loads
+  PhaseB **lazily** (`React.lazy` + Suspense), keeping it out of the
+  static module graph. Depcruise still counts the dynamic edge:
+  static cycles 121 → 127, of which 4 are the transient facade family
+  (die at T025) and 2 are this module graph (the PhaseB edge is
+  dynamic at runtime; the Prefill variant runs over a type-only
+  import). Downstream harness consequence: every suite that mocks
+  `survey/index.ts` with `studioShellMocks/surveyIndex` now also
+  registers the same stubs for `survey/Prefill.tsx` /
+  `survey/PhaseB.tsx`, and two tests await the lazy mount
+  (`findByTestId`) where they previously asserted synchronously.
+  (c) **Module `requires` are the step's declared requires** (the
+  FR-002 coverage parity pins them EQUAL — the foundational stub was
+  right, the spike's empty set was the anomaly). Corollary:
+  `runDecisionFlow` orders by requires and throws on unprovided ones,
+  so subset flows that include the module must include the requires
+  closure (track_choice, project_keyboard_id, project_display_name):
+  `extractContext.test.ts`, `successCriteria.test.ts` (closure kept
+  OUT of SC-001's measured set — the rate still measures the same six
+  decisions), and `sc004Harness.ts` ADAPT_MODULES were extended
+  accordingly.
+  (d) **Draft restore order changed** (`lib/draftPersistence.ts`):
+  the decision snapshot now restores BEFORE the phase-B slice, and
+  the slice restore is skipped when the envelope's decisions already
+  carry the inventory records (the slice was folded from them at save
+  time; the old order let the decision restore clobber the FR-032
+  pre-079 stamp, which is now itself a decision record). Pre-090
+  envelopes — slice only — restore exactly as before (draftPersistence
+  suite 112/112).
+  (e) **StepHost golden-walk delta for T021** (both tracks, sole
+  delta): at `characters/prefill`, `decisionMutations: [] →
+  ["record", "record"]` — confirmPrefill's draft reset and
+  evidence-key stamp are now two character-inventory records.
+  Fixture regeneration is deferred to the US2 story gate (T029)
+  with the rest of US2's signature, per the US1 pattern.
+  Also noted, not T021 fallout: the two `touch_seed_source`
+  renderSmoke failures reproduce identically at the pre-T021 HEAD
+  (b7bcbbc4) — predecessor-surface state (089 watch item), untouched
+  here.

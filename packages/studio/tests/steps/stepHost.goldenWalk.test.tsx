@@ -87,6 +87,10 @@ import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 
 vi.mock("../../src/survey/FlowStepHost.tsx", () => import("../../src/test/studioShellMocks/FlowStepHost.tsx"));
 vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
+// CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
+// the barrel), so the shallow stubs must be registered for the files too.
+vi.mock("../../src/survey/Prefill.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("../../src/survey/PhaseB.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
   import("../../src/test/studioShellMocks/BaseResolution.tsx"),
 );

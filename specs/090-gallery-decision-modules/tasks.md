@@ -154,7 +154,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   `invisibles`, `convenience` against the landed code (including every `saveAnswer` id
   `MarksSeriesStep` writes — research R1's composite warning); amend
   specs/090-gallery-decision-modules/research.md if any row drifted
-- [ ] T021 [US2] `character-inventory` module: value mapped field-for-field from the characters
+- [x] T021 [US2] `character-inventory` module: value mapped field-for-field from the characters
   slice of `PhaseBDraftState` (data-model.md) in
   packages/studio/src/survey/questions/gallery/characterInventory.ts; `CharactersStep` becomes
   the renderer reporting through `onChange` in packages/studio/src/survey/CharactersStep.tsx;

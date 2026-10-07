@@ -32,6 +32,10 @@ import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
 
 vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
 vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+// CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
+// the barrel), so the shallow stubs must be registered for the files too.
+vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));

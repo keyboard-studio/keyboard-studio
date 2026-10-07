@@ -33,7 +33,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { buildProducedSet, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { peekLastPick, useInventoryDraft } from "./useInventoryDraft.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { casePairOf, isFoldedUppercase, isFormatChar } from "./charNormUtils.ts";
 import { isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
@@ -111,18 +111,19 @@ export function CharacterMapPane({
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 
-  const alphabetChars = usePhaseBDraftStore((s) => s.chars);
-  const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
-  const addChar = usePhaseBDraftStore((s) => s.add);
-  const removeChar = usePhaseBDraftStore((s) => s.remove);
-  const removeLoanword = usePhaseBDraftStore((s) => s.removeLoanword);
+  const draft = useInventoryDraft(scope === "punctuation" ? "punctuation" : "characters");
+  const alphabetChars = draft.chars;
+  const loanwordChars = draft.loanwordChars;
+  const addChar = draft.ops.add;
+  const removeChar = draft.ops.remove;
+  const removeLoanword = draft.ops.removeLoanword;
   // What the map shows as selected: the alphabet plus the loanword letters the
   // author added beside it. Both are characters the keyboard will type.
   const chars = useMemo(
     () => (loanwordChars.length === 0 ? alphabetChars : [...alphabetChars, ...loanwordChars]),
     [alphabetChars, loanwordChars],
   );
-  const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
+  const acceptInvisible = draft.ops.acceptInvisible;
   const glyphFontStack = useGlyphFontStack();
   const isGlyphSupported = useFontSupportChecker(glyphFontStack);
 
@@ -301,7 +302,7 @@ export function CharacterMapPane({
   // Marks; the announcement narrates that three-way update so the pick itself
   // is the teaching moment — no interrupting question.
   function describeContribution(char: string): string {
-    const lastPick = usePhaseBDraftStore.getState().lastPick;
+    const lastPick = peekLastPick();
     if (lastPick === null || lastPick.grapheme !== char.normalize("NFC")) return "";
     const parts: string[] = [];
     if (lastPick.addedBases.length > 0) {

@@ -27,7 +27,7 @@ import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import { galleryModules } from "../survey/questions/registry.ts";
 import type { QuestionModule } from "../survey/types.ts";
-import { CharactersStep } from "../survey/CharactersStep.tsx";
+import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
 import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
 import { stepDependencies } from "./stepDependencies.ts";
@@ -80,9 +80,11 @@ const charactersStep: Step = {
   // step. (The session-level ScriptPrefill is a non-IR signal — not an irPath —
   // so it carries no C5 obligation; irPath('header','script') does not exist.)
   writes: [irPath("header", "bcp47")],
-  // CharactersStep component — self-contained prefill/PhaseB substage adapter
+  // CharactersStepHost — the gallery host around CharactersStep, the
+  // character-inventory module's renderer (spec 090 T021); the component
+  // itself remains the self-contained prefill/PhaseB substage adapter
   // (spec 027 Stage 4; first runtime use of step.component).
-  component: CharactersStep,
+  component: CharactersStepHost,
   // phase_b_characters runs inside the characters step (spec 024, Stage 1);
   // its flowRefs come from stepDependencies.
   // Right pane swaps from the live OSK preview to the interactive character

@@ -1431,14 +1431,27 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     // re-proposed every character the author had removed and flattened every
     // proposed chip to "author". Each field is validated individually and
     // degrades to its empty default, never discarding the record.
-    applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
-    stampPre079Alphabet();
-
     // decisions (spec 088 FR-007): the decision store is restored from the
     // envelope's `decisions` slice — for a migrated v1 envelope, the records
     // the migration built. Applied even when absent ({}), so a project
     // switch never inherits another project's decisions.
+    //
+    // ORDER (spec 090 T021): the decisions restore runs BEFORE the
+    // phase-B slice restore below. Since T021 the Phase B draft IS the
+    // character-inventory / invisibles-inventory decision records, so the
+    // two restores write the same state: when the envelope's decisions
+    // already carry the inventory records they are canonical (the slice
+    // was folded from them at save time) and the slice restore is
+    // skipped; for envelopes saved before the records existed (every
+    // pre-090 draft) the slice restore below is what creates them.
     applyDecisionSnapshot(envelope.decisions ?? {});
+    const decisionsCarryInventory =
+      envelope.decisions?.["character-inventory"] !== undefined ||
+      envelope.decisions?.["invisibles-inventory"] !== undefined;
+    if (!decisionsCarryInventory) {
+      applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
+    }
+    stampPre079Alphabet();
 
     // surveyAnswers (spec 079 R-01, FR-032): optional/additive, restored the
     // same tolerant way. Applied even when absent, so a pre-079 draft (or a

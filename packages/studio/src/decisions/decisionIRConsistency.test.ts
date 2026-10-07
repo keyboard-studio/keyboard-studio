@@ -14,7 +14,6 @@ import type { IRPath } from "@keyboard-studio/contracts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { decisionIRPaths, type DecisionId } from "./decisionTypes.ts";
-import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
 
 /**
  * Decisions that deliberately have no IR relation (they reach their artifact
@@ -162,9 +161,13 @@ function isCoveredBy(writes: readonly IRPath[], mapped: IRPath): boolean {
   );
 }
 
-/** Every provider in play: the registry plus pb_character_inventory (registered nowhere else). */
+/**
+ * Every provider in play: the registry alone — since spec 090 T021 the
+ * character-inventory provider is the gallery module in the registry
+ * (the pb_character_inventory spike it replaced was registered nowhere).
+ */
 function allModules(): QuestionModule[] {
-  return [...Object.values(questionRegistry), pbCharacterInventory];
+  return [...Object.values(questionRegistry)];
 }
 
 const MAPPED_IDS = (Object.keys(decisionIRPaths) as DecisionId[]).filter(

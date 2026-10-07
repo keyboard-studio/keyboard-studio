@@ -30,7 +30,10 @@ import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import {
+  getCharacterInventoryValue,
+  useInventoryDraft,
+} from "./useInventoryDraft.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import { useFlaggedNextGate } from "../hooks/useFlaggedNextGate.ts";
@@ -243,8 +246,7 @@ interface CharChipEditorProps {
 function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }: CharChipEditorProps) {
   const { t } = useLingui();
   const glyphFontStack = useGlyphFontStack();
-  const provenance = usePhaseBDraftStore((s) => s.provenance);
-  const proposalConfidence = usePhaseBDraftStore((s) => s.proposalConfidence);
+  const { provenance, proposalConfidence } = useInventoryDraft("characters");
   const [inputVal, setInputVal] = useState("");
   const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -533,15 +535,8 @@ interface AlphabetBreakdownProps {
 }
 
 function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
-  const bases = usePhaseBDraftStore((s) => s.bases);
-  const marks = usePhaseBDraftStore((s) => s.marks);
-  const attestedStacks = usePhaseBDraftStore((s) => s.attestedStacks);
-  const numbers = usePhaseBDraftStore((s) => s.numbers);
-  const punctuation = usePhaseBDraftStore((s) => s.punctuation);
-  const symbols = usePhaseBDraftStore((s) => s.symbols);
-  const separators = usePhaseBDraftStore((s) => s.separators);
-  const controls = usePhaseBDraftStore((s) => s.controls);
-  const lastPick = usePhaseBDraftStore((s) => s.lastPick);
+  const { bases, marks, attestedStacks, numbers, punctuation, symbols, separators, controls, lastPick } =
+    useInventoryDraft("characters");
   const [showUppercase, setShowUppercase] = useState(false);
   const glyphFontStack = useGlyphFontStack();
 
@@ -739,11 +734,12 @@ const LOANWORD_CHIP_SCALE = 0.85;
 function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
   const { t } = useLingui();
   const { inventory } = useSourcedExemplars(bcp47);
-  const chars = usePhaseBDraftStore((s) => s.chars);
-  const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
-  const addLoanword = usePhaseBDraftStore((s) => s.addLoanword);
-  const removeLoanword = usePhaseBDraftStore((s) => s.removeLoanword);
-  const remove = usePhaseBDraftStore((s) => s.remove);
+  const draft = useInventoryDraft("characters");
+  const chars = draft.chars;
+  const loanwordChars = draft.loanwordChars;
+  const addLoanword = draft.ops.addLoanword;
+  const removeLoanword = draft.ops.removeLoanword;
+  const remove = draft.ops.remove;
   const glyphFontStack = useGlyphFontStack();
 
   const loanwords = useMemo(() => {
@@ -767,9 +763,9 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
    * list holds it, so the chip always reflects what the keyboard will type.
    */
   const setLetter = (ch: string, on: boolean): void => {
-    const state = usePhaseBDraftStore.getState();
     for (const c of casePairOf(ch, bcp47)) {
       const nfc = c.normalize("NFC");
+      const state = getCharacterInventoryValue();
       if (on) addLoanword(nfc);
       else if (state.loanwordChars.includes(nfc)) removeLoanword(nfc);
       else if (state.chars.includes(nfc)) remove(nfc);
@@ -865,15 +861,16 @@ interface BuildListViewProps {
 
 function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const { t, i18n } = useLingui();
-  const chars = usePhaseBDraftStore((s) => s.chars);
-  const setAll = usePhaseBDraftStore((s) => s.setAll);
-  const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
-  const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
-  const provenance = usePhaseBDraftStore((s) => s.provenance);
-  const exemplarDigraphs = usePhaseBDraftStore((s) => s.exemplarDigraphs);
-  const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
-  const removeChar = usePhaseBDraftStore((s) => s.remove);
-  const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
+  const draft = useInventoryDraft("characters");
+  const chars = draft.chars;
+  const setAll = draft.ops.setAll;
+  const selectedFont = draft.selectedFont;
+  const setSelectedFont = draft.ops.setSelectedFont;
+  const provenance = draft.provenance;
+  const exemplarDigraphs = draft.exemplarDigraphs;
+  const loanwordChars = draft.loanwordChars;
+  const removeChar = draft.ops.remove;
+  const alphabetEvidenceKey = draft.alphabetEvidenceKey;
 
   // Defaults-first (spec 3c): the build list can be reached without passing
   // the intro chooser (a restored position, a progress-dot jump). If it opens
@@ -882,8 +879,8 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   // pre-selected option would. Once per mount; seedFromProposal is
   // idempotent and never re-proposes a character the author removed.
   const { inventory: exemplarInventory } = useSourcedExemplars(context.bcp47_tag);
-  const exemplarDeclined = usePhaseBDraftStore((s) => s.exemplarMethodDeclined);
-  const seedExemplars = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const exemplarDeclined = draft.exemplarMethodDeclined;
+  const seedExemplars = draft.ops.seedFromProposal;
   const autoSeededRef = useRef(false);
   useEffect(() => {
     if (autoSeededRef.current || exemplarInventory === null) return;
@@ -1138,8 +1135,8 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
 function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
   const { t } = useLingui();
   const { inventory } = useSourcedExemplars(context.bcp47_tag);
-  const provenance = usePhaseBDraftStore((s) => s.provenance);
-  const seedFromProposal = usePhaseBDraftStore((s) => s.seedFromProposal);
+  const { provenance, ops: draftOps } = useInventoryDraft("characters");
+  const seedFromProposal = draftOps.seedFromProposal;
   const [expanded, setExpanded] = useState(false);
 
   const alreadyApplied = Object.values(provenance).some(
@@ -1222,7 +1219,7 @@ const TEXT_SAMPLE_BASE: BaseKeyboard = {
 
 function TextSampleAffordance() {
   const { t } = useLingui();
-  const addProposed = usePhaseBDraftStore((s) => s.addProposed);
+  const addProposed = useInventoryDraft("characters").ops.addProposed;
   const [rawInput, setRawInput] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [emptyMessage, setEmptyMessage] = useState(false);
@@ -1538,9 +1535,10 @@ type IntroChoice = DiscoveryMethod | "exemplars";
 function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   const { t } = useLingui();
   const { inventory, loading } = useSourcedExemplars(context.bcp47_tag);
-  const seedFromProposal = usePhaseBDraftStore((s) => s.seedFromProposal);
-  const declineExemplarMethod = usePhaseBDraftStore((s) => s.declineExemplarMethod);
-  const declinedBefore = usePhaseBDraftStore((s) => s.exemplarMethodDeclined);
+  const introDraft = useInventoryDraft("characters");
+  const seedFromProposal = introDraft.ops.seedFromProposal;
+  const declineExemplarMethod = introDraft.ops.declineExemplarMethod;
+  const declinedBefore = introDraft.exemplarMethodDeclined;
   // "intro" is never the step's final screen (build-list's Done and the
   // manual walk's last question both are, and each records through its own
   // path — R-04) — record its answer here, on its own Next (spec 079 T035).
