@@ -198,6 +198,18 @@ export function stepHasSettles(id: string): boolean {
   return decl?.settles !== undefined && decl.settles.length > 0;
 }
 
+/**
+ * The decisions a step settles that no question module asks for (its
+ * `settles` list), or `[]` for an undeclared id. Unlike
+ * {@link stepDependencies} this never throws: its caller is the decision
+ * recorder (spec 090 US5), which runs inside a step transition and must not
+ * fail one over an id the manifest does not declare.
+ */
+export function settlesForStep(id: string): readonly DecisionId[] {
+  const decl = (DECLARATIONS as Record<string, StepDeclaration>)[id];
+  return decl?.settles ?? [];
+}
+
 /** A step's dependency declarations. Throws on an undeclared id. */
 export function stepDependencies(id: StepId): StepDependencies {
   const found = resolved.get(id);

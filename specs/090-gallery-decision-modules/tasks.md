@@ -412,17 +412,20 @@ settled decision, checked against the decision list — no gaps, no duplicates.
 
 **PR slice**: this phase is one PR.
 
-- [ ] T050 [US5] Decision-driven recording: the gallery host records exactly one log entry
+- [x] T050 [US5] Decision-driven recording: the gallery host records exactly one log entry
   per settled decision on completion, through the decision-id-keyed recorder 088 established,
   in packages/studio/src/steps/galleryHost.tsx and
   packages/studio/src/decisions/createStudioDecisionRecorder.ts; answer-driven recording for
   migrated steps is removed so nothing double-records in packages/studio/src/steps/reducer.ts
-  — **STOPPED for a lead ruling (D-090-43)**: the landed recorder keys survey-answer
-  supersession slots by decision id; no log payload kind can carry a gallery decision
-  value (survey-answer values are scalar/string-list typed). Options (a) new contracts
-  payload kind, (b) synthesized summary-string survey-answer entries, (d) defer US5 —
-  recorded with risks in research.md. T051–T053 ride this mechanism and are blocked
-  with it.
+  — **STOPPED for a lead ruling (D-090-43)**, then **RULED (a) and landed (D-090-48)**:
+  a real contracts `decision` payload kind (`{decisionId, value: JsonValue, summary}`,
+  DECISION_RECORD_VERSION 3 with staged normalization), recorded at completion by the
+  new decisions/recordGalleryDecisions.ts through the recorder (createDecisionRecorder's
+  injected `getStepDecisions`, composed in createStudioDecisionRecorder from
+  `settlesForStep` + the live decision set, wired in StudioShell). The removal clause
+  had no referent in the landed code (verified in D-090-48: no answer carries a gallery
+  decision; the C-5 answer slots and the decision slots are disjoint), so nothing was
+  removed — exactly-once holds by construction.
 - [ ] T051 [P] [US5] Close the named G7 gaps: entries verified present for `windows-layout`,
   `rule-set`, `touch-seed-source`, `deadkeys-defined`, `punctuation-inventory`,
   `retained-convenience-chars` in a store-level test through the real `StepHost` in

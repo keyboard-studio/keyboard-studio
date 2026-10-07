@@ -34,6 +34,8 @@ import type {
   RemovalCapability,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
+import { settlesForStep } from "../steps/stepDependencies.ts";
+import type { DecisionSet } from "./decisionTypes.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveProjectKeyFromWorkingCopy } from "../lib/draftPersistence.ts";
 import { createDecisionRecorder, type DecisionRecorder, type DecisionRecorderDeps } from "./createDecisionRecorder.ts";
@@ -84,6 +86,14 @@ export interface CreateStudioDecisionRecorderDeps {
     stepId: string,
     questionId: string,
   ) => Pick<SavedAnswer, "answerType" | "proposal"> | undefined;
+  /**
+   * spec 090 US5: read the live decision set (the 088 decision store's
+   * snapshot), from which this factory resolves each completing step's
+   * settled gallery decisions. StudioShell wires it to
+   * `getDecisionSnapshot`. Optional — without it the recorder records no
+   * gallery-decision entries (unit fixtures that never settled any).
+   */
+  getDecisions?: () => DecisionSet;
 }
 
 /**
@@ -102,6 +112,23 @@ export function createStudioDecisionRecorder(
     ...(deps.getLastRecordedHash !== undefined ? { getLastRecordedHash: deps.getLastRecordedHash } : {}),
     ...(deps.resolveCompletionScreen !== undefined
       ? { resolveCompletionScreen: deps.resolveCompletionScreen }
+      : {}),
+    // spec 090 US5: a step's settled gallery decisions are its `settles`
+    // list (steps/stepDependencies.ts — the one declaration of what a step
+    // settles) resolved against the live decision set. A settles id with
+    // no record is a decision the step did not settle this session; it
+    // contributes no entry, which is the G7 check's "gap" made visible
+    // rather than papered over.
+    ...(deps.getDecisions !== undefined
+      ? {
+          getStepDecisions: (stepId: string) => {
+            const decisions = deps.getDecisions!();
+            return settlesForStep(stepId).flatMap((id) => {
+              const record = decisions[id];
+              return record !== undefined ? [record] : [];
+            });
+          },
+        }
       : {}),
     getDeletionCounts: () => {
       const wc = getWorkingCopyState();

@@ -802,6 +802,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           useSurveyAnswerStore.getState().steps[stepId]?.position ?? stepId,
         getSavedAnswer: (stepId, questionId) =>
           useSurveyAnswerStore.getState().steps[stepId]?.answers[questionId],
+        // spec 090 US5: the recorder resolves each completing step's
+        // settled gallery decisions against the live decision set.
+        getDecisions: () => getDecisionSnapshot(),
       }),
     [],
   );

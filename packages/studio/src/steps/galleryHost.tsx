@@ -22,6 +22,15 @@
 // steps-layer), so every store touch is an injected dep — the same pattern
 // as ReducerDeps. `lib/galleryHostDeps.ts` composes the live deps from the
 // stores; step wrappers hand them in.
+//
+// The records written through this host (and through the step adapters that
+// share `recordGalleryDecision`) are also the decision trail's source:
+// at step completion the decision recorder (decisions/recordGalleryDecisions
+// .ts, spec 090 US5) reads the step's settled decisions back out of the
+// decision store and appends exactly one log entry per decision. Nothing
+// here writes to the log directly — completion is the one recording moment,
+// so a decision edited five times mid-step still leaves exactly one entry
+// per settled value.
 
 import { createContext, useContext } from "react";
 import type { IRPath, KeyboardIR, HistoryEntryState } from "@keyboard-studio/contracts";
