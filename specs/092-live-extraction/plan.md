@@ -450,6 +450,41 @@ gallery).
   decision value, recorded with its value, never over an existing
   disposition.
 
+- **G-16 (restack pass gate accounting, 2026-10-07):** full studio
+  suite, run in bounded batches on a contended 2-vCPU box (a VM
+  reboot mid-pass cleared the other crews; batches that appeared to
+  stall were batch-mates of one spinning file, identified by
+  bisection). **508 of 511 test files verdicted; 8 failed tests,
+  exactly the named budget:** the 4 local-corpus SC-004 failures
+  (`basic_kbdru` + `arabic_izza` in successCriteria.sc004.test.ts
+  and successCriteria.sc004.kmp.test.ts — the absent-local-corpus
+  set) and 4 in the spec-079 carry-over step files
+  (InvisiblesStep.test.tsx ×3 — two writing-direction/bidi tests +
+  the phase-C answer-slot D-4/R-08 test; PunctuationStep.test.tsx
+  ×1 — the same D-4/R-08 slot test). Everything else green,
+  including the StepHost golden walk (byte-identical, both tracks —
+  the T002 fixture delta is fully reconciled by the cascade) and
+  all 13 liveExtraction + StepHost acceptance tests. **Three files
+  do not terminate on this stack** and are excluded above:
+  PhaseFAdaptiveDescription.integration.test.tsx,
+  PhaseFContactSeed.integration.test.tsx (both re-checked
+  immediately after the G-14/A2 fix, repeatedly, solo, 200–420 s —
+  zero tests complete; 093's expected cure did NOT arrive with the
+  edge drop), and **panelAdapters.test.tsx** (bisected as the file
+  poisoning every batch that contained it; solo kills at 150 s /
+  240 s / 300 s, the last on a quiet box; A/B-verified NOT a
+  restack-pass regression — it spins identically with the pre-pass
+  IdentityLite at 96d046d0, and 093 verdicted it on the pre-restack
+  tree, so it arrived with the completed stack, upstream of 092).
+  The three files' mechanism is one named family for the lead /
+  093's final pass: drivers that walk a live flow through the real
+  runner on the completed stack spin instead of completing.
+  tsc clean; eslint 0 errors on touched files; depcruise 0 new
+  violations (the cruised closure's 4 are pre-existing: 2×
+  decisions-layer on liveExtraction's landed wiring halves —
+  covered by the lead's exemption ruling for 093's final pass —
+  and 2× upstream Phase-F bypass).
+
 ## Implementation outcome (Phase 7, T060–T063)
 
 - **SC-001 (FR-005):** the one-line `requires` edit + both-tracks
