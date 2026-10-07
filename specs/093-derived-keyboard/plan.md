@@ -18,32 +18,39 @@ closure in the `requires` graph under the HANDOFF provenance rule, generalising 
 deleting) the touch-only `steps/repropagate.ts` + `staleSteps` precedent. Drafts go to
 `DRAFT_VERSION` 3 and save the starting point's id and the decisions, nothing else.
 
-Two questions are **owner decisions awaiting Matthew's ruling** and are NOT resolved by this
-plan — see "Open owner decisions" below. The task list is structured so everything except the
-tasks explicitly gated on ruling (a) proceeds either way, and measurement precedes any
-commitment on (b).
+Two questions were **owner decisions** when this plan was written. **Both were ruled on
+2026-10-06** (owner ruling, "Use the proposals" — km-lead proposals Q6/Q7, in
+`~/workspace/keyboard-studio-notes/modular-decisions-proposals.md`): (a) changing the starting
+point is a **recalculation**, and (b) SC-004's method is **measure-first** (medians, split
+protocols; the proposed numbers stay proposed until T021 plus a later ruling). See "Owner
+decisions (ruled 2026-10-06)" below. A later cross-spec analyze added three design amendments
+— replay folds all five `apply` channels (I-1), the draft migration handles the localStorage
+key suffix (I-2), and the T001 audit corrections (I-4) — applied throughout this plan set.
 
 No new stack choices: TypeScript, the existing studio stores, vitest per package, Playwright
 walks in `pnpm dev` for live-app success criteria (the 088 lesson: demo/harness results don't
 count). No `packages/contracts` change, no new timer.
 
-## Open owner decisions (gating clarifications — verbatim, unresolved)
+## Owner decisions (ruled 2026-10-06)
 
-### (a) Changing the starting point — gates US2 task T017 only
+### (a) Changing the starting point — RULED: recalculation (gates lifted; T017 unblocked)
 
-From [spec.md](spec.md), Edge Cases, verbatim:
+From [spec.md](spec.md), Edge Cases, verbatim (the clarification as asked):
 
 > **Changing the starting point** is the widest possible closure.
 > [NEEDS CLARIFICATION: is it a recalculation (re-extract everything, keep asked answers), or a
 > new project that carries the answers over?]
 
-Matthew's ruling is pending (asked 2026-10-06, with a lean toward recalculation recorded by the
-asking agent — a lean is not a ruling). Until he rules: the replay engine, closure, provenance
-rule, checkpointing, draft-v3 format and measurement tasks proceed unchanged, because they are
-identical under either answer (research §8). Only T017 (starting-point-change behaviour and its
-test) is blocked on the ruling; it MUST NOT be implemented on an assumed answer.
+**Ruling (owner, 2026-10-06, adopting km-lead proposals Q6): recalculation.** Changing the
+starting point re-extracts everything against the new starting point; `asked` answers are kept
+under the US1 validate/re-propose rule (kept if they still validate, otherwise kept + flagged +
+re-proposed, never silently overwritten). The decision log stays one history: prior entries
+keep the old keyboard as their historical `source`, and superseding entries name the new
+keyboard. Gate task T013 records this ruling; T017 proceeds as recalculation. (The replay
+engine, closure, provenance rule, checkpointing, draft-v3 format and measurement tasks were
+identical under either answer — research §8.)
 
-### (b) SC-004 perf budgets — proposed numbers, measurement first
+### (b) SC-004 perf budgets — RULED: measure-first is the method; numbers stay proposed
 
 From [spec.md](spec.md), SC-004, verbatim:
 
@@ -51,19 +58,43 @@ From [spec.md](spec.md), SC-004, verbatim:
 > (proposed: under 300 ms, so the preview updates within one debounce cycle), and resume within
 > a budget set there too (proposed: under 2 s). Measure before committing to these.
 
-This plan follows the spec's instruction: **measure before committing**. Tasks T002 (baseline
-harness) and T021 (re-measurement on the replay path) produce the evidence; the numbers
-**<300 ms per single-decision edit** and **<2 s resume** on `sil_euro_latin` are recorded here
-as **proposed, pending Matthew's ruling** — not committed thresholds, and no task treats them
-as pass/fail gates until he rules. Whether FR-006's disposable rebuild cache is built at all
-depends on those measurements.
+**Ruling (owner, 2026-10-06, adopting km-lead proposals Q7): measure-first is adopted as
+SC-004's method.** Concretely: figures are **medians with split protocols** — edit = warm
+median, resume = cold median — recorded in `perf-baseline.md`; they are **never an absolute-ms
+CI pass/fail**. Tasks T002 (baseline harness, landed) and T021 (re-measurement on the replay
+path) produce the evidence. The numbers **<300 ms per single-decision edit** and **<2 s
+resume** on `sil_euro_latin` remain **PROPOSED** — not committed thresholds — until T021's
+re-measurement plus a later owner ruling; if a hard gate is wanted after T021, it is set
+**relative to the recorded baseline**, not as an absolute number. Whether FR-006's disposable
+rebuild cache is built at all depends on those measurements.
+
+## Amendment (cross-spec analyze I-1): replay folds all five `apply` channels
+
+089's `WorkingCopyPatch` is not IR-only: it has five channels — `ir`, `identity`,
+`attribution`, `helpDocs`, `historyEntryState` (089 data-model / apply contract). An IR-only
+replay cannot satisfy FR-001 or SC-003: the composed applies write exactly the non-IR channels,
+and identity/attribution land in the emitted source header while helpDocs land in output files,
+so a reload rebuilt from IR alone would not be byte-identical. Therefore:
+
+- The replay engine folds **every channel** of each `WorkingCopyPatch`, in derived order,
+  through 089's runner (`applyDecisionEffects` in `steps/reducer.ts`; `applyMutatePatch` in
+  `steps/mutateApply.ts` is the containment it uses, not the runner).
+- Checkpoints and the rebuild result carry an **overlay accumulator** (the folded non-IR
+  channel state — see data-model.md, OverlayState) alongside the IR; an edit replays from the
+  checkpoint before the first changed decision, overlay included.
+- 089's `ApplyContext.currentHistoryEntryState` is, at replay time, read from the overlay
+  accumulator folded so far — never from a live store (the engine stays pure, research §3).
+- This design depends on 089's patch shape as landed; T001's audit verifies the five channels
+  against the landed `WorkingCopyPatch` type and halts on a delta.
 
 ## Technical Context
 
 **Language/Version**: TypeScript (repo standard), Node ≥ 22.19.0, pnpm 9
 
 **Primary Dependencies**: existing studio stack only — `decisionStore` (088), pure
-`QuestionModule.apply` + the `applyMutatePatch` runner (089), decision modules with per-item
+`QuestionModule.apply` + its five-channel `WorkingCopyPatch` and the `applyDecisionEffects`
+runner in `steps/reducer.ts` (089; `applyMutatePatch` is the containment, not the runner —
+cross-spec analyze I-4), decision modules with per-item
 provenance (090), `orderByDependencies` in `packages/studio/src/decisions/orderDecisions.ts`,
 `reproposalNoticeStore`, engine codec (IR production is consumed, not changed)
 
@@ -78,8 +109,11 @@ measurement harness for SC-004
 
 **Project Type**: web application (single package focus: `packages/studio`)
 
-**Performance Goals**: PROPOSED, pending ruling (b) — <300 ms single-decision edit rebuild and
-<2 s resume on `sil_euro_latin`; measured first (T002/T021), committed only on Matthew's ruling
+**Performance Goals**: method RULED (owner, 2026-10-06, km-lead proposals Q7) — measure-first,
+medians with split protocols (edit = warm median, resume = cold median) recorded in
+`perf-baseline.md`, never an absolute-ms CI pass/fail. The <300 ms edit / <2 s resume numbers
+on `sil_euro_latin` remain PROPOSED until T021 plus a later owner ruling; any later hard gate
+is relative to the recorded baseline
 
 **Constraints**: no `packages/contracts` change; no new timer (the rebuild is a write, not a
 validation — validation runs once on the rebuilt copy inside the existing D3 300 ms cycle);
@@ -132,13 +166,13 @@ decision-record shape (data-model.md) and the existing mutate-seam contract it w
 
 ```text
 packages/studio/src/decisions/
-├── replayKeyboard.ts        # NEW — pure replay: (starting point IR, DecisionSet, order) → IR
+├── replayKeyboard.ts        # NEW — pure replay: (starting point IR, DecisionSet, order) → IR + overlay accumulator (all five patch channels, I-1)
 ├── downstreamClosure.ts     # NEW — reverse reachability over the orderByDependencies graph
 ├── recalculate.ts           # NEW — provenance rule over the closure (US1 scenarios 1–6)
-├── replayCheckpoints.ts     # NEW — in-memory per-decision IR checkpoints (FR-003)
+├── replayCheckpoints.ts     # NEW — in-memory per-decision checkpoints, IR + overlay state (FR-003)
 └── *.test.ts                # closure, provenance-matrix, determinism property tests
 packages/studio/src/lib/
-└── draftPersistence.ts      # DRAFT_VERSION 3; envelope drops workingCopy; v2→v3 migration
+└── draftPersistence.ts      # DRAFT_VERSION 3; envelope drops workingCopy; v2→v3 migration incl. key-suffix boot scan + v1→v2→v3 chaining (I-2)
 packages/studio/src/steps/
 ├── repropagate.ts           # DELETED (FR-005) after consumers migrate to the general rule
 └── reducer.ts               # staleSteps seam removed; consumers re-pointed
@@ -157,7 +191,9 @@ the purity boundary and the test files land.
 ## Series prerequisites (verify at Setup, T001)
 
 093 assumes, from the stacked branches: 088's `decisionStore` + decision-keyed drafts at
-`DRAFT_VERSION` 2; 089's pure `apply(value, ctx) → WorkingCopyPatch` + single patch runner +
+`DRAFT_VERSION` 2; 089's pure `apply(value, ctx) → WorkingCopyPatch` (all five channels:
+`ir`, `identity`, `attribution`, `helpDocs`, `historyEntryState` — I-1) + the single patch
+runner (`applyDecisionEffects` in `steps/reducer.ts`) +
 the golden-walk baseline script (089 SC-001); 090's decision modules for every `settles` name,
 overlays as decision values with per-item provenance, and in-place IR rewrites moved inside
 `apply`; 091's derived steps; 092's setup-as-a-decision (the starting point is established by

@@ -55,8 +55,10 @@ a single edit quick on a large starting point.
 
 ### Edge Cases
 - **Changing the starting point** is the widest possible closure.
-  [NEEDS CLARIFICATION: is it a recalculation (re-extract everything, keep asked answers), or a
-  new project that carries the answers over?]
+  [RULED 2026-10-06 (owner, adopting km-lead proposals Q6): it is a **recalculation** —
+  re-extract everything against the new starting point; `asked` answers are kept under the
+  US1 validate/re-propose rule. Prior decision-log entries keep the old keyboard as their
+  historical source; superseding entries name the new one.]
 - A `RawKmnFragment` is carried through a replay unchanged, never regenerated.
 - The rebuild is a write, not a validation. Validation runs once on the rebuilt copy, in the
   existing D3 cycle. No timer is added.
@@ -94,4 +96,9 @@ After 093, the decisions are the only stored state.
 - **SC-004** On `sil_euro_latin`, a single-decision edit rebuilds within the budget set in
   `/speckit-plan` (proposed: under 300 ms, so the preview updates within one debounce cycle), and
   resume within a budget set there too (proposed: under 2 s). Measure before committing to these.
+  [Method RULED 2026-10-06 (owner, adopting km-lead proposals Q7): measure-first — figures are
+  medians with split protocols (edit = warm median, resume = cold median) recorded in
+  `perf-baseline.md`, never an absolute-ms CI pass/fail; the proposed numbers stay proposed
+  until T021's re-measurement plus a later ruling, and any hard gate set after T021 is relative
+  to the recorded baseline.]
 - **SC-005** The golden walk is byte-identical.

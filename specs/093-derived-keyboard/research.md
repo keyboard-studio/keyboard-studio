@@ -2,8 +2,9 @@
 
 Phase 0 output for [plan.md](plan.md). All findings are from the code on the
 stacked base (`km/live-extraction` @ 07356c2f lineage) plus the predecessor
-specs 088–092, whose deliverables this spec consumes. Two questions are
-**owner decisions** and are deliberately NOT resolved here (see §8, §9).
+specs 088–092, whose deliverables this spec consumes. The two owner
+questions (§8, §9) were **ruled on 2026-10-06** (owner adopted the km-lead
+proposals); §3, §4 and §6 carry the cross-spec analyze amendments I-1/I-2.
 
 ## 1. The precedent being generalised: `steps/repropagate.ts`
 
@@ -52,9 +53,20 @@ specs 088–092, whose deliverables this spec consumes. Two questions are
   lists of recomputed / re-proposed / inactivated decisions.
 - Rationale: `decisions/` is the series' home (087 structure decision);
   089 FR-001 makes every `apply(value, ctx)` pure — a function of (IR, value,
-  inputs) that writes no store — and 089 FR-002's runner
-  (`applyMutatePatch` with declared `writes`) is the only write path a replay
-  step may use. Purity is what makes replay possible at all.
+  inputs) that writes no store — and 089 FR-002's runner is the only write
+  path a replay step may use. (Runner identity, cross-spec analyze I-4: the
+  runner is `applyDecisionEffects` in `steps/reducer.ts`;
+  `applyMutatePatch` in `steps/mutateApply.ts` is the declared-`writes`
+  containment it calls, not the runner.) Purity is what makes replay
+  possible at all.
+- Amendment (cross-spec analyze I-1): the patch being folded is 089's
+  five-channel `WorkingCopyPatch` (`ir`, `identity`, `attribution`,
+  `helpDocs`, `historyEntryState`), not an IR patch. Replay's output is
+  therefore (IR, overlay accumulator) — see data-model.md OverlayState —
+  and `ApplyContext.currentHistoryEntryState` is supplied from the
+  accumulator folded so far. An IR-only output was the original §3 shape;
+  it cannot reproduce the emitted source (identity/attribution land in the
+  source header, helpDocs in output files), so SC-003 would fail on it.
 - Alternatives considered: extending `decisions/decisionFlow.ts` — rejected:
   that runner is extraction/adapt-time; folding rebuild into it would couple
   two lifecycles. Putting replay in `steps/` — rejected: the store-wiring
@@ -62,10 +74,10 @@ specs 088–092, whose deliverables this spec consumes. Two questions are
 
 ## 4. Checkpoints
 
-- Decision: in-memory ordered checkpoints — the `KeyboardIR` reference after
-  each decision's `apply` — held beside the replay engine, never persisted
-  (FR-003). Replay for an edit starts from the checkpoint before the first
-  changed decision.
+- Decision: in-memory ordered checkpoints — the `KeyboardIR` reference **and
+  the overlay accumulator** (I-1) after each decision's `apply` — held beside
+  the replay engine, never persisted (FR-003). Replay for an edit starts
+  from the checkpoint before the first changed decision.
 - Rationale: `applyMutatePatch` produces a new IR per patch, so a checkpoint
   is a retained reference, not a copy. Memory cost on a large starting point
   is a measured quantity in the US3 perf work, not an assumption.
@@ -109,6 +121,17 @@ specs 088–092, whose deliverables this spec consumes. Two questions are
 - Rationale: FR-004, verbatim. Resume after migration is a full replay, which
   is also the SC-003 test (reload reproduces byte-identical source, no
   `workingCopy` slice in the saved draft).
+- Key suffix and boot scan (cross-spec analyze I-2): `DRAFT_VERSION` is not
+  just a field — it is embedded in the localStorage key
+  (`ks.draft.<projectKey>.v<N>`), and the boot scan filters keys by the
+  current version's suffix. 088 documented this trap and its T010 rewired
+  the scan to also find `.v1` keys, running `migrateDraftEnvelope` before
+  every version gate. 093 must extend the same pattern: the v3 build's scan
+  finds `.v2` keys (and `.v1` keys never opened under v2) and migrates
+  before version gates, chaining v1→v2→v3 inside one load when needed.
+  Without this, the v2→v3 migration above is unreachable for real stored
+  drafts — a fixture-file test would pass while production drafts vanish
+  from the scan.
 - The starting point's id is available from the setup decision 092 FR-004
   creates (working-copy setup as the `apply` of a decision requiring
   `authoring-track`; `base-keyboard` names the starting point).
@@ -122,23 +145,26 @@ specs 088–092, whose deliverables this spec consumes. Two questions are
 - Rationale: replay is a pure function of (starting point, decisions, order)
   — §3 — so the property must hold universally, not on fixtures only.
 
-## 8. OPEN OWNER DECISION (a) — changing the starting point — NOT RESOLVED
+## 8. OWNER DECISION (a) — changing the starting point — RULED: RECALCULATION
 
-Verbatim from [spec.md](spec.md), Edge Cases:
+Verbatim from [spec.md](spec.md), Edge Cases (the clarification as asked):
 
 > **Changing the starting point** is the widest possible closure.
 > [NEEDS CLARIFICATION: is it a recalculation (re-extract everything, keep
 > asked answers), or a new project that carries the answers over?]
 
-This plan does not resolve it. Impact mapping: the replay engine, closure,
-provenance rule, checkpointing, draft v3 format, and measurement work are
-identical under either ruling — under "recalculation" a starting-point change
-is the widest closure through the US1 machinery; under "new project" the same
-machinery replays the carried-over decision set onto the new starting point.
-Only the US2 starting-point-change task (T017) and its test depend on the
-ruling, and they are gated on it in [tasks.md](tasks.md).
+**Ruling (owner, 2026-10-06, adopting km-lead proposals Q6): recalculation.**
+A starting-point change is the widest closure through the US1 machinery:
+everything is re-extracted against the new starting point, and `asked`
+answers are kept under the §5 validate/re-propose rule. The decision log
+stays one history — prior entries keep the old keyboard as their historical
+`source`; superseding entries name the new keyboard. (Impact mapping from
+the pre-ruling analysis stands: the replay engine, closure, provenance rule,
+checkpointing, draft v3 format, and measurement work were identical under
+either ruling; only T017 depended on it, and it now proceeds — tasks.md
+T013/T017.)
 
-## 9. OPEN OWNER DECISION (b) — SC-004 perf budgets — NUMBERS PROPOSED ONLY
+## 9. OWNER DECISION (b) — SC-004 perf budgets — METHOD RULED: MEASURE-FIRST
 
 Verbatim from [spec.md](spec.md), SC-004:
 
@@ -147,15 +173,20 @@ Verbatim from [spec.md](spec.md), SC-004:
 > one debounce cycle), and resume within a budget set there too (proposed:
 > under 2 s). Measure before committing to these.
 
-- Decision: measurement comes FIRST (tasks T002 and T021). The harness drives
-  the real replay path against `sil_euro_latin` (already used as a large
-  starting point in studio tests, e.g. `lib/rankBases.test.ts`,
-  `lib/suggestBase.test.ts`) and records median edit-rebuild and resume
-  (full-replay) latencies in `perf-baseline.md` in this spec directory.
-- The numbers **<300 ms (edit)** and **<2 s (resume)** are recorded as
-  **proposed, pending Matthew's ruling** — they are not committed thresholds
-  and no task asserts them as pass/fail gates until he rules. The
-  measurement results are the evidence for that ruling.
+**Ruling (owner, 2026-10-06, adopting km-lead proposals Q7): measure-first
+is adopted as SC-004's method.**
+
+- Measurement comes FIRST (tasks T002 — landed, commit `744b6636` — and
+  T021). The harness drives the real replay path against `sil_euro_latin`
+  (already used as a large starting point in studio tests, e.g.
+  `lib/rankBases.test.ts`, `lib/suggestBase.test.ts`) and records latencies
+  in `perf-baseline.md` in this spec directory.
+- Figures are **medians with split protocols**: edit = warm median, resume =
+  cold median. They are **never an absolute-ms CI pass/fail**.
+- The numbers **<300 ms (edit)** and **<2 s (resume)** remain **PROPOSED** —
+  not committed thresholds — until T021's re-measurement plus a later owner
+  ruling. If a hard gate is wanted after T021, it is set **relative to the
+  recorded baseline**.
 - FR-006's disposable rebuild cache is conditional on those measurements
   ("allowed for resume only if measurements require it").
 
