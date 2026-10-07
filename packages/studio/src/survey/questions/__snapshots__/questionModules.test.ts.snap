@@ -190,7 +190,7 @@ exports[`live question modules > gallery/carvedLayout.ts > definition contract 1
 
 exports[`live question modules > gallery/characterInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > gallery/deadkeysDefined.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+exports[`live question modules > gallery/deadkeysDefined.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores, raw]"`;
 
 exports[`live question modules > gallery/helpDocs.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 

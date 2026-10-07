@@ -247,7 +247,7 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
   applied view through the existing carve pipeline in
   packages/studio/src/lib/projectWorkingCopyVfs.ts; `undoStack` is re-pointed to operate on
   the decision value (research R5) in packages/studio/src/stores/workingCopyStore.ts
-- [ ] T033 [P] [US3] `deadkeys-defined` module: value = the op list in
+- [x] T033 [P] [US3] `deadkeys-defined` module: value = the op list in
   packages/studio/src/survey/questions/gallery/deadkeysDefined.ts; the deadkey editors record
   ops through the host instead of calling `commitDeadkeyOp` in
   packages/studio/src/editors/deadkey/DeadkeySurface.tsx (and its sibling editors);

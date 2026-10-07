@@ -1,17 +1,36 @@
 // deadkeysDefined — gallery decision module for `deadkeys-defined` (spec 090).
 //
-// Stub landed with T008 so the FR-002 coverage test pins this decision's
-// provider from the start; the real renderer/apply fill in with T033 (US3).
-// The value is the list of deadkey operations; its apply replays them
-// through the deadkey write path. The op type is re-homed to an
-// importable layer by T033 (today it lives in editors/, which gallery
-// modules may not import).
+// The value is the author's deadkey lifecycle op log (data-model.md):
+// the same DeadkeyOperation list the working copy's deadkeyOverlay
+// accumulates at edit time (survey/deadkeys/deadkeyOps.ts). The module's apply
+// replays the ops over the context IR through that module's IR-level
+// replay — the same primitives the projection's VFS replay uses — and
+// returns the groups/stores/raw subtrees as its patch. Recording is
+// step-side: the DeadkeyAdapter records the overlay's ops as this
+// decision when the author completes the step (the base-keyboard
+// precedent — editor steps record their own decision).
+//
+// No extract: the base keyboard's deadkeys are carried by the base IR
+// itself, not by ops — the op log holds author lifecycle edits only,
+// so there is nothing to probe. An unrecorded decision means the
+// author has not completed the step; a recorded { ops: [] } means
+// they completed it with no edits.
+//
 // Boundary (FR-003): a gallery module is a pure descriptor — no store
 // imports; the value arrives via DecisionRendererProps and changes leave
 // via onChange, recorded and applied by the gallery host.
 
+import { irPath } from "@keyboard-studio/contracts";
 import type { GalleryModule } from "../../types.ts";
-import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
+import {
+  applyDeadkeyOpsToIr,
+  type DeadkeysDefinedValue,
+} from "../../deadkeys/deadkeyOps.ts";
+import { DeadkeyDecisionRenderer } from "../../deadkeys/DeadkeyDecisionRenderer.tsx";
+
+// The value type is declared with the op type in survey/deadkeys/deadkeyOps.ts
+// (the D-090-8 pattern) and re-exported for module consumers.
+export type { DeadkeysDefinedValue };
 
 export const definition = {
   id: "deadkeysDefined",
@@ -20,27 +39,21 @@ export const definition = {
   audit_label: "Deadkeys defined",
 };
 
-/**
- * The deadkeys-defined decision value (data-model.md): the deadkey
- * operations, replayed in order by the module's apply. Op payloads are
- * the deadkey editor's serializable operations; their precise type is
- * pinned by T033.
- */
-export interface DeadkeysDefinedValue {
-  ops: readonly unknown[];
-}
-
 const deadkeysDefined: GalleryModule<DeadkeysDefinedValue> = {
   definition,
   provides: ["deadkeys-defined"],
   requires: ["carved-layout"],
   inputs: [],
-  // decisionIRPaths maps this decision to [] today; a story that gives the
-  // module real IR writes updates decisionIRPaths in the same change
-  // (decisionIRConsistency.test.ts pins the two together).
-  writes: [],
-  apply: () => ({}),
-  renderer: UnmigratedGalleryRenderer,
+  // DEADKEY_WRITES (steps/editorMutate.ts): the deadkey lifecycle writes
+  // groups, stores, and raw fragments — mirrored in decisionIRPaths.
+  writes: [irPath("groups"), irPath("stores"), irPath("raw")],
+  apply: (value, ctx) => {
+    if (value === undefined || ctx.ir === null || value.ops.length === 0) return {};
+    const { ir, changed } = applyDeadkeyOpsToIr(ctx.ir, value.ops);
+    if (!changed) return {};
+    return { ir: { groups: ir.groups, stores: ir.stores, raw: ir.raw } };
+  },
+  renderer: DeadkeyDecisionRenderer,
   fixtures: {
     valid: [{ value: undefined, note: "no decision recorded yet" }],
     invalid: [],

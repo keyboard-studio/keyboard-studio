@@ -142,7 +142,8 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "invisibles-inventory",
   "retained-convenience-chars",
   "carved-layout",
-  "deadkeys-defined",
+  // deadkeys-defined left this allowlist at spec 090 T033 (its apply
+  // replays the op log onto groups/stores/raw — decisionIRPaths maps it).
   "rule-set",
   "physical-layout",
   "touch-seed-source",

@@ -1242,3 +1242,37 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   deadkeyWrite/DEADKEY_WRITES), T034 (rule additions are IR
   groups), T035's deadkeys/rules lists, T036's deadkeys/rules
   tests — proceeding with those.
+
+- **D-090-25 — T033 done: deadkeys-defined rebuilt (op-log value,
+  replay apply, step-side recording); the op machinery re-homed to
+  survey/deadkeys/ under the depcruise boundary.** Value =
+  { ops: readonly DeadkeyOperation[] }; apply replays the ops over
+  ctx.ir via applyDeadkeyOpsToIr and returns the groups/stores/raw
+  subtrees when anything changed ({} for no value / no IR / empty
+  log / full precondition-skip — so replay over the live IR, which
+  already carries the edits, is a safe no-op). writes =
+  [groups, stores, raw] (DEADKEY_WRITES) and decisionIRPaths maps
+  the decision correspondingly; deadkeys-defined left the
+  IR-less allowlist in decisionIRConsistency.test.ts; the
+  questionModules snapshot refreshed (diff = the deadkeys writes
+  line only). Recording: DeadkeyAdapter records the overlay's ops
+  as the decision on step completion (base-keyboard precedent);
+  the module renderer is survey/deadkeys/DeadkeyDecisionRenderer
+  (the surface, reporting the op log through onChange on
+  completion). No extract (rationale in the module header: base
+  deadkeys ride the base IR; ops are author edits only).
+  **Boundary finding:** dependency-cruiser's
+  question-modules-no-bypass-mutate-seam rule forbids survey/
+  questions/** importing stores/, editors/, OR lib/ at all — the
+  stub's "re-home the op type to an importable layer" was therefore
+  load-bearing. The op union, overlay/value shapes, the single-op
+  applier, and the IR replay moved to survey/deadkeys/deadkeyOps.ts
+  (the survey feature-home pattern: markGuards, phaseBDraftOps);
+  lib/deadkeyOps.ts keeps applyDeadkeyOpsToVfs (the projection
+  replay, now calling the shared applier) and re-exports the types,
+  so all ten existing importers are untouched. First attempt
+  (module importing lib/ + editors/adapters/) scored depcruise 4;
+  after the re-home it is back to the baseline 2. New module suite
+  deadkeysDefined.test.ts (contract + deterministic replay +
+  live-state no-op) plus the lib/editor suites green; tsc + eslint
+  clean.
