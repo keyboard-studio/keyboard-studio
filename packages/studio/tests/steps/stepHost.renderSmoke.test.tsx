@@ -85,8 +85,8 @@ vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stub-TouchGallery" />,
 }));
 
-vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
-  TouchSeedSourcePanel: () => <div data-testid="stub-TouchSeedSourcePanel" />,
+vi.mock("../../src/survey/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
+  TouchSeedSourceRenderer: () => <div data-testid="stub-TouchSeedSourcePanel" />,
 }));
 
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
@@ -263,7 +263,7 @@ const editorSteps = manifest.filter(
 //   charactersStep    → CharactersStep                    → stub-CharactersStep
 //   carveStep         → CarveAdapter                      → CarveGalleryV2 stub
 //   mechanismsStep    → AddPhysicalAdapter                → MechanismGallery stub
-//   touchSeedSourceStep → TouchSeedSourcePanel            → TouchSeedSourcePanel stub (layout:"full" — P0 fix, spec 035 R4b follow-up)
+//   touchSeedSourceStep → TouchSeedSourceHost → gallery module renderer (TouchSeedSourceRenderer, survey/touchSeedSource/ since spec 090 US1) → TouchSeedSourcePanel stub (layout:"full" — P0 fix, spec 035 R4b follow-up)
 //   touchStep         → AddTouchAdapter                   → TouchGallery stub
 //   helpStep          → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
 //   packageStep       → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)

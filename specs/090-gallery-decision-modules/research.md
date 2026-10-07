@@ -1084,3 +1084,39 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   (contract + deterministic no-op apply over InventoryDecisionValue
   fixtures). Batch: the five gallery suites + draftPersistence
   130/130.
+
+- **D-090-22 — T029 gate (in progress): fixtures regenerated for the
+  post-merge signature; two 090 bookkeeping failures found by the
+  gate run and fixed; full accounting below.** (1) **Golden walk:**
+  fixtures regenerated via the harness write path and re-verified
+  (write run 2/2, compare run 2/2). The semantic diff vs the US1-era
+  fixtures is 7 field deltas per track, ALL purely additive decision
+  `record` insertions: layout/choose_base/touch_seed_source gain
+  `record` in `storeMutations` (the 089-restack unified spy now
+  feeds both lists — the both-instruments harness shape), and the
+  characters entries gain their US2 records (prefill:
+  `decisionMutations` +2 and `storeMutations` +2 around
+  `setCharactersSubStage`; B: +1/+1). Zero removals, zero
+  navigation/content/other-store deltas — the expected post-merge +
+  US2 signature, nothing else. (2) **registry.test.ts (2 failures,
+  fixed here):** the invariant still asserted the pre-090 registry
+  (114 entries, membership groups without the gallery group) while
+  T008 registered the 14 gallery modules in the same registry
+  (R2's design) — count now 128 with the comment re-derived
+  (114 question + 14 gallery), and `galleryModules` joins the
+  membership total. 090 Foundational bookkeeping, missed because
+  focused batches never ran this file; the full gate did. 8/8
+  after the fix. (3) **stepHost.renderSmoke.test.tsx (2 failures,
+  fixed here):** the touch_seed_source stub mocked the panel's
+  pre-US1 path (`editors/touchSeedSource/TouchSeedSourcePanel.tsx`,
+  deleted by T012's move to `survey/touchSeedSource/`) and the old
+  export name; the mock now targets the moved file and stubs
+  `TouchSeedSourceRenderer`. 26/26 after the fix. Both pairs are
+  among the previously unaccounted failures in the stale-tree
+  accounting the lead flagged (8656 passed / 12 failed: 4 SC-004
+  corpus + 2 goldenWalk + 2 renderSmoke + 2 registry = 10 named;
+  the current-tree full run below is the authority for any
+  remainder). (4) **Full suite:** the first attempt on this VM was
+  OOM-killed twice (concurrent sibling-worktree runs; exit 137 in
+  transform) and re-run in directory batches at --maxWorkers=2 —
+  results recorded at the gate commit.
