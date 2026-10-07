@@ -595,7 +595,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // BEFORE the author clicks "Choose this keyboard" (they might preview
   // several bases first). `onInstantiate` below only CAPTURES the settled
   // artifact here; the actual instantiation (`doCommit`) is deferred until
-  // `baseConfirmed` flips true, via the effect that follows `onInstantiate`.
+  // the `base-keyboard` decision is recorded, via the effect that follows
+  // `onInstantiate`.
   // Cleared alongside `instantiatedForBaseIdRef` on start-over.
   // ---------------------------------------------------------------------------
   const pendingArtifactRef = useRef<{
@@ -927,7 +928,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // Extracted verbatim from the pre-preview-before-commit `onInstantiate` body
   // so its internals are unchanged; it is now invoked from the single-
-  // instantiation effect below (gated on `baseConfirmed`) rather than directly
+  // instantiation effect below (gated on the `base-keyboard` decision) rather
+  // than directly
   // from the compile-pipeline callback. Dispatches
   // applyStepCompletion("choose_base", ...), which routes Track 2 →
   // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
@@ -1064,7 +1066,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // the pipeline for its base). This callback ONLY captures the settled
   // artifact — it does NOT instantiate the working copy or advance the
   // wizard. `doCommit` (above) does that, invoked by the effect below once
-  // the author clicks "Choose this keyboard" (`baseConfirmed` flips true).
+  // the author clicks "Choose this keyboard" (the `base-keyboard` decision
+  // is recorded).
   // This is what makes previewing several bases side-effect-free.
   // ---------------------------------------------------------------------------
   const onInstantiate = useCallback<OnInstantiateCallback>(
@@ -1074,8 +1077,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     [],
   );
 
-  // Subscribed so the effect below re-checks whenever the author confirms.
-  const baseConfirmed = useSurveySessionStore((s) => s.baseConfirmed);
+  // Subscribed so the effect below re-checks whenever the author confirms
+  // a base: since spec 090 T013 the arming signal is the recorded
+  // `base-keyboard` decision (the session `baseConfirmed` flag is retired
+  // as the trigger; the renderer records the decision synchronously in
+  // the confirm click, after the F1 rebase gate — the same moment the
+  // flag used to flip).
+  const baseKeyboardDecision = useDecisionStore((s) => s.decisions["base-keyboard"]);
 
   // Pattern map for the working-copy transform — needed from Phase F onwards so
   // mechanism assignments are projected into the OSK preview.
@@ -1150,10 +1158,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Single-instantiation effect (preview-before-commit).
   //
   // Runs `doCommit` once BOTH are true:
-  //   - the author has confirmed (`baseConfirmed`, set by
-  //     BaseResolutionAdapter's onConfirm — see editors/adapters/panelAdapters.tsx,
-  //     which has already synchronously resolved any rebase-confirm question
-  //     via confirmRebaseTo BEFORE flipping baseConfirmed — F1 fix)
+  //   - the author has confirmed a base — the recorded `base-keyboard`
+  //     decision (spec 090 T013; recorded by BaseKeyboardRenderer's confirm
+  //     through the gallery host, which has already synchronously resolved
+  //     any rebase-confirm question via confirmRebaseTo BEFORE recording —
+  //     F1 fix)
   //   - the compile pipeline has actually settled for THAT SAME base
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
@@ -1166,19 +1175,22 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // becomes true, in either order.
   //
   // Confirm is gated on `previewStatus === "ready"` in BaseResolution's commit
-  // button, so in practice `baseConfirmed` only flips true once the pipeline
+  // button, so in practice the decision is only recorded once the pipeline
   // has already settled — the ref is already populated by the time this
-  // effect sees `baseConfirmed`. The `artifactStage`-triggered re-run (waiting
+  // effect sees the decision. The `artifactStage`-triggered re-run (waiting
   // for the ref to be filled after confirm) is retained purely as a defensive
   // fallback, not a load-bearing path. The `art.base.id === lb.id` check
   // guards against a stale ref from a PREVIOUS preview surviving a fast
-  // re-preview.
+  // re-preview; the `lb.id === decisionId` check is what stops a preview of
+  // an UNCONFIRMED base from instantiating — previewing never records.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!baseConfirmed) return;
+    const decisionValue = baseKeyboardDecision?.value as { id?: unknown } | undefined;
+    const decisionId = typeof decisionValue?.id === "string" ? decisionValue.id : undefined;
+    if (decisionId === undefined) return;
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localBase;
-    if (art && lb && art.base.id === lb.id) {
+    if (art && lb && art.base.id === lb.id && lb.id === decisionId) {
       doCommit(art.base, {
         vfs: art.vfs,
         ir: art.ir,
@@ -1192,7 +1204,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // above) — omitted from deps to mirror the existing escape-hatch
     // convention in this file (e.g. the reducerDeps memo above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseConfirmed, artifactStage]);
+  }, [baseKeyboardDecision, artifactStage]);
 
   // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {

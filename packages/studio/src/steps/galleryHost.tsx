@@ -44,6 +44,13 @@ import { assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
 export interface GalleryStepContextValue {
   onComplete: (result: unknown) => void;
   onBack?: () => void;
+  /**
+   * Step-specific plumbing the wrapper owns and the renderer consumes
+   * (e.g. the base picker's preview channel — host-layer wiring that is
+   * not part of the decision contract). Each hosted step defines its own
+   * extras shape next to its renderer and narrows this bag to it.
+   */
+  extras?: Readonly<Record<string, unknown>>;
 }
 
 export const GalleryStepContext = createContext<GalleryStepContextValue | null>(null);

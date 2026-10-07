@@ -3,7 +3,10 @@
 // the compile pipeline's settled artifact into `pendingArtifactRef`; the real
 // instantiation (`doCommit` -> applyStepCompletion("choose_base") ->
 // instantiateFromBaseIfConfirmed) fires ONLY once BOTH:
-//   - the author has confirmed (surveySessionStore.baseConfirmed === true), AND
+//   - the author has confirmed (the `base-keyboard` decision is recorded —
+//     since spec 090 T013 this replaced surveySessionStore.baseConfirmed as
+//     the arming signal; the decision-record assertions below are the same
+//     checks, re-pointed), AND
 //   - the compile pipeline has settled for THAT SAME base
 // are true (either order).
 //
@@ -13,9 +16,10 @@
 // controllable `stage` so a test can simulate the pipeline transitioning to
 // "ready" independently of when the author clicks confirm. BaseResolution is
 // mocked with two fixed preview buttons (base A / base B) + one confirm
-// button, mirroring the real BaseResolutionAdapter wiring under test (which
-// is NOT mocked — it is the code under test here, along with SurveyView's
-// capture-ref effect).
+// button, mirroring the real BaseKeyboardRenderer + BaseResolutionAdapter
+// wiring under test (neither is mocked — they are the code under test here,
+// along with SurveyView's capture-ref effect; the mock panel's buttons call
+// the renderer's real preview/confirm handlers).
 //
 // Follow-up fix on PR #1174: the REAL BaseResolution now disables its
 // "Choose this keyboard" button unless previewStatus === "ready" (see
@@ -25,9 +29,12 @@
 // `commit` button is disabled only on `previewedBase === null` — because the
 // scenarios that exercise it are testing SurveyView's own effect-level
 // defensive guarantees (the single-instantiation effect gated on
-// `baseConfirmed`/`artifactStage`), which exist independently of whatever UI
+// `base-keyboard decision`/`artifactStage`), which exist independently of whatever UI
 // sits in front of them and must hold even if a future caller reaches this
-// effect through a different, less-gated component.
+// effect through a different, less-gated component. (The confirm handler the
+// mock drives records the `base-keyboard` decision through the gallery host —
+// the mocked confirmRebaseTo module, shared with the renderer under
+// `survey/chooseBase/`, always allows.)
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
@@ -100,7 +107,16 @@ vi.mock("./editors/panels/BaseResolution.tsx", () => ({
 import { SurveyView } from "./StudioShell.tsx";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
+import { useDecisionStore } from "./stores/decisionStore.ts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
+
+/** The recorded base-keyboard decision's id, or undefined when unconfirmed. */
+function confirmedBaseId(): string | undefined {
+  const value = useDecisionStore.getState().decisions["base-keyboard"]?.value as
+    | { id?: unknown }
+    | undefined;
+  return typeof value?.id === "string" ? value.id : undefined;
+}
 
 const instantiateSpy = instantiateFromBaseIfConfirmed as ReturnType<typeof vi.fn>;
 
@@ -134,7 +150,7 @@ function readyStageFor(base: BaseKeyboard): Stage {
  * onInstantiate callback THEN transitions the mocked hook's stage to "ready"
  * — same order as the real hook (see useKeyboardArtifact.ts run(), which
  * calls onInstantiate before setStage(readyStage)). Both happen inside one
- * act() so SurveyView's single-instantiation effect (deps: [baseConfirmed,
+ * act() so SurveyView's single-instantiation effect (deps: [baseKeyboardDecision,
  * artifactStage]) sees both the filled pendingArtifactRef AND the new stage
  * reference in the same re-render, exactly as production does.
  */
@@ -162,6 +178,9 @@ async function renderAtChooseBase() {
 beforeEach(() => {
   hoisted.onInstantiateRef.current = null;
   hoisted.stageSetters = [];
+  // The decision store is a module singleton — a commit in one test must not
+  // arm the instantiation effect in the next.
+  useDecisionStore.getState().reset();
 });
 
 afterEach(() => {
@@ -185,7 +204,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
 
     // Multiple previews, no commit click at all.
     expect(instantiateSpy).not.toHaveBeenCalled();
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
+    expect(confirmedBaseId()).toBeUndefined();
     expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
   });
 
@@ -205,7 +224,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
       expect.anything(),
       { skipConfirm: true },
     );
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+    expect(confirmedBaseId()).toBe(BASE_B.id);
   });
 
   // P1 regression (double-instantiation guard) sibling of the F1 fix: the F1
@@ -222,13 +241,13 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     fireEvent.click(screen.getByTestId("commit"));
 
     expect(instantiateSpy).toHaveBeenCalledTimes(1);
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+    expect(confirmedBaseId()).toBe(BASE_B.id);
 
     // setScaffoldSpec() (Track 1) triggers a SECOND compile run for the SAME
     // base that was just committed — onInstantiate re-fires and the stage
     // transitions to "ready" again (a new object reference), re-running the
-    // single-instantiation effect (its `artifactStage` dependency) with
-    // `baseConfirmed` already true from the commit above.
+    // single-instantiation effect (its `artifactStage` dependency) with the
+    // decision already recorded from the commit above.
     settleFor(BASE_B);
 
     // instantiatedForBaseIdRef already recorded BASE_B from the first commit —
@@ -244,18 +263,18 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
   // compile is still pending. The mocked commit button here does not
   // reproduce that gating (see the file-header note above), so this test now
   // documents a DEFENSIVE EFFECT-LEVEL guarantee rather than a user-reachable
-  // flow: if `baseConfirmed` is ever set before `pendingArtifactRef` is
+  // flow: if the decision is ever recorded before `pendingArtifactRef` is
   // filled for the current base (e.g. a future caller with looser gating),
   // the single-instantiation effect must still defer, not misfire, and must
   // complete exactly once the pipeline later settles for that same base.
-  it("[effect-level defensive guarantee] baseConfirmed set before the pipeline settles defers doCommit; completes once it settles for that same base", async () => {
+  it("[effect-level defensive guarantee] base-keyboard decision recorded before the pipeline settles defers doCommit; completes once it settles for that same base", async () => {
     await renderAtChooseBase();
 
     fireEvent.click(screen.getByTestId("preview-b"));
     // No settleFor() yet — the compile is still "in flight" for base B.
 
     fireEvent.click(screen.getByTestId("commit"));
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+    expect(confirmedBaseId()).toBe(BASE_B.id);
     expect(instantiateSpy).not.toHaveBeenCalled();
 
     // The pipeline settles for base B AFTER the commit click — the
@@ -275,12 +294,12 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
   // finding #2): if the previewed base's compile ERRORS rather than settling
   // ready, `onInstantiate` never fires for it (see useKeyboardArtifact.ts —
   // the callback only runs on the success path), so `pendingArtifactRef`
-  // never fills for that base. Even if `baseConfirmed` is set regardless
+  // never fills for that base. Even if the decision is recorded regardless
   // (again: unreachable via the real gated button, but a defensive guarantee
   // the effect itself must uphold), the single-instantiation effect must
   // NEVER run doCommit for an errored base — no instantiation, no autosave
   // install, no advance onto a broken working copy.
-  it("[effect-level defensive guarantee] baseConfirmed set while the previewed base's compile has ERRORED never instantiates", async () => {
+  it("[effect-level defensive guarantee] base-keyboard decision recorded while the previewed base's compile has ERRORED never instantiates", async () => {
     await renderAtChooseBase();
 
     fireEvent.click(screen.getByTestId("preview-b"));
@@ -293,7 +312,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     });
 
     fireEvent.click(screen.getByTestId("commit"));
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+    expect(confirmedBaseId()).toBe(BASE_B.id);
     expect(instantiateSpy).not.toHaveBeenCalled();
     expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
 
@@ -319,13 +338,13 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
   // the real UI this is unreachable — the button is gated on
   // previewStatus === "ready" — so this documents the effect's own defensive
   // guarantee; see the file-header note.)
-  it("[effect-level defensive guarantee] baseConfirmed set while pending, then the compile ERRORS -> never instantiates", async () => {
+  it("[effect-level defensive guarantee] base-keyboard decision recorded while pending, then the compile ERRORS -> never instantiates", async () => {
     await renderAtChooseBase();
 
     fireEvent.click(screen.getByTestId("preview-b"));
     // Confirm while B's compile is still in flight — no settleFor() yet.
     fireEvent.click(screen.getByTestId("commit"));
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
+    expect(confirmedBaseId()).toBe(BASE_B.id);
     expect(instantiateSpy).not.toHaveBeenCalled();
 
     // The pipeline then settles into ERROR (not ready) for base B AFTER the
@@ -352,7 +371,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     settleFor(BASE_A);
 
     expect(instantiateSpy).not.toHaveBeenCalled();
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
+    expect(confirmedBaseId()).toBeUndefined();
   });
 
   it("a stale settled artifact from a PREVIOUS preview does not leak into a commit for the CURRENT preview", async () => {

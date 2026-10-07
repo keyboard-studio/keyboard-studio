@@ -20,6 +20,8 @@ import {
 } from "@keyboard-studio/contracts/fixtures";
 
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import type { Decision } from "../../decisions/decisionTypes.ts";
 import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
 import { buildTargetBcp47 } from "../../survey/IdentityLite.tsx";
 import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
@@ -143,18 +145,23 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
 });
 
 // ---------------------------------------------------------------------------
-// BaseResolutionAdapter — preview-before-commit split.
+// BaseResolutionAdapter — preview-before-commit split (gallery-hosted since
+// spec 090 T013: the adapter is the host wrapper; the renderer is
+// survey/chooseBase/BaseKeyboardRenderer.tsx).
 //
 // Preview (every suggestion-card / search-result click) must write
-// setLocalBase WITHOUT calling onComplete (the wizard does not advance, the
-// working copy is not instantiated). Commit (the "Choose this keyboard"
-// button) must set baseConfirmed=true BEFORE calling onComplete (R7 ordering
-// — StudioShell's single-instantiation effect gates on baseConfirmed).
+// setLocalBase WITHOUT calling onComplete and WITHOUT recording any
+// decision (the wizard does not advance, the working copy is not
+// instantiated). Commit (the "Choose this keyboard" button) must record
+// the `base-keyboard` decision BEFORE calling onComplete (R7 ordering —
+// StudioShell's single-instantiation effect arms off the recorded
+// decision; the session baseConfirmed flag is no longer written at all).
 // ---------------------------------------------------------------------------
 
 describe("BaseResolutionAdapter — preview vs commit", () => {
   it("previewing a suggestion card writes setLocalBase and does NOT call onComplete", async () => {
     useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+    useDecisionStore.getState().reset();
     const onComplete = vi.fn();
 
     render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
@@ -166,23 +173,25 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
       expect(useSurveySessionStore.getState().localBase?.id).toBe("sil_euro_latin");
     });
     expect(onComplete).not.toHaveBeenCalled();
-    // A fresh preview re-arms the commit gate — baseConfirmed stays false.
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
+    // A preview is not a decision — nothing is recorded.
+    expect(useDecisionStore.getState().decisions["base-keyboard"]).toBeUndefined();
     // basePreviewStatusStore stays at its default "idle" (nothing in this
     // unit test publishes to it), so the confirm button stays disabled too —
     // a preview alone can never reach the commit path.
     expect((screen.getByTestId("base-confirm") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("committing after a preview sets baseConfirmed BEFORE calling onComplete (R7 ordering)", async () => {
+  it("committing after a preview records the base-keyboard decision BEFORE calling onComplete (R7 ordering)", async () => {
     useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+    useDecisionStore.getState().reset();
 
-    // Spy on setBaseConfirmed via the store's setState escape hatch, wrapping
-    // the real action so both the spy AND the actual mutation fire — same
-    // pattern as the golden-walk oracle in tests/steps/stepHost.goldenWalk.test.tsx.
-    const originalSetBaseConfirmed = useSurveySessionStore.getState().setBaseConfirmed;
-    const setBaseConfirmedSpy = vi.fn((v: boolean) => originalSetBaseConfirmed(v));
-    useSurveySessionStore.setState({ setBaseConfirmed: setBaseConfirmedSpy });
+    // Spy on the decision store's record via the setState escape hatch,
+    // wrapping the real action so both the spy AND the actual mutation
+    // fire — same pattern as the golden-walk oracle in
+    // tests/steps/stepHost.goldenWalk.test.tsx.
+    const originalRecord = useDecisionStore.getState().record;
+    const recordSpy = vi.fn((d: Decision) => originalRecord(d));
+    useDecisionStore.setState({ record: recordSpy });
 
     const onComplete = vi.fn();
     render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
@@ -208,17 +217,25 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     expect(onComplete).toHaveBeenCalledWith({
       base: expect.objectContaining({ id: "sil_euro_latin" }),
     });
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
 
-    // setBaseConfirmed is called twice: (false) on preview, (true) on commit.
-    expect(setBaseConfirmedSpy.mock.calls.map((args) => args[0])).toEqual([false, true]);
+    // Exactly one decision is recorded — the commit's — carrying the
+    // previewed base's catalog identity with asked provenance.
+    expect(recordSpy).toHaveBeenCalledTimes(1);
+    expect(recordSpy.mock.calls[0]![0]).toMatchObject({
+      id: "base-keyboard",
+      value: { id: "sil_euro_latin" },
+      provenance: "asked",
+      step: "choose_base",
+    });
+    expect(useDecisionStore.getState().decisions["base-keyboard"]).toBeDefined();
+    // The retired session flag is untouched by the whole flow.
+    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
 
-    // Call-order assertion: the COMMIT's setBaseConfirmed(true) call fires
-    // strictly before onComplete (R7 — "writes before advance").
-    const commitCallIdx = setBaseConfirmedSpy.mock.calls.findIndex((args) => args[0] === true);
-    const commitCallOrder = setBaseConfirmedSpy.mock.invocationCallOrder[commitCallIdx];
+    // Call-order assertion: the record fires strictly before onComplete
+    // (R7 — "writes before advance").
+    const recordOrder = recordSpy.mock.invocationCallOrder[0];
     const onCompleteOrder = onComplete.mock.invocationCallOrder[0];
-    expect(commitCallOrder).toBeLessThan(onCompleteOrder!);
+    expect(recordOrder).toBeLessThan(onCompleteOrder!);
   });
 });
 

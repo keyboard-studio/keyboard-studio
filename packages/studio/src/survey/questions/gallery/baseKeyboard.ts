@@ -1,16 +1,18 @@
 // baseKeyboard — gallery decision module for `base-keyboard` (spec 090).
 //
-// Stub landed with T008 so the FR-002 coverage test pins this decision's
-// provider from the start; the real renderer/apply fill in with T013 (US1).
-// The value is the chosen base keyboard's catalog identity; its apply is
-// an IR no-op in 090 (instantiation setup stays in StudioShell, research
-// R3, and reads the recorded decision once T013 lands).
+// The value is the chosen base keyboard's catalog identity. Its apply is
+// an IR no-op in 090: instantiation setup stays in StudioShell (research
+// R3), whose single-instantiation effect reads this recorded decision
+// since T013 (the session `baseConfirmed` flag is retired as the trigger).
+// Renderer: `survey/chooseBase/BaseKeyboardRenderer.tsx` — the
+// BaseResolution picker hosted; its confirm runs the F1 rebase gate and
+// then records through the gallery host's onChange.
 // Boundary (FR-003): a gallery module is a pure descriptor — no store
 // imports; the value arrives via DecisionRendererProps and changes leave
 // via onChange, recorded and applied by the gallery host.
 
 import type { GalleryModule } from "../../types.ts";
-import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
+import { BaseKeyboardRenderer } from "../../chooseBase/BaseKeyboardRenderer.tsx";
 
 export const definition = {
   id: "baseKeyboard",
@@ -35,7 +37,7 @@ const baseKeyboard: GalleryModule<BaseKeyboardValue> = {
   // (decisionIRConsistency.test.ts pins the two together).
   writes: [],
   apply: () => ({}),
-  renderer: UnmigratedGalleryRenderer,
+  renderer: BaseKeyboardRenderer,
   fixtures: {
     valid: [{ value: undefined, note: "no decision recorded yet" }],
     invalid: [],
