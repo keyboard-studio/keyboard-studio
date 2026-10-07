@@ -1085,6 +1085,23 @@ function soleEditorSummary(): EditorActionSummary {
 }
 
 describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
+  it("spec 092 T051: on the adapt track the entry's mode is adapt-existing and its inputs are non-null", () => {
+    // The setup gate (spec 092 FR-004/T013) means instantiation — and so
+    // this completion — happens only once the track decision exists, so
+    // the entry is written from a fully instantiated copy: real base id,
+    // real starting key count, and the mode matching the chosen track.
+    const ir = parseKmn(KMN, `${BASE_ID}.kmn`).ir;
+    useWorkingCopyStore.getState().instantiateFromExisting(BASE, { vfs: makeBaseVfs(), ir });
+
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), depsWith(realRecorder()));
+
+    const entry = onlyBaseContribution();
+    expect(entry.payload.baseId).toBe(BASE_ID);
+    expect(entry.payload.instantiationMode).toBe("adapt-existing");
+    expect(entry.payload.startingKeyCount).toBe(railGlyphGids(ir).length);
+    expect(entry.payload.startingKeyCount).toBeGreaterThan(0);
+  });
+
   it("records the base chosen and what it left in the working copy", () => {
     const ir = instantiate();
 
