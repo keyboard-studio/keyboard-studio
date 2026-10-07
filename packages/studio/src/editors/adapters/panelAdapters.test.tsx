@@ -292,10 +292,10 @@ describe("IdentityLiteAdapter — resume from recorded decisions (spec 089)", ()
     // 4 -> 7: spec 064 US1 appends the three attribution answers.
     expect(forwarded.answers.length).toBe(7);
     // And the session store carries no identity residue from the adapter:
-    // the fields it used to write stay at their reset defaults until T017
-    // deletes them outright.
-    expect(useSurveySessionStore.getState().identityResult).toBeNull();
-    expect(useSurveySessionStore.getState().surveyContext).toEqual({});
-    expect(useSurveySessionStore.getState().identityPhaseResult).toBeNull();
+    // the fields it used to write no longer exist at all (T017).
+    const session = useSurveySessionStore.getState();
+    expect("identityResult" in session).toBe(false);
+    expect("surveyContext" in session).toBe(false);
+    expect("identityPhaseResult" in session).toBe(false);
   });
 });
