@@ -129,6 +129,39 @@ export function galleryModuleFor(decisionId: DecisionId): GalleryModule<any> | u
   return galleryModuleList.find((m) => m.provides[0] === decisionId);
 }
 
+// ---------------------------------------------------------------------------
+// Spec 091 — the derivation's module list and the `group` seeding (T003/T004).
+//
+// `decisionModules` is the single declaration-ordered list spec 091's
+// `deriveScreens` consumes: the live question flows' modules plus the
+// gallery modules, concatenated in the same relative order `questionRegistry`
+// composes them (reserve and demoted sets are registered but are NOT live
+// flow members, so they are not in the list). Declaration order in this list
+// is the sort's stable tie-break input ONLY — it carries no other semantics,
+// exactly like flow-list key order today.
+//
+// Each live flow's modules are seeded here with their screen `group`
+// (spec 091 T003): the three SurveyRunner flows name their own screen;
+// the two intra-step flows name their enclosing custom screen, per
+// research.md's two-level treatment (their modules form no top-level
+// screen). A module that already declares its own `group` keeps it.
+// ---------------------------------------------------------------------------
+
+const withGroup = (
+  modules: readonly QuestionModule[],
+  group: string,
+): QuestionModule[] =>
+  modules.map((m) => (m.group === undefined ? { ...m, group } : m));
+
+export const decisionModules: readonly QuestionModule[] = [
+  ...withGroup(flowModules.identity_lite, "identity"),
+  ...withGroup(flowModules.phase_b_characters, "characters"),
+  ...withGroup(flowModules.phase_f_helpdocs, "help"),
+  ...withGroup(flowModules.track, "track"),
+  ...withGroup(flowModules.project_name, "project_name"),
+  ...galleryModules,
+];
+
 /**
  * The reserve / Leftover set (no-delete guardrail): every module physically
  * under questions/reserve/ — the demoted Phase A battery plus the flow-less

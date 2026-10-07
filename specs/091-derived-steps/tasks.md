@@ -26,19 +26,19 @@ conversation.
 **Purpose**: Confirm the stacked predecessors' end-state and seed the declarations the
 derivation reads. No behaviour change.
 
-- [ ] T001 Audit the stacked branch state the plan assumes — `decisionStore` live (088),
+- [x] T001 Audit the stacked branch state the plan assumes — `decisionStore` live (088),
   `apply` the only question write path and the golden-walk script present (089), and a decision
   module with `provides`/`requires`/`renderer` for every `settles` name in
   `packages/studio/src/steps/stepDependencies.ts` (090) — and record any gap as a blocker note
   in specs/091-derived-steps/plan.md before proceeding
-- [ ] T002 Add the optional `group?: string` field (with the "never affects order" doc comment)
+- [x] T002 Add the optional `group?: string` field (with the "never affects order" doc comment)
   to `QuestionModule` in packages/studio/src/survey/types.ts
-- [ ] T003 [P] Seed `group` on the live question modules in
+- [x] T003 [P] Seed `group` on the live question modules in
   packages/studio/src/survey/questions/registry.ts: identity_lite → `"identity"`, track →
   `"track"`, project_name → `"project_name"`, phase_b_characters → `"characters"` and
   phase_f_helpdocs → `"help"` (the intra-step groups naming their enclosing custom screen, per
   research.md's two-level treatment)
-- [ ] T004 [P] Expose the single declaration-ordered decision-module list the derivation
+- [x] T004 [P] Expose the single declaration-ordered decision-module list the derivation
   consumes (question modules plus 090's gallery/picker modules, concatenated in declaration
   order, documented as tie-break input only) in packages/studio/src/survey/questions/registry.ts,
   unless 090 already landed an equivalent export — in that case adopt it and delete this task's

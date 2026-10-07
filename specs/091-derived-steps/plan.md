@@ -168,3 +168,55 @@ arranged by the derived screen order.
   km-lead proposals Q9): the `package` screen has no decision module; it is a terminal screen
   appended after the last derived screen. This is settled, not an open question — no
   confirmation at implementation kickoff is needed.
+
+## T001 audit — stacked-branch state (2026-10-07, on the 090 @ 726ebcfd restack)
+
+Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
+
+- **088 ✓** `stores/decisionStore.ts` is live; completions record decisions
+  through it; the golden-walk script (089) is present at
+  `packages/studio/e2e/golden-walk.spec.ts` (its capture is a CI gate per the
+  owner's ruling, not a local blocker).
+- **089 ✓** `applyDecisionEffects` in `steps/reducer.ts` is the question
+  write path; the mutate seam / flag are gone.
+- **090 — coverage complete, depth partial.** All fourteen `settles` names in
+  `stepDependencies.ts` have exactly one registered gallery module with
+  `provides` / `requires` / `renderer` (`registry.ts` galleryModuleList), and
+  every gallery `requires` mirrors its step declaration. Eight carry real
+  renderers/applies (US1+US2: windows-layout, base-keyboard,
+  touch-seed-source, character-inventory, marks-treatment,
+  punctuation-inventory, invisibles-inventory, retained-convenience-chars).
+  Six are declaration-complete **stubs** — `UnmigratedGalleryRenderer`, no-op
+  `apply` — pending 090 US3–US5: carved-layout, deadkeys-defined, rule-set,
+  physical-layout, touch-layout, help-docs. The derivation reads only
+  provides/requires/renderer-kind, so the core is unblocked; hosting
+  equivalence for the six is 090's remaining work and shows up as a
+  parity-report delta until 090 completes.
+- **Delta A (plan assumption vs. landed 090): no screen key exists.**
+  data-model.md names a singleton's id "the module's declared screen key
+  (seeded with today's step names — when 090's modules are declared)". No
+  such field exists on `QuestionModule` / `GalleryModule` or in any gallery
+  module. 091 must seed it, exactly as T002/T003 seed `group`; proposed as
+  an optional `screen?: string` on the module contract, seeded on the
+  fourteen gallery modules with today's step ids. Flagged to the lead with
+  the Phase 2 report — T005's singleton ids depend on it.
+- **Delta B: no `gatedBy` field on modules.** Question gates are
+  routing-derived (`effectiveGatedBy`) and need no field. Of the two
+  step-level gates, project_name's is a property of its flow's routing
+  (derived ✓), but touch_seed_source's "asked only while unrecorded" gate
+  exists **only** in `stepDependencies.ts` — its module's header says so
+  explicitly. FR-003's move therefore needs an optional `gatedBy` on the
+  module contract, seeded on the touch-seed-source module; folded into
+  Phase 2 (T005) and flagged with Delta A.
+- **Inherited, do not fix here:** the depcruise cycle
+  `survey/types ↔ workingCopyStore` is present in this base (090 merged 089
+  @ 03d1a1ef; the fix 030bf59c sits on `km/decision-apply` and arrives via a
+  later 090 merge). `pnpm lint` reports it until then; it is not 091
+  fallout.
+- **Init-cycle constraint on T008 (from 090's D-090-7):** `stepOrder.ts`
+  executes its sort at module load and is reached during registry load
+  (registry → gallery renderer → workingCopyStore → completeness →
+  stepOrder). A module list exported from `registry.ts` (T004) is therefore
+  safe for component-layer consumers (manifest seam, StepHost, tests) but
+  may be mid-initialisation when `stepOrder`'s top level runs. T008 will
+  verify empirically and stop-and-report rather than adapt if it bites.

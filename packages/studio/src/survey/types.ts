@@ -338,6 +338,17 @@ export interface QuestionModule {
   requires?: readonly DecisionId[];
 
   /**
+   * Screen-grouping hint (spec 091 FR-002 / US3). Question-renderer modules
+   * sharing a `group` merge into one wizard screen keyed by it; a `group`
+   * naming a custom (singleton) screen instead marks the module intra-step
+   * to that screen (the two-level treatment in spec 091 research.md).
+   * Seeded per live flow at registry composition. Display/partition only:
+   * it NEVER affects order — placement is provides/requires plus the
+   * stable declaration-order tie-break (FR-001).
+   */
+  group?: string;
+
+  /**
    * Base-keyboard probe: read this module's decisions from the import bundle
    * (spec 087 Q1) instead of asking the author. Return `undefined` when the
    * bundle carries no evidence for the decision. The result runs through
