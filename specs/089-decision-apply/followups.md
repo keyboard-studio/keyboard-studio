@@ -237,3 +237,21 @@ completion-scoping, and the no-double-run rule.
   an omitted-vs-undefined distinction (or a seed-logic revisit), not a
   mechanical move. Revisit when the project_name seed logic next
   changes.
+
+## 9. Hand-off: the footer's overlap band can trap real clicks too (app-side, NOT fixed here)
+
+Surfaced by copy-edit:455's deterministic CI failure (2026-10-07). Spec
+081's studio footer overlaps the bottom 40px of content by design
+(`.ks-studio-footer { margin-top: -40px; z-index: 100 }`), and the
+Mechanism Gallery's sequence builder puts its Apply button where that
+band can cover it: Playwright's click was intercepted by the footer's
+progress-dot-row and retried until the test's 240s budget was gone.
+The harness side is fixed in the e2e helper (`driveMechanismsGallery`'s
+sequence fallback now centres `sequences-apply` in the viewport before
+clicking, with the click bounded so a genuine intercept fails fast).
+The app-side observation is handed off, not fixed: a real user on a
+short viewport can hit the same trap — the sequence builder's Apply
+sitting under the footer band, visible but not clickable. Whether the
+band should yield (footer pointer-events, content padding, builder
+placement) is a design call for the chrome's owning spec (081), not
+for 089.

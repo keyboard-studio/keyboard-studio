@@ -752,7 +752,23 @@ export async function driveMechanismsGallery(
         await page.getByRole("button", { name: "Type a sequence" }).click();
         await page.getByTestId("sequences-content").fill(contentToken);
         await page.getByTestId("sequences-indicator").fill("j");
-        await page.getByTestId("sequences-apply").click();
+        const sequencesApply = page.getByTestId("sequences-apply");
+        // The studio footer overlaps the viewport's bottom 40px BY DESIGN
+        // (spec 081: .ks-studio-footer { margin-top: -40px; z-index: 100 }
+        // in index.css), and Playwright's scroll-into-view does not know
+        // about that band: when this button's click point lands inside it,
+        // the footer's progress-dot-row intercepts the click and Playwright
+        // retries until the whole test budget is gone (copy-edit:455's CI
+        // failure hung the full 240s this way — that walk types a language
+        // code, so this fallback fires for most of its characters). Centre
+        // the button in the viewport so its click point sits clear of the
+        // band, and bound the click so a genuine intercept fails fast and
+        // names itself instead of consuming the test. Deliberately NOT a
+        // force click: actionability must keep policing real intercepts.
+        await sequencesApply.evaluate((el) => {
+          el.scrollIntoView({ block: "center" });
+        });
+        await sequencesApply.click({ timeout: 10_000 });
       }
     }
 
