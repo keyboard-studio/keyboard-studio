@@ -199,13 +199,12 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
 }
 
 /**
- * The live wiring (T012): build the bundle from the working-copy store's
- * post-setup slots (`baseIr`, `baseKeyboard`) and run the pass over the
- * live registry against the live decision store. Called from the setup
- * commit (StudioShell's `doCommit`, spec 092 T013) — synchronously, once
- * per instantiation, never on a timer or per step.
+ * Build the live extract context from the working-copy store's base
+ * slots, including the Phase F augmentation (spec 092 T036). Shared by
+ * the extraction pass and by spec 093's rebuild wiring (re-extraction
+ * during recalculation must read the same bundle the seeding pass read).
  */
-export function runLiveExtractionFromStores(): LiveExtractionResult {
+export function buildLiveExtractContext(): ExtractContext {
   const wc = useWorkingCopyStore.getState();
   const ctx = buildExtractContext(wc.baseIr, wc.baseKeyboard);
   // Spec 092 (T036): Phase F's derivations read working-copy slices and
@@ -233,9 +232,20 @@ export function runLiveExtractionFromStores(): LiveExtractionResult {
       ? { bcp47Tag: surveyContext["bcp47_tag"] }
       : {}),
   };
+  return ctx;
+}
+
+/**
+ * The live wiring (T012): build the bundle from the working-copy store's
+ * post-setup slots (`baseIr`, `baseKeyboard`) and run the pass over the
+ * live registry against the live decision store. Called from the setup
+ * commit (StudioShell's `doCommit`, spec 092 T013) — synchronously, once
+ * per instantiation, never on a timer or per step.
+ */
+export function runLiveExtractionFromStores(): LiveExtractionResult {
   return runLiveExtraction({
     modules: Object.values(questionRegistry),
-    ctx,
+    ctx: buildLiveExtractContext(),
     store: useDecisionStore.getState(),
   });
 }

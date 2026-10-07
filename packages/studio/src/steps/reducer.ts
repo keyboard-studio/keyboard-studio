@@ -31,7 +31,7 @@ import type { ApplyContext, WorkingCopyPatch } from "../survey/types.ts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
 import { repropagate } from "./repropagate.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import type { Decision, DecisionSet } from "../decisions/decisionTypes.ts";
+import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
 import type { SavedAnswer } from "./answerTypes.ts";
 
@@ -285,6 +285,20 @@ export interface ReducerDeps {
   getSavedAnswer?: (stepId: string, questionId: string) => SavedAnswer | undefined;
   /** The starting-point keyboard's id, named as an extracted record's `source`. */
   getBaseKeyboardId?: () => string | undefined;
+
+  // --- derived rebuild (spec 093 T009) ---
+  /**
+   * Rebuild the working copy from the decision store after a completion
+   * recorded decisions: downstream closure + provenance recalculation +
+   * replay from the checkpoint before the first changed decision, with
+   * the rebuilt state (IR + overlay channels) installed over this
+   * completion's incremental applies. INJECTED for the boundary reason
+   * (StudioShell points it at decisions/rebuildWorkingCopy.ts) so this
+   * layer imports no rebuild wiring. Optional, and a no-op when absent —
+   * a session run without it is carried by the incremental apply path
+   * alone, byte-identical to pre-093 behaviour.
+   */
+  rebuildFromDecisions?: (changed: readonly DecisionId[]) => void;
 }
 
 // ---------------------------------------------------------------------------

@@ -48,6 +48,8 @@ import {
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getDecisionSnapshot, selectTouchSeedSource, selectTrack, useDecisionStore } from "../stores/decisionStore.ts";
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
+import type { DecisionId } from "../decisions/decisionTypes.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { EditorStep } from "../steps/types.ts";
 import {
@@ -447,6 +449,21 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
       // Spec 089 FR-001/FR-002: run each answered module's apply()
       // unconditionally through the checked patch sink.
       applyDecisionEffects(result, reducerDeps);
+      // Spec 093 T009: the recorded change recalculates its downstream
+      // closure and the working copy is rebuilt by replay from the
+      // checkpoint before the first changed decision — the rebuilt
+      // state installs over the incremental applies above, so what the
+      // author continues from is the derived working copy. A no-op when
+      // the host wired no rebuild (pre-093 behaviour) or when this
+      // completion recorded no decisions.
+      if (reducerDeps.rebuildFromDecisions !== undefined) {
+        const changed: DecisionId[] = [];
+        for (const answer of result.answers) {
+          const mod = questionRegistry[answer.questionId];
+          if (mod?.provides !== undefined) changed.push(...mod.provides);
+        }
+        if (changed.length > 0) reducerDeps.rebuildFromDecisions(changed);
+      }
     }
 
     // 2. If step has reducer side effects: applyStepCompletion.

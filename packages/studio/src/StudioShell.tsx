@@ -121,6 +121,7 @@ import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
 import { runLiveExtractionFromStores } from "./decisions/liveExtraction.ts";
+import { rebuildWorkingCopyFromStores } from "./decisions/rebuildWorkingCopy.ts";
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
@@ -887,6 +888,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // store access, injected so steps/reducer.ts never imports stores/.
       writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
       readDecisionSet: () => getDecisionSnapshot(),
+      // Spec 093 T009: after a completion records decisions, recalculate
+      // the downstream closure and rebuild the working copy by replay
+      // (decisions are the only stored state; the keyboard is derived).
+      rebuildFromDecisions: (changed) => {
+        rebuildWorkingCopyFromStores(changed);
+      },
       // Spec 089 FR-001/FR-002 (apply-contract A4): the checked patch sink.
       // The `ir` channel's containment-checked merge runs FIRST — a
       // MutatePatchContainmentError throws before any overlay setter runs,
