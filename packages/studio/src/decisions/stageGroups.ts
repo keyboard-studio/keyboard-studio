@@ -53,7 +53,15 @@ export type StageRollUp =
   | { kind: "base-contribution"; startingKeyCount: number | undefined }
   // A stage whose effective entries are survey answers: the count of those
   // answers (D-02 — "for survey decisions, a count of the effective answers").
-  | { kind: "survey-summary"; answerCount: number };
+  // `decisionCount` rides along when the same stage ALSO settled gallery
+  // decisions (spec 090 US5 — e.g. the characters stage settles
+  // character-inventory beside its Phase B answers): the two counts stay
+  // separate because an answer and a gallery decision are different units,
+  // and folding them into one number would misstate both.
+  | { kind: "survey-summary"; answerCount: number; decisionCount?: number }
+  // A stage whose effective entries are gallery decisions only (spec 090
+  // US5): the count of those decisions.
+  | { kind: "decision-summary"; decisionCount: number };
 
 /** A stage, its decisions in walked order, and its one-line net effect. */
 export interface StageGroup {
@@ -143,7 +151,16 @@ function computeRollUp(
   const base = firstBaseContribution(effective);
   if (base !== undefined) return { kind: "base-contribution", startingKeyCount: base.startingKeyCount };
 
-  return { kind: "survey-summary", answerCount: effective.length };
+  // Survey answers and gallery decisions counted separately (spec 090 US5):
+  // a stage can settle both, and each unit is reported as what it is.
+  const answerCount = effective.filter((e) => e.payload.kind === "survey-answer").length;
+  const decisionCount = effective.filter((e) => e.payload.kind === "decision").length;
+  if (answerCount === 0 && decisionCount > 0) return { kind: "decision-summary", decisionCount };
+  return {
+    kind: "survey-summary",
+    answerCount,
+    ...(decisionCount > 0 ? { decisionCount } : {}),
+  };
 }
 
 /**

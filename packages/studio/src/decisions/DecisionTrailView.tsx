@@ -311,6 +311,17 @@ export function DecisionTrailView({
   // requires a readable degrade — never blank, never the identifier — for a
   // stepId this switch does not name (an unknown-to-the-manifest id, per
   // stageGroups.ts's FR-024 handling).
+  // A settled gallery decision count as a roll-up clause (spec 090 US5).
+  // `count` is a plain local so the Lingui macro derives the named
+  // placeholder, as with the dimension counts above.
+  const decisionCountDetail = (decisionCount: number): string => {
+    const count = decisionCount;
+    return t({
+      id: "trail.stage.rollUp.decisionSummary.decisionCount",
+      message: plural(count, { one: "# decision recorded", other: "# decisions recorded" }),
+    });
+  };
+
   const stepStageLabel = (stepId: string): string => {
     switch (stepId) {
       case "identity":
@@ -360,6 +371,7 @@ export function DecisionTrailView({
       case "not-recorded":
       case "base-contribution":
       case "survey-summary":
+      case "decision-summary":
         return stepStageLabel(group.stepId);
       case "editor-summary":
       case "editor-no-change":
@@ -459,10 +471,27 @@ export function DecisionTrailView({
       case "survey-summary": {
         const stage = stepStageLabel(group.stepId);
         const count = rollUp.answerCount;
-        const detail = t({
+        const answerDetail = t({
           id: "trail.stage.rollUp.surveySummary.answerCount",
           message: plural(count, { one: "# answer recorded", other: "# answers recorded" }),
         });
+        // spec 090 US5: a stage that also settled gallery decisions names
+        // both counts — the details are pre-localized clauses, joined by
+        // formatClauseList for the same reason as the editor dimensions.
+        // The composed message's placeholder is named `detail` (the
+        // catalogue's contract), so the joined string takes that name.
+        const detail =
+          rollUp.decisionCount !== undefined
+            ? formatClauseList([answerDetail, decisionCountDetail(rollUp.decisionCount)], i18n)
+            : answerDetail;
+        return t({
+          id: "trail.stage.rollUp.composed",
+          message: `${stage} (${detail})`,
+        });
+      }
+      case "decision-summary": {
+        const stage = stepStageLabel(group.stepId);
+        const detail = decisionCountDetail(rollUp.decisionCount);
         return t({
           id: "trail.stage.rollUp.composed",
           message: `${stage} (${detail})`,
