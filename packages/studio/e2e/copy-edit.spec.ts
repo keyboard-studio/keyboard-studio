@@ -455,6 +455,16 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   test("emitted .kps declares the author's language and name; .kvks and welcome.htm are non-empty", async ({
     page,
   }) => {
+    // Timeout sized to the work, not the default 240s cap: supplying the
+    // language code seeds the full fr exemplar inventory, so this walk drives
+    // 23 Mechanism Gallery characters, 18 of them through the sequence
+    // fallback with a full preview recompile each — fixed-size work that
+    // overruns 240s at CI pace even with nothing stuck. (The footer-overlap
+    // click trap that used to eat the budget silently was fixed separately in
+    // e5fb293a; what remains is CI pace, not a stall.) If this test ever dies
+    // at 480s, that is evidence of a real stuck state — re-diagnose; do not
+    // raise the timeout again to mask it.
+    test.setTimeout(480_000);
     // Walk the wizard and download. Unlike the other walks here this one supplies
     // the language code, so the identity-lite series composes a real BCP47 tag for
     // the package descriptor to declare (spec 059 FR-001) instead of leaving the
