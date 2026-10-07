@@ -447,10 +447,16 @@ settled decision, checked against the decision list — no gaps, no duplicates.
   handing the result on, so T050's recorder appends its log entry; the write is a
   decision record only — 089's flow applies remain the step's only working-copy path.
   Pinned in editors/adapters/PhaseFGate.helpDocs.test.tsx.
-- [ ] T053 [US5] SC-003 live-walk test: a Playwright walk in `pnpm dev` over every step,
+- [x] T053 [US5] SC-003 live-walk test: a Playwright walk in `pnpm dev` over every step,
   asserting exactly one log entry per decision for all fourteen gallery decisions and the
   question decisions, in packages/studio/tests/steps/galleryDecisionLog.walk.test.tsx (or the
   repo's Playwright e2e home, matching 089's golden-walk placement)
+  — Landed in the repo's Playwright e2e home: packages/studio/e2e/decision-log.spec.ts
+  (the golden walk's own walk + helpers, parsing the downloaded sidecar): no slot of any
+  kind holds more than one live entry, and each of the fourteen gallery ids has exactly
+  one live decision-kind entry with a bounded summary. Base-contribution presence is
+  deliberately NOT asserted (the followups.md starting-point residue). Authored for CI
+  per the standing live-capture ruling; typechecked locally, executed in CI.
 - [ ] T054 [US5] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US5 PR with the SC-003 walk results in its
   body
