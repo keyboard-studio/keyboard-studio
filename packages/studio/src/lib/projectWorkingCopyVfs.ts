@@ -512,6 +512,11 @@ export function projectWorkingCopyVfs(
       {
         dispositions: activeDispositions,
         loud: carveLoud,
+        // The pipeline's slot-removal warnings (blocked stores, skips) are
+        // part of this projection's warning surface — the legacy path
+        // pushed applyStoreSlotRemovals' warnings directly, and the seam
+        // path must surface the same set (spec 089 T021 fix).
+        onWarnings: (w) => warnings.push(...w),
       },
     );
     carveIr = seamIr;

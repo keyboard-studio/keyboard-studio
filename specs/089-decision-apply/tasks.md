@@ -72,7 +72,7 @@ Blocks all stories: the `apply` contract types, the runner, and the FR-005 selec
 
 ## Phase 5: Polish & Cross-Cutting
 
-- [ ] T024 [P] Full gates on the final tree: studio typecheck, the full studio vitest suite (per package config — never bare vitest at root), `pnpm lint` (ESLint + depcruise + checkers), and the golden walk in verify mode · packages/studio/, repo root configs
+- [x] T024 [P] Full gates on the final tree: studio typecheck, the full studio vitest suite (per package config — never bare vitest at root), `pnpm lint` (ESLint + depcruise + checkers), and the golden walk in verify mode · packages/studio/, repo root configs
 - [x] T025 [P] Series hand-off record: what 090 inherits (the runner + channel table as the gallery seam, the golden-walk script and baseline, the OI-1 global un-gating as landed (no remainder), the `onMount` history derivation still writing directly) · specs/089-decision-apply/followups.md (new)
 - [ ] T026 Open the PR against `km/modular-decisions` (the stacked base, not `main`): body reconciles SC-001 (baseline commit + verify result), SC-002 (grep evidence), SC-003 (T009), and states the OI-1/OI-2 rulings as given; spec status in specs/089-decision-apply/spec.md updated to match what actually shipped · specs/089-decision-apply/spec.md (PR via gh)
 
