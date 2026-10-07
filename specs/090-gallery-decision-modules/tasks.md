@@ -433,11 +433,16 @@ settled decision, checked against the decision list — no gaps, no duplicates.
   entry (`recordBaseContribution` timing) is verified in the same walk — if it is still null
   after 088/089, record it in specs/090-gallery-decision-modules/followups.md rather than
   fixing it here (it belongs to the 088/092 boundary)
-- [ ] T052 [P] [US5] `help-docs` gallery-host registration (research Q3 boundary): the
+- [x] T052 [P] [US5] `help-docs` gallery-host registration (research Q3 boundary): the
   `PhaseFGate` step is hosted so gate completion records the `help-docs` log entry, with no
   second write path beside 089's flow `apply`s, in
   packages/studio/src/survey/questions/gallery/helpDocs.ts and
   packages/studio/src/editors/adapters/PhaseFGate.tsx
+  — Landed: PhaseFGate's completion wrap records the composite `help-docs` decision
+  (composeHelpDocsValue over the completion's answers, provenance "derived") before
+  handing the result on, so T050's recorder appends its log entry; the write is a
+  decision record only — 089's flow applies remain the step's only working-copy path.
+  Pinned in editors/adapters/PhaseFGate.helpDocs.test.tsx.
 - [ ] T053 [US5] SC-003 live-walk test: a Playwright walk in `pnpm dev` over every step,
   asserting exactly one log entry per decision for all fourteen gallery decisions and the
   question decisions, in packages/studio/tests/steps/galleryDecisionLog.walk.test.tsx (or the
