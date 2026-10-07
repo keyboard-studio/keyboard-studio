@@ -1472,3 +1472,55 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   marks/characters/punctuation `saveAnswer` bans are recorded as
   NOT registered in both list files, as a scope determination for
   T060 to read, not an exception.
+
+- **D-090-33 — T032 executed under ruling D-090-30 (option (a),
+  characters-precedent cut) + D-090-31 ratification.** The module
+  ships value + step-side recording + a decision renderer; `apply`
+  stays `() => ({})`, now documented as the ruled shape (no
+  carve-overlay channel exists in 089's contract; the applied view
+  keeps being produced by `projectWorkingCopyVfs` from the
+  persisted overlay — the canonical producer). Value types + the
+  pure builder moved to the carve feature home
+  (`survey/carve/carveValue.ts`, D-090-8 pattern; the module
+  re-exports): `carvedLayoutValueFromOverlay` maps the four
+  removal sets to one kind-discriminated item list, canonical-
+  sorted by (kind, id) so click order cannot change the recorded
+  value, and rides dispositions + closedKeyboardCard verbatim;
+  `currentCarvedLayoutValue()` is shared by the recording and
+  rendering surfaces (currentRuleSetValue precedent). Recording:
+  `CarveAdapter` records `{carved-layout, value, asked}` on
+  completion (DeadkeyAdapter precedent, verbatim shape);
+  `survey/carve/CarveDecisionRenderer.tsx` hosts the same gallery
+  under the decision host and reports the value via `onChange`.
+  No `extract` (data-model's rule: only where a starting-point
+  seed exists today — carve proposals are in-gallery suggestions,
+  never an overlay seed; deadkeys no-extract precedent).
+  **Per-item provenance is `asked` for every recorded item,
+  deliberately:** in the live flow every overlay removal is an
+  author action (gallery cascadeDelete handlers; the assign
+  loop's cascadeDelete route, D-090-23) and no proposal-
+  acceptance or starting-point seeding path writes the overlay,
+  so a derived/extracted split recorded today would be
+  fabricated. Those values become producible when the seeding
+  paths land (092). **Ruling condition (i) audit:** the value
+  covers every overlay component that can be non-trivial at
+  carve completion and feeds the applied view — the four
+  removal sets, dispositions, the card. Two named observations:
+  `disabledFamilyIds` is captured as it stands at completion
+  (in the live flow only the rules step's toggle writes it,
+  after carve, so family items are normally absent at record
+  time — faithful capture, no carve-step view impact); and
+  `carveTouchKeepInert` has NO live writer (its only UI,
+  TouchKeepInertControl, is an unmounted stub), so it is always
+  empty in the live flow — if that surface ever mounts, the
+  value needs a field for it (added to the D-090-31 handoff
+  note). **T032's text is superseded by the rulings in two
+  clauses:** the apply-through-the-pipeline clause (D-090-30)
+  and the undoStack re-point (D-090-31: the overlay remains
+  the edit-time write path, so undo keeps operating on it);
+  the "commits through onChange" clause holds under the
+  decision host (the renderer), while the live manifest path
+  records step-side — the ratified precedent, as T033 was
+  built. Gates at the T032 checkpoint: studio tsc clean;
+  questionModules (806) + decisionIRConsistency (393) +
+  registry (8) = 1207/1207.

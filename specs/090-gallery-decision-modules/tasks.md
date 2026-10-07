@@ -239,7 +239,7 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
   carve value code is written
 - [x] T031 [US3] Re-verify research R1's rows for `carve`, `deadkeys`, `rules` against the
   landed code; amend specs/090-gallery-decision-modules/research.md if any row drifted
-- [ ] T032 [US3] `carved-layout` module: value = removal items (ruled shape) + `dispositions`
+- [x] T032 [US3] `carved-layout` module: value = removal items (ruled shape) + `dispositions`
   (the contracts `CarveDisposition`, unchanged) + `closedKeyboardCard` in
   packages/studio/src/survey/questions/gallery/carvedLayout.ts; `CarveGalleryV2` keeps its
   live overlay as renderer-internal draft for the OSK preview and commits through `onChange`
