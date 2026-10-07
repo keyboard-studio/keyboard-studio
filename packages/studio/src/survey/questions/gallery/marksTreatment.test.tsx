@@ -125,6 +125,24 @@ describe("marksTreatment apply — the mark guards (spec 071 FR-021)", () => {
     expect(marksTreatment.apply(undefined, makeContext(irWithRule("a")))).toEqual({});
   });
 
+  it("pass 2: invoked with value undefined, composes from the recorded marks decision", () => {
+    // 089's input-triggered second pass: a completion that records
+    // character-inventory runs this apply with value undefined. With a
+    // recorded marks completion in ctx.decisions the guards still run;
+    // without one, the invocation is a no-op.
+    const withRecord: ApplyContext = {
+      ir: irWithRule("a"),
+      writes: marksTreatment.writes,
+      decisions: {
+        "marks-treatment": { id: "marks-treatment", value: completedValue(), provenance: "asked" },
+      },
+      currentHistoryEntryState: null,
+    };
+    const patch = marksTreatment.apply(undefined, withRecord);
+    expect(patch.ir).toBeDefined();
+    expect(marksTreatment.apply(undefined, makeContext(irWithRule("a")))).toEqual({});
+  });
+
   it("re-applying the same completion changes nothing further (idempotent)", () => {
     const base = irWithRule("a");
     const first = marksTreatment.apply(completedValue(), makeContext(base));

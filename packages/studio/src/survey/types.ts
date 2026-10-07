@@ -12,7 +12,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../decisions/extractContext.ts";
-import type { IdentityPatch } from "../stores/workingCopyStore.ts";
+import type { IdentityPatch } from "../stores/identityPatch.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -266,7 +266,7 @@ export interface QuestionModule {
    * IR locations this question READS — declared as static data.
    * Both `inputs` and `writes` address the same `IRPath` space over `KeyboardIR`
    * (one path algebra; no separate answer-key space). Consumed by the P0 dashboard
-   * and the orphan-input lint without invoking `mutate()`.
+   * and the orphan-input lint without invoking `apply()`.
    * Explicit `[]` is required for questions that read nothing (G7 / FR-006).
    */
   inputs?: readonly IRPath[];
@@ -282,7 +282,7 @@ export interface QuestionModule {
    * Output artifacts this question's answer reaches, if any (spec 059 FR-016).
    *
    * DIFFERENT ADDRESS SPACE from `writes`. `writes` is `IRPath[]` over
-   * `KeyboardIR` and governs `mutate()` containment; `outputs` names emitted
+   * `KeyboardIR` and governs `apply()` containment; `outputs` names emitted
    * ARTIFACTS. A question may legitimately declare `writes: []` and a non-empty
    * `outputs` — an identity answer writes no IR and still ships in the `.kps`.
    * That combination was previously inexpressible, which is why a question could
@@ -301,7 +301,9 @@ export interface QuestionModule {
    * the working copy from the recorded decisions and returns it as a
    * {@link WorkingCopyPatch}; MUST NOT mutate `ctx` or perform side effects.
    * The runner (`applyDecisionEffects` in steps/reducer.ts) executes it
-   * unconditionally for every answered module that declares it, after the
+   * unconditionally for every answered module that declares it — and for
+   * a composed module whose own question went unanswered, when the
+   * completion recorded one of its `requires` inputs — after the
    * completion's decisions are recorded (A6). Channel authorization is
    * fixed by the contract's table (A3) — returning an unauthorized channel
    * throws `ApplyChannelError` and applies nothing. An empty patch `{}` is
@@ -310,7 +312,7 @@ export interface QuestionModule {
    */
   apply?: (value: string | string[] | undefined, ctx: ApplyContext) => WorkingCopyPatch;
 
-  
+
   /**
    * Which spec unit(s) govern this question module (spec 031 FR-002). Same
    * vocabulary and shape as Step.specRef (steps/types.ts): `§N` / `§Na` or

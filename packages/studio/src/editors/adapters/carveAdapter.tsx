@@ -7,10 +7,18 @@
 // out of scope for P4a (see plan.md §"Out of scope for P4a") and is reserved
 // for P4b.
 //
-// Declared but NOT yet wired into StudioShell. T014 repoints the imports;
-// P4b introduces the manifest that actually uses these adapters.
+// Spec 090 T032: completing the step also records the `carved-layout`
+// decision — the working copy's carve overlay as one value (the
+// base-keyboard precedent: editor steps record their own decision;
+// the record-from-working-copy precedent is ratified by D-090-31).
+// The decision module's renderer
+// (survey/carve/CarveDecisionRenderer) is the same gallery hosted by
+// the decision host: it reports the value through onChange on
+// completion instead of recording directly.
 
 import type { EditorStepProps } from "../../steps/types.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { currentCarvedLayoutValue } from "../../survey/carve/carveValue.ts";
 import { CarveGalleryV2 } from "../carve/CarveGalleryV2.tsx";
 
 /**
@@ -20,7 +28,14 @@ import { CarveGalleryV2 } from "../carve/CarveGalleryV2.tsx";
 export function CarveAdapter({ onComplete, onBack }: EditorStepProps) {
   return (
     <CarveGalleryV2
-      onComplete={() => onComplete(undefined)}
+      onComplete={() => {
+        useDecisionStore.getState().record({
+          id: "carved-layout",
+          value: currentCarvedLayoutValue(),
+          provenance: "asked",
+        });
+        onComplete(undefined);
+      }}
       onBack={onBack}
     />
   );

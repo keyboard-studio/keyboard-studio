@@ -377,8 +377,12 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "invisibles-inventory": [],
   "retained-convenience-chars": [],
   "carved-layout": [],
-  "deadkeys-defined": [],
-  "rule-set": [],
+  // spec 090 T033: the deadkeys module's apply replays the op log,
+  // writing the groups/stores/raw subtrees (DEADKEY_WRITES).
+  "deadkeys-defined": [["groups"], ["stores"], ["raw"]],
+  // spec 090 T034: the rule-set module's apply splices the builder
+  // additions into the groups/stores subtrees.
+  "rule-set": [["groups"], ["stores"]],
   "physical-layout": [],
   "touch-seed-source": [],
   "touch-layout": [],

@@ -31,7 +31,7 @@ import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/dec
 import { deriveIdentityResult } from "./decisions/identitySelectors.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
-import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
+import { resetInventoryDecisions } from "./survey/useInventoryDraft.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import type { Stage } from "./hooks/useKeyboardArtifact.ts";
 
@@ -233,7 +233,7 @@ afterEach(() => {
   cleanup();
   // Spec 079 R-07: alphabetEvidenceKey / sticky decisions survive store.reset();
   // global test-setup only calls reset(), so clear them here.
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.

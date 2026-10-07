@@ -8,7 +8,7 @@
 //
 // Clicking a cell toggles it into the SAME accumulating alphabet the center
 // pane's BuildListView builds (CharChipEditor type-in), via the shared
-// stores/phaseBDraftStore.ts — both panes read/write one list.
+// character-inventory decision value — both panes read/write one list.
 //
 // Data source: buildCharacterMap (engine, a parallel-track character-discovery
 // deliverable) via lib/services.ts's characterMapGroups wrapper. baseIr comes
@@ -97,7 +97,7 @@ interface CharacterMapPaneProps {
   //                   screen). DEFAULT.
   //   "punctuation" — punctuation only (the punctuation step between marks
   //                   and convenience).
-  // Both scopes toggle the SAME shared phaseBDraftStore draft.
+  // Both scopes toggle the SAME shared inventory draft.
   scope?: "alphabet" | "punctuation";
 }
 
@@ -244,8 +244,8 @@ export function CharacterMapPane({
   // surface a character from a currently-hidden block. Only when there's no
   // query does the checkbox narrow the grid — and only when we actually know
   // which blocks the base keyboard uses (hasKnownBlocks). A block already
-  // represented in the author's accumulating alphabet (`chars`, from
-  // phaseBDraftStore) is also allowed even if the base doesn't produce it —
+  // represented in the author's accumulating alphabet (`chars`, from the
+  // character-inventory value) is also allowed even if the base doesn't produce it —
   // this is the auto-unhide mechanism: adding a character from a hidden block
   // (via search, or the raw code point field) unhides that block, even while
   // the checkbox stays checked.

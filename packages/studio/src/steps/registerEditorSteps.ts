@@ -185,7 +185,9 @@ export const deadkeysStep: EditorStep = step({
 
 /**
  * Mechanisms step: MechanismGallery (physical key assignment — Phase C).
- * The reducer fires lockDesktop() when this step completes.
+ * On completion AddPhysicalAdapter records the physical-layout decision
+ * and fires the lock + re-propagation effects (lib/assignLoopCompletion
+ * .ts; the reducer's R1 hook retired at spec 090 T041 — D-090-38).
  * Self-read: assigns onto groups[]/stores[] without upstream producer.
  * inputs stays [] to avoid C2 data cycle (FR-002).
  * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).
@@ -235,7 +237,9 @@ export const touchSeedSourceStep: EditorStep = step({
 
 /**
  * Touch step: TouchGallery (touch key assignment — Phase E).
- * The reducer fires buildTouchLayoutJson when this step completes.
+ * On completion AddTouchAdapter records the touch-layout decision and
+ * fires the build effects (lib/assignLoopCompletion.ts; the reducer's
+ * R2 hook retired at spec 090 T042 — D-090-38).
  * Seeds from locked physical layout; inputs stays [] to avoid C2 cycle (FR-002).
  * TOUCH_WRITES: touchLayout...keys[] + touchLayout.nodeIds[] (editorMutate.ts).
  */

@@ -1766,6 +1766,7 @@
   "trail.stage.name.unknown": "une étape que cette version ne mentionne pas",
   "trail.stage.rollUp.baseContribution.startingKeyCount": "{count, plural, one {commence par la touche #} other {commence par les touches #}}",
   "trail.stage.rollUp.composed": "{stage} ({detail})",
+  "trail.stage.rollUp.decisionSummary.decisionCount": "{count, plural, one {# décision enregistrée} other {# décisions enregistrées}}",
   "trail.stage.rollUp.noChange": "{stage} (rien n'a été modifié)",
   "trail.stage.rollUp.notRecorded": "{stage} (aucune décision n'a été consignée)",
   "trail.stage.rollUp.surveySummary.answerCount": "{count, plural, one {# réponse enregistrée} other {# réponses enregistrées}}",

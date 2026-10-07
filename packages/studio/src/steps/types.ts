@@ -36,9 +36,20 @@ export interface EvidenceDeclaration {
  * (FR-007). `{ exempt }` needs a written justification; the manifest test fails
  * on an empty one, which is what makes "unjustified exemptions: zero" (SC-007)
  * a failing test rather than a checklist item.
+ *
+ * `"decision-store"` was added by spec 090 (D-090-29, lead ruling on
+ * D-090-19): a step whose settled value is a decision record in the
+ * decision store (088 FR-007, the draft's `decisions` slice), declared
+ * decision-store-first. Any answer-store residue such a step keeps
+ * (within-step position, step-status slot, the spec 079 evidence layer)
+ * is named in the step's manifest comment — the declaration names where
+ * the step's ANSWERS live, not where its residue lives. `"phase-b-draft"`
+ * remains in the union as spec 079 vocabulary; no step declares it since
+ * spec 090 deleted that store (T025).
  */
 export type PersistenceDeclaration =
   | "answer-store"
+  | "decision-store"
   | "phase-b-draft"
   | "working-copy"
   | { exempt: string };

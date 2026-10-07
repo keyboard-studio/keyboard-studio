@@ -103,7 +103,7 @@ const charactersStep: Step = {
     inputs: ["language tag", "script", "variant", "base keyboard"],
     keyFn: "alphabet",
   },
-  persistence: "phase-b-draft", // the alphabet; its sub-screen position and manual-path answers live in the answer store
+  persistence: "decision-store", // the alphabet (character-inventory decision, spec 090); its sub-screen position and manual-path answers live in the answer store (spec 079 evidence layer, D-090-29)
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,10 @@ const stepPool: readonly Step[] = [
       inputs: ["the confirmed alphabet: its bases, marks and attested combinations"],
       keyFn: "marks",
     },
-    persistence: "answer-store",
+    // The marks-treatment decision (spec 090); the per-toggle evidence
+    // answers and the step-status slot live in the answer store (spec 079
+    // evidence layer, kept by D-090-29).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Punctuation (clone of the Phase B build-list, scoped to punctuation) ---
@@ -190,7 +193,9 @@ const stepPool: readonly Step[] = [
     rightPane: "character-map",
     specRef: ["§8", "specs/020-qu-wire-buildlist", "specs/075-punctuation-defaults"],
     evidence: { inputs: ["resolved language tag", "base keyboard"], keyFn: "punctuation" },
-    persistence: "phase-b-draft",
+    // The punctuation-inventory decision (spec 090); its one evidence
+    // answer lives in the answer store (spec 079 evidence layer, D-090-29).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Invisible characters (spec 075 US3) ---
@@ -213,7 +218,9 @@ const stepPool: readonly Step[] = [
     component: InvisiblesStepHost,
     specRef: ["specs/075-punctuation-defaults"],
     evidence: { inputs: ["the invisible-character candidates offered"], keyFn: "invisibles" },
-    persistence: "phase-b-draft",
+    // The invisibles-inventory decision (spec 090); no answer-store
+    // residue — this step's answer writes were retired in full (T022).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Convenience characters (pre-carve keep question) ---
@@ -237,7 +244,10 @@ const stepPool: readonly Step[] = [
       inputs: ["surplus basic-Latin candidates on the base", "whether the orthography signal is known"],
       keyFn: "convenience",
     },
-    persistence: "answer-store",
+    // The retained-convenience-chars decision (spec 090); the step-status
+    // slot lives in the answer store, whose legacy booleans the adoption
+    // shim still reads from older drafts (D-090-17, kept by D-090-29).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Carve (Phase D: remove unwanted base keys) ---

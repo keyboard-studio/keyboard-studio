@@ -35,12 +35,7 @@ import type {
   KeyboardIR,
   RemovalCapability,
 } from "@keyboard-studio/contracts";
-import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
 import { applyMutatePatch } from "./steps/mutateApply.ts";
-import {
-  shouldEmitTouchLayout,
-  resolveTouchSeedSource,
-} from "./lib/touchEmission.ts";
 import {
   useWorkingCopyStore,
   bindManifest,
@@ -96,7 +91,6 @@ import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
-import { resolveBaseTouchJson } from "./lib/resolveBaseTouchJson.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
 import { LintSummary } from "./lint/index.ts";
 import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
@@ -563,9 +557,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Working-copy store actions needed by SurveyView (not delegated to StepHost).
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
-  const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
-  const clearStale = useWorkingCopyStore((s) => s.clearStale);
-  const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
   const instantiateFromExisting = useWorkingCopyStore(
     (s) => s.instantiateFromExisting,
@@ -811,6 +802,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           useSurveyAnswerStore.getState().steps[stepId]?.position ?? stepId,
         getSavedAnswer: (stepId, questionId) =>
           useSurveyAnswerStore.getState().steps[stepId]?.answers[questionId],
+        // spec 090 US5: the recorder resolves each completing step's
+        // settled gallery decisions against the live decision set.
+        getDecisions: () => getDecisionSnapshot(),
       }),
     [],
   );
@@ -820,46 +814,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // All store actions and lib helpers are injected here; the reducer itself has
   // no static imports from stores/ or lib/ (boundary compliance).
   //
-  // The wrapper lambdas delegate to stable module-level imports (buildTouchLayoutJson,
-  // resolveBaseTouchJson, instantiateFromBaseIfConfirmed) that are not React state,
+  // The wrapper lambdas delegate to stable module-level imports
+  // (instantiateFromBaseIfConfirmed) that are not React state,
   // so they are intentionally omitted from the dependency array.
   // ---------------------------------------------------------------------------
   const reducerDeps: ReducerDeps = useMemo(
     () => ({
-      lockDesktop,
-      clearStale,
-      setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
       clearTouchSeedChoice,
-      // Spec 035 R11: this wrapper is the ONE call site (of the two — the
-      // other is TouchGallery's preview/lint memos) that applies the
-      // emission matrix for the output path. It resolves the Entity-5
-      // default seed source, decides whether to emit at all, and only then
-      // calls the real buildTouchLayoutJson — so reducer.ts (steps/, which
-      // may not import lib/) stays a thin pass-through.
-      buildTouchLayoutJson: (baseIrArg, assignments, opts) => {
-        const seedSource = resolveTouchSeedSource(
-          opts.seedSource,
-          opts.baseTouchJson !== undefined,
-        );
-        const hasRealEdits = assignments.length > 0;
-        if (!shouldEmitTouchLayout(seedSource, opts.mods, hasRealEdits)) {
-          return { json: null, warnings: [] };
-        }
-        return buildTouchLayoutJson(baseIrArg, assignments, {
-          // Reseed discards the shipped layout (R10) — never pass baseTouchJson
-          // through on that path, even though buildTouchLayoutJson's own Case A
-          // branch condition would ignore it anyway.
-          ...(seedSource !== "reseed-from-desktop" &&
-          opts.baseTouchJson !== undefined
-            ? { baseTouchJson: opts.baseTouchJson }
-            : {}),
-          mods: opts.mods,
-          seedSource,
-        });
-      },
-      resolveBaseTouchJson: (vfs) => resolveBaseTouchJson(vfs),
+      // Spec 035 R11: the emission-matrix wrapper that used to live here
+      // (as the buildTouchLayoutJson dep) moved verbatim into
+      // lib/assignLoopCompletion.ts at spec 090 T042 with the R2 build.
       instantiateFromBaseIfConfirmed: (base, opts, options) =>
         instantiateFromBaseIfConfirmed(base, opts, options),
       // spec-014 mutate seam (T014): read/write the working-copy carve IR for
@@ -870,9 +836,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // the carve-deletion overlay (setIR would). See workingCopyStore.setWorkingIR.
       getWorkingIR: () => useWorkingCopyStore.getState().ir,
       setWorkingIR: (next) => useWorkingCopyStore.getState().setWorkingIR(next),
-      // spec-014 US2 (T024): the staleness closure drives touch re-propagation
-      // on physical-step completion. Read via getState() (no re-render churn).
-      getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
       // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
       // everything else here; the reducer knows only that it has a callback.
       recordDecision,
@@ -906,9 +869,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }),
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [
-      lockDesktop,
-      clearStale,
-      setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
       clearTouchSeedChoice,

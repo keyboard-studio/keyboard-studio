@@ -37,10 +37,10 @@ GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desk
   verifies against the committed baseline thereafter. Whoever commits
   the captured zip records here: the base commit it was captured on, the
   capture date, and the CI run id.
-  - Note for the next workflow patch: the CI capture step still passes
-    `VITE_KM_MUTATE_SEAM=1`. Since T021 that variable is inert (nothing
-    reads it; the seam is unconditional), so captures taken with it are
-    valid — but the pin should be dropped for accuracy.
+  - The CI capture step previously passed `VITE_KM_MUTATE_SEAM=1`; the
+    pin has been dropped on this branch (`a4c0db8a`). Since T021 that
+    variable is inert (nothing reads it; the seam is unconditional), so
+    captures taken while it was present remain valid.
 - **Literal-`main` capture + cross-base diff (amended T003)**: the CI
   step above captures from the PR base ref (`km/modular-decisions`,
   the stacked base per the OI-2 ruling — the capture stands on it). A

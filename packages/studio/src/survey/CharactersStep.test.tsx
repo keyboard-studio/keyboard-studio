@@ -20,7 +20,7 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
 import { buildFindingsByQuestionId } from "../lint/lintToQuestion.ts";
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ function seedSessionStore() {
 afterEach(() => {
   cleanup();
   // alphabetEvidenceKey / sticky decisions survive store.reset().
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
   mockPrefillConfirmRef.current = null;
   mockPrefillBackRef.current = null;
   mockPhaseBCompleteRef.current = null;
@@ -324,8 +324,8 @@ describe("CharactersStep — findingsByQuestionId prop passed to PhaseB", () => 
 describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)", () => {
   /** Seed a built alphabet, as the author would have on the build-list screen. */
   function seedAlphabet(chars: string[]) {
-    usePhaseBDraftStore.getState().reset();
-    for (const c of chars) usePhaseBDraftStore.getState().add(c);
+    resetInventoryDraft();
+    for (const c of chars) inventoryOps("characters").add(c);
   }
 
   it("remounting at substage 'B' does NOT clear the draft alphabet", () => {
@@ -340,14 +340,14 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
 
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["é", "ŋ", "ɔ"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["é", "ŋ", "ɔ"]);
   });
 
   it("a prefill -> build-list confirm on CHANGED evidence resets, but carries the author's own picks over (spec 079 US3 T059 — was a full clear before)", () => {
     seedSessionStore(); // substage "prefill"
     seedAlphabet(["é", "ŋ"]); // both via add() — author provenance
     // Built for another language: the stamp no longer matches.
-    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("xx-Latn|Latn|Latn|basic_kbdus");
+    inventoryOps("characters").setAlphabetEvidenceKey("xx-Latn|Latn|Latn|basic_kbdus");
 
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     expect(screen.getByTestId("mock-prefill")).toBeTruthy();
@@ -355,42 +355,42 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     // Both fit the new evidence's script (Latn), so neither is flagged.
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["é", "ŋ"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["é", "ŋ"]);
   });
 
   it("stepping back to prefill and forward again with UNCHANGED evidence keeps it (spec 079 FR-020 — was a clear before)", () => {
     seedSessionStore();
     useSurveySessionStore.setState({ charactersSubStage: "B" });
     seedAlphabet(["é"]);
-    usePhaseBDraftStore.getState().setAlphabetEvidenceKey(CURRENT_KEY);
+    inventoryOps("characters").setAlphabetEvidenceKey(CURRENT_KEY);
 
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["é"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["é"]);
 
     fireEvent.click(screen.getByTestId("prefill-confirm"));
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["é"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["é"]);
   });
 
   it("an UNSTAMPED built alphabet is reset: a new working copy clears the stamp but not the previous project's draft", () => {
     seedSessionStore();
     seedAlphabet(["é", "ŋ"]);
-    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+    expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
 
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     // (A draft saved before spec 079 is stamped on restore instead — see
     // draftPersistence.test.ts — so it never reaches this branch.)
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe(CURRENT_KEY);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
+    expect(getCharacterInventoryValue().alphabetEvidenceKey).toBe(CURRENT_KEY);
   });
 
   it("a first build (empty alphabet) stamps the current key", () => {
     seedSessionStore();
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("prefill-confirm"));
-    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe(CURRENT_KEY);
+    expect(getCharacterInventoryValue().alphabetEvidenceKey).toBe(CURRENT_KEY);
   });
 });
 
@@ -461,17 +461,17 @@ describe("CharactersStep — sub-screen position survives a leave-and-return (sp
 describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", () => {
   /** A built alphabet with an addition and a removal, plus a punctuation pick, stamped for the current evidence. */
   function seedBuiltDraft(): void {
-    const draft = usePhaseBDraftStore.getState();
+    const draft = inventoryOps("characters");
     draft.seedProposals(["a", "b", "c"], "cldr", "alphabet:tl");
-    usePhaseBDraftStore.getState().remove("c"); // removing a proposal
-    usePhaseBDraftStore.getState().add("ŋ"); // an author addition
-    usePhaseBDraftStore.getState().seedProposals(["!"], "cldr", "punctuation:tl");
-    usePhaseBDraftStore.getState().setAlphabetEvidenceKey(CURRENT_KEY);
+    inventoryOps("characters").remove("c"); // removing a proposal
+    inventoryOps("characters").add("ŋ"); // an author addition
+    inventoryOps("characters").seedProposals(["!"], "cldr", "punctuation:tl");
+    inventoryOps("characters").setAlphabetEvidenceKey(CURRENT_KEY);
     useSurveySessionStore.setState({ discoveryMethod: "build-list" });
   }
 
   function draftFacts() {
-    const s = usePhaseBDraftStore.getState();
+    const s = getCharacterInventoryValue();
     return {
       chars: s.chars,
       bases: s.bases,
@@ -552,7 +552,7 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
       act(patch);
       fireEvent.click(screen.getByTestId("prefill-confirm"));
 
-      const s = usePhaseBDraftStore.getState();
+      const s = getCharacterInventoryValue();
       // The proposal chars ("a", "b") are gone with the reset; the author's own
       // addition ("ŋ") is carried over regardless of fit (R-07 step 6 — nothing
       // authored is ever dropped by a shape change).
@@ -579,11 +579,11 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
 describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)", () => {
   /** A built alphabet with a removed proposal and a Latin-only author addition. */
   function seedBuiltDraftWithLatinAddition(): void {
-    const draft = usePhaseBDraftStore.getState();
+    const draft = inventoryOps("characters");
     draft.seedProposals(["a", "b", "c"], "cldr", "alphabet:tl");
-    usePhaseBDraftStore.getState().remove("c"); // removing a proposal -> rejected
-    usePhaseBDraftStore.getState().add("ŋ"); // Latin-script author addition
-    usePhaseBDraftStore.getState().setAlphabetEvidenceKey(CURRENT_KEY);
+    inventoryOps("characters").remove("c"); // removing a proposal -> rejected
+    inventoryOps("characters").add("ŋ"); // Latin-script author addition
+    inventoryOps("characters").setAlphabetEvidenceKey(CURRENT_KEY);
     useSurveySessionStore.setState({ discoveryMethod: "build-list" });
   }
 
@@ -598,7 +598,7 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     act(() => useSurveySessionStore.setState({ localBase: { ...fakeBase, id: "basic_kbdfr" } }));
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
-    const s = usePhaseBDraftStore.getState();
+    const s = getCharacterInventoryValue();
     expect(s.chars).toEqual(["ŋ"]);
     expect(s.rejected).toEqual(["c"]); // the removal survives
     expect(useSurveyAnswerStore.getState().steps["characters"]?.answers ?? {}).toEqual({});
@@ -617,7 +617,7 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     act(() => seedIdentity({ ...fakeIdentity, targetScriptRaw: "Cyrl" }));
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
-    const s = usePhaseBDraftStore.getState();
+    const s = getCharacterInventoryValue();
     expect(s.chars).toEqual(["ŋ"]); // kept, not dropped
 
     const answers = useSurveyAnswerStore.getState().steps["characters"]?.answers ?? {};

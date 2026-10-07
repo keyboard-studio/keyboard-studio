@@ -16,7 +16,7 @@
 //     it, and projecting them would both corrupt the comparison and imply a
 //     relationship between the two keyboards that does not exist.
 //   - It returns **no** setter that writes `workingCopyStore`,
-//     `surveySessionStore`, `phaseBDraftStore` or `decisionLogStore`.
+//     `surveySessionStore`, the decision store or `decisionLogStore`.
 //
 // FR-023 asks for the isolation to be structural rather than flag-gated, and
 // this is why: a `readOnly: true` option on `usePreviewArtifact` would put the

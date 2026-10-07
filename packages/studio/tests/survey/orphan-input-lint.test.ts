@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from "vitest";
 import { formatIRPath, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { questionRegistry } from "../../src/survey/questions/registry.ts";
+import { questionRegistry, galleryModules } from "../../src/survey/questions/registry.ts";
 import { flowSources } from "../../src/steps/flowSources.ts";
 import { orderDecisions } from "../../src/decisions/orderDecisions.ts";
 
@@ -177,8 +177,8 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     expect(reports).toHaveLength(0);
   });
 
-  it("all registry modules are referenced by a manifest, except the two explicit exemptions", () => {
-    // Every registry entry appears in a manifest EXCEPT two documented classes.
+  it("all registry modules are referenced by a manifest, except the explicit exemptions", () => {
+    // Every registry entry appears in a manifest EXCEPT the documented classes.
     // A module absent from all of them is a genuine fault — an unfinished
     // addition, or an accidental drop from a flow.
     //
@@ -192,17 +192,26 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     // decay differently — a relocated module's content is still reachable by an
     // author, a demoted one's is not.
     const RELOCATED_EXEMPT = new Set(["pb_mark_input_order"]);
+    // spec 090 HOSTED_EXEMPT: the gallery decision modules are registered
+    // but intentionally NON-manifested — steps host them as decision
+    // modules (DecisionQuestionMount inside the step components), so the
+    // survey flow never walks them as questions. A third class beside
+    // RELOCATED/RESERVE: their content IS author-reachable (through the
+    // hosting steps), and membership derives from the registry's gallery
+    // group so the exemption cannot drift from the module list.
+    const HOSTED_EXEMPT = new Set(galleryModules.map((m) => m.definition.id));
     const registryIds = Object.keys(questionRegistry);
     const nonManifested = registryIds.filter(
       (id) =>
         !manifestedIds.has(id) &&
         !RELOCATED_EXEMPT.has(id) &&
+        !HOSTED_EXEMPT.has(id) &&
         !RESERVE_ALLOWLIST.has(id),
     );
     expect(
       nonManifested,
       `Registry modules not referenced by any manifest: [${nonManifested.join(", ")}]. ` +
-        `Add them to a manifest, or add to RESERVE_ALLOWLIST if intentionally library/reserve.`,
+        `Add them to a manifest, or to one of the documented exemption classes (RESERVE_ALLOWLIST / RELOCATED / spec-090 HOSTED) if intentionally non-manifested.`,
     ).toHaveLength(0);
   });
 

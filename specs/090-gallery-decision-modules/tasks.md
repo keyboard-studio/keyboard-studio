@@ -182,21 +182,21 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   packages/studio/src/survey/convenience/ConvenienceCharsStep.tsx; the
   `workingCopyStore.session.retainedConvenienceChars` mirror becomes an applied view written
   by `apply` (carve's read is unchanged) in packages/studio/src/stores/workingCopyStore.ts
-- [ ] T025 [US2] Delete `phaseBDraftStore`: store file and its draft slice in
+- [x] T025 [US2] Delete `phaseBDraftStore`: store file and its draft slice in
   packages/studio/src/stores/phaseBDraftStore.ts, packages/studio/src/lib/draftTypes.ts, and
   packages/studio/src/lib/draftPersistence.ts — a saved v2 draft that still carries a
   `phaseBDraft` slice (written between 088 landing and this change) migrates its
   accept/decline state into the inventory decision values on load, with unmappable entries
   surfaced, never dropped (087 Q5 precedent)
-- [ ] T026 [US2] Narrow `surveyAnswerStore` to within-step view position: the gallery answers
+- [x] T026 [US2] Narrow `surveyAnswerStore` to within-step view position: the gallery answers
   migrated by US1 + this phase leave the store (zero gallery answer ids remain), and the
   store's header documents the narrowed role (research Q4 — name kept) in
   packages/studio/src/stores/surveyAnswerStore.ts
-- [ ] T027 [US2] FR-003 identifier list extended with the Phase B/C write actions (phaseBDraft
+- [x] T027 [US2] FR-003 identifier list extended with the Phase B/C write actions (phaseBDraft
   accept/decline actions, the marks `saveAnswer` ids, the characters addition write) in
   eslint.config.mjs and packages/studio/src/decisions/galleryWriteAudit.test.ts; SC-004 grep
   recorded: zero references to `phaseBDraftStore`
-- [ ] T028 [US2] Tests: contract + determinism for the five modules (the marks `apply`
+- [x] T028 [US2] Tests: contract + determinism for the five modules (the marks `apply`
   determinism case covers both the guards and the context-tolerance patch) in
   packages/studio/src/survey/questions/gallery/characterInventory.test.ts,
   packages/studio/src/survey/questions/gallery/marksTreatment.test.ts,
@@ -205,9 +205,15 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   packages/studio/src/survey/questions/gallery/retainedConvenienceChars.test.ts; plus a
   reload test: a draft saved mid-Phase-B restores the inventory values from the `decisions`
   slice in packages/studio/src/lib/draftPersistence.test.ts
-- [ ] T029 [US2] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+- [x] T029 [US2] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US2 PR with the gate results and the
-  SC-004 grep in its body
+  SC-004 grep in its body — Gate discharged (D-090-22): fixtures regenerated for the
+  adjudicated post-merge record signature (additive only); full suite green except the
+  4 pre-existing local-corpus SC-004 failures; six 090 bookkeeping items caught by the
+  gate run and fixed (registry inventory, renderSmoke mock, questionModules snapshot,
+  windowsLayout seeding, decisionRecord envelope list, orphan-lint HOSTED class);
+  tsc/eslint clean, depcruise at the baseline 2. PR opening is the lead's step per
+  series protocol — gate results reported to the lead in lieu of the PR body.
 
 **Checkpoint**: Phase B/C answers exist only as decisions; one store is deleted, one is
 narrowed; the largest composite value (marks) is proven deterministic.
@@ -226,14 +232,14 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
 
 **PR slice**: this phase is one PR.
 
-- [ ] T030 [US3] Set the `CarveRemovalItem` shape in
+- [x] T030 [US3] Set the `CarveRemovalItem` shape in
   packages/studio/src/survey/questions/gallery/carvedLayout.ts to the ruled shape —
   Candidate A, flat per-item `{ provenance: asked | derived | extracted }` (owner ruling
   2026-10-06, km-lead proposals Q4; recorded in research R8 / data-model.md) — before any
   carve value code is written
-- [ ] T031 [US3] Re-verify research R1's rows for `carve`, `deadkeys`, `rules` against the
+- [x] T031 [US3] Re-verify research R1's rows for `carve`, `deadkeys`, `rules` against the
   landed code; amend specs/090-gallery-decision-modules/research.md if any row drifted
-- [ ] T032 [US3] `carved-layout` module: value = removal items (ruled shape) + `dispositions`
+- [x] T032 [US3] `carved-layout` module: value = removal items (ruled shape) + `dispositions`
   (the contracts `CarveDisposition`, unchanged) + `closedKeyboardCard` in
   packages/studio/src/survey/questions/gallery/carvedLayout.ts; `CarveGalleryV2` keeps its
   live overlay as renderer-internal draft for the OSK preview and commits through `onChange`
@@ -241,31 +247,36 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
   applied view through the existing carve pipeline in
   packages/studio/src/lib/projectWorkingCopyVfs.ts; `undoStack` is re-pointed to operate on
   the decision value (research R5) in packages/studio/src/stores/workingCopyStore.ts
-- [ ] T033 [P] [US3] `deadkeys-defined` module: value = the op list in
+- [x] T033 [P] [US3] `deadkeys-defined` module: value = the op list in
   packages/studio/src/survey/questions/gallery/deadkeysDefined.ts; the deadkey editors record
   ops through the host instead of calling `commitDeadkeyOp` in
   packages/studio/src/editors/deadkey/DeadkeySurface.tsx (and its sibling editors);
   `apply` replays the ops through the existing patch construction in
   packages/studio/src/editors/deadkey/deadkeyWrite.ts
-- [ ] T034 [P] [US3] `rule-set` module: the serializable builder-result shape defined from the
+- [x] T034 [P] [US3] `rule-set` module: the serializable builder-result shape defined from the
   builder's own types, and the module, in
   packages/studio/src/survey/questions/gallery/ruleSet.ts; `RulesStep` reports the value
   through `onChange` instead of `onComplete(undefined)` in
   packages/studio/src/survey/rules/RulesStep.tsx
-- [ ] T035 [US3] FR-003 identifier list extended with the carve/deadkey write actions
+- [x] T035 [US3] FR-003 identifier list extended with the carve/deadkey write actions
   (`cascadeDelete`, `cascadeRestore`, `restoreAll`, `keepAll`, `prefillCarveDispositions`,
   `commitDeadkeyOp`) in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the migrated
   trees
-- [ ] T036 [US3] Tests: contract + determinism for the three `apply`s in
+- [x] T036 [US3] Tests: contract + determinism for the three `apply`s in
   packages/studio/src/survey/questions/gallery/carvedLayout.test.ts,
   packages/studio/src/survey/questions/gallery/deadkeysDefined.test.ts, and
   packages/studio/src/survey/questions/gallery/ruleSet.test.ts; an orphaned hand-set removal
   item is kept in the value and shown (spec edge case) and a proposal refresh keeps hand
   removals, both in packages/studio/src/survey/questions/gallery/carvedLayout.test.ts
-- [ ] T037 [US3] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+- [x] T037 [US3] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US3 PR with the gate results and the
-  recorded T003 ruling cited in its body
+  recorded T003 ruling cited in its body — Gate discharged (D-090-36, D-090-37): fixtures
+  regenerated for the adjudicated US3 record signature (two `record` insertions per track,
+  applied view untouched); walk green 2/2 post-regen; the original run's full-suite
+  accounting was lost with the agent and rides on T045's gate run per lead direction.
+  PR opening is the lead's step per series protocol — gate results reported to the lead
+  in lieu of the PR body.
 
 **Checkpoint**: the three hardest galleries are decision values; carve's provenance is the
 owner-ruled shape, and deadkeys reuse their existing mutate path as an `apply`.
@@ -284,35 +295,78 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
 
 **PR slice**: this phase is one PR.
 
-- [ ] T040 [US4] Re-verify research R1's rows for `mechanisms` and `touch` against the landed
-  code; amend specs/090-gallery-decision-modules/research.md if any row drifted
-- [ ] T041 [US4] `physical-layout` module: value = the assignment list (each assignment keeps
+- [x] T040 [US4] Re-verify research R1's rows for `mechanisms` and `touch` against the landed
+  code; amend specs/090-gallery-decision-modules/research.md if any row drifted — done
+  (D-090-38): both rows hold with line drift only (amendments on the rows); one mechanism
+  correction recorded (the R2 build does not consume the key-edit ops); the US4 execution
+  shape fixed under D-090-12/D-090-30/D-090-31 (no patch channel for the lock flag, the
+  touch JSON string, or the phase-C entry — applies are no-ops, R1/R2 effects re-home to
+  the completion wiring); T043 flagged for a lead ruling (D-090-38 Flag 1)
+- [x] T041 [US4] `physical-layout` module: value = the assignment list (each assignment keeps
   the provenance it already carries) in
   packages/studio/src/survey/questions/gallery/physicalLayout.ts; `MechanismGallery` reports
   through `onChange` instead of `recordAssignments` in
   packages/studio/src/editors/assignLoop/MechanismGallery.tsx; `apply` performs the R1
   `lockDesktop` effect and the reducer's R1 hook is retired in
   packages/studio/src/steps/reducer.ts; `repropagate` refresh behaviour (suggested refresh,
-  hand-set survive) is preserved against the value
-- [ ] T042 [US4] `touch-layout` module: value = key-edit ops + `deletedTouchKeyIds`, per-key
+  hand-set survive) is preserved against the value — Landed under the D-090-38
+  execution shape (D-090-39): the task text's "`apply` performs R1" is not
+  implementable inside 089's patch contract (no channel serves the lock flag,
+  the phase-C entry, or repropagate), so the module's apply is a no-op and
+  R1 re-homed to completion wiring (`lib/assignLoopCompletion.ts`), fired by
+  AddPhysicalAdapter after recording step-side and by journey-runner's
+  replay; `recordAssignments` remains the gallery's edit-time write path
+  (the D-090-31 record-from-working-copy pattern). Golden-walk fixture
+  delta at mechanisms adjudicated intended (D-090-39).
+- [x] T042 [US4] `touch-layout` module: value = key-edit ops + `deletedTouchKeyIds`, per-key
   provenance in spec 014's vocabulary unchanged, in
   packages/studio/src/survey/questions/gallery/touchLayout.ts; `TouchGallery` reports through
   `onChange` instead of `setTouchDraft` / `deleteTouchKey` in
   packages/studio/src/editors/assignLoop/TouchGallery.tsx; `apply` performs the R2
   `buildTouchLayoutJson` + `setTouchLayoutJson` work and the reducer's R2 hook is retired in
-  packages/studio/src/steps/reducer.ts
-- [ ] T043 [US4] FR-003 identifier list extended with `recordAssignments`, `setTouchDraft`,
+  packages/studio/src/steps/reducer.ts — Landed under the D-090-38 execution
+  shape (D-090-40): apply is a no-op (R2's build never consumes the ops and
+  its output has no patch channel); R2 re-homed to completion wiring
+  (`lib/assignLoopCompletion.ts`) fired by AddTouchAdapter after recording
+  step-side and by journey-runner's replay; `setTouchDraft`/`deleteTouchKey`
+  remain the gallery's edit-time write paths. Golden-walk fixture delta at
+  touch adjudicated intended. A registry import cycle the new renderers
+  closed (gallery → reducer constants → registry) was broken by moving the
+  step-id constants to the leaf `steps/stepIds.ts`.
+- [x] T043 [US4] FR-003 identifier list extended with `recordAssignments`, `setTouchDraft`,
   `deleteTouchKey` in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the assignLoop
-  trees
-- [ ] T044 [US4] Tests: contract + determinism for both `apply`s (R1 lock effect, R2 JSON
+  trees — **RULED non-registration (D-090-47, lead ruling 2026-10-07 on
+  D-090-38 Flag 1)**: the three identifiers are the galleries' sanctioned
+  edit-time write paths under the ratified record-from-working-copy design
+  (D-090-31), so no bans are registered; the non-registration + rationale
+  are recorded at both FR-003 sites exactly as T035's six actions were
+  (third NOT-REGISTERED note in galleryWriteAudit.test.ts; US4 comment
+  block in eslint.config.mjs), so T060's zero-exceptions audit reads it
+  as scope, not gap. Audit green unregistered, as before.
+- [x] T044 [US4] Tests: contract + determinism for both `apply`s (R1 lock effect, R2 JSON
   build) in packages/studio/src/survey/questions/gallery/physicalLayout.test.ts and
   packages/studio/src/survey/questions/gallery/touchLayout.test.ts; a store-level scenario in
   packages/studio/src/survey/questions/gallery/touchLayout.test.ts: suggested keys refresh on
   an input change, hand-set keys survive, an orphaned hand-set key is kept and shown
-  (spec 014 R6)
-- [ ] T045 [US4] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+  (spec 014 R6) — Landed (D-090-41): contract + SC-005 determinism + pass-2
+  pins for both no-op applies (the R1/R2 effects themselves are pinned in
+  lib/assignLoopCompletion.test.ts), value-builder tests, and the R6
+  scenario at store level through the real completion path (refresh =
+  deadkey-successor augmentation, the landed Case B mechanism). 16/16.
+- [x] T045 [US4] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US4 PR with the gate results in its body
+  — Gate run (D-090-42): golden walk green at the adjudicated US4 fixtures;
+  parity suites green; tsc 0; eslint 0 errors (1 orphaned-helper error from
+  the deps retirement fixed in this gate); full suite classified — only the
+  known SC-004 pair reproduces deterministically (kmp file), everything
+  else green standalone/in batches; parallel-run failure counts (79/61) are
+  worker casualties on the oversubscribed VM. This run also discharged both
+  verification debts (pass-2 pins 19/19 against the merged 089 runner;
+  T037 classification recovered from the predecessor's suite JSON — same
+  SC-004 family only). The PR itself opens at spec completion per the
+  stacked-PR train (base km/decision-apply), with T043's stop reported to
+  the lead alongside.
 
 **Checkpoint**: both assign-loop galleries are modules; the reducer no longer owns any
 gallery's IR rewrite.
@@ -332,12 +386,15 @@ neutral either: 093's replay input is decisions only, so a fact held solely in t
 field would be invisible to replay and silently vanish when the derived-keyboard draft
 drops the working-copy slice.)
 
-- [ ] T063 Delete `phaseAnswersByStep` from packages/studio/src/stores/workingCopyStore.ts,
+- [x] T063 Delete `phaseAnswersByStep` from packages/studio/src/stores/workingCopyStore.ts,
   coupled to `recordPhase` ceasing to carry answers (its answer-carrying writes retire with
   the US1–US4 migrations); strip-on-restore for the stale field in pre-090 snapshots: a
   persisted working-copy snapshot that still carries `phaseAnswersByStep` has the field
   dropped on restore in packages/studio/src/lib/persistWorkingCopy.ts and never re-saved;
   closing grep recorded: zero references to `phaseAnswersByStep` in packages/studio/src
+  — Landed (D-090-44): field + D-4 machinery deleted; recordPhase stores no answers;
+  strip-on-restore pinned. Closing grep: zero references in non-test sources (the 6
+  remaining references are tests pinning the absence/strip).
 
 **Checkpoint**: no answer state remains outside decision records — the working copy holds
 only the applied view the decisions produce (until 093 drops the saved slice entirely).
@@ -355,30 +412,61 @@ settled decision, checked against the decision list — no gaps, no duplicates.
 
 **PR slice**: this phase is one PR.
 
-- [ ] T050 [US5] Decision-driven recording: the gallery host records exactly one log entry
+- [x] T050 [US5] Decision-driven recording: the gallery host records exactly one log entry
   per settled decision on completion, through the decision-id-keyed recorder 088 established,
   in packages/studio/src/steps/galleryHost.tsx and
   packages/studio/src/decisions/createStudioDecisionRecorder.ts; answer-driven recording for
   migrated steps is removed so nothing double-records in packages/studio/src/steps/reducer.ts
-- [ ] T051 [P] [US5] Close the named G7 gaps: entries verified present for `windows-layout`,
+  — **STOPPED for a lead ruling (D-090-43)**, then **RULED (a) and landed (D-090-48)**:
+  a real contracts `decision` payload kind (`{decisionId, value: JsonValue, summary}`,
+  DECISION_RECORD_VERSION 3 with staged normalization), recorded at completion by the
+  new decisions/recordGalleryDecisions.ts through the recorder (createDecisionRecorder's
+  injected `getStepDecisions`, composed in createStudioDecisionRecorder from
+  `settlesForStep` + the live decision set, wired in StudioShell). The removal clause
+  had no referent in the landed code (verified in D-090-48: no answer carries a gallery
+  decision; the C-5 answer slots and the decision slots are disjoint), so nothing was
+  removed — exactly-once holds by construction.
+- [x] T051 [P] [US5] Close the named G7 gaps: entries verified present for `windows-layout`,
   `rule-set`, `touch-seed-source`, `deadkeys-defined`, `punctuation-inventory`,
   `retained-convenience-chars` in a store-level test through the real `StepHost` in
   packages/studio/src/decisions/galleryLogEntries.test.ts; the HANDOFF G7 starting-point
   entry (`recordBaseContribution` timing) is verified in the same walk — if it is still null
   after 088/089, record it in specs/090-gallery-decision-modules/followups.md rather than
   fixing it here (it belongs to the 088/092 boundary)
-- [ ] T052 [P] [US5] `help-docs` gallery-host registration (research Q3 boundary): the
+  — Landed: 9/9 green — all six gaps plus help-docs verified (exactly one live
+  decision-kind entry per settled value; unchanged re-completion a no-op; changed
+  value supersedes). The starting-point entry is STILL null (recorder fires before
+  instantiation) — recorded as an open residue in followups.md, not fixed here.
+- [x] T052 [P] [US5] `help-docs` gallery-host registration (research Q3 boundary): the
   `PhaseFGate` step is hosted so gate completion records the `help-docs` log entry, with no
   second write path beside 089's flow `apply`s, in
   packages/studio/src/survey/questions/gallery/helpDocs.ts and
   packages/studio/src/editors/adapters/PhaseFGate.tsx
-- [ ] T053 [US5] SC-003 live-walk test: a Playwright walk in `pnpm dev` over every step,
+  — Landed: PhaseFGate's completion wrap records the composite `help-docs` decision
+  (composeHelpDocsValue over the completion's answers, provenance "derived") before
+  handing the result on, so T050's recorder appends its log entry; the write is a
+  decision record only — 089's flow applies remain the step's only working-copy path.
+  Pinned in editors/adapters/PhaseFGate.helpDocs.test.tsx.
+- [x] T053 [US5] SC-003 live-walk test: a Playwright walk in `pnpm dev` over every step,
   asserting exactly one log entry per decision for all fourteen gallery decisions and the
   question decisions, in packages/studio/tests/steps/galleryDecisionLog.walk.test.tsx (or the
   repo's Playwright e2e home, matching 089's golden-walk placement)
-- [ ] T054 [US5] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+  — Landed in the repo's Playwright e2e home: packages/studio/e2e/decision-log.spec.ts
+  (the golden walk's own walk + helpers, parsing the downloaded sidecar): no slot of any
+  kind holds more than one live entry, and each of the fourteen gallery ids has exactly
+  one live decision-kind entry with a bounded summary. Base-contribution presence is
+  deliberately NOT asserted (the followups.md starting-point residue). Authored for CI
+  per the standing live-capture ruling; typechecked locally, executed in CI.
+- [x] T054 [US5] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US5 PR with the SC-003 walk results in its
   body
+  — Landed (D-090-49 has the full accounting): golden-walk fixtures re-captured with the
+  sole delta of T052's help-step record, parity green; studio 8729 passed / 8 failed —
+  the 4 budgeted SC-004 corpus failures plus 4 spec-079 step failures verified identical
+  at the pre-US5 base `625c3f43` (pre-existing, not US5 regressions, named in the PR body);
+  engine 3720/24 skipped/1 environmental failure (unfetched SLDR corpus); contracts
+  872/872; tsc clean; eslint 0 errors; depcruise zero violations. PR opened on
+  `km/decision-apply`.
 
 **Checkpoint**: the decision trail is complete — every decision the studio settles is in the
 log exactly once.
@@ -387,20 +475,36 @@ log exactly once.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T060 [P] SC-002 final audit: both FR-003 lint layers pass with **zero exceptions**
+- [x] T060 [P] SC-002 final audit: both FR-003 lint layers pass with **zero exceptions**
   across all renderer trees; the closing grep pack — zero `phaseBDraftStore` references
   (SC-004), zero gallery answer ids in `surveyAnswerStore`, zero in-place IR rewrites outside
   an `apply` — run and recorded in specs/090-gallery-decision-modules/plan.md's PR summary
   (and the final PR body)
-- [ ] T061 [P] Duplication-ledger close-out: verify every row of the spec's ledger (gallery
+  — Landed: audit record in plan.md's PR summary. Depcruise zero violations
+  (D-090-45 closed the D-090-7 cycle), audit 4/4, eslint 0 errors; grep pack
+  recorded; the two ruled determinations (D-090-29, D-090-31→D-090-34) cited;
+  T043's identifiers have since received the same species of ruling
+  (non-registration, D-090-47) and plan.md's summary updated to match.
+- [x] T061 [P] Duplication-ledger close-out: verify every row of the spec's ledger (gallery
   answers + `phaseBDraftStore` deleted; overlays are decision values with the working copy
   holding only an applied view; in-place rewrites deleted outside modules; `settles` strings
   redundant and parity-pinned for 091) and write any slip into
   specs/090-gallery-decision-modules/followups.md naming the later spec that retires it
-- [ ] T062 Full gates and consistency: all package suites, `tsc`, the full `pnpm lint` chain,
+  — Landed: rows verified in followups.md. Row 1's surveyAnswerStore half
+  closed by ruling, not deletion — residue owned by 093; row 2's carve
+  handoff already named in the ledger (093 fold); row 3 verified for
+  completion-time rewrites with the edit-time scope note; row 4 (settles)
+  is 091's deletion, with the modules' declarations parity-pinned by the
+  registry coverage suites.
+- [x] T062 Full gates and consistency: all package suites, `tsc`, the full `pnpm lint` chain,
   the golden walk, and the StepHost parity test green on the branch head; `/speckit-analyze`
   run over spec ↔ plan ↔ tasks with findings resolved or recorded; companion step marked
-  completed
+  completed — Landed (D-090-46): all gates green at head except
+  the content-i18n-freshness leg, which crashes at module load in this
+  worktree's install (environment artifact, recorded). Analyze findings
+  recorded in D-090-46: US5/SC-003 blocked on D-090-43; FR-005's letter vs
+  the ruled shape (lead's call); per-story PRs superseded by the
+  stacked-PR train.
 
 **Checkpoint**: spec 090's success criteria are each measured, not asserted — SC-001 per
 story gate, SC-002 at T060, SC-003 at T053, SC-004 at T027/T060, SC-005 per story.

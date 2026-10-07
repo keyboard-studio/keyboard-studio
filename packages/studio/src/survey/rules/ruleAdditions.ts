@@ -1,5 +1,11 @@
 // Rule additions for the VFS projection (spec 082).
 //
+// Home (spec 090 T034): survey/rules/ — the rules step's feature home,
+// moved from lib/ so the rule-set gallery decision module can import
+// the splice (gallery modules may import only survey/** and packages).
+// lib/ consumers import it from here (lib→survey feature-home edges
+// are the codebase's existing pattern).
+//
 // The rules survey step writes its additions (pack install, guard synthesis,
 // Narrow exceptions) into the working IR through the normal `setWorkingIR`
 // path — the same path that carries touch-layout edits, context-tolerance
@@ -46,6 +52,14 @@ export interface RuleAdditionGroup {
   /** The marked rules absent from the base IR, in working order. */
   added: IRRule[];
 }
+
+/**
+ * The rule-set decision value (spec 090, data-model.md RuleSetValue):
+ * the builder's result in the builder seam's own shape — the marked
+ * additions plus the working order that keeps Narrow exceptions ahead
+ * of their guards. The gallery module re-exports this alias.
+ */
+export type RuleSetValue = DerivedRuleAdditions;
 
 /** Everything the rules survey step added to the working IR. */
 export interface DerivedRuleAdditions {

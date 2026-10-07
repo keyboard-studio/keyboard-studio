@@ -453,6 +453,11 @@ export function DecisionEntryRow({
       id: "trail.entry.headline.fromBase",
       message: `Carried ${value} for ${question} from the base keyboard`,
     });
+  } else if (spec.id === "galleryDecision") {
+    // spec 090 US5: the recording host's summary, verbatim — author-facing
+    // content composed at record time (the identifier guard's payload.value
+    // exemption), not a code to resolve through the catalogue.
+    headline = spec.summary;
   } else if (spec.id === "editorStep") {
     // At least one dimension is present and non-zero (FR-011) — the composed
     // sentence names only what happened, never a row of zeros.

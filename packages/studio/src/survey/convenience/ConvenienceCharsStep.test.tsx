@@ -16,7 +16,7 @@ import { ConvenienceStepHost } from "./ConvenienceStepHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
-import { usePhaseBDraftStore } from "../../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, recordCharacterInventoryValue } from "../../survey/useInventoryDraft.ts";
 import { DEFAULT_PHASE_B_FONT } from "../surveyStyles.ts";
 
 // neededCharsForLanguage does a real CLDR lookup when unmocked (see the same
@@ -273,14 +273,14 @@ describe("ConvenienceCharsStep — the question", () => {
   });
 
   it("draws the convenience chips in the selected glyph font", async () => {
-    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+    inventoryOps("characters").setSelectedFont("charis-sil");
     try {
       await renderQuestion();
       const label = screen.getByLabelText("Keep q Q").closest("label") as HTMLElement;
       const glyphSpan = label.querySelectorAll("span")[0] as HTMLElement;
       expect(glyphSpan.style.fontFamily).toContain("Charis SIL");
     } finally {
-      usePhaseBDraftStore.setState({ selectedFont: DEFAULT_PHASE_B_FONT });
+      recordCharacterInventoryValue({ ...getCharacterInventoryValue(), selectedFont: DEFAULT_PHASE_B_FONT }, "characters");
     }
   });
 

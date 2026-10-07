@@ -83,11 +83,14 @@ import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import {
   applyStepCompletion,
   CHOOSE_BASE_STEP_ID,
-  TOUCH_STEP_ID,
   type ReducerDeps,
   type InstantiateResult,
-  type TouchCompleteResult,
 } from "../steps/reducer.ts";
+import {
+  applyPhysicalCompletionEffects,
+  applyTouchCompletionEffects,
+  type TouchCompleteResult,
+} from "../lib/assignLoopCompletion.ts";
 import { useWorkingCopyStore, bindManifest } from "../stores/workingCopyStore.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { loadFlowSourceDef } from "../steps/flowSources.ts";
@@ -439,17 +442,9 @@ function collectEditorActionEvents(
 
 function buildReplayReducerDeps(): ReducerDeps {
   return {
-    lockDesktop: () => useWorkingCopyStore.getState().lockDesktop(),
-    clearStale: (stepId) => useWorkingCopyStore.getState().clearStale(stepId),
-    setTouchLayoutJson: (json) => useWorkingCopyStore.getState().setTouchLayoutJson(json),
     instantiateFromBase: (base, opts) => useWorkingCopyStore.getState().instantiateFromBase(base, opts),
     instantiateFromExisting: (base, opts) =>
       useWorkingCopyStore.getState().instantiateFromExisting(base, opts),
-    // FR-015: no per-key decomposition — the harness never builds a real
-    // touch layout; this mirrors the R11 emission matrix's own "don't emit"
-    // outcome rather than a build failure.
-    buildTouchLayoutJson: () => ({ json: null, warnings: [] }),
-    resolveBaseTouchJson: () => undefined,
     instantiateFromBaseIfConfirmed: (base, opts) => {
       // The real dep's declared signature allows a null vfs/ir (the pre-parse
       // state a real base resolution can transiently be in); this harness
@@ -468,7 +463,6 @@ function buildReplayReducerDeps(): ReducerDeps {
     },
     getWorkingIR: () => useWorkingCopyStore.getState().ir,
     setWorkingIR: (ir) => useWorkingCopyStore.getState().setWorkingIR(ir),
-    getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
   };
 }
 
@@ -767,7 +761,10 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           collectEditorActionEvents(group, "mechanism_edit");
           // FR-015: no per-key decomposition — record an empty assignment set.
           useWorkingCopyStore.getState().recordAssignments([]);
-          applyStepCompletion("mechanisms", undefined, deps); // fires lockDesktop (R1)
+          // Spec 090 T041: R1 (lock + repropagate) re-homed from the
+          // reducer to lib/assignLoopCompletion.ts — the same effects
+          // AddPhysicalAdapter fires on the live path (D-090-38).
+          applyPhysicalCompletionEffects();
           result = undefined;
           break;
         }
@@ -798,7 +795,17 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
             baseVfs: pendingBase?.vfs ?? null,
             seedSource: touchSeedSource,
           };
-          applyStepCompletion(TOUCH_STEP_ID, touchResult, deps); // fires setTouchLayoutJson (R2)
+          // Spec 090 T042: R2 re-homed from the reducer to
+          // lib/assignLoopCompletion.ts — the same effects
+          // AddTouchAdapter fires on the live path (D-090-38),
+          // replacing this harness's former buildTouchLayoutJson
+          // stub (which always returned null json). Replay now
+          // builds what the live path builds for the same inputs:
+          // with assignments [] and the journey's seed choice, the
+          // R11 matrix still emits on the reseed path — the
+          // desktop-derived layout the author would get completing
+          // touch with no edits after choosing reseed.
+          applyTouchCompletionEffects(touchResult);
           result = undefined;
           break;
         }
