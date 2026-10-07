@@ -77,6 +77,27 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
     trees: ["survey/invisibles", "survey/convenience"],
     identifiers: ["saveAnswer"],
   },
+  {
+    // US3 (T035, ungated slice): the retired Phase B draft store's hook
+    // is banned in the Phase D trees too — it is retired globally
+    // (SC-004 grep: zero references in src). The action-name bans T035
+    // names (cascadeDelete/cascadeRestore/restoreAll/keepAll/
+    // prefillCarveDispositions/commitDeadkeyOp) are NOT registered:
+    // under the as-built US3 precedent those actions are the decision
+    // values' internal write paths (the carve overlay; the deadkey op
+    // log the decision records), and banning them awaits the lead's
+    // ruling on D-090-24/D-090-27 — see the note after this list.
+    story: "US3",
+    trees: [
+      "editors/carve",
+      "editors/deadkey",
+      "editors/adapters/deadkeyAdapter.tsx",
+      "editors/adapters/carveAdapter.tsx",
+      "survey/rules",
+      "survey/deadkeys",
+    ],
+    identifiers: ["usePhaseBDraftStore"],
+  },
   // NOT YET REGISTERED, by design (T027, D-090-20): a `saveAnswer` ban
   // over the marks / characters / punctuation trees. Those calls are the
   // spec-079 answer-store evidence layer — marks' per-toggle answers

@@ -1301,3 +1301,37 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   Snapshot refreshed (ruleSet writes line only). Gates: module +
   rules trees (355) + pins (459 in the earlier batch) green; tsc /
   eslint clean; depcruise baseline 2.
+
+- **D-090-27 — T035 partially discharged; the Phase D action bans
+  and T032/T036-carve/T037 are gated on ONE lead question, and a
+  T033 deviation is flagged for adjudication.** Done now: the
+  usePhaseBDraftStore ban extended to the Phase D trees in both
+  FR-003 layers (audit 4/4 incl. firing probe; eslint clean);
+  SC-004 grep re-run: zero code references (one prose mention in
+  the audit file's own comment). **The gated remainder:** T035's
+  action bans (cascadeDelete/cascadeRestore/restoreAll/keepAll/
+  prefillCarveDispositions/commitDeadkeyOp) presume the
+  host-mediated design in which editors never touch the working
+  copy directly. As built, T033/T034 follow the characters/marks
+  precedent instead: the overlay/op-log remain the edit-time write
+  path, the decision records them at completion, and apply serves
+  replay. **Deviation flagged:** the lead's T033 paraphrase said
+  "step-side op commits become value updates through the host" —
+  T033 as built keeps commitDeadkeyOp as the internal commit and
+  records the log at the adapter; the reason is the same wall as
+  D-090-24: the projection (projectWorkingCopyVfs) reads the
+  deadkey overlay and the carve overlay from the working copy, and
+  no contract channel exists for a decision/host to write those
+  overlays — so "value updates through the host" cannot land in
+  090 without either (b)-style contract work or a projection
+  re-point to read decisions. **The one question for the lead:**
+  ratify the record-from-working-copy precedent for US3's
+  editor-backed decisions (carve included — D-090-24 option (a)),
+  with the overlay-channel/projection question handed to 092/093
+  as a named delta; or direct the (b) contract work in 090 before
+  US3 closes. Until ruled: T035's action bans unregistered
+  (registering them would red the gate against the as-built
+  design), T036's carve cases and T037's gate wait on T032.
+  T036's deadkeys/rules module suites are written (in the T033/
+  T034 commits: replay determinism, live-state no-op, splice
+  order + carve-non-resurrection).

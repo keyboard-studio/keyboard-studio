@@ -66,6 +66,20 @@ const GALLERY_RENDERER_TREES_US2_ANSWER_FREE = [
   "packages/studio/src/survey/convenience/**/*.{ts,tsx}",
 ];
 
+// US3 (T035, ungated slice): the Phase D trees join the global
+// usePhaseBDraftStore ban (the store is deleted; zero references).
+// The action-name bans (cascade*/prefillCarveDispositions/
+// commitDeadkeyOp) are deferred to the lead's ruling on
+// research D-090-24/D-090-27, mirroring the checker test's lists.
+const GALLERY_RENDERER_TREES_US3 = [
+  "packages/studio/src/editors/carve/**/*.{ts,tsx}",
+  "packages/studio/src/editors/deadkey/**/*.{ts,tsx}",
+  "packages/studio/src/editors/adapters/deadkeyAdapter.tsx",
+  "packages/studio/src/editors/adapters/carveAdapter.tsx",
+  "packages/studio/src/survey/rules/**/*.{ts,tsx}",
+  "packages/studio/src/survey/deadkeys/**/*.{ts,tsx}",
+];
+
 function galleryWriteBanRule(identifiers) {
   return [
     "error",
@@ -176,6 +190,15 @@ export default [
     ignores: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "no-restricted-syntax": galleryWriteBanRule(["saveAnswer", "usePhaseBDraftStore"]),
+    },
+  },
+  {
+    // Spec 090 FR-003 layer 2 overlay, US3 (T035, ungated slice): the
+    // Phase D trees never touch the deleted phaseBDraftStore hook.
+    files: GALLERY_RENDERER_TREES_US3,
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": galleryWriteBanRule(["usePhaseBDraftStore"]),
     },
   },
   {
