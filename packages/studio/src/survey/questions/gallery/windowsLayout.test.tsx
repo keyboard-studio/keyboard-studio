@@ -15,7 +15,6 @@ import { runApplyDeterministically } from "../../../decisions/applyDeterminism.t
 import type { ApplyContext } from "../../types.ts";
 import { useDecisionStore } from "../../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../../stores/surveyAnswerStore.ts";
 
 function makeContext(): ApplyContext {
@@ -74,7 +73,14 @@ describe("windowsLayout module contract", () => {
 
 describe("WindowsLayoutRenderer (module renderer)", () => {
   it("shows the recorded value's layout; picking a different one reports origin overturned", () => {
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "en-US" });
+    // Spec 089: the renderer derives its survey context (bcp47) from the
+    // decision store (LayoutStep.tsx) — seed the identity decisions the
+    // en-US tag's subtags represent (the session store's setSurveyContext
+    // is gone; LayoutStep.test.tsx uses the same seeding).
+    const record = useDecisionStore.getState().record;
+    record({ id: "language-code", value: "en", provenance: "asked" });
+    record({ id: "target-script", value: "Latn", provenance: "asked" });
+    record({ id: "language-region", value: "US", provenance: "asked" });
     const onChange = vi.fn();
     render(
       <WindowsLayoutRenderer

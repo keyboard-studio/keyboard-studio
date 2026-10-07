@@ -205,9 +205,15 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   packages/studio/src/survey/questions/gallery/retainedConvenienceChars.test.ts; plus a
   reload test: a draft saved mid-Phase-B restores the inventory values from the `decisions`
   slice in packages/studio/src/lib/draftPersistence.test.ts
-- [ ] T029 [US2] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+- [x] T029 [US2] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US2 PR with the gate results and the
-  SC-004 grep in its body
+  SC-004 grep in its body — Gate discharged (D-090-22): fixtures regenerated for the
+  adjudicated post-merge record signature (additive only); full suite green except the
+  4 pre-existing local-corpus SC-004 failures; six 090 bookkeeping items caught by the
+  gate run and fixed (registry inventory, renderSmoke mock, questionModules snapshot,
+  windowsLayout seeding, decisionRecord envelope list, orphan-lint HOSTED class);
+  tsc/eslint clean, depcruise at the baseline 2. PR opening is the lead's step per
+  series protocol — gate results reported to the lead in lieu of the PR body.
 
 **Checkpoint**: Phase B/C answers exist only as decisions; one store is deleted, one is
 narrowed; the largest composite value (marks) is proven deterministic.

@@ -24,8 +24,6 @@ exports[`live question modules > b/pb_azerty_qz_swap.ts > definition contract 1`
 
 exports[`live question modules > b/pb_char_count.ts > definition contract 1`] = `"radio | required | next [ctx.routing_group == 'qwerty-qwertz' -> pb_latin_qwerty_branch; ctx.routing_group == 'azerty' -> pb_latin_azerty_branch; (default) -> pb_contact_language] | options [tiny, small, medium, large] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > b/pb_character_inventory.ts > definition contract 1`] = `"multi_select | required | next (absent) | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes []"`;
-
 exports[`live question modules > b/pb_co_installed_keyboards.ts > definition contract 1`] = `"text | optional | next pb_discovery_intro | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > b/pb_contact_language.ts > definition contract 1`] = `"text | optional | next pb_legacy_encoding | advisory true | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
@@ -198,7 +196,7 @@ exports[`live question modules > gallery/helpDocs.ts > definition contract 1`] =
 
 exports[`live question modules > gallery/invisiblesInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores]"`;
 
 exports[`live question modules > gallery/physicalLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 

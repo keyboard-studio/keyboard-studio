@@ -1116,7 +1116,48 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   accounting the lead flagged (8656 passed / 12 failed: 4 SC-004
   corpus + 2 goldenWalk + 2 renderSmoke + 2 registry = 10 named;
   the current-tree full run below is the authority for any
-  remainder). (4) **Full suite:** the first attempt on this VM was
+  remainder). (4) **Two more from the batched run, same bookkeeping
+  family, fixed in the gate follow-up:** (i)
+  questionModules.test.ts definition-contract snapshot — stale on
+  T023's marks `writes [groups, stores]` and carrying an obsolete
+  entry for the T025-deleted `b/pb_character_inventory.ts`;
+  refreshed with -u, diff verified to contain exactly those two
+  changes. (ii) windowsLayout.test.tsx renderer test seeded the
+  survey context through `useSurveySessionStore.setSurveyContext`,
+  removed by 089's re-point (the renderer now derives bcp47 from
+  decisions, LayoutStep.tsx:66-69); re-seeded via the identity
+  decisions exactly as LayoutStep.test.tsx does. Both files green
+  after the fix. (iii) 089's draftPersistence.decisionRecord.test.ts
+  (SC-009) still listed `phaseBDraft` among the envelope's
+  pre-existing fields; T025's ruled deletion removed the key, so the
+  expectation now omits it with the ruling cited inline.
+  (iv) tests/survey/orphan-input-lint.test.ts: the pre-090 lint
+  required every registry module to be survey-manifested (classes:
+  RELOCATED, RESERVE); the 14 gallery modules are a third class —
+  step-hosted decision modules, author-reachable through their
+  hosting steps but never walked as survey questions. Added a
+  HOSTED_EXEMPT class derived from the registry's galleryModules
+  group (cannot drift from the module list), rationale inline; the
+  lint's other guards unchanged. Green after the fix. The shell-b
+  batch additionally showed 45 file-level failures with zero test
+  failures — environmental (ENOSPC on the 512 MB /tmp tmpfs +
+  worker kills under cross-worktree memory contention), re-run in
+  small chunks for the record. (5) **Full suite:** the first attempt on this VM was
   OOM-killed twice (concurrent sibling-worktree runs; exit 137 in
-  transform) and re-run in directory batches at --maxWorkers=2 —
-  results recorded at the gate commit.
+  transform) and re-run in directory batches (maxWorkers 2, then 1
+  for the heavy trees). **Final accounting, current tree:**
+  decisions 974 passed / 4 failed — the pre-existing local-corpus
+  SC-004 four (basic_kbdru + arabic_izza in successCriteria.sc004
+  and .sc004.kmp; the corpus is absent in this sandbox and these
+  fail identically on the base); steps+tests/steps 499/499
+  (goldenWalk regenerated fixtures and the renderSmoke fix inside);
+  survey 1953 passed / 2 failed, both fixed above and re-verified
+  green; stores+lib 1754 passed / 1 failed (fixed, re-verified) /
+  1 skipped (pre-existing); editors 1348/1348; shell-a 98/98;
+  shell-b 1437 passed / 1 failed (the orphan lint, fixed,
+  re-verified 6/6) with its 45 environmental file failures re-run
+  green in chunks (335 tests). tsc: all six packages clean.
+  eslint: clean. depcruise: 2 — the post-089-merge baseline,
+  unchanged. The only failures standing are the 4 SC-004 corpus
+  ones, pre-existing and environmental. PR opening is the lead's
+  step per series protocol.
