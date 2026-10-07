@@ -18,7 +18,8 @@
 // placementMap is intentionally omitted from PhaseB props (D-INT-2, v1).
 
 import { useEffect, useRef, type ComponentType } from "react";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { SurveyContext } from "./types.ts";
 import type { DecisionRendererProps } from "../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../steps/galleryHost.tsx";
 import { alphabetKeyOf, graphemeFitsScript } from "../steps/evidence.ts";
@@ -38,20 +39,40 @@ import { useStepWalkStore, peekStepCursor } from "../stores/stepWalkStore.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import { ADDITION_ANSWER_PREFIX } from "./characterFlags.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
-// Direct file imports, NOT the survey/index.ts barrel: since T021 this
-// component is the character-inventory module's renderer, so the registry
-// imports it — the barrel would drag IdentityLite/flowSources into that
-// evaluation and close the D-090-7 cycle through flowModules.
-import { Prefill } from "./Prefill.tsx";
-// PhaseB loads LAZILY: it imports steps/flowSources, which imports the
-// question registry — and since T021 the registry imports THIS component
-// (as the character-inventory module's renderer). A static PhaseB import
-// closes that cycle at module-evaluation time (registry-first entries —
-// the decisions suites — crashed on flowModules being mid-evaluation).
-// The lazy edge keeps PhaseB out of the module graph; it mounts only in
-// substage "B", behind Suspense.
-import { lazy, Suspense } from "react";
-const PhaseB = lazy(() => import("./PhaseB.tsx").then((m) => ({ default: m.PhaseB })));
+// The substage views (Prefill, PhaseB) arrive through the gallery
+// host's step-context extras, supplied by CharactersStepHost — NOT by
+// import. Both views transitively import the question registry
+// (PhaseB via steps/flowSources, Prefill via IdentityLite), and since
+// T021 the registry imports THIS component (as the character-inventory
+// module's renderer, via the module file): importing either view from
+// here — statically, lazily, or even type-only (this repo's depcruise
+// counts a type-only import of a .tsx module as an import edge) —
+// closes that cycle in the static module graph (depcruise
+// no-circular — the D-090-7 cycle, closed for good in T060). Their
+// prop shapes are therefore mirrored structurally below, from types
+// this file already imports.
+import { Suspense } from "react";
+
+/**
+ * The extras shape CharactersStepHost supplies (see galleryHost.tsx).
+ * The prop shapes mirror PrefillProps / the PhaseBProps subset this
+ * component passes — structural typing keeps the real components
+ * assignable without an import edge to their files.
+ */
+export interface CharactersStepExtras {
+  Prefill: ComponentType<{
+    identity: IdentityLiteResult;
+    base: BaseKeyboard;
+    onConfirm: () => void;
+    onBack?: () => void;
+  }>;
+  PhaseB: ComponentType<{
+    context?: SurveyContext;
+    onComplete: (result: SurveyPhaseResult) => void;
+    onBack?: () => void;
+    findingsByQuestionId?: Record<string, LintFinding[]>;
+  }>;
+}
 // Manifest step id — matches steps/manifest.ts's "characters" entry.
 //
 // SINGLE WRITER (spec 079 T035/T081/FR-004): this component is the ONLY place
@@ -168,7 +189,10 @@ function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void 
  * accepted for the contract and not otherwise consumed here.
  */
 const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValue>> = () => {
-  const { onComplete, onBack } = useGalleryStepContext();
+  const { onComplete, onBack, extras } = useGalleryStepContext();
+  const views = extras as unknown as CharactersStepExtras | undefined;
+  const Prefill = views?.Prefill;
+  const PhaseB = views?.PhaseB;
   // --- store reads (selectors) ---
   // Spec 089 FR-005: identity + context are derived from the decision store.
   const decisions = useDecisionStore((s) => s.decisions);
@@ -251,7 +275,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   // Guard: prefill requires both identity and base (unreachable once the step
   // is properly entered, but matches today's null fallback).
   if (charactersSubStage === "prefill") {
-    if (identityResult === null || localBase === null) {
+    if (identityResult === null || localBase === null || Prefill === undefined) {
       return null;
     }
     return (
@@ -276,6 +300,9 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
 
   // substage === "B"
   // NOTE: placementMap intentionally omitted (D-INT-2).
+  if (PhaseB === undefined) {
+    return null;
+  }
   return (
     <Suspense fallback={null}>
     <PhaseB

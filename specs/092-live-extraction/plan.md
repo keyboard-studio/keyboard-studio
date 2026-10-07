@@ -304,6 +304,19 @@ gallery).
   sight-unseen in this pass; the declarations are unit-pinned so the
   remaining wiring is mechanical. The lead may schedule it as a
   follow-up on this branch or fold it into the 091 restack work.
+  **LANDED (restack pass, 2026-10-07, commit 82f23aba):** the ask-time
+  evaluation is wired in IdentityLite — every resolution (profile
+  known, entry resolved, Q1 committed, region variant chosen, entry
+  cleared) re-evaluates the five declarations against the accumulated
+  `IdentityLookupInputs` and records each result as a `default`
+  decision record (seed-if-absent / replace-own-seed / never touch an
+  author-shaped record, so a restored asked record is neither
+  overwritten nor offered a lookup default); a re-resolution forgets
+  the superseded entry's `default` records first. SurveyRunner's
+  record-first seeding (T031) renders the records identically to the
+  host props, so IdentityLite's `getSeedValue` / `getSeedProvenance` /
+  `getSeedSource` props and the seed refs behind them are DELETED.
+  All ten IdentityLite / runner / StepHost identity suites green.
 
 - **G-13 (T050 satisfied by position + T013, no move needed):**
   `recordBaseContribution` is invoked from `createDecisionRecorder`'s
@@ -320,35 +333,195 @@ gallery).
   state), the gated effect is its only live caller, and the restore
   pre-seed guard stays as written.
 
+- **G-14 (restack pass, 2026-10-07 — the G-8 boundary ruling's premise
+  is FALSIFIED for group-member modules by 091's landing; STOPPED for a
+  lead ruling):** the restack merge itself landed clean
+  (`46e1dffe`, origin/km/derived-steps @ ed8f12fd, zero conflicts). The
+  ruled conversion (il_copyright_holder's `authoring-track` edge:
+  module `requires` → `screenRequires`) was then tested by ablation
+  before being committed, and it does NOT heal the full-list consumer
+  on the completed stack. Evidence (scratch ablations, all reverted):
+  (1) with the edge in `requires` (current tree), the raw per-flow sort
+  throws `unresolved decision: "authoring-track" required by
+  "il_copyright_holder"` (G-8's named item), AND `deriveScreens` over
+  the live registry returns 18 screens with the `identity` group SPLIT
+  (il_copyright_holder dragged after `track` by the edge), so
+  `steps/manifest.ts` throws at module load ("18 steps declared but 19
+  screens derived") — stepOrder.parity and sc002 fail at COLLECTION and
+  the live manifest is unloadable. (2) With the edge as
+  `screenRequires`, the per-flow sort heals (copyright last in flow),
+  but deriveScreens STILL returns the split 18: 091's Phase-4 final
+  design folds `screenRequires` back into deriveScreens' module-level
+  sort, which is exactly right for singleton-screen modules
+  (track_choice, project_display_name — 091's cases) and exactly wrong
+  for a group member: the folded edge reorders the one module out of
+  its group. (3) With the edge dropped entirely, deriveScreens returns
+  17 screens = 091's frozen baseline (identity whole, 9 members),
+  the manifest loads, and orderParity + sc002 pass 17/17. A further
+  wrinkle either way: the pass's `snapshotInputs` reads `m.requires`,
+  so moving or dropping the edge removes `authoring-track` from the
+  seeded copyright record's `inputs` snapshot (T012's recorded
+  behaviour) unless the snapshot's declaration channel is extended.
+  Semantic note: `screenRequires: ["authoring-track"]` on this module
+  would assert "the identity screen is placed after the track screen",
+  which the frozen baseline itself contradicts (identity sorts first);
+  the track dependency is a run-time data dependency, already consumed
+  by `seedWhen`, the T013 setup gate (track recorded before the pass
+  runs), and the pass's inputs snapshot — it was never a screen-order
+  fact. Options put to the lead: (A) drop the edge (ablation-proven;
+  snapshot loses authoring-track); (A2) drop the edge + snapshotInputs
+  reads `requires` ∪ the module's `inputs` declaration (set
+  `inputs: ["authoring-track"]` on the module) — keeps T012's snapshot
+  byte-identical, small mechanism change inside liveExtraction.ts,
+  RECOMMENDED by this pass; (B) keep the conversion and re-engineer
+  deriveScreens to apply screenRequires at screen granularity —
+  rewrites 091's landed core sort inside 092's pass, not recommended;
+  (C) convert + move the whole identity screen — contradicts the
+  frozen baseline and the protected parity test, rejected. The rest
+  of the restack pass (T023, acceptance re-run, G-12 remainder, T037,
+  gates, PR) is NOT executed on a tree whose manifest throws at load;
+  it resumes on the ruling.
+- **G-14 RULING (lead, 2026-10-07): option (A2) — drop the ordering
+  edge, keep the dependency's information.** The authoring-track
+  dependency is a run-time DATA dependency — already consumed by
+  `seedWhen`, the T013 setup gate, and the inputs snapshot. It was
+  never a screen-order fact (091's frozen baseline sorts identity
+  first, contradicting the screen-order reading), and 091's landed
+  deriveScreens folds screenRequires into the module-level sort, so
+  the previously ruled conversion splits the identity screen and
+  leaves steps/manifest.ts unloadable. The original ruling's intent —
+  the dependency must not be silently lost — is satisfied by A2: the
+  information lives in the three channels that mean what it means;
+  only the ordering channel, where it is false, loses it.
+  **Landed:** `il_copyright_holder.requires` is back to
+  `["author-name"]`; the track dependency is declared on the new
+  `QuestionModule.snapshotInputs` channel (`["authoring-track"]`) —
+  a dedicated DecisionId-space field, because the module's existing
+  `inputs` field is `IRPath[]` over the KeyboardIR address space and
+  cannot carry a DecisionId (the ruling's "inputs declaration" is
+  this channel; the name records what it feeds). The pass's
+  `snapshotInputs` now reads `requires` ∪ `snapshotInputs`
+  (requires first), so the seeded copyright record's `inputs`
+  snapshot is byte-identical to T012's recorded behaviour
+  (`{author-name, authoring-track}`), re-pinned in
+  liveExtraction.test.ts. Verified on the restacked tree:
+  orderParity + sc002 + deriveScreens + manifest + stepOrder.parity
+  + StepHost.derivedScreens + gateWalkParity all green (full-list
+  deriveScreens yields the frozen 17 screens, identity whole,
+  manifest loads). **Precedent flagged for 093:** decision records'
+  `inputs` snapshots may name decisions sourced from a module's
+  `snapshotInputs` declaration, not only `requires`.
+
+- **G-15 (restack pass, 2026-10-07 — T037's premise is falsified by
+  090's LANDED carve shape; closed as satisfied-by-landed-shape, the
+  G-11/T035 pattern, NO code change):** T037 imagined the bulk-default
+  pre-fill as a starting-point seed the pass could own: write per-item
+  `derived` entries into the `carved-layout` value and delete the
+  `workingCopyStore` action + the `CarveGalleryV2` effect that call
+  it. On the landed shape every element of that picture is otherwise:
+  (1) The per-item entries already exist in the decision value —
+  `CarvedLayoutValue.dispositions` rides the overlay's
+  `CarveDisposition[]` verbatim (comboId + disposition + the
+  contracts type's own spec-076 per-item provenance, incl.
+  `bulk-default`), snapshotted by `currentCarvedLayoutValue()` and
+  recorded decisionId-keyed by the CarveAdapter at completion
+  (`carved-layout` ← the landed recording shape). The one vocabulary
+  difference from T037's text: the per-item provenance is spec-076's
+  (`bulk-default` / `author-override` / `deadkey-requirement`), not
+  the decision-provenance `derived` — deliberate per carveValue.ts
+  (research R8), since dispositions predate the decision record.
+  (2) The action + effect are not a seed write path; they are spec
+  076 FR-022's overlay lifecycle. Their inputs are SESSION-derived —
+  `recommendedComboIds` from the gallery's carve analysis of the
+  current IR, deadkey combos scanned from the current IR, the
+  closed-keyboard card answer — none of which exist at setup, so the
+  extraction pass (setup-time, starting-point bundle) cannot compute
+  them; and the lifecycle continues all session (new combos take the
+  current bulk default; prune on un-carve; read on every recompile).
+  The never-over-a-combo-with-a-disposition rule T037 demands is
+  implemented inside the action itself. (3) Deleting them would
+  delete FR-022's bulk-default behaviour, not convert a seeder — and
+  would contradict the lead-ratified record-from-working-copy design
+  for editor-backed steps (D-090-31): the overlay stays canonical,
+  the decision value snapshots it at completion, and 093's carve
+  fold reconstructs the overlay from that value. T037 is therefore
+  closed with its intent met by the landed architecture: the
+  bulk-default pre-fill IS per-item entries in the carved-layout
+  decision value, recorded with its value, never over an existing
+  disposition.
+
+- **G-16 (restack pass gate accounting, 2026-10-07):** full studio
+  suite, run in bounded batches on a contended 2-vCPU box (a VM
+  reboot mid-pass cleared the other crews; batches that appeared to
+  stall were batch-mates of one spinning file, identified by
+  bisection). **508 of 511 test files verdicted; 8 failed tests,
+  exactly the named budget:** the 4 local-corpus SC-004 failures
+  (`basic_kbdru` + `arabic_izza` in successCriteria.sc004.test.ts
+  and successCriteria.sc004.kmp.test.ts — the absent-local-corpus
+  set) and 4 in the spec-079 carry-over step files
+  (InvisiblesStep.test.tsx ×3 — two writing-direction/bidi tests +
+  the phase-C answer-slot D-4/R-08 test; PunctuationStep.test.tsx
+  ×1 — the same D-4/R-08 slot test). Everything else green,
+  including the StepHost golden walk (byte-identical, both tracks —
+  the T002 fixture delta is fully reconciled by the cascade) and
+  all 13 liveExtraction + StepHost acceptance tests. **Three files
+  do not terminate on this stack** and are excluded above:
+  PhaseFAdaptiveDescription.integration.test.tsx,
+  PhaseFContactSeed.integration.test.tsx (both re-checked
+  immediately after the G-14/A2 fix, repeatedly, solo, 200–420 s —
+  zero tests complete; 093's expected cure did NOT arrive with the
+  edge drop), and **panelAdapters.test.tsx** (bisected as the file
+  poisoning every batch that contained it; solo kills at 150 s /
+  240 s / 300 s, the last on a quiet box; A/B-verified NOT a
+  restack-pass regression — it spins identically with the pre-pass
+  IdentityLite at 96d046d0, and 093 verdicted it on the pre-restack
+  tree, so it arrived with the completed stack, upstream of 092).
+  The three files' mechanism is one named family for the lead /
+  093's final pass: drivers that walk a live flow through the real
+  runner on the completed stack spin instead of completing.
+  tsc clean; eslint 0 errors on touched files; depcruise 0 new
+  violations (the cruised closure's 4 are pre-existing: 2×
+  decisions-layer on liveExtraction's landed wiring halves —
+  covered by the lead's exemption ruling for 093's final pass —
+  and 2× upstream Phase-F bypass).
+
 ## Implementation outcome (Phase 7, T060–T063)
 
 - **SC-001 (FR-005):** the one-line `requires` edit + both-tracks
   acceptance walk are landed; the walk is CI-gated (sandbox Chromium
   cannot navigate localhost). Store-level: T030 proves the seeding,
   offered, copy-track, and no-source behaviours against the real stores.
-  Caveat G-8: on the intermediate stack the live identity step cannot
-  render (cross-flow ordering throws) — the walk's live verdict lands
-  with the completed stack; lead ruling requested on the interim state.
+  Caveat G-8 (CLOSED by the restack pass): the interim cross-flow
+  ordering throw is resolved by the G-14/A2 ruling — the edge left
+  the ordering graph for the `snapshotInputs` channel; the manifest
+  loads, the frozen 17 screens derive with identity whole, and the
+  both-tracks StepHost acceptance re-run is green (T023). The walk's
+  live verdict rides this spec's PR CI.
 - **SC-002 (seed mechanisms):** after this spec, live seed VALUES are
   computed by exactly one engine — the extraction pass — for: the
   copyright holder (extract), all seven Phase F entries (extracts +
   lookup defaults), and every module declaring extract/lookupDefault.
-  Remaining non-pass seed surfaces, honestly counted: (1)
-  `IdentityLite`'s langtags/profile seeders still compute values at
-  render — their lookup defaults are DECLARED on the modules (T033)
-  but the ask-time evaluation is not wired (G-12); (2) the
+  Remaining non-pass seed surfaces, honestly counted: (1) the
   SurveyRunner host-proposal channel remains as the fallback for
   flows this spec did not convert (gallery/mechanism steps are 090's
-  decision modules with their own proposal path). SC-002's "exactly
-  one" is therefore met for every surface this spec converted, with
-  (1) the named remainder.
+  decision modules with their own proposal path). The former second
+  remainder — `IdentityLite`'s render-time langtags/profile seeders —
+  is CLOSED by the restack pass (G-12 landed): the ask-time
+  evaluation records the declared lookup defaults as decision
+  records and IdentityLite's seed write path is deleted, so every
+  seed value on every surface this spec owns is computed by exactly
+  one mechanism — a module declaration, evaluated by the pass at
+  setup or by the identity resolution at ask time.
 - **SC-003 (write paths deleted):** the PHASE_F_SEEDS table is deleted
   (remaining mentions are comments recording its removal);
-  `prefillCarveDispositions` still exists — its deletion is T037,
-  PENDING-PREDECESSOR on 090's carve migration (G-2); the Phase B
-  seeding write (`seedPhaseBFromPrefill`) was already deleted by 090
-  and the character-inventory decision is pass-seeded (T035/G-11);
-  IdentityLite's seed write path remains per G-12.
+  `prefillCarveDispositions` still exists BY DESIGN — G-15: on 090's
+  landed shape it is spec-076 FR-022's overlay lifecycle, not a seed
+  write path, and its output already lands per-item in the
+  carved-layout decision value (T037 closed satisfied-by-landed-
+  shape); the Phase B seeding write (`seedPhaseBFromPrefill`) was
+  already deleted by 090 and the character-inventory decision is
+  pass-seeded (T035/G-11); IdentityLite's seed write path is DELETED
+  (restack pass, G-12 landed).
 - **SC-004:** the walk's adapt leg runs from track choice to prefill
   confirmation with no reload (T042); the mode is asserted at store
   level (T051).

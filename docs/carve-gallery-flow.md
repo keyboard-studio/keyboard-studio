@@ -24,7 +24,7 @@ Primary files:
 
 ## 1. Where Carve sits in the flow
 
-Step order and side-trail membership are **derived**, not declared: order comes from each step's `provides`/`requires` ([stepDependencies.ts](../packages/studio/src/steps/stepDependencies.ts), spec 087), a step is a side trail when it has a `gatedBy`, and its join target (`joinTarget` on the derived `StepTrail`) is its next ungated successor. The `spine`/`joinTarget` flags are no longer manifest fields.
+Step order and side-trail membership are **derived**, not declared: the wizard's screens are derived from the decision modules' `provides`/`requires` and routing ([deriveScreens.ts](../packages/studio/src/decisions/deriveScreens.ts), spec 091; the sort is spec 087's), a screen is a side trail when it carries a derived gate, and its join target (`joinTarget` on the derived `StepTrail`) is its next ungated successor. The `spine`/`joinTarget` flags are no longer manifest fields.
 
 Carve is one step in the step manifest
 ([packages/studio/src/steps/manifest.ts](../packages/studio/src/steps/manifest.ts)).

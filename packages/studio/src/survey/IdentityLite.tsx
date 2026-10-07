@@ -4,10 +4,12 @@
 // and the INDEPENDENT target script, deriving the routing/A2 prefill
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
 
-import { useMemo, useRef, useCallback } from "react";
-import { msg } from "@lingui/core/macro";
+import { useMemo, useRef, useCallback, useEffect } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, DecisionProposalSource, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import type { Attribution, SurveyPhaseResult, LintFinding, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { questionRegistry } from "./questions/registry.ts";
+import type { ExtractContext, IdentityLookupInputs } from "../decisions/extractContext.ts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { surveyPageColumn, phaseHeading, leadParagraph } from "./surveyStyles.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
@@ -26,14 +28,6 @@ import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 // Scripts gated out of v1 (spec §9). When the target is one of these the flow
 // ends on the "not supported" notice and the slice should not proceed.
 const UNSUPPORTED_SCRIPTS = new Set(["Ethi", "Hani", "Hang"]);
-
-// Shared caption descriptor for every langtags-derived seed (spec 030
-// FR-010). Resolved to a plain string (via i18nRef, below) at each seeding
-// site rather than frozen once — the resolved text must track the active locale.
-const LANGTAGS_CAPTION = msg({
-  id: "survey.identityLite.langtagsCaption",
-  message: "Suggested from langtags — edit if needed",
-});
 
 // `IdentityLiteResult` lives in its own type-only leaf module so the
 // survey-session store can name it without closing an import cycle through this
@@ -157,22 +151,9 @@ export function IdentityLite({
   resume,
   authorSeed,
 }: IdentityLiteProps) {
-  const { t, i18n } = useLingui();
-  // Mirrors the latest `i18n` for seedFromEntry/handleAnswerCommit below (deps
-  // `[]`, unchanged — same ref-mirroring idiom this file already uses for
-  // props/state, e.g. q1EnglishRef), so a locale switch is picked up without
-  // changing when those callbacks re-fire. `i18n.t(descriptor)` (a plain method
-  // call on the real i18n instance) is safe to read via ref — unlike the macro
-  // `t` below, it does no compile-time extraction of its own; the extraction
-  // already happened at LANGTAGS_CAPTION's `msg({...})` call site.
-  const i18nRef = useRef(i18n);
-  i18nRef.current = i18n;
+  const { t } = useLingui();
 
   const flow = useMemo(() => loadFlowSourceDef(flowSources["identity_lite"]!), []);
-  // Held in a ref to match this file's seeding idiom: getSeedValue has an empty
-  // dep array by design (see its comment), so it must read through refs.
-  const authorSeedRef = useRef(authorSeed);
-  authorSeedRef.current = authorSeed;
 
   const resumeAnswers = useMemo(
     () => (resume !== undefined ? toResumeAnswers(resume) : undefined),
@@ -198,21 +179,97 @@ export function IdentityLite({
   // auto-selected as the own-language name.
   const englishNamesSeedRef = useRef<readonly string[] | undefined>(undefined);
 
-  // Proposed target-script seed from langtags (from the resolved variant).
-  // "Default once, then user owns it" — SurveyRunner enforces the seed only on
-  // first forward arrival at il_target_script; Back discards unsaved edits so
-  // re-arrival re-seeds from this ref, which is correct (spec §8).
-  const scriptSeedRef = useRef<string | undefined>(undefined);
+  // Spec 092 (T033, plan.md G-12): the identity lookup inputs, accumulated
+  // across this step's resolutions — the resolved langtags entry's seed
+  // values, the Q1 English answer, and the stored author profile, in the
+  // exact shapes the five il_* modules' declared `lookupDefault`s read
+  // (ExtractContext.identity). Kept in a ref because the resolutions fire
+  // from callbacks that must not re-subscribe on every keystroke.
+  const identityInputsRef = useRef<IdentityLookupInputs>({});
 
-  // Language-code seed (spec 030 US4): the 3-letter ISO 639-3 code of the
-  // resolved entry (falling back to the canonical bare subtag when the entry has
-  // no 639-3 code). Seeds il_language_code for confirmation. Undefined when the
-  // English name matched nothing — the author types a code or leaves it blank.
-  const codeSeedRef = useRef<string | undefined>(undefined);
+  // Evaluate the five declared lookup defaults against the accumulated
+  // inputs and record each result as a `default` decision record.
+  // SurveyRunner's record-first seeding then renders the record — value,
+  // the langtags caption for "langtags"-sourced records, and the proposal
+  // source the completed answer's record will name — exactly as the old
+  // getSeedValue / getSeedProvenance / getSeedSource host props did
+  // (spec 092 T031). Write rule (the extraction pass's merge rule,
+  // G-12): seed when absent, replace a record this mechanism itself
+  // seeded (`default` provenance), and NEVER touch an author-shaped
+  // record — a restored asked record is neither overwritten nor offered
+  // a lookup default. Re-evaluating an unchanged snapshot writes nothing.
+  const evaluateIdentityDefaults = useCallback(() => {
+    const ctx: ExtractContext = {
+      ir: null,
+      catalog: null,
+      identity: identityInputsRef.current,
+    };
+    const store = useDecisionStore.getState();
+    for (const questionId of [
+      "il_language_autonym",
+      "il_language_code",
+      "il_target_script",
+      "il_author_name",
+      "il_author_email",
+    ] as const) {
+      const mod = questionRegistry[questionId];
+      if (mod?.lookupDefault === undefined || mod.provides === undefined) continue;
+      const dflt = mod.lookupDefault(ctx);
+      if (dflt === undefined || dflt.value === undefined || dflt.value === null) continue;
+      for (const id of mod.provides) {
+        const existing = store.decisions[id];
+        if (existing !== undefined && existing.provenance !== "default") continue;
+        if (
+          existing !== undefined &&
+          existing.value === dflt.value &&
+          existing.source === dflt.source
+        ) {
+          continue;
+        }
+        store.record({
+          id,
+          value: dflt.value,
+          provenance: "default",
+          ...(dflt.source !== undefined ? { source: dflt.source } : {}),
+        });
+      }
+    }
+  }, []);
 
-  // Provenance map: questionId → LangtagsProvenance, for seeded fields.
-  // Stored in a ref so getSeedProvenance reads it without re-renders.
-  const provenanceRef = useRef<Map<string, LangtagsProvenance>>(new Map());
+  // Forget the `default` records for the given questions — the replacement
+  // half of a re-resolution (a new entry picked, a region variant chosen,
+  // the entry cleared): the superseded entry's seeds must not survive
+  // into the new resolution. Only `default` records are forgotten; an
+  // answered question keeps its record (the author owns it).
+  const forgetIdentityDefaults = useCallback((questionIds: readonly string[]) => {
+    const store = useDecisionStore.getState();
+    for (const questionId of questionIds) {
+      const mod = questionRegistry[questionId];
+      if (mod?.provides === undefined) continue;
+      for (const id of mod.provides) {
+        if (store.decisions[id]?.provenance === "default") store.forget(id);
+      }
+    }
+  }, []);
+
+  // The stored author profile is a resolution input known from the first
+  // render (spec 064 D7): evaluate against it as soon as it is known, so
+  // the attribution questions arrive pre-filled for confirmation. A
+  // profile with no name seeds nothing — ASK rather than substitute the
+  // login handle, which is not a copyright holder (the modules' declared
+  // defaults encode that exclusion).
+  const authorName = authorSeed?.name;
+  const authorEmail = authorSeed?.email;
+  useEffect(() => {
+    identityInputsRef.current = {
+      ...identityInputsRef.current,
+      authorProfile: {
+        ...(authorName !== undefined ? { name: authorName } : {}),
+        ...(authorEmail !== undefined ? { email: authorEmail } : {}),
+      },
+    };
+    evaluateIdentityDefaults();
+  }, [authorName, authorEmail, evaluateIdentityDefaults]);
 
   // The search summary the author selected at il_language_english (spec 030 US1).
   // Its `hasRegionVariants` flag is read synchronously by getNextOverride at
@@ -232,52 +289,78 @@ export function IdentityLite({
 
   // Seed the downstream fields from a resolved langtags entry. Shared by the
   // English-name selection (primary variant) and — via reseedFromVariant — the
-  // region pick. Records provenance only for the fields actually seeded (FR-010).
-  const seedFromEntry = useCallback((defaults: LanguageDefaults) => {
-    scriptSeedRef.current = scriptToTargetOption(defaults.defaultScript) ?? undefined;
-    // 3-letter ISO 639-3 code preferred (author's choice), else the bare subtag.
-    codeSeedRef.current =
-      defaults.iso639_3 !== undefined && defaults.iso639_3 !== ""
-        ? defaults.iso639_3
-        : defaults.code !== ""
-          ? defaults.code
+  // region pick. The dropdown option state (local/English names) stays in
+  // refs; the SEEDS themselves are decision records now (spec 092 T033):
+  // this resolution supersedes any previous entry's `default` records and
+  // re-evaluates the declared lookup defaults against the new inputs.
+  const seedFromEntry = useCallback(
+    (defaults: LanguageDefaults) => {
+      // Own-script names head Q2's dropdown; English/alternate names are
+      // the dropdown's fallback only (used when there is no own-script
+      // name).
+      localNamesSeedRef.current =
+        defaults.localNames !== undefined && defaults.localNames.length > 0
+          ? defaults.localNames
           : undefined;
-    // Own-script names head Q2's dropdown and seed its default (localNames[0]);
-    // English/alternate names are the dropdown's fallback only (used when there is
-    // no own-script name). When a recorded own-script name IS the default, the
-    // autonym field shows the langtags caption.
-    localNamesSeedRef.current =
-      defaults.localNames !== undefined && defaults.localNames.length > 0
-        ? defaults.localNames
-        : undefined;
-    englishNamesSeedRef.current =
-      defaults.englishNames !== undefined && defaults.englishNames.length > 0
-        ? defaults.englishNames
-        : undefined;
+      englishNamesSeedRef.current =
+        defaults.englishNames !== undefined && defaults.englishNames.length > 0
+          ? defaults.englishNames
+          : undefined;
 
-    const langtagsProvenance: LangtagsProvenance = {
-      source: "langtags",
-      caption: i18nRef.current.t(LANGTAGS_CAPTION),
-    };
-    const provenance = new Map<string, LangtagsProvenance>();
-    if (scriptSeedRef.current !== undefined) provenance.set("il_target_script", langtagsProvenance);
-    if (codeSeedRef.current !== undefined) provenance.set("il_language_code", langtagsProvenance);
-    // The autonym default is a langtags value only when an own-script name exists.
-    if (localNamesSeedRef.current !== undefined) provenance.set("il_language_autonym", langtagsProvenance);
-    provenanceRef.current = provenance;
-  }, []);
+      forgetIdentityDefaults(["il_language_autonym", "il_language_code", "il_target_script"]);
+      // 3-letter ISO 639-3 code preferred (author's choice), else the
+      // bare subtag; absent when the entry carries neither.
+      const languageCode =
+        defaults.iso639_3 !== undefined && defaults.iso639_3 !== ""
+          ? defaults.iso639_3
+          : defaults.code !== ""
+            ? defaults.code
+            : undefined;
+      const targetScript = scriptToTargetOption(defaults.defaultScript) ?? undefined;
+      const q1English =
+        defaults.englishName ??
+        (q1EnglishRef.current !== "" ? q1EnglishRef.current : undefined);
+      // The new entry's inputs REPLACE the previous entry's wholesale —
+      // destructure the entry-derived keys out first so a field this
+      // entry lacks cannot survive from the superseded resolution.
+      const {
+        localNames: _ln,
+        languageCode: _lc,
+        targetScript: _ts,
+        q1English: _q1,
+        ...restInputs
+      } = identityInputsRef.current;
+      identityInputsRef.current = {
+        ...restInputs,
+        ...(defaults.localNames !== undefined && defaults.localNames.length > 0
+          ? { localNames: defaults.localNames }
+          : {}),
+        ...(languageCode !== undefined ? { languageCode } : {}),
+        ...(targetScript !== undefined ? { targetScript } : {}),
+        ...(q1English !== undefined ? { q1English } : {}),
+      };
+      evaluateIdentityDefaults();
+    },
+    [evaluateIdentityDefaults, forgetIdentityDefaults],
+  );
 
   // Reset every resolved-entry-derived seed. Called when the English name is
   // cleared / matches nothing (free text → graceful degradation, FR-003).
+  // The autonym is re-evaluated afterwards: with no entry behind it, its
+  // declared default falls back to the Q1 English answer itself.
   const clearSeeds = useCallback(() => {
-    scriptSeedRef.current = undefined;
-    codeSeedRef.current = undefined;
     localNamesSeedRef.current = undefined;
     englishNamesSeedRef.current = undefined;
     resolvedEntryRef.current = null;
     selectedRegionRef.current = "";
-    provenanceRef.current = new Map();
-  }, []);
+    forgetIdentityDefaults(["il_language_autonym", "il_language_code", "il_target_script"]);
+    const { authorProfile } = identityInputsRef.current;
+    identityInputsRef.current = {
+      ...(authorProfile !== undefined ? { authorProfile } : {}),
+      ...(q1EnglishRef.current !== "" ? { q1English: q1EnglishRef.current } : {}),
+    };
+    evaluateIdentityDefaults();
+  }, [evaluateIdentityDefaults, forgetIdentityDefaults]);
 
   // Side-channel from the @langtags_names picker (spec 030 US1): the author
   // selected (entry) or cleared/free-texted (null) a concrete language at
@@ -329,8 +412,17 @@ export function IdentityLite({
       if (questionId === "il_language_english") {
         // Capture the Q1 name so it can seed Q2's default own-language name and
         // head its choice list (spec 030 US2). Works for a picked language and
-        // for free text with no langtags match alike.
+        // for free text with no langtags match alike. Re-evaluating here is
+        // what records the autonym's Q1 fallback for the free-text path (no
+        // entry resolution ever fires there); for a picked language the
+        // resolution already recorded its seeds and this is a no-op.
         q1EnglishRef.current = typeof value === "string" ? value.trim() : "";
+        const { q1English: _q1, ...restInputs } = identityInputsRef.current;
+        identityInputsRef.current = {
+          ...restInputs,
+          ...(q1EnglishRef.current !== "" ? { q1English: q1EnglishRef.current } : {}),
+        };
+        evaluateIdentityDefaults();
       }
 
       if (questionId === "il_language_region") {
@@ -343,111 +435,31 @@ export function IdentityLite({
         const variant = resolvedEntryRef.current?.regionVariants?.find((v) => v.region === region);
         if (variant !== undefined) {
           localNamesSeedRef.current = variant.localNames.length > 0 ? variant.localNames : undefined;
-          scriptSeedRef.current = scriptToTargetOption(variant.defaultScript) ?? undefined;
 
-          // Keep provenance in step with the reseeded fields (FR-010): the autonym
-          // default is a langtags value only when the variant has an own-script
-          // name; il_language_code is untouched (region variants share the subtag).
-          const langtagsProvenance: LangtagsProvenance = {
-            source: "langtags",
-            caption: i18nRef.current.t(LANGTAGS_CAPTION),
+          // The variant's autonym / script seeds replace the primary's
+          // (FR-010): forget the primary's `default` records for those two
+          // questions and re-evaluate against the variant's inputs — a
+          // variant with no own-script name drops the autonym back to the
+          // Q1 fallback (sourceless, uncaptioned), and one with no script
+          // leaves the script unseeded. il_language_code is untouched
+          // (region variants share the subtag).
+          forgetIdentityDefaults(["il_language_autonym", "il_target_script"]);
+          const variantScript = scriptToTargetOption(variant.defaultScript) ?? undefined;
+          const {
+            localNames: _ln,
+            targetScript: _ts,
+            ...restInputs
+          } = identityInputsRef.current;
+          identityInputsRef.current = {
+            ...restInputs,
+            ...(variant.localNames.length > 0 ? { localNames: variant.localNames } : {}),
+            ...(variantScript !== undefined ? { targetScript: variantScript } : {}),
           };
-          const nextProvenance = new Map(provenanceRef.current);
-          if (scriptSeedRef.current !== undefined) {
-            nextProvenance.set("il_target_script", langtagsProvenance);
-          } else {
-            nextProvenance.delete("il_target_script");
-          }
-          if (localNamesSeedRef.current !== undefined) {
-            nextProvenance.set("il_language_autonym", langtagsProvenance);
-          } else {
-            nextProvenance.delete("il_language_autonym");
-          }
-          provenanceRef.current = nextProvenance;
+          evaluateIdentityDefaults();
         }
       }
     },
-    [],
-  );
-
-  // Pre-fill the autonym / code / script steps from the langtags entry resolved
-  // at il_language_english (spec 030 US2/US4).
-  //
-  // "Default once, then user owns it" contract is upheld by SurveyRunner:
-  // the seed only fires on forward push; Back discards unsaved edits (stack pop),
-  // so re-arriving re-seeds from the current ref values — correct behavior.
-  //
-  // FR-008: the seed value is only returned when the ref is non-empty. Since
-  // SurveyRunner only calls getSeedValue when pushing a *new* stack entry
-  // (never when restoring a saved entry via Back), a previously user-edited
-  // value that was saved on the stack is restored directly and getSeedValue is
-  // NOT called for that entry — preserving author override.
-  const getSeedValue = useCallback(
-    (questionId: string): string | string[] | undefined => {
-      if (questionId === "il_language_autonym") {
-        // Default own-language name (spec 030 US2, per author request): the primary
-        // recorded own-script name (localNames[0]) when langtags has one; otherwise
-        // fall back to the Q1 response. The author keeps it or picks from the
-        // dropdown (own-script + English/alternate names).
-        const locals = localNamesSeedRef.current;
-        if (locals !== undefined && locals.length > 0 && locals[0]!.trim() !== "") {
-          return locals[0];
-        }
-        return q1EnglishRef.current !== "" ? q1EnglishRef.current : undefined;
-      }
-      if (questionId === "il_language_code") {
-        // 3-letter language-code confirmation, seeded from the resolved entry.
-        return codeSeedRef.current;
-      }
-      if (questionId === "il_target_script") {
-        return scriptSeedRef.current;
-      }
-      // spec 064 FR-001: propose-then-confirm, never a blank form. Undefined
-      // when the profile has no name — ASK rather than substitute the login
-      // handle, which is not a copyright holder.
-      if (questionId === "il_author_name") {
-        const n = authorSeedRef.current?.name;
-        return n !== undefined && n !== null && n !== "" ? n : undefined;
-      }
-      if (questionId === "il_author_email") {
-        const e = authorSeedRef.current?.email;
-        return e !== undefined && e !== null && e !== "" ? e : undefined;
-      }
-      // il_copyright_holder is deliberately NOT seeded: a blank means "same as
-      // the author" (D1), so pre-filling it would turn a sensible default into a
-      // value the author has to notice and delete.
-      return undefined;
-    },
-    [],
-  );
-
-  // Return a LangtagsProvenance for a question if it has a langtags-derived
-  // seed, or undefined when no provenance applies.
-  const getSeedProvenance = useCallback(
-    (questionId: string): LangtagsProvenance | undefined => {
-      return provenanceRef.current.get(questionId);
-    },
-    [],
-  );
-
-  // Name each seed's source for the decision trail (km-triage, PR #1927):
-  // the same provenance the field caption already shows, so the two
-  // mechanisms cannot disagree. Deriving this FROM getSeedProvenance (not a
-  // second static table) keeps the conditional cases honest — e.g.
-  // il_language_autonym's seed is langtags-sourced only when an own-script
-  // name exists, which is exactly when the provenance map has an entry (the
-  // Q1-English fallback has no langtags behind it and stays sourceless).
-  // il_author_name / il_author_email seeds come from the stored author
-  // profile, so they name "identity"; getSeedValue above returns a value
-  // for them only when the profile has one, so this can only attach to a
-  // real profile-derived proposal.
-  const getSeedSource = useCallback(
-    (questionId: string): DecisionProposalSource | undefined => {
-      if (getSeedProvenance(questionId) !== undefined) return "langtags";
-      if (questionId === "il_author_name" || questionId === "il_author_email") return "identity";
-      return undefined;
-    },
-    [getSeedProvenance],
+    [evaluateIdentityDefaults, forgetIdentityDefaults],
   );
 
   // Soft mismatch warning for il_language_code: when the typed/selected code
@@ -478,8 +490,8 @@ export function IdentityLite({
       });
     },
     // `t` closes over the live useLingui() binding directly (required for the
-    // lingui macro extractor to track this call site — see the note above
-    // seedFromEntry's i18nRef usage) so it must be a dependency here.
+    // lingui macro extractor to track this call site) so it must be a
+    // dependency here.
     [t],
   );
 
@@ -555,8 +567,8 @@ export function IdentityLite({
       return undefined;
     },
     // `t` closes over the live useLingui() binding directly (required for the
-    // lingui macro extractor to track this call site — see the note above
-    // seedFromEntry's i18nRef usage) so it must be a dependency here.
+    // lingui macro extractor to track this call site) so it must be a
+    // dependency here.
     [t],
   );
 
@@ -599,9 +611,6 @@ export function IdentityLite({
           context={context}
           onComplete={handleComplete}
           onAnswerCommit={handleAnswerCommit}
-          getSeedValue={getSeedValue}
-          getSeedSource={getSeedSource}
-          getSeedProvenance={getSeedProvenance}
           getFieldWarning={getFieldWarning}
           getSeedOptions={getSeedOptions}
           getNextOverride={getNextOverride}

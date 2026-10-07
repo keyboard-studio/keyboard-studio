@@ -20,7 +20,7 @@
 // linear history rather than five siblings all claiming to replace the original.
 //
 // No persistence of its own — draftPersistence.ts snapshots and rehydrates this
-// store, the same arrangement phaseBDraftStore.ts has.
+// store, the same arrangement the decision store has.
 
 import { create } from "zustand";
 import {
@@ -36,6 +36,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { normalizeDecisionRecord } from "@keyboard-studio/engine";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { deepEqual } from "./deepEqual.ts";
 
 /**
  * A decision to record. The store owns `entryId`, `recordedAt`, and `supersedes`
@@ -162,6 +163,14 @@ export function slotKeyOf(stepId: string, payload: DecisionPayload): string {
     if (decisionId !== undefined) return `${decisionId}${d}q${d}${decisionId}`;
     return `${stepId}${d}q${d}${payload.questionId}`;
   }
+  if (payload.kind === "decision") {
+    // spec 090 US5 (D-090-48): a gallery decision's slot is its DECISION,
+    // keyed exactly like the survey-answer slot above — step-independent, so
+    // the same decision settled from a different step supersedes rather than
+    // duplicating. The "d" discriminator keeps it out of the "q" key space:
+    // a question decision and a gallery decision never share a slot.
+    return `${payload.decisionId}${d}d${d}${payload.decisionId}`;
+  }
   if (payload.kind === "editor-action") return `${stepId}${d}e${d}${payload.actionType}`;
   // base-contribution (specs/055-legible-decision-trail D-11), recorded once at
   // `choose_base` by recordBaseContribution.ts. The slot only needs to exist
@@ -199,6 +208,14 @@ export function payloadsEqual(a: DecisionPayload, b: DecisionPayload): boolean {
       x.sample.length === y.sample.length &&
       x.sample.every((v, i) => v === y.sample[i])
     );
+  }
+  if (a.kind === "decision" && b.kind === "decision") {
+    // The VALUE is the decision (spec 090 US5): deep-compared, since gallery
+    // values are objects/arrays, not the scalar shapes the survey arm
+    // handles. The summary is the host's rendering OF the value, so equal
+    // values are the same decision even if a later build words the summary
+    // differently — the recorded summary stands.
+    return a.decisionId === b.decisionId && deepEqual(a.value, b.value);
   }
   if (a.kind === "base-contribution" && b.kind === "base-contribution") {
     // `startingKeyCount` is optional (absent means "not measured", never a
@@ -282,8 +299,8 @@ function highestSeq(entries: readonly DecisionEntry[]): number {
   return max;
 }
 
-// Monotonic id counter, module-side like phaseBDraftStore's `picks`: it is
-// bookkeeping, not state any component subscribes to.
+// Monotonic id counter, module-side: it is bookkeeping, not state any
+// component subscribes to.
 let seq = 0;
 
 /** Reset the id counter. Exported for tests that assert on exact entry ids. */
@@ -368,7 +385,7 @@ export const useDecisionLogStore = create<DecisionLogState>((set, get) => ({
     // contract §5), regardless of how `record` got here. In the studio's own
     // read path it has already been normalized once, by the engine's
     // `parseDecisionRecord` — `normalizeDecisionRecord` is a no-op there (a
-    // `version >= 2` record passes through by reference). This call is the
+    // current-version record passes through by reference). This call is the
     // defensive second seam: nothing here mutates `record` or writes
     // anything back to storage; it only decides what goes into memory.
     const normalized = normalizeDecisionRecord(record);
@@ -379,7 +396,7 @@ export const useDecisionLogStore = create<DecisionLogState>((set, get) => ({
     set({
       record: {
         format: DECISION_RECORD_FORMAT,
-        // Whatever came in, what goes into memory is v2-shaped —
+        // Whatever came in, what goes into memory is current-shaped —
         // `normalizeDecisionRecord` guarantees that and already tags its
         // result accordingly. `Math.max` is this seam's own restatement of
         // that floor rather than a second opinion about it (see the module

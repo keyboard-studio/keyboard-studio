@@ -4,9 +4,10 @@
 // performs survey-level side effects when a step completes. It is keyed by
 // step id and encapsulates the THREE inline side effects currently in SurveyView:
 //
-//   R1 — lock gate: fires lockDesktop() when the "mechanisms" step completes.
-//   R2 — touch-layout build: runs buildTouchLayoutJson + setTouchLayoutJson at
-//          the "touch" step, with the same Case-A/B and graceful degradation.
+//   R1 — RETIRED (spec 090 T041): the lock gate re-homed to
+//          lib/assignLoopCompletion.ts (applyPhysicalCompletionEffects).
+//   R2 — RETIRED (spec 090 T042): the touch-layout build re-homed to
+//          lib/assignLoopCompletion.ts (applyTouchCompletionEffects).
 //   R3 — copy/adapt instantiation: routes Track 2 → instantiateFromExisting,
 //          Track 1/default → instantiateFromBaseIfConfirmed at the "choose_base"
 //          step (today: onInstantiate in StudioShell.tsx:240-253).
@@ -22,41 +23,27 @@
 // and lib helpers the reducer needs — nothing more.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
-import type { ApplyContext, WorkingCopyPatch } from "../survey/types.ts";
-// DesktopModifications is a type from the engine package (a workspace
-// dependency, not an internal studio/src/ layer) — the steps-layer boundary
-// forbids steps/ -> lib/stores/dashboard/components, not other packages.
-import type { DesktopModifications } from "@keyboard-studio/engine";
-import { repropagate } from "./repropagate.ts";
+import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
 import type { SavedAnswer } from "./answerTypes.ts";
 
-/**
- * The empty/no-op DesktopModifications — used as the TOUCH_STEP_ID case's
- * default when a caller's payload omits `mods` (defensive; every real caller
- * — AddTouchAdapter — always supplies it).
- */
-const EMPTY_DESKTOP_MODIFICATIONS: DesktopModifications = { removals: [], placements: [] };
-
 // ---------------------------------------------------------------------------
 // Step ids that carry side effects (keyed constants — never inline strings)
 // ---------------------------------------------------------------------------
-
-/** Step id for the Mechanisms (physical assignment) step — fires lockDesktop() on complete. */
-export const MECHANISMS_STEP_ID = "mechanisms" as const;
-
-/** Step id for the Touch (Phase E) step — fires buildTouchLayoutJson on complete. */
-export const TOUCH_STEP_ID = "touch" as const;
-
-/**
- * Step id for the choose-base step — fires the copy/adapt instantiation on complete.
- * (Corresponds to today's "base" SurveyStage and the onInstantiate callback.)
- */
-export const CHOOSE_BASE_STEP_ID = "choose_base" as const;
+// The constants live in the leaf module stepIds.ts (the galleries read
+// them, and a gallery → reducer import would cycle through the question
+// registry — spec 090 T042); re-exported here so existing imports of
+// this module keep working.
+export {
+  MECHANISMS_STEP_ID,
+  TOUCH_STEP_ID,
+  CHOOSE_BASE_STEP_ID,
+} from "./stepIds.ts";
+import { CHOOSE_BASE_STEP_ID } from "./stepIds.ts";
 
 // ---------------------------------------------------------------------------
 // Instantiation result — passed to the reducer when choose_base completes.
@@ -85,35 +72,6 @@ export interface InstantiateResult {
 }
 
 // ---------------------------------------------------------------------------
-// Touch-completion result — passed to the reducer when the touch step completes.
-// ---------------------------------------------------------------------------
-
-export interface TouchCompleteResult {
-  /** Non-inherited touch assignments from Phase E (pre-filtered by TouchGallery). */
-  assignments: TouchAssignment[];
-  /** The base IR at lock time (post-lockDesktop snapshot). */
-  baseIr: KeyboardIR | null;
-  /** The base VFS (for resolving the shipped .keyman-touch-layout, if any). */
-  baseVfs: VirtualFS | null;
-  /**
-   * Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
-   * removals + Phase C individual letter placements. Computed by the touch
-   * step's adapter (AddTouchAdapter) via deriveDesktopModifications so this
-   * reducer (steps/) never imports lib/ or stores/ directly. Optional so
-   * existing/mocked callers that don't care about the replay can omit it —
-   * the reducer defaults to the empty (no-op) modifications.
-   */
-  mods?: DesktopModifications;
-  /**
-   * The author's raw touch_seed_source fork choice (spec 035 FR-006), or null
-   * if the fork was never recorded (defensive — the R11 Entity-5 default is
-   * applied inside the injected buildTouchLayoutJson dep, not here). Optional
-   * for the same reason as `mods`.
-   */
-  seedSource?: "import-adapt" | "reseed-from-desktop" | null;
-}
-
-// ---------------------------------------------------------------------------
 // Injected dependencies (replacing direct lib/stores imports)
 //
 // All deps are functions — the caller injects concrete implementations.
@@ -122,16 +80,8 @@ export interface TouchCompleteResult {
 
 export interface ReducerDeps {
   // --- Store actions (from workingCopyStore) ---
-  /** Lock the desktop layout after Mechanisms completion (R1). */
-  lockDesktop: () => void;
-  /** Persist the serialized touch layout JSON at Phase E completion (R2). */
-  setTouchLayoutJson: (json: string | null) => void;
-  /**
-   * Clear a step's stale marker (removes it as a re-opened root and recomputes
-   * the staleness closure). Called at Touch completion (R2) so re-completing
-   * the touch step clears the re-review flag a prior Mechanisms edit set on it.
-   */
-  clearStale: (stepId: string) => void;
+  // (lockDesktop retired at spec 090 T041, setTouchLayoutJson + clearStale
+  // at T042: R1/R2 re-homed to lib/assignLoopCompletion.ts — D-090-38.)
   /** Track 1 instantiation — copy from base, new identity. */
   instantiateFromBase: (
     base: BaseKeyboard,
@@ -153,39 +103,10 @@ export interface ReducerDeps {
    */
   clearTouchSeedChoice?: () => void;
 
-  // --- Lib helpers (from lib/buildTouchLayoutJson + lib/resolveBaseTouchJson) ---
-  /**
-   * Derive (and, per the spec 035 R11 emission matrix, decide whether to
-   * emit) the .keyman-touch-layout JSON string from a base IR + assignments.
-   * Two derivation paths: Case A (generate from scratch, replaying `mods`)
-   * and Case B (faithful edit onto the shipped layout, replaying `mods`
-   * first). Returns { json, warnings }; json is null when the R11 matrix says
-   * "don't emit" OR the emit pipeline failed — the reducer treats both
-   * identically (omit the stored layout).
-   *
-   * THIS is the one call site (injected from StudioShell.tsx, which may
-   * import lib/touchEmission.ts) that applies the R11 matrix for the output
-   * path — this reducer (steps/) may not import lib/ directly, so the
-   * gating logic lives inside the injected implementation, not here.
-   */
-  buildTouchLayoutJson: (
-    baseIr: KeyboardIR,
-    assignments: ReadonlyArray<TouchAssignment>,
-    opts: {
-      /** Present ⇒ the base ships a shipped touch layout to adapt (Case B candidate). */
-      baseTouchJson?: string;
-      /** Desktop modifications to replay onto the seed (spec 035 R3). */
-      mods: DesktopModifications;
-      /** Raw fork choice — may be null; the dep resolves the R11 default. */
-      seedSource: "import-adapt" | "reseed-from-desktop" | null;
-    },
-  ) => { json: string | null; warnings: string[] };
-
-  /**
-   * Resolve the base keyboard's shipped .keyman-touch-layout JSON string from
-   * a VFS. Returns undefined when vfs is null or the file is absent/binary.
-   */
-  resolveBaseTouchJson: (vfs: VirtualFS | null) => string | undefined;
+  // --- Lib helpers ---
+  // (buildTouchLayoutJson + resolveBaseTouchJson retired at spec 090
+  // T042: the R2 build now composes them directly in
+  // lib/assignLoopCompletion.ts — D-090-38.)
 
   /**
    * Track 1 instantiation helper that guards against rebase without user
@@ -218,13 +139,9 @@ export interface ReducerDeps {
   setWorkingIR?: (ir: KeyboardIR) => void;
 
   // --- touch re-propagation (spec-014 US2, T024) ---
-  /**
-   * Read the current staleness closure (the P4b `staleSteps` slice). Injected
-   * (steps/ may not import stores/). Drives touch re-propagation on a physical
-   * change; an empty closure short-circuits to a no-op (R5). Absent ⇒ no
-   * re-propagation is attempted (P4b behavior).
-   */
-  getStaleSteps?: () => ReadonlySet<string>;
+  // (getStaleSteps retired at spec 090 T041 with R1: re-propagation is
+  // driven from lib/assignLoopCompletion.ts, which reads the closure
+  // from the store directly — D-090-38.)
 
   // --- decision audit (spec 053 FR-001/FR-002, research D-02) ---
   /**
@@ -327,84 +244,16 @@ export function applyStepCompletion(
     // completion payload, and MarksStepHost mirrors the R10 migration
     // determination into the session.)
 
-    // R1 — lock gate: fire lockDesktop() after Mechanisms completes.
-    case MECHANISMS_STEP_ID: {
-      deps.lockDesktop();
-      // spec-014 US2 (T024): a physical step/lock completion triggers automatic
-      // touch re-propagation. Spec 089 T021 (OI-1 ruled global): the mutate
-      // flag that used to gate this is deleted — re-propagation runs
-      // unconditionally. repropagate() itself short-circuits to a no-op when
-      // the staleness closure is empty (R5). Deps are injected to respect the
-      // steps-layer boundary (no stores/ import here).
-      if (
-        deps.getStaleSteps !== undefined &&
-        deps.getWorkingIR !== undefined &&
-        deps.setWorkingIR !== undefined
-      ) {
-        repropagate({
-          staleSteps: deps.getStaleSteps(),
-          getWorkingIR: deps.getWorkingIR,
-          setWorkingIR: deps.setWorkingIR,
-        });
-      }
-      break;
-    }
+    // (No mechanisms case: spec 090 T041 retired R1. The physical-layout
+    // decision records step-side in AddPhysicalAdapter, and the lock +
+    // re-propagation effects re-homed to lib/assignLoopCompletion.ts,
+    // fired by the adapter and by journey-runner's replay — D-090-38.)
 
-    // R2 — touch-layout build: mirrors StudioShell.tsx handlePhaseEComplete.
-    // Spec 035 R11: the reducer no longer gates the build on "assignments is
-    // empty" — that decision (the R11 emission matrix) now lives inside the
-    // injected deps.buildTouchLayoutJson (constructed in StudioShell.tsx,
-    // which may import lib/touchEmission.ts; this reducer may not). The one
-    // gate this reducer still owns is baseIr === null (nothing to build from).
-    case TOUCH_STEP_ID: {
-      // "Result may genuinely be absent" — destructuring an `undefined`
-      // cast directly throws.
-      const payload = (result as Partial<TouchCompleteResult> | undefined) ?? {};
-      const {
-        assignments = [],
-        baseIr = null,
-        baseVfs = null,
-        mods = EMPTY_DESKTOP_MODIFICATIONS,
-        seedSource = null,
-      } = payload;
+    // (No touch case: spec 090 T042 retired R2. The touch-layout
+    // decision records step-side in AddTouchAdapter, and the build +
+    // stale-clear effects re-homed to lib/assignLoopCompletion.ts,
+    // fired by the adapter and by journey-runner's replay — D-090-38.)
 
-      if (baseIr === null) {
-        // No working IR to derive from — clear the stored touch layout (KMW
-        // uses its native default).
-        deps.setTouchLayoutJson(null);
-      } else {
-        try {
-          const baseTouchJson = deps.resolveBaseTouchJson(baseVfs);
-          const { json, warnings } = deps.buildTouchLayoutJson(baseIr, assignments, {
-            ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
-            mods,
-            seedSource,
-          });
-          if (warnings.length > 0) {
-            devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson warnings:", warnings);
-          }
-          // json is null when the R11 matrix said "don't emit" OR the emit
-          // pipeline threw — omit rather than injecting null/empty either way.
-          deps.setTouchLayoutJson(json);
-        } catch (err) {
-          devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson threw unexpectedly:", err);
-          // Per spec, the transition proceeds regardless of build failure.
-          // Graceful degradation: no touch layout → KMW falls back to shipped file or its default.
-          deps.setTouchLayoutJson(null);
-        }
-      }
-      // Re-completing the touch step resolves whatever re-review flag was set
-      // on it (e.g. by a Mechanisms edit after unlock — MechanismGallery marks
-      // "touch" stale directly, since the production manifest gives "touch"
-      // inputs: [] and a mechanisms→touch stale-propagation edge does not
-      // exist). Clearing here, not on entry, means the flag survives until
-      // the user has actually re-reviewed and re-completed the step.
-      deps.clearStale(TOUCH_STEP_ID);
-      break;
-    }
-
-    // R3 — copy/adapt instantiation: mirrors StudioShell.tsx onInstantiate (lines 240-253).
-    // Routes Track 2 → instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
     case CHOOSE_BASE_STEP_ID: {
       const payload = result as Partial<InstantiateResult> | undefined;
       // Guard: result must carry a base keyboard. Without it, instantiation
@@ -573,7 +422,9 @@ export function recordAnswersAsDecisions(
 // contracts/apply-contract.md). The successor to routeAnswersThroughMutate:
 // where that routed answers through the flag-gated `mutate()` seam, this
 // runs each answered module's `apply()` UNCONDITIONALLY (A1 — no flag, no
-// per-module gate) and hands the returned patch to the injected sink.
+// per-module gate) and hands the returned patch to the injected sink. A
+// second pass runs composed applies whose own question went unanswered
+// when the completion recorded one of their `requires` inputs (A6).
 //
 // Called from StepHost.handleComplete AFTER recordAnswersAsDecisions (A6:
 // the completion's decisions are recorded first, so ctx.decisions includes
@@ -591,12 +442,18 @@ import { assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
 /**
  * Run the decision effects of a completed step's answers.
  *
- * For each answer whose module declares `apply`: build the ApplyContext
- * (the live IR is re-read per answer, so a later apply in the same
- * completion sees an earlier apply's IR write), call `apply`, verify every
- * returned channel against the authorization table, and hand the patch to
- * the injected sink. An unauthorized channel throws {@link ApplyChannelError}
- * before the sink is called — no partial patch (A3).
+ * Pass 1: for each answer whose module declares `apply`: build the
+ * ApplyContext (the live IR is re-read per answer, so a later apply in the
+ * same completion sees an earlier apply's IR write), call `apply`, verify
+ * every returned channel against the authorization table, and hand the
+ * patch to the injected sink. An unauthorized channel throws
+ * {@link ApplyChannelError} before the sink is called — no partial
+ * patch (A3).
+ *
+ * Pass 2: a composed apply (A6) whose own question went unanswered — a
+ * survey result carries no entry for an unanswered question — still runs
+ * when this completion recorded one of its declared `requires` inputs.
+ * See the pass-2 note at the loop below.
  *
  * A no-op when the host injected no patch sink.
  */
@@ -605,10 +462,17 @@ export function applyDecisionEffects(
   deps: ReducerDeps,
 ): void {
   if (deps.applyWorkingCopyPatch === undefined) return;
+  const sink = deps.applyWorkingCopyPatch;
   const decisions: DecisionSet = deps.getDecisions?.() ?? {};
-  for (const answer of result.answers) {
-    const mod = questionRegistry[answer.questionId];
-    if (mod === undefined || mod.apply === undefined) continue;
+
+  /** Run one module's apply through the authorization check into the sink. */
+  const runApply = (
+    questionId: string,
+    mod: QuestionModule,
+    value: string | string[] | undefined,
+  ): void => {
+    const apply = mod.apply;
+    if (apply === undefined) return;
     const writes = mod.writes ?? [];
     const ctx: ApplyContext = {
       ir: deps.getWorkingIR?.() ?? null,
@@ -616,8 +480,48 @@ export function applyDecisionEffects(
       decisions,
       currentHistoryEntryState: deps.getHistoryEntryState?.() ?? null,
     };
-    const patch = mod.apply(answer.value as string | string[] | undefined, ctx);
-    if (!assertPatchChannelsAuthorized(answer.questionId, mod, patch)) continue;
-    deps.applyWorkingCopyPatch(patch, writes);
+    const patch = apply(value, ctx);
+    if (!assertPatchChannelsAuthorized(questionId, mod, patch)) return;
+    sink(patch, writes);
+  };
+
+  // Pass 1 — per-answer dispatch, in answer order (A8).
+  const ran = new Set<string>();
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined || mod.apply === undefined) continue;
+    ran.add(answer.questionId);
+    runApply(answer.questionId, mod, answer.value as string | string[] | undefined);
+  }
+
+  // Pass 2 — input-triggered dispatch for composed applies (A6). A survey
+  // result omits UNANSWERED questions entirely, so a module whose question
+  // the author legitimately left blank never appears in `result.answers`
+  // and pass 1 cannot reach it — yet its apply may be a composed effect
+  // whose inputs are OTHER decisions this completion just recorded. The
+  // case that forced this: il_copyright_holder is optional and terminal,
+  // blank means "holder = author" (spec 064 D1), and its apply is the sole
+  // owner of the attribution channel; with per-answer dispatch only, the
+  // attribution never landed and the Output screen blocked every download
+  // (CI, PR #1974). So: a module that declares `apply`, was not answered,
+  // and names a `requires` decision this completion recorded also runs —
+  // with `undefined` as its value, composing from ctx.decisions like any
+  // composed apply. Registry order keeps the pass deterministic; modules
+  // already run in pass 1 are not re-run, and a module whose inputs this
+  // completion did not touch does not fire.
+  const recordedIds = new Set<string>();
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined) continue;
+    for (const id of mod.provides ?? []) recordedIds.add(id);
+  }
+  if (recordedIds.size > 0) {
+    for (const [questionId, mod] of Object.entries(questionRegistry)) {
+      if (mod.apply === undefined || ran.has(questionId)) continue;
+      const requires = mod.requires ?? [];
+      if (requires.length === 0) continue;
+      if (!requires.some((id) => recordedIds.has(id))) continue;
+      runApply(questionId, mod, undefined);
+    }
   }
 }

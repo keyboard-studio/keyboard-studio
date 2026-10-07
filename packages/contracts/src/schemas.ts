@@ -63,8 +63,9 @@ import type {
   DiffHunk,
   EditorActionSummary,
   EditorActionType,
+  JsonValue,
 } from "./decisionRecord";
-import { DECISION_RECORD_FORMAT } from "./decisionRecord";
+import { DECISION_RECORD_FORMAT, DECISION_SUMMARY_LIMIT } from "./decisionRecord";
 import type { HelpDocsAnswers } from "./help-docs";
 import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
@@ -752,6 +753,22 @@ export const BaseContributionSchema = z.object({
   instantiationMode: z.enum(["new-from-base", "adapt-existing"]),
 });
 
+// Any JSON value (spec 090 US5, D-090-48): a `decision` payload's `value` is
+// the providing module's own value type, and the record validates only that
+// it is JSON — never a per-module shape (see JsonValue in decisionRecord.ts).
+// Recursive via z.lazy; the explicit ZodType annotation is what keeps the
+// inferred type the contract's JsonValue rather than `unknown`.
+export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(JsonValueSchema),
+    z.record(z.string(), JsonValueSchema),
+  ]),
+);
+
 export const DecisionPayloadSchema = z.union([
   z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("char-list"), value: z.array(z.string()) }),
   z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("boolean"), value: z.boolean() }),
@@ -766,6 +783,15 @@ export const DecisionPayloadSchema = z.union([
     summary: EditorActionSummarySchema,
   }),
   BaseContributionSchema,
+  z.object({
+    kind: z.literal("decision"),
+    decisionId: z.string().min(1),
+    value: JsonValueSchema,
+    // Bounded at the same literal the recording host truncates to
+    // (DECISION_SUMMARY_LIMIT in decisionRecord.ts): one clause, never a
+    // rendering of the value.
+    summary: z.string().min(1).max(DECISION_SUMMARY_LIMIT),
+  }),
 ]);
 
 export const DecisionEntrySchema = z.object({
@@ -1096,6 +1122,7 @@ type _DecisionImpactGuard = Expect<AssignableTo<z.infer<typeof DecisionImpactSch
 type _BaseContributionGuard = Expect<
   AssignableTo<z.infer<typeof BaseContributionSchema>, BaseContribution>
 >;
+type _JsonValueGuard = Expect<AssignableTo<z.infer<typeof JsonValueSchema>, JsonValue>>;
 type _DecisionPayloadGuard = Expect<AssignableTo<z.infer<typeof DecisionPayloadSchema>, DecisionPayload>>;
 type _DecisionEntryGuard = Expect<AssignableTo<z.infer<typeof DecisionEntrySchema>, DecisionEntry>>;
 type _DecisionRecordGuard = Expect<AssignableTo<z.infer<typeof DecisionRecordSchema>, DecisionRecord>>;

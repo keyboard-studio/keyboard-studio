@@ -12,7 +12,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../decisions/extractContext.ts";
-import type { IdentityPatch } from "../stores/workingCopyStore.ts";
+import type { IdentityPatch } from "../stores/identityPatch.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -266,7 +266,7 @@ export interface QuestionModule {
    * IR locations this question READS — declared as static data.
    * Both `inputs` and `writes` address the same `IRPath` space over `KeyboardIR`
    * (one path algebra; no separate answer-key space). Consumed by the P0 dashboard
-   * and the orphan-input lint without invoking `mutate()`.
+   * and the orphan-input lint without invoking `apply()`.
    * Explicit `[]` is required for questions that read nothing (G7 / FR-006).
    */
   inputs?: readonly IRPath[];
@@ -282,7 +282,7 @@ export interface QuestionModule {
    * Output artifacts this question's answer reaches, if any (spec 059 FR-016).
    *
    * DIFFERENT ADDRESS SPACE from `writes`. `writes` is `IRPath[]` over
-   * `KeyboardIR` and governs `mutate()` containment; `outputs` names emitted
+   * `KeyboardIR` and governs `apply()` containment; `outputs` names emitted
    * ARTIFACTS. A question may legitimately declare `writes: []` and a non-empty
    * `outputs` — an identity answer writes no IR and still ships in the `.kps`.
    * That combination was previously inexpressible, which is why a question could
@@ -301,7 +301,9 @@ export interface QuestionModule {
    * the working copy from the recorded decisions and returns it as a
    * {@link WorkingCopyPatch}; MUST NOT mutate `ctx` or perform side effects.
    * The runner (`applyDecisionEffects` in steps/reducer.ts) executes it
-   * unconditionally for every answered module that declares it, after the
+   * unconditionally for every answered module that declares it — and for
+   * a composed module whose own question went unanswered, when the
+   * completion recorded one of its `requires` inputs — after the
    * completion's decisions are recorded (A6). Channel authorization is
    * fixed by the contract's table (A3) — returning an unauthorized channel
    * throws `ApplyChannelError` and applies nothing. An empty patch `{}` is
@@ -310,7 +312,7 @@ export interface QuestionModule {
    */
   apply?: (value: string | string[] | undefined, ctx: ApplyContext) => WorkingCopyPatch;
 
-  
+
   /**
    * Which spec unit(s) govern this question module (spec 031 FR-002). Same
    * vocabulary and shape as Step.specRef (steps/types.ts): `§N` / `§Na` or
@@ -336,6 +338,54 @@ export interface QuestionModule {
 
   /** Decisions that must be resolved before this module can run. */
   requires?: readonly DecisionId[];
+
+  /**
+   * Screen-grouping hint (spec 091 FR-002 / US3). Question-renderer modules
+   * sharing a `group` merge into one wizard screen keyed by it; a `group`
+   * naming a custom (singleton) screen instead marks the module intra-step
+   * to that screen (the two-level treatment in spec 091 research.md).
+   * Seeded per live flow at registry composition. Display/partition only:
+   * it NEVER affects order — placement is provides/requires plus the
+   * stable declaration-order tie-break (FR-001).
+   */
+  group?: string;
+
+  /**
+   * Declared screen key (spec 091, FR-002/FR-004): for a custom
+   * (component-renderer) module, the id of the singleton screen it forms.
+   * Seeded with today's step ids on the gallery modules, so derived screen
+   * ids keep the author's vocabulary (deep links, draft history). Absent on
+   * question modules (their screen id is their `group`). Never affects
+   * order.
+   */
+  screen?: string;
+
+  /**
+   * Screen-order requirements (spec 091 FR-003, phase-4 revision): decisions
+   * that must be provided by an EARLIER screen for this module's screen to be
+   * placed correctly — the former STEP-layer `requires` from the pre-091
+   * step table, re-homed. Distinct from `requires` (a
+   * question-order fact inside the flow graph): `screenRequires` is honoured
+   * ONLY by `deriveScreens`, which folds it into the full-list sort. It is
+   * deliberately invisible to per-flow ordering (orderParity / SC-002 sort a
+   * flow's modules alone, where a cross-screen decision is unresolvable and
+   * must not throw) and to the runner.
+   */
+  screenRequires?: readonly DecisionId[];
+
+  /**
+   * Snapshot-only decision dependencies (spec 092 G-14, lead ruling A2):
+   * decisions whose values join the `inputs` snapshot of records this
+   * module seeds — alongside `requires` — WITHOUT becoming ordering
+   * requirements. For a run-time DATA dependency that is not an order
+   * fact: the dependency's information stays auditable on the record
+   * (088 FR-001) while `orderDecisions` / `deriveScreens` never see the
+   * edge. Read by the live extraction pass's snapshot; invisible to
+   * ordering, gating, and the runner. NOT the `inputs` field above —
+   * that is `IRPath[]` over the KeyboardIR address space; this channel
+   * names DecisionIds.
+   */
+  snapshotInputs?: readonly DecisionId[];
 
   /**
    * Base-keyboard probe: read this module's decisions from the import bundle

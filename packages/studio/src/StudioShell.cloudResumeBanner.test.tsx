@@ -29,7 +29,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "./stores/phaseBDraftStore.ts";
+import { resetInventoryDraft } from "./survey/useInventoryDraft.ts";
 import { markVisited } from "./lib/firstVisit.ts";
 import { makeScaffoldedIR } from "./test/draftSeeds.ts";
 
@@ -145,7 +145,7 @@ function buildRemoteEnvelope(): DurableDraft {
   localStorage.clear();
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
+  resetInventoryDraft();
 
   return envelope;
 }

@@ -15,7 +15,8 @@ import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore
 import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { charToPositionToken } from "../../lib/stepWalk.ts";
-import { MECHANISMS_STEP_ID, TOUCH_STEP_ID, applyStepCompletion, type ReducerDeps } from "../../steps/reducer.ts";
+import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { applyPhysicalCompletionEffects } from "../../lib/assignLoopCompletion.ts";
 import type { EditorStep, Step } from "../../steps/types.ts";
 import { createVirtualFS, irPath, ARRAY_INDEX, type MechanismAssignment, type IRGroup, type IRRule } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -910,12 +911,13 @@ describe("MechanismGallery — Done button forced visible when the whole invento
 //       character gets assigned to at least one key/mechanism" functional
 //       path, and
 //   (b) reaching the phase's completion (the final Done click) fires the
-//       real applyStepCompletion(MECHANISMS_STEP_ID) reducer path (R1),
+//       real completion effects (R1, re-homed from the reducer to
+//       lib/assignLoopCompletion.ts at spec 090 T041 — D-090-38),
 //       landing desktopLocked === true on the real store.
 //
 // NOTE: the explicit-gate UX affordance (a visible lock button) is
 // deliberately deferred — this suite asserts only the functional auto-lock
-// side effect via the reducer, never a lock-button UI element.
+// side effect via the completion effects, never a lock-button UI element.
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008)", () => {
@@ -926,21 +928,10 @@ describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008
     let completionFired = false;
     const onComplete = () => {
       completionFired = true;
-      // Mirror the production wiring (SurveyView -> applyStepCompletion): the
-      // gallery's onComplete triggers the reducer's R1 lock gate. lockDesktop
-      // is bound to the REAL store action so this exercises the actual
-      // desktopLocked flip, not a mock.
-      const deps: ReducerDeps = {
-        lockDesktop: useWorkingCopyStore.getState().lockDesktop,
-        clearStale: vi.fn(),
-        setTouchLayoutJson: vi.fn(),
-        instantiateFromBase: vi.fn(),
-        instantiateFromExisting: vi.fn(),
-        buildTouchLayoutJson: vi.fn().mockReturnValue({ json: "{}", warnings: [] }),
-        resolveBaseTouchJson: vi.fn().mockReturnValue(undefined),
-        instantiateFromBaseIfConfirmed: vi.fn().mockReturnValue(true),
-      };
-      applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
+      // Mirror the production wiring (AddPhysicalAdapter -> completion
+      // effects): the gallery's onComplete fires the R1 effects, which
+      // flip the REAL store's desktopLocked — not a mock.
+      applyPhysicalCompletionEffects();
     };
 
     await act(async () => {
@@ -966,7 +957,7 @@ describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008
     }
 
     // The last character's forward button reads "Done" — Apply, then Done
-    // fires onComplete (which runs the real R1 lock reducer above).
+    // fires onComplete (which runs the real R1 completion effects above).
     const lastChar = DECLARED_CHARS[DECLARED_CHARS.length - 1]!;
     fireEvent.click(
       screen.getByRole("button", {

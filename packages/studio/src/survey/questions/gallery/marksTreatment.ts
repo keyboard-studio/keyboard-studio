@@ -44,12 +44,21 @@ const MARKS_WRITES: readonly IRPath[] = [irPath("groups"), irPath("stores")];
 const marksTreatment: GalleryModule<MarksTreatmentValue> = {
   definition,
   provides: ["marks-treatment"],
+  screen: "marks",
   requires: ["character-inventory"],
   inputs: [],
   writes: MARKS_WRITES,
   apply: (value: MarksTreatmentValue | undefined, ctx) => {
-    if (value === undefined || value.completion === null || ctx.ir === null) return {};
-    const guarded = applyMarkGuards(ctx.ir, value.completion.worklist, value.completion.outputForm);
+    // Pass-2 composition (089 semantics, relayed 2026-10-07): when a
+    // completion records character-inventory, this apply also runs —
+    // with value undefined — and must compose from ctx.decisions: the
+    // recorded marks value, if one exists, is the effective value.
+    const effective =
+      value ??
+      (ctx.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined);
+    if (effective === undefined || effective.completion === null || ctx.ir === null) return {};
+    const completion = effective.completion;
+    const guarded = applyMarkGuards(ctx.ir, completion.worklist, completion.outputForm);
     if (guarded.ir === ctx.ir) return {};
     const ir: Partial<KeyboardIR> = {};
     if (guarded.ir.groups !== ctx.ir.groups) ir.groups = guarded.ir.groups;

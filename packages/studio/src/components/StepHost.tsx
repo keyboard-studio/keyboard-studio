@@ -50,8 +50,8 @@ import { getDecisionSnapshot, selectTouchSeedSource, selectTrack, useDecisionSto
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { DecisionId } from "../decisions/decisionTypes.ts";
-import { manifest } from "../steps/manifest.ts";
-import type { EditorStep } from "../steps/types.ts";
+import { manifest as defaultManifest } from "../steps/manifest.ts";
+import type { EditorStep, Step } from "../steps/types.ts";
 import {
   applyDecisionEffects,
   applyStepCompletion,
@@ -97,6 +97,16 @@ export interface StepHostProps {
   onStartOver: () => void;
   /** Optional: shared survey context to pass as EditorStepProps.ctx. */
   ctx?: SurveyContext;
+  /**
+   * Optional: the manifest to resolve the active step from (spec 091
+   * T010 — the seam the SC-001 test drives: a manifest built by
+   * steps/manifest.ts `buildManifest` from a supplied module list).
+   * Defaults to the live built manifest; StudioShell passes nothing, so
+   * production behaviour is unchanged. Step RESOLUTION reads this list;
+   * the advance() navigation policy keeps reading the default manifest
+   * until Phase 4 (T012) rewires it.
+   */
+  manifest?: readonly Step[];
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +198,8 @@ const DEEP_LINK_CONTINUE_BUTTON_STYLE: CSSProperties = {
 // StepHost
 // ---------------------------------------------------------------------------
 
-export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): ReactNode {
+export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp }: StepHostProps): ReactNode {
+  const manifest = manifestProp ?? defaultManifest;
   const { t, i18n } = useLingui();
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   // The identity result is read here only for the terminal panels

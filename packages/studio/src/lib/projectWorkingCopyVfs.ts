@@ -112,7 +112,7 @@ import {
   spliceRuleAdditions,
   hasRuleAdditions,
   type DerivedRuleAdditions,
-} from "./ruleAdditions.ts";
+} from "../survey/rules/ruleAdditions.ts";
 import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */

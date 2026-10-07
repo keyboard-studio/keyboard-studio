@@ -24,7 +24,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
-import { deriveRuleAdditions } from "./ruleAdditions.ts";
+import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import {

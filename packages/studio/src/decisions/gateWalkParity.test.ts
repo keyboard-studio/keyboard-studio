@@ -2,9 +2,11 @@
 // as used by runDecisionFlow) select exactly the questions the survey runner
 // reaches by walking `definition.next` (spec 087 FR-005, one routing source).
 //
-// For every derived flow in flowSources and a set of answer combinations
-// (every gate option enumerated; sampled when the product is large), the set of
-// visible modules under the derived gates must equal the walked set.
+// For every derived screen (spec 091 T018 — the iteration is over
+// decisions/deriveScreens.ts screens, not flowSources flows) and a set of
+// answer combinations (every gate option enumerated; sampled when the
+// product is large), the set of visible modules under the derived gates
+// must equal the walked set.
 //
 // `ctx.*` conditions have no DecisionSet equivalent: the derivation fails open,
 // so the walker treats such a rule as "may be taken" and also keeps following
@@ -12,15 +14,16 @@
 // evalCondition.
 
 import { describe, it, expect } from "vitest";
-import { flowSources } from "../steps/flowSources.ts";
 import { evalCondition } from "../survey/SurveyRunner.tsx";
 import type { QuestionModule } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 import {
+  decisionModules,
   demotedPhaseFModules,
   reserveModules,
 } from "../survey/questions/registry.ts";
-import { effectiveGatedBy, orderDecisions } from "./orderDecisions.ts";
+import { deriveScreens } from "./deriveScreens.ts";
+import { effectiveGatedBy } from "./orderDecisions.ts";
 
 const MAX_COMBOS = 300;
 
@@ -133,7 +136,7 @@ function combos(branching: readonly QuestionModule[]): Map<string, string | unde
   return out;
 }
 
-/** Modules outside every flowSources flow that may still carry a `next` graph. */
+/** Modules outside every derived screen that may still carry a `next` graph. */
 const extraGroups: Record<string, readonly QuestionModule[]> = {
   demotedPhaseF: demotedPhaseFModules,
   reserve: reserveModules,
@@ -163,18 +166,31 @@ function checkParity(modules: readonly QuestionModule[]): void {
   if (branching.length > 0) expect(sizes.size).toBeGreaterThan(1);
 }
 
+/** Member modules of each derived screen, by screen id (spec 091 T018). */
+const screenGroups: Record<string, readonly QuestionModule[]> = ((): Record<
+  string,
+  readonly QuestionModule[]
+> => {
+  const byModuleId = new Map(decisionModules.map((m) => [m.definition.id, m] as const));
+  const out: Record<string, readonly QuestionModule[]> = {};
+  for (const s of deriveScreens(decisionModules)) {
+    out[`screen:${s.id}`] = s.moduleIds
+      .map((id) => byModuleId.get(id))
+      .filter((m): m is QuestionModule => m !== undefined);
+  }
+  return out;
+})();
+
 describe("derived gates agree with walking definition.next", () => {
-  for (const [flowId, source] of Object.entries(flowSources)) {
-    const modules = source.derivedModules;
-    if (modules === undefined) continue;
-    it(`${flowId}: visible set equals walked set for every sampled answer combination`, () => {
-      orderDecisions(modules); // the flow derives at all
+  for (const [screenId, modules] of Object.entries(screenGroups)) {
+    it(`${screenId}: visible set equals walked set for every sampled answer combination`, () => {
+      expect(modules.length).toBeGreaterThan(0);
       checkParity(modules);
     });
   }
 
   for (const [groupId, modules] of Object.entries(extraGroups)) {
-    it(`${groupId} (outside flowSources): visible set equals walked set`, () => {
+    it(`${groupId} (outside derived screens): visible set equals walked set`, () => {
       expect(modules.length).toBeGreaterThan(0);
       checkParity(modules);
     });

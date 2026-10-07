@@ -132,10 +132,15 @@ describe("runLiveExtraction — seeding", () => {
     expect(store.decisions["copyright-holder"]?.provenance).toBe("extracted");
   });
 
-  it("snapshots the module's requires values into the seeded record's inputs", () => {
+  it("snapshots requires ∪ snapshotInputs values into the seeded record's inputs", () => {
+    // Spec 092 T012's recorded behaviour, re-pinned under G-14 / ruling
+    // A2: authoring-track arrives via the module's `snapshotInputs`
+    // declaration (a data dependency), not an ordering `requires` edge —
+    // the seeded record's snapshot is byte-identical either way.
     const holder = stubModule("il_copyright_holder", {
       provides: ["copyright-holder"],
-      requires: ["author-name", "authoring-track"],
+      requires: ["author-name"],
+      snapshotInputs: ["authoring-track"],
       extract: () => "(c) X",
     });
     const store = fakeStore({

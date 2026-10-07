@@ -90,5 +90,9 @@ const mod: QuestionModule = {
   writes: [irPath("header", "keyboardId")],
   provides: ["project-keyboard-id"],
   requires: ["project-display-name"],
+  // Spec 091 (Delta P2/P6): the project_name screen's copy-track gate is
+  // declared once for the screen in the registry's `declaredScreenGates`
+  // (a manifest-level fork gate is not routing-expressible, and spec 087
+  // FR-005 forbids a module-level gatedBy).
 };
 export default mod;

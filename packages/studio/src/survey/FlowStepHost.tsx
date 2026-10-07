@@ -22,7 +22,11 @@ import type { FlowDef, SurveyContext } from "./types.ts";
 export interface FlowStepHostProps {
   /** Pre-loaded flow (factory calls loadFlowSourceDef(source)). */
   flow: FlowDef;
-  /** Header text (from options.title / flowSource.title). */
+  /**
+   * Header text — the hosted flow's derived SCREEN label (spec 091 T020):
+   * the factory resolves the screen's localized title (keyed by screen id)
+   * or falls back to options.title / flowSource.title.
+   */
   title: string;
   /** Survey context passed to SurveyRunner (from options.buildContext). */
   context: SurveyContext;

@@ -118,12 +118,18 @@ const mod: QuestionModule = {
   writes: [],
   // Decision spike (km/decisions-spike).
   provides: ["copyright-holder"],
-  // Spec 092 FR-005 (the series acceptance test): the authoring-track
-  // decision is also required — the track decides what the starting
-  // point's copyright may do here (seed on adapt, never offered on copy),
-  // and the derived order (spec 087/091) now places this question after
-  // the track choice, where the extraction pass has already run.
-  requires: ["author-name", "authoring-track"],
+  // Spec 092 FR-005 (the series acceptance test): the holder defaults to
+  // the author, so the author-name decision is a true ordering
+  // requirement. The authoring-track dependency is NOT one (G-14, lead
+  // ruling A2): it is a run-time DATA dependency — the track decides what
+  // the starting point's copyright may do here (seed on adapt, never
+  // offered on copy) — consumed by `seedWhen` below, by the setup gate
+  // (the track is recorded before the pass runs), and by the seeded
+  // record's `inputs` snapshot via `snapshotInputs`. As a `requires`
+  // edge it was false: 091's frozen baseline sorts identity first, and
+  // the edge dragged this module out of its screen group.
+  requires: ["author-name"],
+  snapshotInputs: ["authoring-track"],
   extract: extractCopyrightHolder,
   // Spec 092 T022: the track-dependent seeding disposition, declared here
   // rather than special-cased in the pass. Adapt: the extracted notice

@@ -63,6 +63,17 @@ function routingPredecessors<T>(
 ): Map<string, Set<string>> {
   const ids = items.map((i) => node(i).id);
   const idSet = new Set(ids);
+  // Spec 091 note (Delta P5, REVERTED in phase 4): an earlier revision dropped
+  // a routing edge u -> v whenever u transitively required a decision v
+  // provides (requires = declared placement wins over a stale `next`). That
+  // made injected routing faults SILENT — successCriteria.sc002's fault
+  // injection requires every undocumented routing edge to surface as a named
+  // error — so the drop was reverted and 087 semantics restored verbatim.
+  // Consequence, recorded as an open delta for the lead: SC-001's one-edit
+  // move (T009) trips the routing-cycle error when the moved question's
+  // `next` points at a question whose decision it now transitively requires;
+  // the seam works when the edit also re-points `next` (or the cycle does not
+  // arise). See plan.md, Delta P5.
   const out = new Map<string, RouteEdge[]>();
   const hasInbound = new Set<string>();
   for (const item of items) {
@@ -261,6 +272,47 @@ export function orderDecisions(
   modules: readonly QuestionModule[],
 ): QuestionModule[] {
   return orderByDependencies(modules, moduleNode);
+}
+
+/**
+ * A node's place in the flow, derived rather than flagged.
+ *
+ * spine: false  — the node is conditionally gated (a side trail).
+ * joinTarget    — a side trail's next UNGATED successor in the derived order:
+ *                 where it rejoins the main line. Absent on spine nodes, and
+ *                 absent on a gated node with no ungated successor (a dead
+ *                 end, which completeness check C3 reports).
+ */
+export interface StepTrail {
+  readonly spine: boolean;
+  readonly joinTarget?: string;
+}
+
+/**
+ * Derive each node's trail from an already-ordered list: a node with a
+ * `gatedBy` is a side trail and rejoins at the next node without one.
+ *
+ * Lives here, beside the sort (spec 091): steps/stepOrder.ts applies it to
+ * steps and decisions/deriveScreens.ts applies it to derived screens, and
+ * neither may import the other. stepOrder.ts re-exports it for its
+ * existing consumers.
+ */
+export function deriveStepStructure(
+  ordered: readonly {
+    readonly id: string;
+    readonly gatedBy?: ((decisions: DecisionSet) => boolean) | undefined;
+  }[],
+): ReadonlyMap<string, StepTrail> {
+  const trails = new Map<string, StepTrail>();
+  ordered.forEach((step, i) => {
+    if (step.gatedBy === undefined) {
+      trails.set(step.id, { spine: true });
+      return;
+    }
+    const join = ordered.slice(i + 1).find((s) => s.gatedBy === undefined);
+    trails.set(step.id, join === undefined ? { spine: false } : { spine: false, joinTarget: join.id });
+  });
+  return trails;
 }
 
 /**

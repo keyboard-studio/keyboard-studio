@@ -49,6 +49,7 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 // result/context/scaffold types are likewise gone with the fields they typed
 // — those values are derived from the decision store (T017).
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
+import { resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
 
 // ---------------------------------------------------------------------------
 // CharactersSubStage — internal substage for the characters manifest step.
@@ -484,8 +485,6 @@ export interface SurveySessionState {
    */
   hydrate: (snapshot: SurveySessionSnapshot) => void;
 
-
-
   /** Plain setter — local base driving the compile pipeline. */
   setLocalBase: (b: BaseKeyboard | null) => void;
 
@@ -900,11 +899,30 @@ export function expectedBackTarget(
  * repair step for that case. See the STEP_ORDER/sanitizeHistory doc comment.
  */
 export function applyTraversalSnapshot(snapshot: TraversalSnapshot): void {
-  useSurveySessionStore.setState({
+  // Spec 091 T015: a draft persisted before the derived screens maps its
+  // stored step ids through the frozen legacy map (decisions/
+  // legacyStepIds.ts), so the active step, history and visited land on
+  // the screens that now hold those steps' decisions. Current ids map to
+  // themselves, so a current draft is untouched.
+  const activeStepId = resolveLegacyStepId(snapshot.activeStepId) as ActiveStepId;
+  const history = snapshot.history.map(
+    (id) => resolveLegacyStepId(id) as ActiveStepId,
+  );
+  const mapped: TraversalSnapshot = {
     ...snapshot,
-    history: sanitizeHistory(snapshot.activeStepId, snapshot.history),
+    activeStepId,
+    history,
+    ...(snapshot.visited !== undefined && {
+      visited: snapshot.visited.map(
+        (id) => resolveLegacyStepId(id) as ActiveStepId,
+      ),
+    }),
+  };
+  useSurveySessionStore.setState({
+    ...mapped,
+    history: sanitizeHistory(activeStepId, history),
     // Same back-fill as `hydrate` — this is the OTHER restore seam, and a
     // draft written before the slot existed reaches the store through either.
-    visited: normalizeVisited(snapshot),
+    visited: normalizeVisited(mapped),
   });
 }

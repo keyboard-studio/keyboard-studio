@@ -41,6 +41,8 @@ import { useDecisionLogStore } from "./decisionLogStore.ts";
 import { recordSurveyAnswers, type ProposalLookup } from "./recordSurveyAnswers.ts";
 import { withContextToleranceProposal } from "./contextToleranceProposal.ts";
 import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
+import { recordGalleryDecisions } from "./recordGalleryDecisions.ts";
+import type { Decision } from "./decisionTypes.ts";
 import {
   recordBaseContribution,
   type InstantiatedMode,
@@ -115,6 +117,14 @@ export interface DecisionRecorderDeps {
    * (its final screen), or the step itself for a single-screen step.
    */
   resolveCompletionScreen?: (stepId: string) => string;
+  /**
+   * spec 090 US5: the gallery decisions a step settles (its `settles` list
+   * resolved against the live decision set), read at completion so each
+   * appends its one log entry (recordGalleryDecisions.ts). Optional — a
+   * recorder built without it (unit fixtures) records answers and editor
+   * steps exactly as before.
+   */
+  getStepDecisions?: (stepId: string) => readonly Decision[];
 }
 
 /** Records one screen's answers at its Next (spec 079 R-04). */
@@ -261,15 +271,34 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
       ...(deps.getCarveChars !== undefined ? { getCarveChars: deps.getCarveChars } : {}),
     });
 
+    // spec 090 US5 (research R6): the step's settled GALLERY decisions, read
+    // from the decision set — by completion the host/adapters have recorded
+    // them, and StepHost's recordAnswersAsDecisions has already run for this
+    // completion's answers, so the set read here is final for this boundary.
+    const galleryIds =
+      deps.getStepDecisions !== undefined
+        ? recordGalleryDecisions(stepId, {
+            append: log.append,
+            decisions: deps.getStepDecisions(stepId),
+          })
+        : [];
+
     // Every entry recorded at this boundary — a question step's answers, or an
     // editor step's single aggregated entry (never both: a step is one or the
-    // other). This is the boundary's full co-decision set, collected BEFORE the
-    // capture resolves so `sharedWith` can name every sibling once it lands.
+    // other), plus the step's gallery-decision entries, which can accompany
+    // either (a characters completion records its answers AND its inventory
+    // decision; a carve completion its editor entry AND its carved-layout
+    // decision). This is the boundary's full co-decision set, collected BEFORE
+    // the capture resolves so `sharedWith` can name every sibling once it lands.
     //
     // Advance the source baseline on EVERY completion, whether or not anything
     // was recorded. Skipping non-recording steps would make the next diff span
     // two boundaries and attribute another step's change to this one.
-    captureAndAttach(editorId !== null ? [editorId] : answerIds);
+    captureAndAttach([
+      ...answerIds,
+      ...(editorId !== null ? [editorId] : []),
+      ...galleryIds,
+    ]);
   }) as DecisionRecorder;
 
   recordDecision.recordQuestionAnswers = (stepId, screenId, answers) => {

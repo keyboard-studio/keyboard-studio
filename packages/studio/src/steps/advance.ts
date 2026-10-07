@@ -17,7 +17,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
-import { manifest } from "./manifest.ts";
+import { manifest, screenGates } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
 import type { Step } from "./types.ts";
 
@@ -130,10 +130,11 @@ export const STEPS_WITH_APPLY_COMPLETION: ReadonlySet<string> = new Set([
   "characters",
   "marks",
   "carve",
-  "mechanisms",
-  "touch",
   "help",
 ]);
+// ("mechanisms" left the set at spec 090 T041 and "touch" at T042: their
+// R1/R2 effects re-homed to lib/assignLoopCompletion.ts, fired by
+// AddPhysicalAdapter / AddTouchAdapter — D-090-38.)
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf — moved from StudioShell.tsx (was private, now exported).
@@ -172,12 +173,14 @@ export function nextMainLineStepAfter(currentId: string): ActiveStepId {
 }
 
 /**
- * Does a side-trail step apply for this context? The condition is the step's
- * own `gatedBy` (steps/stepDependencies.ts) — the single source — evaluated
- * over the decisions the context already records.
+ * Does a side-trail step apply for this context? The condition is the
+ * step's DERIVED SCREEN gate (spec 091 T015 — steps no longer carry
+ * `gatedBy`; steps/manifest.ts publishes the derived gates as
+ * `screenGates`) — the single source — evaluated over the decisions the
+ * context already records.
  */
 function stepApplies(step: Step | undefined, ctx: AdvanceContext): boolean {
-  const gate = step?.gatedBy;
+  const gate = step === undefined ? undefined : screenGates.get(step.id);
   if (gate === undefined) return true;
   return gate(ctx.decisions ?? {});
 }

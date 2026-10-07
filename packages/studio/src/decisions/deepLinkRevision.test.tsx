@@ -46,7 +46,16 @@ function TrivialTouchStep({ onComplete }: EditorStepProps): React.ReactElement {
     <button
       type="button"
       data-testid="touch-confirm"
-      onClick={() => onComplete({ assignments: [], baseIr: null, baseVfs: null })}
+      onClick={() => {
+        const payload = { assignments: [], baseIr: null, baseVfs: null };
+        // Mirror AddTouchAdapter's completion wiring (spec 090 T042): the
+        // adapter fires the touch completion effects — whose clearStale is
+        // the staleness side effect under test — before reporting the
+        // completion. (Pre-T042 the reducer's R2 case did this from the
+        // payload via deps.clearStale.)
+        applyTouchCompletionEffects(payload);
+        onComplete(payload);
+      }}
     >
       confirm
     </button>
@@ -70,10 +79,25 @@ vi.mock("../steps/manifest.ts", () => ({
       component: TrivialTouchStep,
     },
   ],
+  // Spec 091 T015: jumpToLocation's live resolve context reads the derived
+  // screen gates from the manifest module; this fixture's single step is
+  // ungated, so the map is empty.
+  screenGates: new Map(),
+  // Spec 091 T008/T016: steps/stepOrder.ts re-publishes the manifest's
+  // derivation, so the stub models the derived screen and trails for the
+  // fixture's single step too.
+  derivedScreens: [
+    { id: "touch", kind: "custom", decisionIds: ["touch-layout"], moduleIds: [], spine: true },
+  ],
+  screenTrails: new Map([
+    ["touch", { spine: true }],
+    ["package", { spine: true }],
+  ]),
 }));
 
 import { StepHost } from "../components/StepHost.tsx";
 import { jumpToLocation, clearPendingJump } from "../lib/jumpToLocation.ts";
+import { applyTouchCompletionEffects } from "../lib/assignLoopCompletion.ts";
 
 // ---------------------------------------------------------------------------
 // Staleness fixture for `bindManifest` (workingCopyStore's OWN write/inputs
@@ -135,15 +159,8 @@ function makeRecordDecision(touchKeysAffected: number): ReducerDeps["recordDecis
 
 function makeReducerDeps(touchKeysAffected: number): ReducerDeps {
   return {
-    lockDesktop: vi.fn(),
-    setTouchLayoutJson: vi.fn(),
-    // The REAL store action — this is the staleness side effect under test,
-    // not a spy standing in for it.
-    clearStale: (stepId) => useWorkingCopyStore.getState().clearStale(stepId),
     instantiateFromBase: vi.fn(),
     instantiateFromExisting: vi.fn(),
-    buildTouchLayoutJson: vi.fn(() => ({ json: null, warnings: [] })),
-    resolveBaseTouchJson: vi.fn(() => undefined),
     instantiateFromBaseIfConfirmed: vi.fn(() => true),
     recordDecision: makeRecordDecision(touchKeysAffected),
   };

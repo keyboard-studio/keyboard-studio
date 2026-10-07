@@ -21,19 +21,35 @@
 //
 // Coverage truth is the SAME shared helper (lib/unimplementedInventory.ts)
 // both galleries use — do not fork the definition here.
+//
+// spec 090 T052: the gate also carries the `help-docs` gallery-host
+// registration — its completion wrap records the composite decision the
+// step settles (see handleComplete below), the one write this wrapper
+// owns; the gate's display behaviour above is unchanged by it.
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
+import type { SurveyAnswer } from "@keyboard-studio/contracts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useInventoryCoverageGate } from "../../hooks/useInventoryCoverageGate.ts";
 import { formatCoverageBannerParts } from "../../lib/unimplementedInventory.ts";
 import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
 import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
 import { DocsPreviewPanel } from "../../components/DocsPreviewPanel.tsx";
+import { composeHelpDocsValue } from "../../survey/questions/gallery/helpDocs.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
+
+/** The answers a completion result carries, when it is a phase result. */
+function phaseAnswersOf(result: unknown): readonly SurveyAnswer[] | undefined {
+  if (typeof result !== "object" || result === null) return undefined;
+  const answers = (result as { answers?: unknown }).answers;
+  return Array.isArray(answers) ? (answers as readonly SurveyAnswer[]) : undefined;
+}
 
 export function PhaseFGate(props: EditorStepProps): React.ReactElement {
   const { t } = useLingui();
+  const { onComplete } = props;
 
   const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
 
@@ -78,9 +94,31 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
     );
   };
 
+  // spec 090 T052 (research Q3): the gate is where the `help` step's
+  // completion is observable, so the gate records the composite `help-docs`
+  // decision — composed from the completion's own answers, provenance
+  // "derived" (the tool composes it from the flow's decisions; no question
+  // asks for it directly) — BEFORE handing the result on, so StepHost's
+  // completion recorder (T050) sees the settled record and appends the
+  // decision's one log entry. This is the gallery-host registration for
+  // help-docs; it writes a decision RECORD only, no working-copy state —
+  // 089's flow applies remain the step's only write path.
+  const handleComplete = (result: unknown): void => {
+    const answers = phaseAnswersOf(result);
+    if (answers !== undefined) {
+      useDecisionStore.getState().record({
+        id: "help-docs",
+        value: composeHelpDocsValue(answers),
+        provenance: "derived",
+        step: "help",
+      });
+    }
+    onComplete(result);
+  };
+
   return (
     <>
-      <PhaseFStepFactoryComponent {...props} />
+      <PhaseFStepFactoryComponent {...props} onComplete={handleComplete} />
       <DocsPreviewPanel />
       <ConfirmDialog
         open={blocked}

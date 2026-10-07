@@ -10,8 +10,14 @@
 
 import { describe, it, expect } from "vitest";
 import { advance, nextMainLineStepAfter, manifestIndexOf } from "./advance.ts";
-import { manifest, validateManifestShape } from "./manifest.ts";
+import { buildManifest, manifest, validateManifestShape } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
+import type { DecisionId } from "../decisions/decisionTypes.ts";
+import {
+  decisionModules,
+  declaredScreenGates,
+} from "../survey/questions/registry.ts";
 
 // ---------------------------------------------------------------------------
 // walkSpine — drive advance() from "identity" to a terminal, collecting the
@@ -562,5 +568,93 @@ describe("advance: gates read the DecisionSet (spec 088 T020)", () => {
       },
     });
     expect(outcome.next).toBe("touch_seed_source");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 091 T021 (US3) — walk-level tests over derived screens.
+//
+// The split-run case exercises the T010 seam the host walks (buildManifest
+// over a supplied module list): advance() itself is id-based over the live
+// manifest, so the split is asserted on the built sequence and the derived
+// screens' labels, and the gate cases are asserted through advance() on the
+// live manifest.
+// ---------------------------------------------------------------------------
+
+describe("spec 091 T021 — derived screens in the walk", () => {
+  // The SC-001 declaration edit (same as T009/T011): il_language_autonym
+  // gains requires: ["base-keyboard"] and its `next` is re-pointed.
+  const editedModules = decisionModules.map((m) =>
+    m.definition.id === "il_language_autonym"
+      ? {
+          ...m,
+          requires: [...(m.requires ?? []), "base-keyboard" as DecisionId],
+          definition: { ...m.definition, next: null },
+        }
+      : m,
+  );
+
+  it("a split run yields two screens with the same group label, in derived order", () => {
+    const screens = deriveScreens(editedModules, declaredScreenGates);
+    const identityScreens = screens.filter((s) => s.id === "identity");
+    expect(identityScreens).toHaveLength(2);
+    // Same group label on both halves of the split run.
+    expect(identityScreens.map((s) => s.group)).toEqual(["identity", "identity"]);
+    // Derived order: first identity run, layout, choose_base, second run.
+    const ids = screens.map((s) => s.id);
+    const firstIdx = ids.indexOf("identity");
+    const secondIdx = ids.lastIndexOf("identity");
+    expect(ids.indexOf("layout")).toBeGreaterThan(firstIdx);
+    expect(ids.indexOf("choose_base")).toBeGreaterThan(ids.indexOf("layout"));
+    expect(secondIdx).toBeGreaterThan(ids.indexOf("choose_base"));
+
+    // The manifest the host walks (T010 seam) carries the same sequence.
+    const built = buildManifest(editedModules);
+    expect(built.map((s) => s.id)).toEqual([...ids, "package"]);
+    expect(built.filter((s) => s.id === "identity")).toHaveLength(2);
+  });
+
+  it("baseline contrast: the unedited registry walks a single identity screen", () => {
+    const built = buildManifest(decisionModules);
+    expect(built.filter((s) => s.id === "identity")).toHaveLength(1);
+    expect(built.map((s) => s.id)).toEqual(manifest.map((s) => s.id));
+  });
+
+  it("a screen whose decisions are all gated off is skipped by advance (adapt skips project_name)", () => {
+    const outcome = advance("track", undefined, adaptCtx);
+    expect(outcome.next).toBe("characters");
+  });
+
+  it("the same screen is walked when its gate passes (copy walks project_name)", () => {
+    const outcome = advance("track", undefined, copyCtx);
+    expect(outcome.next).toBe("project_name");
+    // And the walked side trail rejoins the spine at characters.
+    expect(advance("project_name", undefined, copyCtx).next).toBe("characters");
+  });
+
+  it("a partially gated screen is walked: characters carries routing-gated questions but no screen gate", () => {
+    // The characters screen has no entry in the derived screen gates (its
+    // members' gates are per-question routing), so advance lands on it and
+    // walks through it on BOTH tracks.
+    expect(advance("track", undefined, adaptCtx).next).toBe("characters");
+    expect(advance("characters", undefined, adaptCtx).next).toBe("marks");
+    expect(advance("characters", undefined, copyCtx).next).toBe("marks");
+  });
+
+  it("the touch_seed_source screen is walked while unrecorded and skipped once its decision exists", () => {
+    const unrecorded = advance("mechanisms", undefined, copyCtx);
+    expect(unrecorded.next).toBe("touch_seed_source");
+    const recorded = advance("mechanisms", undefined, {
+      ...copyCtx,
+      decisions: {
+        ...copyCtx.decisions,
+        "touch-seed-source": {
+          id: "touch-seed-source" as const,
+          value: "import-adapt",
+          provenance: "asked" as const,
+        },
+      },
+    });
+    expect(recorded.next).toBe("touch");
   });
 });
