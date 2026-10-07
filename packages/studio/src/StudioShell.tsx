@@ -1093,9 +1093,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     },
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
-    // React state, so an empty dep array is intentional here too.
-    // promotePendingAutosave is itself an empty-deps useCallback (stable).
-    [promotePendingAutosave],
+    // React state. promotePendingAutosave is itself an empty-deps
+    // useCallback (stable), and recordDecision is an empty-deps useMemo
+    // (stable) — both are listed so the deps name every stable value the
+    // body closes over.
+    [promotePendingAutosave, recordDecision],
   );
 
   // ---------------------------------------------------------------------------
