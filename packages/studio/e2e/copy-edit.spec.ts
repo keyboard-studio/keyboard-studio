@@ -455,15 +455,21 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   test("emitted .kps declares the author's language and name; .kvks and welcome.htm are non-empty", async ({
     page,
   }) => {
-    // Timeout sized to the work, not the default 240s cap: supplying the
-    // language code seeds the full fr exemplar inventory, so this walk drives
-    // 23 Mechanism Gallery characters, 18 of them through the sequence
-    // fallback with a full preview recompile each — fixed-size work that
-    // overruns 240s at CI pace even with nothing stuck. (The footer-overlap
-    // click trap that used to eat the budget silently was fixed separately in
-    // e5fb293a; what remains is CI pace, not a stall.) If this test ever dies
-    // at 480s, that is evidence of a real stuck state — re-diagnose; do not
-    // raise the timeout again to mask it.
+    // Timeout: 480s is headroom for this walk, not a tripwire. Trace
+    // analysis of the 480s death (run 37632354160) showed the walk was never
+    // stuck at either cap: progress was linear in budget (≈6 sequences
+    // recorded at the old 240s cap, 14 at 480s, mid-gallery on character 17
+    // of 23 in healthy, advancing state) — on the contended CI runner every
+    // action costs 2–8s in actionability waits, so a ~250-action walk fits
+    // no reasonable cap. The cost was an accident of the fixture, not of
+    // what this test asserts: typing the language code seeds the composed
+    // tag's exemplar inventory, and fr's (42 main characters) inflated the
+    // mechanisms worklist to 23 and the touch walk to the whole inventory.
+    // The fixture below therefore types "de" — a 30-character main
+    // inventory (a–z + ä ö ü ß) whose gallery worklist is a handful of
+    // characters — sizing the walk to its assertions, which concern only
+    // the emitted package. (The footer-overlap click trap that ate the
+    // first 240s budget silently was fixed separately in e5fb293a.)
     test.setTimeout(480_000);
     // Walk the wizard and download. Unlike the other walks here this one supplies
     // the language code, so the identity-lite series composes a real BCP47 tag for
@@ -473,7 +479,10 @@ test.describe("Track 1 (copy-edit) E2E", () => {
       english: FIXTURE.english,
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
-      languageCode: FIXTURE.languageCode,
+      // "de", not FIXTURE's "fr": the small-inventory retarget explained in
+      // the timeout comment above. Same driveIdentityLite path, same tag
+      // shape; only the seeded inventory's size changes.
+      languageCode: "de",
     });
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
@@ -509,21 +518,22 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     const kpsText = new TextDecoder().decode(kps![1]);
     // The author's composed tag, taken whole from the identity-lite result.
     // buildTargetBcp47 elides the script subtag when it is the language's
-    // langtags defaultScript (canonical BCP47), and Latn is French's default, so
-    // fr + Latn composes `fr`, not `fr-Latn`. The literal is deliberate: the
-    // composer needs the lazily-loaded langtags module, which this Node-side spec
-    // does not load. EXACTLY ONE <Language>, so a base tag cannot be sitting
-    // alongside it.
+    // langtags defaultScript (canonical BCP47), and Latn is German's default
+    // in the langtags index, so de + Latn composes `de`, not `de-Latn`. The
+    // literal is deliberate: the composer needs the lazily-loaded langtags
+    // module, which this Node-side spec does not load. EXACTLY ONE
+    // <Language>, so a base tag cannot be sitting alongside it.
     const languageElements = kpsText.match(/<Language\b[^>]*>[^<]*<\/Language>/g) ?? [];
     expect(
       languageElements,
       ".kps must declare exactly one language: the author's composed tag, with their language's English name as its display text",
     ).toEqual([
-      `<Language ID="fr">${FIXTURE.english}</Language>`,
+      `<Language ID="de">${FIXTURE.english}</Language>`,
     ]);
-    // SC-002 stated directly: the base keyboard's own language declaration is gone.
-    // Both declare ID="fr" now, so the display text is what tells them apart: the
-    // author's reads their English name, the base's reads `fr`.
+    // SC-002 stated directly: the base keyboard's own language declaration is
+    // gone. The author's tag is `de` while the base (basic_kbdfr) declares
+    // `fr`, so the base's element — ID "fr", display text `fr` — must not
+    // survive into the emitted descriptor.
     expect(kpsText, ".kps must not declare the base keyboard's language").not.toContain(
       '<Language ID="fr">fr</Language>',
     );
