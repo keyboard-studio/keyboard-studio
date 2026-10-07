@@ -40,9 +40,10 @@
 // non-vacuity guard: a projection that silently dropped every edit would
 // otherwise compile clean and pass.
 //
-// Runs under both VITE_KM_MUTATE_SEAM states — the seam routes carve and the
-// add gallery through mutate() inside projectWorkingCopyVfs, so each state is
-// a distinct emit path that must produce a compilable keyboard.
+// The seam routes carve and the add gallery through mutate() inside
+// projectWorkingCopyVfs — unconditionally since spec 089 T021 deleted the
+// flag (this oracle used to run under both flag states; there is one emit
+// path now, and it must produce a compilable keyboard).
 //
 // Fixtures: tests/fixtures/walkBases/ is a minimal copy of the two bases from
 // the keyboard-studio/keyboards corpus (MIT, SIL International; LICENSE.md
@@ -360,11 +361,10 @@ describe("MVP walk compile oracle — the blocking-diagnostic filter is not vacu
   });
 });
 
-for (const seamOn of [false, true]) {
-  describe(`MVP walk compile oracle — mutate seam ${seamOn ? "ON" : "OFF"}`, () => {
+{
+  describe("MVP walk compile oracle — mutate seam (single path, spec 089)", () => {
     for (const c of CASES) {
       it(`${c.label}: carve + desktop + touch edits emit a keyboard that compiles and carries the edits`, async () => {
-        vi.stubEnv("VITE_KM_MUTATE_SEAM", seamOn ? "1" : "");
 
         // --- 1. instantiate -------------------------------------------------
         await instantiateLikeStudio(c.base);

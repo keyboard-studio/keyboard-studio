@@ -18,7 +18,8 @@
 import { useMemo } from "react";
 import { Trans } from "@lingui/react/macro";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { WindowsLayoutPicker } from "../../components/WindowsLayoutPicker.tsx";
 import { proposeWindowsLayout, windowsLayoutById } from "../../lib/windowsLayouts.ts";
 import type { LayoutProposalBasis } from "../../lib/windowsLayouts.ts";
@@ -62,7 +63,10 @@ function WhyLine({ basis, tag }: { basis: LayoutProposalBasis; tag: string }) {
 }
 
 export function WindowsLayoutRenderer({ value, onChange }: DecisionRendererProps<WindowsLayoutValue>) {
-  const bcp47 = useSurveySessionStore((s) => s.surveyContext.bcp47_tag);
+  // bcp47 from the decision-derived survey context (spec 089's
+  // identitySelectors migration, adopted at the 089 merge — the session
+  // store's surveyContext is no longer the source).
+  const bcp47 = useDecisionStore((s) => deriveSurveyContext(s.decisions).bcp47_tag);
 
   const proposal = useMemo(() => proposeWindowsLayout(bcp47), [bcp47]);
   const recordedId =

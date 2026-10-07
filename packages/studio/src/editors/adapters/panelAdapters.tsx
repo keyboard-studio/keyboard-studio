@@ -8,30 +8,31 @@
 //   TrackStepAdapter, ProjectNameStepAdapter, and PhaseFAdapter have been DELETED.
 //   Those three flows are now live via factory components (flowStepOptions.tsx →
 //   makeFlowStepComponent → FlowStepHost). Retained adapters:
-//     - IdentityLiteAdapter (identityStep): writes setIdentityResult + setSurveyContext
-//       before onComplete (R7 ordering).
+//     - IdentityLiteAdapter (identityStep): writes NOTHING (spec 089) — it
+//       forwards the result; the identity step's effects are the recorded
+//       decisions and il_copyright_holder's apply, both at StepHost's
+//       boundary. Its context and resume are decision-derived (FR-005).
 //     - BaseResolutionAdapter (chooseBaseStep): the base-keyboard gallery
-//       host wrapper (spec 090 T013) — preview plumbing only; the decision
-//       write is the hosted renderer's onChange.
+//       host wrapper (spec 090 T013) — the decision write is the hosted
+//       renderer's onChange; setLocalBase is called before onComplete as
+//       the preview/compile channel only.
 //     - ScaffoldFormAdapter: retained (legacy; not in manifest).
 //     - TrackOneIdentityPanelAdapter: stub for the reserved "package" step.
 //
 // STEP-SPECIFIC EFFECT PLACEMENT (research R7):
 //   The host's generic onComplete path is:
-//     [recordPhase + routeAnswersThroughMutate if SurveyPhaseResult]
+//     [recordPhase + recordAnswersAsDecisions + applyDecisionEffects if SurveyPhaseResult]
 //     [applyStepCompletion if step in STEPS_WITH_APPLY_COMPLETION]
 //     advance → session.advance(next)
 //     [setCharactersSubStage if advanceOutcome carries it]
 //   For steps whose handlers call store mutators BEFORE advance
-//   (setIdentityResult, setSurveyContext, setLocalBase), those writes are placed
+//   (setLocalBase), those writes are placed
 //   in the ADAPTER so they fire before onComplete triggers the host's advance call.
 //
 // Boundary: editors/adapters/ → stores/ and hooks/ is allowed by depcruise.
 
 import { useMemo } from "react";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useGitHubAuth } from "../../hooks/useGitHubAuth.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -44,78 +45,50 @@ import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { TrackOneIdentityPanel } from "../panels/TrackOneIdentityPanel.tsx";
 import type { SuggestTarget } from "../../lib/suggestBase.ts";
 import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
-import {
-  IdentityLite,
-  extractIdentityLite,
-} from "../../survey/index.ts";
-import type { SurveyContext } from "../../survey/types.ts";
-import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
+import { IdentityLite } from "../../survey/index.ts";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-
-// ---------------------------------------------------------------------------
-// contextFromIdentity — derive SurveyContext from IdentityLiteResult.
-// Moved from StudioShell.tsx (was private) to here, where the identity adapter
-// needs it. Same logic, same output.
-// ---------------------------------------------------------------------------
-
-function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
-  return {
-    language_name: identity.english || identity.autonym,
-    routing_group: identity.prefill.routingGroup,
-    script_family: identity.prefill.script,
-    ...(identity.bcp47 !== "" ? { bcp47_tag: identity.bcp47 } : {}),
-    // spec 064 FR-016: publishing the contact here activates the Phase F
-    // pre-fill seam (see CTX_AUTHOR_CONTACT in flowStepOptions.tsx), so
-    // pf_contact_info is confirmed rather than asked a second time.
-    ...(identity.attribution?.authorEmail !== undefined &&
-    identity.attribution.authorEmail !== ""
-      ? { author_contact: identity.attribution.authorEmail }
-      : {}),
-  };
-}
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import {
+  deriveIdentityResult,
+  deriveIdentityResume,
+  deriveSurveyContext,
+} from "../../decisions/identitySelectors.ts";
 
 // ---------------------------------------------------------------------------
 // IdentityLiteAdapter (T008)
 //
 // Real adapter for identityStep — replaces TrackOneIdentityPanelAdapter
-// placeholder. Reads surveyContext + findingsByQuestionId from the store
-// bridge; on completion writes setIdentityResult + setSurveyContext (the
-// identity-specific session-store effects per research R7) BEFORE calling
-// onComplete so the golden-walk mutation order is preserved:
-//   setIdentityResult → setSurveyContext → onComplete → (host) advance
+// placeholder. Spec 089: the adapter WRITES NOTHING. The identity step's
+// effects are the recorded decisions (StepHost's recordAnswersAsDecisions)
+// and il_copyright_holder's apply landing the attribution on the working
+// copy (StepHost's applyDecisionEffects) — the session fields this adapter
+// used to write (identityResult, surveyContext, identityPhaseResult) and
+// the working-copy attribution write are all derived or applied at the
+// host boundary now. What the adapter still owns is presentation wiring:
+// the decision-derived context, the authenticated-profile seed, and the
+// decision-derived resume payload.
 // ---------------------------------------------------------------------------
 
 export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
-  // Read surveyContext for the live context prop (identity panel needs it).
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  // The live context prop, derived from the recorded decisions (FR-005) —
+  // the successor to the stored surveyContext this adapter used to write.
+  const surveyContext = deriveSurveyContext(decisions);
   // Derive per-question findings from the V3 store bridge (spec-014).
   const findingsByQuestionId = useValidatorFindings();
-
-  // Step-specific session-store writers (R7 — written before onComplete so the
-  // golden-walk ordering is setIdentityResult → setSurveyContext → advance).
-  const setIdentityResult = useSurveySessionStore((s) => s.setIdentityResult);
-  const setSurveyContext = useSurveySessionStore((s) => s.setSurveyContext);
-  const setAttribution = useWorkingCopyStore((s) => s.setAttribution);
   // Only the profile fields are read here; the auth STATUS is irrelevant to
   // identity capture, and a guest simply gets no seed (D6 then requires a typed
   // name before emission).
   const { authorName, authorEmail } = useGitHubAuth();
-  const setIdentityPhaseResult = useSurveySessionStore((s) => s.setIdentityPhaseResult);
-  // Prior completed run, if any — lets a history pop back onto this step resume
-  // the flow at its last question instead of replaying from question 1.
-  const identityPhaseResult = useSurveySessionStore((s) => s.identityPhaseResult);
+  // Prior completed run, rebuilt from the decisions — lets a history pop back
+  // onto this step resume the flow at its last question instead of replaying
+  // from question 1.
+  const identityResume = deriveIdentityResume(decisions);
 
-  function handleComplete(result: SurveyPhaseResult, identity: IdentityLiteResult) {
-    // R7: identity-specific writes fire here, before onComplete → host → advance.
-    setIdentityResult(identity);
-    setSurveyContext(contextFromIdentity(identity));
-    // spec 064 US1: the working copy is the single source the scaffolder reads
-    // for LICENSE.md / store(&COPYRIGHT) / .kps <Copyright>, and it rides the
-    // existing draft so attribution survives a reload for free.
-    setAttribution(identity.attribution);
-    setIdentityPhaseResult(result);
-    // Forward the phase result; host guards on SurveyPhaseResult shape and calls
-    // recordPhase + routeAnswersThroughMutate.
+  function handleComplete(result: SurveyPhaseResult) {
+    // Forward the phase result only; the host guards on SurveyPhaseResult
+    // shape and runs recordPhase + recordAnswersAsDecisions +
+    // applyDecisionEffects.
     onComplete(result);
   }
 
@@ -127,7 +100,7 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
       context={surveyContext}
       onComplete={handleComplete}
       findingsByQuestionId={findingsByQuestionId}
-      {...(identityPhaseResult ? { resume: identityPhaseResult } : {})}
+      {...(identityResume ? { resume: identityResume } : {})}
     />
   );
 }
@@ -185,16 +158,17 @@ export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
 // ---------------------------------------------------------------------------
 
 /**
- * Adapter for BaseResolution. Reads the suggest target from the
- * surveySessionStore's identityResult (written by IdentityLiteAdapter's
- * setIdentityResult before this step is reached).
+ * Adapter for BaseResolution. Reads the suggest target from the identity
+ * result derived over the decision store (spec 089 FR-005 — recorded by the
+ * identity step's completion before this step is reached).
  *
  * previewStatus is read from basePreviewStatusStore (published by
  * StudioShell's SurveyView) so this adapter never imports useKeyboardArtifact
  * or the compile pipeline directly.
  */
 export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
-  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityResult = deriveIdentityResult(decisions);
   const localBase = useSurveySessionStore((s) => s.localBase);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
 
@@ -243,6 +217,3 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
     />
   );
 }
-
-// Re-export extractIdentityLite for consumers that need it.
-export { extractIdentityLite };

@@ -18,7 +18,6 @@ import { InvisiblesStepHost } from "./InvisiblesStepHost.tsx";
 import { invisibleCandidatesFor } from "./invisibleCandidates.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
 function lastResult(onComplete: ReturnType<typeof vi.fn>): SurveyPhaseResult {
@@ -220,8 +219,11 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
     first.unmount();
 
     // Shape change: the author is now known to be RTL — new bidi candidates
-    // become relevant.
-    useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
+    // become relevant. (Spec 089: the signal is the Phase B rtl-confirm
+    // answer in the phase results — markRtl() — not a seeded survey context,
+    // which is decision-derived now and cannot carry a synthetic "rtl"
+    // script_family.)
+    markRtl();
     render(<InvisiblesStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     // The earlier decision survives untouched.
@@ -238,7 +240,7 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
     fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
     first.unmount();
 
-    useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
+    markRtl();
     render(<InvisiblesStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();

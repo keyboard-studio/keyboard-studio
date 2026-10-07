@@ -27,6 +27,8 @@ import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
+import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/decisionStore.ts";
+import { deriveIdentityResult } from "./decisions/identitySelectors.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
@@ -913,17 +915,16 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
       vfs: createVirtualFS([]),
       ir: makeTestIR([]),
     });
-    // identityResult must be non-null in the snapshot: the restored
-    // CharactersStep renders null (its prefill guard) without it.
-    useSurveySessionStore.getState().setIdentityResult({
-      autonym: "English",
-      english: "English",
-      languageSubtag: "en",
-      targetScriptRaw: "Latn",
-      bcp47: "en-Latn",
-      supported: true,
-      prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-    });
+    // The derived identity result must be non-null in the snapshot: the
+    // restored CharactersStep renders null (its prefill guard) without it.
+    // Spec 089: that means the identity decisions are recorded.
+    {
+      const record = useDecisionStore.getState().record;
+      record({ id: "language-name", value: "English", provenance: "asked" });
+      record({ id: "language-autonym", value: "English", provenance: "asked" });
+      record({ id: "language-code", value: "en", provenance: "asked" });
+      record({ id: "target-script", value: "Latn", provenance: "asked" });
+    }
     useSurveySessionStore.getState().setLocalBase(basicKbdus);
     useSurveySessionStore.getState().setBaseConfirmed(true);
     useSurveySessionStore.getState().advance("choose_base");
@@ -1955,20 +1956,23 @@ describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)
     expect(screen.getByTestId("stage-B")).toBeTruthy();
   });
 
-  it("keeps the answers the walk recorded — identityResult and selectedTrack", async () => {
+  it("keeps the answers the walk recorded — the identity and track decisions (spec 089)", async () => {
     useSurveySessionStore.getState().reset();
     await mountSurvey();
     advanceToTrack();
     fireEvent.click(screen.getByTestId("track-copy"));
 
-    const identityBefore = useSurveySessionStore.getState().identityResult;
-    const trackBefore = useSurveySessionStore.getState().selectedTrack;
+    // Spec 089: identity and track live in the decision store now; the
+    // session fields this test used to read are deleted.
+    const identityBefore = deriveIdentityResult(getDecisionSnapshot());
+    const trackBefore = selectTrack(getDecisionSnapshot());
     expect(identityBefore).not.toBeNull();
+    expect(trackBefore).toBe("copy");
 
     await routeRoundTrip();
 
-    expect(useSurveySessionStore.getState().identityResult).toEqual(identityBefore);
-    expect(useSurveySessionStore.getState().selectedTrack).toBe(trackBefore);
+    expect(deriveIdentityResult(getDecisionSnapshot())).toEqual(identityBefore);
+    expect(selectTrack(getDecisionSnapshot())).toBe(trackBefore);
   });
 
   it("survives repeated round trips — the loss is not merely deferred by one", async () => {
@@ -2008,7 +2012,9 @@ describe("SurveyView — a reset happens only on an explicit start-over (spec 05
 
     expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
     expect(useSurveySessionStore.getState().history).toEqual([]);
-    expect(useSurveySessionStore.getState().identityResult).toBeNull();
+    // Spec 089: start-over resets the decision store too (088 FR-007), so
+    // the derived identity result is null again.
+    expect(deriveIdentityResult(getDecisionSnapshot())).toBeNull();
   });
 });
 

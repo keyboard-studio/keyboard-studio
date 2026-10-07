@@ -79,6 +79,8 @@ import type { MarkInputOrder } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore, type SavedAnswer } from "../../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../../lib/questionRecorder.ts";
 import {
@@ -261,7 +263,8 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const importedOrder = useWorkingCopyStore((s) => s.session.axes.markInputOrder);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   // spec 078: the context-tolerance analysis (published by the compile gate)
   // and the decision a previous pass through this series recorded.
   const toleranceEnabled = isContextToleranceEnabled();

@@ -4,17 +4,18 @@
 //   (a) resolve → run → extract → complete for the "track" flow ref (US3).
 //   (b) stay-on-step when extract returns undefined.
 //   (c) loud throw for an unknown flowRef (FR-010 / "no default is a defect").
-//   (d) onCommit fires BEFORE onComplete (R7 ordering).
+//   (d) completion forwards the UNTOUCHED result to onComplete after the
+//       extract guard — the factory performs no store writes on completion
+//       (spec 089: effects live in the modules' applies, run by StepHost).
 //
 // The test mocks survey/index.ts so that FlowStepHost renders a controllable
 // stub (matching the golden-walk pattern). Store deps are injected via
 // vi.mock so the factory's useSurveySessionStore / useWorkingCopyStore selectors
 // return deterministic values.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
-import type { EditorStepProps } from "../../src/steps/types.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted refs for mock callbacks
@@ -82,57 +83,55 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock stores — return deterministic values; spy on the decision record
-// (spec 088: FlowStepDeps.setSelectedTrack is backed by the decision store)
+// Mock stores — return deterministic values. Spec 089: the factory reads
+// localBase (session), the decision set (decision store), and the working
+// copy's history-entry state + validator findings. It writes NOTHING.
 // ---------------------------------------------------------------------------
 
-const mockRecordDecision = vi.fn();
-const mockForgetDecision = vi.fn();
-const mockSetScaffoldSpec = vi.fn();
-const mockSetIdentity = vi.fn();
 
 vi.mock("../../src/stores/surveySessionStore.ts", () => ({
   useSurveySessionStore: (selector: (s: unknown) => unknown) => {
     const store = {
       localBase: { displayName: "Test Base" },
-      identityResult: { autonym: "Hausa", english: "Hausa" },
-      surveyContext: {},
-      setScaffoldSpec: mockSetScaffoldSpec,
+
     };
     return selector(store);
   },
 }));
 
 vi.mock("../../src/stores/decisionStore.ts", () => {
-  // Lazy state: the factory runs at import time (hoisted), before the
-  // top-level mock fns initialize — resolve them at call time instead.
-  const state = () => ({ decisions: {}, record: mockRecordDecision, forget: mockForgetDecision });
+  // Spec 089: the factory derives its context from the recorded identity
+  // decisions, so the mock store carries them. Spec 090 (T021/T022): the
+  // registry's import graph now includes the inventory-draft surface and
+  // the interim draft facade, which read snapshots and subscribe at
+  // module scope, and the global test setup's facade reset records
+  // through the gallery host deps — the mock answers those too (record /
+  // forget are inert here; nothing in these tests asserts on them).
+  const decisions = {
+    "language-name": { id: "language-name", value: "Hausa", provenance: "asked" },
+    "language-autonym": { id: "language-autonym", value: "Hausa", provenance: "asked" },
+    "target-script": { id: "target-script", value: "Latn", provenance: "asked" },
+  };
+  const state = () => ({ decisions, record: () => {}, forget: () => {} });
   const useDecisionStore = Object.assign(
     (selector: (s: unknown) => unknown) => selector(state()),
-    // subscribe: the interim draft facade (spec 090 T021) subscribes at
-    // module scope; a no-op subscription is inert for these tests.
     { getState: state, subscribe: () => () => {} },
   );
   return {
     useDecisionStore,
-    // The inventory-draft surface (spec 090 T021/T022) reads decision
-    // snapshots at module scope in the registry's import graph.
-    getDecisionSnapshot: () => ({}),
+    getDecisionSnapshot: () => decisions,
     selectTrack: () => null,
     selectTouchSeedSource: () => null,
   };
 });
 
 vi.mock("../../src/stores/workingCopyStore.ts", () => {
-  // Lazy like the decisionStore mock above: the factory is hoisted, so
-  // mockSetIdentity is resolved at call time, not factory time.
+  // getState: read by the gallery host deps when the global test setup
+  // resets the (decision-backed) draft facade after each test (spec 090).
   const store = () => ({
     validatorFindings: [],
-    setIdentity: mockSetIdentity,
-    // Read by the gallery host deps when the global test setup resets the
-    // (decision-backed) draft facade after each test (spec 090 T021).
+    historyEntryState: null,
     ir: null,
-    historyEntryState: undefined,
   });
   return {
     useWorkingCopyStore: Object.assign(
@@ -174,9 +173,6 @@ function buildTrackOptions(overrides?: Partial<FlowStepOptions<TrackPayload>>): 
           : undefined;
       if (v === "copy" || v === "adapt") return { track: v };
       return undefined;
-    },
-    onCommit(extracted, deps) {
-      deps.setSelectedTrack(extracted.track);
     },
     ...overrides,
   };
@@ -229,20 +225,11 @@ describe("makeFlowStepComponent", () => {
       expect(screen.getByTestId("flow-step-title").textContent).toBe("Authoring Track");
     });
 
-    it("records the track decision BEFORE onComplete when extract succeeds (R7 ordering)", async () => {
-      const callOrder: string[] = [];
+    it("forwards the UNTOUCHED SurveyPhaseResult to onComplete when extract succeeds (spec 089)", async () => {
+      const onCompleteSpy = vi.fn();
 
-      const onCommitSpy = vi.fn((extracted: TrackPayload, deps: FlowStepDeps) => {
-        callOrder.push("onCommit");
-        deps.setSelectedTrack(extracted.track);
-      });
-      const onCompleteSpy = vi.fn(() => {
-        callOrder.push("onComplete");
-      });
 
-      const TrackComponent = makeFlowStepComponent(
-        buildTrackOptions({ onCommit: onCommitSpy }),
-      );
+      const TrackComponent = makeFlowStepComponent(buildTrackOptions());
 
       await act(async () => {
         render(<TrackComponent onComplete={onCompleteSpy} />);
@@ -252,21 +239,16 @@ describe("makeFlowStepComponent", () => {
         fireEvent.click(screen.getByTestId("fsh-complete"));
       });
 
-      // R7: onCommit fires before onComplete (state mutations before navigation).
-      expect(callOrder).toEqual(["onCommit", "onComplete"]);
-      // Spec 088: the dep now records the authoring-track decision.
-      expect(mockRecordDecision).toHaveBeenCalledWith({
-        id: "authoring-track",
-        value: "copy",
-        provenance: "asked",
-        step: "track",
-      });
+
       // onComplete receives the UNTOUCHED SurveyPhaseResult, not the extracted
       // `{ track: "copy" }` — StepHost's generic completion path (recordPhase /
       // recordStepCompletion / advance) needs the real, answers-bearing result.
-      // `extract()`'s reshaping is for this factory's own onCommit effects only
-      // (see the mock FlowStepHost's "fsh-complete" button above for the exact
-      // shape the real runner hands back).
+      // `extract()`'s reshaping exists for the no-advance guard only; the
+      // completion's store effects are the modules' applies, run by StepHost's
+      // applyDecisionEffects — never by this factory (see the mock
+      // FlowStepHost's "fsh-complete" button above for the exact shape the
+      // real runner hands back).
+      expect(onCompleteSpy).toHaveBeenCalledTimes(1);
       expect(onCompleteSpy).toHaveBeenCalledWith({
         phase: "G",
         answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
@@ -281,7 +263,6 @@ describe("makeFlowStepComponent", () => {
       const TrackComponent = makeFlowStepComponent(
         buildTrackOptions({
           extract: extractReturnsUndefined,
-          onCommit: vi.fn(),
         }),
       );
 

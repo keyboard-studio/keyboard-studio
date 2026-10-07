@@ -15,8 +15,8 @@ import { GalleryHost, decideGalleryValue } from "../../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../../lib/galleryHostDeps.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { proposeWindowsLayout, windowsLayoutById } from "../../lib/windowsLayouts.ts";
 import { LAYOUT_FAMILY_STEP_ID } from "../../lib/layoutFamily.ts";
 import windowsLayoutModule from "../questions/gallery/windowsLayout.ts";
@@ -24,7 +24,7 @@ import type { WindowsLayoutValue } from "../questions/gallery/windowsLayout.ts";
 
 const LayoutStepHost: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
-  const bcp47 = useSurveySessionStore((s) => s.surveyContext.bcp47_tag);
+  const bcp47 = useDecisionStore((s) => deriveSurveyContext(s.decisions).bcp47_tag);
   const record = useDecisionStore((s) => s.decisions["windows-layout"]);
   const deps = useMemo(buildGalleryHostDeps, []);
 

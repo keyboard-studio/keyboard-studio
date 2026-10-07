@@ -3,14 +3,16 @@
     "stepId": "identity",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setIdentityResult",
-      "setSurveyContext",
+      "recordAll",
       "advance"
     ],
     "workingCopyMutations": [
-      "recordPhase"
+      "recordPhase",
+      "setAttribution"
     ],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "recordAll"
+    ],
     "navigateTo": []
   },
   {
@@ -42,7 +44,7 @@
     "stepId": "track",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setScaffoldSpec",
+      "recordAll",
       "advance",
       "setCharactersSubStage"
     ],
@@ -50,7 +52,6 @@
       "recordPhase"
     ],
     "decisionMutations": [
-      "record",
       "recordAll"
     ],
     "navigateTo": []
@@ -175,7 +176,8 @@
       "advance"
     ],
     "workingCopyMutations": [
-      "setTouchLayoutJson"
+      "setTouchLayoutJson",
+      "setHistoryEntryState"
     ],
     "decisionMutations": [],
     "navigateTo": []

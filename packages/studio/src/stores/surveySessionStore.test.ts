@@ -63,42 +63,31 @@ describe("surveySessionStore", () => {
     const store = getStore();
     store.advance("choose_base");
     store.advance("track");
-    store.setScaffoldSpec({ keyboardId: "test_kb", displayName: "Test Keyboard" });
+
 
     // Confirm non-initial state
     expect(getStore().activeStepId).toBe("track");
     expect(getStore().history.length).toBe(2);
-    expect(getStore().scaffoldSpec).toMatchObject({ keyboardId: "test_kb", displayName: "Test Keyboard" });
+
 
     getStore().reset();
 
     const s = getStore();
     expect(s.activeStepId).toBe("identity");
     expect(s.history).toEqual([]);
-    expect(s.identityResult).toBeNull();
-    expect(s.identityPhaseResult).toBeNull();
-    expect(s.surveyContext).toEqual({});
-    expect(s.scaffoldSpec).toBeNull();
+
     expect(s.localBase).toBeNull();
     expect(s.baseConfirmed).toBe(false);
-  });
-
-  // identityPhaseResult round-trip — the history-pop resume payload
-  it("identityPhaseResult round-trips through set and is cleared by reset()", () => {
-    const phaseResult = {
-      phase: "A" as const,
-      answers: [
-        { questionId: "il_language_autonym", answerType: "text" as const, value: "Hausa" },
-        { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
-      ],
-    };
-
-    expect(getStore().identityPhaseResult).toBeNull();
-    getStore().setIdentityPhaseResult(phaseResult);
-    expect(getStore().identityPhaseResult).toEqual(phaseResult);
-
-    getStore().reset();
-    expect(getStore().identityPhaseResult).toBeNull();
+    // Spec 089 T017: the identity/scaffold slots are gone from the session
+    // state entirely — they are decision-derived now.
+    expect("identityResult" in s).toBe(false);
+    expect("identityPhaseResult" in s).toBe(false);
+    expect("surveyContext" in s).toBe(false);
+    expect("scaffoldSpec" in s).toBe(false);
+    // Spec 088 FR-005: the track and touch-seed slots are likewise gone —
+    // they are decisions now (authoring-track / touch-seed-source).
+    expect("selectedTrack" in s).toBe(false);
+    expect("touchSeedSource" in s).toBe(false);
   });
 
   // hydrate() bulk-restores every value slot from a serialized draft
@@ -107,10 +96,7 @@ describe("surveySessionStore", () => {
     const snapshot = {
       activeStepId: "track" as const,
       history,
-      identityResult: null,
-      identityPhaseResult: null,
-      surveyContext: { targetScript: "Latn" } as never,
-      scaffoldSpec: { keyboardId: "haus_latn", displayName: "Hausa" },
+
       localBase: null,
       charactersSubStage: "B" as const,
     };
@@ -120,7 +106,7 @@ describe("surveySessionStore", () => {
     const s = getStore();
     expect(s.activeStepId).toBe("track");
     expect(s.history).toEqual(["identity", "choose_base"]);
-    expect(s.scaffoldSpec).toEqual({ keyboardId: "haus_latn", displayName: "Hausa" });
+
     expect(s.charactersSubStage).toBe("B");
 
     // The restored history is a copy — advancing must not mutate the snapshot's array.

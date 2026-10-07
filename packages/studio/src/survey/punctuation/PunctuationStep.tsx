@@ -56,7 +56,8 @@ import {
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import {
   getCharacterInventoryValue,
@@ -235,7 +236,8 @@ const groupCaption = { margin: "0 0 8px 0", fontSize: 11, color: TEXT_DIM } as c
 const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValue>> = () => {
   const { onComplete, onBack } = useGalleryStepContext();
   const { t, i18n } = useLingui();
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 

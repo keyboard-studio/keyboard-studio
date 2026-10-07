@@ -30,7 +30,7 @@
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
 import { create } from "zustand";
-import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { BaseKeyboard } from "@keyboard-studio/contracts";
 // Imported directly from TYPE-ONLY LEAF modules (identityLiteResult.ts /
 // types.ts), NOT from the survey/index.ts barrel — that barrel re-exports
 // PhaseB.tsx at runtime, and PhaseB.tsx now imports this store at runtime too
@@ -43,12 +43,11 @@ import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts
 // lib/stepWalk.ts), and IdentityLite.tsx renders SurveyRunner, so importing the
 // component module here would close the loop even for a type. That extracted
 // leaf has no runtime dependencies at all.
-import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
-import type { SurveyContext } from "../survey/types.ts";
-import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 // Spec 088: this store no longer imports workingCopyStore — its only use
 // was the deleted setTouchSeedSource's touch-draft side effect, which moved
-// to the decision writer's call sites (research D-06).
+// to the decision writer's call sites (research D-06). Spec 089: the identity
+// result/context/scaffold types are likewise gone with the fields they typed
+// — those values are derived from the decision store (T017).
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 
 // ---------------------------------------------------------------------------
@@ -292,32 +291,14 @@ export interface SurveySessionState {
    */
   marksMigrationNeeded: boolean;
 
-  /** Identity-lite output from the identity step. Null until the step completes. */
-  identityResult: IdentityLiteResult | null;
-
-  /**
-   * Raw phase result of the completed identity-lite flow (the answers that
-   * produced identityResult). Persisted so a history pop back onto the identity
-   * step resumes the flow at its last question with answers restored, rather
-   * than replaying from question 1. Null until the identity step completes.
-   */
-  identityPhaseResult: SurveyPhaseResult | null;
-
-  /**
-   * Derived from identityResult via contextFromIdentity. Stored (not re-derived)
-   * to match today's useState semantics. Empty object until identity completes.
-   */
-  surveyContext: SurveyContext;
+  // Spec 089 FR-005/T017: identityResult, identityPhaseResult, surveyContext,
+  // and scaffoldSpec are NO LONGER session fields — they are derived from the
+  // decision store (decisions/identitySelectors.ts: deriveIdentityResult,
+  // deriveIdentityResume, deriveSurveyContext, deriveScaffoldSpec).
 
   // Spec 088 FR-005: the authoring track is NOT stored here any more — it
   // is the `authoring-track` decision in stores/decisionStore.ts, read via
   // its `selectTrack` selector.
-
-  /**
-   * Track-1 project metadata set at the project_name step.
-   * Null for Track 2 (adapt uses the base's existing id/name).
-   */
-  scaffoldSpec: ScaffoldSpec | null;
 
   /**
    * Local base selection that drives the compile pipeline immediately on pick.
@@ -503,17 +484,7 @@ export interface SurveySessionState {
    */
   hydrate: (snapshot: SurveySessionSnapshot) => void;
 
-  /** Plain setter — identity-lite output. */
-  setIdentityResult: (r: IdentityLiteResult | null) => void;
 
-  /** Plain setter — raw identity-lite phase result (history-pop resume). */
-  setIdentityPhaseResult: (r: SurveyPhaseResult | null) => void;
-
-  /** Plain setter — survey context derived from identity. */
-  setSurveyContext: (c: SurveyContext) => void;
-
-  /** Plain setter — Track-1 scaffold spec. */
-  setScaffoldSpec: (s: ScaffoldSpec | null) => void;
 
   /** Plain setter — local base driving the compile pipeline. */
   setLocalBase: (b: BaseKeyboard | null) => void;
@@ -593,8 +564,7 @@ type SurveySessionData = Omit<
   SurveySessionState,
   | "advance" | "popHistory" | "jumpToStep" | "backToTouchSeedSource"
   | "backToUnfinishedGallery" | "backToChooseBase" | "reset" | "hydrate"
-  | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
-  | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
+  | "setLocalBase" | "setCharactersSubStage"
   | "setBaseConfirmed" | "setDiscoveryMethod"
   | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
@@ -628,10 +598,7 @@ const INITIAL_STATE = {
   visited: ["identity"] as readonly ActiveStepId[],
   lastNavigation: "advance" as const,
   marksMigrationNeeded: false,
-  identityResult: null,
-  identityPhaseResult: null,
-  surveyContext: {} as SurveyContext,
-  scaffoldSpec: null,
+
   localBase: null,
   baseConfirmed: false,
   charactersSubStage: "prefill" as CharactersSubStage,
@@ -814,10 +781,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
 
-  setIdentityResult: (r) => set({ identityResult: r }),
-  setIdentityPhaseResult: (r) => set({ identityPhaseResult: r }),
-  setSurveyContext: (c) => set({ surveyContext: c }),
-  setScaffoldSpec: (s) => set({ scaffoldSpec: s }),
+
   setLocalBase: (b) => set({ localBase: b }),
   setBaseConfirmed: (v) => set({ baseConfirmed: v }),
   setCharactersSubStage: (s) => set({ charactersSubStage: s }),
@@ -866,10 +830,7 @@ export function snapshotTraversal(): TraversalSnapshot {
     visited: s.visited,
     lastNavigation: s.lastNavigation,
     marksMigrationNeeded: s.marksMigrationNeeded,
-    identityResult: s.identityResult,
-    identityPhaseResult: s.identityPhaseResult,
-    surveyContext: s.surveyContext,
-    scaffoldSpec: s.scaffoldSpec,
+
     localBase: s.localBase,
     baseConfirmed: s.baseConfirmed,
     charactersSubStage: s.charactersSubStage,

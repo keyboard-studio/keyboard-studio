@@ -51,7 +51,8 @@ import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useInventoryDraft } from "../useInventoryDraft.ts";
 import type { InventoryDecisionValue } from "../phaseBDraftOps.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
@@ -199,7 +200,8 @@ const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue
   const { onComplete, onBack } = useGalleryStepContext();
   const { t } = useLingui();
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   const direction = useMemo(
     () => writingDirectionFrom(phaseResults, surveyContext),
     [phaseResults, surveyContext],

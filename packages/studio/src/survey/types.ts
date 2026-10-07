@@ -181,26 +181,6 @@ export interface OutputWrite {
 }
 
 /**
- * Context passed to a module's `mutate()` (spec-014, mutate-seam.contract.md).
- *
- * SUPERSEDED by {@link ApplyContext} (spec 089): `apply()` is the write seam
- * now — it sees the recorded decisions and returns a multi-channel
- * {@link WorkingCopyPatch}. This type and `QuestionModule.mutate` are deleted
- * in spec 089 T020, once the last consumer has migrated.
- *
- * The contract leaves the exact field set to the reducer apply site (gated task
- * T014); kept deliberately minimal here — the read-only current `KeyboardIR`
- * snapshot plus the module's own declared `writes` containment set, which the
- * reducer asserts the returned patch stays within.
- */
-export interface MutateContext {
-  /** Read-only snapshot of the working-copy IR at apply time. `mutate()` MUST NOT mutate it. */
-  readonly ir: KeyboardIR;
-  /** The module's declared `writes` paths — the only IR locations the returned patch may touch. */
-  readonly writes: readonly IRPath[];
-}
-
-/**
  * Context passed to a module's `apply()` (spec 089, contracts/apply-contract.md).
  *
  * Everything an apply may read, and nothing it may write directly: the
@@ -330,33 +310,7 @@ export interface QuestionModule {
    */
   apply?: (value: string | string[] | undefined, ctx: ApplyContext) => WorkingCopyPatch;
 
-  /**
-   * Optional IR mutation hook — the question-module IR write seam (spec-014,
-   * mutate-seam.contract.md). SUPERSEDED by `apply` above (spec 089): the
-   * remaining implementations migrate in T008/T020, and this member is
-   * deleted there. RATIFIED SIGNATURE; the implementation in any
-   * module and the reducer apply path remain GATED (task T014) — modules keep
-   * their stubs and nothing calls this yet.
-   *
-   * Contract:
-   *  - PURE: returns a `Partial<KeyboardIR>` patch; MUST NOT mutate `ctx.ir`
-   *    in place or perform side effects (M1/FR-002).
-   *  - The reducer applies the patch as a path-scoped DEEP merge restricted to
-   *    the module's declared `writes` `IRPath`s; nested siblings under a shared
-   *    parent are preserved, not branch-replaced (M2/Q9).
-   *  - Writing outside the declared `writes` is a FAIL-FAST whole-patch
-   *    rejection in all builds — never a partial apply, never swallowed, IR
-   *    left unchanged (M3/Q11/FR-003).
-   *  - IDEMPOTENT: applying the same `value` against the same IR twice is
-   *    byte-identical to applying it once (M4/FR-004).
-   *  - An empty patch `{}` is valid and merges to a no-op (M5); display-only
-   *    (empty `writes`) modules leave `mutate` absent (FR-007).
-   *
-   * Reducer apply path: steps/reducer.ts `applyStepCompletion` →
-   * steps/mutateApply.ts — OUT of scope for the contract surface (gated T014).
-   */
-  mutate?: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
-
+  
   /**
    * Which spec unit(s) govern this question module (spec 031 FR-002). Same
    * vocabulary and shape as Step.specRef (steps/types.ts): `§N` / `§Na` or

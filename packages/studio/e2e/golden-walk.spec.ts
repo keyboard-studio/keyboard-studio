@@ -38,15 +38,14 @@
  * A mismatch fails with the differing entry names, so the spec delta that
  * changed the output is named, not inferred.
  *
- * CAPTURE ENVIRONMENT (research R9): run with `VITE_KM_MUTATE_SEAM=1` in
- * the environment (the Playwright webServer inherits it for `pnpm dev`).
- * The baseline is only meaningful under the flag-on environment: once the
- * seam is unconditional the emitter includes the `kmStandardLetters` store
- * pb_standard_letters writes, and a flag-off baseline would make SC-001
- * unsatisfiable by construction.
+ * CAPTURE ENVIRONMENT (research R9): the baseline was only meaningful
+ * under the seam-on environment; since spec 089 T021 deleted the flag
+ * (OI-1 ruled global) the seam is unconditional — the emitter always
+ * includes the `kmStandardLetters` store pb_standard_letters' apply
+ * writes, and no environment pin remains to set.
  *
  * CAPTURE / RE-CAPTURE (one command):
- *   GOLDEN_WALK_CAPTURE=1 VITE_KM_MUTATE_SEAM=1 npx playwright test \
+ *   GOLDEN_WALK_CAPTURE=1 npx playwright test \
  *     e2e/golden-walk.spec.ts --project=desktop
  * writes the downloaded archive to
  *   e2e/fixtures/golden-walk/basic-kbdfr-copy.zip
@@ -56,7 +55,7 @@
  * a different day legitimately differs in that entry alone.
  *
  * VERIFY (the default mode):
- *   VITE_KM_MUTATE_SEAM=1 npx playwright test \
+ *   npx playwright test \
  *     e2e/golden-walk.spec.ts --project=desktop
  */
 import { test, expect } from "playwright/test";

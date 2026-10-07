@@ -621,3 +621,49 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   That file also carries 2 PRE-EXISTING eslint errors (unused
   `beforeEach`/`EditorStepProps` imports, present at the pre-T022
   HEAD) — left untouched as out-of-scope.
+
+- **D-090-15 — spec 089 merged (km/decision-apply @ 03d1a1ef, lead
+  update 2026-10-07).** Merge taken at the T022 checkpoint. What it
+  changed on this branch: (a) the mutate seam is gone (mutateFlag.ts,
+  QuestionModule.mutate/MutateContext deleted) — no US2 code assumed
+  either; the inventory modules are pure descriptors and the facade/
+  hook record through the host's decide core, so nothing here needed
+  adaptation. (b) Identity/context reads are decision-derived
+  everywhere (089 FR-005/T017: `identityResult`/`surveyContext` no
+  longer exist on surveySessionStore; `deriveIdentityResult` /
+  `deriveSurveyContext` / `deriveIdentityResume` in
+  decisions/identitySelectors.ts are the reads). Conflict resolutions
+  all took the same shape — 090's decision-value surface + 089's
+  decision-derived reads: CharactersStep, CharacterMapPane,
+  InvisiblesStep(+test), LayoutStep (US1 renderer kept; only its
+  bcp47 source adopted the derivation, as did LayoutStepHost),
+  panelAdapters(+test: 089's writes-nothing IdentityLiteAdapter and
+  seedIdentityDecisions setup + T013's decision-recording
+  assertions), makeFlowStepComponent mocks (self-contained union:
+  089's seeded identity decisions + 090's snapshot/subscribe/getState
+  surface). (c) draftPersistence: BOTH branches had independently
+  moved `applyDecisionSnapshot` before the phase-B restore (089 for
+  the stamp's decision-derived identity, 090 T021 for the inventory
+  clobber); the merge keeps one restore, 090's decisions-carry-
+  inventory guard, and one stamp. (d) Golden walk: the merged harness
+  (unified spy installation feeding both lists) walked against the
+  committed fixtures produces deltas of EXACTLY two shapes, verified
+  entry-by-entry in both tracks — interleaved "record" entries in
+  storeMutations at layout/choose_base/touch_seed_source (the second
+  list the unified spies feed, absent from the pre-merge fixture
+  which descended from a single-list regeneration) and the T021
+  signature at characters/prefill (decisionMutations [record, record]
+  + the same two records interleaved). Nothing else differs; step
+  sets identical (16/15). Fixture regeneration remains the T029
+  story-gate action. One harness repair was needed post-merge:
+  driveSteps now awaits each click target (findByTestId) — the copy
+  track's first lazy PhaseB load no longer resolves inside a
+  synchronous getBy (the adapt track, running second on a warm module
+  cache, masked it); recorder windows are unchanged. (e) Depcruise:
+  127 → 131, exactly 089's +4 type-only decisions/ cycle paths; the
+  4 transient facade cycles remain (die at T025). The two
+  touch_seed_source renderSmoke failures persist post-merge (they
+  were pre-existing on BOTH branches' bases). Full studio suite run
+  as the merge gate: see the merge commit / story report for the
+  tally (focused merge-seam battery: 292/292 + tsc clean at commit
+  time).

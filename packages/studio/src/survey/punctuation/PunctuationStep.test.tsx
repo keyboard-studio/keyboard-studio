@@ -19,7 +19,7 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { ASCII_PUNCTUATION_FLOOR } from "@keyboard-studio/engine";
 import { PunctuationStepHost } from "./PunctuationStepHost.tsx";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 
@@ -66,6 +66,17 @@ afterEach(() => {
   cleanup();
   i18n.activate("en");
 });
+
+/** Record the identity decisions a completed identity step records (spec 089:
+ * the survey context / scaffold spec are derived from these, never seeded
+ * into the session store directly). */
+function seedIdentityDecisions(languageCode: string, languageName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: languageName, provenance: "asked" });
+  record({ id: "language-autonym", value: languageName, provenance: "asked" });
+  record({ id: "language-code", value: languageCode, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
 
 describe("PunctuationStep — type-in and Done", () => {
   it("adds typed punctuation to the list and Done emits it as phase-C confirmedInventory", () => {
@@ -135,10 +146,7 @@ describe("PunctuationStep — shared draft continuity", () => {
 describe("PunctuationStep — sourced suggestions", () => {
   // useSourcedExemplars only looks up when the session carries a BCP47 tag.
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({
-      bcp47_tag: "hi",
-      language_name: "Hindi",
-    });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("the exemplar punctuation tier arrives already chosen as PROPOSED picks that keep their attribution (spec 075: defaults are the product)", async () => {
@@ -289,7 +297,7 @@ describe("PunctuationStep — FR-024: the result stays a phase-C slice", () => {
 
 describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("FR-001/FR-003/SC-002: the tier is already chosen on arrival and Done with zero clicks confirms it", async () => {
@@ -463,7 +471,7 @@ function chipsIn(group: HTMLElement): string[] {
 
 describe("PunctuationStep — the base-produced group (US2)", () => {
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("FR-006/FR-009: with complete coverage the base group is every produced punctuation char not in the CLDR group, under the base caption", async () => {
@@ -633,7 +641,7 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
 
 describe("PunctuationStep — a removed proposal is never re-proposed (US4)", () => {
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("SC-006: removals survive a step revisit and a locale re-resolution; typing a removed mark back makes it the author's own", async () => {
@@ -717,7 +725,7 @@ describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
 describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence (spec 079 FR-022)", () => {
   beforeEach(() => {
     useSurveyAnswerStore.getState().reset();
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   function confirmedFor(key: string | null): void {
@@ -774,7 +782,7 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
 describe("PunctuationStep — shape change: tag change re-proposes, removals survive (spec 079 US3 T048)", () => {
   beforeEach(() => {
     useSurveyAnswerStore.getState().reset();
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("a resolved-tag change proposes a new candidate the old tag lacked, while a removed mark stays removed", async () => {
@@ -813,7 +821,7 @@ describe("PunctuationStep — shape change: tag change re-proposes, removals sur
 describe("PunctuationStep — flagged stale confirmation (spec 079 US3 T079/T080)", () => {
   beforeEach(() => {
     useSurveyAnswerStore.getState().reset();
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   function confirmedFor(key: string | null): void {

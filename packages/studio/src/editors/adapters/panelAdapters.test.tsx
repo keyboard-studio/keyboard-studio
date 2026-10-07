@@ -23,8 +23,7 @@ import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import type { Decision } from "../../decisions/decisionTypes.ts";
 import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
-import { buildTargetBcp47 } from "../../survey/IdentityLite.tsx";
-import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
+import { recordAnswersAsDecisions } from "../../steps/reducer.ts";
 
 // ---------------------------------------------------------------------------
 // jsdom does not implement scrollIntoView — BaseKeyboardPicker (rendered
@@ -66,22 +65,20 @@ import { BaseResolutionAdapter, IdentityLiteAdapter } from "./panelAdapters.tsx"
 // Fixtures
 // ---------------------------------------------------------------------------
 
-/** Full IdentityLiteResult shape (see survey/IdentityLite.tsx). */
-function makeIdentityResult(overrides: Partial<IdentityLiteResult>): IdentityLiteResult {
-  return {
-    autonym: "Hausa",
-    english: "Hausa",
-    languageSubtag: "ha",
-    targetScriptRaw: "Latn",
-    bcp47: "ha-Latn",
-    supported: true,
-    prefill: {
-      script: "Latn",
-      scriptClass: "alphabetic",
-      routingGroup: "qwerty-qwertz",
-    },
-    ...overrides,
-  };
+/**
+ * Seed the identity decisions the identity step's completion records
+ * (spec 089: BaseResolutionAdapter reads deriveIdentityResult(decisions)
+ * in place of the deleted surveySessionStore.identityResult field).
+ * Defaults reproduce the old makeIdentityResult({}) fixture: Hausa/Latn.
+ */
+function seedIdentityDecisions(
+  overrides: { languageCode?: string; targetScript?: string } = {},
+): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: "Hausa", provenance: "asked" });
+  record({ id: "language-autonym", value: "Hausa", provenance: "asked" });
+  record({ id: "language-code", value: overrides.languageCode ?? "ha", provenance: "asked" });
+  record({ id: "target-script", value: overrides.targetScript ?? "Latn", provenance: "asked" });
 }
 
 afterEach(() => {
@@ -92,9 +89,9 @@ afterEach(() => {
   useBasePreviewStatusStore.setState({ status: "idle" });
 });
 
-describe("BaseResolutionAdapter — suggest target sourced from surveySessionStore", () => {
-  it("declared-language identityResult surfaces the language-match badge", async () => {
-    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+describe("BaseResolutionAdapter — suggest target derived from the decision store (spec 089)", () => {
+  it("declared-language identity decisions surface the language-match badge", async () => {
+    seedIdentityDecisions();
 
     render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
@@ -103,8 +100,8 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
     });
   });
 
-  it("identityResult === null falls back to script-only target without crashing", async () => {
-    useSurveySessionStore.getState().setIdentityResult(null);
+  it("no identity decisions falls back to script-only target without crashing", async () => {
+    // No decisions recorded — deriveIdentityResult returns null.
 
     render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
@@ -114,10 +111,8 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
     expect(screen.queryByText("Already supports your language")).toBeNull();
   });
 
-  it("identityResult.bcp47 === '' falls back to script-only target without crashing", async () => {
-    useSurveySessionStore.getState().setIdentityResult(
-      makeIdentityResult({ bcp47: "" }),
-    );
+  it("empty language-code decision (bcp47 === '') falls back to script-only target without crashing", async () => {
+    seedIdentityDecisions({ languageCode: "" });
 
     render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
@@ -127,13 +122,10 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
     expect(screen.queryByText("Already supports your language")).toBeNull();
   });
 
-  it("prefill.script === '' falls back to 'Latn' so script matching still works", async () => {
-    useSurveySessionStore.getState().setIdentityResult(
-      makeIdentityResult({
-        bcp47: "",
-        prefill: { script: "", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-      }),
-    );
+  it("empty target-script decision falls back to 'Latn' so script matching still works", async () => {
+    // deriveIdentityResult: an empty recorded script composes to
+    // prefill.script "" — the adapter's `|| "Latn"` fallback covers it.
+    seedIdentityDecisions({ languageCode: "", targetScript: "" });
 
     render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
@@ -160,8 +152,7 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
 
 describe("BaseResolutionAdapter — preview vs commit", () => {
   it("previewing a suggestion card writes setLocalBase and does NOT call onComplete", async () => {
-    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
-    useDecisionStore.getState().reset();
+    seedIdentityDecisions();
     const onComplete = vi.fn();
 
     render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
@@ -182,8 +173,7 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
   });
 
   it("committing after a preview records the base-keyboard decision BEFORE calling onComplete (R7 ordering)", async () => {
-    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
-    useDecisionStore.getState().reset();
+    seedIdentityDecisions();
 
     // Spy on the decision store's record via the setState escape hatch,
     // wrapping the real action so both the spy AND the actual mutation
@@ -240,7 +230,7 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
 });
 
 // ---------------------------------------------------------------------------
-// IdentityLiteAdapter — history-pop resume wiring (identityPhaseResult)
+// IdentityLiteAdapter — history-pop resume wiring (decision-derived, spec 089)
 // ---------------------------------------------------------------------------
 
 /** A completed identity-lite phase result, as the flow would produce it. */
@@ -260,8 +250,16 @@ const IDENTITY_PHASE_RESULT = {
   ],
 };
 
-describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
-  it("first visit (no stored phase result) starts the flow at question 1", () => {
+/** Record the completed identity run the way StepHost does at completion. */
+function seedCompletedIdentityDecisions(): void {
+  recordAnswersAsDecisions(IDENTITY_PHASE_RESULT, "identity", {
+    writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
+    readDecisionSet: () => useDecisionStore.getState().decisions,
+  });
+}
+
+describe("IdentityLiteAdapter — resume from recorded decisions (spec 089)", () => {
+  it("first visit (no decisions recorded) starts the flow at question 1", () => {
     render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
     // il_language_english (English-name picker) is the first question in the
     // reordered flow (spec 030 FR-009).
@@ -270,8 +268,8 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
     ).toBeDefined();
   });
 
-  it("re-entry with a stored phase result resumes on the flow's last question", () => {
-    useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
+  it("re-entry with decisions recorded resumes on the flow's last question", () => {
+    seedCompletedIdentityDecisions();
 
     render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
 
@@ -282,37 +280,36 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
     ).toBeNull();
   });
 
-  it("completion writes identityResult, surveyContext, AND identityPhaseResult before onComplete", () => {
-    useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
-    // R7 ordering: SNAPSHOT the store from inside the callback, but ASSERT
-    // outside it.
-    //
-    // An expect() that throws in here surfaces as an uncaught React error and
-    // does NOT fail the test — verified by mutation: removing the author_contact
-    // write made this assertion throw while the suite still reported all green.
-    // Capturing and asserting afterwards is what actually gates.
-    let atCompletion: ReturnType<typeof useSurveySessionStore.getState> | null = null;
-    const onComplete = vi.fn((_result: unknown) => {
-      atCompletion = { ...useSurveySessionStore.getState() };
-    });
+  it("T018 round trip: decisions recorded at completion rebuild the resume payload field-for-field", () => {
+    seedCompletedIdentityDecisions();
+
+    render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
+
+    // The resumed flow shows the last question with its recorded answer.
+    expect(screen.getByText("Who holds the copyright, if not you?")).toBeDefined();
+    expect(screen.getByDisplayValue("Hausa Language Committee")).toBeDefined();
+  });
+
+  it("completion writes NOTHING to any store — it forwards the result untouched (spec 089)", () => {
+    seedCompletedIdentityDecisions();
+    const onComplete = vi.fn();
 
     render(<IdentityLiteAdapter onComplete={onComplete} />, { withStepNav: true });
     // Resumed on the last question with its answer restored — Finish directly.
     fireEvent.click(screen.getByTestId("survey-advance"));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
-    expect(atCompletion, "store was not snapshotted — onComplete never ran").not.toBeNull();
-    const s = atCompletion!;
-    // Every write below must have landed BEFORE onComplete fired.
-    // Through the composer: this assertion is about the WRITE having landed
-    // before onComplete, and `Latn` is Hausa's default script, so the tag's own
-    // spelling belongs to the composer's tests, not this one.
-    expect(s.identityResult?.bcp47).toBe(buildTargetBcp47("ha", "Latn"));
-    expect(s.surveyContext.language_name).toBe("Hausa");
+    // The forwarded value is the phase result StepHost consumes (recordPhase +
+    // recordAnswersAsDecisions + applyDecisionEffects run there).
+    const forwarded = onComplete.mock.calls[0]![0] as { phase: string; answers: unknown[] };
+    expect(forwarded.phase).toBe("A");
     // 4 -> 7: spec 064 US1 appends the three attribution answers.
-    expect(s.identityPhaseResult?.answers.length).toBe(7);
-    // spec 064 FR-016: publishing the contact here is what activates the Phase F
-    // pf_contact_info pre-fill.
-    expect(s.surveyContext.author_contact).toBe("alice@example.org");
+    expect(forwarded.answers.length).toBe(7);
+    // And the session store carries no identity residue from the adapter:
+    // the fields it used to write no longer exist at all (T017).
+    const session = useSurveySessionStore.getState();
+    expect("identityResult" in session).toBe(false);
+    expect("surveyContext" in session).toBe(false);
+    expect("identityPhaseResult" in session).toBe(false);
   });
 });

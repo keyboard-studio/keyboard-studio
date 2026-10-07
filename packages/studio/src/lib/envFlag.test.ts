@@ -95,7 +95,7 @@ describe("readEnvFlag — URL fallback", () => {
 });
 
 // ---------------------------------------------------------------------------
-// urlParam omitted -> env-only mode (mutateFlag shape); URL must be ignored
+// urlParam omitted -> env-only mode; URL must be ignored
 // (row 6)
 // ---------------------------------------------------------------------------
 

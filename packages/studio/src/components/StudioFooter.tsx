@@ -44,6 +44,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import {
   decisionsWithoutTouchSeed,
@@ -85,7 +86,8 @@ export function StudioFooter() {
   // ---------------------------------------------------------------------------
   // Project label — the ONE precedence (FR-041). No fourth derivation.
   // ---------------------------------------------------------------------------
-  const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const scaffoldSpec = deriveScaffoldSpec(decisions);
   const identity = useWorkingCopyStore((s) => s.identity);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const projectLabel = useMemo(
@@ -106,8 +108,8 @@ export function StudioFooter() {
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   const history = useSurveySessionStore((s) => s.history);
   // Spec 088 FR-005: the track is a decision-store selector now; the
-  // session field it used to be read from is deleted.
-  const decisions = useDecisionStore((s) => s.decisions);
+  // session field it used to be read from is deleted. (Reads the `decisions`
+  // subscription from the project-label block above.)
   const selectedTrack = selectTrack(decisions);
   // `visited` is the high-water mark `isReached` now keys on (see
   // surveySessionStore.ts). Omitting it here is not a cosmetic gap: the ROW

@@ -6,7 +6,7 @@
 // order) over plain cells, so A4's "containment first, no partial patch"
 // is exercised against the real merge, not a mock of it.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import type { IRPath, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -81,7 +81,7 @@ function registerSynthetic(id: string, mod: Partial<QuestionModule>): () => void
 describe("applyDecisionEffects — A1: runs unconditionally (no flag)", () => {
   it("applies pb_standard_letters with no env flag set anywhere", () => {
     // Deliberately NO vi.stubEnv: the pre-089 seam wrote nothing unless
-    // VITE_KM_MUTATE_SEAM=1. The runner must write regardless.
+    // its (since-deleted) flag was set. The runner must write regardless.
     const h = makeHarness(makeTestIR([]));
     applyDecisionEffects(
       result([{ questionId: "pb_standard_letters", answerType: "select", value: "extended-latin" }]),
