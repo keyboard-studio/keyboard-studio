@@ -113,9 +113,20 @@ module.exports = {
         'Forbidden: decisions/ -> dashboard/, editors/, stores/, components/ ' +
         '(the trail components read no store — the record is passed down from StudioShell, ' +
         'same as completenessReport; recording reaches the reducer via an injected ' +
-        'ReducerDeps.recordDecision, not by reaching into stores/ or editors/ directly).',
+        'ReducerDeps.recordDecision, not by reaching into stores/ or editors/ directly). ' +
+        'EXEMPTION (spec 093 final pass, lead ruling — option (a), followups.md): the three ' +
+        'named store-wiring halves — decisions/liveExtraction.ts, decisions/rebuildWorkingCopy.ts, ' +
+        'decisions/rebuildPerf.measure.ts — are exempt from the stores/ ban. The principle: this ' +
+        'rule guards the PURE CORE (ordering, closure, replay, the decision types); a wiring half ' +
+        'imports its stores by definition — it is the seam where the pure core meets the live ' +
+        'stores, and there is nowhere else for that import to live. Core modules are never ' +
+        'exempted: a store import appearing in any other decisions/ module is a violation.',
       severity: 'error',
-      from: { path: '^packages/studio/src/decisions/' },
+      from: {
+        path: '^packages/studio/src/decisions/',
+        pathNot:
+          '^packages/studio/src/decisions/(liveExtraction|rebuildWorkingCopy|rebuildPerf\\.measure)\\.ts$',
+      },
       to:   { path: '^packages/studio/src/(dashboard|editors|stores|components)/' },
     },
     {
