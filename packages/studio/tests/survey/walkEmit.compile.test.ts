@@ -84,7 +84,6 @@ import { irToCharacterView } from "../../src/lib/irToCharacterView.ts";
 import { deriveDesktopModifications } from "../../src/lib/deriveDesktopModifications.ts";
 import { findTouchLayoutPath } from "../../src/lib/findTouchLayoutPath.ts";
 import { buildSourceZipForDownload } from "../../src/lib/buildOutputBundle.ts";
-import { type ReducerDeps } from "../../src/steps/reducer.ts";
 import {
   applyPhysicalCompletionEffects,
   applyTouchCompletionEffects,
@@ -169,19 +168,6 @@ function carveCharacter(ch: string): string[] {
   return [...ruleNodeIds, ...storeSlotIds];
 }
 
-/** The reducer deps StudioShell injects, limited to what these steps touch. */
-function studioReducerDeps(): ReducerDeps {
-  const wc = () => useWorkingCopyStore.getState();
-  return {
-    instantiateFromBase: (b, o) => wc().instantiateFromBase(b, o),
-    instantiateFromExisting: (b, o) => wc().instantiateFromExisting(b, o),
-    instantiateFromBaseIfConfirmed: () => {
-      throw new Error("not used by this oracle");
-    },
-    getWorkingIR: () => wc().ir,
-    setWorkingIR: (next) => wc().setWorkingIR(next),
-  };
-}
 
 /** AddTouchAdapter.handleComplete -> the touch completion effects (spec 090
  * T042: R2 re-homed from the reducer to lib/assignLoopCompletion.ts, whose

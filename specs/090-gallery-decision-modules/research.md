@@ -1799,3 +1799,34 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   desktop derivation produces — a from-scratch scaffold gives
   K_Z only template content) is kept with its content intact.
   16/16 green; tsc 0; eslint clean.
+- **D-090-42 — US4 gate (T045) + the two discharges this run owed.**
+  (1) *Verification debt 1 discharged*: after the `b6567241` merge
+  of 089 @ `24c213c3`, the three pass-2 pin suites re-run against
+  089's actual runner change — marksTreatment 9/9,
+  deadkeysDefined 5/5, ruleSet 5/5 (19/19). (2) *Verification
+  debt 2 / T037 classification*: the predecessor's lost full-suite
+  accounting was recovered from its artifacts
+  (`~/tmp-090/full-suite-t037.json`, US3-complete tree): 5 failed —
+  the 4 SC-004 corpus (`basic_kbdru`/`arabic_izza`, 2 in each
+  sc004 file) + 1 `useValidator`. At this gate the only failures
+  that reproduce deterministically are the same SC-004 family:
+  `successCriteria.sc004.kmp.test.ts` fails standalone on exactly
+  `basic_kbdru` + `arabic_izza` (2); the sibling sc004 file passes
+  standalone (49/49) and `useValidator` passes (8/8). Parallel
+  full-suite runs on this VM (load average ~7 on 2 vCPUs, five
+  sibling agents) produced 79 then 61 non-reproducing failures —
+  worker casualties, not assertions: every file in US4's blast
+  radius passes standalone and in batches. No failure beyond the
+  known SC-004 budget is attributable to 090 at either checkpoint,
+  so T037's deferred classification closes clean. (3) *Gate legs*:
+  golden walk green at both steps' regenerated fixtures (deltas
+  adjudicated intended, D-090-39/-40); StepHost parity suites
+  green; tsc 0; package eslint 0 errors after removing one helper
+  orphaned by the T041/T042 deps retirement in
+  walkEmit.compile.test.ts (the run's single error; 394 warnings
+  pre-existing). US4's remaining item is T043, STOPPED for a lead
+  ruling (see the T043 stop note in tasks.md): its three
+  identifiers are the galleries' live edit-time write paths under
+  the ratified record-from-working-copy design, so registering
+  them would red the audit against the ruling — the US3 species,
+  whose disposition was ruled non-registration (D-090-31/-34).

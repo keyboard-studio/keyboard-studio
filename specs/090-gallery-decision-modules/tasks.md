@@ -336,7 +336,13 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
 - [ ] T043 [US4] FR-003 identifier list extended with `recordAssignments`, `setTouchDraft`,
   `deleteTouchKey` in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the assignLoop
-  trees
+  trees — **STOPPED for a lead ruling (D-090-38 Flag 1, D-090-42)**: all three
+  identifiers are the galleries' live edit-time write paths under the ratified
+  record-from-working-copy design (12 + 3 live call sites in editors/assignLoop
+  non-test sources), so registering the bans reds the audit against the
+  ruling — the US3 species, disposed there as ruled non-registration
+  (D-090-31 → D-090-34). Proceeds only on the lead's word: registration, or
+  non-registration recorded at both FR-003 sites mirroring D-090-34.
 - [x] T044 [US4] Tests: contract + determinism for both `apply`s (R1 lock effect, R2 JSON
   build) in packages/studio/src/survey/questions/gallery/physicalLayout.test.ts and
   packages/studio/src/survey/questions/gallery/touchLayout.test.ts; a store-level scenario in
