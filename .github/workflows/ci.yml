@@ -344,7 +344,7 @@ jobs:
           pnpm --filter "@keyboard-studio/studio^..." build
           cd packages/studio
           npx playwright install --with-deps chromium
-          GOLDEN_WALK_CAPTURE=1 VITE_KM_MUTATE_SEAM=1 npx playwright test e2e/golden-walk.spec.ts --project=desktop
+          GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desktop
           cp e2e/fixtures/golden-walk/basic-kbdfr-copy.zip "$GITHUB_WORKSPACE/packages/studio/e2e/fixtures/golden-walk/"
 
       - name: Upload captured golden-walk baseline
@@ -411,6 +411,4 @@ jobs:
       # results.json does not displace the main lane's summary above.
       - name: Playwright (spec 089 golden walk, verify)
         if: hashFiles('packages/studio/e2e/golden-walk.spec.ts') != ''
-        env:
-          VITE_KM_MUTATE_SEAM: "1"
         run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk
