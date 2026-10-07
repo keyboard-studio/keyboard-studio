@@ -130,3 +130,37 @@ paths through the same pre-existing SCC via 089's new `decisions/`
 imports). Every reported path traverses an `import type` edge the config
 intends to exempt (`dependencyTypesNot: ['type-only']`), so the local
 counts are not a usable gate here; CI's resolution is authoritative.
+
+## 6. Correction to the §5 depcruise note — the 126 were real CI errors (fixed)
+
+The note above concluded the branch's 126 local `no-circular` reports were
+exempt-in-CI because every path traverses a type-only edge. **CI disagreed,
+and CI was right.** On PR #1974's first full CI run (`37581299792`, head
+`70a0216f`), Build and Typecheck passed but the Lint step failed at
+depcruise with **126 `error no-circular`, exit 126** — every report the same
+cycle shape through `survey/questions/registry.ts → <module> →
+survey/types.ts → stores/workingCopyStore.ts → dashboard/completeness.ts →
+steps/stepOrder.ts → steps/stepDependencies.ts → registry.ts`.
+
+Root cause: `bfc9c418` (Phase 2, T004 apply contract types) added
+`import type { IdentityPatch }` from `stores/workingCopyStore.ts` into
+`survey/types.ts`, making `types.ts → workingCopyStore.ts` an edge of the
+runtime cycle above. The `no-circular` rule's type-only exemption
+(`dependencyTypesNot`) only rescues a cycle whose **first** edge is
+type-only; a lone type-only edge on an otherwise runtime cycle does not,
+and the sandbox's depcruise classification — which made all 126 look
+traversed-by-a-type-only-edge — does not match CI's. The local caveat in
+§5 therefore cuts the other way: local "all exempt" readings are not
+evidence about CI either. Spec 088's tree reported zero because it never
+added that edge.
+
+Fix (owner, `030bf59c`): `IdentityPatch` moved to a leaf module
+`stores/identityPatch.ts` (no imports); `survey/types.ts`,
+`lib/identityLanguagePatch.ts`, and `lib/outputKeyboardId.ts` import it
+from there, and `workingCopyStore.ts` re-exports the type so other
+importers are unchanged. `survey/types.ts` now has **no** import of
+`workingCopyStore` at all — the edge is severed, not merely re-typed.
+`.dependency-cruiser.cjs` is untouched (no new exemptions, no severity
+changes). Verified in CI: run `37584204599` (head `030bf59c`) — Build,
+Typecheck, and **Lint (eslint + depcruise + crew-lint + facet-lint) all
+success**. Same leaf-extraction shape as spec 090's D-090-7.

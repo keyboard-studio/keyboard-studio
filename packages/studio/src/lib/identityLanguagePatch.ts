@@ -13,7 +13,7 @@
 // their own fallbacks (the descriptor writer's `und` placeholder) instead
 // of declaring a blank tag.
 
-import type { IdentityPatch } from "../stores/workingCopyStore.ts";
+import type { IdentityPatch } from "../stores/identityPatch.ts";
 
 /**
  * The minimal shape this helper reads. Deliberately narrower than

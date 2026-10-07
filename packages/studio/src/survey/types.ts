@@ -12,7 +12,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../decisions/extractContext.ts";
-import type { IdentityPatch } from "../stores/workingCopyStore.ts";
+import type { IdentityPatch } from "../stores/identityPatch.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
