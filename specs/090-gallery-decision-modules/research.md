@@ -1276,3 +1276,28 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   deadkeysDefined.test.ts (contract + deterministic replay +
   live-state no-op) plus the lib/editor suites green; tsc + eslint
   clean.
+
+- **D-090-26 — T034 done: rule-set module (builder-result value,
+  splice apply, step-side recording); ruleAdditions re-homed to
+  survey/rules/.** Value = RuleSetValue, an alias of the builder
+  seam's DerivedRuleAdditions (marked added IRRules/IRStores per
+  group + workingOrder) declared beside the seam in
+  survey/rules/ruleAdditions.ts (D-090-8 pattern). apply splices
+  the additions into ctx.ir via spliceRuleAdditions with the
+  deletion set taken from the recorded carved-layout decision's
+  removals — so an addition the author carved away is never
+  resurrected (pinned by a dedicated test) — and returns the
+  groups/stores subtrees. writes [groups, stores]; decisionIRPaths
+  maps rule-set; it left the IR-less allowlist. Recording:
+  RulesStep.complete() records the derived value (currentRuleSetValue
+  in survey/rules/ruleSetValue.ts, shared with the renderer) before
+  onComplete — the step is its own adapter (manifest hosts it
+  directly); the module renderer is RulesDecisionRenderer wrapping
+  the step. No extract (additions are a working-vs-base diff of
+  session work; rationale in the module header). ruleAdditions.ts
+  and its test moved lib/ → survey/rules/ for the same boundary
+  reason as D-090-25; its three lib/hooks importers re-pointed,
+  behaviour unchanged (ruleAdditions + projection suites green).
+  Snapshot refreshed (ruleSet writes line only). Gates: module +
+  rules trees (355) + pins (459 in the earlier batch) green; tsc /
+  eslint clean; depcruise baseline 2.

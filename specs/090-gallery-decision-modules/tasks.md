@@ -253,7 +253,7 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
   packages/studio/src/editors/deadkey/DeadkeySurface.tsx (and its sibling editors);
   `apply` replays the ops through the existing patch construction in
   packages/studio/src/editors/deadkey/deadkeyWrite.ts
-- [ ] T034 [P] [US3] `rule-set` module: the serializable builder-result shape defined from the
+- [x] T034 [P] [US3] `rule-set` module: the serializable builder-result shape defined from the
   builder's own types, and the module, in
   packages/studio/src/survey/questions/gallery/ruleSet.ts; `RulesStep` reports the value
   through `onChange` instead of `onComplete(undefined)` in

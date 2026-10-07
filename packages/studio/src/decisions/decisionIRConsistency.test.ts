@@ -144,7 +144,8 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "carved-layout",
   // deadkeys-defined left this allowlist at spec 090 T033 (its apply
   // replays the op log onto groups/stores/raw — decisionIRPaths maps it).
-  "rule-set",
+  // rule-set left it at T034 (its apply splices additions into
+  // groups/stores — decisionIRPaths maps it).
   "physical-layout",
   "touch-seed-source",
   "touch-layout",
