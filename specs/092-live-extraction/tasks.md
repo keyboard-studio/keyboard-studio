@@ -89,28 +89,45 @@ keyboard's own copyright, labelled "from <keyboard>"; copy: defaults to the auth
 **Independent Test:** a Playwright walk of both tracks in `pnpm dev` (SC-001).
 
 ### Tests for User Story 1
-- [ ] **T020** [US1] Write the both-tracks acceptance walk FIRST (expect it to fail):
+- [x] **T020** [US1] Write the both-tracks acceptance walk FIRST (expect it to fail):
   adapt walk — choose `basic_kbdfr`, choose adapt, assert the copyright-holder question
   appears after the track choice, pre-filled "(c) 2009-2019 SIL International"
   (docs/keyboard-index.md), labelled "from basic_kbdfr"; copy walk — same starting point,
   assert the field defaults to the author and the copied notice is not offered for
   re-entry · packages/studio/e2e/live-extraction-acceptance.spec.ts (new)
+  — DONE: both tests written and listed by Playwright; the shared
+  `driveIdentityLite` gained an opt-in `deferCopyright` option (the question
+  no longer renders in the identity sequence). CI-gated per the owner's
+  ruling; its live pass additionally depends on 091's unified flow (G-8).
 
 ### Implementation for User Story 1
 **Wave 1 — the one allowed edit:**
-- [ ] **T021** [US1] FR-005: `requires` on `il_copyright_holder` becomes
+- [x] **T021** [US1] FR-005: `requires` on `il_copyright_holder` becomes
   `["author-name", "authoring-track"]`. One line; no other change to the module (its
   `extract` and its D1 no-`validate` stance are unchanged) ·
   packages/studio/src/survey/questions/a/il_copyright_holder.ts
+  — DONE, exactly one line. Its intermediate-base consequence (per-flow
+  ordering throws on the cross-flow requires) is recorded as plan.md G-8
+  with a lead ruling requested; the US1 thread is stopped there per the
+  series rule, not adapted around.
 **⟶ Then:**
-- [ ] **T022** [US1] Track-dependent disposition in the pass (generic mechanism, not a
+- [x] **T022** [US1] Track-dependent disposition in the pass (generic mechanism, not a
   copyright special case): where a decision's `inputs` include `authoring-track`, the
   pass applies the module's declared seeding disposition — for `copyright-holder`:
   adapt → the extracted value seeds the record; copy → no extracted seed, the D1
   default-to-author stands · packages/studio/src/decisions/liveExtraction.ts
+  — DONE: the generic mechanism is the pass's `seedWhen` evaluation (landed
+  with T010); the disposition itself is declared on `il_copyright_holder`
+  (`authoring-track === "adapt"`), unit-tested both ways in
+  liveExtraction.test.ts.
 - [ ] **T023** [US1] Run T020's walk: both tracks pass in `pnpm dev`. If a second edit
   appears necessary, stop and report per the series rule above ·
   packages/studio/e2e/live-extraction-acceptance.spec.ts
+  — STOPPED AND REPORTED (plan.md G-8): the walk is CI-gated in-sandbox,
+  and a second change WOULD be necessary on the intermediate base (the
+  per-flow ordering throw) — that change is 091's already-planned unified
+  flow, not a 092 edit. Awaiting the lead's ruling among G-8's options
+  (a)/(b)/(c).
 
 **Checkpoint:** the series acceptance test passes with exactly one declaration edit.
 

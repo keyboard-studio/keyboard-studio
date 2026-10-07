@@ -118,7 +118,20 @@ const mod: QuestionModule = {
   writes: [],
   // Decision spike (km/decisions-spike).
   provides: ["copyright-holder"],
-  requires: ["author-name"],
+  // Spec 092 FR-005 (the series acceptance test): the authoring-track
+  // decision is also required — the track decides what the starting
+  // point's copyright may do here (seed on adapt, never offered on copy),
+  // and the derived order (spec 087/091) now places this question after
+  // the track choice, where the extraction pass has already run.
+  requires: ["author-name", "authoring-track"],
   extract: extractCopyrightHolder,
+  // Spec 092 T022: the track-dependent seeding disposition, declared here
+  // rather than special-cased in the pass. Adapt: the extracted notice
+  // seeds the question (pre-filled, labelled with its source). Copy: NO
+  // seed and NO `offered` — the copied keyboard's notice is retained by
+  // the attribution machinery (D1 leaves the holder defaulting to the
+  // author), and offering it for re-entry is the D4 duplicate-holder
+  // hazard this module's help text exists to prevent.
+  seedWhen: (decisions) => decisions["authoring-track"]?.value === "adapt",
 };
 export default mod;

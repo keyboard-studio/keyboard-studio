@@ -222,6 +222,30 @@ gallery).
   holds: instantiation only through the apply path, requires both decisions,
   runs once, track known.
 
+- **G-8 (FR-005 is NOT self-sufficient on the intermediate base — lead
+  ruling requested, US1 thread stopped at T023):** T021's one-line edit
+  landed exactly as specified, and T022's `seedWhen` is independently
+  sound at pass level. But on today's base the edit has a consequence the
+  plan did not record: `orderDecisions(flowModules.identity_lite)` — and
+  with it `loadFlowSourceDef(identity_lite)`, which the live step host
+  (`makeFlowStepComponent`) loads — THROWS `unresolved decision:
+  "authoring-track" required by "il_copyright_holder"`, because per-flow
+  ordering rejects cross-flow `requires` by design. So on the
+  intermediate stack the live identity flow cannot load; the frozen
+  parity test (`orderParity.test.ts`, identity_lite) is red for the same
+  reason. On the COMPLETED stack this resolves itself: 091's design
+  unifies identity/track/project_name into one SurveyRunner flow (its
+  research.md: "screens are one SurveyRunner over one flow"), making the
+  requires intra-flow, and 091's plan already owns the parity rewrite.
+  Options for the lead: (a) accept the intermediate red — it heals at the
+  091 restack, which precedes 092 in merge order; (b) hold T021 (revert
+  the one line; T020/T022 stand) until 091 lands; (c) authorise a
+  cross-flow tolerance change in `orderDecisions`/`loadDerivedFlow` on
+  this branch — out of 092's declared scope and on the exact surface 091
+  is rewriting, so a restack collision is likely. 092's recommendation:
+  (a), with (b) if any consumer needs a runnable identity flow from this
+  branch before 091 lands (093's re-audit is the candidate consumer).
+
 **T002 baseline (pre-change, this base):** the Playwright golden walk is
 CI-gated per the owner's ruling (sandbox Chromium cannot navigate localhost).
 The store-level StepHost golden walk (`tests/steps/stepHost.goldenWalk.test.tsx`,
