@@ -245,3 +245,52 @@ re-run and the halted tasks unblock in order. The known depcruise cycle on
 the base (`survey/types` ↔ `workingCopyStore`) is likewise a predecessor
 fix arriving via restack; per the lead's instruction it is **not** fixed on
 this branch.
+
+## Appendix — T001 prerequisite audit, RE-RUN at the cascade restack
+
+Re-run after merging `origin/km/live-extraction` at `4600dc18` (092 complete
+through Phase 7) into `km/derived-keyboard` as merge `7c715d60` — clean
+merge, no conflicts. Every prerequisite that halted work at the pipelined
+start is now verified present in this tree:
+
+- **088** ✔ — `stores/decisionStore.ts` present; `lib/draftPersistence.ts`
+  has `DRAFT_VERSION = 2` with the decisions envelope slice and the
+  migrate-before-gate boot scan; `DecisionProvenance` includes `derived`;
+  `Decision` carries `inputs?` / `offered?` snapshots.
+- **089** ✔ — `QuestionModule.apply` is the pure five-channel contract in
+  `survey/types.ts` (`WorkingCopyPatch`: `ir` / `identity` / `attribution` /
+  `helpDocs` / `historyEntryState`); the runner `applyDecisionEffects` is in
+  `steps/reducer.ts`; the mutate seam is deleted from production code (the
+  only remaining `VITE_KM_MUTATE_SEAM` references are comments/stubs inside
+  093's own T002 harness file).
+- **090** ✔ (landed portion) — gallery decision modules are in
+  `survey/questions/gallery/` (base keyboard, character inventory,
+  punctuation, invisibles, marks, convenience, touch seed/layout, windows
+  layout, deadkeys, rules, carve, help docs); per-item provenance is the
+  ruled flat enum (`carvedLayout.ts`: `provenance: "asked" | "derived" |
+  "extracted"`). 090 is still mid-US3 upstream and its tail task T063
+  (`phaseAnswersByStep` deletion; 16 references remain) is predecessor work
+  in flight — it arrives via the final restack and blocks nothing in 093.
+- **091** ◐ (in flight, not missing) — step order is derived
+  (`steps/stepOrder.ts`: `deriveStepStructure`, `STEP_TRAILS`);
+  `steps/stepDependencies.ts` is still present because 091's deletion +
+  final FR-005 parity gate are held (by the lead's pipeline rule) until 090
+  completes. T010's consumer surface is therefore audited against the
+  current tree and re-verified at the final restack.
+- **092** ✔ — `decisions/liveExtraction.ts` (the live extraction pass) and
+  setup-as-a-decision: StudioShell's instantiation gates on BOTH the
+  `base-keyboard` and `authoring-track` decision records, and the
+  base-keyboard module's `apply` is `() => ({})`, so replay's index 0 (the
+  starting-point IR + empty overlay) is exactly the post-setup state.
+
+**Known intermediate red (lead-ruled, G-8 on 092):** 092's one-line
+cross-flow `requires` makes `loadFlowSourceDef(identity_lite)` throw
+`unresolved decision "authoring-track"` on this intermediate stack — the
+live identity step cannot render until 091's unified flow lands and
+restacks up. Not a 093 defect; not fixed here. Store-level evidence routes
+around it.
+
+**Disposition.** Nothing is missing outright. The halt is LIFTED: Phase 2
+(T004–T006) and the story phases proceed in plan order. Items still in
+flight upstream (090 US3/T063, 091 `stepDependencies` deletion + parity
+gate) are re-verified at the final restack, per the pipeline rule.
