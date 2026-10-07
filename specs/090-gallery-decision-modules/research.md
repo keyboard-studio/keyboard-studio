@@ -1358,3 +1358,91 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   US4 modules will be authored to this contract from the start.
   Gates: the three suites + coverage + audit 67/67; studio tsc
   clean.
+
+- **D-090-29 — LEAD RULING on D-090-19 (T026): Option (a) —
+  declare the decisions slice (lead rulings message, 2026-10-07).**
+  `"decision-store"` is added to the `PersistenceDeclaration`
+  union in `steps/types.ts`; the five US2 steps are re-declared
+  decision-store-first — characters keeps its dual form
+  (`` `decision-store` (alphabet) + `answer-store` (sub-screen
+  position, manual-path answers) ``), marks and convenience
+  declare `decision-store` with their answer-store
+  evidence/status residue named in the manifest comment,
+  punctuation and invisibles declare `decision-store` — and the
+  five rows of the spec-079 step-classification table are
+  amended in lockstep WITH an amendment note recording that
+  spec 090 superseded the "Declaration after 079" cells for
+  these rows. The answer-store evidence layer (marks
+  per-toggle answers, characters' addition answers,
+  punctuation's inventory answer) and the convenience adoption
+  shim (D-090-17) are KEPT: they are the narrowed store's
+  sanctioned role — within-step draft/evidence state, exactly
+  what T026's store text describes. **Scope determination for
+  D-090-20 / T060 (stated by the ruling):** the evidence layer
+  is spec 079's own draft surface, not a gallery write-around —
+  FR-003's ban targets gallery components writing answers IN
+  PLACE OF decision records. The `saveAnswer` bans over
+  marks/characters/punctuation deferred in D-090-20 are
+  therefore NOT registered: not as an exception, but as a scope
+  determination, cited at the registration sites in both FR-003
+  list files (the audit test and the eslint overlay). T060's
+  zero-exceptions assertion reads on the banned category so
+  defined. Options (b) and (c) are rejected: (b) leaves the
+  declarations actively ambiguous at exactly the surface 091
+  derives step membership from — the table would stop answering
+  where the five steps' answers live; (c) eliminates the
+  evidence layer by reopening D-090-11's rejected design and
+  retiring the convenience shim, dropping pre-T024 drafts'
+  restored booleans with no orphan surface — contrary to the
+  087 Q5 / 088 T030 "surfaced, never dropped" precedent the
+  rest of US2 followed, and overriding recorded rationale
+  without new evidence. Executed at T026.
+
+- **D-090-30 — LEAD RULING on D-090-24 (T032): Option (a) —
+  the characters-precedent cut (lead rulings message,
+  2026-10-07).** The `carved-layout` module ships value +
+  extract + step-side recording; `apply = () => ({})` like
+  characterInventory's; the applied view keeps being produced
+  by `projectWorkingCopyVfs` from the persisted overlay. Two
+  conditions attach: (i) the recorded value must suffice to
+  reconstruct the overlay state that produces the applied view
+  (removal items + dispositions); purely presentational state
+  (e.g. card collapse) is exempt — an overlay component that
+  is authorial, view-affecting, and NOT capturable in the
+  value stops on that component alone and is reported to the
+  lead; (ii) the downstream delta is recorded in the spec's
+  duplication ledger / followups as a named handoff (see
+  D-090-31). Option (b) is rejected: amending 089's PRed
+  apply contract mid-flight from inside 090 is cross-spec
+  overreach, and PR #1974 would no longer match its contract.
+  Option (c) is rejected: two producers of the carve result
+  with different inputs can diverge from the emitted artifact,
+  contradicting the seam's canonical-producer design.
+  Executed at T032.
+
+- **D-090-31 — LEAD RULING on D-090-27: the
+  record-from-working-copy precedent is RATIFIED for US3's
+  editor-backed decisions (lead rulings message, 2026-10-07).**
+  Overlays/op-logs remain the edit-time write path for carve
+  (D-090-30), deadkeys (T033 as built) and rules (T034 as
+  built); the decision records them at completion; `apply`
+  serves replay where the contract has channels. The T033
+  deviation from the lead's earlier paraphrase ("step-side op
+  commits become value updates through the host") is closed
+  by this ratification: no contract channel exists for a host
+  to write those overlays, and the projection reads them from
+  the working copy. Consequences executed under this ruling:
+  T035's Phase D action bans (cascadeDelete / cascadeRestore /
+  restoreAll / keepAll / prefillCarveDispositions /
+  commitDeadkeyOp) are NOT registered — they presumed the
+  host-mediated design this ruling sets aside, and registering
+  them would red the gate against the ratified design; the
+  non-registration + rationale is recorded at the T035 site
+  in both FR-003 list files so T060 does not read it as a
+  gap. T036's carve cases proceed under D-090-30 (the no-op
+  apply pinned as such); T037's gate proceeds. **Named
+  downstream handoff (from D-090-30 condition (ii)):** 093's
+  I-1 overlay accumulator grows a carve-overlay fold —
+  reconstruct the overlay from carved-layout decision values
+  during replay; 092's T037 (prefillCarveDispositions) remains
+  pending on carve until that fold exists.
