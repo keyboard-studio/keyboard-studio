@@ -1891,3 +1891,22 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   persistWorkingCopy (185 combined), draftPersistence 112/112,
   decisionRecord/prePrDraft/journey/consistency 403/403,
   walkEmit + StepHost green.
+- **D-090-45 — the D-090-7 static cycle closed (T060 enabler).**
+  The full depcruise run had been red on this branch since US2:
+  two no-circular violations, both on the spine registry →
+  characterInventory → CharactersStep → {PhaseB, Prefill} →
+  {flowSources, IdentityLite} → registry (089's tree cruises
+  clean, so this was a 090 regression; earlier "depcruise
+  clean" records were scoped runs over subsets). Runtime had
+  been saved by PhaseB's lazy edge, but this repo's depcruise
+  counts lazy and even type-only .tsx imports as import edges,
+  so only a real graph break counts. Fix: the substage views
+  are composed by CharactersStepHost (the manifest wrapper,
+  outside the cycle) and handed to the renderer through the
+  gallery host's step-context extras — the channel that exists
+  for wrapper-owned plumbing; CharactersStep imports neither
+  view (their prop shapes are mirrored structurally in
+  `CharactersStepExtras` from types already in scope). PhaseB
+  stays lazy, now at the host. Depcruise: zero violations
+  (1075 modules); tsc 0; CharactersStep + characterInventory
+  25/25; golden walk + PhaseB suites 140/140.
