@@ -56,6 +56,36 @@ Unblocks when: the same 090 US3/US4 conversions land. The v3 work
 then proceeds exactly as tasked (fixture, envelope, boot-scan
 migration with .v2/.v1 key chaining, replay resume, SC-003 walk).
 
+## OWNED DELTA — carve-overlay fold (090 ruling D-090-24, relayed by the lead 2026-10-07)
+
+090's carve module ships as value + extract + step-side recording with
+a NO-OP apply: 089's patch contract has no carve-overlay channel, and
+amending a PRed contract mid-flight was rejected. Consequence owned by
+093: when 090 completes and restacks up to this branch, the
+carved-layout decision values in the decision set must fold into a
+CARVE-OVERLAY state in the I-1 overlay accumulator, so a replay
+rebuild can install the overlay slice (deleted node/item/touch-key
+sets, carve chars, dispositions) into the working copy. 090 has been
+ruled to record values sufficient for that reconstruction (removal
+items + dispositions). Deadkeys/rules need no such fold (IR-channel
+applies; replay already handles them).
+
+Seam assessment (against the landed T009 wiring, commit 4b2412a1):
+no fight — the extension is additive.
+- `decisions/replayKeyboard.ts`: `OverlayState` is currently
+  `Omit<WorkingCopyPatch, "ir">` (closed over the patch channels);
+  it gains a carve slice field. `foldPatch` spreads the prior overlay,
+  so the slice survives folds it doesn't touch; checkpoints retain
+  the overlay by reference, so it rides the trail free.
+- The fold step itself (decision values → carve-overlay state) is
+  written when 090's value shape lands here — writing it now would
+  mean inventing that shape.
+- `decisions/rebuildWorkingCopy.ts` `installRebuiltState` enumerates
+  the overlay channels explicitly; the carve install block slots in
+  beside them (writing the store's carve slice actions).
+This delta unblocks together with the T010/T011 hold above (same
+predecessor landing: 090 US3 carve + US4 touch).
+
 ## PARTIAL — T024 grep gates
 
 While the held items stand, `staleSteps`/`repropagate` references in
