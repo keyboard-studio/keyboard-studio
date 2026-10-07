@@ -1161,3 +1161,84 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   unchanged. The only failures standing are the 4 SC-004 corpus
   ones, pre-existing and environmental. PR opening is the lead's
   step per series protocol.
+
+- **D-090-23 — US3 opening: T030 verified discharged by the
+  Foundational stub; T031 R1 rows re-verified against the branch,
+  one refinement.** T030: `CarveRemovalItem` in carvedLayout.ts is
+  the ruled flat shape (kind node|item|family|char, id, provenance
+  asked|derived|extracted) and `CarvedLayoutValue` =
+  {removals, dispositions (contracts CarveDisposition),
+  closedKeyboardCard} per data-model.md. T031: carve writes are
+  the workingCopyStore overlay Sets (deletedNodeIds /
+  deletedItemIds / disabledFamilyIds / carveChars /
+  carveDispositions / closedKeyboardCard, workingCopyStore.ts:576-
+  659) via cascadeDelete/cascadeRestore/restoreAll/keepAll
+  (:1886-1903ff) plus prefillCarveDispositions (:975) called from
+  CarveGalleryV2's effect (:825-836); applyCarveMutate consumes the
+  overlay in lib/projectWorkingCopyVfs.ts (:443-454). ALSO a
+  second cascadeDelete caller R1 did not list: MechanismGallery
+  (assign loop) routes its removals through the same action
+  (:3689-3700) — the overlay is shared infrastructure, so T032's
+  re-point must keep the assign loop's path working or migrate it
+  too. Deadkeys: editors call workingCopyStore.commitDeadkeyOp
+  (:1108) with ops built in editors/deadkey/deadkeyWrite.ts —
+  R1's row holds. Rules refinement: RulesStep holds NO local
+  builder state — RuleBuilderMount/RuleListMount write the working
+  copy directly and the step reports onComplete(undefined)
+  ("the step's result lives in the working copy", RulesStep.tsx:
+  50-57); R1's "builder-owned state" means the builder mounts +
+  guardIntentStore, and the ruleSet value/extract work from the
+  built rules in the IR, as R1's extract note said.
+
+- **D-090-24 — T032 STOPPED at an assumption failure: 089's
+  apply-contract has no channel for the carve overlay. Lead ruling
+  requested; options below.** T032's text assumes "apply writes the
+  overlay's applied view through the existing pipeline". Verified
+  facts: (1) A module apply returns a WorkingCopyPatch whose
+  channels are ir / identity / attribution / helpDocs /
+  historyEntryState (survey/types.ts:216-227); overlay channels are
+  authorized per-module by 089's data-model channel table, and the
+  runner rejects an unauthorized channel with ApplyChannelError,
+  applying nothing (089 contracts/apply-contract.md A3/A5). No
+  carve-overlay channel exists in that table. (2) The carve overlay
+  (workingCopyStore Sets + dispositions + closedKeyboardCard) is
+  not an IR slice: the applied view (carved IR / emitted .kmn) is
+  produced by lib/projectWorkingCopyVfs.ts from baseIr + overlay +
+  session aggregates (effectiveItemIds' tainted-contributor union,
+  entry-group deferral, rule-additions splice), with applyCarveMutate
+  as the canonical seam — none of those inputs are in ApplyContext
+  (ir / writes / decisions / currentHistoryEntryState only).
+  (3) The overlay DOES persist today inside the draft's workingCopy
+  slice, so in-session resume does not depend on the decision.
+  Options: **(a)** Characters-precedent cut: the module ships value
+  + extract + step-side recording (the adapter records the
+  overlay-derived value on change/complete, as CharactersStep
+  records its additions); apply = () => ({}) like
+  characterInventory's; the applied view keeps being written by
+  projectWorkingCopyVfs from the persisted overlay. Cost: 092/093
+  replay-from-decisions cannot re-assert the overlay — 093's
+  planned I-1 overlay accumulator becomes the place that must grow
+  a carve channel, a named downstream delta. **(b)** Add a
+  `carveOverlay` channel to WorkingCopyPatch + 089's authorization
+  table from inside 090: amends a completed, PRed spec's contract;
+  the runner (088/089 code) and applyWorkingCopyPatch must learn
+  the channel — cross-spec change, needs lead/owner adjudication,
+  and 089's PR #1974 would no longer match its contract. **(c)**
+  Carve apply returns the carved IR through the ir channel
+  (writes [groups, stores], applyCarveMutate over ctx.ir +
+  value-derived sets): two producers of the carve result with
+  different inputs — the pipeline's effectiveItemIds aggregation,
+  entry-group deferral, and rule-additions splice are not
+  reproducible from the value alone, so apply's output can diverge
+  from the emitted artifact's; the golden walk compares emitted
+  bytes and would be the arbiter, but a permanent dual-producer
+  arrangement contradicts the seam's canonical-producer design.
+  Implementer's assessment: (a) is the only option inside 090's
+  authority and matches the T021/T022 precedent; (b) is the
+  architecturally complete answer if the lead wants replay
+  supported from 090 already; (c) is not recommended. T032 is
+  STOPPED pending the ruling. NOT gated on it: T033 (deadkey ops
+  replay to groups/stores patches — IR-channel-expressible via
+  deadkeyWrite/DEADKEY_WRITES), T034 (rule additions are IR
+  groups), T035's deadkeys/rules lists, T036's deadkeys/rules
+  tests — proceeding with those.

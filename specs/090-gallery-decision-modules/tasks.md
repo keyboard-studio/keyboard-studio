@@ -232,12 +232,12 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
 
 **PR slice**: this phase is one PR.
 
-- [ ] T030 [US3] Set the `CarveRemovalItem` shape in
+- [x] T030 [US3] Set the `CarveRemovalItem` shape in
   packages/studio/src/survey/questions/gallery/carvedLayout.ts to the ruled shape —
   Candidate A, flat per-item `{ provenance: asked | derived | extracted }` (owner ruling
   2026-10-06, km-lead proposals Q4; recorded in research R8 / data-model.md) — before any
   carve value code is written
-- [ ] T031 [US3] Re-verify research R1's rows for `carve`, `deadkeys`, `rules` against the
+- [x] T031 [US3] Re-verify research R1's rows for `carve`, `deadkeys`, `rules` against the
   landed code; amend specs/090-gallery-decision-modules/research.md if any row drifted
 - [ ] T032 [US3] `carved-layout` module: value = removal items (ruled shape) + `dispositions`
   (the contracts `CarveDisposition`, unchanged) + `closedKeyboardCard` in
