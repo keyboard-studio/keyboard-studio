@@ -320,6 +320,55 @@ gallery).
   state), the gated effect is its only live caller, and the restore
   pre-seed guard stays as written.
 
+- **G-14 (restack pass, 2026-10-07 — the G-8 boundary ruling's premise
+  is FALSIFIED for group-member modules by 091's landing; STOPPED for a
+  lead ruling):** the restack merge itself landed clean
+  (`46e1dffe`, origin/km/derived-steps @ ed8f12fd, zero conflicts). The
+  ruled conversion (il_copyright_holder's `authoring-track` edge:
+  module `requires` → `screenRequires`) was then tested by ablation
+  before being committed, and it does NOT heal the full-list consumer
+  on the completed stack. Evidence (scratch ablations, all reverted):
+  (1) with the edge in `requires` (current tree), the raw per-flow sort
+  throws `unresolved decision: "authoring-track" required by
+  "il_copyright_holder"` (G-8's named item), AND `deriveScreens` over
+  the live registry returns 18 screens with the `identity` group SPLIT
+  (il_copyright_holder dragged after `track` by the edge), so
+  `steps/manifest.ts` throws at module load ("18 steps declared but 19
+  screens derived") — stepOrder.parity and sc002 fail at COLLECTION and
+  the live manifest is unloadable. (2) With the edge as
+  `screenRequires`, the per-flow sort heals (copyright last in flow),
+  but deriveScreens STILL returns the split 18: 091's Phase-4 final
+  design folds `screenRequires` back into deriveScreens' module-level
+  sort, which is exactly right for singleton-screen modules
+  (track_choice, project_display_name — 091's cases) and exactly wrong
+  for a group member: the folded edge reorders the one module out of
+  its group. (3) With the edge dropped entirely, deriveScreens returns
+  17 screens = 091's frozen baseline (identity whole, 9 members),
+  the manifest loads, and orderParity + sc002 pass 17/17. A further
+  wrinkle either way: the pass's `snapshotInputs` reads `m.requires`,
+  so moving or dropping the edge removes `authoring-track` from the
+  seeded copyright record's `inputs` snapshot (T012's recorded
+  behaviour) unless the snapshot's declaration channel is extended.
+  Semantic note: `screenRequires: ["authoring-track"]` on this module
+  would assert "the identity screen is placed after the track screen",
+  which the frozen baseline itself contradicts (identity sorts first);
+  the track dependency is a run-time data dependency, already consumed
+  by `seedWhen`, the T013 setup gate (track recorded before the pass
+  runs), and the pass's inputs snapshot — it was never a screen-order
+  fact. Options put to the lead: (A) drop the edge (ablation-proven;
+  snapshot loses authoring-track); (A2) drop the edge + snapshotInputs
+  reads `requires` ∪ the module's `inputs` declaration (set
+  `inputs: ["authoring-track"]` on the module) — keeps T012's snapshot
+  byte-identical, small mechanism change inside liveExtraction.ts,
+  RECOMMENDED by this pass; (B) keep the conversion and re-engineer
+  deriveScreens to apply screenRequires at screen granularity —
+  rewrites 091's landed core sort inside 092's pass, not recommended;
+  (C) convert + move the whole identity screen — contradicts the
+  frozen baseline and the protected parity test, rejected. The rest
+  of the restack pass (T023, acceptance re-run, G-12 remainder, T037,
+  gates, PR) is NOT executed on a tree whose manifest throws at load;
+  it resumes on the ruling.
+
 ## Implementation outcome (Phase 7, T060–T063)
 
 - **SC-001 (FR-005):** the one-line `requires` edit + both-tracks
