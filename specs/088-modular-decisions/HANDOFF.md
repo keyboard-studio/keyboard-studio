@@ -1,8 +1,8 @@
 # Handoff: decisions modular underneath, whatever their UI
 
 **Branch:** `km/modular-decisions` (cut from `main` at 18e63aa4, after spec 087 merged as #1938)
-**Status:** handoff, not yet a spec. Start with `/speckit-specify` using this file as input.
-**Spec number:** 088 (086 is claimed by open PR #1956; 087 is merged).
+**Status:** split into six specs, 088–093 (series table in [spec.md](spec.md)). Each runs `/speckit-plan` on its own branch once the one before it merges.
+**Spec numbers:** 088–093 (086 is claimed by open PR #1956; 087 is merged).
 
 ## The goal, in the owner's words
 
