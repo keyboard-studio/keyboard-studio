@@ -1,19 +1,22 @@
 // LayoutStep — the community-layout spine step (spec 076 A4): the proposal is
 // preselected, the picker searches every layout, picks persist immediately.
+// Since spec 090 T011 the step is the windows-layout gallery module hosted
+// by LayoutStepHost: picks persist as the `windows-layout` decision.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import { LayoutStep } from "./LayoutStep.tsx";
+import { LayoutStepHost } from "./LayoutStepHost.tsx";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { getPickedWindowsLayout } from "../../lib/layoutFamily.ts";
 
 function mount(bcp47: string | undefined) {
   useSurveySessionStore.getState().setSurveyContext(bcp47 === undefined ? {} : { bcp47_tag: bcp47 });
   const onComplete = vi.fn();
   const onBack = vi.fn();
-  render(<LayoutStep onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
+  render(<LayoutStepHost onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
   return { onComplete, onBack };
 }
 
@@ -21,6 +24,7 @@ const inputEl = () => screen.getByTestId("layout-picker-input") as HTMLInputElem
 
 beforeEach(() => {
   useSurveyAnswerStore.getState().reset();
+  useDecisionStore.getState().reset();
 });
 afterEach(cleanup);
 

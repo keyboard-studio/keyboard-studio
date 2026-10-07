@@ -102,11 +102,11 @@ on reload, and routing that reads it (touch seed asked once, per 088) behaves as
 
 **PR slice**: this phase is one PR.
 
-- [ ] T010 [US1] Re-verify research R1's rows for `layout`, `touch_seed_source`, `choose_base`
+- [x] T010 [US1] Re-verify research R1's rows for `layout`, `touch_seed_source`, `choose_base`
   against the landed 088/089 code (088 already removed the `touchSeedSource` session field —
   research R6 note); amend the table in specs/090-gallery-decision-modules/research.md if any
   row drifted
-- [ ] T011 [P] [US1] `windows-layout` module: module + `WindowsLayoutValue` + selector-based
+- [x] T011 [P] [US1] `windows-layout` module: module + `WindowsLayoutValue` + selector-based
   readers in packages/studio/src/survey/questions/gallery/windowsLayout.ts;
   `LayoutStep` becomes the renderer and reports through `onChange` in
   packages/studio/src/survey/layout/LayoutStep.tsx; the `savePickedWindowsLayout` write path

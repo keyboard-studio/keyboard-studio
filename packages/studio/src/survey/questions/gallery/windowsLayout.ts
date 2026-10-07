@@ -1,15 +1,17 @@
 // windowsLayout — gallery decision module for `windows-layout` (spec 090).
 //
-// Stub landed with T008 so the FR-002 coverage test pins this decision's
-// provider from the start; the real renderer/apply fill in with T011 (US1).
-// The value is the author's confirmed community layout pick; readers in
-// lib/layoutFamily.ts resolve it from the decision once T011 lands.
+// Migrated in T011 (US1): the renderer is the layout step's picker
+// (survey/layout/LayoutStep.tsx), hosted by LayoutStepHost; readers in
+// lib/layoutFamily.ts resolve the pick from this decision. The decision
+// has no working-copy effect — its `apply` is deliberately empty and the
+// recorded decision itself is the effect (carve, the rules demo, and the
+// mechanism gallery read it back through layoutFamily's selectors).
 // Boundary (FR-003): a gallery module is a pure descriptor — no store
 // imports; the value arrives via DecisionRendererProps and changes leave
 // via onChange, recorded and applied by the gallery host.
 
 import type { GalleryModule } from "../../types.ts";
-import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
+import { WindowsLayoutRenderer } from "../../layout/LayoutStep.tsx";
 
 export const definition = {
   id: "windowsLayout",
@@ -34,7 +36,7 @@ const windowsLayout: GalleryModule<WindowsLayoutValue> = {
   // (decisionIRConsistency.test.ts pins the two together).
   writes: [],
   apply: () => ({}),
-  renderer: UnmigratedGalleryRenderer,
+  renderer: WindowsLayoutRenderer,
   fixtures: {
     valid: [{ value: undefined, note: "no decision recorded yet" }],
     invalid: [],

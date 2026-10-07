@@ -37,7 +37,7 @@ import {
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
 } from "../editors/adapters/flowStepOptions.tsx";
-import { LayoutStep } from "../survey/layout/LayoutStep.tsx";
+import { LayoutStepHost } from "../survey/layout/LayoutStepHost.tsx";
 import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
 import { rulesStep } from "./rulesStep.ts";
 import { stepDependencies } from "./stepDependencies.ts";
@@ -84,14 +84,15 @@ export const identityStep: EditorStep = step({
 /**
  * Layout step (spec 076 A4): the community-layout question, right after
  * Identity. Proposes a Windows layout from the identity language tag; the
- * author confirms or searches all layouts. Answers persist per question in the
- * answer store; no IR writes.
+ * author confirms or searches all layouts. The pick is the `windows-layout`
+ * decision (spec 090 T011): LayoutStepHost renders the gallery module's
+ * renderer through the gallery host; no IR writes.
  */
 export const layoutStep: EditorStep = step({
   id: "layout",
   ...stepDependencies("layout"),
   title: "Keyboard Layout",
-  component: LayoutStep,
+  component: LayoutStepHost,
   specRef: ["specs/076-rule-behaviours"],
   persistence: "answer-store",
 });
