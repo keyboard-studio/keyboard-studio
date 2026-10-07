@@ -194,6 +194,13 @@ export interface Decision<T = unknown> {
    * ordering, or gating.
    */
   step?: string;
+  /**
+   * Spec 093 (US1 scenario 6): set when a change gates this decision off.
+   * The record — value, provenance, history — is kept whole; replay skips
+   * it while the flag stands, and clearing the gate restores the record
+   * unchanged (the flag is simply removed). Absent = active.
+   */
+  inactive?: boolean;
 }
 
 /**
