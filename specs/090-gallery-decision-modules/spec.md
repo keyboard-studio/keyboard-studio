@@ -72,6 +72,18 @@ leave none (HANDOFF G7). Each decision's completion records one.
   written only by `apply`.
 - **FR-005** The in-place IR rewrites (MARKS guards, R1, R2, deadkey ops, context tolerance) MUST
   run only inside `apply`, as functions of (IR, value, inputs).
+  **Amendment (lead ruling, 2026-10-07; D-090-46 finding 2):** the letter above is
+  amended to the ruled execution shape. A rewrite runs inside the owning module's
+  `apply` where 089's patch channels can express it; where they cannot — the
+  carve overlay (no patch channel exists; `projectWorkingCopyVfs` stays the
+  canonical producer of the applied view), R1's lock + re-propagation and R2's
+  touch build (effects on store state no patch channel reaches) — the rewrite
+  runs as a completion-wiring effect fired by the step's adapter (and the
+  journey runner's replay) beside the recorded decision, per D-090-27 /
+  D-090-30 / D-090-31 / D-090-38. Edit-time gallery writes remain the ratified
+  record-from-working-copy write path (D-090-31): the working copy is what the
+  author edits, and its settlement is the decision record plus these completion
+  effects — never a completion-time rewrite outside a module or its wiring.
 - **FR-006** Collection values MUST carry provenance per item (`asked`, `derived`, `extracted`).
 - **FR-007** `phaseBDraftStore` and the gallery answers in `surveyAnswerStore` MUST be deleted.
   `surveyAnswerStore` keeps only within-step view position, or is renamed to say so.
@@ -85,6 +97,16 @@ leave none (HANDOFF G7). Each decision's completion records one.
 | overlays as independent state | **now decision values**; the working copy holds only an applied view | 093 |
 | in-place IR rewrites outside modules | **deleted** | 090 |
 | `settles` strings | redundant | 091 |
+
+Named handoff on the "overlays" row (lead ruling D-090-30/D-090-31, 2026-10-07): the
+carve overlay is the one overlay whose applied view is NOT produced by a module `apply`
+(089's contract has no carve-overlay channel; `projectWorkingCopyVfs` remains the
+canonical producer, and the `carved-layout` decision records the overlay at completion).
+**093's I-1 overlay accumulator grows a carve-overlay fold — reconstruct the overlay
+from carved-layout decision values during replay; 092's T037 remains pending on carve
+until that fold exists.** Addendum (D-090-33): if the TouchKeepInertControl surface ever
+mounts, the carved-layout value needs a field for `carveTouchKeepInert` before the fold
+can be complete — it has no live writer today.
 
 ## Success Criteria
 - **SC-001** The golden walk is byte-identical after each user story lands.

@@ -42,7 +42,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { FlowStepHost } from "../../survey/FlowStepHost.tsx";
-import { loadFlowSourceDef } from "../../steps/flowSources.ts";
+import { loadFlowSourceDef, screenIdForFlow } from "../../steps/flowSources.ts";
 import { flowSources } from "../../steps/flowSources.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { selectTrack, useDecisionStore } from "../../stores/decisionStore.ts";
@@ -57,16 +57,19 @@ import type { SurveyContext } from "../../survey/types.ts";
 // Step-title localization (Tier A UI chrome). The heading FlowStepHost paints
 // as <h2>{title}</h2> is engine-owned chrome, not flow-question content, so it
 // resolves through the Lingui catalog rather than the Tier B content path. The
-// map is keyed by the stable `flowRef`; a flow with no entry falls back to the
-// plain options.title / flowSource.title string (unlocalized, as before). Kept
-// as literal `msg` descriptors at module scope so `lingui extract` sees them —
-// resolved per-render via resolveMessage(i18n, ...) inside the component.
+// map is keyed by the flow's DERIVED SCREEN id (spec 091 T020 — the screen
+// label comes from the screen's structural key, not the flow's identity; the
+// message ids are unchanged from when the map was keyed by flowRef); a screen
+// with no entry falls back to the plain options.title / flowSource.title
+// string (unlocalized, as before). Kept as literal `msg` descriptors at
+// module scope so `lingui extract` sees them — resolved per-render via
+// resolveMessage(i18n, ...) inside the component.
 // ---------------------------------------------------------------------------
 
-const STEP_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
+const SCREEN_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
   track: msg({ id: "step.track.title", message: "Authoring Track" }),
   project_name: msg({ id: "step.projectName.title", message: "Name your keyboard" }),
-  phase_f_helpdocs: msg({
+  help: msg({
     id: "step.phaseF.title",
     message: "Help documentation",
   }),
@@ -210,9 +213,10 @@ export function makeFlowStepComponent<Extracted>(
   // Capture at factory-call time so the produced component closure is stable.
   const capturedSource = source;
   const resolvedTitle = options.title ?? capturedSource.title;
-  // Localized heading descriptor for this flow (undefined → keep the plain
-  // English title). Captured at factory-call time; resolved per-render below.
-  const titleMessage = STEP_TITLE_MESSAGES[options.flowRef];
+  // Localized heading descriptor for this flow's derived screen (undefined →
+  // keep the plain English title). Captured at factory-call time; resolved
+  // per-render below.
+  const titleMessage = SCREEN_TITLE_MESSAGES[screenIdForFlow(options.flowRef) ?? options.flowRef];
 
   // ---------------------------------------------------------------------------
   // The produced component — satisfies EditorStepProps (C2.1).

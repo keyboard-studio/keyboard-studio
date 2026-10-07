@@ -14,7 +14,7 @@
 import { formatLocation, locationsEqual, type Location } from "./location.ts";
 import { navigateTo } from "./navigate.ts";
 import { resolveLocation, type ResolveContext, type UnreachableReason } from "./resolveLocation.ts";
-import { manifest } from "../steps/manifest.ts";
+import { manifest, screenGates } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { snapshotTraversal, useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -120,6 +120,8 @@ export function consumePendingWelcomeLocation(): Location | null {
 export function liveResolveContext(): ResolveContext {
   return {
     manifest,
+    // Spec 091 T015: the derived screen gates resolveLocation reads.
+    screenGates,
     questionRegistry,
     traversal: snapshotTraversal(),
     // Spec 088 C-3.2: the gate view over the decision store, seed omitted.

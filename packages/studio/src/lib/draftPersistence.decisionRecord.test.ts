@@ -169,7 +169,8 @@ describe("SC-009 — a draft written WITH a decision record", () => {
       "languageTag",
       "workingCopy",
       "traversal",
-      "phaseBDraft",
+      // "phaseBDraft" was on this list until spec 090 T025 deleted the
+      // slice (D-090-18): the envelope no longer carries it, by ruling.
     ]) {
       expect(envelope[key]).toBeDefined();
     }

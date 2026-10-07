@@ -1,8 +1,8 @@
 // steps/flowSources.ts — the single authoritative registry of all known survey
 // flows, keyed by flow_id.
 //
-// Spec 024 (ADR-0001): the Flow Map derives drill-downs from the step flowRefs
-// declared in the manifest. Spec 087: every flow's membership is the module list
+// Spec 024 (ADR-0001): the Flow Map derives drill-downs from the flows'
+// screen membership. Spec 087: every flow's membership is the module list
 // registered for it in survey/questions/registry.ts (`flowModules`) and its ORDER
 // is derived from those modules' provides/requires — there are no hand-maintained
 // order lists. This file only adds per-flow metadata (title, phase letter,
@@ -10,10 +10,10 @@
 //
 // Boundary (.dependency-cruiser.cjs steps-layer rule): steps/ MAY import
 // survey/ (registry) and contracts — but NOT dashboard/, stores/, lib/, or
-// components/. dashboard/ reads this file via flowRefs.
+// components/. dashboard/ reads this file for the Flow Map.
 //
 // Status semantics:
-//   "live"     — referenced by at least one manifest step via flowRefs;
+//   "live"     — every module is a member of a derived screen (spec 091);
 //                appears as a live drill-down in the Flow Map.
 //   "proposed" — known to the registry but NOT referenced by any manifest step;
 //                excluded from live drill-downs and from the rendered<->runtime
@@ -30,11 +30,13 @@
 // each module's definition.next (gatedBy is derived from it, FR-005).
 
 import {
+  decisionModules,
   flowModules,
   phaseFLibraryModules,
   reserveModules,
   moduleRecord,
 } from "../survey/questions/registry.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
 
 import type { QuestionModule } from "../survey/types.ts";
 import type { FlowDef } from "../survey/types.ts";
@@ -73,9 +75,11 @@ export interface FlowSource {
    */
   registry: Readonly<Record<string, QuestionModule>>;
   /**
-   * "live"     — referenced by >=1 manifest step; appears in live drill-downs.
-   * "proposed" — not yet referenced by any manifest step; rendered as an
+   * "live"     — every module is a member of a derived screen (spec 091
+   *              T014); appears in live drill-downs.
+   * "proposed" — registered but in no derived screen; rendered as an
    *              ordered graph in the Library section.
+   * Derived at the bottom of this module, never declared per entry.
    */
   status: "live" | "proposed";
 }
@@ -97,9 +101,10 @@ export function loadFlowSourceDef(source: FlowSource): FlowDef {
 /**
  * All known survey flows, keyed by flow_id.
  *
- * Adding a flow here does NOT put it in the live drill-downs — it must also be
- * referenced via a manifest step's `flowRefs` field. Status:"proposed" entries
- * are explicitly excluded from live drill-down rendering.
+ * Adding a flow here does NOT put it in the live drill-downs — its modules
+ * must also be members of a derived screen (see the liveness rule below).
+ * Status:"proposed" entries are explicitly excluded from live drill-down
+ * rendering.
  *
  * phase_a_identity is intentionally status:"proposed" and referenced by NO
  * manifest step — this realises the spec-022 demotion. Its modules are
@@ -109,8 +114,8 @@ export function loadFlowSourceDef(source: FlowSource): FlowDef {
  * the live identity_lite drill-down (whose registry holds only the il_*
  * modules).
  */
-export const flowSources: Readonly<Record<string, FlowSource>> = {
-  // --- Live flows (referenced by manifest step flowRefs) ---
+const declaredFlowSources = {
+  // --- Live flows (their modules are members of derived screens) ---
 
   identity_lite: {
     id: "identity_lite",
@@ -118,7 +123,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "A",
     title: "Identity-lite",
     registry: moduleRecord(flowModules.identity_lite),
-    status: "live",
   },
 
   track: {
@@ -127,7 +131,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "G",
     title: "Track selection",
     registry: moduleRecord(flowModules.track),
-    status: "live",
   },
 
   project_name: {
@@ -136,7 +139,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "G",
     title: "Project name",
     registry: moduleRecord(flowModules.project_name),
-    status: "live",
   },
 
   phase_b_characters: {
@@ -145,7 +147,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "B",
     title: "Character discovery",
     registry: moduleRecord(flowModules.phase_b_characters),
-    status: "live",
   },
 
   phase_f_helpdocs: {
@@ -156,7 +157,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     // Includes the demoted tip slots: registered but not flow members, so they
     // surface as library-not-in-flow nodes in this drill-down.
     registry: moduleRecord(phaseFLibraryModules),
-    status: "live",
   },
 
   // --- Proposed flows (NOT referenced by any manifest step) ---
@@ -180,6 +180,60 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     ),
     title: "Full identity (reserve/library)",
     registry: moduleRecord(reserveModules),
-    status: "proposed",
   },
-} as const;
+};
+
+// ---------------------------------------------------------------------------
+// Liveness, derived from screen membership (spec 091 T014)
+// ---------------------------------------------------------------------------
+
+/**
+ * A flow is "live" iff every one of its modules is a member of a derived
+ * screen (decisions/deriveScreens.ts over the live registry) — i.e. the
+ * wizard actually walks it. Registered-but-unwalked flows (the reserve
+ * phase_a_identity battery) are "proposed". This replaces both the
+ * per-entry status literal and the old "referenced via a manifest step's
+ * flowRefs" rule: flowRefs are deleted (T014), screen membership is the
+ * single source.
+ */
+const derivedScreenList = deriveScreens(decisionModules);
+
+const liveScreenModuleIds: ReadonlySet<string> = new Set(
+  derivedScreenList.flatMap((s) => s.moduleIds),
+);
+
+/**
+ * The derived screen a flow's modules belong to (spec 091 T020): the screen
+ * holding the flow's FIRST module — a live flow's modules sit on exactly
+ * one top-level screen (intra-step flows name their enclosing screen), so
+ * this is the screen the flow is hosted as. Screen labels key off this id,
+ * never the flow id. Undefined for a flow with no module on any screen.
+ */
+const flowScreenByFlowId: ReadonlyMap<string, string> = new Map(
+  Object.entries(declaredFlowSources).flatMap(([flowId, source]) => {
+    const first = source.derivedModules[0];
+    if (first === undefined) return [];
+    const screen = derivedScreenList.find((s) =>
+      s.moduleIds.includes(first.definition.id),
+    );
+    return screen === undefined ? [] : [[flowId, screen.id] as const];
+  }),
+);
+
+export function screenIdForFlow(flowId: string): string | undefined {
+  return flowScreenByFlowId.get(flowId);
+}
+
+export const flowSources: Readonly<Record<string, FlowSource>> = Object.fromEntries(
+  Object.entries(declaredFlowSources).map(([id, source]) => [
+    id,
+    {
+      ...source,
+      status: source.derivedModules.every((m) =>
+        liveScreenModuleIds.has(m.definition.id),
+      )
+        ? ("live" as const)
+        : ("proposed" as const),
+    },
+  ]),
+);

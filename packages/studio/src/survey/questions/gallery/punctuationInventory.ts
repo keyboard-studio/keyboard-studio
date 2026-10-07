@@ -29,6 +29,7 @@ export type { InventoryDecisionValue, InventoryItem } from "../../phaseBDraftOps
 const punctuationInventory: GalleryModule<InventoryDecisionValue> = {
   definition,
   provides: ["punctuation-inventory"],
+  screen: "punctuation",
   requires: ["character-inventory"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

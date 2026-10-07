@@ -28,9 +28,9 @@ table suggests.
 | carve (`carved-layout`) | `CarveGalleryV2` ([editors/carve/CarveGalleryV2.tsx](../../packages/studio/src/editors/carve/CarveGalleryV2.tsx)) | working-copy overlay actions `cascadeDelete` / `cascadeRestore` / `restoreAll` / `keepAll`, `prefillCarveDispositions` (:703-712, 825); overlay fields `deletedNodeIds`, `deletedItemIds`, `disabledFamilyIds`, `carveChars`, `carveDispositions`, `closedKeyboardCard` ([workingCopyStore.ts:568-651](../../packages/studio/src/stores/workingCopyStore.ts)); `applyCarveMutate` runs in the projection ([projectWorkingCopyVfs.ts:447-504](../../packages/studio/src/lib/projectWorkingCopyVfs.ts)) |
 | deadkeys (`deadkeys-defined`) | deadkey editors ([editors/deadkey/](../../packages/studio/src/editors/deadkey)) | components call `workingCopyStore.commitDeadkeyOp`; the op is turned into a patch by [deadkeyWrite.ts](../../packages/studio/src/editors/deadkey/deadkeyWrite.ts) through `applyMutatePatch` with `DEADKEY_WRITES` ([editorMutate.ts](../../packages/studio/src/steps/editorMutate.ts)) → `setWorkingIR`; the op log lives in `workingCopyStore.deadkeyOverlay.ops` |
 | rules (`rule-set`) | `RulesStep` ([survey/rules/RulesStep.tsx:46](../../packages/studio/src/survey/rules/RulesStep.tsx)) | builder-owned state; `onComplete(undefined)` — no value, no store write, no log entry |
-| mechanisms (`physical-layout`) | `MechanismGallery` ([editors/assignLoop/MechanismGallery.tsx](../../packages/studio/src/editors/assignLoop/MechanismGallery.tsx)) | `recordAssignments` on `workingCopyStore` (:1568, 2646) into `phaseResults`; reducer R1 `lockDesktop()` on completion ([reducer.ts:384-386](../../packages/studio/src/steps/reducer.ts)); `repropagate` refreshes suggested assignments |
+| mechanisms (`physical-layout`) | `MechanismGallery` ([editors/assignLoop/MechanismGallery.tsx](../../packages/studio/src/editors/assignLoop/MechanismGallery.tsx)) | `recordAssignments` on `workingCopyStore` (:1568, 2646) into `phaseResults`; reducer R1 `lockDesktop()` on completion ([reducer.ts:384-386](../../packages/studio/src/steps/reducer.ts)); `repropagate` refreshes suggested assignments. **Re-verified T040 (2026-10-07):** the row holds; only line drift. `recordAssignments` (store type :1046, impl :2092) still writes `MechanismAssignment[]` into the phase-C `phaseResults` entry; the gallery selector is still :1568, call sites now :2646, :3070, :3163, :3189, :3258. R1 now sits at reducer.ts:316-318 and fires `deps.lockDesktop()` plus the staleness-gated `repropagate` in the same case; `lockDesktop()` itself is a bare `set({ desktopLocked: true })` — a store flag, no snapshot. `repropagate` (steps/repropagate.ts) is the spec-014 no-clobber TOUCH re-propagation triggered by physical completion (suggested touch keys refresh; hand-set survive), not a mechanisms-internal refresh. The step is registered via `AddPhysicalAdapter` (registerEditorSteps.ts:210), which completes with `undefined`; journey-runner replays the step by calling `applyStepCompletion("mechanisms", undefined, deps)` directly (journey-runner.ts:766-770). See D-090-38 |
 | touch_seed_source (`touch-seed-source`) | `TouchSeedSourcePanel` ([editors/touchSeedSource/TouchSeedSourcePanel.tsx:359](../../packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx)) | `setTouchSeedSource` on `surveySessionStore` (after 088 this session field is deleted — the panel's write becomes a decision record; see R6 note) |
-| touch (`touch-layout`) | `TouchGallery` ([editors/assignLoop/TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx)) | `setTouchDraft` (:1917, 4115), `deleteTouchKey` (:1781); overlay `keyEditOverlay.ops`, `deletedTouchKeyIds`, `touchDraft`; reducer R2 `setTouchLayoutJson` on completion |
+| touch (`touch-layout`) | `TouchGallery` ([editors/assignLoop/TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx)) | `setTouchDraft` (:1917, 4115), `deleteTouchKey` (:1781); overlay `keyEditOverlay.ops`, `deletedTouchKeyIds`, `touchDraft`; reducer R2 `setTouchLayoutJson` on completion. **Re-verified T040 (2026-10-07):** the row holds; only line drift (`setTouchDraft` selector :1918, call :4116; `deleteTouchKey` selector :1782; store defs :1066 / :898). The overlay types are engine types (`KeyEditOverlay` / `KeyEditOperation` from `@keyboard-studio/engine`); `deletedTouchKeyIds` (store :602) and `touchDraft` (:733) sit on `workingCopyStore`. R2 now sits at reducer.ts:339-390 and consumes a `TouchCompleteResult` assembled by `AddTouchAdapter` (assignments + baseIr + baseVfs + mods + seedSource; mods computed adapter-side via `deriveDesktopModifications`). **Mechanism correction to the row's implication:** `buildTouchLayoutJson` does NOT consume the key-edit ops — its inputs are baseIr + `TouchAssignment[]` + {baseTouchJson, mods, seedSource}, with the spec-035 R11 emission matrix inside the injected dep; the ops replay onto the gallery's derived layout, never into the R2 build. Journey-runner assembles its own payload (assignments: []) and calls `applyStepCompletion` directly (journey-runner.ts:795-803). See D-090-38 |
 | help (`help-docs`, gallery part) | `PhaseFGate` wrapping `PhaseFStepFactoryComponent` ([registerEditorSteps.ts:281](../../packages/studio/src/steps/registerEditorSteps.ts), [PhaseFGate.tsx](../../packages/studio/src/editors/adapters/PhaseFGate.tsx)) | the gate itself only reads session navigation (`backToUnfinishedGallery`); the value writes are the Phase F flow's — 089 moves those into `apply`. 090's help slice is the host/log wiring, not a second write path (see Open Questions Q3) |
 
 **Discrepancies from the HANDOFF table, for the record:**
@@ -788,3 +788,1294 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   per track) — T024 adds zero delta (convenience is not a walk step).
   The 2 goldenWalk + 2 renderSmoke failures are the known pending
   T029 regeneration and pre-existing items respectively.
+
+- **D-090-18 — T025 phaseBDraftStore deleted; the draft slice is gone
+  from the written envelope; legacy slices migrate into the inventory
+  decision values on load.** `stores/phaseBDraftStore.ts` is deleted
+  and grep for `phaseBDraftStore` is 0 across src and tests (the
+  T027/SC-004 condition, reached here). The real production consumers
+  were few and are re-pointed at the decision values:
+  `hooks/useWorkToDo.ts` (alphabetEvidenceKey — a `useDecisionStore`
+  selector + `getCharacterInventoryValue()`), `lib/crashCallerContext.ts`
+  (chars length), `survey/phaseCInventory.ts` (invisibleDecisions via
+  `invisibleDecisionsOf(getInvisiblesInventoryValue())`),
+  `survey/useGlyphFontStack.ts` (selectedFont via a decision-store
+  selector), `src/test/draftSeeds.ts` (`resetInventoryDraft()`).
+  `stores/workingCopyStore.ts` keeps a module-private leaf named
+  `resetPhaseBDraftDecisions` over `useDecisionStore` +
+  phaseBDraftOps only: workingCopyStore sits UNDER the gallery host
+  deps in the import graph, so importing the inventory hook would
+  close the old facade cycle in a new shape; behaviour parity holds
+  because both modules' applies are no-ops and `resetDraftDecisions`
+  never touches `chars`. `useInventoryDraft.ts` gains the public
+  surface the facade's callers used: `resetInventoryDecisions()`,
+  `resetInventoryDraft()`, `restoreInventoryFromSnapshot(snapshot)`.
+  **Envelope:** `DurableDraft.phaseBDraft` and the `buildEnvelope`
+  write are removed (no DRAFT_VERSION bump — the field was always
+  optional/additive). `loadDraft`, after `applyDecisionSnapshot`, runs
+  the slice migration ONLY when the envelope's decisions carry no
+  inventory records (when they do, the slice is a stale duplicate of
+  the canonical records and is ignored). `parsePhaseBDraftSlice` keeps
+  the old tolerant field-by-field semantics, but every unmappable
+  entry (non-string array members, invalid declaredRoles /
+  invisibleDecisions values, non-string provenance / confidence /
+  alphabetEvidenceKey, invalid selectedFont, unknown slice keys,
+  non-array / non-record field values) is collected as a
+  `MigrationOrphan` with questionId `phaseBDraft.<field>` (record-entry
+  drops: `phaseBDraft.<field>.<key>`), stepId `characters` — surfaced,
+  never dropped (087 Q5 / 088 T030 precedent). **Ordering catch, found
+  by the new tests:** the orphans must be appended AFTER the
+  decisionRecord restore, whose `hydrate` replaces the log — the first
+  implementation appended inside the migration and the hydrate erased
+  them; `migratePhaseBDraftSlice` now RETURNS its orphans and loadDraft
+  appends them together with the envelope's own migrationOrphans, the
+  position 088 already used for the same reason. **Autosave:** both
+  facade subscriptions (autosave installer, cloud sync) moved to
+  `useDecisionStore.subscribe` with an identical trigger set — the
+  facade only ever changed when decisions changed, and every decision
+  change already scheduled a save through it. **Manifest:** the
+  `persistence: "phase-b-draft"` declarations on characters /
+  punctuation / invisibles are KEPT. They are pinned by
+  `manifest.persistence.test.ts` against the spec-079 persistence
+  table (the kind union is spec-079 vocabulary in `steps/types.ts`);
+  renaming the kind amends that table, which is T026's persistence
+  adjudication alongside marks/convenience (T024 precedent,
+  D-090-17). **Tests:** the sweep re-pointed 20 files mechanically
+  (ops via `inventoryOps("characters")`, reads via
+  `getCharacterInventoryValue()` / `invisibleDecisionsOf(...)`,
+  snapshot via `snapshotFromValues(...)`); the 946-line store suite is
+  RENAMED `stores/phaseBDraftStore.test.ts` →
+  `survey/phaseBDraftOps.test.ts` with a `draft()` adapter (the old
+  getState() shape over the values + ops) — this discharges most of
+  T028's formal re-point early; T028 should verify what remains.
+  draftPersistence's legacy-field tests are rewritten as migration
+  tests (hand-built slice + inventory stripped from decisions), two of
+  them asserting the orphan lands in the decision log
+  (`phaseBDraft.selectedFont`, `phaseBDraft.alphabetEvidenceKey`). The
+  phaseCInventory malformed-key test changes its malformed classes:
+  the value carries ITEMS and keys are derived via `toUPlusNotation`,
+  so stored-key garbage cannot exist; the carry-able malformed entries
+  are a lone surrogate (U+DFFF) and a noncharacter (U+FDD0), both
+  rejected by `parseUPlusNotation` — asserted ignored. Gates: tsc
+  clean; eslint 0 errors on changed files; focused suites green
+  (draftPersistence + phaseCInventory 118/118; the re-point batch
+  incl. workingCopyStore / phaseBDraftOps / surveyWriteObservability /
+  punctuation / invisibles / convenience green; StudioShell family
+  66 + 71; PhaseB / CharacterMapPane / BuildListView / marks
+  textSample 127/127; useWorkToDo 4/4); parity trio green UNMODIFIED;
+  decisions 974 passed with ONLY the 4 known pre-existing local-corpus
+  SC-004 failures (basic_kbdru + arabic_izza, both sc004 suites);
+  depcruise 131 → **127** (exactly the 4 facade-family cycles dying;
+  the remaining count still carries the 089-side shared cycle —
+  registry → … → survey/types → workingCopyStore → completeness —
+  whose fix `030bf59c` on km/decision-apply arrives with the next
+  merge; post-merge number reported at that checkpoint). Golden walk:
+  fresh-walk classification byte-identical to T023/T024 (the 7 known
+  post-merge-signature deltas per track) — T025 adds zero delta;
+  fixtures restored (regeneration remains T029's action).
+
+- **D-090-19 — T026 persistence adjudication: the options, re-derived
+  and recorded for the lead's ruling (T026 STOPPED here — no option
+  is chosen by this entry).** Provenance note: the predecessor's
+  report referenced lettered options (a)/(b)/(c) that were not in the
+  delivered text; the option space below is re-derived from the
+  branch evidence (D-090-17, D-090-18, D-090-16, the spec-079
+  persistence table, `steps/types.ts`, `manifest.persistence.test.ts`)
+  and recorded in full so the ruling is made on text, not on a
+  summary of text.
+
+  **The facts the adjudication turns on.** (1) The five US2 steps'
+  decided values now live in `decisionStore`, persisted in the v2
+  draft's `decisions` slice (088 FR-007): character-inventory (T021),
+  punctuation- + invisibles-inventory (T022), marks-treatment (T023),
+  retained-convenience-chars (T024). (2) The manifest declarations
+  have not moved: characters / punctuation / invisibles still
+  declare `persistence: "phase-b-draft"` (manifest.ts:100/189/213) —
+  a store T025 deleted; marks and convenience declare
+  `"answer-store"` (manifest.ts:163/238 in the pre-merge numbering).
+  (3) The declarations are machine-pinned:
+  `manifest.persistence.test.ts` parses
+  `specs/079-survey-answer-persistence/contracts/step-classification.md`
+  and fails unless each row's FIRST backtick token equals the
+  manifest's declaration for that step (dual declarations are
+  expressible — the characters row already reads `` `phase-b-draft`
+  (alphabet) + `answer-store` (sub-screen position, …) `` and only
+  the first token is compared). The kind union itself is spec-079
+  vocabulary (`steps/types.ts`, R-02/R-12):
+  `"answer-store" | "phase-b-draft" | "working-copy" | { exempt }`.
+  There is no decision kind. (4) The answer store is NOT yet free of
+  gallery answers, so T026's premise ("zero gallery answer ids
+  remain") is not currently true: marks' per-toggle answers remain
+  in `surveyAnswerStore` BY DESIGN (D-090-16(2) — they carry spec
+  079's draft→confirmed evidence lifecycle; the value records the
+  derived composite at commit points, and per-toggle recording was
+  rejected in D-090-11 because re-guarding a partial series is not
+  proven idempotent; D-090-16 names T026 as the adjudicator of this
+  layer's fate); characters' per-grapheme addition answers remain
+  (CharactersStep.tsx:147, the manifest comment's "manual-path
+  answers"); punctuation still writes its one inventory answer
+  (PunctuationStep.tsx:481); convenience's booleans LEFT the store
+  (D-090-17) but its pre-T024 adoption shim reads legacy booleans
+  restored from older drafts' `surveyAnswers` slices — D-090-17:
+  "T026 must keep the convenience answers readable for this shim or
+  retire it with the slot"; marks and convenience also keep their
+  step-status slots (not-asked/finished + evidence key) in the store
+  (D-090-17's stated basis for convenience's unchanged declaration).
+  (5) `surveyAnswerStore`'s own header already frames the narrowed
+  role T026's text asks for ("what was GIVEN, including drafts" vs
+  the decision record's "what was DECIDED") — the narrowing is a
+  declaration problem more than a store problem.
+
+  **Option (a) — declare the decisions slice (extend the spec-079
+  vocabulary).** Add `"decision-store"` to `PersistenceDeclaration`
+  in `steps/types.ts`; re-declare the five steps with the decisions
+  slice as the first token — characters keeps its dual form
+  (`` `decision-store` (alphabet) + `answer-store` (sub-screen
+  position, manual-path answers) ``), marks/convenience declare
+  `decision-store` with the answer-store evidence/status residue
+  named in the manifest comment (the pin compares only the first
+  token, so the residue stays visible in the row text), punctuation
+  /invisibles declare `decision-store`. The five rows of the
+  spec-079 table are amended in lockstep, with an amendment note in
+  step-classification.md recording that spec 090 superseded the
+  "Declaration after 079" cells for these rows. The answer-store
+  evidence layer (marks per-toggle, characters additions,
+  punctuation inventory answer) and the convenience shim are KEPT:
+  they are the within-step draft/evidence surface, which is exactly
+  the narrowed role T026's store text describes.
+  *Consequence for the pinned table:* five rows amended plus a
+  written amendment note — the 079 contract's end-state column no
+  longer describes these steps without the note; the pin test stays
+  green because manifest and table move together, and the kind union
+  (079 vocabulary) gains a member by 090's hand, visible in both
+  files' history. *Consequence for 091:* the declarations become
+  truthful and machine-readable at the moment 091 starts deriving
+  step membership over the manifest/declaration surface: a
+  `decision-store` step is exactly a step whose settled state is a
+  decision record, so 091's derivation (and its FR-005 parity
+  rewrite) can key decision-backed membership off the declaration
+  instead of re-deriving it from the registry.
+
+  **Option (b) — residue reading, vocabulary untouched.** Keep the
+  kind union exactly as spec 079 left it; reinterpret the
+  declaration (documented in `steps/types.ts`) as naming where a
+  step's NON-decision residue persists. Characters / punctuation /
+  invisibles: `phase-b-draft` → `answer-store` (their residue —
+  position, evidence layer — is answer-store state); marks /
+  convenience stay `answer-store` (the D-090-17 status-slot reading,
+  generalized). Evidence layer and shim kept, as in (a). Only the
+  three `phase-b-draft` rows change in the table; the
+  `phase-b-draft` kind itself either stays in the union as
+  defined-but-unused vocabulary or is struck — striking it is the
+  same species of 079 amendment as (a)'s addition, so the clean
+  form of (b) keeps it, unused.
+  *Consequence for the pinned table:* three rows amended, no
+  amendment note strictly required (the tokens stay within 079's
+  vocabulary), but the table's declaration column stops answering
+  FR-007's question ("where a step's answers are kept so that
+  leaving and returning loses nothing") for the five steps — the
+  alphabet, the marks composite and the retained set are declared
+  NOWHERE; a reviewer reading the table learns where the residue
+  lives, not where the answers live. *Consequence for 091:*
+  declarations become actively ambiguous for derivation — identity,
+  track and help (pure question steps) share `answer-store` with
+  the five decision-backed steps, so 091 cannot distinguish
+  decision-settled steps from answer-store steps by declaration and
+  must hard-code or registry-derive the set its membership
+  derivation was supposed to read off the manifest.
+
+  **Option (c) — T026's letter, executed literally (eliminate the
+  evidence layer).** Remove the remaining gallery answer writes so
+  the task text's premise is made true: marks records per-toggle
+  into the value (reopening D-090-11's rejected design — the value
+  can carry per-toggle `answers` with `completion: null`, but spec
+  079's evidence lifecycle — savedAt/stage/evidence keys, read by
+  `steps/evidence.ts` key fns — has no home in the value and would
+  need a new carrier or be dropped); characters' addition answers
+  and punctuation's inventory answer likewise move into their
+  values or vanish; the convenience adoption shim is RETIRED with
+  its slot (pre-T024 drafts' restored convenience booleans become
+  unreadable — no orphan surface exists for answer-store residue,
+  so that state is dropped, contrary to the 087 Q5 / 088 T030
+  "surfaced, never dropped" precedent the rest of US2 followed).
+  Declarations then follow (b)'s tokens (`answer-store` residue =
+  position/status only) and the same three table rows are amended.
+  *Consequence for the pinned table:* as (b) for the tokens, plus
+  D-090-11 and D-090-16 require superseding entries (their recorded
+  rationale — evidence lifecycle, guard idempotence — is overridden
+  by the ruling, not by new evidence), and spec-079 evidence
+  suites re-point or lose coverage. *Consequence for 091:* the
+  cleanest store story (surveyAnswerStore = question steps +
+  position/status only, T026's checkpoint text verbatim), but the
+  marks/characters recording redesign lands under 090's tail task
+  rather than as its own adjudicated change, and 091's parity
+  surface (FR-005 rewrite) inherits whatever the redesign does to
+  the evidence lifecycle as a fait accompli.
+
+  **What is NOT in dispute across the options:** the store keeps
+  its name (research Q4); the header documents the narrowed role
+  under every option; `phase-b-draft` cannot survive as a
+  declaration for any step (its store is deleted) — the options
+  differ in what replaces it and in the fate of the evidence layer,
+  not in whether the status quo is declarable. **Stopped for the
+  lead's ruling.**
+
+- **D-090-20 — T027 executed; the marks/characters/punctuation
+  `saveAnswer` ban is deferred to the T026 ruling (D-090-19), and
+  that deferral is itself a consequence the ruling must price.**
+  Both FR-003 lists are extended in this change.
+  `galleryWriteAudit.test.ts` gains two US2 entries: (1) all Phase
+  B/C renderer trees (CharactersStep, PhaseB, CharacterMapPane,
+  marks/, punctuation/, invisibles/, convenience/) ban
+  `usePhaseBDraftStore` — the deleted store's hook is the precise
+  signature of the retired write path, because the phaseBDraft
+  accept/decline/setter action NAMES survived the migration as pure
+  functions over the values (phaseBDraftOps.ts) and as gallery-host
+  hook methods (useInventoryDraft.ts) and are therefore the
+  sanctioned decision path, not bannable identifiers; (2)
+  invisibles/ + convenience/ additionally ban `saveAnswer` — the
+  two trees whose answer writes US2 retired in full (D-090-17).
+  eslint.config.mjs mirrors both entries as two new overlay blocks
+  (the US1 block refactored onto a shared `galleryWriteBanRule`
+  builder, behaviour unchanged); a planted `saveAnswer(` in the
+  invisibles tree errors under the overlay (verified, plant
+  removed), and the audit test is green (4/4). **Deferred:** a
+  `saveAnswer` ban over marks/ (16 live calls), CharactersStep.tsx
+  (1) and punctuation/ (1). Those calls are the spec-079
+  answer-store evidence layer whose fate IS D-090-19's question;
+  registering the ban today would either red both gates or force
+  option (c) before the lead rules. The deferral is recorded in
+  both list files at the registration site. **Interplay flagged
+  for the ruling:** T060/SC-002 asserts the final FR-003 lists
+  leave ZERO exceptions — under ruling (a) or (b) the evidence
+  layer survives as the store's sanctioned residue, so SC-002's
+  zero-exceptions claim can only be met by carrying this ban
+  exception with the ruling cited, or by reading the evidence
+  layer as outside FR-003's "gallery answer" scope (it is the
+  answer store's own draft surface, spec 079's design, not a
+  gallery write-around); under (c) the ban lands with the
+  elimination and no exception exists. The ruling should say
+  which. **SC-004 grep recorded (T027):** `phaseBDraftStore` —
+  zero references in packages/studio/src and packages/studio/tests
+  (code and tests; reached at T025, D-090-18); remaining repo hits
+  are historical prose only (specs 047/050 as-built documents,
+  engine source comments, one e2e comment narrating the old
+  durability argument).
+
+- **D-090-21 — T028 verified: what remained after T025's early
+  discharge.** T025's suite rename (phaseBDraftStore.test.ts →
+  survey/phaseBDraftOps.test.ts, D-090-18) discharged the ops-level
+  re-point; the marks contract + guards-determinism suite landed at
+  T023 and the convenience contract at T024. Verified present and
+  green at this checkpoint: marksTreatment.test.tsx (8 cases,
+  incl. `runApplyDeterministically` over the guards + the
+  context-tolerance patch), retainedConvenienceChars.test.ts
+  (contract + no-op apply), and the T028 reload test — already
+  present as draftPersistence.test.ts's round-trip family ("the
+  build-list alphabet folds into the durable draft round-trip",
+  decisions-carried since T021: restores the in-progress alphabet,
+  digraphs, and font from the `decisions` slice; the legacy-slice
+  variants beside it are T025's migration tests). Written new at
+  T028, in the house contract shape: characterInventory.test.ts
+  (contract — requires pinned to the step's declared three; no-op
+  apply determinism; extract probe: undefined on null/empty IR,
+  produced set seeded with `base` provenance, deterministic),
+  punctuationInventory.test.ts and invisiblesInventory.test.ts
+  (contract + deterministic no-op apply over InventoryDecisionValue
+  fixtures). Batch: the five gallery suites + draftPersistence
+  130/130.
+
+- **D-090-22 — T029 gate (in progress): fixtures regenerated for the
+  post-merge signature; two 090 bookkeeping failures found by the
+  gate run and fixed; full accounting below.** (1) **Golden walk:**
+  fixtures regenerated via the harness write path and re-verified
+  (write run 2/2, compare run 2/2). The semantic diff vs the US1-era
+  fixtures is 7 field deltas per track, ALL purely additive decision
+  `record` insertions: layout/choose_base/touch_seed_source gain
+  `record` in `storeMutations` (the 089-restack unified spy now
+  feeds both lists — the both-instruments harness shape), and the
+  characters entries gain their US2 records (prefill:
+  `decisionMutations` +2 and `storeMutations` +2 around
+  `setCharactersSubStage`; B: +1/+1). Zero removals, zero
+  navigation/content/other-store deltas — the expected post-merge +
+  US2 signature, nothing else. (2) **registry.test.ts (2 failures,
+  fixed here):** the invariant still asserted the pre-090 registry
+  (114 entries, membership groups without the gallery group) while
+  T008 registered the 14 gallery modules in the same registry
+  (R2's design) — count now 128 with the comment re-derived
+  (114 question + 14 gallery), and `galleryModules` joins the
+  membership total. 090 Foundational bookkeeping, missed because
+  focused batches never ran this file; the full gate did. 8/8
+  after the fix. (3) **stepHost.renderSmoke.test.tsx (2 failures,
+  fixed here):** the touch_seed_source stub mocked the panel's
+  pre-US1 path (`editors/touchSeedSource/TouchSeedSourcePanel.tsx`,
+  deleted by T012's move to `survey/touchSeedSource/`) and the old
+  export name; the mock now targets the moved file and stubs
+  `TouchSeedSourceRenderer`. 26/26 after the fix. Both pairs are
+  among the previously unaccounted failures in the stale-tree
+  accounting the lead flagged (8656 passed / 12 failed: 4 SC-004
+  corpus + 2 goldenWalk + 2 renderSmoke + 2 registry = 10 named;
+  the current-tree full run below is the authority for any
+  remainder). (4) **Two more from the batched run, same bookkeeping
+  family, fixed in the gate follow-up:** (i)
+  questionModules.test.ts definition-contract snapshot — stale on
+  T023's marks `writes [groups, stores]` and carrying an obsolete
+  entry for the T025-deleted `b/pb_character_inventory.ts`;
+  refreshed with -u, diff verified to contain exactly those two
+  changes. (ii) windowsLayout.test.tsx renderer test seeded the
+  survey context through `useSurveySessionStore.setSurveyContext`,
+  removed by 089's re-point (the renderer now derives bcp47 from
+  decisions, LayoutStep.tsx:66-69); re-seeded via the identity
+  decisions exactly as LayoutStep.test.tsx does. Both files green
+  after the fix. (iii) 089's draftPersistence.decisionRecord.test.ts
+  (SC-009) still listed `phaseBDraft` among the envelope's
+  pre-existing fields; T025's ruled deletion removed the key, so the
+  expectation now omits it with the ruling cited inline.
+  (iv) tests/survey/orphan-input-lint.test.ts: the pre-090 lint
+  required every registry module to be survey-manifested (classes:
+  RELOCATED, RESERVE); the 14 gallery modules are a third class —
+  step-hosted decision modules, author-reachable through their
+  hosting steps but never walked as survey questions. Added a
+  HOSTED_EXEMPT class derived from the registry's galleryModules
+  group (cannot drift from the module list), rationale inline; the
+  lint's other guards unchanged. Green after the fix. The shell-b
+  batch additionally showed 45 file-level failures with zero test
+  failures — environmental (ENOSPC on the 512 MB /tmp tmpfs +
+  worker kills under cross-worktree memory contention), re-run in
+  small chunks for the record. (5) **Full suite:** the first attempt on this VM was
+  OOM-killed twice (concurrent sibling-worktree runs; exit 137 in
+  transform) and re-run in directory batches (maxWorkers 2, then 1
+  for the heavy trees). **Final accounting, current tree:**
+  decisions 974 passed / 4 failed — the pre-existing local-corpus
+  SC-004 four (basic_kbdru + arabic_izza in successCriteria.sc004
+  and .sc004.kmp; the corpus is absent in this sandbox and these
+  fail identically on the base); steps+tests/steps 499/499
+  (goldenWalk regenerated fixtures and the renderSmoke fix inside);
+  survey 1953 passed / 2 failed, both fixed above and re-verified
+  green; stores+lib 1754 passed / 1 failed (fixed, re-verified) /
+  1 skipped (pre-existing); editors 1348/1348; shell-a 98/98;
+  shell-b 1437 passed / 1 failed (the orphan lint, fixed,
+  re-verified 6/6) with its 45 environmental file failures re-run
+  green in chunks (335 tests). tsc: all six packages clean.
+  eslint: clean. depcruise: 2 — the post-089-merge baseline,
+  unchanged. The only failures standing are the 4 SC-004 corpus
+  ones, pre-existing and environmental. PR opening is the lead's
+  step per series protocol.
+
+- **D-090-23 — US3 opening: T030 verified discharged by the
+  Foundational stub; T031 R1 rows re-verified against the branch,
+  one refinement.** T030: `CarveRemovalItem` in carvedLayout.ts is
+  the ruled flat shape (kind node|item|family|char, id, provenance
+  asked|derived|extracted) and `CarvedLayoutValue` =
+  {removals, dispositions (contracts CarveDisposition),
+  closedKeyboardCard} per data-model.md. T031: carve writes are
+  the workingCopyStore overlay Sets (deletedNodeIds /
+  deletedItemIds / disabledFamilyIds / carveChars /
+  carveDispositions / closedKeyboardCard, workingCopyStore.ts:576-
+  659) via cascadeDelete/cascadeRestore/restoreAll/keepAll
+  (:1886-1903ff) plus prefillCarveDispositions (:975) called from
+  CarveGalleryV2's effect (:825-836); applyCarveMutate consumes the
+  overlay in lib/projectWorkingCopyVfs.ts (:443-454). ALSO a
+  second cascadeDelete caller R1 did not list: MechanismGallery
+  (assign loop) routes its removals through the same action
+  (:3689-3700) — the overlay is shared infrastructure, so T032's
+  re-point must keep the assign loop's path working or migrate it
+  too. Deadkeys: editors call workingCopyStore.commitDeadkeyOp
+  (:1108) with ops built in editors/deadkey/deadkeyWrite.ts —
+  R1's row holds. Rules refinement: RulesStep holds NO local
+  builder state — RuleBuilderMount/RuleListMount write the working
+  copy directly and the step reports onComplete(undefined)
+  ("the step's result lives in the working copy", RulesStep.tsx:
+  50-57); R1's "builder-owned state" means the builder mounts +
+  guardIntentStore, and the ruleSet value/extract work from the
+  built rules in the IR, as R1's extract note said.
+
+- **D-090-24 — T032 STOPPED at an assumption failure: 089's
+  apply-contract has no channel for the carve overlay. Lead ruling
+  requested; options below.** T032's text assumes "apply writes the
+  overlay's applied view through the existing pipeline". Verified
+  facts: (1) A module apply returns a WorkingCopyPatch whose
+  channels are ir / identity / attribution / helpDocs /
+  historyEntryState (survey/types.ts:216-227); overlay channels are
+  authorized per-module by 089's data-model channel table, and the
+  runner rejects an unauthorized channel with ApplyChannelError,
+  applying nothing (089 contracts/apply-contract.md A3/A5). No
+  carve-overlay channel exists in that table. (2) The carve overlay
+  (workingCopyStore Sets + dispositions + closedKeyboardCard) is
+  not an IR slice: the applied view (carved IR / emitted .kmn) is
+  produced by lib/projectWorkingCopyVfs.ts from baseIr + overlay +
+  session aggregates (effectiveItemIds' tainted-contributor union,
+  entry-group deferral, rule-additions splice), with applyCarveMutate
+  as the canonical seam — none of those inputs are in ApplyContext
+  (ir / writes / decisions / currentHistoryEntryState only).
+  (3) The overlay DOES persist today inside the draft's workingCopy
+  slice, so in-session resume does not depend on the decision.
+  Options: **(a)** Characters-precedent cut: the module ships value
+  + extract + step-side recording (the adapter records the
+  overlay-derived value on change/complete, as CharactersStep
+  records its additions); apply = () => ({}) like
+  characterInventory's; the applied view keeps being written by
+  projectWorkingCopyVfs from the persisted overlay. Cost: 092/093
+  replay-from-decisions cannot re-assert the overlay — 093's
+  planned I-1 overlay accumulator becomes the place that must grow
+  a carve channel, a named downstream delta. **(b)** Add a
+  `carveOverlay` channel to WorkingCopyPatch + 089's authorization
+  table from inside 090: amends a completed, PRed spec's contract;
+  the runner (088/089 code) and applyWorkingCopyPatch must learn
+  the channel — cross-spec change, needs lead/owner adjudication,
+  and 089's PR #1974 would no longer match its contract. **(c)**
+  Carve apply returns the carved IR through the ir channel
+  (writes [groups, stores], applyCarveMutate over ctx.ir +
+  value-derived sets): two producers of the carve result with
+  different inputs — the pipeline's effectiveItemIds aggregation,
+  entry-group deferral, and rule-additions splice are not
+  reproducible from the value alone, so apply's output can diverge
+  from the emitted artifact's; the golden walk compares emitted
+  bytes and would be the arbiter, but a permanent dual-producer
+  arrangement contradicts the seam's canonical-producer design.
+  Implementer's assessment: (a) is the only option inside 090's
+  authority and matches the T021/T022 precedent; (b) is the
+  architecturally complete answer if the lead wants replay
+  supported from 090 already; (c) is not recommended. T032 is
+  STOPPED pending the ruling. NOT gated on it: T033 (deadkey ops
+  replay to groups/stores patches — IR-channel-expressible via
+  deadkeyWrite/DEADKEY_WRITES), T034 (rule additions are IR
+  groups), T035's deadkeys/rules lists, T036's deadkeys/rules
+  tests — proceeding with those.
+
+- **D-090-25 — T033 done: deadkeys-defined rebuilt (op-log value,
+  replay apply, step-side recording); the op machinery re-homed to
+  survey/deadkeys/ under the depcruise boundary.** Value =
+  { ops: readonly DeadkeyOperation[] }; apply replays the ops over
+  ctx.ir via applyDeadkeyOpsToIr and returns the groups/stores/raw
+  subtrees when anything changed ({} for no value / no IR / empty
+  log / full precondition-skip — so replay over the live IR, which
+  already carries the edits, is a safe no-op). writes =
+  [groups, stores, raw] (DEADKEY_WRITES) and decisionIRPaths maps
+  the decision correspondingly; deadkeys-defined left the
+  IR-less allowlist in decisionIRConsistency.test.ts; the
+  questionModules snapshot refreshed (diff = the deadkeys writes
+  line only). Recording: DeadkeyAdapter records the overlay's ops
+  as the decision on step completion (base-keyboard precedent);
+  the module renderer is survey/deadkeys/DeadkeyDecisionRenderer
+  (the surface, reporting the op log through onChange on
+  completion). No extract (rationale in the module header: base
+  deadkeys ride the base IR; ops are author edits only).
+  **Boundary finding:** dependency-cruiser's
+  question-modules-no-bypass-mutate-seam rule forbids survey/
+  questions/** importing stores/, editors/, OR lib/ at all — the
+  stub's "re-home the op type to an importable layer" was therefore
+  load-bearing. The op union, overlay/value shapes, the single-op
+  applier, and the IR replay moved to survey/deadkeys/deadkeyOps.ts
+  (the survey feature-home pattern: markGuards, phaseBDraftOps);
+  lib/deadkeyOps.ts keeps applyDeadkeyOpsToVfs (the projection
+  replay, now calling the shared applier) and re-exports the types,
+  so all ten existing importers are untouched. First attempt
+  (module importing lib/ + editors/adapters/) scored depcruise 4;
+  after the re-home it is back to the baseline 2. New module suite
+  deadkeysDefined.test.ts (contract + deterministic replay +
+  live-state no-op) plus the lib/editor suites green; tsc + eslint
+  clean.
+
+- **D-090-26 — T034 done: rule-set module (builder-result value,
+  splice apply, step-side recording); ruleAdditions re-homed to
+  survey/rules/.** Value = RuleSetValue, an alias of the builder
+  seam's DerivedRuleAdditions (marked added IRRules/IRStores per
+  group + workingOrder) declared beside the seam in
+  survey/rules/ruleAdditions.ts (D-090-8 pattern). apply splices
+  the additions into ctx.ir via spliceRuleAdditions with the
+  deletion set taken from the recorded carved-layout decision's
+  removals — so an addition the author carved away is never
+  resurrected (pinned by a dedicated test) — and returns the
+  groups/stores subtrees. writes [groups, stores]; decisionIRPaths
+  maps rule-set; it left the IR-less allowlist. Recording:
+  RulesStep.complete() records the derived value (currentRuleSetValue
+  in survey/rules/ruleSetValue.ts, shared with the renderer) before
+  onComplete — the step is its own adapter (manifest hosts it
+  directly); the module renderer is RulesDecisionRenderer wrapping
+  the step. No extract (additions are a working-vs-base diff of
+  session work; rationale in the module header). ruleAdditions.ts
+  and its test moved lib/ → survey/rules/ for the same boundary
+  reason as D-090-25; its three lib/hooks importers re-pointed,
+  behaviour unchanged (ruleAdditions + projection suites green).
+  Snapshot refreshed (ruleSet writes line only). Gates: module +
+  rules trees (355) + pins (459 in the earlier batch) green; tsc /
+  eslint clean; depcruise baseline 2.
+
+- **D-090-27 — T035 partially discharged; the Phase D action bans
+  and T032/T036-carve/T037 are gated on ONE lead question, and a
+  T033 deviation is flagged for adjudication.** Done now: the
+  usePhaseBDraftStore ban extended to the Phase D trees in both
+  FR-003 layers (audit 4/4 incl. firing probe; eslint clean);
+  SC-004 grep re-run: zero code references (one prose mention in
+  the audit file's own comment). **The gated remainder:** T035's
+  action bans (cascadeDelete/cascadeRestore/restoreAll/keepAll/
+  prefillCarveDispositions/commitDeadkeyOp) presume the
+  host-mediated design in which editors never touch the working
+  copy directly. As built, T033/T034 follow the characters/marks
+  precedent instead: the overlay/op-log remain the edit-time write
+  path, the decision records them at completion, and apply serves
+  replay. **Deviation flagged:** the lead's T033 paraphrase said
+  "step-side op commits become value updates through the host" —
+  T033 as built keeps commitDeadkeyOp as the internal commit and
+  records the log at the adapter; the reason is the same wall as
+  D-090-24: the projection (projectWorkingCopyVfs) reads the
+  deadkey overlay and the carve overlay from the working copy, and
+  no contract channel exists for a decision/host to write those
+  overlays — so "value updates through the host" cannot land in
+  090 without either (b)-style contract work or a projection
+  re-point to read decisions. **The one question for the lead:**
+  ratify the record-from-working-copy precedent for US3's
+  editor-backed decisions (carve included — D-090-24 option (a)),
+  with the overlay-channel/projection question handed to 092/093
+  as a named delta; or direct the (b) contract work in 090 before
+  US3 closes. Until ruled: T035's action bans unregistered
+  (registering them would red the gate against the as-built
+  design), T036's carve cases and T037's gate wait on T032.
+  T036's deadkeys/rules module suites are written (in the T033/
+  T034 commits: replay determinism, live-state no-op, splice
+  order + carve-non-resurrection).
+
+- **D-090-28 — 089 pass-2 apply semantics absorbed (lead relay
+  2026-10-07, landed on km/decision-apply @ 24c213c3; reaches this
+  branch at the next restack): applyDecisionEffects gains an
+  input-triggered second pass — a module declaring apply + requires
+  also runs, with value undefined, when a completion records one of
+  its required decisions, and must compose from ctx.decisions.**
+  Audit of every apply already built in 090: the trivial
+  `() => ({})` modules (base-keyboard, windows-layout,
+  touch-seed-source, characters, punctuation, invisibles,
+  convenience) are pass-2 safe by construction. The three applies
+  with real logic all guarded `value === undefined → {}` — correct
+  for "never answered", wrong for pass 2 when the module's own
+  decision was recorded earlier: **marksTreatment, deadkeysDefined,
+  and ruleSet now resolve their effective value as
+  `value ?? ctx.decisions[<own id>]?.value`** before their existing
+  guards, so a pass-2 invocation composes from the recorded value
+  and stays a no-op when none exists. Each suite gained a pass-2
+  pin (invoked with undefined: composes with a recorded own
+  decision, no-ops without one). Carve (stub, D-090-24) and the
+  US4 modules will be authored to this contract from the start.
+  Gates: the three suites + coverage + audit 67/67; studio tsc
+  clean.
+
+- **D-090-29 — LEAD RULING on D-090-19 (T026): Option (a) —
+  declare the decisions slice (lead rulings message, 2026-10-07).**
+  `"decision-store"` is added to the `PersistenceDeclaration`
+  union in `steps/types.ts`; the five US2 steps are re-declared
+  decision-store-first — characters keeps its dual form
+  (`` `decision-store` (alphabet) + `answer-store` (sub-screen
+  position, manual-path answers) ``), marks and convenience
+  declare `decision-store` with their answer-store
+  evidence/status residue named in the manifest comment,
+  punctuation and invisibles declare `decision-store` — and the
+  five rows of the spec-079 step-classification table are
+  amended in lockstep WITH an amendment note recording that
+  spec 090 superseded the "Declaration after 079" cells for
+  these rows. The answer-store evidence layer (marks
+  per-toggle answers, characters' addition answers,
+  punctuation's inventory answer) and the convenience adoption
+  shim (D-090-17) are KEPT: they are the narrowed store's
+  sanctioned role — within-step draft/evidence state, exactly
+  what T026's store text describes. **Scope determination for
+  D-090-20 / T060 (stated by the ruling):** the evidence layer
+  is spec 079's own draft surface, not a gallery write-around —
+  FR-003's ban targets gallery components writing answers IN
+  PLACE OF decision records. The `saveAnswer` bans over
+  marks/characters/punctuation deferred in D-090-20 are
+  therefore NOT registered: not as an exception, but as a scope
+  determination, cited at the registration sites in both FR-003
+  list files (the audit test and the eslint overlay). T060's
+  zero-exceptions assertion reads on the banned category so
+  defined. Options (b) and (c) are rejected: (b) leaves the
+  declarations actively ambiguous at exactly the surface 091
+  derives step membership from — the table would stop answering
+  where the five steps' answers live; (c) eliminates the
+  evidence layer by reopening D-090-11's rejected design and
+  retiring the convenience shim, dropping pre-T024 drafts'
+  restored booleans with no orphan surface — contrary to the
+  087 Q5 / 088 T030 "surfaced, never dropped" precedent the
+  rest of US2 followed, and overriding recorded rationale
+  without new evidence. Executed at T026.
+
+- **D-090-30 — LEAD RULING on D-090-24 (T032): Option (a) —
+  the characters-precedent cut (lead rulings message,
+  2026-10-07).** The `carved-layout` module ships value +
+  extract + step-side recording; `apply = () => ({})` like
+  characterInventory's; the applied view keeps being produced
+  by `projectWorkingCopyVfs` from the persisted overlay. Two
+  conditions attach: (i) the recorded value must suffice to
+  reconstruct the overlay state that produces the applied view
+  (removal items + dispositions); purely presentational state
+  (e.g. card collapse) is exempt — an overlay component that
+  is authorial, view-affecting, and NOT capturable in the
+  value stops on that component alone and is reported to the
+  lead; (ii) the downstream delta is recorded in the spec's
+  duplication ledger / followups as a named handoff (see
+  D-090-31). Option (b) is rejected: amending 089's PRed
+  apply contract mid-flight from inside 090 is cross-spec
+  overreach, and PR #1974 would no longer match its contract.
+  Option (c) is rejected: two producers of the carve result
+  with different inputs can diverge from the emitted artifact,
+  contradicting the seam's canonical-producer design.
+  Executed at T032.
+
+- **D-090-31 — LEAD RULING on D-090-27: the
+  record-from-working-copy precedent is RATIFIED for US3's
+  editor-backed decisions (lead rulings message, 2026-10-07).**
+  Overlays/op-logs remain the edit-time write path for carve
+  (D-090-30), deadkeys (T033 as built) and rules (T034 as
+  built); the decision records them at completion; `apply`
+  serves replay where the contract has channels. The T033
+  deviation from the lead's earlier paraphrase ("step-side op
+  commits become value updates through the host") is closed
+  by this ratification: no contract channel exists for a host
+  to write those overlays, and the projection reads them from
+  the working copy. Consequences executed under this ruling:
+  T035's Phase D action bans (cascadeDelete / cascadeRestore /
+  restoreAll / keepAll / prefillCarveDispositions /
+  commitDeadkeyOp) are NOT registered — they presumed the
+  host-mediated design this ruling sets aside, and registering
+  them would red the gate against the ratified design; the
+  non-registration + rationale is recorded at the T035 site
+  in both FR-003 list files so T060 does not read it as a
+  gap. T036's carve cases proceed under D-090-30 (the no-op
+  apply pinned as such); T037's gate proceeds. **Named
+  downstream handoff (from D-090-30 condition (ii)):** 093's
+  I-1 overlay accumulator grows a carve-overlay fold —
+  reconstruct the overlay from carved-layout decision values
+  during replay; 092's T037 (prefillCarveDispositions) remains
+  pending on carve until that fold exists.
+
+- **D-090-32 — T026 executed under ruling D-090-29 (option (a)).**
+  `steps/types.ts`: `"decision-store"` added to
+  `PersistenceDeclaration` (with the vocabulary note; `phase-b-draft`
+  stays as defined-but-unused 079 vocabulary). `steps/manifest.ts`:
+  characters / marks / punctuation / invisibles / convenience
+  re-declared `decision-store`, each manifest comment naming its
+  answer-store residue (characters: sub-screen position +
+  manual-path answers; marks: per-toggle evidence answers +
+  step-status slot; punctuation: one evidence answer; invisibles:
+  none — writes retired in full at T022; convenience: step-status
+  slot + the legacy-boolean adoption shim's read source).
+  `specs/079-.../step-classification.md`: the five rows amended in
+  lockstep plus the amendment note recording that spec 090
+  superseded those cells. `surveyAnswerStore.ts` header now
+  documents the narrowed role (no gallery DECISION is held there;
+  the evidence layer + status/position residue + shim source are
+  the sanctioned remainder). Census re-verified at execution: the
+  only gallery `saveAnswer` call sites left in src are the evidence
+  layer itself (MarksSeriesStep per-toggle, CharactersStep:147
+  additions, PunctuationStep:481 inventory answer) — zero gallery
+  decision values in the store. FR-003 sites updated per the
+  ruling's scope determination (D-090-29): the deferred
+  marks/characters/punctuation `saveAnswer` bans are recorded as
+  NOT registered in both list files, as a scope determination for
+  T060 to read, not an exception.
+
+- **D-090-33 — T032 executed under ruling D-090-30 (option (a),
+  characters-precedent cut) + D-090-31 ratification.** The module
+  ships value + step-side recording + a decision renderer; `apply`
+  stays `() => ({})`, now documented as the ruled shape (no
+  carve-overlay channel exists in 089's contract; the applied view
+  keeps being produced by `projectWorkingCopyVfs` from the
+  persisted overlay — the canonical producer). Value types + the
+  pure builder moved to the carve feature home
+  (`survey/carve/carveValue.ts`, D-090-8 pattern; the module
+  re-exports): `carvedLayoutValueFromOverlay` maps the four
+  removal sets to one kind-discriminated item list, canonical-
+  sorted by (kind, id) so click order cannot change the recorded
+  value, and rides dispositions + closedKeyboardCard verbatim;
+  `currentCarvedLayoutValue()` is shared by the recording and
+  rendering surfaces (currentRuleSetValue precedent). Recording:
+  `CarveAdapter` records `{carved-layout, value, asked}` on
+  completion (DeadkeyAdapter precedent, verbatim shape);
+  `survey/carve/CarveDecisionRenderer.tsx` hosts the same gallery
+  under the decision host and reports the value via `onChange`.
+  No `extract` (data-model's rule: only where a starting-point
+  seed exists today — carve proposals are in-gallery suggestions,
+  never an overlay seed; deadkeys no-extract precedent).
+  **Per-item provenance is `asked` for every recorded item,
+  deliberately:** in the live flow every overlay removal is an
+  author action (gallery cascadeDelete handlers; the assign
+  loop's cascadeDelete route, D-090-23) and no proposal-
+  acceptance or starting-point seeding path writes the overlay,
+  so a derived/extracted split recorded today would be
+  fabricated. Those values become producible when the seeding
+  paths land (092). **Ruling condition (i) audit:** the value
+  covers every overlay component that can be non-trivial at
+  carve completion and feeds the applied view — the four
+  removal sets, dispositions, the card. Two named observations:
+  `disabledFamilyIds` is captured as it stands at completion
+  (in the live flow only the rules step's toggle writes it,
+  after carve, so family items are normally absent at record
+  time — faithful capture, no carve-step view impact); and
+  `carveTouchKeepInert` has NO live writer (its only UI,
+  TouchKeepInertControl, is an unmounted stub), so it is always
+  empty in the live flow — if that surface ever mounts, the
+  value needs a field for it (added to the D-090-31 handoff
+  note). **T032's text is superseded by the rulings in two
+  clauses:** the apply-through-the-pipeline clause (D-090-30)
+  and the undoStack re-point (D-090-31: the overlay remains
+  the edit-time write path, so undo keeps operating on it);
+  the "commits through onChange" clause holds under the
+  decision host (the renderer), while the live manifest path
+  records step-side — the ratified precedent, as T033 was
+  built. Gates at the T032 checkpoint: studio tsc clean;
+  questionModules (806) + decisionIRConsistency (393) +
+  registry (8) = 1207/1207.
+
+- **D-090-34 — T035 completed under ruling D-090-31.** The ungated
+  slice (the Phase D trees join the `usePhaseBDraftStore` ban in
+  both FR-003 layers) landed at cd7b1f03. The remainder — the six
+  action bans T035's text names — is discharged as a RULED
+  NON-REGISTRATION: the non-registration + rationale is recorded
+  at the T035 site in both list files (the audit test's US3 entry
+  and after-list note; the eslint overlay's US3 comment), as a
+  scope determination for T060 to read — not a gap, not an
+  exception. The named downstream handoff (D-090-30 condition
+  (ii)) is recorded in spec.md's duplication ledger on the
+  "overlays as independent state" row: 093's I-1 overlay
+  accumulator grows a carve-overlay fold; 092's T037 remains
+  pending on carve until that fold exists (with the D-090-33
+  carveTouchKeepInert addendum).
+
+- **D-090-35 — T036 executed: contract + determinism for the three
+  US3 applies.** deadkeysDefined.test.ts and ruleSet.test.ts were
+  written with T033/T034 (replay determinism, live-state no-op,
+  splice order, carve-non-resurrection, pass-2 pins — re-run here,
+  5 + 5 green). carvedLayout.test.ts is new (10 tests): the module
+  contract (provides/requires/writes/renderer/extract-undefined);
+  the ruled no-op apply under the SC-005 frozen-stores harness
+  (`runApplyDeterministically`) and under a pass-2 invocation; the
+  value builder — the four sets mapped to one kind-discriminated
+  list with dispositions + card verbatim, canonical (kind, id)
+  ordering so click order cannot change the recorded value, an
+  orphaned hand-set removal kept verbatim (spec edge case — the
+  builder snapshots the overlay and never filters against a target
+  list), a proposal refresh (dispositions re-prefilled under a new
+  card state) leaving hand removals identical, and the empty
+  overlay recording an empty value; plus `currentCarvedLayoutValue`
+  against the live store. 20/20 across the three suites.
+
+- **D-090-36 — T037 gate: golden-walk fixture regeneration,
+  adjudicated (two `record` deltas, both intended).** The walk
+  failed against the T029-era fixtures with exactly two
+  insertions per track, nothing else: (1) the `carve` step's
+  `decisionMutations [] → ["record"]` (+ `record` leading its
+  storeMutations) — T032's CarveAdapter recording firing in the
+  harness (the real adapter wraps the mocked gallery, so the
+  recording is exercised here even though the gallery is a
+  stub); (2) the `rules` step's identical delta — T034's
+  RulesStep recording, latent since T034 because the walk was
+  not among that slice's gates (D-090-26's list). No
+  workingCopyMutations changed anywhere — the applied view is
+  untouched, exactly as ruling D-090-30 requires (recording
+  added; the projection still produces the view). `deadkeys`
+  shows no record because the harness mocks deadkeyAdapter
+  (studioShellMocks stub) — T033's recording is covered by the
+  deadkey suites, not the walk. Regenerated with the harness's
+  write-on-first-run mechanism; the old↔new JSON diff is
+  exactly the two insertions per track. This is the same
+  adjudicated family as the T013 and T029 regenerations: a new
+  decision recording at a migrated step is the migration's
+  intended signature, not drift.
+- **D-090-37 — verification debts from the lost T037 run discharged
+  (continuation agent, lead direction).** (1) The three pass-2 pin
+  suites (D-090-28) re-run against 089's ACTUAL runner change as
+  merged at b6567241 (km/decision-apply @ 24c213c3): marksTreatment
+  9/9, deadkeysDefined 5/5, ruleSet 5/5 — 19/19 green, each suite's
+  pass-2 pin (invoked with value undefined: composes from
+  ctx.decisions when a recorded own decision exists, no-ops without
+  one) passing against the real second pass, not the relay
+  description. (2) T037 checkbox reconciled: the gate commit
+  c53e001e + D-090-36 establish the golden-walk half of the gate
+  (fixtures regenerated for the adjudicated US3 signature; walk
+  green 2/2 post-regen, applied view untouched). The full-suite /
+  tsc / lint accounting of the original T037 run was lost when that
+  agent's background exec vanished; per lead direction the checkbox
+  is checked on the walk evidence and the full-suite classification
+  rides on T045's gate run, which must classify the whole suite on
+  the US4 head — any failure there beyond the known 4-corpus budget
+  reopens T037's accounting.
+- **D-090-38 — T040 executed: R1 rows for mechanisms/touch re-verified
+  (both hold, line drift only — amendments on the rows); the US4
+  execution shape is fixed by the same wall as D-090-12/D-090-24.**
+  `WorkingCopyPatch` channels are ir / identity / attribution /
+  helpDocs / historyEntryState only. Neither `desktopLocked` (a bare
+  store boolean), nor the `touchLayoutJson` string, nor the phase-C
+  `phaseResults` entry is reachable from an `apply` — so T041's
+  "apply performs the R1 lockDesktop effect" and T042's "apply
+  performs the R2 buildTouchLayoutJson + setTouchLayoutJson work"
+  are not implementable inside 089's contract, exactly as T024's
+  "applied view written by apply" was not (D-090-12). Execution
+  under the ruled precedents (D-090-30 option (a); D-090-31
+  ratification of record-from-working-copy for editor-backed
+  decisions):
+  *physical-layout (T041):* value = the phase-C assignment list —
+  contracts `MechanismAssignment[]`, each keeping its `source`
+  provenance (data-model shape `{ assignments }`; the T008 stub's
+  `Record<string,string>` is re-pinned to the gallery's own record
+  shape). Pure builder + `currentPhysicalLayoutValue()` in a survey
+  feature home, shared by recording and rendering (D-090-33
+  pattern). `AddPhysicalAdapter` records
+  `{physical-layout, value, asked}` on completion (CarveAdapter
+  shape). `apply` is a no-op, `writes: []` (assignments touch no IR
+  channel; their applied view is the `phaseResults` entry).
+  `recordAssignments` stays the edit-time write path producing that
+  applied view (D-090-31). R1's two effects — `lockDesktop()` and
+  the staleness-gated `repropagate` — re-home to the step's
+  completion wiring (see below) with identical deps and ordering;
+  the reducer's MECHANISMS case is deleted and `mechanisms` leaves
+  `STEPS_WITH_APPLY_COMPLETION`.
+  *touch-layout (T042):* value =
+  `{ ops: KeyEditOperation[], deletedTouchKeyIds: string[] }`
+  (data-model shape), snapshotted from `keyEditOverlay` +
+  `deletedTouchKeyIds` at completion; builder +
+  `currentTouchLayoutValue()` likewise. `AddTouchAdapter` records
+  on completion. `apply` is a no-op, `writes: []`: the ops replay
+  onto the gallery's derived layout, not the IR (no analogue to
+  deadkeys' IR replay), and the serialized JSON is a derived
+  string with no patch channel. R2's build — inputs already
+  assembled adapter-side (baseIr, baseVfs, mods via
+  `deriveDesktopModifications`, seedSource) — plus
+  `setTouchLayoutJson` and `clearStale("touch")` re-home to the
+  completion wiring with the reducer's exact semantics (baseIr-null
+  clears; warnings logged; a build throw degrades to null, never
+  blocks the transition). The reducer's TOUCH case is deleted and
+  `touch` leaves `STEPS_WITH_APPLY_COMPLETION`. `setTouchDraft` /
+  `deleteTouchKey` stay as the overlay's edit-time writes
+  (D-090-31); `touchDraft` remains the gallery's persisted draft —
+  applied view, not value (data-model).
+  *Shared completion effects:* both re-homed effect sets must fire
+  on BOTH completion paths — the StepHost adapter path and
+  journey-runner's direct replay (it bypasses the adapters:
+  journey-runner.ts:766-770, :795-803) — so they are factored as
+  plain store-driven functions in the adapters' layer, called by
+  the adapters after recording and by journey-runner in place of
+  its `applyStepCompletion` calls for these two steps. ReducerDeps
+  members that serve only R1/R2 (`lockDesktop`,
+  `buildTouchLayoutJson`, `resolveBaseTouchJson`, `getStaleSteps`)
+  are retired from the deps type and both constructions if no
+  other case consumes them.
+  **Flag 1 (lead ruling requested at T043):** T043's three actions
+  (`recordAssignments`, `setTouchDraft`, `deleteTouchKey`) all
+  remain the sanctioned edit-time write paths under this shape —
+  registering FR-003 bans over the assignLoop trees would red the
+  audit against the ratified design, the identical species as
+  US3's six actions, whose non-registration was LEAD-RULED
+  (D-090-31 → D-090-34). No ruling yet names US4's three; T043 is
+  therefore executed as analysis + stop, and proceeds only on the
+  lead's word (registration, or non-registration as a scope
+  determination recorded at both FR-003 sites).
+  **Flag 2 (expected T045 gate adjudication, not drift):** moving
+  R1/R2 from mock-dep reducer calls to real adapter-completion
+  effects means the golden-walk harness (real adapters over mocked
+  galleries) will fire real `desktopLocked` / `touchLayoutJson`
+  store writes at mechanisms/touch where the mocks previously
+  absorbed them — fixture signature deltas at exactly those steps
+  are the D-090-36 family (an intended migration signature), to be
+  adjudicated at the gate, neither pre-regenerated nor treated as
+  regression without a diff read.
+- **D-090-39 — T041 landed: physical-layout module migrated under
+  the D-090-38 shape; golden-walk fixture delta adjudicated
+  INTENDED (the Flag-2 signature, arriving one task early).**
+  Value home `survey/assignLoop/physicalLayoutValue.ts` (value =
+  `{ assignments }` from `selectDesktopAssignments(phaseResults)` —
+  the gallery's own selector, so the recorded value is the set the
+  author saw); renderer `PhysicalLayoutDecisionRenderer` mirrors
+  AddPhysicalAdapter's reads; the adapter records
+  `{physical-layout, provenance: "asked"}` and fires
+  `applyPhysicalCompletionEffects()` (new `lib/assignLoopCompletion
+  .ts`: `lockDesktop()` + staleness-gated `repropagate`, the retired
+  R1 verbatim) before `onComplete`. Reducer MECHANISMS case
+  deleted; `mechanisms` left `STEPS_WITH_APPLY_COMPLETION`;
+  journey-runner's mechanisms case re-pointed at the shared
+  effects; ReducerDeps `lockDesktop` + `getStaleSteps` retired
+  (type, StudioShell, journey-runner, and three test constructions;
+  `getWorkingIR`/`setWorkingIR` stay — `applyDecisionEffects`'
+  ctx uses them). Two completion simulations re-pointed at the
+  real effects (walkEmit.compile, MechanismGallery.progression
+  T008 — the latter now exercises the real repropagate too).
+  **Fixture adjudication (read, not assumed):** both tracks delta
+  ONLY at the mechanisms step — `applyStepCompletion
+  ["mechanisms"] → []`, `decisionMutations [] → ["record"]`,
+  interleaved `storeMutations` gains the same single `record`;
+  `workingCopyMutations ["lockDesktop"]` UNCHANGED in both, now
+  fired by the adapter's effects instead of the reducer. A
+  store-level probe verified exactly one `physical-layout` record
+  per walk, from the adapter. Fixtures regenerated through the
+  harness's own write path; walk green 2/2 against them, plus a
+  confirmation run. Gates: tsc 0; module/consistency/reducer/
+  registry 45/45; progression 37/37; walkEmit 4/4; StepHost +
+  applyDecisionEffects ×2 + deepLinkRevision + walk 30/30;
+  recorder suites 15/15; eslint 0 errors (4 pre-existing
+  StudioShell warnings, untouched lines).
+  **Correction (same day, found by direct re-run):** the batch
+  figure above was wrong — the run that produced "45/45" did not
+  in fact execute reducer.test.ts's R1-era tests (its count
+  cannot be reconciled with the 401 tests in the module +
+  consistency files alone). Direct re-runs after the T041 commit
+  showed reducer.test.ts carrying 4 failures, all R1-mechanism
+  tests the migration should have re-pointed: the R1 describe
+  (lockDesktop via the reducer), R4's probe (re-pointed to
+  choose_base, which still exercises injected deps), R5's stale
+  `deps.lockDesktop` assertion (line removed), and the T024 pair
+  (moved to the effects' new home, `lib/assignLoopCompletion
+  .test.ts`, 3/3 — including the no-setTouchLayoutJson pin).
+  Verified counts after the fix: reducer.test.ts 40/40;
+  questionModules + decisionIRConsistency 401/401; registry 8/8;
+  assignLoopCompletion 3/3. The remaining figures above were
+  single-purpose runs and stand; the full recount rides on
+  T045's gate as before.
+- **D-090-40 — T042 landed: touch-layout module migrated under
+  the D-090-38 shape; golden-walk fixture delta adjudicated
+  INTENDED (the mechanisms signature, one step later).** Value
+  home `survey/assignLoop/touchLayoutValue.ts` (ops copied from
+  `keyEditOverlay.ops`, `deletedTouchKeyIds` Set→list in deletion
+  order); renderer `TouchDecisionRenderer` (TouchGallery requires
+  `onBack`; the decision host owns navigation, so the gallery's
+  Back is inert there — the adapter's defensive fallback
+  inverted, commented in place). AddTouchAdapter records
+  `{touch-layout, provenance: "asked"}`, fires
+  `applyTouchCompletionEffects(payload)`, and still passes the
+  payload to onComplete (the spec-053 audit recorder reads the
+  assignments from it). The R2 effects in
+  `lib/assignLoopCompletion.ts` compose the reducer's semantics
+  with StudioShell's former deps wrapper VERBATIM
+  (`buildTouchLayoutJsonForStep`: seed resolution, R11 gate,
+  reseed never passes the shipped layout); `TouchCompleteResult`
+  moved there from reducer.ts. Reducer TOUCH case deleted;
+  `touch` left `STEPS_WITH_APPLY_COMPLETION`; ReducerDeps
+  `setTouchLayoutJson` / `clearStale` / `buildTouchLayoutJson` /
+  `resolveBaseTouchJson` retired (type, StudioShell incl. its
+  wrapper, journey-runner incl. its stubs, test constructions).
+  Journey replay now builds what the live path builds for the
+  same inputs (the former stub always returned null; with the
+  journey's seed choice the R11 matrix still emits on the reseed
+  path — journey suites green 9/9 as observed). R2's reducer-era
+  coverage moved to `lib/assignLoopCompletion.test.ts` (Case A/B,
+  reseed R10 pass-through ban, don't-emit, throw→null, stale
+  cleared on every path; 10/10 with the physical pins).
+  deepLinkRevision's trivial touch step re-pointed to fire the
+  effects like the adapter (its staleness assertion is the R2
+  clearStale behaviour). **Fixture adjudication:** both tracks
+  delta ONLY at the touch step — `applyStepCompletion ["touch"]
+  → []`, `decisionMutations [] → ["record"]`, `workingCopy
+  Mutations` still carrying `setTouchLayoutJson` unchanged;
+  regenerated through the harness; walk green 2/2.
+  **Cycle found + fixed:** the two new renderers closed an import
+  cycle — gallery → `steps/reducer.ts` (step-id constants) →
+  question registry → modules → renderers → gallery — leaving a
+  module undefined at registry construction
+  (questionModules.test.ts collection failure; the walk's entry
+  order masked it, and it had existed since T041's physical
+  renderer). The constants moved to the leaf `steps/stepIds.ts`
+  (imports nothing); reducer re-exports them; both galleries
+  import the leaf. questionModules green 806/806 after the fix.
+  Gates: tsc 0; depcruise over the new graph clean (650 modules);
+  reducer 27/27; assignLoopCompletion 10/10; walkEmit 4/4;
+  decisionIRConsistency 393/393; galleryModules.coverage 44/44;
+  registry 8/8; journey-runner 9/9; StepHost + applyDecisionEffects
+  ×2 + scroll + smoke green; deepLinkRevision 4/4; progression +
+  TouchGallery.suggestions 42/42; eslint 0 errors on changed
+  files.
+- **D-090-41 — T044 landed: contract + determinism tests for both
+  US4 modules.** `physicalLayout.test.ts` / `touchLayout.test.ts`:
+  module contract (provides/requires/writes/renderer/extract),
+  the no-op applies under the SC-005 frozen-stores harness
+  (`runApplyDeterministically`) with pass-2 pins, value-builder
+  tests (selector fidelity + copy semantics for physical;
+  snapshot copy + deletion-order for touch), store-level
+  `current*Value` reads, and the spec-014 R6 scenario at store
+  level through the real R1 completion path. R6's refresh
+  observable, as the landed architecture actually implements it:
+  Case B scaffolding preserves the existing layout and augments
+  deadkey successors — so the scenario's input change is a new
+  S-02 pattern (successor "ç" for K_C, engine longpress fixture
+  shape), the refresh is the gained `sk[]` entry on the
+  physical-suggested key, hand-set keys survive byte-identical,
+  and the orphaned hand-set key (authored "ʒ" on K_Z, which no
+  desktop derivation produces — a from-scratch scaffold gives
+  K_Z only template content) is kept with its content intact.
+  16/16 green; tsc 0; eslint clean.
+- **D-090-42 — US4 gate (T045) + the two discharges this run owed.**
+  (1) *Verification debt 1 discharged*: after the `b6567241` merge
+  of 089 @ `24c213c3`, the three pass-2 pin suites re-run against
+  089's actual runner change — marksTreatment 9/9,
+  deadkeysDefined 5/5, ruleSet 5/5 (19/19). (2) *Verification
+  debt 2 / T037 classification*: the predecessor's lost full-suite
+  accounting was recovered from its artifacts
+  (`~/tmp-090/full-suite-t037.json`, US3-complete tree): 5 failed —
+  the 4 SC-004 corpus (`basic_kbdru`/`arabic_izza`, 2 in each
+  sc004 file) + 1 `useValidator`. At this gate the only failures
+  that reproduce deterministically are the same SC-004 family:
+  `successCriteria.sc004.kmp.test.ts` fails standalone on exactly
+  `basic_kbdru` + `arabic_izza` (2); the sibling sc004 file passes
+  standalone (49/49) and `useValidator` passes (8/8). Parallel
+  full-suite runs on this VM (load average ~7 on 2 vCPUs, five
+  sibling agents) produced 79 then 61 non-reproducing failures —
+  worker casualties, not assertions: every file in US4's blast
+  radius passes standalone and in batches. No failure beyond the
+  known SC-004 budget is attributable to 090 at either checkpoint,
+  so T037's deferred classification closes clean. (3) *Gate legs*:
+  golden walk green at both steps' regenerated fixtures (deltas
+  adjudicated intended, D-090-39/-40); StepHost parity suites
+  green; tsc 0; package eslint 0 errors after removing one helper
+  orphaned by the T041/T042 deps retirement in
+  walkEmit.compile.test.ts (the run's single error; 394 warnings
+  pre-existing). US4's remaining item is T043, STOPPED for a lead
+  ruling (see the T043 stop note in tasks.md): its three
+  identifiers are the galleries' live edit-time write paths under
+  the ratified record-from-working-copy design, so registering
+  them would red the audit against the ruling — the US3 species,
+  whose disposition was ruled non-registration (D-090-31/-34).
+- **D-090-43 — T050 STOPPED for a lead ruling: its premise about
+  the recorder does not hold in the landed code.** T050 assumes a
+  "decision-id-keyed recorder 088 established" through which the
+  gallery host can record one log entry per settled decision.
+  What 088 actually established (decisionLogStore.ts slot keying,
+  FR-008/C-5) is that a *survey-answer* entry's supersession slot
+  is keyed by the decision id its question provides. The log's
+  payload union (contracts decisionRecord.ts) has exactly three
+  kinds — survey-answer, editor-action, base-contribution — and
+  survey-answer values are typed per AnswerType (text / select /
+  boolean / char-list / char-single / key-name / store-content:
+  strings, string lists, booleans). Gallery decision values
+  (rule-set additions, deadkey ops, carve dispositions, physical
+  assignments, touch ops) fit none of them, and no payload kind
+  carries a decision id + value. So there is no recorder call
+  the host can make today that records a gallery decision.
+  Options: **(a)** a new contracts payload kind
+  `{kind:"decision", decisionId, …}` + zod schema + slotKeyOf /
+  payloadsEqual arms + engine normalization + trail rendering
+  (DecisionEntryRow/catalog) — the only option satisfying
+  SC-003 as written; risk: it amends the 053/055 record format
+  (DECISION_RECORD_VERSION, sidecar consumers) and is larger
+  than 090's named files. **(b)** the host synthesizes
+  survey-answer entries (answerType "text", value = a bounded
+  human summary of the decision) — fits today's types and slot
+  keying, exactly one entry per decision; risk: the trail
+  records a rendering, not the decision value, and the
+  recorder's proposal-based provenance + 079 screen-recording
+  side effects must be kept from polluting answer bookkeeping.
+  **(c)** editor-action summaries — rejected semantically
+  (counts shape; renders as an edit, not a decision).
+  **(d)** defer US5's entries to a followup and close 090
+  without them, SC-003 recorded unmet; risk: the G7 gap
+  persists into the PR. T051/T052/T053 all ride this mechanism
+  (T052's help-docs entry included), so US5 is blocked as a
+  whole; T063 + Polish proceed meanwhile (T063's "strictly
+  last" yields to the stop rather than idling the spec).
+- **D-090-44 — T063 landed: `phaseAnswersByStep` deleted.**
+  The field, its `PhaseAnswersByStep` type, and the whole
+  spec-079 D-4 ownership machinery (`ownersOf`,
+  `concatPhaseAnswers`, `LEGACY_ANSWER_OWNER`) are out of
+  workingCopyStore; `recordPhase` now shallow-merges the
+  result's non-answer fields per phase and stores `answers: []`
+  — no answer state remains in the working copy (the result
+  object still flows to recordAnswersAsDecisions /
+  applyDecisionEffects / the trail recorder directly from
+  StepHost, untouched). Verified beforehand: no production
+  code reads stored phase-slot answers (the cross-spec R-2
+  finding). Persistence: the field is out of the snapshot
+  types and both (de)serializers; a pre-090 snapshot carrying
+  it has it dropped on restore and never re-saved (pinned in
+  persistWorkingCopy.test.ts). Closing grep: zero references
+  in non-test sources; the 6 remaining references are tests
+  pinning the absence/strip. The 079 D-4 store tests were
+  replaced by T063 pins (no answers stored, per-phase shallow
+  merge keeps both steps' fields); the pre-079 draft test's
+  D-4 tail was re-pinned to the new semantics. Gates: tsc 0;
+  eslint clean on changed files; workingCopyStore 153/153 +
+  persistWorkingCopy (185 combined), draftPersistence 112/112,
+  decisionRecord/prePrDraft/journey/consistency 403/403,
+  walkEmit + StepHost green.
+- **D-090-45 — the D-090-7 static cycle closed (T060 enabler).**
+  The full depcruise run had been red on this branch since US2:
+  two no-circular violations, both on the spine registry →
+  characterInventory → CharactersStep → {PhaseB, Prefill} →
+  {flowSources, IdentityLite} → registry (089's tree cruises
+  clean, so this was a 090 regression; earlier "depcruise
+  clean" records were scoped runs over subsets). Runtime had
+  been saved by PhaseB's lazy edge, but this repo's depcruise
+  counts lazy and even type-only .tsx imports as import edges,
+  so only a real graph break counts. Fix: the substage views
+  are composed by CharactersStepHost (the manifest wrapper,
+  outside the cycle) and handed to the renderer through the
+  gallery host's step-context extras — the channel that exists
+  for wrapper-owned plumbing; CharactersStep imports neither
+  view (their prop shapes are mirrored structurally in
+  `CharactersStepExtras` from types already in scope). PhaseB
+  stays lazy, now at the host. Depcruise: zero violations
+  (1075 modules); tsc 0; CharactersStep + characterInventory
+  25/25; golden walk + PhaseB suites 140/140.
+- **D-090-46 — T062 final gates + spec↔plan↔tasks analyze.**
+  Gates at head: tsc 0; root eslint over all packages 0 errors;
+  depcruise zero violations; every `pnpm lint` chain leg green
+  except content-i18n-freshness, which crashes at module load in
+  this worktree's node_modules (`babel-plugin-macros` resolution
+  inside the lingui macro package — an install artifact, before
+  any source is read; CI installs fresh). One chain finding was
+  real and fixed in this pass: test-antipattern-lint flagged a
+  hardcoded order array in carvedLayout.test.ts — rewritten as a
+  property assertion (membership + sortedness), suite 10/10.
+  Golden walk green; StepHost parity green; final-head batches:
+  workingCopy/persist/draft suites (T063), CharactersStep +
+  characterInventory 25/25, StudioShell charmap + questionModules
+  + coverage 855/855. Full-suite classification stands as
+  D-090-42 (only the SC-004 corpus pair reproduces).
+  **Analyze findings:** (1) FR-008 / SC-003 unmet — US5 blocked
+  on the D-090-43 ruling (recorded, with options). (2) FR-005's
+  letter ("rewrites run only inside apply") diverges from the
+  ruled execution shape for US3/US4 (D-090-27/-30/-31/-38:
+  record-from-working-copy + completion-wiring effects, because
+  089's patch channels cannot express R1/R2 or the carve
+  overlay) — the divergence is recorded at each site; whether
+  spec.md's FR-005 text should be amended to the ruled shape is
+  the lead's call. (3) The plan's one-PR-per-story slicing was
+  superseded in execution by the lead's stacked-PR train (one
+  PR per spec at completion, base = predecessor branch) —
+  noted at T045. Everything else cross-checks: FR-001/002/003/
+  004/006/007 landed as specified or as ruled; SC-001/002/004/
+  005 measured green.
+- **D-090-47 — T043 RULED by the lead (2026-10-07):
+  NON-REGISTRATION.** The lead's ruling on D-090-38 Flag 1 extends
+  the D-090-31/D-090-34 scope determination to US4's three
+  actions: `recordAssignments`, `setTouchDraft`, and
+  `deleteTouchKey` remain the sanctioned edit-time write paths
+  under the ratified record-from-working-copy design (D-090-31) —
+  they write the working-copy state that completion snapshots
+  into the decision value; they are not gallery write-arounds in
+  FR-003's sense (the ban targets writing answers IN PLACE OF
+  decision records). No bans are registered over the assignLoop
+  trees for these three. The non-registration + rationale are
+  recorded at both FR-003 sites exactly as T035's six actions
+  were: the third NOT-REGISTERED note after the
+  `GALLERY_WRITE_AUDIT` list in galleryWriteAudit.test.ts, and
+  the US4 comment block in eslint.config.mjs — so T060's
+  zero-exceptions audit reads it as scope, not gap (plan.md's PR
+  summary updated to match). T043 is checked on this basis; the
+  audit gate stays green unregistered, as it was. Flag 2 needed
+  no ruling (the lead confirmed the T045 fixture deltas are
+  adjudicated at the gate by diff read; D-090-39/-40 stand).
+- **D-090-48 — T050's mechanism RULED by the lead (2026-10-07):
+  option (a), a real `decision` payload kind; US5 unblocked.**
+  The trail records decisions, not renderings of them: option
+  (b)'s synthesized survey-answers would pollute answer
+  bookkeeping with fabricated answers (rejected); (d) leaves the
+  HANDOFF G7 gap open across the downstream stack (rejected);
+  (c) was already rejected semantically in D-090-43. The format
+  amendment happens NOW, inside the stacked series that owns the
+  format, rather than after merge when consumers pin v2.
+  Ruled shape: contracts payload kind
+  `{kind:"decision", decisionId, value, summary}` — `value` is
+  the module's decision value as JSON (contracts validates it
+  as a JSON value via a recursive `JsonValue` schema, NOT
+  per-module schemas); `summary` is a bounded human-readable
+  string (DECISION_SUMMARY_LIMIT) produced by the recording
+  host, so trail rendering (headline / DecisionEntryRow /
+  prSummary) needs no per-module knowledge. Supersession:
+  `slotKeyOf` keys the kind by decisionId (the C-5 form,
+  step-independent); `payloadsEqual` compares decision values
+  by deep equality. `DECISION_RECORD_VERSION` bumps 2 → 3 with
+  staged read-time normalization: the v1 transforms (editor
+  count stripping, flat-impact lift) apply only to `version < 2`
+  records; a v2 record's entries load unchanged (they simply
+  contain no decision-kind entries) and only the version tag
+  advances — re-running the v1 transforms over v2 entries would
+  strip genuinely measured counts, the FR-005a failure
+  recordMigration.ts's header warns about.
+  **Scope determination (lead):** the contracts / engine /
+  trail-rendering files this requires are in-scope for T050
+  under this ruling, beyond 090's originally named files.
+  **Consumer census** (every `DecisionPayload` consumer,
+  verified by grep + read; disposition per consumer):
+  FIXED for the new kind — contracts/decisionRecord.ts (kind +
+  JsonValue + version), contracts/schemas.ts (payload arm +
+  guard), engine/decision-audit/record.ts (serialize arm —
+  the base-contribution fall-through would have corrupted the
+  entry), engine/decision-audit/recordMigration.ts (staged
+  normalization), engine/decision-audit/prSummary.ts (decision
+  arm returns the recorded summary), studio
+  decisionLogStore.ts (slotKeyOf + payloadsEqual arms),
+  studio headline.ts + DecisionEntryRow.tsx (headline renders
+  the summary verbatim — author-facing content, the
+  payload.value exemption), studio stageGroups.ts +
+  DecisionTrailView.tsx (a stage of decision entries rolls up
+  as decisions, not "answers"), studio
+  historyProposalSeed.ts (explicit ignore arm — gallery
+  decisions contribute neither characters nor editor counts).
+  TOLERATES unchanged (verified ignore/guard arms): engine
+  shed.ts + sidecar.ts (payload-agnostic), studio impact.ts +
+  counterfactualProjection.ts + progressDots.ts +
+  StudioShell's recorded-hash scan (survey-answer guards skip
+  the kind), crashCallerContext.ts (reads `kind` as a string),
+  DecisionEntryRow's jump location (non-survey entries locate
+  by step).
+  **Recording design (R6 executed):** decision-driven at step
+  completion — `createDecisionRecorder` gains an injected
+  `getStepDecisions(stepId)` (composed by
+  createStudioDecisionRecorder from `settlesForStep` + the
+  live decision set, wired in StudioShell), and a new
+  recordGalleryDecisions.ts appends exactly one entry per
+  settled gallery decision of the completing step. The log's
+  own append semantics make it exactly-once: same slot +
+  deep-equal value + same provenance is the identical-revisit
+  no-op; a changed value supersedes. Provenance maps from the
+  decision record's vocabulary (asked → hand-set; extracted →
+  base-derived/base; default → tool-proposed (+ source when it
+  names a DecisionProposalSource); derived → tool-proposed).
+  The entries join the boundary capture's co-decision set
+  (FR-019 joint attribution), like the editor entry does.
+  **Premise determination on T050's removal clause:** "answer-
+  driven recording for migrated steps is removed in reducer.ts"
+  has no referent in the landed code — verified: no survey
+  answer carries a gallery question id (gallery modules are in
+  no flow) and no non-gallery module provides any of the
+  fourteen ids, so `recordAnswersAsDecisions` cannot write a
+  gallery decision and nothing double-records today. No
+  removal is made; exactly-once holds by construction (C-5
+  answer slots and decision slots are disjoint key spaces).
+  The carve / mechanisms / touch steps keep their spec-053
+  editor-action entries beside the new decision entries — the
+  editor entry occupies the step's editor slot, not the
+  decision's slot, and SC-003's exactly-one is per decision.
+- **D-090-49 — US5 landed; T054 gate accounting (2026-10-07).**
+  US5 (T050–T054) is complete under the D-090-48 ruling, in nine commits
+  (`ab9a59a9`..`49c55c49` plus this entry's commit): FR-005 amended;
+  contracts `decision` payload kind + DECISION_RECORD_VERSION 3 with
+  staged normalization; engine + studio consumers; completion-time
+  recording (decisions/recordGalleryDecisions.ts via the
+  createDecisionRecorder → createStudioDecisionRecorder chain,
+  `settlesForStep` as the canonical step→settles source); T051's
+  StepHost-level G7 verification (9/9 — the six gaps plus help-docs,
+  exactly-once and supersession pinned; the G7 starting-point residue
+  confirmed still reproducing and recorded in followups.md, unfixed);
+  T052's PhaseFGate help-docs registration; T053's CI live-walk spec
+  (e2e/decision-log.spec.ts). Gate numbers, exact: studio full suite
+  8729 passed / 8 failed / 1 skipped (8738) — the 8 are the 4 budgeted
+  SC-004 local-corpus failures (`basic_kbdru`/`arabic_izza` in
+  successCriteria.sc004{,.kmp}) PLUS 4 spec-079 step failures
+  (InvisiblesStep ×3: D-4/R-08 phase-C slot, RTL bidi proposal, RTL
+  direction-controls expansion; PunctuationStep ×1: D-4/R-08 phase-C
+  slot). The 4 spec-079 failures were verified byte-identical at the
+  pre-US5 base `625c3f43` (same 4 failed / 53 passed in isolation), so
+  they are pre-existing branch state, not US5 regressions; the brief's
+  "exactly 4" budget understated the branch's pre-existing count by
+  those 4, and fixing spec-079 step behaviour is outside US5's scope —
+  named here and in the PR body rather than absorbed. Engine suite:
+  3720 passed / 24 skipped / 1 failed — the failure is
+  character-discovery/exemplarCodegen determinism, which requires the
+  fetched SLDR corpus (`packages/engine/data/sldr/sldr` absent in this
+  worktree; environmental, subsystem untouched by this spec). Contracts
+  872/872. Golden walk: store-level fixtures re-captured with the sole
+  delta of T052's help-step decision `record` (both tracks); parity
+  green in compare mode (2/2); emitted files unchanged. tsc clean
+  (contracts/engine/studio); eslint 0 errors on changed files (5
+  warnings, all outside the US5 hunks); depcruise zero violations
+  (1442 modules); i18n-catalog-lint, spec-number-lint,
+  content-i18n-lint OK. `content-i18n-freshness` still crashes in this
+  worktree on the D-090-46 install artifact (`babel-plugin-macros`
+  module-not-found at load, before any content is read); CI installs
+  fresh. Spec 090 is 49/49; the PR bases on `km/decision-apply`.

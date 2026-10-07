@@ -3,7 +3,7 @@
 //
 // What matters here: the page collects ONLY punctuation (typed letters are
 // declined visibly, never silently absorbed into the shared draft); the list
-// is the shared phaseBDraftStore's derived `punctuation` category (so map
+// is the shared character-inventory value's derived `punctuation` category (so map
 // picks and Phase-B leftovers arrive pre-listed); Done emits the picks as
 // confirmedInventory on a phase:"C" result (never "B" — see the component's
 // module header for the recordPhase shallow-merge hazard); suggestions come
@@ -18,7 +18,8 @@ import type { IRGroup, IRRule, RawKmnFragment, SurveyPhaseResult } from "@keyboa
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { ASCII_PUNCTUATION_FLOOR } from "@keyboard-studio/engine";
 import { PunctuationStepHost } from "./PunctuationStepHost.tsx";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, getInvisiblesInventoryValue, inventoryOps, resetInventoryDecisions } from "../../survey/useInventoryDraft.ts";
+import { invisibleDecisionsOf } from "../../survey/phaseBDraftOps.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
@@ -59,7 +60,7 @@ beforeEach(() => {
   // reset() deliberately leaves the sticky proposal decisions (`rejected`)
   // alone; clear them so a removal in one test cannot suppress a proposal in
   // the next.
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 afterEach(() => {
@@ -113,7 +114,7 @@ describe("PunctuationStep — type-in and Done", () => {
     // here would silently resurface in the Phase B alphabet.
     expect(screen.getByText("Your punctuation (1)")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("a");
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["!"]);
   });
 
   it("clicking a chip removes that pick", () => {
@@ -131,8 +132,8 @@ describe("PunctuationStep — type-in and Done", () => {
 
 describe("PunctuationStep — shared draft continuity", () => {
   it("punctuation already in the shared draft (Phase B leftovers, map picks) arrives pre-listed", () => {
-    usePhaseBDraftStore.getState().add("«");
-    usePhaseBDraftStore.getState().add("a"); // a letter — not this page's category
+    inventoryOps("characters").add("«");
+    inventoryOps("characters").add("a"); // a letter — not this page's category
     const onComplete = vi.fn();
     render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
@@ -317,8 +318,8 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
       confirmedInventory: HI_TIER,
     });
     // The seed is keyed by the resolved locale.
-    expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
-    expect(usePhaseBDraftStore.getState().provenance["\u0964"]).toBe("cldr");
+    expect(getCharacterInventoryValue().seededProposals).toEqual(["punctuation:hi"]);
+    expect(getCharacterInventoryValue().provenance["\u0964"]).toBe("cldr");
   });
 
   it("FR-002: the group caption names the supplying source and the resolved locale", async () => {
@@ -343,12 +344,12 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
   });
 
   it("FR-005: a character the author typed before the seed keeps its author attribution and is never restyled", async () => {
-    usePhaseBDraftStore.getState().add("!");
+    inventoryOps("characters").add("!");
     mocks.inventory = hindiInventory();
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
 
-    expect(usePhaseBDraftStore.getState().provenance["!"]).toBe("author");
+    expect(getCharacterInventoryValue().provenance["!"]).toBe("author");
     const authored = screen.getAllByTestId("authored-punctuation-chip");
     expect(authored).toHaveLength(1);
     expect(authored[0]!.textContent).toContain("!");
@@ -363,7 +364,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
       expect(screen.getByText(/no exemplar data/i)).toBeTruthy();
     });
     expect(screen.queryByTestId("cldr-punctuation-group")).toBeNull();
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 
   it("says why the CLDR group is absent: the source has an empty punctuation tier — a distinct message", async () => {
@@ -379,15 +380,15 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
   it("FR-023: an author who already confirmed a punctuation inventory is neither overwritten nor extended, and the seed key is still recorded", async () => {
     // A phase-C confirmedInventory recorded before this feature existed.
     useWorkingCopyStore.getState().recordPhase({ phase: "C", answers: [], confirmedInventory: ["!"] });
-    usePhaseBDraftStore.getState().add("!");
+    inventoryOps("characters").add("!");
     mocks.inventory = hindiInventory();
     const onComplete = vi.fn();
     render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
+      expect(getCharacterInventoryValue().seededProposals).toEqual(["punctuation:hi"]);
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["!"]);
     expect(screen.queryByTestId("cldr-punctuation-group")).toBeNull();
     fireEvent.click(screen.getByTestId("punctuation-done"));
     expect(lastResult(onComplete).confirmedInventory).toEqual(["!"]);
@@ -399,10 +400,10 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
     await screen.findByTestId("cldr-punctuation-group");
 
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
-    expect(usePhaseBDraftStore.getState().rejected).toEqual(["!"]);
+    expect(getCharacterInventoryValue().rejected).toEqual(["!"]);
     fireEvent.click(await screen.findByRole("button", { name: "Add ! (U+0021)" }));
-    expect(usePhaseBDraftStore.getState().chars).toContain("!");
-    expect(usePhaseBDraftStore.getState().provenance["!"]).toBe("author");
+    expect(getCharacterInventoryValue().chars).toContain("!");
+    expect(getCharacterInventoryValue().provenance["!"]).toBe("author");
   });
 
   it("the suggestion section appears only while it has something to offer, and ticking the last chip moves focus to the type-in field", async () => {
@@ -483,8 +484,8 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
     expect(chipsIn(base).sort()).toEqual([".", "?"].sort());
     expect(base.textContent).toMatch(/base keyboard/i);
     expect(base.textContent).not.toMatch(/not fully known/i);
-    expect(usePhaseBDraftStore.getState().provenance["."]).toBe("base");
-    expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation-base:basic_kbdus");
+    expect(getCharacterInventoryValue().provenance["."]).toBe("base");
+    expect(getCharacterInventoryValue().seededProposals).toContain("punctuation-base:basic_kbdus");
   });
 
   it("FR-007/FR-008: with an opaque fragment the group is the ASCII floor under the incomplete caption, and the base's real output is NOT mixed in", async () => {
@@ -503,7 +504,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
     expect(chips).not.toContain("$");
     expect(chips).not.toContain("\u061B");
     expect(base.textContent).toMatch(/not fully known/i);
-    expect(usePhaseBDraftStore.getState().provenance["#"]).toBe("ascii-floor");
+    expect(getCharacterInventoryValue().provenance["#"]).toBe("ascii-floor");
   });
 
   it("SC-003/FR-010: the two groups are disjoint, the count is the size of their union, and a char in both is rendered once under CLDR annotated as also produced by the base", async () => {
@@ -559,9 +560,9 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
     mocks.inventory = null;
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation-base:basic_kbdus");
+      expect(getCharacterInventoryValue().seededProposals).toContain("punctuation-base:basic_kbdus");
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
     expect(screen.queryByTestId("base-punctuation-group")).toBeNull();
   });
 
@@ -584,8 +585,8 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
     render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
     typeAndAdd("\u200D");
 
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200D"]).toBe("accepted");
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200D"]).toBe("accepted");
+    expect(getCharacterInventoryValue().chars).toEqual([]);
     const note = screen.getByTestId("punctuation-handoff-note");
     expect(note.getAttribute("role")).toBe("status");
     expect(note.textContent).toMatch(/U\+200D/);
@@ -605,8 +606,8 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
     // test. Added in turn, each takes its own route.
     typeAndAdd("!");
     typeAndAdd("\u200C");
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(getCharacterInventoryValue().chars).toEqual(["!"]);
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("accepted");
     expect(screen.getByTestId("punctuation-handoff-note")).toBeTruthy();
     expect(screen.queryByTestId("punctuation-declined-cluster")).toBeNull();
   });
@@ -614,9 +615,9 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
   it("a PUNCTUATION mark fused with a format character is declined too — glyphCategory reads the cluster as punctuation, and that must not smuggle the ZWNJ in", () => {
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     typeAndAdd("!\u200C");
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().punctuation).toEqual([]);
-    expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({});
+    expect(getCharacterInventoryValue().chars).toEqual([]);
+    expect(getCharacterInventoryValue().punctuation).toEqual([]);
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())).toEqual({});
     const note = screen.getByTestId("punctuation-declined-cluster");
     expect(note.textContent).toMatch(/U\+0021 U\+200C/);
   });
@@ -625,8 +626,8 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     // ZWNJ is a grapheme extender, so "a" + ZWNJ segments as ONE cluster.
     typeAndAdd("a\u200C");
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({});
+    expect(getCharacterInventoryValue().chars).toEqual([]);
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())).toEqual({});
     const note = screen.getByTestId("punctuation-declined-cluster");
     expect(note.getAttribute("role")).toBe("status");
     expect(note.textContent).toMatch(/U\+0061 U\+200C/);
@@ -651,14 +652,14 @@ describe("PunctuationStep — a removed proposal is never re-proposed (US4)", ()
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
     fireEvent.click(screen.getByRole("button", { name: /Remove \?/ }));
     const kept = HI_TIER.filter((c) => c !== "!" && c !== "?");
-    expect(usePhaseBDraftStore.getState().punctuation).toEqual(kept);
-    expect(usePhaseBDraftStore.getState().rejected).toEqual(["!", "?"]);
+    expect(getCharacterInventoryValue().punctuation).toEqual(kept);
+    expect(getCharacterInventoryValue().rejected).toEqual(["!", "?"]);
     first.unmount();
 
     // Revisit: same locale, same seed key — nothing comes back.
     const second = render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
-    expect(usePhaseBDraftStore.getState().punctuation).toEqual(kept);
+    expect(getCharacterInventoryValue().punctuation).toEqual(kept);
     expect(screen.queryByRole("button", { name: /Remove !/ })).toBeNull();
     second.unmount();
 
@@ -667,14 +668,14 @@ describe("PunctuationStep — a removed proposal is never re-proposed (US4)", ()
     mocks.inventory = { ...hindiInventory(), resolvedTag: "hi-IN" };
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation:hi-IN");
+      expect(getCharacterInventoryValue().seededProposals).toContain("punctuation:hi-IN");
     });
-    expect(usePhaseBDraftStore.getState().punctuation).toEqual(kept);
+    expect(getCharacterInventoryValue().punctuation).toEqual(kept);
 
     // The override: typing a removed mark by hand restores it as the author's.
     typeAndAdd("!");
-    expect(usePhaseBDraftStore.getState().punctuation).toEqual([...kept, "!"]);
-    expect(usePhaseBDraftStore.getState().provenance["!"]).toBe("author");
+    expect(getCharacterInventoryValue().punctuation).toEqual([...kept, "!"]);
+    expect(getCharacterInventoryValue().provenance["!"]).toBe("author");
     expect(screen.getAllByTestId("authored-punctuation-chip")).toHaveLength(1);
   });
 });
@@ -689,11 +690,11 @@ describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
   it("typed-in picks survive an unmount/remount with the same evidence", () => {
     const first = render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     typeAndAdd("! ?");
-    expect(usePhaseBDraftStore.getState().punctuation).toEqual(["!", "?"]);
+    expect(getCharacterInventoryValue().punctuation).toEqual(["!", "?"]);
     first.unmount();
 
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
-    expect(usePhaseBDraftStore.getState().punctuation).toEqual(["!", "?"]);
+    expect(getCharacterInventoryValue().punctuation).toEqual(["!", "?"]);
     expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
   });
 
@@ -738,7 +739,7 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
       evidenceKey: key,
       screenId: "punctuation",
     });
-    usePhaseBDraftStore.getState().add("!");
+    inventoryOps("characters").add("!");
   }
 
   it("Done records the evidence key the inventory was confirmed on", async () => {
@@ -759,9 +760,9 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
+      expect(getCharacterInventoryValue().seededProposals).toEqual(["punctuation:hi"]);
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["!"]);
   });
 
   it("a confirmation on OTHER evidence does not: the punctuation defaults are proposed again", async () => {
@@ -770,7 +771,7 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await screen.findByTestId("cldr-punctuation-group");
-    expect(usePhaseBDraftStore.getState().chars).toEqual(expect.arrayContaining(HI_TIER));
+    expect(getCharacterInventoryValue().chars).toEqual(expect.arrayContaining(HI_TIER));
   });
 });
 
@@ -791,7 +792,7 @@ describe("PunctuationStep — shape change: tag change re-proposes, removals sur
     await screen.findByTestId("cldr-punctuation-group");
 
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
-    expect(usePhaseBDraftStore.getState().rejected).toContain("!");
+    expect(getCharacterInventoryValue().rejected).toContain("!");
     first.unmount();
 
     // A new resolved tag (e.g. a more specific locale) with one candidate
@@ -800,15 +801,15 @@ describe("PunctuationStep — shape change: tag change re-proposes, removals sur
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation:hi-IN");
+      expect(getCharacterInventoryValue().seededProposals).toContain("punctuation:hi-IN");
     });
     // Genuinely new candidate: proposed.
-    expect(usePhaseBDraftStore.getState().punctuation).toContain("…");
+    expect(getCharacterInventoryValue().punctuation).toContain("…");
     // Unchanged mark, never removed: still there.
-    expect(usePhaseBDraftStore.getState().punctuation).toContain("?");
+    expect(getCharacterInventoryValue().punctuation).toContain("?");
     // The removal survives — never re-proposed by the new tag.
-    expect(usePhaseBDraftStore.getState().punctuation).not.toContain("!");
-    expect(usePhaseBDraftStore.getState().rejected).toContain("!");
+    expect(getCharacterInventoryValue().punctuation).not.toContain("!");
+    expect(getCharacterInventoryValue().rejected).toContain("!");
   });
 });
 
@@ -834,7 +835,7 @@ describe("PunctuationStep — flagged stale confirmation (spec 079 US3 T079/T080
       evidenceKey: key,
       screenId: "punctuation",
     });
-    usePhaseBDraftStore.getState().add("!");
+    inventoryOps("characters").add("!");
   }
 
   it("shows a reason cue and the flagged-answers list when confirmed on other evidence, and Done is not blocked", async () => {

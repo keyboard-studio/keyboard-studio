@@ -54,13 +54,16 @@ one persistent working copy.
   [§8](../spec.md#8-data-flow) → [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
 - **Generic step host (v1.3 studio).** The studio renders every survey/editor
   step through one generic host — no per-step `switch` in the shell. A typed
-  step **manifest** (`{ id, component, layout, inputs, writes, flowRefs }`)
+  step **manifest** (`{ id, component, layout, inputs, writes }`)
   declares each step; `StepHost` resolves `manifest.find(activeStepId)`, renders
   the declared `component` in the chrome its `layout` selects, and runs a single
   centralized completion path (`applyStepCompletion → advance → session.advance`).
   Adding or re-laying-out a step is a manifest edit, not a shell edit; step
-  *order* is not stated in the manifest but derived from each step's
-  `provides`/`requires` (`steps/stepDependencies.ts`, spec 087). The three bespoke survey wrappers converged onto a single `FlowStepHost`
+  *order* is not stated in the manifest but derived: the wizard's screens are
+  derived from the decision modules' `provides`/`requires` and routing
+  (`decisions/deriveScreens.ts` over the registry's `decisionModules`, spec
+  091; the sort is spec 087's), and the manifest is arranged by the derived
+  screen order. The three bespoke survey wrappers converged onto a single `FlowStepHost`
   + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
   the extension mechanism for new flows; existing flows keep their
   `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.

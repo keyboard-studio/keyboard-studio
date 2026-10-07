@@ -69,8 +69,8 @@
 // in this codebase, and already the established idiom for exactly this
 // interaction (TouchGallery/MechanismGallery's own character walk).
 // `CharacterMapPane.tsx` (survey/) was considered and deliberately NOT reused
-// here: it accumulates a GROWING list into `phaseBDraftStore` (Phase B's own
-// survey state) rather than resolving a single pick, and its rendering
+// here: it accumulates a GROWING list into the character-inventory decision
+// value (Phase B's own survey state) rather than resolving a single pick, and its rendering
 // primitives (`CharacterMapGroupSection`) pull in `useGlyphFontStack`/
 // `useFontSupportChecker`, both keyed off that same Phase B font-selection
 // store — a real cross-boundary coupling this component has no business

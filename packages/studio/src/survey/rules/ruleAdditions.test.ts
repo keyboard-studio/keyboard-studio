@@ -26,7 +26,7 @@ import {
   hasRuleAdditions,
   ruleAdditionsKey,
   EMPTY_RULE_ADDITIONS,
-} from "./ruleAdditions.js";
+} from "./ruleAdditions.ts";
 
 function marked(rule: IRRule): IRRule {
   return { ...rule, rulesStepAdded: true as const };

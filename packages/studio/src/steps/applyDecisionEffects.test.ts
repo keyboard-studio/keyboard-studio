@@ -269,3 +269,114 @@ describe("applyDecisionEffects — A6: recording precedes applying", () => {
     expect(echo?.items).toEqual([{ kind: "raw", text: "just-recorded" }]);
   });
 });
+
+describe("applyDecisionEffects — pass 2: composed apply with an unanswered question", () => {
+  const cleanups: Array<() => void> = [];
+  afterEach(() => {
+    for (const c of cleanups.splice(0)) c();
+  });
+
+  /** A synthetic input provider + composed owner pair, in
+   *  il_copyright_holder's shape: the owner provides the attribution
+   *  channel's decision, requires the input decision, and composes its
+   *  patch from ctx.decisions, ignoring its own value. Synthetic ids keep
+   *  the real registry's own composed owner (il_copyright_holder) out of
+   *  this test's blast radius. */
+  function registerPair(calls: Array<{ value: unknown }>): void {
+    cleanups.push(
+      registerSynthetic("synthetic_author", {
+        provides: ["synthetic-input"],
+        requires: [],
+        apply: undefined,
+      }),
+    );
+    cleanups.push(
+      registerSynthetic("synthetic_holder", {
+        provides: ["copyright-holder"],
+        requires: ["synthetic-input"],
+        writes: [],
+        apply: (value, ctx) => {
+          calls.push({ value });
+          const name = ctx.decisions["synthetic-input"]?.value;
+          if (typeof name !== "string" || name === "") return {};
+          return { attribution: { authorName: name, copyrightHolder: name } };
+        },
+      }),
+    );
+  }
+
+  /** Decision-store deps wired to a local cell, as in the A6 test. */
+  function wireDecisionCell(h: Harness, seed: DecisionSet = {}): void {
+    let decisions: DecisionSet = seed;
+    h.deps.writeDecisionRecords = (records) => {
+      const next: Partial<Record<string, Decision<unknown>>> = { ...decisions };
+      for (const r of records) next[r.id] = r;
+      decisions = next as DecisionSet;
+    };
+    h.deps.readDecisionSet = () => decisions;
+    h.deps.getDecisions = () => decisions;
+  }
+
+  it("runs the owner when the completion records its input but its own question is unanswered", () => {
+    const calls: Array<{ value: unknown }> = [];
+    registerPair(calls);
+    const h = makeHarness(makeTestIR([]));
+    wireDecisionCell(h);
+
+    // The live identity completion's shape: the input question is
+    // answered, the owner's question is left blank — so NO answer in the
+    // result names the owner module at all.
+    const completion = result([
+      { questionId: "synthetic_author", answerType: "text", value: "Test Author" },
+    ]);
+    recordAnswersAsDecisions(completion, "identity", h.deps);
+    applyDecisionEffects(completion, h.deps);
+
+    expect(calls).toEqual([{ value: undefined }]);
+    expect(h.sinkCalls).toHaveLength(1);
+    expect(h.sinkCalls[0]?.patch).toEqual({
+      attribution: { authorName: "Test Author", copyrightHolder: "Test Author" },
+    });
+  });
+
+  it("does not fire at a completion that records none of its inputs, even if they were recorded earlier", () => {
+    const calls: Array<{ value: unknown }> = [];
+    registerPair(calls);
+    const h = makeHarness(makeTestIR([]));
+    // The input decision is already in the store from an EARLIER completion.
+    wireDecisionCell(h, {
+      "synthetic-input": {
+        id: "synthetic-input",
+        value: "Earlier Author",
+        provenance: "asked",
+        step: "identity",
+      } as Decision,
+    });
+
+    const completion = result([
+      { questionId: "track_choice", answerType: "select", value: "copy" },
+    ]);
+    recordAnswersAsDecisions(completion, "track", h.deps);
+    applyDecisionEffects(completion, h.deps);
+
+    expect(calls).toHaveLength(0);
+    expect(h.sinkCalls).toHaveLength(0);
+  });
+
+  it("runs exactly once, with its own value, when its question IS answered", () => {
+    const calls: Array<{ value: unknown }> = [];
+    registerPair(calls);
+    const h = makeHarness(makeTestIR([]));
+    wireDecisionCell(h);
+
+    const completion = result([
+      { questionId: "synthetic_author", answerType: "text", value: "Test Author" },
+      { questionId: "synthetic_holder", answerType: "text", value: "Some Holder" },
+    ]);
+    recordAnswersAsDecisions(completion, "identity", h.deps);
+    applyDecisionEffects(completion, h.deps);
+
+    expect(calls).toEqual([{ value: "Some Holder" }]);
+    expect(h.sinkCalls).toHaveLength(1);
+  });
+});

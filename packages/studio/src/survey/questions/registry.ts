@@ -22,7 +22,7 @@
 // entries in walk order (decisions/orderParity.test.ts pins the result).
 
 import type { GalleryModule, QuestionModule } from "../types.ts";
-import type { DecisionId } from "../../decisions/decisionTypes.ts";
+import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
@@ -82,8 +82,8 @@ export const reserveOnlyModules: readonly QuestionModule[] = [
 
 /**
  * The gallery decision modules (spec 090): one module per decision a gallery
- * or editor step settles (the fourteen `settles` ids in
- * steps/stepDependencies.ts). Registered here — so `decisionIndex` resolves
+ * or editor step settles (the fourteen gallery decisions). Registered
+ * here — so `decisionIndex` resolves
  * exactly one provider per gallery decision — but members of NO flow: the
  * gallery host (steps/galleryHost.tsx) renders them, never the SurveyRunner.
  * Module files live under questions/gallery/; the list is composed here, in
@@ -128,6 +128,58 @@ export const galleryModules: readonly QuestionModule[] = galleryModuleList.map(
 export function galleryModuleFor(decisionId: DecisionId): GalleryModule<any> | undefined {
   return galleryModuleList.find((m) => m.provides[0] === decisionId);
 }
+
+// ---------------------------------------------------------------------------
+// Spec 091 — the derivation's module list and the `group` seeding (T003/T004).
+//
+// `decisionModules` is the single declaration-ordered list spec 091's
+// `deriveScreens` consumes: the live question flows' modules plus the
+// gallery modules, concatenated in the same relative order `questionRegistry`
+// composes them (reserve and demoted sets are registered but are NOT live
+// flow members, so they are not in the list). Declaration order in this list
+// is the sort's stable tie-break input ONLY — it carries no other semantics,
+// exactly like flow-list key order today.
+//
+// Each live flow's modules are seeded here with their screen `group`
+// (spec 091 T003): the three SurveyRunner flows name their own screen;
+// the two intra-step flows name their enclosing custom screen, per
+// research.md's two-level treatment (their modules form no top-level
+// screen). A module that already declares its own `group` keeps it.
+// ---------------------------------------------------------------------------
+
+const withGroup = (
+  modules: readonly QuestionModule[],
+  group: string,
+): QuestionModule[] =>
+  modules.map((m) => (m.group === undefined ? { ...m, group } : m));
+
+export const decisionModules: readonly QuestionModule[] = [
+  ...withGroup(flowModules.identity_lite, "identity"),
+  ...withGroup(flowModules.phase_b_characters, "characters"),
+  ...withGroup(flowModules.phase_f_helpdocs, "help"),
+  ...withGroup(flowModules.track, "track"),
+  ...withGroup(flowModules.project_name, "project_name"),
+  ...galleryModules,
+];
+
+/**
+ * Declared screen gates (spec 091 FR-003, Delta P6): the gates of screens
+ * whose visibility is NOT routing-expressible — the project_name fork
+ * (manifest-level in StudioShell, never a property of the flow's `next`
+ * graph) and the touch seed fork (asked only while unrecorded). Spec 087
+ * FR-005 forbids a module-level `gatedBy` (conditional visibility comes
+ * from `next` only), so these former step-level gates are declared here,
+ * at the composition layer,
+ * keyed by screen id, and passed to `deriveScreens` by its callers. Every
+ * other screen's gate is member-derived from routing.
+ */
+export const declaredScreenGates: ReadonlyMap<
+  string,
+  (decisions: DecisionSet) => boolean
+> = new Map([
+  ["project_name", (d) => d["authoring-track"]?.value === "copy"],
+  ["touch_seed_source", (d) => d["touch-seed-source"] === undefined],
+]);
 
 /**
  * The reserve / Leftover set (no-delete guardrail): every module physically

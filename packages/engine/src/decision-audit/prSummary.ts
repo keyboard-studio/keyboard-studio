@@ -146,6 +146,15 @@ function formatDecision(entry: DecisionEntry): string {
     return `Started from base \`${payload.baseId}\` ("${payload.baseDisplayName}")`;
   }
 
+  if (payload.kind === "decision") {
+    // spec 090 US5 (D-090-48): the recorded summary IS the clause — the
+    // recording host composed it from the decision's own label and value,
+    // and this surface has no per-module knowledge to compose a better one.
+    // Restating the decision id here would put an internal identifier in
+    // front of the reviewer for no gain.
+    return payload.summary;
+  }
+
   const value = `"${formatValue(payload.value)}"`;
   const question = `\`${payload.questionId}\``;
 

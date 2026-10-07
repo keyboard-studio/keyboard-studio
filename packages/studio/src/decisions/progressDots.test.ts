@@ -24,7 +24,7 @@ import { I18n } from "@lingui/core";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import type { DecisionEntry, DecisionRecord } from "@keyboard-studio/contracts";
 import { PRE_IDENTITY_STEP_ID } from "@keyboard-studio/contracts";
-import { manifest } from "../steps/manifest.ts";
+import { manifest, screenGates } from "../steps/manifest.ts";
 import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { ResolveContext } from "../lib/resolveLocation.ts";
 import type { WorkItem } from "../steps/workToDo.ts";
@@ -64,6 +64,8 @@ function decisionsForTrack(track: "copy" | "adapt" | null | undefined): ResolveC
 function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
   const base: ResolveContext = {
     manifest,
+    // Spec 091 T015: the derived screen gates, as liveResolveContext passes.
+    screenGates,
     questionRegistry: REGISTRY,
     traversal: traversal({
       activeStepId: "characters",

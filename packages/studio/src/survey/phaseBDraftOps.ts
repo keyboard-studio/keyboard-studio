@@ -1,9 +1,9 @@
 // phaseBDraftOps — the Phase B/C draft accumulator as pure functions over
 // the gallery decision values (spec 090 US2, research D-090-10).
 //
-// Until US2 the accumulator was `stores/phaseBDraftStore.ts`, a zustand
-// store shared by the characters, punctuation and invisibles steps and by
-// StudioShell's CharacterMapPane. The store is deleted (T025); its logic
+// Until US2 the accumulator was a standalone zustand draft store shared by
+// the characters, punctuation and invisibles steps and by StudioShell's
+// CharacterMapPane. That store is deleted (T025); its logic
 // lives here, behaviour-verbatim, as pure functions over
 // `CharacterInventoryValue` (the `character-inventory` decision) and the
 // invisibles half of the old state, which is now the
@@ -43,8 +43,8 @@ import { DEFAULT_PHASE_B_FONT, type PhaseBFontValue } from "./surveyStyles.ts";
 
 /**
  * Where a character in the draft came from (spec 044 FR-017) — the draft
- * provenance union `stores/phaseBDraftStore.ts` declared as
- * `DraftProvenance`, moved here with the logic. `"author"` is the
+ * provenance union the old draft store declared as `DraftProvenance`,
+ * moved here with the logic. `"author"` is the
  * STRONGEST claim; the rest are proposal origins. `"text"` is reserved
  * for the text-sample surface owned by spec 050.
  */
@@ -431,7 +431,7 @@ export function toggleChar(
 
 /**
  * Replace the whole list wholesale. Pinned contract (the old store's
- * phaseBDraftStore.test.ts): `chars` takes the input VERBATIM — no
+ * test suite, now phaseBDraftOps.test.ts): `chars` takes the input VERBATIM — no
  * dedupe, no NFC-normalization; that is the caller's job. The derived
  * split still derives from a normalized/deduped pick rebuild.
  * Provenance follows the new list: retained characters keep their

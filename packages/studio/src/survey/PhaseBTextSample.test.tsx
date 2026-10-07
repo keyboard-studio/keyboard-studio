@@ -14,10 +14,7 @@ import userEvent from "@testing-library/user-event";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB } from "./PhaseB.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import {
-  usePhaseBDraftStore,
-  resetPhaseBDraftDecisions,
-} from "../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
 import type { SourcedInventory } from "../lib/services.ts";
 
 const { getSourcedExemplars, extractionShouldFail } = vi.hoisted(() => {
@@ -113,14 +110,14 @@ beforeEach(() => {
   getSourcedExemplars.set(null);
   extractionShouldFail.set(false);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 afterEach(() => {
   cleanup();
   extractionShouldFail.set(false);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 function pasteAndSubmit(text: string): void {
@@ -139,9 +136,9 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     pasteAndSubmit("aab ŋɛ");
 
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().chars).toContain("a");
+      expect(getCharacterInventoryValue().chars).toContain("a");
     });
-    const state = usePhaseBDraftStore.getState();
+    const state = getCharacterInventoryValue();
     for (const c of ["a", "b", "ŋ", "ɛ"]) {
       expect(state.chars).toContain(c);
       expect(state.provenance[c]).toBe("text");
@@ -168,18 +165,18 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     renderPhaseB();
     await reachPage2();
     pasteAndSubmit("abc");
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("a"));
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
 
-    usePhaseBDraftStore.getState().remove("a");
-    expect(usePhaseBDraftStore.getState().rejected).toContain("a");
+    inventoryOps("characters").remove("a");
+    expect(getCharacterInventoryValue().rejected).toContain("a");
 
     // Re-entering the step calls reset(); rejected survives it by contract.
-    usePhaseBDraftStore.getState().reset();
-    expect(usePhaseBDraftStore.getState().rejected).toContain("a");
+    resetInventoryDraft();
+    expect(getCharacterInventoryValue().rejected).toContain("a");
 
     pasteAndSubmit("abc");
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("b"));
-    expect(usePhaseBDraftStore.getState().chars).not.toContain("a");
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("b"));
+    expect(getCharacterInventoryValue().chars).not.toContain("a");
   });
 
   it("an empty or whitespace-only paste leaves the draft empty with an inline message, no error (AS3, FR-008)", async () => {
@@ -190,7 +187,7 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("text-sample-empty-message")).toBeTruthy();
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
     expect(screen.queryByTestId("text-sample-upload-error")).toBeNull();
     // The step is still usable — heading has not moved off "Add".
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
@@ -208,14 +205,14 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("text-sample-upload-error")).toBeTruthy();
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
     // Not stuck: the submit button re-enables once the failed attempt settles.
     expect((screen.getByTestId("text-sample-submit") as HTMLButtonElement).disabled).toBe(false);
 
     // Recovers on a subsequent successful attempt.
     extractionShouldFail.set(false);
     pasteAndSubmit("abc");
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("a"));
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
     expect(screen.queryByTestId("text-sample-upload-error")).toBeNull();
   });
 });
@@ -232,11 +229,11 @@ describe("US2 — upload a .txt file (FR-003)", () => {
     renderPhaseB();
     await reachPage2();
     pasteAndSubmit(sampleText);
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("a"));
-    const pastedChars = [...usePhaseBDraftStore.getState().chars].sort();
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
+    const pastedChars = [...getCharacterInventoryValue().chars].sort();
     cleanup();
-    usePhaseBDraftStore.getState().reset();
-    resetPhaseBDraftDecisions();
+    resetInventoryDraft();
+    resetInventoryDecisions();
     // Mid-test reset: the top-level afterEach only fires between separate
     // it()s. This test simulates two independent test entries within one, so
     // it must also reset discoveryMethod itself — otherwise the second render
@@ -252,10 +249,10 @@ describe("US2 — upload a .txt file (FR-003)", () => {
     const input = screen.getByTestId("text-sample-file-input") as HTMLInputElement;
     await user.upload(input, file);
 
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("a"));
-    const uploadedChars = [...usePhaseBDraftStore.getState().chars].sort();
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
+    const uploadedChars = [...getCharacterInventoryValue().chars].sort();
     expect(uploadedChars).toEqual(pastedChars);
-    expect(usePhaseBDraftStore.getState().provenance["a"]).toBe("text");
+    expect(getCharacterInventoryValue().provenance["a"]).toBe("text");
   });
 
   it("surfaces a plain message for an undecodable/binary file without blocking the step (AS2)", async () => {
@@ -273,7 +270,7 @@ describe("US2 — upload a .txt file (FR-003)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("text-sample-upload-error")).toBeTruthy();
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
     // The step remains usable.
     expect(screen.getByTestId("phase-b-done")).toBeTruthy();
   });
@@ -289,17 +286,17 @@ describe("US3 — union with exemplar coverage (FR-007, research R5)", () => {
     renderPhaseB();
     await acceptExemplarsAndReachPage2();
 
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("ŋ"));
-    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBe("cldr");
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("ŋ"));
+    expect(getCharacterInventoryValue().provenance["ŋ"]).toBe("cldr");
 
     // A text sample with one extra character ("q") plus one already covered
     // by the exemplar offer ("a").
     pasteAndSubmit("a q");
 
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().chars).toContain("q");
+      expect(getCharacterInventoryValue().chars).toContain("q");
     });
-    const state = usePhaseBDraftStore.getState();
+    const state = getCharacterInventoryValue();
     // Union: the exemplar-sourced characters are still there...
     expect(state.chars).toContain("ŋ");
     expect(state.provenance["ŋ"]).toBe("cldr");
@@ -316,13 +313,13 @@ describe("US3 — union with exemplar coverage (FR-007, research R5)", () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderPhaseB();
     await acceptExemplarsAndReachPage2();
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("ŋ"));
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("ŋ"));
 
     pasteAndSubmit("a ŋ q");
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("q"));
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("q"));
 
     // Both previously-exemplar-attributed characters kept their attribution.
-    const state = usePhaseBDraftStore.getState();
+    const state = getCharacterInventoryValue();
     expect(state.provenance["a"]).toBe("cldr");
     expect(state.provenance["ŋ"]).toBe("cldr");
   });

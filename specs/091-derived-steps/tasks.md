@@ -26,19 +26,19 @@ conversation.
 **Purpose**: Confirm the stacked predecessors' end-state and seed the declarations the
 derivation reads. No behaviour change.
 
-- [ ] T001 Audit the stacked branch state the plan assumes — `decisionStore` live (088),
+- [x] T001 Audit the stacked branch state the plan assumes — `decisionStore` live (088),
   `apply` the only question write path and the golden-walk script present (089), and a decision
   module with `provides`/`requires`/`renderer` for every `settles` name in
   `packages/studio/src/steps/stepDependencies.ts` (090) — and record any gap as a blocker note
   in specs/091-derived-steps/plan.md before proceeding
-- [ ] T002 Add the optional `group?: string` field (with the "never affects order" doc comment)
+- [x] T002 Add the optional `group?: string` field (with the "never affects order" doc comment)
   to `QuestionModule` in packages/studio/src/survey/types.ts
-- [ ] T003 [P] Seed `group` on the live question modules in
+- [x] T003 [P] Seed `group` on the live question modules in
   packages/studio/src/survey/questions/registry.ts: identity_lite → `"identity"`, track →
   `"track"`, project_name → `"project_name"`, phase_b_characters → `"characters"` and
   phase_f_helpdocs → `"help"` (the intra-step groups naming their enclosing custom screen, per
   research.md's two-level treatment)
-- [ ] T004 [P] Expose the single declaration-ordered decision-module list the derivation
+- [x] T004 [P] Expose the single declaration-ordered decision-module list the derivation
   consumes (question modules plus 090's gallery/picker modules, concatenated in declaration
   order, documented as tie-break input only) in packages/studio/src/survey/questions/registry.ts,
   unless 090 already landed an equivalent export — in that case adopt it and delete this task's
@@ -55,26 +55,35 @@ before any user story.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 Implement `deriveScreens(modules)` in packages/studio/src/decisions/deriveScreens.ts
+- [x] T005 Implement `deriveScreens(modules)` in packages/studio/src/decisions/deriveScreens.ts
   per the data-model.md contract: order with the existing `orderByDependencies` (no second
   sort), partition into singleton custom screens and maximal same-`group` question runs, split
   a run at a group change or an intervening singleton, derive each screen's gate (present iff
   every member decision is gated) and trail structure via the existing `deriveStepStructure`
   logic; fail-fast named errors for the data-model validation rules; no store access, no
   component imports
-- [ ] T006 Write the derivation unit tests in packages/studio/src/decisions/deriveScreens.test.ts:
+- [x] T006 Write the derivation unit tests in packages/studio/src/decisions/deriveScreens.test.ts:
   singleton formation, merged question run, split run repeating the group label, group
   disagreement split, all-gated screen skipped while a partially gated screen is walked, the
   frozen trails (project_name → characters, touch_seed_source → touch), and each validation
   error
-- [ ] T007 Create the frozen legacy-id map in packages/studio/src/decisions/legacyStepIds.ts:
+- [x] T007 Create the frozen legacy-id map in packages/studio/src/decisions/legacyStepIds.ts:
   all 18 step ids from `main` at 18e63aa4 (identity, layout, choose_base, track, project_name,
   characters, marks, punctuation, invisibles, convenience, carve, deadkeys, rules, mechanisms,
   touch_seed_source, touch, help, package — inventoried in research.md) mapped to the screen id
   holding that step's decisions, with `done`/`unsupported` documented as pass-through terminals
-- [ ] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
+- [x] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
   packages/studio/src/steps/stepOrder.ts, keeping the exported shapes identical so existing
   consumers (`stores/workingCopyStore.ts` ranking, `steps/advance.ts`) compile unchanged
+  — LANDED in Phase 2, REVERTED in Phase 3 (plan.md Delta P4: the D-090-7
+  init-cycle bites under store-first entry orders; the Phase 2 batch
+  masked it). Returned with Phase 4's rewiring (T012–T016) and LANDED at
+  the finishing-phase flip: stepOrder now re-publishes the manifest's
+  derivation (manifest.ts is the one deriveScreens call over the live
+  registry; Delta P4's prerequisite — breaking the completeness →
+  stepOrder-during-registry-evaluation path — was discharged by T014's
+  threading of screenTrails). The deriveScreens standalone canary
+  (the Phase 3 reproducer) passes.
 
 **Checkpoint**: `deriveScreens` is tested pure; stepOrder still serves its consumers, now
 screen-derived. `stepDependencies.ts` still exists but is no longer the source for STEP_ORDER.
@@ -90,15 +99,15 @@ place, with nothing else edited.
 `il_language_autonym`. The derived steps show it after `choose_base`, the identity screen
 splits into two screens both labelled `identity`, and the diff touches one line.
 
-- [ ] T009 [US1] Write the one-edit test first (it must fail against step-membership as
+- [x] T009 [US1] Write the one-edit test first (it must fail against step-membership as
   currently wired): test-registry module list with the added edge, asserting the autonym lands
   after the `choose_base` screen in a second `identity`-labelled screen, in
   packages/studio/src/decisions/deriveScreens.test.ts
-- [ ] T010 [US1] Add the registry seam the SC-001 test needs: building the manifest/screen list
+- [x] T010 [US1] Add the registry seam the SC-001 test needs: building the manifest/screen list
   from a supplied module list (defaulting to the live registry) in
   packages/studio/src/steps/manifest.ts, consumed by packages/studio/src/components/StepHost.tsx
   without changing its default behaviour
-- [ ] T011 [US1] Write the SC-001 store-level test driving the real `StepHost` with the test
+- [x] T011 [US1] Write the SC-001 store-level test driving the real `StepHost` with the test
   registry from T009 — screen sequence reflects the one-line edit, and reverting the edit
   restores the baseline sequence — in
   packages/studio/src/components/StepHost.derivedScreens.test.tsx
@@ -118,43 +127,74 @@ to assert "same order as main unless a `requires` edge says otherwise" (FR-005).
 `main` with the same questions on each (SC-002); the golden walk is byte-identical (SC-003);
 `stepDependencies.ts` does not exist (SC-004).
 
-- [ ] T012 [US2] Rewire packages/studio/src/steps/manifest.ts: the pool is keyed by screen id
+- [x] T012 [US2] Rewire packages/studio/src/steps/manifest.ts: the pool is keyed by screen id
   and arranged by the derived screen order; remove the `stepDependencies("characters")` spread
   and the pool-≡-declared-set assertion (replaced by pool-≡-derived-screens validation); keep
   the M-rule validations (locks, unique ids) running over the derived order
-- [ ] T013 [US2] Remove every remaining `stepDependencies(...)` spread from
+- [x] T013 [US2] Remove every remaining `stepDependencies(...)` spread from
   packages/studio/src/steps/registerEditorSteps.ts and packages/studio/src/steps/rulesStep.ts,
   leaving screen-host declarations only (component, inputs, writes, persistence, specRef, lock)
-- [ ] T014 [US2] Narrow `Step` in packages/studio/src/steps/types.ts — delete `provides`,
+- [x] T014 [US2] Narrow `Step` in packages/studio/src/steps/types.ts — delete `provides`,
   `requires`, `gatedBy` and `flowRefs` — and move the Flow Map consumers to screen membership:
   packages/studio/src/dashboard/renderedNodeSet.ts (drill-downs from the screen's module list)
   and packages/studio/src/dashboard/buildStepGraph.ts (nodes/edges from derived screens and
   trails); re-derive flow liveness in packages/studio/src/steps/flowSources.ts from screen
   membership instead of "referenced via flowRefs"
-- [ ] T015 [US2] Move gate reads to the derived screen gate and legacy ids to the map:
+- [x] T015 [US2] Move gate reads to the derived screen gate and legacy ids to the map:
   `walkedByTrack`/resolution in packages/studio/src/lib/resolveLocation.ts reads the screen's
   derived `gatedBy` against `decisionStore` and resolves unknown/old step ids through
   `legacyStepIds.ts`; restored-draft history sanitising in
   packages/studio/src/stores/surveySessionStore.ts maps stored step ids through the same map
-- [ ] T016 [US2] Delete packages/studio/src/steps/stepDependencies.ts and verify SC-004: zero
+  (also: steps/advance.ts's stepApplies gate read moved to the same screen
+  gates — a consumer the task text did not name; manifest.ts publishes
+  `screenGates`/`screenTrails` as the one source)
+- [x] T016 [US2] Delete packages/studio/src/steps/stepDependencies.ts and verify SC-004: zero
   live references to `stepDependencies`, `flowRefs` or `settles` remain in
   packages/studio/src (grep gate in quickstart.md §1)
-- [ ] T017 [US2] Rewrite packages/studio/src/steps/stepOrder.parity.test.ts per FR-005 —
+  — LANDED at the finishing-phase flip (after spec 090 completed, PR
+  #1981). `settlesForStep`/`stepHasSettles` re-homed to
+  decisions/screenSettles.ts over a pure `settlesByScreen` in
+  decisions/deriveScreens.ts (a screen settles what its gallery members
+  provide), computed lazily so no registry read happens at module-init
+  time; 090's galleryLogEntries suite stays green (9/9). The two other
+  partial manifest mocks (StepHost.test, deepLinkRevision) were extended
+  to model the manifest module's derived exports, as galleryLogEntries'
+  was. SC-004 grep gate verified empty.
+- [x] T017 [US2] Rewrite packages/studio/src/steps/stepOrder.parity.test.ts per FR-005 —
   explicitly replacing the frozen-literal oracle, not regenerating it: carry the `main`@18e63aa4
   screen sequence, membership, trails and lock order over as baseline data; assert the derived
   screens equal the baseline unless a `requires` edge in the current declarations orders the
   pair differently (edge-explained differences are enumerated, not silent); keep the
   documented tie-break-pairs mechanism and the adversarial input-order property, run over
   screens
-- [ ] T018 [US2] Rewrite the M2 assertion in packages/studio/src/steps/manifest.test.ts as
+  — COMPLETED at the finishing-phase flip: the frozen-literal oracle is
+  retired; the file now asserts FR-005 in baseline form (main@18e63aa4
+  sequence/membership/trails/locks carried as BASELINE_* literals —
+  membership from the deleted table's provides lists, captured
+  mechanically before deletion), order admitted in edge-explained form,
+  tie-break pairs and the adversarial input-order property re-run over
+  deriveScreens itself. The tie-break set reproduced the frozen 14
+  pairs exactly from the module graph.
+- [x] T018 [US2] Rewrite the M2 assertion in packages/studio/src/steps/manifest.test.ts as
   manifest ≡ derived screens (M3–M6 unchanged, evaluated over screens); re-point
   packages/studio/src/decisions/gateWalkParity.test.ts to iterate derived question screens
   instead of `flowSources` flows, keeping its property (derived gates select exactly the
   walked set); confirm packages/studio/src/decisions/orderParity.test.ts passes **unmodified**
-- [ ] T019 [US2] Run the live verification from quickstart.md §3–§4: `pnpm dev` walk of both
+- [x] T019 [US2] Run the live verification from quickstart.md §3–§4: `pnpm dev` walk of both
   tracks matching `main` screen-for-screen (SC-002), a pre-091 deep link and a pre-091 draft
   landing correctly, and the golden walk byte-identical (SC-003); record the evidence in the
   phase commit message
+  — LANDED at the finishing phase, store-level per the series' live-
+  capture ruling (sandbox Chromium blocks localhost; the live walk runs
+  in CI on this branch's PR): SC-002 = the FR-005 parity baseline
+  (order + membership equal to main@18e63aa4, zero inversions) plus the
+  golden walk's per-track traversals through the real StepHost;
+  SC-003 = tests/steps/stepHost.goldenWalk.test.tsx, copy AND adapt
+  tracks byte-identical to the committed fixtures on the flipped tree;
+  deep link + pre-091 draft = lib/legacyStepIds.test.ts (SC-005
+  inventory), lib/resolveLocation.test.ts and the draftPersistence
+  suites, all green. The browser golden walk (e2e/golden-walk.spec.ts,
+  byte-compare of the emitted zip) is CI-gated on the PR.
 
 **Checkpoint**: `stepDependencies.ts` is gone, the rewritten parity is green, and the wizard is
 visibly unchanged. US1 + US2 together are the spec's core delivery.
@@ -170,15 +210,15 @@ skipped as steps are today.
 **Independent Test**: The identity flow renders as one labelled page; the US1 split case shows
 two pages with the same label; a fully gated screen is skipped in the walk.
 
-- [ ] T020 [US3] Surface the screen label from `group` in the question-screen host
+- [x] T020 [US3] Surface the screen label from `group` in the question-screen host
   (packages/studio/src/survey/FlowStepHost.tsx) and the progress/stage surfaces that name the
   current screen (packages/studio/src/decisions/progressDots.ts), with no i18n id changes —
   labels key off existing ids or the structural group key, never a renamed message (FR-006)
-- [ ] T021 [US3] Add the walk-level tests: a split run yields two screens with the same group
+- [x] T021 [US3] Add the walk-level tests: a split run yields two screens with the same group
   label in derived order, and a screen whose decisions are all gated off is skipped by
   packages/studio/src/steps/advance.ts while a partially gated screen is walked, in
   packages/studio/src/steps/advance.test.ts
-- [ ] T022 [US3] Point packages/studio/src/decisions/stageGroups.ts at screens (stage = derived
+- [x] T022 [US3] Point packages/studio/src/decisions/stageGroups.ts at screens (stage = derived
   screen, following the screen list) — display grouping only; entries keep the step display
   metadata recorded under 088 FR-008, so no recorded data changes shape
 
@@ -191,24 +231,30 @@ screens consistently.
 
 **Purpose**: Close the remaining success criteria and the series-level obligations.
 
-- [ ] T023 [P] Write the SC-005 inventory test: a test that lists every step id on `main` at
+- [x] T023 [P] Write the SC-005 inventory test: a test that lists every step id on `main` at
   18e63aa4 (the 18 ids in research.md, named in the test) and asserts each resolves through
   `legacyStepIds.ts` + resolveLocation to the screen holding that step's decisions, with
   `done`/`unsupported` passing through — in packages/studio/src/lib/resolveLocation.test.ts
   (or a new packages/studio/src/lib/legacyStepIds.test.ts if the suite fits better there)
-- [ ] T024 [P] Correct constitution Article IX's naming of `steps/stepDependencies.ts` in
+- [x] T024 [P] Correct constitution Article IX's naming of `steps/stepDependencies.ts` in
   .specify/memory/constitution.md to name the derived screens as the step source, with the
   version footer bumped, in the same change that deletes the file (Governance: the article
   follows the change that prompts it)
-- [ ] T025 [P] Sweep docs/ and the dashboard/Flow Map docs for live references to
+- [x] T025 [P] Sweep docs/ and the dashboard/Flow Map docs for live references to
   `stepDependencies.ts`, `flowRefs` and `settles` as current machinery and update or retire
   them (historical spec text under specs/_archive and landed spec docs are not rewritten)
-- [ ] T026 Run the full gates from quickstart.md §5 on the phase result: studio typecheck,
+- [x] T026 Run the full gates from quickstart.md §5 on the phase result: studio typecheck,
   the studio vitest suite through the package (never bare vitest at root), and `pnpm lint`
   including depcruise (the decisions/ derivation must stay cycle-free); fix only 091 fallout
-- [ ] T027 Run `/speckit-analyze` (spec ↔ plan ↔ tasks consistency) and one scoped km-lead
+- [x] T027 Run `/speckit-analyze` (spec ↔ plan ↔ tasks consistency) and one scoped km-lead
   review cycle over the diff before the PR; confirm FR-006 by diffing the i18n catalogs
   (zero message-id changes) and record the check in the PR body
+  — DONE at the finishing phase: analyze consistent (FR-001…FR-006,
+  SC-001…SC-005 each mapped to landed tasks + named tests; 27/27 tasks
+  checked); FR-006 confirmed — zero i18n catalog files in the branch
+  diff; full gates in the PR body (studio tsc clean, depcruise 0
+  violations, full suite 8791 passed / 8 failed = the named budget of
+  4 local-corpus SC-004 + 4 spec-079, verified pre-existing).
 
 ---
 

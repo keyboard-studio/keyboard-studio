@@ -174,3 +174,44 @@ shrink to host wiring and are deleted per story as their step migrates.
    A story whose gate is not green does not land, and its PR is not opened.
 4. **MVP** is US1: three small pickers prove the host, the registry group, and the enforcement
    layers end-to-end on the lowest-risk components, before the composite values of US2/US3.
+
+## PR summary (T060 — SC-002 final audit, recorded 2026-10-07)
+
+**SC-002: both FR-003 lint layers pass with zero exceptions.**
+- Layer 1 (depcruise): the full run over `packages/studio/src` reports
+  **zero violations** (1075 modules) — including the
+  `gallery-modules-no-store-writes` rule and `no-circular`, whose two
+  D-090-7 violations on the character-inventory spine were closed in
+  this polish pass (D-090-45).
+- Layer 2 (call-site audit, `galleryWriteAudit.test.ts`): **4/4 green**
+  over the registered US1–US3 entries; the root eslint overlay carries
+  the same lists and the package eslint run reports **0 errors**.
+- The two **ruled scope determinations** recorded at the FR-003 sites
+  are determinations, not exceptions: the spec-079 evidence layer is
+  not a gallery write-around (D-090-29), and US3's Phase D action bans
+  were ruled non-registered against the ratified
+  record-from-working-copy design (D-090-31 → D-090-34). US4's three
+  identifiers (`recordAssignments`, `setTouchDraft`, `deleteTouchKey`)
+  are the same species: ruled non-registration by the lead
+  (D-090-47, on D-090-38 Flag 1) and recorded at both FR-003 sites
+  in the same form.
+
+**Closing grep pack:**
+- `phaseBDraftStore`: zero code references in `packages/studio/src`
+  (one comment in the audit test documents the retirement) — SC-004.
+- Gallery answer ids in `surveyAnswerStore`: only the ruled 079
+  evidence-layer answers (marks/characters/punctuation within-step
+  draft state); every gallery decision is recorded as a decision
+  record, and T063 deleted the working copy's answer state.
+- In-place IR rewrites outside an `apply`: the reducer's
+  completion-time rewrites are all deleted (MARKS/R1/R2/deadkeys/
+  rules cases gone); remaining `setWorkingIR` call sites in gallery
+  trees (TouchGallery ×4, DeadkeySurface ×1) are edit-time writes
+  under the ratified record-from-working-copy design (followups.md
+  ledger note).
+
+**Story gates:** golden walk byte-identical at each story's
+adjudicated fixtures (US3: D-090-36; US4: D-090-39/-40); StepHost
+parity green at every gate; `tsc` 0; full-suite classification at
+D-090-42 (only the known SC-004 corpus pair reproduces). SC-003
+(US5) is blocked on the D-090-43 ruling — see followups.md.

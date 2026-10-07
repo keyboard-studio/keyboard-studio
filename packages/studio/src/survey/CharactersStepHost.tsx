@@ -8,13 +8,25 @@
 // contract deliberately excludes step chrome). All draft edits flow
 // through the shared inventory-draft surface (useInventoryDraft.ts).
 
-import { useMemo } from "react";
+import { lazy, useMemo } from "react";
 import type { ComponentType } from "react";
 import type { EditorStepProps } from "../steps/types.ts";
 import { GalleryHost } from "../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../lib/galleryHostDeps.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import characterInventoryModule from "./questions/gallery/characterInventory.ts";
+import { Prefill } from "./Prefill.tsx";
+import type { CharactersStepExtras } from "./CharactersStep.tsx";
+
+// The substage views are composed HERE, in the wrapper, and handed to
+// the renderer through the step-context extras (spec 090 T060): both
+// views transitively import the question registry, and the registry
+// imports the renderer (via the module) — composing them here keeps
+// the renderer's own import graph out of that cycle (depcruise
+// no-circular). PhaseB stays lazy, as it was when the renderer
+// imported it: it mounts only in substage "B", behind the renderer's
+// Suspense.
+const PhaseB = lazy(() => import("./PhaseB.tsx").then((m) => ({ default: m.PhaseB })));
 
 const CHARACTERS_STEP_ID = "characters";
 
@@ -30,7 +42,11 @@ const CharactersStepHost: ComponentType<EditorStepProps> = ({
       record={record}
       stepId={CHARACTERS_STEP_ID}
       deps={deps}
-      stepContext={{ onComplete, ...(onBack !== undefined && { onBack }) }}
+      stepContext={{
+        onComplete,
+        ...(onBack !== undefined && { onBack }),
+        extras: { Prefill, PhaseB } satisfies CharactersStepExtras,
+      }}
     />
   );
 };

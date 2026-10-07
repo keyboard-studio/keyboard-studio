@@ -1,42 +1,64 @@
 // galleryModules.coverage — spec 090 FR-002 / T008: every decision a
 // gallery step settles has exactly one registered gallery module, and the
 // module's declared requires EQUAL its step's declared requires — the
-// parity spec 091's derived step membership will rely on.
+// parity spec 091's derived step membership relies on.
 //
-// The expected settles set is DERIVED, not listed: for each declared step,
-// its `provides` minus the decisions its flows' question modules provide
-// is exactly the step's `settles` (steps/stepDependencies.ts). If a future
-// step settles a new decision without a gallery module, this test fails.
+// Spec 091 T016 flip: the step table this test once read is deleted, so
+// the expected settles set is derived from the derived screens
+// themselves — a decision is settled by the screen whose gallery
+// (custom-renderer) member provides it — and the step requires it pins
+// against are the pre-091 table's, carried below as frozen baseline
+// literals (main@18e63aa4 declarations). If a future screen settles a
+// new decision without a gallery module, or a module's requires drift
+// from the baseline its screen was declared with, this test fails.
 
 import { describe, it, expect } from "vitest";
 import {
-  DECLARED_STEP_IDS,
-  stepDependencies,
-} from "../steps/stepDependencies.ts";
-import {
   decisionIndex,
-  flowModules,
+  decisionModules,
+  declaredScreenGates,
   galleryModules,
 } from "../survey/questions/registry.ts";
 import type { DecisionId } from "./decisionTypes.ts";
+import { deriveScreens } from "./deriveScreens.ts";
+import { settlesForStep, stepHasSettles } from "./screenSettles.ts";
 
-/** decision id → the step that settles it, derived from stepDependencies. */
+/** decision id → the screen that settles it, derived from the screens. */
 function derivedSettles(): Map<DecisionId, string> {
-  const flowProvided = new Set<DecisionId>();
-  for (const modules of Object.values(flowModules)) {
-    for (const mod of modules) {
-      for (const id of mod.provides ?? []) flowProvided.add(id);
-    }
-  }
+  const galleryProvided = new Set<DecisionId>(
+    galleryModules.flatMap((m) => m.provides ?? []),
+  );
   const settles = new Map<DecisionId, string>();
-  for (const stepId of DECLARED_STEP_IDS) {
-    const deps = stepDependencies(stepId);
-    for (const id of deps.provides) {
-      if (!flowProvided.has(id)) settles.set(id, stepId);
+  for (const screen of deriveScreens(decisionModules, declaredScreenGates)) {
+    for (const id of screen.decisionIds) {
+      if (galleryProvided.has(id)) settles.set(id, screen.id);
     }
   }
   return settles;
 }
+
+/**
+ * The pre-091 step table's declared requires per gallery step, frozen at
+ * the T016 flip. A module's requires must still equal the requires its
+ * step was declared with — the ordering contract has not changed, only
+ * its source (the module is now the declaration).
+ */
+const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
+  layout: ["language-code"],
+  choose_base: ["language-code", "target-script"],
+  characters: ["target-script", "authoring-track", "project-keyboard-id"],
+  marks: ["character-inventory"],
+  punctuation: ["character-inventory"],
+  invisibles: ["character-inventory"],
+  convenience: ["character-inventory", "base-keyboard"],
+  carve: ["base-keyboard", "windows-layout", "marks-treatment", "punctuation-inventory", "invisibles-inventory", "retained-convenience-chars"],
+  deadkeys: ["carved-layout"],
+  rules: ["deadkeys-defined", "windows-layout"],
+  mechanisms: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"],
+  touch_seed_source: ["physical-layout"],
+  touch: ["physical-layout", "touch-seed-source"],
+  help: ["physical-layout", "touch-layout"],
+};
 
 const SETTLES = derivedSettles();
 
@@ -86,8 +108,23 @@ describe("gallery module coverage (FR-002)", () => {
     });
 
     it("declares requires EQUAL to its step's declared requires (the 091 parity)", () => {
-      const stepRequires = stepDependencies(stepId as never).requires;
-      expect([...(mod?.requires ?? [])]).toEqual([...stepRequires]);
+      const stepRequires = BASELINE_STEP_REQUIRES[stepId];
+      expect(stepRequires, `baseline requires recorded for step ${stepId}`).toBeDefined();
+      expect([...(mod?.requires ?? [])]).toEqual([...(stepRequires ?? [])]);
     });
+
+    it("is the decision the recorder's settles source names for its screen", () => {
+      // decisions/screenSettles.ts (spec 091) is what the recorder and
+      // the draft migration read; it must agree with this derived map.
+      expect(settlesForStep(stepId)).toContain(decisionId);
+      expect(stepHasSettles(stepId)).toBe(true);
+    });
+  });
+
+  it("question-only screens settle nothing (the recorder's negative case)", () => {
+    for (const id of ["identity", "track", "project_name", "package", "no-such-step"]) {
+      expect(settlesForStep(id), id).toEqual([]);
+      expect(stepHasSettles(id), id).toBe(false);
+    }
   });
 });

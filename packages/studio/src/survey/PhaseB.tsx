@@ -10,8 +10,8 @@
 //   build-list  — unified "add your whole alphabet": type every character
 //                 your language uses, browse+toggle the right-pane
 //                 character map (CharacterMapPane.tsx, rendered by StudioShell's
-//                 SurveyView — see stores/phaseBDraftStore.ts for the shared
-//                 alphabet the two panes both mutate) (DEFAULT)
+//                 SurveyView — the two panes both mutate the shared
+//                 character-inventory alphabet) (DEFAULT)
 //   manual      — step-by-step questions via SurveyRunner
 //
 // On completion, extractInventory() scans the Phase B answers for the question
@@ -847,10 +847,10 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
 // BuildListView — unified "add your whole alphabet" method
 //
 // The alphabet accumulated here is shared with CharacterMapPane (the right-pane
-// character map, rendered independently by StudioShell's SurveyView) via
-// phaseBDraftStore — both panes toggle the SAME chars array. See
-// stores/phaseBDraftStore.ts for the lifecycle contract (reset on substage
-// entry, not on every render).
+// character map, rendered independently by StudioShell's SurveyView) via the
+// character-inventory decision value (useInventoryDraft) — both panes toggle
+// the SAME chars array. The lifecycle contract (reset on substage entry, not
+// on every render) lives with the ops in survey/phaseBDraftOps.ts.
 // ---------------------------------------------------------------------------
 
 interface BuildListViewProps {
@@ -1018,7 +1018,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       {/* Font selection — custom SelectMenu (webview-safe dropdown): native
           <select> popups don't open in the VS Code Simple Browser, so this is
           a DOM-rendered menu. Applies to every character glyph on this step,
-          incl. the character map — see phaseBDraftStore.selectedFont. */}
+          incl. the character map — see the character-inventory value's selectedFont. */}
       <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
         {/* Not a <label>: the control is named via ariaLabelledby on the
             SelectMenu below, and an un-associated label element (no htmlFor,

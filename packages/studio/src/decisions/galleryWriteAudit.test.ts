@@ -49,6 +49,96 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
     ],
     identifiers: ["saveAnswer", "setLocalBase", "setBaseConfirmed", "setTouchSeedSource"],
   },
+  {
+    // US2 (T027): the Phase B/C store write path is retired — T025 deleted
+    // phaseBDraftStore, and its accept/decline/setter actions survive ONLY
+    // as pure functions over the decision values (survey/phaseBDraftOps.ts)
+    // and hook methods that record through the gallery host
+    // (survey/useInventoryDraft.ts). Those names are therefore NOT bannable
+    // (they are the sanctioned decision path now); the bannable signature
+    // of the old write path is the deleted store's hook itself.
+    story: "US2",
+    trees: [
+      "survey/CharactersStep.tsx",
+      "survey/PhaseB.tsx",
+      "survey/CharacterMapPane.tsx",
+      "survey/marks",
+      "survey/punctuation",
+      "survey/invisibles",
+      "survey/convenience",
+    ],
+    identifiers: ["usePhaseBDraftStore"],
+  },
+  {
+    // US2 (T027): the trees whose answer writes US2 retired in full —
+    // invisibles (ops only, never wrote answers) and convenience (its
+    // per-candidate booleans left the store in T024, D-090-17).
+    story: "US2",
+    trees: ["survey/invisibles", "survey/convenience"],
+    identifiers: ["saveAnswer"],
+  },
+  {
+    // US3 (T035): the retired Phase B draft store's hook is banned in
+    // the Phase D trees too — it is retired globally (SC-004 grep:
+    // zero references in src). The action-name bans T035's text names
+    // (cascadeDelete/cascadeRestore/restoreAll/keepAll/
+    // prefillCarveDispositions/commitDeadkeyOp) are NOT registered,
+    // by ruling (D-090-31) — see the note after this list.
+    story: "US3",
+    trees: [
+      "editors/carve",
+      "editors/deadkey",
+      "editors/adapters/deadkeyAdapter.tsx",
+      "editors/adapters/carveAdapter.tsx",
+      "survey/rules",
+      "survey/deadkeys",
+    ],
+    identifiers: ["usePhaseBDraftStore"],
+  },
+  // NOT REGISTERED — ruled scope determination (T026, D-090-29, lead
+  // ruling on D-090-19/D-090-20): there is no `saveAnswer` ban over the
+  // marks / characters / punctuation trees, and none is pending. Those
+  // calls are the spec-079 answer-store evidence layer — marks'
+  // per-toggle answers (D-090-16(2)), characters' addition answers,
+  // punctuation's inventory answer — which is spec 079's own draft
+  // surface (the answer store's sanctioned narrowed role after T026),
+  // not a gallery write-around: FR-003's ban targets gallery components
+  // writing answers IN PLACE OF decision records, and these calls are
+  // the within-step draft state the decision values are composed from.
+  // This is a scope determination, not an exception: T060's
+  // zero-exceptions assertion reads on the banned category so defined.
+  //
+  // NOT REGISTERED — ruled (T035, D-090-31, lead ruling ratifying
+  // D-090-27): the Phase D action bans T035's text names
+  // (cascadeDelete / cascadeRestore / restoreAll / keepAll /
+  // prefillCarveDispositions / commitDeadkeyOp). Those actions are
+  // the ratified edit-time write paths of the editor-backed
+  // decisions — the carve overlay actions and the deadkey op-log
+  // commit — from which the carved-layout / deadkeys-defined
+  // decisions record at completion. They presumed a host-mediated
+  // design the ruling set aside; registering them would red this
+  // gate against the ratified design. Like the evidence-layer
+  // determination above, this is a scope determination for T060 to
+  // read, not a gap and not an exception.
+  //
+  // NOT REGISTERED — ruled (T043, D-090-47, lead ruling on
+  // D-090-38 Flag 1, extending the D-090-31 scope determination to
+  // US4): the identifier bans T043's text names (recordAssignments /
+  // setTouchDraft / deleteTouchKey) over the assignLoop trees.
+  // Those actions are the sanctioned edit-time write paths of the
+  // two assign-loop galleries under the ratified
+  // record-from-working-copy design (D-090-31): they write the
+  // working-copy state — the phase-C assignment list, the touch
+  // draft, the deleted-touch-key set — that completion snapshots
+  // into the physical-layout / touch-layout decision values
+  // (T041/T042). They are not gallery write-arounds in FR-003's
+  // sense: the ban targets writing answers IN PLACE OF decision
+  // records, and these calls are the within-step editing state the
+  // decision values are recorded from. Registering them would red
+  // this gate against the ratified design (12 + 3 live call sites
+  // in editors/assignLoop non-test sources). Like the two
+  // determinations above, this is a scope determination for T060
+  // to read, not a gap and not an exception.
 ];
 
 /** A single banned call site found in a source text. */

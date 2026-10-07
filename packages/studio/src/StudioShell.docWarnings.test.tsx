@@ -22,7 +22,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
+import { resetInventoryDecisions } from "./survey/useInventoryDraft.ts";
 
 // ---------------------------------------------------------------------------
 // Shallow stubs for every child component plus the heavy hooks (shared
@@ -126,7 +126,7 @@ afterEach(() => {
   cleanup();
   // Spec 079 R-07: alphabetEvidenceKey / sticky decisions survive store.reset();
   // global test-setup only calls reset(), so clear them here.
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
   vi.clearAllMocks();
   localStorage.clear();
 });

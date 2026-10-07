@@ -33,7 +33,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { resetInventoryDraft } from "../survey/useInventoryDraft.ts";
 import { instantiateMinimal } from "../test/draftSeeds.ts";
 
 // Same idiom as draftPersistence.test.ts: serverDraftStore's fetch-based
@@ -140,7 +140,7 @@ describe("plain reload after a rename — no Resume click involved", () => {
     // survive.
     useWorkingCopyStore.getState().reset();
     useSurveySessionStore.getState().reset();
-    usePhaseBDraftStore.getState().reset();
+    resetInventoryDraft();
 
     // main.tsx's pre-mount restore: resolve the active pointer, then
     // loadDraft() it. The pointer still names baseId — loadDraft() does not
