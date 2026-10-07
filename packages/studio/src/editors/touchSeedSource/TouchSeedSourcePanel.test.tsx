@@ -6,7 +6,7 @@
 //   - malformed base JSON is treated as absent, with a distinct note (R4)
 //   - tablet-drop advisory rendered on the Reseed card when the base ships a
 //     non-phone platform (R7/R10)
-//   - confirm calls setTouchSeedSource then onComplete
+//   - confirm records the touch-seed-source decision then onComplete (spec 088)
 //   - the draft-discard warning (R12) is shown ONLY on re-entry with a
 //     DIFFERENT selection than the recorded choice, while a touch draft exists
 //   - the live preview is now the REAL OSK (mocked here the same way
@@ -19,7 +19,24 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchSeedSourcePanel } from "./TouchSeedSourcePanel.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import {
+  getDecisionSnapshot,
+  selectTouchSeedSource,
+  useDecisionStore,
+} from "../../stores/decisionStore.ts";
+
+/** Spec 088: the recorded fork choice lives in the decision store. */
+function seedRecordedSeed(value: "import-adapt" | "reseed-from-desktop"): void {
+  useDecisionStore.getState().record({
+    id: "touch-seed-source",
+    value,
+    provenance: "asked",
+    step: "touch_seed_source",
+  });
+}
+function recordedSeed(): string | null {
+  return selectTouchSeedSource(getDecisionSnapshot());
+}
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { TouchAssignment, IRGroup, IRRule, KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
@@ -367,7 +384,7 @@ describe("TouchSeedSourcePanel — advisories", () => {
 // ---------------------------------------------------------------------------
 
 describe("TouchSeedSourcePanel — confirm", () => {
-  it("confirm calls setTouchSeedSource with the selection, then onComplete", () => {
+  it("confirm records the touch-seed-source decision with the selection, then onComplete", () => {
     seedBase(); // absent -> default reseed
     let completed = false;
     render(
@@ -383,7 +400,7 @@ describe("TouchSeedSourcePanel — confirm", () => {
     fireEvent.click(screen.getByTestId("seed-source-import-adapt"));
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
 
-    expect(useSurveySessionStore.getState().touchSeedSource).toBe("import-adapt");
+    expect(recordedSeed()).toBe("import-adapt");
     expect(completed).toBe(true);
   });
 
@@ -409,7 +426,7 @@ describe("TouchSeedSourcePanel — confirm", () => {
     fireEvent.click(screen.getByTestId("seed-source-reseed"));
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
 
-    expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
+    expect(recordedSeed()).toBe("reseed-from-desktop");
     expect(completed).toBe(true);
   });
 
@@ -637,7 +654,7 @@ describe("TouchSeedSourcePanel — reseed derivation error logging", () => {
 describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
   it("does not warn on a fresh entry (no recorded choice yet), even if a stray draft existed", () => {
     seedBase(PHONE_ONLY_JSON);
-    // touchSeedSource is null (fresh) — the warning must never depend on
+    // no seed decision recorded (fresh) — the warning must never depend on
     // touchDraft alone.
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", fakeTouchAssignment]],
@@ -652,7 +669,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
 
   it("does not warn when re-confirming the SAME recorded choice, even with a draft present", () => {
     seedBase(PHONE_ONLY_JSON);
-    useSurveySessionStore.setState({ touchSeedSource: "import-adapt" });
+    seedRecordedSeed("import-adapt");
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", fakeTouchAssignment]],
       suggestionResolvedChars: [],
@@ -668,7 +685,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
 
   it("warns when re-entry picks a DIFFERENT value than the recorded choice, with a draft present", () => {
     seedBase(PHONE_ONLY_JSON);
-    useSurveySessionStore.setState({ touchSeedSource: "import-adapt" });
+    seedRecordedSeed("import-adapt");
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", fakeTouchAssignment]],
       suggestionResolvedChars: [],
@@ -685,7 +702,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
 
   it("does not warn on a different selection when no touch draft exists", () => {
     seedBase(PHONE_ONLY_JSON);
-    useSurveySessionStore.setState({ touchSeedSource: "import-adapt" });
+    seedRecordedSeed("import-adapt");
     // touchDraft stays null (no in-progress touch edits).
     render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
@@ -697,7 +714,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
 
   it("confirming a changed selection past the warning records the new choice AND clears touchDraft", () => {
     seedBase(PHONE_ONLY_JSON);
-    useSurveySessionStore.setState({ touchSeedSource: "import-adapt" });
+    seedRecordedSeed("import-adapt");
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", fakeTouchAssignment]],
       suggestionResolvedChars: [],
@@ -708,11 +725,12 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
     expect(screen.getByTestId("seed-source-draft-warning")).toBeTruthy();
 
     // Confirming past the warning is the wiring under test: the panel must
-    // call setTouchSeedSource with the NEW value, and that setter (R12,
-    // surveySessionStore.ts) is what actually clears touchDraft.
+    // record the NEW seed value, and the panel's confirm handler (spec 088
+    // D-06 — the side effect re-homed from the deleted session setter) is
+    // what actually clears touchDraft.
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
 
-    expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
+    expect(recordedSeed()).toBe("reseed-from-desktop");
     expect(useWorkingCopyStore.getState().touchDraft).toBeNull();
   });
 });
@@ -733,7 +751,7 @@ describe("TouchSeedSourcePanel — leave and return (spec 079 FR-051, T029)", ()
     const first = render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("seed-source-reseed"));
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
-    expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
+    expect(recordedSeed()).toBe("reseed-from-desktop");
     first.unmount();
 
     render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });

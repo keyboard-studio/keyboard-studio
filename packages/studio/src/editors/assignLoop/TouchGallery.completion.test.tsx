@@ -9,6 +9,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -100,7 +101,7 @@ function seedShippedPlusSwapped(opts: {
     assignments: [swapAssignment],
   });
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
-  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+  useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +164,7 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
       confirmedInventory: ["€", "中"],
     });
     useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
-    useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+    useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });

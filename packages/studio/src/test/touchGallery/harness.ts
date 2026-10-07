@@ -10,6 +10,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { installDialogShim } from "../dialogShim.ts";
 import {
   buildTouchLayoutJsonSpy,
@@ -58,7 +59,12 @@ export function seedStore(
   // Import & adapt from the fork chooser even though there is nothing to
   // import onto (TouchSeedSourcePanel allows this; it starts from an empty
   // layout).
-  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+  useDecisionStore.getState().record({
+    id: "touch-seed-source",
+    value: "import-adapt",
+    provenance: "asked",
+    step: "touch_seed_source",
+  });
 }
 
 /** Invoke the captured vfsTransform with a fresh VFS and the given kbId. */
@@ -96,7 +102,12 @@ export function seedWithDesktopAssignment(
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
   // spec 035 R11 — see seedStore's comment: pin the explicit import-adapt
   // choice so these fixtures don't fall into the reseed-always-emits default.
-  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+  useDecisionStore.getState().record({
+    id: "touch-seed-source",
+    value: "import-adapt",
+    provenance: "asked",
+    step: "touch_seed_source",
+  });
 }
 
 // ---------------------------------------------------------------------------

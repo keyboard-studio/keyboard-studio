@@ -31,6 +31,11 @@ import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import {
+  getDecisionSnapshot,
+  selectTrack,
+  useDecisionStore,
+} from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type {
   BaseDocumentationProfile,
@@ -54,9 +59,21 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
   setHelpDocsSpy: ReturnType<typeof vi.fn>;
   setHistoryEntryStateSpy: ReturnType<typeof vi.fn>;
 } {
-  const setSelectedTrackSpy = vi.fn(
-    (t: "copy" | "adapt" | null) => useSurveySessionStore.getState().setSelectedTrack(t),
-  );
+  // Spec 088: FlowStepDeps.setSelectedTrack is backed by the decision
+  // store (makeFlowStepComponent) — the spy calls through to the same
+  // record/forget the factory performs.
+  const setSelectedTrackSpy = vi.fn((t: "copy" | "adapt" | null) => {
+    if (t === null) {
+      useDecisionStore.getState().forget("authoring-track");
+    } else {
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: t,
+        provenance: "asked",
+        step: "track",
+      });
+    }
+  });
   const setScaffoldSpecSpy = vi.fn(
     (s: { keyboardId: string; displayName: string } | null) =>
       useSurveySessionStore.getState().setScaffoldSpec(s),
@@ -127,7 +144,7 @@ describe("trackOptions.buildContext", () => {
 // ---------------------------------------------------------------------------
 
 describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () => {
-  it("seeds track_choice from the session's recorded selectedTrack", () => {
+  it("seeds track_choice from the recorded track (deps.selectedTrack)", () => {
     const { deps } = buildDeps({ selectedTrack: "adapt" });
     expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
   });
@@ -282,7 +299,7 @@ describe("trackOptions.onCommit", () => {
 
     expect(setSelectedTrackSpy).toHaveBeenCalledExactlyOnceWith("copy");
     expect(setScaffoldSpecSpy).not.toHaveBeenCalled();
-    expect(useSurveySessionStore.getState().selectedTrack).toBe("copy");
+    expect(selectTrack(getDecisionSnapshot())).toBe("copy");
   });
 
   it("adapt track: calls setSelectedTrack('adapt') AND setScaffoldSpec(null)", () => {
@@ -293,7 +310,7 @@ describe("trackOptions.onCommit", () => {
 
     expect(setSelectedTrackSpy).toHaveBeenCalledExactlyOnceWith("adapt");
     expect(setScaffoldSpecSpy).toHaveBeenCalledExactlyOnceWith(null);
-    expect(useSurveySessionStore.getState().selectedTrack).toBe("adapt");
+    expect(selectTrack(getDecisionSnapshot())).toBe("adapt");
     expect(useSurveySessionStore.getState().scaffoldSpec).toBeNull();
   });
 
@@ -302,7 +319,15 @@ describe("trackOptions.onCommit", () => {
     const { deps } = buildDeps({
       setSelectedTrack: vi.fn((t) => {
         callOrder.push("setSelectedTrack");
-        useSurveySessionStore.getState().setSelectedTrack(t);
+        // Spec 088: the dep's call-through target is the decision store.
+        if (t !== null) {
+          useDecisionStore.getState().record({
+            id: "authoring-track",
+            value: t,
+            provenance: "asked",
+            step: "track",
+          });
+        }
       }),
       setScaffoldSpec: vi.fn((s) => {
         callOrder.push("setScaffoldSpec");

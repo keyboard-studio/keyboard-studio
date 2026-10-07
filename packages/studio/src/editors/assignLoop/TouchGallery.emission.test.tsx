@@ -19,6 +19,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -394,7 +395,7 @@ function seedWithShippedTouchLayout(opts: {
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
   // Explicit import-adapt choice — the shipped layout above is what makes
   // this a genuine Case B (adapt the shipped file), not the reseed fallback.
-  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+  useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });
 }
 
 describe("TouchGallery — seed-source-aware detection reads the shipped layout (T015) and still injects under R11 with zero Phase E edits (T017)", () => {
@@ -492,7 +493,7 @@ describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on 
     useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
     // import-adapt so detectionSeedLayout takes deriveSeedLayout's Case B
     // (reads the malformed shipped file) instead of a fresh Case A scaffold.
-    useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+    useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });
 
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });

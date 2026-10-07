@@ -74,6 +74,7 @@ import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionR
 import type { SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { getDecisionSnapshot, selectTouchSeedSource } from "../stores/decisionStore.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveDesktopModifications } from "../lib/deriveDesktopModifications.ts";
 import { toRailNodes } from "../lib/irToCarveNodes.ts";
@@ -281,7 +282,8 @@ function touchCompleteResult(assignments: readonly MechanismAssignment[]): unkno
       baseIr === null
         ? { removals: [], placements: [] }
         : deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults),
-    seedSource: useSurveySessionStore.getState().touchSeedSource,
+    // Spec 088: the fork choice is read from the decision store.
+    seedSource: selectTouchSeedSource(getDecisionSnapshot()),
   };
 }
 

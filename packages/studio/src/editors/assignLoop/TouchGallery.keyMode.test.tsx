@@ -9,6 +9,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery, describeUndoTarget } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { changeSelectMenu } from "../../test/selectMenuTestUtils.ts";
@@ -88,7 +89,7 @@ function seedKeyModeFixture(opts: {
     confirmedInventory: opts.inventory,
   });
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
-  useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+  useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });
 }
 
 describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)", () => {

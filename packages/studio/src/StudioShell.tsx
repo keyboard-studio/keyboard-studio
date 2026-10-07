@@ -658,8 +658,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //     recorded `new-from-base`, and `resolveInstantiationCase` reads
   //     same-id/different-mode as a genuine base switch and clears
   //     `phaseResults` (workingCopyStore.ts). A refresh silently discarded the
-  //     survey. The same re-commit also fires `setTouchSeedSource(null)` and
-  //     the rebase draft-key migration, neither of which a restore should do.
+  //     survey. The same re-commit also clears the touch-seed choice and
+  //     fires the rebase draft-key migration, neither of which a restore should do.
   //
   // Both follow from re-running a COMMIT to restore a copy that is already
   // committed. So the restore path now does what the résumé path has always

@@ -9,6 +9,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { buildTouchLayoutJsonSpy } from "../../test/touchGallery/mocks.tsx";
@@ -49,8 +50,8 @@ installTouchGalleryHooks();
 //   - `useWorkingCopyStore.getState().instantiateFromBase/recordPhase/
 //     markGalleryIntroSeen` — the same store-seeding calls `seedStore`/
 //     `seedKeyModeFixture` above already use.
-//   - `useSurveySessionStore.getState().setTouchSeedSource(...)` — same as
-//     every other Case A/B fixture in this file.
+//   - recording the `touch-seed-source` decision in the decision store —
+//     same as every other Case A/B fixture in this file (spec 088).
 //   - `runTransform(kbId)` — this file's own VFS-projection helper (defined
 //     near the top, alongside `seedStore`), invoked unmodified.
 //   - `touch-mode-tab-key` to reach key mode, exactly as the T072
@@ -173,7 +174,7 @@ function seedKeyModeParityFixture() {
     confirmedInventory: ["a"],
   });
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
-  useSurveySessionStore.getState().setTouchSeedSource("reseed-from-desktop");
+  useDecisionStore.getState().record({ id: "touch-seed-source", value: "reseed-from-desktop", provenance: "asked", step: "touch_seed_source" });
 }
 
 /**

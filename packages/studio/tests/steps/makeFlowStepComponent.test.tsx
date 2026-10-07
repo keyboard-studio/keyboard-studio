@@ -82,10 +82,12 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock stores — return deterministic values; spy on setSelectedTrack
+// Mock stores — return deterministic values; spy on the decision record
+// (spec 088: FlowStepDeps.setSelectedTrack is backed by the decision store)
 // ---------------------------------------------------------------------------
 
-const mockSetSelectedTrack = vi.fn();
+const mockRecordDecision = vi.fn();
+const mockForgetDecision = vi.fn();
 const mockSetScaffoldSpec = vi.fn();
 const mockSetIdentity = vi.fn();
 
@@ -95,12 +97,24 @@ vi.mock("../../src/stores/surveySessionStore.ts", () => ({
       localBase: { displayName: "Test Base" },
       identityResult: { autonym: "Hausa", english: "Hausa" },
       surveyContext: {},
-      setSelectedTrack: mockSetSelectedTrack,
       setScaffoldSpec: mockSetScaffoldSpec,
     };
     return selector(store);
   },
 }));
+
+vi.mock("../../src/stores/decisionStore.ts", () => {
+  const state = { decisions: {}, record: mockRecordDecision, forget: mockForgetDecision };
+  const useDecisionStore = Object.assign(
+    (selector: (s: unknown) => unknown) => selector(state),
+    { getState: () => state },
+  );
+  return {
+    useDecisionStore,
+    selectTrack: () => null,
+    selectTouchSeedSource: () => null,
+  };
+});
 
 vi.mock("../../src/stores/workingCopyStore.ts", () => ({
   useWorkingCopyStore: (selector: (s: unknown) => unknown) => {
@@ -199,7 +213,7 @@ describe("makeFlowStepComponent", () => {
       expect(screen.getByTestId("flow-step-title").textContent).toBe("Authoring Track");
     });
 
-    it("fires setSelectedTrack('copy') BEFORE onComplete when extract succeeds (R7 ordering)", async () => {
+    it("records the track decision BEFORE onComplete when extract succeeds (R7 ordering)", async () => {
       const callOrder: string[] = [];
 
       const onCommitSpy = vi.fn((extracted: TrackPayload, deps: FlowStepDeps) => {
@@ -224,7 +238,13 @@ describe("makeFlowStepComponent", () => {
 
       // R7: onCommit fires before onComplete (state mutations before navigation).
       expect(callOrder).toEqual(["onCommit", "onComplete"]);
-      expect(mockSetSelectedTrack).toHaveBeenCalledWith("copy");
+      // Spec 088: the dep now records the authoring-track decision.
+      expect(mockRecordDecision).toHaveBeenCalledWith({
+        id: "authoring-track",
+        value: "copy",
+        provenance: "asked",
+        step: "track",
+      });
       // onComplete receives the UNTOUCHED SurveyPhaseResult, not the extracted
       // `{ track: "copy" }` — StepHost's generic completion path (recordPhase /
       // recordStepCompletion / advance) needs the real, answers-bearing result.

@@ -43,6 +43,7 @@ import { FlowStepHost } from "../../survey/FlowStepHost.tsx";
 import { loadFlowSourceDef } from "../../steps/flowSources.ts";
 import { flowSources } from "../../steps/flowSources.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { selectTrack, useDecisionStore } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { IdentityPatch } from "../../stores/workingCopyStore.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
@@ -248,11 +249,25 @@ export function makeFlowStepComponent<Extracted>(
     const localBase = useSurveySessionStore((s) => s.localBase);
     const identityResult = useSurveySessionStore((s) => s.identityResult);
     const surveyContext = useSurveySessionStore((s) => s.surveyContext);
-    const setSelectedTrack = useSurveySessionStore((s) => s.setSelectedTrack);
+    // Spec 088 FR-005: the FlowStepDeps track surface is backed by the
+    // decision store — writing records the `authoring-track` decision,
+    // reading selects it back out. (The session field/setter are deleted.)
+    const setSelectedTrack = useCallback((t: "copy" | "adapt" | null) => {
+      if (t === null) {
+        useDecisionStore.getState().forget("authoring-track");
+      } else {
+        useDecisionStore.getState().record({
+          id: "authoring-track",
+          value: t,
+          provenance: "asked",
+          step: "track",
+        });
+      }
+    }, []);
     const setScaffoldSpec = useSurveySessionStore((s) => s.setScaffoldSpec);
     const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
     const setHelpDocs = useWorkingCopyStore((s) => s.setHelpDocs);
-    const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
+    const selectedTrack = useDecisionStore((s) => selectTrack(s.decisions));
     const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
     const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
     const setHistoryEntryState = useWorkingCopyStore((s) => s.setHistoryEntryState);

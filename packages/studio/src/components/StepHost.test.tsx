@@ -17,11 +17,16 @@ import { render } from "../test/renderWithI18n.tsx";
 import { StepHost } from "./StepHost.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import {
+  liveEntryForSlot,
+  slotKeyOf,
+  useDecisionLogStore,
+} from "../decisions/decisionLogStore.ts";
 import {
   useDecisionStore,
   getDecisionSnapshot,
   applyDecisionSnapshot,
+  peekDecision,
 } from "../stores/decisionStore.ts";
 import { useSurveyAnswerStore, peekStepAnswers, applySurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
 import { rehydrateAnswersFromDecisions } from "../lib/draftPersistence.ts";
@@ -55,7 +60,7 @@ function TrivialStep({ onBack }: EditorStepProps): React.ReactElement {
 // file, so anything it closes over must be built through vi.hoisted rather
 // than an ordinary top-level const/function (vitest docs: "no top level
 // variables inside").
-const { MARKS_RESULT, INVISIBLES_RESULT, IDENTITY_RESULT, makeFixedResultStep } = vi.hoisted(() => {
+const { MARKS_RESULT, INVISIBLES_RESULT, IDENTITY_RESULT, SECOND_COPYRIGHT_RESULT, makeFixedResultStep } = vi.hoisted(() => {
   /** Spec 088 T012: an identity-shaped survey completion (registry questions). */
   const identityResult = {
     phase: "A" as const,
@@ -73,6 +78,14 @@ const { MARKS_RESULT, INVISIBLES_RESULT, IDENTITY_RESULT, makeFixedResultStep } 
   const marksResult = {
     phase: "C" as const,
     answers: [{ questionId: "marks.station.attachment", answerType: "select" as const, value: "confirmed" }],
+  };
+
+  /** Spec 088 T034: il_copyright_holder answered again, from another step. */
+  const secondCopyrightResult = {
+    phase: "A" as const,
+    answers: [
+      { questionId: "il_copyright_holder", answerType: "text" as const, value: "Second Author" },
+    ],
   };
 
   const invisiblesResult = {
@@ -115,6 +128,7 @@ const { MARKS_RESULT, INVISIBLES_RESULT, IDENTITY_RESULT, makeFixedResultStep } 
     MARKS_RESULT: marksResult,
     INVISIBLES_RESULT: invisiblesResult,
     IDENTITY_RESULT: identityResult,
+    SECOND_COPYRIGHT_RESULT: secondCopyrightResult,
     makeFixedResultStep: makeStep,
   };
 });
@@ -152,6 +166,17 @@ vi.mock("../steps/manifest.ts", () => ({
       inputs: [],
       writes: [],
       component: makeFixedResultStep(INVISIBLES_RESULT),
+    },
+    {
+      // Spec 088 T034: in this test registry, il_copyright_holder ALSO lives
+      // on project_name — the "question moved steps" arrangement SC-005
+      // is about. Production places it on identity only.
+      kind: "editor-step",
+      id: "project_name",
+      title: "Project name",
+      inputs: [],
+      writes: [],
+      component: makeFixedResultStep(SECOND_COPYRIGHT_RESULT),
     },
   ],
 }));
@@ -397,5 +422,83 @@ describe("StepHost — decision records survive a reload (spec 088 T012)", () =>
     const restored = peekStepAnswers("identity")?.answers;
     expect(restored?.["il_language_code"]?.value).toBe("fr");
     expect(restored?.["il_copyright_holder"]?.value).toBe("Fixture Author");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 088 US4 — SC-005: a question that moves steps keeps ONE decision.
+// The test manifest above places il_copyright_holder on identity AND on
+// project_name (production: identity only). Answering it in both places,
+// through the real StepHost, must leave a single copyright-holder record
+// and a single trail chain (T031's decision-keyed slots), across a reload.
+// ---------------------------------------------------------------------------
+
+describe("spec 088 SC-005 — moved question, one decision", () => {
+  it("answering il_copyright_holder in two steps yields one record and one trail chain, surviving reload", () => {
+    useDecisionStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    useDecisionLogStore.getState().reset();
+    const save = useSurveyAnswerStore.getState().saveAnswer;
+    save("identity", "il_language_code", {
+      value: "fr", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_language_code",
+    });
+    save("identity", "il_copyright_holder", {
+      value: "Fixture Author", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_copyright_holder",
+    });
+    save("project_name", "il_copyright_holder", {
+      value: "Second Author", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_copyright_holder",
+    });
+
+    const deps: ReducerDeps = {
+      ...reducerDepsWithDecisionStore(),
+      recordDecision: reducerDepsWithRealRecorder().recordDecision,
+    };
+    act(() => {
+      useSurveySessionStore.getState().advance("identity");
+    });
+    render(<StepHost reducerDeps={deps} onStartOver={() => {}} />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+    expect(peekDecision("copyright-holder")).toMatchObject({ value: "Fixture Author", step: "identity" });
+
+    // The question "moves": project_name now asks it, with a new answer.
+    act(() => {
+      useSurveySessionStore.getState().advance("project_name");
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+
+    // One decision record, holding the latest answer and its step.
+    expect(peekDecision("copyright-holder")).toMatchObject({ value: "Second Author", step: "project_name" });
+
+    // The trail shows both entries under the one decision — the second
+    // supersedes the first even though the steps differ (C-5).
+    const allEntries = useDecisionLogStore.getState().record.entries;
+    const entries = allEntries.filter(
+      (e) => e.payload.kind === "survey-answer" && e.payload.questionId === "il_copyright_holder",
+    );
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ stepId: "identity" });
+    expect(entries[1]).toMatchObject({ stepId: "project_name", supersedes: entries[0]!.entryId });
+    expect(
+      liveEntryForSlot(allEntries, slotKeyOf("identity", entries[0]!.payload))?.entryId,
+    ).toBe(entries[1]!.entryId);
+
+    // Reload: the current record survives the move, and the answer
+    // rehydrates under the step that asked it last.
+    const snapshot = getDecisionSnapshot();
+    useDecisionStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    applyDecisionSnapshot(snapshot);
+    applySurveyAnswerSnapshot(
+      rehydrateAnswersFromDecisions(getDecisionSnapshot(), { steps: {}, recordedScreenOf: {} }, 1234),
+    );
+    expect(getDecisionSnapshot()["copyright-holder"]).toMatchObject({ value: "Second Author" });
+    expect(peekStepAnswers("project_name")?.answers["il_copyright_holder"]?.value).toBe("Second Author");
   });
 });
