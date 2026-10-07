@@ -1,5 +1,6 @@
-// stageGroups — group a decision record's entries by the stage (manifest step)
-// they were made in, for the staged-narrative presentation
+// stageGroups — group a decision record's entries by the stage (derived
+// screen, spec 091 T022) they were made in, for the staged-narrative
+// presentation
 // (specs/055-legible-decision-trail FR-022 through FR-026; research D-02).
 //
 // Pure derivation over an EXISTING record. Not persisted, not a second record
@@ -24,7 +25,7 @@ import {
   type EditorActionSummary,
   type EditorActionType,
 } from "@keyboard-studio/contracts";
-import { manifest } from "../steps/manifest.ts";
+import { derivedScreens } from "../steps/manifest.ts";
 import type { HeadlineDimension, HeadlineDimensionKind } from "./headline.ts";
 
 /**
@@ -57,7 +58,7 @@ export type StageRollUp =
 
 /** A stage, its decisions in walked order, and its one-line net effect. */
 export interface StageGroup {
-  /** The manifest step id this stage belongs to, or an unknown id (FR-024). */
+  /** The derived screen id this stage belongs to, or an unknown id (FR-024). */
   stepId: string;
   /** Every entry recorded under this stage, in record order — INCLUDING superseded history (FR-026). */
   entries: readonly DecisionEntry[];
@@ -148,20 +149,24 @@ function computeRollUp(
 
 /**
  * Group a record's entries by stage, ordered by the stage's position in the
- * flow manifest (FR-022) — the order the author actually walked, not
- * insertion order and not alphabetical.
+ * derived screen list (FR-022; spec 091 T022 — a stage IS a derived screen,
+ * following the screen list, with the ruled terminal `package` screen last)
+ * — the order the author actually walked, not insertion order and not
+ * alphabetical. Display grouping only: entries keep the step display
+ * metadata they were recorded with (088 FR-008), so no recorded data
+ * changes shape.
  *
- * One group per manifest step, always — including a step for which nothing
+ * One group per screen, always — including a screen for which nothing
  * was recorded (`rollUp: { kind: "not-recorded" }`), so the renderer can
  * choose to omit it or show it as untouched (spec Edge Cases) without having
  * to re-derive "was this step ever reached" from the record itself.
  *
- * Any `stepId` absent from the manifest — {@link PRE_IDENTITY_STEP_ID}, or a
+ * Any `stepId` absent from the screen list — {@link PRE_IDENTITY_STEP_ID}, or a
  * step id a later build removed — is NEVER dropped (FR-024): its group is
- * placed first, ahead of every manifest stage, under what the renderer treats
+ * placed first, ahead of every screen stage, under what the renderer treats
  * as a generic heading. Multiple such stepIds are ordered by their first
  * appearance in the record, the only stable order available for ids the
- * manifest does not place.
+ * screen list does not place.
  */
 export function buildStageGroups(
   record: { readonly entries: readonly DecisionEntry[] },
@@ -183,7 +188,7 @@ export function buildStageGroups(
     bucket.push(entry);
   }
 
-  const manifestStepIds = manifest.map((step) => step.id);
+  const manifestStepIds = [...derivedScreens.map((s) => s.id), "package"];
   const manifestStepIdSet = new Set(manifestStepIds);
 
   // Unknown-to-the-manifest stepIds (PRE_IDENTITY_STEP_ID included, since it

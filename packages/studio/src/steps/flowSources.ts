@@ -195,9 +195,33 @@ const declaredFlowSources = {
  * flowRefs" rule: flowRefs are deleted (T014), screen membership is the
  * single source.
  */
+const derivedScreenList = deriveScreens(decisionModules);
+
 const liveScreenModuleIds: ReadonlySet<string> = new Set(
-  deriveScreens(decisionModules).flatMap((s) => s.moduleIds),
+  derivedScreenList.flatMap((s) => s.moduleIds),
 );
+
+/**
+ * The derived screen a flow's modules belong to (spec 091 T020): the screen
+ * holding the flow's FIRST module — a live flow's modules sit on exactly
+ * one top-level screen (intra-step flows name their enclosing screen), so
+ * this is the screen the flow is hosted as. Screen labels key off this id,
+ * never the flow id. Undefined for a flow with no module on any screen.
+ */
+const flowScreenByFlowId: ReadonlyMap<string, string> = new Map(
+  Object.entries(declaredFlowSources).flatMap(([flowId, source]) => {
+    const first = source.derivedModules[0];
+    if (first === undefined) return [];
+    const screen = derivedScreenList.find((s) =>
+      s.moduleIds.includes(first.definition.id),
+    );
+    return screen === undefined ? [] : [[flowId, screen.id] as const];
+  }),
+);
+
+export function screenIdForFlow(flowId: string): string | undefined {
+  return flowScreenByFlowId.get(flowId);
+}
 
 export const flowSources: Readonly<Record<string, FlowSource>> = Object.fromEntries(
   Object.entries(declaredFlowSources).map(([id, source]) => [

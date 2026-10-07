@@ -31,11 +31,10 @@ import { buildDerivedFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryRese
 import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { buildManifestProjection, attachDrillDowns, CHARACTERS_STEP_ID as _CHARACTERS_STEP_ID } from "./manifestProjection.ts";
 import type { FlowGraph, GraphNode } from "./model.ts";
-import { flowSources } from "../steps/flowSources.ts";
+import { flowSources, screenIdForFlow } from "../steps/flowSources.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { FlowDef } from "../survey/types.ts";
-import { decisionModules, questionRegistry, reserveModules, moduleRecord } from "../survey/questions/registry.ts";
-import { deriveScreens } from "../decisions/deriveScreens.ts";
+import { questionRegistry, reserveModules, moduleRecord } from "../survey/questions/registry.ts";
 
 // Re-export CHARACTERS_STEP_ID so driftGuardrail and other callers don't need
 // a separate import from manifestProjection.
@@ -92,24 +91,17 @@ function safeBuild(sourceId: string, stepId: string): BuiltFlowSource {
 /**
  * Which screen each flow hangs under, derived from screen membership
  * (spec 091 T014 — steps no longer declare flowRefs): a flow's screen is
- * the derived screen holding its modules. Every module of a flow sits on
- * the same screen by construction (a flow is one screen's question set,
- * or the intra-step set of one custom screen).
+ * the derived screen holding its modules, via steps/flowSources.ts's
+ * `screenIdForFlow` (the one source; every module of a flow sits on the
+ * same screen by construction — a flow is one screen's question set, or
+ * the intra-step set of one custom screen).
  */
-const flowScreenByFlowId: ReadonlyMap<string, string> = ((): Map<string, string> => {
-  const screenByModuleId = new Map<string, string>();
-  for (const s of deriveScreens(decisionModules)) {
-    for (const moduleId of s.moduleIds) screenByModuleId.set(moduleId, s.id);
-  }
-  const out = new Map<string, string>();
-  for (const source of Object.values(flowSources)) {
-    const first = source.derivedModules[0];
-    if (first === undefined) continue;
-    const screenId = screenByModuleId.get(first.definition.id);
-    if (screenId !== undefined) out.set(source.id, screenId);
-  }
-  return out;
-})();
+const flowScreenByFlowId: ReadonlyMap<string, string> = new Map(
+  Object.values(flowSources).flatMap((source) => {
+    const screenId = screenIdForFlow(source.id);
+    return screenId === undefined ? [] : [[source.id, screenId] as const];
+  }),
+);
 
 /**
  * buildFlowSources — derive the drill-down list by walking the manifest.

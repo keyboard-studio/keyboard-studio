@@ -181,15 +181,15 @@ skipped as steps are today.
 **Independent Test**: The identity flow renders as one labelled page; the US1 split case shows
 two pages with the same label; a fully gated screen is skipped in the walk.
 
-- [ ] T020 [US3] Surface the screen label from `group` in the question-screen host
+- [x] T020 [US3] Surface the screen label from `group` in the question-screen host
   (packages/studio/src/survey/FlowStepHost.tsx) and the progress/stage surfaces that name the
   current screen (packages/studio/src/decisions/progressDots.ts), with no i18n id changes —
   labels key off existing ids or the structural group key, never a renamed message (FR-006)
-- [ ] T021 [US3] Add the walk-level tests: a split run yields two screens with the same group
+- [x] T021 [US3] Add the walk-level tests: a split run yields two screens with the same group
   label in derived order, and a screen whose decisions are all gated off is skipped by
   packages/studio/src/steps/advance.ts while a partially gated screen is walked, in
   packages/studio/src/steps/advance.test.ts
-- [ ] T022 [US3] Point packages/studio/src/decisions/stageGroups.ts at screens (stage = derived
+- [x] T022 [US3] Point packages/studio/src/decisions/stageGroups.ts at screens (stage = derived
   screen, following the screen list) — display grouping only; entries keep the step display
   metadata recorded under 088 FR-008, so no recorded data changes shape
 

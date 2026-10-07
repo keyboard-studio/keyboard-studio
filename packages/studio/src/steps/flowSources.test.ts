@@ -21,7 +21,7 @@
 
 import { describe, it, expect } from "vitest";
 import { manifest } from "./manifest.ts";
-import { flowSources } from "./flowSources.ts";
+import { flowSources, screenIdForFlow } from "./flowSources.ts";
 import { decisionModules } from "../survey/questions/registry.ts";
 import { deriveScreens } from "../decisions/deriveScreens.ts";
 
@@ -109,5 +109,32 @@ describe("spec-022 demotion — phase_a_identity is proposed and unwalked", () =
 
   it("no derived screen holds a phase_a_identity module", () => {
     expect(screensOf("phase_a_identity")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 091 T020 — screenIdForFlow: screen labels key off the derived screen.
+// ---------------------------------------------------------------------------
+
+describe("screenIdForFlow (spec 091 T020)", () => {
+  it("maps each live flow to the screen holding its modules", () => {
+    expect(screenIdForFlow("identity_lite")).toBe("identity");
+    expect(screenIdForFlow("track")).toBe("track");
+    expect(screenIdForFlow("project_name")).toBe("project_name");
+    // Intra-step flows name their enclosing custom screen.
+    expect(screenIdForFlow("phase_b_characters")).toBe("characters");
+    expect(screenIdForFlow("phase_f_helpdocs")).toBe("help");
+  });
+
+  it("agrees with the independently derived membership map for every live flow", () => {
+    for (const source of Object.values(flowSources)) {
+      if (source.status !== "live") continue;
+      const first = source.derivedModules[0]!;
+      expect(screenIdForFlow(source.id)).toBe(screenByModuleId.get(first.definition.id));
+    }
+  });
+
+  it("a proposed flow has no screen", () => {
+    expect(screenIdForFlow("phase_a_identity")).toBeUndefined();
   });
 });
