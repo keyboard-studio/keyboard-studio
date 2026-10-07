@@ -24,7 +24,7 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
-import type { ApplyContext, WorkingCopyPatch } from "../survey/types.ts";
+import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
 // DesktopModifications is a type from the engine package (a workspace
 // dependency, not an internal studio/src/ layer) — the steps-layer boundary
 // forbids steps/ -> lib/stores/dashboard/components, not other packages.
@@ -613,7 +613,9 @@ export function recordAnswersAsDecisions(
 // contracts/apply-contract.md). The successor to routeAnswersThroughMutate:
 // where that routed answers through the flag-gated `mutate()` seam, this
 // runs each answered module's `apply()` UNCONDITIONALLY (A1 — no flag, no
-// per-module gate) and hands the returned patch to the injected sink.
+// per-module gate) and hands the returned patch to the injected sink. A
+// second pass runs composed applies whose own question went unanswered
+// when the completion recorded one of their `requires` inputs (A6).
 //
 // Called from StepHost.handleComplete AFTER recordAnswersAsDecisions (A6:
 // the completion's decisions are recorded first, so ctx.decisions includes
@@ -662,12 +664,18 @@ const APPLY_CHANNEL_AUTHORIZATION: ReadonlyArray<{
 /**
  * Run the decision effects of a completed step's answers.
  *
- * For each answer whose module declares `apply`: build the ApplyContext
- * (the live IR is re-read per answer, so a later apply in the same
- * completion sees an earlier apply's IR write), call `apply`, verify every
- * returned channel against the authorization table, and hand the patch to
- * the injected sink. An unauthorized channel throws {@link ApplyChannelError}
- * before the sink is called — no partial patch (A3).
+ * Pass 1: for each answer whose module declares `apply`: build the
+ * ApplyContext (the live IR is re-read per answer, so a later apply in the
+ * same completion sees an earlier apply's IR write), call `apply`, verify
+ * every returned channel against the authorization table, and hand the
+ * patch to the injected sink. An unauthorized channel throws
+ * {@link ApplyChannelError} before the sink is called — no partial
+ * patch (A3).
+ *
+ * Pass 2: a composed apply (A6) whose own question went unanswered — a
+ * survey result carries no entry for an unanswered question — still runs
+ * when this completion recorded one of its declared `requires` inputs.
+ * See the pass-2 note at the loop below.
  *
  * A no-op when the host injected no patch sink.
  */
@@ -676,10 +684,17 @@ export function applyDecisionEffects(
   deps: ReducerDeps,
 ): void {
   if (deps.applyWorkingCopyPatch === undefined) return;
+  const sink = deps.applyWorkingCopyPatch;
   const decisions: DecisionSet = deps.getDecisions?.() ?? {};
-  for (const answer of result.answers) {
-    const mod = questionRegistry[answer.questionId];
-    if (mod === undefined || mod.apply === undefined) continue;
+
+  /** Run one module's apply through the authorization check into the sink. */
+  const runApply = (
+    questionId: string,
+    mod: QuestionModule,
+    value: string | string[] | undefined,
+  ): void => {
+    const apply = mod.apply;
+    if (apply === undefined) return;
     const writes = mod.writes ?? [];
     const ctx: ApplyContext = {
       ir: deps.getWorkingIR?.() ?? null,
@@ -687,21 +702,61 @@ export function applyDecisionEffects(
       decisions,
       currentHistoryEntryState: deps.getHistoryEntryState?.() ?? null,
     };
-    const patch = mod.apply(answer.value as string | string[] | undefined, ctx);
+    const patch = apply(value, ctx);
     const channels = (Object.keys(patch) as Array<keyof WorkingCopyPatch>).filter(
       (channel) => patch[channel] !== undefined,
     );
-    if (channels.length === 0) continue;
+    if (channels.length === 0) return;
     for (const channel of channels) {
       if (channel === "ir") {
-        if (writes.length === 0) throw new ApplyChannelError(answer.questionId, channel);
+        if (writes.length === 0) throw new ApplyChannelError(questionId, channel);
         continue;
       }
       const rule = APPLY_CHANNEL_AUTHORIZATION.find((r) => r.channel === channel);
       if (rule === undefined || !(mod.provides ?? []).includes(rule.decisionId)) {
-        throw new ApplyChannelError(answer.questionId, channel);
+        throw new ApplyChannelError(questionId, channel);
       }
     }
-    deps.applyWorkingCopyPatch(patch, writes);
+    sink(patch, writes);
+  };
+
+  // Pass 1 — per-answer dispatch, in answer order (A8).
+  const ran = new Set<string>();
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined || mod.apply === undefined) continue;
+    ran.add(answer.questionId);
+    runApply(answer.questionId, mod, answer.value as string | string[] | undefined);
+  }
+
+  // Pass 2 — input-triggered dispatch for composed applies (A6). A survey
+  // result omits UNANSWERED questions entirely, so a module whose question
+  // the author legitimately left blank never appears in `result.answers`
+  // and pass 1 cannot reach it — yet its apply may be a composed effect
+  // whose inputs are OTHER decisions this completion just recorded. The
+  // case that forced this: il_copyright_holder is optional and terminal,
+  // blank means "holder = author" (spec 064 D1), and its apply is the sole
+  // owner of the attribution channel; with per-answer dispatch only, the
+  // attribution never landed and the Output screen blocked every download
+  // (CI, PR #1974). So: a module that declares `apply`, was not answered,
+  // and names a `requires` decision this completion recorded also runs —
+  // with `undefined` as its value, composing from ctx.decisions like any
+  // composed apply. Registry order keeps the pass deterministic; modules
+  // already run in pass 1 are not re-run, and a module whose inputs this
+  // completion did not touch does not fire.
+  const recordedIds = new Set<string>();
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined) continue;
+    for (const id of mod.provides ?? []) recordedIds.add(id);
+  }
+  if (recordedIds.size > 0) {
+    for (const [questionId, mod] of Object.entries(questionRegistry)) {
+      if (mod.apply === undefined || ran.has(questionId)) continue;
+      const requires = mod.requires ?? [];
+      if (requires.length === 0) continue;
+      if (!requires.some((id) => recordedIds.has(id))) continue;
+      runApply(questionId, mod, undefined);
+    }
   }
 }
