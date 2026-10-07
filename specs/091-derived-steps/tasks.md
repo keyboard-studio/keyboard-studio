@@ -180,10 +180,21 @@ to assert "same order as main unless a `requires` edge says otherwise" (FR-005).
   packages/studio/src/decisions/gateWalkParity.test.ts to iterate derived question screens
   instead of `flowSources` flows, keeping its property (derived gates select exactly the
   walked set); confirm packages/studio/src/decisions/orderParity.test.ts passes **unmodified**
-- [ ] T019 [US2] Run the live verification from quickstart.md §3–§4: `pnpm dev` walk of both
+- [x] T019 [US2] Run the live verification from quickstart.md §3–§4: `pnpm dev` walk of both
   tracks matching `main` screen-for-screen (SC-002), a pre-091 deep link and a pre-091 draft
   landing correctly, and the golden walk byte-identical (SC-003); record the evidence in the
   phase commit message
+  — LANDED at the finishing phase, store-level per the series' live-
+  capture ruling (sandbox Chromium blocks localhost; the live walk runs
+  in CI on this branch's PR): SC-002 = the FR-005 parity baseline
+  (order + membership equal to main@18e63aa4, zero inversions) plus the
+  golden walk's per-track traversals through the real StepHost;
+  SC-003 = tests/steps/stepHost.goldenWalk.test.tsx, copy AND adapt
+  tracks byte-identical to the committed fixtures on the flipped tree;
+  deep link + pre-091 draft = lib/legacyStepIds.test.ts (SC-005
+  inventory), lib/resolveLocation.test.ts and the draftPersistence
+  suites, all green. The browser golden walk (e2e/golden-walk.spec.ts,
+  byte-compare of the emitted zip) is CI-gated on the PR.
 
 **Checkpoint**: `stepDependencies.ts` is gone, the rewritten parity is green, and the wizard is
 visibly unchanged. US1 + US2 together are the spec's core delivery.
