@@ -28,6 +28,7 @@ export type { InventoryDecisionValue, InventoryItem } from "../../phaseBDraftOps
 const invisiblesInventory: GalleryModule<InventoryDecisionValue> = {
   definition,
   provides: ["invisibles-inventory"],
+  screen: "invisibles",
   requires: ["character-inventory"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

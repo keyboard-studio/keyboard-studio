@@ -53,6 +53,7 @@ export function extractCharacterInventory(
 const characterInventory: GalleryModule<CharacterInventoryValue> = {
   definition,
   provides: ["character-inventory"],
+  screen: "characters",
   // The step's declared requires (steps/stepDependencies.ts) — the FR-002
   // coverage test pins module.requires EQUAL to them (the 091 parity).
   // Subset decision flows that include this module must therefore also

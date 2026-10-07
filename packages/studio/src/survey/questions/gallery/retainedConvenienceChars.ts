@@ -34,6 +34,7 @@ export const definition = {
 const retainedConvenienceChars: GalleryModule<RetainedConvenienceCharsValue> = {
   definition,
   provides: ["retained-convenience-chars"],
+  screen: "convenience",
   requires: ["character-inventory", "base-keyboard"],
   inputs: [],
   writes: [],

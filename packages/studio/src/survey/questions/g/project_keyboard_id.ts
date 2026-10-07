@@ -90,5 +90,9 @@ const mod: QuestionModule = {
   writes: [irPath("header", "keyboardId")],
   provides: ["project-keyboard-id"],
   requires: ["project-display-name"],
+  // Spec 091 FR-003 re-homing (Delta P2): same copy-track gate as
+  // project_display_name — every member decision of the project_name
+  // screen is gated, so the derived screen gate exists.
+  gatedBy: (decisions) => decisions["authoring-track"]?.value === "copy",
 };
 export default mod;

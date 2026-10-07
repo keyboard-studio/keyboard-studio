@@ -62,5 +62,12 @@ const mod: QuestionModule = {
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name")],
   provides: ["project-display-name"],
+  // Spec 091 FR-003 re-homing (Delta P2): the project_name step's copy-track
+  // gate lived only in steps/stepDependencies.ts; research.md's claim that
+  // it was already a property of this flow's routing did not hold (the fork
+  // is manifest-level), so the gate and the track ordering edge are declared
+  // on the module now.
+  requires: ["authoring-track"],
+  gatedBy: (decisions) => decisions["authoring-track"]?.value === "copy",
 };
 export default mod;

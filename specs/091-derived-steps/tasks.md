@@ -55,24 +55,24 @@ before any user story.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 Implement `deriveScreens(modules)` in packages/studio/src/decisions/deriveScreens.ts
+- [x] T005 Implement `deriveScreens(modules)` in packages/studio/src/decisions/deriveScreens.ts
   per the data-model.md contract: order with the existing `orderByDependencies` (no second
   sort), partition into singleton custom screens and maximal same-`group` question runs, split
   a run at a group change or an intervening singleton, derive each screen's gate (present iff
   every member decision is gated) and trail structure via the existing `deriveStepStructure`
   logic; fail-fast named errors for the data-model validation rules; no store access, no
   component imports
-- [ ] T006 Write the derivation unit tests in packages/studio/src/decisions/deriveScreens.test.ts:
+- [x] T006 Write the derivation unit tests in packages/studio/src/decisions/deriveScreens.test.ts:
   singleton formation, merged question run, split run repeating the group label, group
   disagreement split, all-gated screen skipped while a partially gated screen is walked, the
   frozen trails (project_name → characters, touch_seed_source → touch), and each validation
   error
-- [ ] T007 Create the frozen legacy-id map in packages/studio/src/decisions/legacyStepIds.ts:
+- [x] T007 Create the frozen legacy-id map in packages/studio/src/decisions/legacyStepIds.ts:
   all 18 step ids from `main` at 18e63aa4 (identity, layout, choose_base, track, project_name,
   characters, marks, punctuation, invisibles, convenience, carve, deadkeys, rules, mechanisms,
   touch_seed_source, touch, help, package — inventoried in research.md) mapped to the screen id
   holding that step's decisions, with `done`/`unsupported` documented as pass-through terminals
-- [ ] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
+- [x] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
   packages/studio/src/steps/stepOrder.ts, keeping the exported shapes identical so existing
   consumers (`stores/workingCopyStore.ts` ranking, `steps/advance.ts`) compile unchanged
 

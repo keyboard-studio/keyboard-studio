@@ -85,5 +85,9 @@ const mod: QuestionModule = {
   inputs: [],
   writes: [],
   provides: ["authoring-track"],
+  // Spec 091 FR-003 re-homing (Delta P1): the track step's ordering edge
+  // lived only in steps/stepDependencies.ts (`requires: ["base-keyboard"]`);
+  // it is declared on the module now so the derived order carries it.
+  requires: ["base-keyboard"],
 };
 export default mod;

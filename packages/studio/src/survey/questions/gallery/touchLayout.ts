@@ -34,6 +34,7 @@ export interface TouchLayoutValue {
 const touchLayout: GalleryModule<TouchLayoutValue> = {
   definition,
   provides: ["touch-layout"],
+  screen: "touch",
   requires: ["physical-layout", "touch-seed-source"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

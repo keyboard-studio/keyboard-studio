@@ -44,6 +44,7 @@ const MARKS_WRITES: readonly IRPath[] = [irPath("groups"), irPath("stores")];
 const marksTreatment: GalleryModule<MarksTreatmentValue> = {
   definition,
   provides: ["marks-treatment"],
+  screen: "marks",
   requires: ["character-inventory"],
   inputs: [],
   writes: MARKS_WRITES,

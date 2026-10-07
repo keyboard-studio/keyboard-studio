@@ -220,3 +220,48 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   safe for component-layer consumers (manifest seam, StepHost, tests) but
   may be mid-initialisation when `stepOrder`'s top level runs. T008 will
   verify empirically and stop-and-report rather than adapt if it bites.
+
+## Phase 2 deltas (2026-10-07, for lead ratification)
+
+- **Delta P1 — the track step's ordering edge lived only in
+  `stepDependencies.ts`.** `track_choice` declared no `requires`; the
+  `track` step's `requires: ["base-keyboard"]` had no module-level source,
+  so the derived order sorted track (and project_name) before
+  layout/choose_base. Re-homed per FR-003: `track_choice` now declares
+  `requires: ["base-keyboard"]`.
+- **Delta P2 — research.md's project_name gate claim is falsified.**
+  research.md held that project_name's copy-track gate "is already a
+  property of its questions' routing". It is not: `track_choice`'s
+  `next: null`, the copy/adapt fork is manifest-level
+  (`StudioShell.handleTrackSelected`), and neither project_name module
+  declared a gate. Re-homed per FR-003: `project_display_name` declares
+  `requires: ["authoring-track"]` and
+  `gatedBy: (d) => d["authoring-track"]?.value === "copy"`;
+  `project_keyboard_id` declares the same `gatedBy`. With P1+P2 the
+  derived screens reproduce the frozen baseline exactly — all 17 screens
+  in step order, project_name a gated side trail joining `characters`,
+  touch_seed_source a gated side trail joining `touch` (pinned in
+  `decisions/deriveScreens.test.ts`).
+- **Delta P3 — the per-flow loader assumed flow-local `requires`.**
+  `loadDerivedFlowDef` sorts one flow's modules alone, and
+  `orderByDependencies` fail-fast throws on a requirement with no provider
+  in the set — so P1/P2's cross-flow edges broke every
+  `loadFlowSourceDef` call for the track and project_name flows (8 tests
+  in `dashboard/buildStepGraph.test.ts`). The cross-flow edge carries no
+  information for a flow's internal order (the provider is not a member),
+  so `survey/loadDerivedFlow.ts` now scopes each module's `requires` to
+  the decisions its own flow provides before sorting, and maps the sorted
+  copies back to the original modules. Unresolved-requirement diagnosis
+  still fires in the full-list derivation and the registry provider
+  index. This file is 087 machinery, not a named 091 task — flagged for
+  ratification; reversible in one commit if the lead prefers the
+  external-providers treatment inside the sort itself.
+- **T008 outcome — the D-090-7 init-cycle did not bite.** `stepOrder.ts`
+  now derives `STEP_ORDER` / `STEP_TRAILS` from `deriveScreens` over the
+  registry's `decisionModules` (plus the ruled terminal `package`), and
+  the Phase 2 gate batch (survey + decisions + steps + dashboard suites,
+  131 files / 4192 tests, all green) shows no TDZ or partially-initialised
+  registry failure under any entry order those suites exercise. The
+  depcruise cycle edge is type-level at runtime. If a future 090 restack
+  changes the gallery renderers' store imports, this is the first place
+  to re-check.

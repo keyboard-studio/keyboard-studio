@@ -32,6 +32,7 @@ export type { BaseKeyboardValue };
 const baseKeyboard: GalleryModule<BaseKeyboardValue> = {
   definition,
   provides: ["base-keyboard"],
+  screen: "choose_base",
   requires: ["language-code", "target-script"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

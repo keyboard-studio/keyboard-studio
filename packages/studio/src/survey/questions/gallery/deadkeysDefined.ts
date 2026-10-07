@@ -33,6 +33,7 @@ export interface DeadkeysDefinedValue {
 const deadkeysDefined: GalleryModule<DeadkeysDefinedValue> = {
   definition,
   provides: ["deadkeys-defined"],
+  screen: "deadkeys",
   requires: ["carved-layout"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

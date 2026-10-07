@@ -43,6 +43,7 @@ export interface CarvedLayoutValue {
 const carvedLayout: GalleryModule<CarvedLayoutValue> = {
   definition,
   provides: ["carved-layout"],
+  screen: "carve",
   requires: ["base-keyboard", "windows-layout", "marks-treatment", "punctuation-inventory", "invisibles-inventory", "retained-convenience-chars"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

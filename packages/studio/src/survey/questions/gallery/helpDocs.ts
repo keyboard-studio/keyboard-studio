@@ -30,6 +30,7 @@ export interface HelpDocsValue {
 const helpDocs: GalleryModule<HelpDocsValue> = {
   definition,
   provides: ["help-docs"],
+  screen: "help",
   requires: ["physical-layout", "touch-layout"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

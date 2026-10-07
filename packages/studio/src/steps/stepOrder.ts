@@ -1,10 +1,12 @@
 // stepOrder — the wizard's step order and side-trail structure, DERIVED.
 //
-// The decision registry is the single source of order (spec 087 Q3). Steps
-// declare provides / requires / gatedBy (steps/stepDependencies.ts) and are
-// sorted by the same implementation that orders questions
-// (decisions/orderDecisions.ts `orderByDependencies`) — there is no second sort
-// and no hand-maintained list of step ids.
+// The decision registry is the single source of order (spec 087 Q3), and
+// since spec 091 T008 the step order is the DERIVED SCREEN order
+// (decisions/deriveScreens.ts over the registry's decisionModules): screens
+// are what the wizard walks, so STEP_ORDER is their ids, plus the ruled
+// terminal "package" screen (no module settles it; it packages the derived
+// result). steps/stepDependencies.ts still exists until T016 deletes it,
+// but it is no longer the source for STEP_ORDER.
 //
 // Exists as plain data so a store can order per-step data by the wizard order
 // without importing the manifest itself (which imports every step component,
@@ -12,8 +14,16 @@
 // the manifest array equals STEP_ORDER, so they cannot drift.
 
 import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
-import { orderByDependencies } from "../decisions/orderDecisions.ts";
-import { DECLARED_STEP_IDS, stepDependencies } from "./stepDependencies.ts";
+import { deriveStepStructure, orderByDependencies } from "../decisions/orderDecisions.ts";
+import type { StepTrail } from "../decisions/orderDecisions.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
+import { decisionModules } from "../survey/questions/registry.ts";
+
+// The trail derivation lives in decisions/orderDecisions.ts (spec 091 —
+// decisions/deriveScreens.ts applies it to screens and may not import
+// steps/); re-exported here for this module's existing consumers.
+export { deriveStepStructure };
+export type { StepTrail };
 
 /** What the sort reads from a step. */
 export interface StepOrderable {
@@ -28,45 +38,24 @@ export function orderSteps<T extends StepOrderable>(steps: readonly T[]): T[] {
   return orderByDependencies(steps, (s) => s);
 }
 
-/**
- * A step's place in the flow, derived rather than flagged.
- *
- * spine: false  — the step is conditionally gated (a side trail).
- * joinTarget    — a side trail's next UNGATED successor in the derived order:
- *                 where it rejoins the main line. Absent on spine steps, and
- *                 absent on a gated step with no ungated successor (a dead end,
- *                 which completeness check C3 reports).
- */
-export interface StepTrail {
-  readonly spine: boolean;
-  readonly joinTarget?: string;
-}
+const derivedScreens = deriveScreens(decisionModules);
 
-/**
- * Derive each step's trail from an already-ordered step list: a step with a
- * `gatedBy` is a side trail and rejoins at the next step without one.
- */
-export function deriveStepStructure(
-  ordered: readonly Pick<StepOrderable, "id" | "gatedBy">[],
-): ReadonlyMap<string, StepTrail> {
-  const trails = new Map<string, StepTrail>();
-  ordered.forEach((step, i) => {
-    if (step.gatedBy === undefined) {
-      trails.set(step.id, { spine: true });
-      return;
-    }
-    const join = ordered.slice(i + 1).find((s) => s.gatedBy === undefined);
-    trails.set(step.id, join === undefined ? { spine: false } : { spine: false, joinTarget: join.id });
-  });
-  return trails;
-}
-
-const orderedSteps = orderSteps(
-  DECLARED_STEP_IDS.map((id) => ({ id, ...stepDependencies(id) })),
-);
-
-/** The wizard's step ids, in derived order. */
-export const STEP_ORDER: readonly string[] = orderedSteps.map((s) => s.id);
+/** The wizard's step ids, in derived order (derived screens + "package"). */
+export const STEP_ORDER: readonly string[] = [
+  ...derivedScreens.map((s) => s.id),
+  "package",
+];
 
 /** Each step's derived trail (spine membership and join target), by id. */
-export const STEP_TRAILS: ReadonlyMap<string, StepTrail> = deriveStepStructure(orderedSteps);
+export const STEP_TRAILS: ReadonlyMap<string, StepTrail> = new Map<string, StepTrail>([
+  ...derivedScreens.map(
+    (s) =>
+      [
+        s.id,
+        s.joinTarget !== undefined
+          ? { spine: s.spine, joinTarget: s.joinTarget }
+          : { spine: s.spine },
+      ] as const,
+  ),
+  ["package", { spine: true }],
+]);

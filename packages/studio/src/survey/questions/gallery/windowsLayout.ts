@@ -32,6 +32,7 @@ export type { WindowsLayoutValue };
 const windowsLayout: GalleryModule<WindowsLayoutValue> = {
   definition,
   provides: ["windows-layout"],
+  screen: "layout",
   requires: ["language-code"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

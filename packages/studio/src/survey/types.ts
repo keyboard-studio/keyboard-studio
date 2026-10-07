@@ -349,6 +349,27 @@ export interface QuestionModule {
   group?: string;
 
   /**
+   * Declared screen key (spec 091, FR-002/FR-004): for a custom
+   * (component-renderer) module, the id of the singleton screen it forms.
+   * Seeded with today's step ids on the gallery modules, so derived screen
+   * ids keep the author's vocabulary (deep links, draft history). Absent on
+   * question modules (their screen id is their `group`). Never affects
+   * order.
+   */
+  screen?: string;
+
+  /**
+   * Declared visibility gate (spec 091 FR-003) for modules whose gate is
+   * not routing-derived: returns true when the module is asked. Question
+   * modules' gates stay derived from conditional `next` routing
+   * (`effectiveGatedBy` in decisions/orderDecisions.ts — the one source);
+   * this field is for custom modules, whose step-level `gatedBy` in
+   * steps/stepDependencies.ts moves here. A screen's gate is derived from
+   * its members' gates by `deriveScreens`.
+   */
+  gatedBy?: (decisions: DecisionSet) => boolean;
+
+  /**
    * Base-keyboard probe: read this module's decisions from the import bundle
    * (spec 087 Q1) instead of asking the author. Return `undefined` when the
    * bundle carries no evidence for the decision. The result runs through

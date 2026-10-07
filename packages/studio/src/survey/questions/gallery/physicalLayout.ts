@@ -30,6 +30,7 @@ export interface PhysicalLayoutValue {
 const physicalLayout: GalleryModule<PhysicalLayoutValue> = {
   definition,
   provides: ["physical-layout"],
+  screen: "mechanisms",
   requires: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the

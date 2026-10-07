@@ -30,6 +30,7 @@ export interface RuleSetValue {
 const ruleSet: GalleryModule<RuleSetValue> = {
   definition,
   provides: ["rule-set"],
+  screen: "rules",
   requires: ["deadkeys-defined", "windows-layout"],
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the
