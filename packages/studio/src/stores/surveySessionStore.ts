@@ -484,8 +484,6 @@ export interface SurveySessionState {
    */
   hydrate: (snapshot: SurveySessionSnapshot) => void;
 
-
-
   /** Plain setter — local base driving the compile pipeline. */
   setLocalBase: (b: BaseKeyboard | null) => void;
 
