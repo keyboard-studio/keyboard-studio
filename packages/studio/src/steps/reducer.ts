@@ -661,6 +661,39 @@ const APPLY_CHANNEL_AUTHORIZATION: ReadonlyArray<{
 ];
 
 /**
+ * Verify a patch's channels against the A3 authorization table. Returns
+ * true when the patch carries at least one channel (the sink should be
+ * called); an unauthorized channel throws {@link ApplyChannelError} before
+ * anything is applied — no partial patch (A3).
+ *
+ * Shared by `applyDecisionEffects` below and by the gallery host
+ * (steps/galleryHost.tsx, spec 090 T005), which runs gallery modules'
+ * applies through exactly the same authorization as question modules'.
+ */
+export function assertPatchChannelsAuthorized(
+  questionId: string,
+  mod: { provides?: readonly Decision["id"][]; writes?: readonly IRPath[] },
+  patch: WorkingCopyPatch,
+): boolean {
+  const writes = mod.writes ?? [];
+  const channels = (Object.keys(patch) as Array<keyof WorkingCopyPatch>).filter(
+    (channel) => patch[channel] !== undefined,
+  );
+  if (channels.length === 0) return false;
+  for (const channel of channels) {
+    if (channel === "ir") {
+      if (writes.length === 0) throw new ApplyChannelError(questionId, channel);
+      continue;
+    }
+    const rule = APPLY_CHANNEL_AUTHORIZATION.find((r) => r.channel === channel);
+    if (rule === undefined || !(mod.provides ?? []).includes(rule.decisionId)) {
+      throw new ApplyChannelError(questionId, channel);
+    }
+  }
+  return true;
+}
+
+/**
  * Run the decision effects of a completed step's answers.
  *
  * For each answer whose module declares `apply`: build the ApplyContext
@@ -689,20 +722,7 @@ export function applyDecisionEffects(
       currentHistoryEntryState: deps.getHistoryEntryState?.() ?? null,
     };
     const patch = mod.apply(answer.value as string | string[] | undefined, ctx);
-    const channels = (Object.keys(patch) as Array<keyof WorkingCopyPatch>).filter(
-      (channel) => patch[channel] !== undefined,
-    );
-    if (channels.length === 0) continue;
-    for (const channel of channels) {
-      if (channel === "ir") {
-        if (writes.length === 0) throw new ApplyChannelError(answer.questionId, channel);
-        continue;
-      }
-      const rule = APPLY_CHANNEL_AUTHORIZATION.find((r) => r.channel === channel);
-      if (rule === undefined || !(mod.provides ?? []).includes(rule.decisionId)) {
-        throw new ApplyChannelError(answer.questionId, channel);
-      }
-    }
+    if (!assertPatchChannelsAuthorized(answer.questionId, mod, patch)) continue;
     deps.applyWorkingCopyPatch(patch, writes);
   }
 }

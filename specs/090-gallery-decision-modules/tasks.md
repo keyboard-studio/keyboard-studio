@@ -63,7 +63,7 @@ the recording of the owner's carve ruling (T003, resolved).
   packages/studio/src/decisions/decisionTypes.ts and packages/studio/src/survey/types.ts,
   with the question-module snapshot updated in
   packages/studio/src/survey/questions/__snapshots__/questionModules.test.ts.snap
-- [ ] T005 Gallery host: render a module's `renderer` with the `decisionStore` value for its
+- [x] T005 Gallery host: render a module's `renderer` with the `decisionStore` value for its
   decision; `onChange` records the decision and runs the module's `apply` through 089's
   runner — the first runtime reader of `module.renderer` — in
   packages/studio/src/steps/galleryHost.tsx, wired into the manifest/StepHost path in

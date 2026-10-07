@@ -25,6 +25,8 @@
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
+import { galleryModules } from "../survey/questions/registry.ts";
+import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
 import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
@@ -293,6 +295,27 @@ export const manifest: readonly Step[] = ((): readonly Step[] => {
   return found;
   });
 })();
+
+/**
+ * Gallery-hosted steps (spec 090 T005): step id → the gallery module that
+ * settles the step's gallery decision. Derived, not listed: a step appears
+ * here exactly when one of the decisions in its `provides` (the step's
+ * `settles`, spread from stepDependencies) is provided by a registered
+ * gallery module. Step wrappers and StepHost resolve their module through
+ * this map and render it via the gallery host (steps/galleryHost.tsx);
+ * per-step adapters retire per story (US1–US5), not here. A step settling
+ * two gallery decisions would be ambiguous — the coverage test
+ * (decisions/galleryModules.coverage.test.ts) pins one provider per
+ * settles id, and no step settles more than one.
+ */
+export const galleryModuleByStep: ReadonlyMap<string, QuestionModule> = new Map(
+  manifest.flatMap((step) => {
+    const mod = galleryModules.find((m) =>
+      (m.provides ?? []).some((id) => (step.provides ?? []).includes(id)),
+    );
+    return mod === undefined ? [] : [[step.id, mod] as const];
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M3, M5, layout).
