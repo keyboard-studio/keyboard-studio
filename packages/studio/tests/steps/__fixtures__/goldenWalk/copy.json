@@ -141,10 +141,13 @@
       "carve"
     ],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
@@ -161,10 +164,13 @@
     "stepId": "rules",
     "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {

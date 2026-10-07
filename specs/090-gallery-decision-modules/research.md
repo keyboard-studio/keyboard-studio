@@ -1557,3 +1557,26 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   card state) leaving hand removals identical, and the empty
   overlay recording an empty value; plus `currentCarvedLayoutValue`
   against the live store. 20/20 across the three suites.
+
+- **D-090-36 — T037 gate: golden-walk fixture regeneration,
+  adjudicated (two `record` deltas, both intended).** The walk
+  failed against the T029-era fixtures with exactly two
+  insertions per track, nothing else: (1) the `carve` step's
+  `decisionMutations [] → ["record"]` (+ `record` leading its
+  storeMutations) — T032's CarveAdapter recording firing in the
+  harness (the real adapter wraps the mocked gallery, so the
+  recording is exercised here even though the gallery is a
+  stub); (2) the `rules` step's identical delta — T034's
+  RulesStep recording, latent since T034 because the walk was
+  not among that slice's gates (D-090-26's list). No
+  workingCopyMutations changed anywhere — the applied view is
+  untouched, exactly as ruling D-090-30 requires (recording
+  added; the projection still produces the view). `deadkeys`
+  shows no record because the harness mocks deadkeyAdapter
+  (studioShellMocks stub) — T033's recording is covered by the
+  deadkey suites, not the walk. Regenerated with the harness's
+  write-on-first-run mechanism; the old↔new JSON diff is
+  exactly the two insertions per track. This is the same
+  adjudicated family as the T013 and T029 regenerations: a new
+  decision recording at a migrated step is the migration's
+  intended signature, not drift.
