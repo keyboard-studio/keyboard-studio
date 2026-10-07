@@ -292,7 +292,34 @@ describe("runLiveExtraction — failure and idempotence", () => {
     });
     runLiveExtraction({ modules: [holder, autonym], ctx: ctx(), store });
     const afterFirst = store.decisions;
-    runLiveExtraction({ modules: [holder, autonym], ctx: ctx(), store });
+    const second = runLiveExtraction({ modules: [holder, autonym], ctx: ctx(), store });
     expect(store.decisions).toEqual(afterFirst);
+    // Store-level idempotence (the G-9 render-path contract): the second
+    // run writes NOTHING — no re-seeded record objects, no repeated
+    // offers. A value-identical re-seed that still replaced the record
+    // objects would churn the live decisions map's identity on every
+    // pass and loop SurveyRunner's render (the flow-driver hang).
+    expect(second).toEqual({ seeded: [], offered: [] });
+    expect(store.decisions["copyright-holder"]).toBe(afterFirst["copyright-holder"]);
+    expect(store.decisions["language-autonym"]).toBe(afterFirst["language-autonym"]);
+  });
+
+  it("an offer already standing beside an answer is not rewritten", () => {
+    const holder = stubModule("il_copyright_holder", {
+      provides: ["copyright-holder"],
+      extract: () => "(c) X",
+    });
+    const store = fakeStore({
+      "copyright-holder": {
+        id: "copyright-holder",
+        value: "(c) Author",
+        provenance: "asked",
+        offered: "(c) X",
+      },
+    });
+    const before = store.decisions["copyright-holder"];
+    const result = runLiveExtraction({ modules: [holder], ctx: ctx(), store });
+    expect(result).toEqual({ seeded: [], offered: [] });
+    expect(store.decisions["copyright-holder"]).toBe(before);
   });
 });

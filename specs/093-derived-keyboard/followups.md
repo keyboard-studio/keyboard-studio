@@ -244,3 +244,36 @@ re-proposed (the core's `offered` path), never silently dropped.
 Exact strings are the implementer's, against that requirement. The
 wire-in remains scheduled for the final pass (post-091 restack), not
 a standalone change on this tree.
+
+## FINAL PASS (2026-10-07) — the non-terminating flow-driver family: CAUSE FOUND AND FIXED
+
+The three files (`survey/PhaseFAdaptiveDescription.integration.test.tsx`,
+`survey/PhaseFContactSeed.integration.test.tsx`,
+`editors/adapters/panelAdapters.test.tsx` IdentityLite block) hung on the
+completed stack. Inspector evidence (worker paused mid-spin, twice, plus a
+12s CPU profile): the stack is SurveyRunner render → callerProposal →
+recordProposal → runLiveExtractionFromStores → the ordering/gating
+machinery, with samples spread across orderByDependencies /
+routingPredecessors / filterGated and React diffing — i.e. the extraction
+pass re-running in a render loop, not a loop inside any one function.
+
+Mechanism: spec 092's G-9 makes SurveyRunner re-run the live extraction
+pass at question-push time when a question has no record. The pass's
+documented idempotence was VALUE-level only: its re-seed branch rewrote
+every extracted/default record with a fresh object on every pass
+(proven: passes 2 and 3 over the initial stores re-seeded
+`help-history-entry` + `help-more-detail` and replaced both record
+objects). `recordAll` therefore churned the decisions map's identity on
+every pass → IdentityLiteAdapter (subscribed to the whole map) re-rendered
+→ SurveyRunner re-rendered → recordProposal re-ran the pass → forever.
+On the intermediate stack the pass THREW (the authoring-track edge)
+before writing, which masked the loop as ordinary failures; 092's A2
+edge fix removed the throw and exposed the loop.
+
+Fix (this branch): `runLiveExtraction` is now idempotent at the STORE
+level — a re-seed or an offer that would store exactly what is already
+held (deep-equal over the full record) writes nothing. Pinned in
+liveExtraction.test.ts (second run returns {seeded: [], offered: []} and
+record objects are identical; an already-standing offer is not
+rewritten). All three files now terminate and pass: panelAdapters 10/10,
+Phase F pair 9/9.

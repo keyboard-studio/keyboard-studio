@@ -94,7 +94,15 @@ function namedThrow(moduleId: string, what: string, err: unknown): Error {
  * module aborts the pass with NOTHING written — a broken extractor is a
  * loud defect, never a partial seed. Idempotent over an unchanged store +
  * bundle: pass-written records are re-seeded with identical values, and
- * author answers only gain/update `offered`.
+ * author answers only gain/update `offered`. Idempotence is at the STORE
+ * level, not just the value level: a re-seed (or an offer) that would
+ * store exactly what is already held writes NOTHING. `recordAll` replaces
+ * record objects wholesale, so an identical re-seed would still churn the
+ * decisions map's identity and re-render every subscriber — and the
+ * runner's question-push re-run (G-9) invokes this pass from inside a
+ * render, where that churn closes an infinite render loop (pass →
+ * recordAll → re-render → pass → …; the flow-driver integration tests
+ * hung on exactly this until the no-op was enforced here).
  */
 export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResult {
   const { modules, ctx, store } = deps;
@@ -193,13 +201,23 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
           ...(valueSource !== undefined ? { source: valueSource } : {}),
           ...(inputs !== undefined ? { inputs } : {}),
         };
+        // Store-level idempotence (see the pass docstring): the record
+        // already held is exactly this record — writing it again would
+        // replace the object and churn the decisions map for no change.
+        if (existing !== undefined && deepEqual(existing, record)) {
+          continue;
+        }
         working[p] = record;
         writes.push(record);
         seeded.push(p);
       } else if (!deepEqual(existing.value, value)) {
         // Already answered: the author's record stands untouched except
         // for `offered` — the extracted/defaulted value beside the answer,
-        // never over it. An identical value is not an offer.
+        // never over it. An identical value is not an offer, and an offer
+        // already standing is not a new write (same idempotence contract).
+        if (deepEqual(existing.offered, value)) {
+          continue;
+        }
         const record: Decision = { ...existing, offered: value };
         working[p] = record;
         writes.push(record);
