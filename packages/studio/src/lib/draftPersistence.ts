@@ -20,6 +20,7 @@
 import {
   AnswerTypeSchema,
   DecisionProposalSourceSchema,
+  type DecisionPayload,
   type DeclaredRole,
 } from "@keyboard-studio/contracts";
 import {
@@ -55,6 +56,7 @@ import { deriveProjectLabel } from "./projectLabel.ts";
 import {
   applyDecisionRecordSnapshot,
   snapshotDecisionRecord,
+  useDecisionLogStore,
 } from "../decisions/decisionLogStore.ts";
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 import { alphabetKeyOf } from "../steps/evidence.ts";
@@ -1469,6 +1471,46 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
       if (!decisions.unreadable) {
         applyDecisionRecordSnapshot(decisions.record, decisions.droppedCount);
       }
+    }
+
+    // migrationOrphans → the decision trail (spec 088 T030; OPEN-088-1
+    // ruled by the owner 2026-10-06, km-lead proposals Q1: the trail is the
+    // surface). Each orphaned v1 answer — a question this build no longer
+    // has — is appended as an ordinary survey-answer entry carrying its
+    // value, so the author can see what the old draft held and re-answer
+    // it in the current questions. The entry uses the trail's existing
+    // shape throughout: the unresolvable question id renders through the
+    // trail's normal degraded-label path (FR-035), and provenance is
+    // "hand-set" — the truthful floor for a value the author gave, with
+    // no proposal evidence surviving migration (the same floor
+    // recordSurveyAnswers uses). Appending is idempotent: the log's
+    // append() no-ops an identical (slot, payload, provenance) revisit,
+    // so re-applying the same migrated envelope cannot duplicate entries.
+    for (const orphan of envelope.migrationOrphans ?? []) {
+      const value = orphan.value;
+      // DecisionPayload's survey-answer variant is discriminated by
+      // answerType, so the payload is built per value shape.
+      const payload: DecisionPayload =
+        typeof value === "boolean"
+          ? { kind: "survey-answer", questionId: orphan.questionId, answerType: "boolean", value }
+          : Array.isArray(value)
+            ? {
+                kind: "survey-answer",
+                questionId: orphan.questionId,
+                answerType: "char-list",
+                value: value as string[],
+              }
+            : {
+                kind: "survey-answer",
+                questionId: orphan.questionId,
+                answerType: "text",
+                value: value as string,
+              };
+      useDecisionLogStore.getState().append({
+        stepId: orphan.stepId,
+        payload,
+        provenance: { agency: "hand-set" },
+      });
     }
 
     return { ok: true };
