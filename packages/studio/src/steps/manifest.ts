@@ -1,10 +1,11 @@
 // manifest — the survey steps, in DERIVED order (not a hand-ordered list).
 //
 // The decision registry is the single source of order (spec 087 Q3, SC-003).
-// Each step below is a declaration — component, inputs, writes, persistence —
-// held in an unordered pool. Its provides / requires / gatedBy come from
-// steps/stepDependencies.ts, and `manifest` is the pool sorted by the same
-// sort that orders questions (steps/stepOrder.ts → decisions/orderDecisions.ts).
+// Each step below is a host declaration — component, inputs, writes,
+// persistence — held in an unordered pool. What a screen settles, needs,
+// and when it is walked is derived from the decision modules
+// (decisions/deriveScreens.ts, spec 091); `manifest` is the pool arranged
+// by that derived screen order via buildManifest below.
 // Nothing in this file says what comes before what.
 //
 // The runtime (T028) and the dashboard (T031) both read `manifest`. Editing a
@@ -25,14 +26,19 @@
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
-import { decisionModules, galleryModules } from "../survey/questions/registry.ts";
-import { deriveScreens } from "../decisions/deriveScreens.ts";
+import {
+  decisionModules,
+  declaredScreenGates,
+  galleryModules,
+} from "../survey/questions/registry.ts";
+import { deriveScreens, type DerivedScreen } from "../decisions/deriveScreens.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import type { StepTrail } from "../decisions/orderDecisions.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
 import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
-import { stepDependencies } from "./stepDependencies.ts";
-import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
+import { STEP_ORDER } from "./stepOrder.ts";
 import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
 import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
 import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
@@ -68,7 +74,6 @@ import {
 const charactersStep: Step = {
   kind: "editor-step",
   id: "characters",
-  ...stepDependencies("characters"),
   title: "Characters",
   inputs: [],
   // DEC-D1 (subsumption, Matt 2026-06-29): the opaque charactersStep subsumes the
@@ -149,7 +154,6 @@ const stepPool: readonly Step[] = [
   {
     kind: "editor-step",
     id: "marks",
-    ...stepDependencies("marks"),
     title: "Accents & marks",
     inputs: [],
     // spec 078: the step's own write is the context-tolerance decision; these
@@ -176,7 +180,6 @@ const stepPool: readonly Step[] = [
   {
     kind: "editor-step",
     id: "punctuation",
-    ...stepDependencies("punctuation"),
     title: "Punctuation",
     inputs: [],
     writes: [],
@@ -204,7 +207,6 @@ const stepPool: readonly Step[] = [
   {
     kind: "editor-step",
     id: "invisibles",
-    ...stepDependencies("invisibles"),
     title: "Invisible characters",
     inputs: [],
     writes: [],
@@ -226,7 +228,6 @@ const stepPool: readonly Step[] = [
   {
     kind: "editor-step",
     id: "convenience",
-    ...stepDependencies("convenience"),
     title: "Convenience letters",
     inputs: [],
     writes: [],
@@ -320,23 +321,65 @@ export const manifest: readonly Step[] = ((): readonly Step[] => {
 })();
 
 /**
- * Gallery-hosted steps (spec 090 T005): step id → the gallery module that
- * settles the step's gallery decision. Derived, not listed: a step appears
- * here exactly when one of the decisions in its `provides` (the step's
- * `settles`, spread from stepDependencies) is provided by a registered
- * gallery module. Step wrappers and StepHost resolve their module through
- * this map and render it via the gallery host (steps/galleryHost.tsx);
- * per-step adapters retire per story (US1–US5), not here. A step settling
- * two gallery decisions would be ambiguous — the coverage test
+ * The derived screens of the live registry, computed once (spec 091).
+ * The manifest above is arranged by these screens; the gate and trail
+ * views below are published from the same derivation so every consumer
+ * reads one source.
+ */
+export const derivedScreens: readonly DerivedScreen[] = deriveScreens(
+  decisionModules,
+  declaredScreenGates,
+);
+
+/**
+ * Derived screen gates by screen id (spec 091 T015): present only for a
+ * screen whose every member decision is gated. Steps no longer carry
+ * `gatedBy` (T014) — gate reads (steps/advance.ts, lib/resolveLocation.ts
+ * via its ResolveContext) come from here.
+ */
+export const screenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
+  new Map(
+    derivedScreens.flatMap((s) =>
+      s.gatedBy !== undefined ? [[s.id, s.gatedBy] as const] : [],
+    ),
+  );
+
+/**
+ * Derived screen trails by screen id (spine membership + join target),
+ * including the ruled terminal "package" screen (ungated spine). The
+ * Flow Map and completeness checks read trails from here (spec 091 T014)
+ * instead of re-deriving them from step declarations.
+ */
+export const screenTrails: ReadonlyMap<string, StepTrail> = new Map<string, StepTrail>([
+  ...derivedScreens.map(
+    (s) =>
+      [
+        s.id,
+        s.joinTarget !== undefined
+          ? { spine: s.spine, joinTarget: s.joinTarget }
+          : { spine: s.spine },
+      ] as const,
+  ),
+  ["package", { spine: true }],
+]);
+
+/**
+ * Gallery-hosted steps (spec 090 T005): screen id → the gallery module
+ * that settles the screen's gallery decision. Derived from screen
+ * membership (spec 091 T014): a screen appears here exactly when one of
+ * its member decisions is provided by a registered gallery module. Step
+ * wrappers and StepHost resolve their module through this map and render
+ * it via the gallery host (steps/galleryHost.tsx). A screen settling two
+ * gallery decisions would be ambiguous — the coverage test
  * (decisions/galleryModules.coverage.test.ts) pins one provider per
- * settles id, and no step settles more than one.
+ * settles id, and no screen settles more than one.
  */
 export const galleryModuleByStep: ReadonlyMap<string, QuestionModule> = new Map(
-  manifest.flatMap((step) => {
+  derivedScreens.flatMap((screen) => {
     const mod = galleryModules.find((m) =>
-      (m.provides ?? []).some((id) => (step.provides ?? []).includes(id)),
+      (m.provides ?? []).some((id) => screen.decisionIds.includes(id)),
     );
-    return mod === undefined ? [] : [[step.id, mod] as const];
+    return mod === undefined ? [] : [[screen.id, mod] as const];
   }),
 );
 
@@ -362,7 +405,7 @@ export function validateManifestShape(): void {
   if (ids.length !== STEP_ORDER.length || ids.some((id, i) => id !== STEP_ORDER[i])) {
     throw new Error(`[manifest] manifest order is not the derived STEP_ORDER`);
   }
-  for (const [id, trail] of STEP_TRAILS) {
+  for (const [id, trail] of screenTrails) {
     if (!trail.spine && trail.joinTarget === undefined) {
       throw new Error(`[manifest] gated step "${id}" has no ungated successor to rejoin at`);
     }

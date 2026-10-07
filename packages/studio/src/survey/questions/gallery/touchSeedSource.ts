@@ -2,11 +2,12 @@
 //
 // Migrated in T012 (US1): the renderer is the touch seed fork chooser
 // (survey/touchSeedSource/TouchSeedSourcePanel.tsx), hosted by
-// TouchSeedSourceHost. The step's asked-while-unrecorded gating is
-// declared on the module below (spec 091 FR-003: step-level `gatedBy`
-// moves onto modules); the `touch_seed_source` declaration's identical
-// `gatedBy` in steps/stepDependencies.ts (landed by 088) remains the live
-// source until spec 091 deletes that file. The decision has no
+// TouchSeedSourceHost. The step's asked-while-unrecorded gating is a
+// SCREEN gate, declared in the registry's `declaredScreenGates` (spec 091
+// Delta P6: spec 087 FR-005 forbids a module-level gatedBy; the gate is
+// not routing-expressible for a custom screen); the identical `gatedBy`
+// in steps/stepDependencies.ts (landed by 088) remains the live source
+// until spec 091 deletes that file. The decision has no
 // working-copy effect of its own (the touch
 // step's derivation reads the recorded value), so `apply` is empty.
 // Boundary (FR-003): a gallery module is a pure descriptor — no store
@@ -31,9 +32,6 @@ const touchSeedSource: GalleryModule<TouchSeedSourceValue> = {
   provides: ["touch-seed-source"],
   screen: "touch_seed_source",
   requires: ["physical-layout"],
-  // Asked only while no choice is recorded (spec 091 FR-003 — the
-  // step-level gate from stepDependencies, moved onto the module).
-  gatedBy: (decisions) => decisions["touch-seed-source"] === undefined,
   inputs: [],
   // decisionIRPaths maps this decision to [] today; a story that gives the
   // module real IR writes updates decisionIRPaths in the same change

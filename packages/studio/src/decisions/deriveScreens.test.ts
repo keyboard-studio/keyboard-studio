@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import type { QuestionModule } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
-import { decisionModules } from "../survey/questions/registry.ts";
+import { decisionModules, declaredScreenGates } from "../survey/questions/registry.ts";
 import { deriveScreens } from "./deriveScreens.ts";
 
 type Gate = (decisions: DecisionSet) => boolean;
@@ -19,8 +19,7 @@ function questionModule(
     provides?: DecisionId[];
     requires?: readonly DecisionId[];
     group?: string;
-    gatedBy?: Gate;
-    next?: string;
+    next?: string | readonly object[];
   } = {},
 ): QuestionModule {
   const { next, ...rest } = opts;
@@ -39,7 +38,6 @@ function customModule(
     provides?: DecisionId[];
     requires?: readonly DecisionId[];
     screen?: string;
-    gatedBy?: Gate;
   } = {},
 ): QuestionModule {
   return {
@@ -154,27 +152,28 @@ describe("deriveScreens — screen formation", () => {
 describe("deriveScreens — gates and trails", () => {
   const copyGate: Gate = (d) => d["authoring-track"]?.value === "copy";
 
-  it("a screen whose every member decision is gated carries the derived gate", () => {
-    const screens = deriveScreens([
-      questionModule("q_track", { provides: ["authoring-track"], group: "track" }),
-      questionModule("q_pname", {
-        provides: ["project-display-name"],
-        requires: ["authoring-track"],
-        group: "project_name",
-        gatedBy: copyGate,
-      }),
-      questionModule("q_pid", {
-        provides: ["project-keyboard-id"],
-        requires: ["project-display-name"],
-        group: "project_name",
-        gatedBy: copyGate,
-      }),
-      customModule("inventory", {
-        provides: ["character-inventory"],
-        requires: ["project-keyboard-id"],
-        screen: "characters",
-      }),
-    ]);
+  it("a screen with a declared gate carries it (Delta P6: composition-layer declaration)", () => {
+    const screens = deriveScreens(
+      [
+        questionModule("q_track", { provides: ["authoring-track"], group: "track" }),
+        questionModule("q_pname", {
+          provides: ["project-display-name"],
+          requires: ["authoring-track"],
+          group: "project_name",
+        }),
+        questionModule("q_pid", {
+          provides: ["project-keyboard-id"],
+          requires: ["project-display-name"],
+          group: "project_name",
+        }),
+        customModule("inventory", {
+          provides: ["character-inventory"],
+          requires: ["project-keyboard-id"],
+          screen: "characters",
+        }),
+      ],
+      new Map([["project_name", copyGate]]),
+    );
     const projectName = screens.find((s) => s.id === "project_name")!;
     expect(projectName.gatedBy).toBeDefined();
     expect(projectName.gatedBy!(decision("authoring-track", "copy"))).toBe(true);
@@ -186,13 +185,21 @@ describe("deriveScreens — gates and trails", () => {
   });
 
   it("a partially gated screen has no screen gate (it is walked; per-question gating applies inside)", () => {
+    // q_pname is routing-gated (reached only on the copy branch); q_note
+    // has no inbound routing at all — so the screen is only partially
+    // gated and carries no screen gate. (A default-branch target would NOT
+    // serve here: the default branch's gate is the negation of the earlier
+    // conditions, so such a member is gated too.)
     const screens = deriveScreens([
-      questionModule("q_track", { provides: ["authoring-track"], group: "track" }),
+      questionModule("q_track", {
+        provides: ["authoring-track"],
+        group: "track",
+        next: [{ condition: "value == 'copy'", goto: "q_pname" }],
+      }),
       questionModule("q_pname", {
         provides: ["project-display-name"],
         requires: ["authoring-track"],
         group: "project_name",
-        gatedBy: copyGate,
       }),
       questionModule("q_note", {
         provides: ["project-keyboard-id"],
@@ -206,20 +213,32 @@ describe("deriveScreens — gates and trails", () => {
   });
 
   it("the screen gate passes when ANY member gate passes", () => {
+    // q_a and q_b are routing-gated by complementary branches of q_pred's
+    // conditional `next` over language-name; q_tail is a non-provider
+    // member reached on the default branch.
     const screens = deriveScreens([
-      questionModule("q_a", {
+      questionModule("q_pred", {
         provides: ["language-name"],
+        group: "h",
+        next: [
+          { condition: "value == 'a'", goto: "q_a" },
+          { condition: "value == 'b'", goto: "q_b" },
+          { default: true, goto: "q_tail" },
+        ],
+      }),
+      questionModule("q_a", {
+        provides: ["language-autonym"],
+        requires: ["language-name"],
         group: "g",
-        gatedBy: (d) => d["language-name"]?.value === "a",
       }),
       questionModule("q_b", {
         provides: ["language-code"],
         requires: ["language-name"],
         group: "g",
-        gatedBy: (d) => d["language-name"]?.value === "b",
       }),
+      questionModule("q_tail", { group: "g" }),
     ]);
-    const g = screens[0]!;
+    const g = screens.find((s) => s.id === "g")!;
     expect(g.gatedBy).toBeDefined();
     expect(g.gatedBy!(decision("language-name", "a"))).toBe(true);
     expect(g.gatedBy!(decision("language-name", "b"))).toBe(true);
@@ -263,7 +282,7 @@ describe("deriveScreens — validation (fail-fast named errors)", () => {
 });
 
 describe("deriveScreens — the live registry list (frozen baseline)", () => {
-  const screens = deriveScreens(decisionModules);
+  const screens = deriveScreens(decisionModules, declaredScreenGates);
 
   it("derives the frozen screen sequence", () => {
     expect(screens.map((s) => s.id)).toEqual([
@@ -325,13 +344,35 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
 });
 
 describe("US1 one-edit (SC-001, pure level) — T009", () => {
-  // The one-line edit: il_language_autonym gains requires: ["base-keyboard"]
-  // in a test registry. Nothing else changes.
+  // The edit: il_language_autonym gains requires: ["base-keyboard"] in a test
+  // registry, and its `next` is re-pointed (null) — under 087 sort semantics
+  // the stale `next: "il_language_code"` would close a routing cycle through
+  // the new requires chain (see the Delta P5 case below). Nothing else
+  // changes; the screens re-derive from the declarations alone.
   const editedModules = decisionModules.map((m) =>
     m.definition.id === "il_language_autonym"
-      ? { ...m, requires: [...(m.requires ?? []), "base-keyboard" as DecisionId] }
+      ? {
+          ...m,
+          requires: [...(m.requires ?? []), "base-keyboard" as DecisionId],
+          definition: { ...m.definition, next: null },
+        }
       : m,
   );
+
+  it("Delta P5 (open): the requires-only edit trips the sort's named cycle error", () => {
+    // The requires edge alone — autonym's `next` still points at
+    // il_language_code, whose decision the autonym now transitively requires
+    // via base-keyboard — closes a cycle the sort names (as a dependency
+    // cycle over the routing chain) under 087 semantics. An earlier
+    // 091 revision dropped such routing edges in the sort; that made SC-002's
+    // injected routing faults silent, so it was reverted (plan.md, Delta P5).
+    const requiresOnly = decisionModules.map((m) =>
+      m.definition.id === "il_language_autonym"
+        ? { ...m, requires: [...(m.requires ?? []), "base-keyboard" as DecisionId] }
+        : m,
+    );
+    expect(() => deriveScreens(requiresOnly)).toThrowError(/cycle/);
+  });
 
   it("baseline: the autonym sits in the single identity screen", () => {
     const identityScreens = deriveScreens(decisionModules).filter((s) => s.id === "identity");

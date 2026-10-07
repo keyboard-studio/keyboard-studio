@@ -5,7 +5,7 @@
 // referential transparency.
 
 import { describe, it, expect } from "vitest";
-import { manifest } from "../steps/manifest.ts";
+import { manifest, screenGates } from "../steps/manifest.ts";
 import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
 import { resolveLocation, type ResolveContext } from "./resolveLocation.ts";
@@ -39,6 +39,8 @@ function decisionsForTrack(track: "copy" | "adapt" | null | undefined): ResolveC
 function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
   const base: ResolveContext = {
     manifest,
+    // Spec 091 T015: the derived screen gates, as liveResolveContext passes.
+    screenGates,
     questionRegistry: REGISTRY,
     traversal: traversal({
       activeStepId: "characters",

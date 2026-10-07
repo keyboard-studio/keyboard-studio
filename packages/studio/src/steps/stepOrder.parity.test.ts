@@ -7,10 +7,12 @@
 // regenerate them from the code under test.
 
 import { describe, expect, it } from "vitest";
-import { manifest } from "./manifest.ts";
-import { STEP_ORDER, STEP_TRAILS, deriveStepStructure, orderSteps } from "./stepOrder.ts";
+import { manifest, screenTrails } from "./manifest.ts";
+import { STEP_ORDER, STEP_TRAILS, orderSteps } from "./stepOrder.ts";
 import { stepDependencies } from "./stepDependencies.ts";
 import { buildManifestStepGraph } from "../dashboard/buildStepGraph.ts";
+import { decisionModules, declaredScreenGates } from "../survey/questions/registry.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
 
 const FROZEN_ORDER = [
   "identity",
@@ -88,8 +90,10 @@ describe("step order parity (frozen hand-ordered manifest vs derivation)", () =>
     expect(sideTrails).toEqual(FROZEN_SIDE_TRAILS);
   });
 
-  it("deriveStepStructure over the manifest agrees with the component-free table", () => {
-    expect(deriveStepStructure(manifest)).toEqual(STEP_TRAILS);
+  it("the derived SCREEN trails (steps/manifest.ts screenTrails) agree with the component-free table", () => {
+    // Spec 091 T014: steps no longer carry gatedBy, so the trail
+    // derivation runs over the derived screens, published by manifest.ts.
+    expect(screenTrails).toEqual(STEP_TRAILS);
   });
 
   it("lock placement order is unchanged (a validation on the derived order, not an input)", () => {
@@ -186,5 +190,94 @@ describe("step order parity (frozen hand-ordered manifest vs derivation)", () =>
         }
       }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-005 parity over the DERIVED SCREENS (spec 091 T017) — REPORT-ONLY
+// while T016 (the stepDependencies.ts deletion) is held for spec 090's
+// completion: the frozen-literal oracle above remains the landing gate
+// until then. These assertions already run as real tests: the derived
+// screens must equal the main@18e63aa4 baseline (the frozen literals
+// above, plus stepDependencies' provides as baseline membership), and
+// ANY difference must be explained by a `requires` edge in the current
+// declarations — enumerated here, never silent. When T016 lands, this
+// block replaces the oracle above and the stepDependencies-based
+// membership baseline is carried over as literals.
+// ---------------------------------------------------------------------------
+
+describe("FR-005 parity over derived screens (spec 091 T017, report-only)", () => {
+  const screens = deriveScreens(decisionModules, declaredScreenGates);
+  const derivedOrder = [...screens.map((s) => s.id), "package"];
+  const screenById = new Map(screens.map((s) => [s.id, s] as const));
+
+  // Transitive requires-reachability between modules (module id -> the
+  // provider module ids it transitively requires).
+  const providerOf = new Map<string, string>();
+  for (const m of decisionModules) {
+    for (const p of m.provides ?? []) providerOf.set(p, m.definition.id);
+  }
+  const byModuleId = new Map(decisionModules.map((m) => [m.definition.id, m] as const));
+  const reachCache = new Map<string, Set<string>>();
+  const requiresReach = (start: string): Set<string> => {
+    const cached = reachCache.get(start);
+    if (cached !== undefined) return cached;
+    const seen = new Set<string>();
+    const walk = (id: string): void => {
+      for (const r of byModuleId.get(id)?.requires ?? []) {
+        const provider = providerOf.get(r);
+        if (provider !== undefined && !seen.has(provider)) {
+          seen.add(provider);
+          walk(provider);
+        }
+      }
+    };
+    walk(start);
+    reachCache.set(start, seen);
+    return seen;
+  };
+  /** Screen `a` must precede screen `b` per a requires edge: some member
+   *  of `b` transitively requires a decision a member of `a` provides. */
+  const edgeExplains = (earlier: string, later: string): boolean => {
+    const a = screenById.get(earlier);
+    const b = screenById.get(later);
+    if (a === undefined || b === undefined) return false;
+    const aModules = new Set(a.moduleIds);
+    return b.moduleIds.some((id) =>
+      [...requiresReach(id)].some((provider) => aModules.has(provider)),
+    );
+  };
+
+  it("screen order equals the frozen baseline, or every inversion is edge-explained", () => {
+    const unexplained: string[] = [];
+    for (let i = 0; i < FROZEN_ORDER.length; i++) {
+      for (let j = i + 1; j < FROZEN_ORDER.length; j++) {
+        const a = FROZEN_ORDER[i]!;
+        const b = FROZEN_ORDER[j]!;
+        if (derivedOrder.indexOf(a) < derivedOrder.indexOf(b)) continue;
+        // Baseline a-before-b is inverted in the derivation: explained
+        // iff a requires edge orders a after b.
+        if (!edgeExplains(b, a)) unexplained.push(`${a} before ${b} (baseline) inverted, unexplained`);
+      }
+    }
+    expect(unexplained).toEqual([]);
+  });
+
+  it("screen membership equals the baseline membership (stepDependencies provides)", () => {
+    for (const id of FROZEN_ORDER) {
+      if (id === "package") continue;
+      const screen = screenById.get(id);
+      expect(screen, id).toBeDefined();
+      const baseline = [...stepDependencies(id).provides].sort();
+      expect([...screen!.decisionIds].sort(), id).toEqual(baseline);
+    }
+  });
+
+  it("screen trails equal the frozen side-trail baseline", () => {
+    for (const s of screens) {
+      const expectedJoin = FROZEN_SIDE_TRAILS[s.id];
+      expect(s.joinTarget, s.id).toBe(expectedJoin);
+      expect(s.spine, s.id).toBe(expectedJoin === undefined);
+    }
   });
 });

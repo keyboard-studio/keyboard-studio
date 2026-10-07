@@ -70,6 +70,10 @@ vi.mock("../steps/manifest.ts", () => ({
       component: TrivialTouchStep,
     },
   ],
+  // Spec 091 T015: jumpToLocation's live resolve context reads the derived
+  // screen gates from the manifest module; this fixture's single step is
+  // ungated, so the map is empty.
+  screenGates: new Map(),
 }));
 
 import { StepHost } from "../components/StepHost.tsx";

@@ -228,7 +228,9 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   `track` step's `requires: ["base-keyboard"]` had no module-level source,
   so the derived order sorted track (and project_name) before
   layout/choose_base. Re-homed per FR-003: `track_choice` now declares
-  `requires: ["base-keyboard"]`.
+  `requires: ["base-keyboard"]`. **REVISED in Phase 4 — the edge is now a
+  `screenRequires` declaration, not a module `requires`; see the Phase 4
+  revisions below.**
 - **Delta P2 — research.md's project_name gate claim is falsified.**
   research.md held that project_name's copy-track gate "is already a
   property of its questions' routing". It is not: `track_choice`'s
@@ -241,7 +243,9 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   derived screens reproduce the frozen baseline exactly — all 17 screens
   in step order, project_name a gated side trail joining `characters`,
   touch_seed_source a gated side trail joining `touch` (pinned in
-  `decisions/deriveScreens.test.ts`).
+  `decisions/deriveScreens.test.ts`). **REVISED in Phase 4 — the ordering
+  edge is now `screenRequires` and the gate is a composition-layer
+  declaration (Delta P6); see below.**
 - **Delta P3 — the per-flow loader assumed flow-local `requires`.**
   `loadDerivedFlowDef` sorts one flow's modules alone, and
   `orderByDependencies` fail-fast throws on a requirement with no provider
@@ -281,6 +285,19 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   completeness/workingCopyStore → stepOrder-during-registry-evaluation
   path (or an equivalent leaf-level module list); T008's one-file change
   cannot land safely on its own.
+- **T016 flip inventory (Phase 4, for the held deletion).** With
+  T012–T015 landed, the remaining LIVE references to
+  `stepDependencies.ts` machinery are exactly: (1) `steps/stepOrder.ts`'s
+  derivation source (plus Delta P4's cycle prerequisite);
+  (2) `lib/draftPersistence.ts`'s `stepHasSettles` import (re-home at the
+  flip: a screen whose members include a gallery module settles
+  non-question decisions); (3) `decisions/galleryModules.coverage.test.ts`
+  (090's coverage oracle — its stepDependencies baseline must be carried
+  as literals or re-derived from screens at the flip);
+  (4) `decisions/successCriteria.sc002.test.ts` fixtures;
+  (5) `steps/stepOrder.parity.test.ts` (the frozen oracle + the T017
+  report-only block's membership baseline). Everything else is comments.
+  The flip is one commit when the lead releases the hold.
 - **Delta P5 — the one sort conflates routing edges with requires edges;
   SC-001's edit closes a false cycle.** T009's prescribed edit
   (`il_language_autonym` += `requires: ["base-keyboard"]`) cycles in
@@ -295,4 +312,61 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   conflict-free inputs (a live conflict is a cycle today, so no current
   declaration set contains one); `orderParity.test.ts` stays green
   unmodified. This is 087 sort semantics, not a named 091 task — flagged
-  for ratification alongside P3.
+  for ratification alongside P3. **REVERTED in Phase 4 — the drop breaks
+  SC-002's fail-fast contract; see below.**
+
+## Phase 4 delta revisions (2026-10-07, for lead ratification)
+
+- **Deltas P1/P2 revised — cross-flow `requires` on question modules is
+  falsified by the frozen per-flow contracts.** Phase 4's full-suite runs
+  surfaced what the Phase 2/3 batches masked: `orderParity.test.ts`
+  (protected, unmodifiable) and `successCriteria.sc002.test.ts` both sort
+  each flow's modules ALONE via `orderDecisions(flowModules.<flow>)`,
+  where P1/P2's cross-flow `requires` are unresolvable and throw. The
+  re-homing's final shape keeps the facts as declarations but on channels
+  the per-flow sorts never see:
+  - ordering edges → **`screenRequires`** (new optional field on
+    QuestionModule, `survey/types.ts`): `track_choice` declares
+    `["base-keyboard"]`, `project_display_name` declares
+    `["authoring-track"]`. `deriveScreens` folds `screenRequires` into
+    its full-list sort only; the sort's unresolved diagnosis still fires
+    there if a provider is genuinely absent.
+  - gates → **Delta P6** below.
+  Ablation evidence: with neither channel, the derived order is
+  identity, track, project_name, layout, choose_base, … (the edges are
+  load-bearing); with `screenRequires`, the frozen baseline reproduces
+  exactly and orderParity/SC-002 pass unmodified.
+- **Delta P5 reverted — the routing-edge drop silences SC-002's fault
+  injection.** `successCriteria.sc002.test.ts` requires every injected
+  undocumented routing edge to surface as a named error; under the drop,
+  three identity_lite injections (e.g. `il_language_region ->
+  il_language_english`) produced NO ERROR, and the sweep counts failed.
+  (Phase 3's first run showed exactly this failure; it was misattributed
+  to worker pollution at the time — corrected here.) The
+  `routingPredecessors` change is reverted verbatim; 087 sort semantics
+  are restored. Consequence for SC-001: the one-edit move
+  (`il_language_autonym` += `requires: ["base-keyboard"]`) trips the
+  sort's named cycle error while the moved question's `next` still
+  points at its old successor; the T009/T011 tests now make the edit
+  with the `next` re-point included, plus a pin test asserting the
+  requires-only form fails fast with a named cycle error. OPEN for the
+  lead: grow a requires-wins rule in 087's sort properly (with SC-002
+  amended by its owner), or SC-001's contract is "edit the declaration,
+  including its routing".
+- **Delta P6 — screen gates for non-routing-expressible screens are
+  declared at the composition layer.** Phase 2's module-level `gatedBy`
+  re-homing (touchSeedSource, both project_name modules) violates spec
+  087's FR-005 invariant — `orderDecisions.test.ts`: "no registry module
+  declares gatedBy (conditional visibility comes from next only)". The
+  two gates are not routing-expressible (project_name's fork is
+  manifest-level; touch_seed_source is a custom screen asked while
+  unrecorded), so they are declared in the registry's
+  **`declaredScreenGates`** map (keyed by screen id, predicates identical
+  to the stepDependencies oracle) and passed to `deriveScreens` by
+  `steps/manifest.ts` and the gate-sensitive tests. The `gatedBy` field
+  added to QuestionModule in Phase 2 is removed; member gates in
+  `deriveScreens` are routing-derived only. Alternatives the lead may
+  prefer: (a) amend 087's FR-005 invariant with a 091 carve-out and
+  restore module-level gates; (b) express the project_name fork as
+  cross-flow routing on `track_choice` (changes what the live runner
+  reads — 092's territory, not attempted).

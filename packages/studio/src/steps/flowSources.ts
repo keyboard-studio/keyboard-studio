@@ -30,11 +30,13 @@
 // each module's definition.next (gatedBy is derived from it, FR-005).
 
 import {
+  decisionModules,
   flowModules,
   phaseFLibraryModules,
   reserveModules,
   moduleRecord,
 } from "../survey/questions/registry.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
 
 import type { QuestionModule } from "../survey/types.ts";
 import type { FlowDef } from "../survey/types.ts";
@@ -73,9 +75,11 @@ export interface FlowSource {
    */
   registry: Readonly<Record<string, QuestionModule>>;
   /**
-   * "live"     — referenced by >=1 manifest step; appears in live drill-downs.
-   * "proposed" — not yet referenced by any manifest step; rendered as an
+   * "live"     — every module is a member of a derived screen (spec 091
+   *              T014); appears in live drill-downs.
+   * "proposed" — registered but in no derived screen; rendered as an
    *              ordered graph in the Library section.
+   * Derived at the bottom of this module, never declared per entry.
    */
   status: "live" | "proposed";
 }
@@ -109,7 +113,7 @@ export function loadFlowSourceDef(source: FlowSource): FlowDef {
  * the live identity_lite drill-down (whose registry holds only the il_*
  * modules).
  */
-export const flowSources: Readonly<Record<string, FlowSource>> = {
+const declaredFlowSources = {
   // --- Live flows (referenced by manifest step flowRefs) ---
 
   identity_lite: {
@@ -118,7 +122,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "A",
     title: "Identity-lite",
     registry: moduleRecord(flowModules.identity_lite),
-    status: "live",
   },
 
   track: {
@@ -127,7 +130,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "G",
     title: "Track selection",
     registry: moduleRecord(flowModules.track),
-    status: "live",
   },
 
   project_name: {
@@ -136,7 +138,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "G",
     title: "Project name",
     registry: moduleRecord(flowModules.project_name),
-    status: "live",
   },
 
   phase_b_characters: {
@@ -145,7 +146,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     phase: "B",
     title: "Character discovery",
     registry: moduleRecord(flowModules.phase_b_characters),
-    status: "live",
   },
 
   phase_f_helpdocs: {
@@ -156,7 +156,6 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     // Includes the demoted tip slots: registered but not flow members, so they
     // surface as library-not-in-flow nodes in this drill-down.
     registry: moduleRecord(phaseFLibraryModules),
-    status: "live",
   },
 
   // --- Proposed flows (NOT referenced by any manifest step) ---
@@ -180,6 +179,36 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
     ),
     title: "Full identity (reserve/library)",
     registry: moduleRecord(reserveModules),
-    status: "proposed",
   },
-} as const;
+};
+
+// ---------------------------------------------------------------------------
+// Liveness, derived from screen membership (spec 091 T014)
+// ---------------------------------------------------------------------------
+
+/**
+ * A flow is "live" iff every one of its modules is a member of a derived
+ * screen (decisions/deriveScreens.ts over the live registry) — i.e. the
+ * wizard actually walks it. Registered-but-unwalked flows (the reserve
+ * phase_a_identity battery) are "proposed". This replaces both the
+ * per-entry status literal and the old "referenced via a manifest step's
+ * flowRefs" rule: flowRefs are deleted (T014), screen membership is the
+ * single source.
+ */
+const liveScreenModuleIds: ReadonlySet<string> = new Set(
+  deriveScreens(decisionModules).flatMap((s) => s.moduleIds),
+);
+
+export const flowSources: Readonly<Record<string, FlowSource>> = Object.fromEntries(
+  Object.entries(declaredFlowSources).map(([id, source]) => [
+    id,
+    {
+      ...source,
+      status: source.derivedModules.every((m) =>
+        liveScreenModuleIds.has(m.definition.id),
+      )
+        ? ("live" as const)
+        : ("proposed" as const),
+    },
+  ]),
+);

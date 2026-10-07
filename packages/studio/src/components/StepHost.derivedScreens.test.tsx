@@ -3,7 +3,7 @@
 // The registry seam (steps/manifest.ts `buildManifest`, T010) builds the
 // manifest StepHost resolves from, from a supplied module list. This test
 // builds that list twice from the REAL registry modules — once with the
-// one-line edit (il_language_autonym gains requires: ["base-keyboard"]),
+// declaration edit (il_language_autonym gains requires: ["base-keyboard"])
 // once without — and asserts the screen sequence StepHost is handed
 // reflects the edit, and that reverting it restores the baseline.
 //
@@ -85,10 +85,17 @@ const fakeReducerDeps: ReducerDeps = {
   instantiateFromBaseIfConfirmed: vi.fn(() => true),
 };
 
-// The one-line edit, in a test registry (same edit as T009's pure test).
+// The declaration edit, in a test registry (same edit as T009's pure test:
+// the requires edge plus the `next` re-point — see deriveScreens.test.ts for
+// the Delta P5 note on why the re-point is part of the edit under 087 sort
+// semantics).
 const editedModules = decisionModules.map((m) =>
   m.definition.id === "il_language_autonym"
-    ? { ...m, requires: [...(m.requires ?? []), "base-keyboard" as DecisionId] }
+    ? {
+        ...m,
+        requires: [...(m.requires ?? []), "base-keyboard" as DecisionId],
+        definition: { ...m.definition, next: null },
+      }
     : m,
 );
 

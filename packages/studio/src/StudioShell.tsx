@@ -116,7 +116,7 @@ import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
-import { manifest, validateManifestShape } from "./steps/manifest.ts";
+import { manifest, screenTrails, validateManifestShape } from "./steps/manifest.ts";
 import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
@@ -1814,6 +1814,9 @@ export function StudioShell() {
         { desktopLocked, touchLayoutJson },
         staleSteps,
         validatorFindings,
+        // Spec 091 T014: the derived screen trails (completeness.ts
+        // cannot import steps/manifest.ts — the documented cycle).
+        screenTrails,
       ),
     [desktopLocked, touchLayoutJson, staleSteps, validatorFindings],
   );

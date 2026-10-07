@@ -22,7 +22,7 @@
 // entries in walk order (decisions/orderParity.test.ts pins the result).
 
 import type { GalleryModule, QuestionModule } from "../types.ts";
-import type { DecisionId } from "../../decisions/decisionTypes.ts";
+import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
 
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
@@ -161,6 +161,25 @@ export const decisionModules: readonly QuestionModule[] = [
   ...withGroup(flowModules.project_name, "project_name"),
   ...galleryModules,
 ];
+
+/**
+ * Declared screen gates (spec 091 FR-003, Delta P6): the gates of screens
+ * whose visibility is NOT routing-expressible — the project_name fork
+ * (manifest-level in StudioShell, never a property of the flow's `next`
+ * graph) and the touch seed fork (asked only while unrecorded). Spec 087
+ * FR-005 forbids a module-level `gatedBy` (conditional visibility comes
+ * from `next` only), so these former step-level gates from
+ * steps/stepDependencies.ts are declared here, at the composition layer,
+ * keyed by screen id, and passed to `deriveScreens` by its callers. Every
+ * other screen's gate is member-derived from routing.
+ */
+export const declaredScreenGates: ReadonlyMap<
+  string,
+  (decisions: DecisionSet) => boolean
+> = new Map([
+  ["project_name", (d) => d["authoring-track"]?.value === "copy"],
+  ["touch_seed_source", (d) => d["touch-seed-source"] === undefined],
+]);
 
 /**
  * The reserve / Leftover set (no-delete guardrail): every module physically

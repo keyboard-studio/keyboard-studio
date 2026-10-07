@@ -15,12 +15,16 @@
 //     top-level screen, wherever the sort places it, and its decisions are
 //     members of the enclosing screen.
 //
-// Gates (FR-003): a member's gate is its declared `gatedBy` when it has
-// one (custom modules), else its routing-derived gate (effectiveGatedBy —
-// the one source for question modules). A screen's gate is present iff
-// EVERY member decision's provider is gated; it passes when at least one
-// member gate passes (a partially gated screen is walked; the runner's own
-// per-question gating still applies inside it).
+// Gates (FR-003): a member's gate is its routing-derived gate
+// (effectiveGatedBy — the one source; spec 087 FR-005: no module-level
+// gatedBy override exists). A screen's gate is present iff EVERY member
+// decision's provider is gated; it passes when at least one member gate
+// passes (a partially gated screen is walked; the runner's own per-question
+// gating still applies inside it). A screen whose gate is NOT
+// routing-expressible (a manifest-level fork, an asked-while-unrecorded
+// custom screen) declares it at the composition layer instead: the caller
+// passes `declaredScreenGates` (the registry's map, keyed by screen id),
+// and a declared gate wins over the member-derived one (Delta P6).
 
 import type { QuestionModule } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
@@ -73,8 +77,21 @@ interface ScreenRecord {
  */
 export function deriveScreens(
   modules: readonly QuestionModule[],
+  declaredScreenGates?: ReadonlyMap<string, Gate>,
 ): DerivedScreen[] {
-  const ordered = orderDecisions(modules);
+  // Screen-order requirements (types.ts `screenRequires`) fold into the
+  // full-list sort as ordinary requires: across the whole registry every
+  // screenRequires decision has its provider present, so the sort's
+  // unresolved diagnosis still fires for a genuinely missing provider.
+  const sortInput = modules.map((m) =>
+    m.screenRequires === undefined
+      ? m
+      : { ...m, requires: [...(m.requires ?? []), ...m.screenRequires] },
+  );
+  const originalById = new Map(modules.map((m) => [m.definition.id, m] as const));
+  const ordered = orderDecisions(sortInput).map(
+    (m) => originalById.get(m.definition.id) ?? m,
+  );
 
   // Classification pass: singleton screen keys are known from the whole
   // set before partitioning, so an intra-step module is recognised
@@ -97,11 +114,11 @@ export function deriveScreens(
     singletonOwner.set(m.screen, m);
   }
 
-  // Member gates, computed once: declared gate wins; question modules
-  // carry no declared gate today, so theirs is routing-derived.
+  // Member gates, computed once: routing-derived only (087 FR-005 — no
+  // module declares a gate; see the header note).
   const gateOf = new Map<string, Gate | undefined>();
   for (const m of modules) {
-    gateOf.set(m.definition.id, m.gatedBy ?? effectiveGatedBy(m, modules));
+    gateOf.set(m.definition.id, effectiveGatedBy(m, modules));
   }
 
   // Partition pass.
@@ -163,10 +180,12 @@ export function deriveScreens(
     const allGated =
       providers.length > 0 &&
       providers.every((m) => gateOf.get(m.definition.id) !== undefined);
-    const gatedBy: Gate | undefined = allGated
-      ? (decisions: DecisionSet) =>
-          providers.some((m) => gateOf.get(m.definition.id)!(decisions))
-      : undefined;
+    const gatedBy: Gate | undefined =
+      declaredScreenGates?.get(rec.id) ??
+      (allGated
+        ? (decisions: DecisionSet) =>
+            providers.some((m) => gateOf.get(m.definition.id)!(decisions))
+        : undefined);
     return {
       id: rec.id,
       kind: rec.kind,

@@ -359,15 +359,17 @@ export interface QuestionModule {
   screen?: string;
 
   /**
-   * Declared visibility gate (spec 091 FR-003) for modules whose gate is
-   * not routing-derived: returns true when the module is asked. Question
-   * modules' gates stay derived from conditional `next` routing
-   * (`effectiveGatedBy` in decisions/orderDecisions.ts — the one source);
-   * this field is for custom modules, whose step-level `gatedBy` in
-   * steps/stepDependencies.ts moves here. A screen's gate is derived from
-   * its members' gates by `deriveScreens`.
+   * Screen-order requirements (spec 091 FR-003, phase-4 revision): decisions
+   * that must be provided by an EARLIER screen for this module's screen to be
+   * placed correctly — the former STEP-layer `requires` from
+   * steps/stepDependencies.ts, re-homed. Distinct from `requires` (a
+   * question-order fact inside the flow graph): `screenRequires` is honoured
+   * ONLY by `deriveScreens`, which folds it into the full-list sort. It is
+   * deliberately invisible to per-flow ordering (orderParity / SC-002 sort a
+   * flow's modules alone, where a cross-screen decision is unresolvable and
+   * must not throw) and to the runner.
    */
-  gatedBy?: (decisions: DecisionSet) => boolean;
+  screenRequires?: readonly DecisionId[];
 
   /**
    * Base-keyboard probe: read this module's decisions from the import bundle

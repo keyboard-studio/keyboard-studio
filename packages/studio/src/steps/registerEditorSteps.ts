@@ -40,7 +40,6 @@ import {
 import { LayoutStepHost } from "../survey/layout/LayoutStepHost.tsx";
 import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
 import { rulesStep } from "./rulesStep.ts";
-import { stepDependencies } from "./stepDependencies.ts";
 
 /** Re-exported for the manifest (spec 082 Track A). */
 export { rulesStep };
@@ -74,7 +73,6 @@ function step(
  */
 export const identityStep: EditorStep = step({
   id: "identity",
-  ...stepDependencies("identity"),
   title: "Keyboard Identity",
   component: IdentityLiteAdapter,
   specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
@@ -90,7 +88,6 @@ export const identityStep: EditorStep = step({
  */
 export const layoutStep: EditorStep = step({
   id: "layout",
-  ...stepDependencies("layout"),
   title: "Keyboard Layout",
   component: LayoutStepHost,
   specRef: ["specs/076-rule-behaviours"],
@@ -107,7 +104,6 @@ export const layoutStep: EditorStep = step({
  */
 export const chooseBaseStep: EditorStep = step({
   id: "choose_base",
-  ...stepDependencies("choose_base"),
   title: "Choose Base Keyboard",
   component: BaseResolutionAdapter,
   specRef: ["§8", "specs/080-documentation-completeness"],
@@ -122,7 +118,6 @@ export const chooseBaseStep: EditorStep = step({
  */
 export const trackStep: EditorStep = step({
   id: "track",
-  ...stepDependencies("track"),
   title: "Authoring Track",
   component: TrackStepFactoryComponent,
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
@@ -139,7 +134,6 @@ export const trackStep: EditorStep = step({
  */
 export const projectNameStep: EditorStep = step({
   id: "project_name",
-  ...stepDependencies("project_name"),
   title: "Project Name",
   component: ProjectNameStepFactoryComponent,
   inputs: [irPath("header", "bcp47")],
@@ -160,7 +154,6 @@ export const projectNameStep: EditorStep = step({
  */
 export const carveStep: EditorStep = step({
   id: "carve",
-  ...stepDependencies("carve"),
   title: "Carve Keys",
   layout: "full",
   component: CarveAdapter,
@@ -182,7 +175,6 @@ export const carveStep: EditorStep = step({
  */
 export const deadkeysStep: EditorStep = step({
   id: "deadkeys",
-  ...stepDependencies("deadkeys"),
   title: "Deadkeys",
   layout: "full",
   component: DeadkeyAdapter,
@@ -204,7 +196,6 @@ export const deadkeysStep: EditorStep = step({
  */
 export const mechanismsStep: EditorStep = step({
   id: "mechanisms",
-  ...stepDependencies("mechanisms"),
   title: "Assign Mechanisms",
   layout: "full",
   component: AddPhysicalAdapter,
@@ -235,7 +226,6 @@ export const mechanismsStep: EditorStep = step({
  */
 export const touchSeedSourceStep: EditorStep = step({
   id: "touch_seed_source",
-  ...stepDependencies("touch_seed_source"),
   title: "Touch Seed Source",
   layout: "full",
   component: TouchSeedSourceHost,
@@ -251,7 +241,6 @@ export const touchSeedSourceStep: EditorStep = step({
  */
 export const touchStep: EditorStep = step({
   id: "touch",
-  ...stepDependencies("touch"),
   title: "Touch Layout",
   layout: "full",
   component: AddTouchAdapter,
@@ -282,7 +271,6 @@ export const touchStep: EditorStep = step({
  */
 export const helpStep: EditorStep = step({
   id: "help",
-  ...stepDependencies("help"),
   title: "Help & Tips",
   component: PhaseFGate,
   specRef: ["§8", "specs/061-help-docs-generation", "specs/080-documentation-completeness"],
@@ -295,7 +283,6 @@ export const helpStep: EditorStep = step({
  */
 export const packageStep: EditorStep = step({
   id: "package",
-  ...stepDependencies("package"),
   title: "Package (reserved)",
   component: PhaseFStepFactoryComponent,
   specRef: "§16",

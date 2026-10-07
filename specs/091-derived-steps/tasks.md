@@ -122,24 +122,27 @@ to assert "same order as main unless a `requires` edge says otherwise" (FR-005).
 `main` with the same questions on each (SC-002); the golden walk is byte-identical (SC-003);
 `stepDependencies.ts` does not exist (SC-004).
 
-- [ ] T012 [US2] Rewire packages/studio/src/steps/manifest.ts: the pool is keyed by screen id
+- [x] T012 [US2] Rewire packages/studio/src/steps/manifest.ts: the pool is keyed by screen id
   and arranged by the derived screen order; remove the `stepDependencies("characters")` spread
   and the pool-≡-declared-set assertion (replaced by pool-≡-derived-screens validation); keep
   the M-rule validations (locks, unique ids) running over the derived order
-- [ ] T013 [US2] Remove every remaining `stepDependencies(...)` spread from
+- [x] T013 [US2] Remove every remaining `stepDependencies(...)` spread from
   packages/studio/src/steps/registerEditorSteps.ts and packages/studio/src/steps/rulesStep.ts,
   leaving screen-host declarations only (component, inputs, writes, persistence, specRef, lock)
-- [ ] T014 [US2] Narrow `Step` in packages/studio/src/steps/types.ts — delete `provides`,
+- [x] T014 [US2] Narrow `Step` in packages/studio/src/steps/types.ts — delete `provides`,
   `requires`, `gatedBy` and `flowRefs` — and move the Flow Map consumers to screen membership:
   packages/studio/src/dashboard/renderedNodeSet.ts (drill-downs from the screen's module list)
   and packages/studio/src/dashboard/buildStepGraph.ts (nodes/edges from derived screens and
   trails); re-derive flow liveness in packages/studio/src/steps/flowSources.ts from screen
   membership instead of "referenced via flowRefs"
-- [ ] T015 [US2] Move gate reads to the derived screen gate and legacy ids to the map:
+- [x] T015 [US2] Move gate reads to the derived screen gate and legacy ids to the map:
   `walkedByTrack`/resolution in packages/studio/src/lib/resolveLocation.ts reads the screen's
   derived `gatedBy` against `decisionStore` and resolves unknown/old step ids through
   `legacyStepIds.ts`; restored-draft history sanitising in
   packages/studio/src/stores/surveySessionStore.ts maps stored step ids through the same map
+  (also: steps/advance.ts's stepApplies gate read moved to the same screen
+  gates — a consumer the task text did not name; manifest.ts publishes
+  `screenGates`/`screenTrails` as the one source)
 - [ ] T016 [US2] Delete packages/studio/src/steps/stepDependencies.ts and verify SC-004: zero
   live references to `stepDependencies`, `flowRefs` or `settles` remain in
   packages/studio/src (grep gate in quickstart.md §1)
@@ -150,7 +153,11 @@ to assert "same order as main unless a `requires` edge says otherwise" (FR-005).
   pair differently (edge-explained differences are enumerated, not silent); keep the
   documented tie-break-pairs mechanism and the adversarial input-order property, run over
   screens
-- [ ] T018 [US2] Rewrite the M2 assertion in packages/studio/src/steps/manifest.test.ts as
+  — PARTIAL (Phase 4, per the lead's hold): the FR-005 assertions (order
+  with edge-explained inversions, membership, trails over derived
+  screens) are written and running in the same file, report-only; the
+  frozen-literal oracle's retirement lands with T016's flip.
+- [x] T018 [US2] Rewrite the M2 assertion in packages/studio/src/steps/manifest.test.ts as
   manifest ≡ derived screens (M3–M6 unchanged, evaluated over screens); re-point
   packages/studio/src/decisions/gateWalkParity.test.ts to iterate derived question screens
   instead of `flowSources` flows, keeping its property (derived gates select exactly the

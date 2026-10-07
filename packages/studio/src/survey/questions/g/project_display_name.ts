@@ -62,12 +62,15 @@ const mod: QuestionModule = {
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name")],
   provides: ["project-display-name"],
-  // Spec 091 FR-003 re-homing (Delta P2): the project_name step's copy-track
-  // gate lived only in steps/stepDependencies.ts; research.md's claim that
-  // it was already a property of this flow's routing did not hold (the fork
-  // is manifest-level), so the gate and the track ordering edge are declared
-  // on the module now.
-  requires: ["authoring-track"],
-  gatedBy: (decisions) => decisions["authoring-track"]?.value === "copy",
+  // Spec 091 FR-003 re-homing (Delta P2, gate revised by P6): the
+  // project_name step's copy-track gate lived only in
+  // steps/stepDependencies.ts; research.md's claim that it was already a
+  // property of this flow's routing did not hold (the fork is
+  // manifest-level). The gate is declared for the SCREEN in the registry's
+  // `declaredScreenGates` — not on this module (spec 087 FR-005: no
+  // module-level gatedBy) — and the step's track ordering edge as a
+  // screen-order requirement (see track_choice.ts for why it is not a
+  // module `requires`).
+  screenRequires: ["authoring-track"],
 };
 export default mod;
