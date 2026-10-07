@@ -353,8 +353,19 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
   lib/assignLoopCompletion.test.ts), value-builder tests, and the R6
   scenario at store level through the real completion path (refresh =
   deadkey-successor augmentation, the landed Case B mechanism). 16/16.
-- [ ] T045 [US4] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+- [x] T045 [US4] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US4 PR with the gate results in its body
+  — Gate run (D-090-42): golden walk green at the adjudicated US4 fixtures;
+  parity suites green; tsc 0; eslint 0 errors (1 orphaned-helper error from
+  the deps retirement fixed in this gate); full suite classified — only the
+  known SC-004 pair reproduces deterministically (kmp file), everything
+  else green standalone/in batches; parallel-run failure counts (79/61) are
+  worker casualties on the oversubscribed VM. This run also discharged both
+  verification debts (pass-2 pins 19/19 against the merged 089 runner;
+  T037 classification recovered from the predecessor's suite JSON — same
+  SC-004 family only). The PR itself opens at spec completion per the
+  stacked-PR train (base km/decision-apply), with T043's stop reported to
+  the lead alongside.
 
 **Checkpoint**: both assign-loop galleries are modules; the reducer no longer owns any
 gallery's IR rewrite.
