@@ -17,7 +17,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, dev]
+    # `km/*` added 2026-10-07 for the modular-decisions stack: stacked PRs
+    # base on the previous spec's km/* branch, and without this they report
+    # no CI at all (the spec 089 golden-walk capture/verify lives in the
+    # e2e lane and keys off the PR base ref).
+    branches: [main, dev, 'km/*']
 
 # Cancel a superseded run when a newer commit lands on the same ref, so a
 # rapid second push doesn't leave the first full run burning runner minutes.
