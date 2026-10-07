@@ -333,16 +333,17 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
   touch adjudicated intended. A registry import cycle the new renderers
   closed (gallery → reducer constants → registry) was broken by moving the
   step-id constants to the leaf `steps/stepIds.ts`.
-- [ ] T043 [US4] FR-003 identifier list extended with `recordAssignments`, `setTouchDraft`,
+- [x] T043 [US4] FR-003 identifier list extended with `recordAssignments`, `setTouchDraft`,
   `deleteTouchKey` in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the assignLoop
-  trees — **STOPPED for a lead ruling (D-090-38 Flag 1, D-090-42)**: all three
-  identifiers are the galleries' live edit-time write paths under the ratified
-  record-from-working-copy design (12 + 3 live call sites in editors/assignLoop
-  non-test sources), so registering the bans reds the audit against the
-  ruling — the US3 species, disposed there as ruled non-registration
-  (D-090-31 → D-090-34). Proceeds only on the lead's word: registration, or
-  non-registration recorded at both FR-003 sites mirroring D-090-34.
+  trees — **RULED non-registration (D-090-47, lead ruling 2026-10-07 on
+  D-090-38 Flag 1)**: the three identifiers are the galleries' sanctioned
+  edit-time write paths under the ratified record-from-working-copy design
+  (D-090-31), so no bans are registered; the non-registration + rationale
+  are recorded at both FR-003 sites exactly as T035's six actions were
+  (third NOT-REGISTERED note in galleryWriteAudit.test.ts; US4 comment
+  block in eslint.config.mjs), so T060's zero-exceptions audit reads it
+  as scope, not gap. Audit green unregistered, as before.
 - [x] T044 [US4] Tests: contract + determinism for both `apply`s (R1 lock effect, R2 JSON
   build) in packages/studio/src/survey/questions/gallery/physicalLayout.test.ts and
   packages/studio/src/survey/questions/gallery/touchLayout.test.ts; a store-level scenario in
@@ -457,7 +458,8 @@ log exactly once.
   — Landed: audit record in plan.md's PR summary. Depcruise zero violations
   (D-090-45 closed the D-090-7 cycle), audit 4/4, eslint 0 errors; grep pack
   recorded; the two ruled determinations (D-090-29, D-090-31→D-090-34) cited;
-  T043's identifiers await the same species of ruling from the lead.
+  T043's identifiers have since received the same species of ruling
+  (non-registration, D-090-47) and plan.md's summary updated to match.
 - [x] T061 [P] Duplication-ledger close-out: verify every row of the spec's ledger (gallery
   answers + `phaseBDraftStore` deleted; overlays are decision values with the working copy
   holding only an applied view; in-place rewrites deleted outside modules; `settles` strings

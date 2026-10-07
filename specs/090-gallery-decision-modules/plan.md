@@ -192,8 +192,9 @@ shrink to host wiring and are deleted per story as their step migrates.
   were ruled non-registered against the ratified
   record-from-working-copy design (D-090-31 → D-090-34). US4's three
   identifiers (`recordAssignments`, `setTouchDraft`, `deleteTouchKey`)
-  are the same species and remain unregistered pending the lead's
-  ruling on the stopped T043 (D-090-38 Flag 1, D-090-42).
+  are the same species: ruled non-registration by the lead
+  (D-090-47, on D-090-38 Flag 1) and recorded at both FR-003 sites
+  in the same form.
 
 **Closing grep pack:**
 - `phaseBDraftStore`: zero code references in `packages/studio/src`

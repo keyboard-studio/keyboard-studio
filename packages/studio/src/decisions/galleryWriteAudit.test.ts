@@ -120,6 +120,25 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
   // gate against the ratified design. Like the evidence-layer
   // determination above, this is a scope determination for T060 to
   // read, not a gap and not an exception.
+  //
+  // NOT REGISTERED — ruled (T043, D-090-47, lead ruling on
+  // D-090-38 Flag 1, extending the D-090-31 scope determination to
+  // US4): the identifier bans T043's text names (recordAssignments /
+  // setTouchDraft / deleteTouchKey) over the assignLoop trees.
+  // Those actions are the sanctioned edit-time write paths of the
+  // two assign-loop galleries under the ratified
+  // record-from-working-copy design (D-090-31): they write the
+  // working-copy state — the phase-C assignment list, the touch
+  // draft, the deleted-touch-key set — that completion snapshots
+  // into the physical-layout / touch-layout decision values
+  // (T041/T042). They are not gallery write-arounds in FR-003's
+  // sense: the ban targets writing answers IN PLACE OF decision
+  // records, and these calls are the within-step editing state the
+  // decision values are recorded from. Registering them would red
+  // this gate against the ratified design (12 + 3 live call sites
+  // in editors/assignLoop non-test sources). Like the two
+  // determinations above, this is a scope determination for T060
+  // to read, not a gap and not an exception.
 ];
 
 /** A single banned call site found in a source text. */

@@ -1939,3 +1939,23 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   noted at T045. Everything else cross-checks: FR-001/002/003/
   004/006/007 landed as specified or as ruled; SC-001/002/004/
   005 measured green.
+- **D-090-47 — T043 RULED by the lead (2026-10-07):
+  NON-REGISTRATION.** The lead's ruling on D-090-38 Flag 1 extends
+  the D-090-31/D-090-34 scope determination to US4's three
+  actions: `recordAssignments`, `setTouchDraft`, and
+  `deleteTouchKey` remain the sanctioned edit-time write paths
+  under the ratified record-from-working-copy design (D-090-31) —
+  they write the working-copy state that completion snapshots
+  into the decision value; they are not gallery write-arounds in
+  FR-003's sense (the ban targets writing answers IN PLACE OF
+  decision records). No bans are registered over the assignLoop
+  trees for these three. The non-registration + rationale are
+  recorded at both FR-003 sites exactly as T035's six actions
+  were: the third NOT-REGISTERED note after the
+  `GALLERY_WRITE_AUDIT` list in galleryWriteAudit.test.ts, and
+  the US4 comment block in eslint.config.mjs — so T060's
+  zero-exceptions audit reads it as scope, not gap (plan.md's PR
+  summary updated to match). T043 is checked on this basis; the
+  audit gate stays green unregistered, as it was. Flag 2 needed
+  no ruling (the lead confirmed the T045 fixture deltas are
+  adjudicated at the gate by diff read; D-090-39/-40 stand).

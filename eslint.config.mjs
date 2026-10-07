@@ -85,6 +85,18 @@ const GALLERY_RENDERER_TREES_US3 = [
   "packages/studio/src/survey/deadkeys/**/*.{ts,tsx}",
 ];
 
+// US4 (T043): the assignLoop trees are NOT added, and the action-name
+// bans T043's text names (recordAssignments / setTouchDraft /
+// deleteTouchKey) are NOT registered, by ruling (research D-090-47,
+// lead ruling on D-090-38 Flag 1, extending D-090-31's scope
+// determination to US4): those actions are the sanctioned edit-time
+// write paths of the mechanisms / touch galleries under the ratified
+// record-from-working-copy design — they write the working-copy
+// state (the phase-C assignment list, the touch draft, the
+// deleted-touch-key set) that completion snapshots into the
+// physical-layout / touch-layout decision values, not answers in
+// place of decision records. Mirrors the checker test's lists.
+
 function galleryWriteBanRule(identifiers) {
   return [
     "error",
