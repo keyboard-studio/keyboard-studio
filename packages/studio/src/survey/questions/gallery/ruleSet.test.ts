@@ -68,6 +68,22 @@ describe("ruleSet apply (splice)", () => {
     expect(spliced.groups[0]!.rules.map((r) => r.nodeId)).toEqual(["r-base", "r-added"]);
   });
 
+  it("pass 2: invoked with value undefined, composes the recorded rule-set value from ctx.decisions", () => {
+    // 089's input-triggered second pass: a completion that records
+    // deadkeys-defined or windows-layout runs this apply with value
+    // undefined. With a recorded rule-set decision the splice still
+    // happens; without one, the invocation is a no-op.
+    const ir = baseIr();
+    const withRecord = ctx(ir, {
+      "rule-set": { id: "rule-set", value: VALUE, provenance: "asked" },
+    });
+    const patch = ruleSet.apply(undefined, withRecord);
+    expect(patch.ir).toBeDefined();
+    const spliced = { ...ir, ...patch.ir };
+    expect(spliced.groups[0]!.rules.map((r) => r.nodeId)).toEqual(["r-base", "r-added"]);
+    expect(ruleSet.apply(undefined, ctx(ir))).toEqual({});
+  });
+
   it("never resurrects an addition the recorded carve decision removed", () => {
     const ir = baseIr();
     const decisions: ApplyContext["decisions"] = {

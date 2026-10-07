@@ -48,8 +48,15 @@ const deadkeysDefined: GalleryModule<DeadkeysDefinedValue> = {
   // groups, stores, and raw fragments — mirrored in decisionIRPaths.
   writes: [irPath("groups"), irPath("stores"), irPath("raw")],
   apply: (value, ctx) => {
-    if (value === undefined || ctx.ir === null || value.ops.length === 0) return {};
-    const { ir, changed } = applyDeadkeyOpsToIr(ctx.ir, value.ops);
+    // Pass-2 composition (089 semantics, relayed 2026-10-07): when a
+    // completion records carved-layout, this apply also runs — with
+    // value undefined — and must compose from ctx.decisions: the
+    // recorded op log, if one exists, is the effective value.
+    const effective =
+      value ??
+      (ctx.decisions["deadkeys-defined"]?.value as DeadkeysDefinedValue | undefined);
+    if (effective === undefined || ctx.ir === null || effective.ops.length === 0) return {};
+    const { ir, changed } = applyDeadkeyOpsToIr(ctx.ir, effective.ops);
     if (!changed) return {};
     return { ir: { groups: ir.groups, stores: ir.stores, raw: ir.raw } };
   },

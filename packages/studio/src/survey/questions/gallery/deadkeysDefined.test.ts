@@ -11,8 +11,8 @@ import deadkeysDefined, { type DeadkeysDefinedValue } from "./deadkeysDefined.ts
 import { DeadkeyDecisionRenderer } from "../../deadkeys/DeadkeyDecisionRenderer.tsx";
 import type { ApplyContext } from "../../types.ts";
 
-function ctx(ir: ApplyContext["ir"]): ApplyContext {
-  return { ir, writes: deadkeysDefined.writes, decisions: {}, currentHistoryEntryState: null };
+function ctx(ir: ApplyContext["ir"], decisions: ApplyContext["decisions"] = {}): ApplyContext {
+  return { ir, writes: deadkeysDefined.writes, decisions, currentHistoryEntryState: null };
 }
 
 const DEFINE_OP: DeadkeysDefinedValue = {
@@ -45,6 +45,21 @@ describe("deadkeysDefined apply (op replay)", () => {
     expect(first.ir).toBeDefined();
     const replayed = { ...base, ...first.ir };
     expect(listDeadkeys(replayed).map((d) => d.id)).toContain(0x3001);
+  });
+
+  it("pass 2: invoked with value undefined, composes the recorded op log from ctx.decisions", () => {
+    // 089's input-triggered second pass: a completion that records
+    // carved-layout runs this apply with value undefined. With a
+    // recorded deadkeys decision the ops replay; without one, no-op.
+    const base = makeTestIR();
+    const withRecord = ctx(base, {
+      "deadkeys-defined": { id: "deadkeys-defined", value: DEFINE_OP, provenance: "asked" },
+    });
+    const patch = deadkeysDefined.apply(undefined, withRecord);
+    expect(patch.ir).toBeDefined();
+    const replayed = { ...base, ...patch.ir };
+    expect(listDeadkeys(replayed).map((d) => d.id)).toContain(0x3001);
+    expect(deadkeysDefined.apply(undefined, ctx(base))).toEqual({});
   });
 
   it("is a no-op over an IR that already carries the op's effect (live completion state)", () => {

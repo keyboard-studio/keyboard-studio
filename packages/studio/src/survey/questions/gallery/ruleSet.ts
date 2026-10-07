@@ -45,7 +45,16 @@ const ruleSet: GalleryModule<RuleSetValue> = {
   inputs: [],
   writes: [irPath("groups"), irPath("stores")],
   apply: (value, ctx) => {
-    if (value === undefined || ctx.ir === null || !hasRuleAdditions(value)) return {};
+    // Pass-2 composition (089 semantics, relayed 2026-10-07): when a
+    // completion records deadkeys-defined or windows-layout, this
+    // apply also runs — with value undefined — and must compose from
+    // ctx.decisions: the recorded rule-set value, if one exists, is
+    // the effective value.
+    const effective =
+      value ??
+      (ctx.decisions["rule-set"]?.value as RuleSetValue | undefined);
+    if (effective === undefined || ctx.ir === null || !hasRuleAdditions(effective)) return {};
+    value = effective;
     // Additions the carve decision removed must not be resurrected
     // (the projection splice's own rule) — the deletion set is the
     // recorded carve removals' node/item ids.

@@ -1335,3 +1335,26 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   T036's deadkeys/rules module suites are written (in the T033/
   T034 commits: replay determinism, live-state no-op, splice
   order + carve-non-resurrection).
+
+- **D-090-28 — 089 pass-2 apply semantics absorbed (lead relay
+  2026-10-07, landed on km/decision-apply @ 24c213c3; reaches this
+  branch at the next restack): applyDecisionEffects gains an
+  input-triggered second pass — a module declaring apply + requires
+  also runs, with value undefined, when a completion records one of
+  its required decisions, and must compose from ctx.decisions.**
+  Audit of every apply already built in 090: the trivial
+  `() => ({})` modules (base-keyboard, windows-layout,
+  touch-seed-source, characters, punctuation, invisibles,
+  convenience) are pass-2 safe by construction. The three applies
+  with real logic all guarded `value === undefined → {}` — correct
+  for "never answered", wrong for pass 2 when the module's own
+  decision was recorded earlier: **marksTreatment, deadkeysDefined,
+  and ruleSet now resolve their effective value as
+  `value ?? ctx.decisions[<own id>]?.value`** before their existing
+  guards, so a pass-2 invocation composes from the recorded value
+  and stays a no-op when none exists. Each suite gained a pass-2
+  pin (invoked with undefined: composes with a recorded own
+  decision, no-ops without one). Carve (stub, D-090-24) and the
+  US4 modules will be authored to this contract from the start.
+  Gates: the three suites + coverage + audit 67/67; studio tsc
+  clean.
