@@ -26,6 +26,11 @@ import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keybo
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore, getSurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
+import {
+  getDecisionSnapshot,
+  selectTouchSeedSource,
+  useDecisionStore,
+} from "../stores/decisionStore.ts";
 import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
 import {
   usePhaseBDraftStore,
@@ -143,11 +148,11 @@ describe("draftPersistence", () => {
   describe("constants + draftKey", () => {
     it("DRAFT_KEY_PREFIX and DRAFT_VERSION match the documented contract", () => {
       expect(DRAFT_KEY_PREFIX).toBe("ks.draft.");
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2); // spec 088 FR-007: bumped 1 → 2
     });
 
     it("draftKey namespaces and versions the per-project key", () => {
-      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v1");
+      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v2");
     });
   });
 
@@ -643,7 +648,7 @@ describe("draftPersistence", () => {
   });
 
   describe("G-1/G-5: round-trip save + load restores BOTH stores from a single draft", () => {
-    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touchSeedSource, never re-instantiating a second working copy", () => {
+    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touch-seed decision, never re-instantiating a second working copy", () => {
       const base: BaseKeyboard = {
         id: "test_keyboard",
         displayName: "Test Keyboard",
@@ -667,10 +672,16 @@ describe("draftPersistence", () => {
       } as unknown as SurveyPhaseResult);
 
       // Traversal position: two forward hops (history becomes non-trivial) plus
-      // the spec-035 touchSeedSource fork choice (km-frontend-flagged risk (a)).
+      // the spec-035 touch-seed fork choice — since spec 088 that choice is
+      // the `touch-seed-source` decision, not a session field.
       useSurveySessionStore.getState().advance("choose_base");
       useSurveySessionStore.getState().advance("track");
-      useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+      useDecisionStore.getState().record({
+        id: "touch-seed-source",
+        value: "import-adapt",
+        provenance: "asked",
+        step: "touch_seed_source",
+      });
 
       const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
       expect(projectKey).toBe("test_keyboard");
@@ -678,10 +689,11 @@ describe("draftPersistence", () => {
       saveDraft(projectKey!);
       expect(localStorage.getItem(draftKey(projectKey!))).not.toBeNull();
 
-      // Cold reset BOTH stores — nothing left to inherit from; a partial reset
+      // Cold reset the stores — nothing left to inherit from; a partial reset
       // would mask a restore that only APPEARED to work.
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
       expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
 
@@ -706,8 +718,9 @@ describe("draftPersistence", () => {
       const session = useSurveySessionStore.getState();
       expect(session.activeStepId).toBe("track");
       expect(session.history).toEqual(["identity", "choose_base"]);
-      // (a) touchSeedSource round-trips through the traversal snapshot.
-      expect(session.touchSeedSource).toBe("import-adapt");
+      // (a) the touch-seed choice round-trips through the draft's decisions
+      // slice (spec 088 — it no longer rides the traversal snapshot).
+      expect(selectTouchSeedSource(getDecisionSnapshot())).toBe("import-adapt");
 
       expect(wasDraftRestoredThisBoot()).toBe(true);
     });

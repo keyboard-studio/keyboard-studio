@@ -34,6 +34,9 @@ import { applyMutatePatch } from "./mutateApply.ts";
 import { repropagate } from "./repropagate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import type { Decision, DecisionSet } from "../decisions/decisionTypes.ts";
+import { answerProvenance } from "../decisions/answerProvenance.ts";
+import type { SavedAnswer } from "./answerTypes.ts";
 
 /**
  * The empty/no-op DesktopModifications — used as the TOUCH_STEP_ID case's
@@ -164,14 +167,14 @@ export interface ReducerDeps {
   ) => void;
   /**
    * Clear the recorded touch_seed_source fork choice (spec 035 R12: a genuine
-   * base re-instantiation invalidates it). Injected as a surveySessionStore
-   * action so this reducer.ts (steps/) does not import stores/ directly, and
-   * so workingCopyStore does not need to import surveySessionStore (which
-   * would create a circular dependency with surveySessionStore's own
-   * setTouchSeedSource reaching into workingCopyStore to clear touchDraft).
+   * base re-instantiation invalidates it). Spec 088: the choice is the
+   * `touch-seed-source` decision now — the host's implementation removes the
+   * record from the decision store AND clears the working copy's touch draft
+   * (research D-06: the side effect rides with the decision's writers).
+   * Injected so this reducer.ts (steps/) does not import stores/ directly.
    * Optional so tests that don't care about the fork can omit it.
    */
-  setTouchSeedSource?: (v: "import-adapt" | "reseed-from-desktop" | null) => void;
+  clearTouchSeedChoice?: () => void;
 
   // --- Lib helpers (from lib/buildTouchLayoutJson + lib/resolveBaseTouchJson) ---
   /**
@@ -281,6 +284,23 @@ export interface ReducerDeps {
     screenId: string,
     answers: readonly SurveyAnswer[],
   ) => void;
+
+  // --- decision store (spec 088 FR-003, contract C-2) ---
+  /**
+   * Write decision records into the live decision store. INJECTED for the
+   * same boundary reason as every dep above (`steps/` may not import
+   * `stores/`): StudioShell points this at `useDecisionStore.recordAll`.
+   * Optional, and a no-op when absent — the same load-bearing optionality
+   * as `recordDecision` (a session run without it must produce a
+   * byte-identical keyboard).
+   */
+  writeDecisionRecords?: (records: readonly Decision[]) => void;
+  /** Read the live decision set (for a record's `inputs` snapshot). */
+  readDecisionSet?: () => DecisionSet;
+  /** Read one saved answer (for its pre-fill proposal, research D-05). */
+  getSavedAnswer?: (stepId: string, questionId: string) => SavedAnswer | undefined;
+  /** The starting-point keyboard's id, named as an extracted record's `source`. */
+  getBaseKeyboardId?: () => string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -502,7 +522,7 @@ export function applyStepCompletion(
         deps.instantiateFromExisting(base, { ...opts, vfs, ir });
         // spec 035 R12: a genuine (re-)instantiation invalidates any previously
         // recorded touch_seed_source choice — the fork must be re-asked.
-        deps.setTouchSeedSource?.(null);
+        deps.clearTouchSeedChoice?.();
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
         // instantiateFromBaseIfConfirmed no-ops (returns false) on a redundant
@@ -518,7 +538,7 @@ export function applyStepCompletion(
           ? deps.instantiateFromBaseIfConfirmed(base, opts, { skipConfirm: true })
           : deps.instantiateFromBaseIfConfirmed(base, opts);
         if (instantiated) {
-          deps.setTouchSeedSource?.(null);
+          deps.clearTouchSeedChoice?.();
         }
       }
       break;
@@ -579,6 +599,62 @@ export function recordStepCompletion(
   deps: ReducerDeps,
 ): void {
   deps.recordDecision?.({ stepId, result });
+}
+
+/**
+ * Spec 088 FR-003 (contract C-2): write one decision record per provided
+ * decision for every survey-question answer in a completed step.
+ *
+ * Called once per completion from `StepHost.handleComplete`, in the same
+ * block as `recordPhase` / `routeAnswersThroughMutate` — no other call site
+ * writes question answers into the decision store. For each answer the
+ * module is looked up in `questionRegistry` (the same lookup
+ * `routeAnswersThroughMutate` performs); an answer with no registry entry
+ * writes nothing (C-2.2). Each id in `module.provides` gets one record
+ * carrying the answer's value (broadcast — research §1b: the split rule is
+ * the module's own, and every live module provides exactly one id),
+ * `step` = the completing step, `inputs` = the store's current values for
+ * the module's `requires`, and provenance per research D-05 (derived from
+ * the saved answer's proposal via `answerProvenance`).
+ *
+ * Synchronous; no timer, no async work, no validation pass (C-2.5, D3
+ * untouched). A no-op when the host injected no decision-store dep.
+ */
+export function recordAnswersAsDecisions(
+  result: SurveyPhaseResult,
+  stepId: string,
+  deps: ReducerDeps,
+): void {
+  if (deps.writeDecisionRecords === undefined) return;
+  const current: DecisionSet = deps.readDecisionSet?.() ?? {};
+  const records: Decision[] = [];
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined || mod.provides === undefined || mod.provides.length === 0) continue;
+    const saved = deps.getSavedAnswer?.(stepId, answer.questionId);
+    const mapped = answerProvenance(answer.value, saved?.proposal, deps.getBaseKeyboardId?.());
+    let inputs: Decision["inputs"];
+    if (mod.requires !== undefined && mod.requires.length > 0) {
+      const snapshot: NonNullable<Decision["inputs"]> = {};
+      for (const required of mod.requires) {
+        const record = current[required];
+        if (record !== undefined) snapshot[required] = record.value;
+      }
+      if (Object.keys(snapshot).length > 0) inputs = snapshot;
+    }
+    for (const id of mod.provides) {
+      records.push({
+        id,
+        value: answer.value,
+        provenance: mapped.provenance,
+        ...(mapped.source !== undefined && { source: mapped.source }),
+        ...(mapped.offered !== undefined && { offered: mapped.offered }),
+        ...(inputs !== undefined && { inputs }),
+        step: stepId,
+      });
+    }
+  }
+  if (records.length > 0) deps.writeDecisionRecords(records);
 }
 
 export function routeAnswersThroughMutate(

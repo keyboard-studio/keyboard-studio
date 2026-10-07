@@ -22,6 +22,13 @@ export interface DecisionStoreState {
   record: (r: Decision) => void;
   /** `record` folded over the argument list, in argument order (C-1.1). */
   recordAll: (rs: readonly Decision[]) => void;
+  /**
+   * Remove one decision outright — no record remains (not a supersede).
+   * For facts invalidated by a later act, e.g. the touch-seed choice on a
+   * genuine base re-instantiation (spec 035 R12): the fork must be re-asked,
+   * which requires NO record to exist.
+   */
+  forget: (id: DecisionId) => void;
   /** Start-over / new-project only — wired beside surveyAnswerStore's reset. */
   reset: () => void;
 }
@@ -37,6 +44,14 @@ export const useDecisionStore = create<DecisionStoreState>()((set) => ({
       if (rs.length === 0) return s;
       const next: Partial<Record<DecisionId, Decision<unknown>>> = { ...s.decisions };
       for (const r of rs) next[r.id] = r;
+      return { decisions: next };
+    }),
+
+  forget: (id) =>
+    set((s) => {
+      if (s.decisions[id] === undefined) return s;
+      const next: Partial<Record<DecisionId, Decision<unknown>>> = { ...s.decisions };
+      delete next[id];
       return { decisions: next };
     }),
 
@@ -76,4 +91,17 @@ export function selectTrack(decisions: DecisionSet): TrackValue | null {
 export function selectTouchSeedSource(decisions: DecisionSet): TouchSeedSourceValue | null {
   const value = decisions["touch-seed-source"]?.value;
   return value === "import-adapt" || value === "reseed-from-desktop" ? value : null;
+}
+
+/**
+ * Contract C-3.2's one permitted view: the set with the `touch-seed-source`
+ * record omitted, for `resolveLocation`'s gate evaluation (a remembered seed
+ * must not strand the jump back to the chooser). Constructed by omission
+ * from a snapshot at the call site — never stored, never rebuilt from
+ * session fields.
+ */
+export function decisionsWithoutTouchSeed(decisions: DecisionSet): DecisionSet {
+  if (decisions["touch-seed-source"] === undefined) return decisions;
+  const { "touch-seed-source": _omitted, ...rest } = decisions;
+  return rest;
 }

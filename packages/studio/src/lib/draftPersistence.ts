@@ -59,6 +59,7 @@ import {
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 import { alphabetKeyOf } from "../steps/evidence.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { applyDecisionSnapshot, getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { stepHasSettles } from "../steps/stepDependencies.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
@@ -94,8 +95,14 @@ export const DRAFT_KEY_PREFIX = "ks.draft." as const;
  * Current draft envelope version. On boot, a draft whose stored version does
  * not equal this is discarded, not migrated (VR-1) — an MVP-appropriate policy
  * that prevents a stale-shape draft from rehydrating into a changed store.
+ *
+ * Spec 088 FR-007 bumped this 1 → 2 (the `decisions` slice). The bump is
+ * safe by construction, not by the old policy: every reader migrates a v1
+ * envelope before any version gate runs and also looks under the legacy
+ * `.v1` key suffix (see `migrateDraftEnvelope` / `readRawDraft`, plan
+ * Risk R-1), so no existing author's draft is discarded by the bump.
  */
-export const DRAFT_VERSION = 1 as const;
+export const DRAFT_VERSION = 2 as const;
 
 /**
  * The namespaced, versioned localStorage key for a project's durable draft.
@@ -103,7 +110,7 @@ export const DRAFT_VERSION = 1 as const;
  * @param projectKey  A stable per-project id (derived from the working copy's
  *                    keyboard id at instantiation). The MVP only ever reads/
  *                    writes one such key at a time.
- * @returns e.g. `ks.draft.my_kbd.v1`.
+ * @returns e.g. `ks.draft.my_kbd.v2`.
  */
 export function draftKey(projectKey: string): string {
   return `${DRAFT_KEY_PREFIX}${projectKey}.v${DRAFT_VERSION}`;
@@ -414,7 +421,7 @@ export function reconcileProjectIndex(): number {
   // `.v1` suffix, so a pre-bump draft is adopted (and migrated on load)
   // instead of becoming invisible when DRAFT_VERSION moves to 2.
   const suffixes =
-    DRAFT_VERSION === LEGACY_DRAFT_VERSION
+    (DRAFT_VERSION as number) === LEGACY_DRAFT_VERSION
       ? [`.v${DRAFT_VERSION}`]
       : [`.v${DRAFT_VERSION}`, `.v${LEGACY_DRAFT_VERSION}`];
   const indexed = new Set(readProjectIndex().map((e) => e.projectKey));
@@ -805,7 +812,12 @@ export function saveDraft(projectKey: string): void {
     // saved locally.
     decisionRecord: snapshotDecisionRecord(),
     // spec 079 R-01: saved answers and within-step positions survive a reload.
-    surveyAnswers: getSurveyAnswerSnapshot(),
+    // Spec 088 FR-006: survey-question answers are NOT persisted here — the
+    // `decisions` slice below is their only saved record. The filter keeps
+    // position/status and gallery-step answers (090 retires those).
+    surveyAnswers: filterSurveyAnswersForDraft(getSurveyAnswerSnapshot()),
+    // spec 088 FR-007: the live decision set, keyed by decision id.
+    decisions: getDecisionSnapshot(),
   };
 
   try {
@@ -1205,13 +1217,126 @@ function readRawDraft(projectKey: string): string | null {
   try {
     const current = localStorage.getItem(draftKey(projectKey));
     if (current !== null) return current;
-    if (DRAFT_VERSION !== LEGACY_DRAFT_VERSION) {
+    if ((DRAFT_VERSION as number) !== LEGACY_DRAFT_VERSION) {
       return localStorage.getItem(legacyDraftKey(projectKey));
     }
     return null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Spec 088 FR-006 (T015): the draft writer's `surveyAnswers` slice keeps
+ * within-step position, step status, and GALLERY-step answers (spec 090
+ * retires those); survey-question answers are removed — their only saved
+ * record is the envelope's `decisions` slice. An answer counts as a
+ * survey-question answer iff its id is a question-registry module id.
+ */
+export function filterSurveyAnswersForDraft(snapshot: SurveyAnswerSnapshot): SurveyAnswerSnapshot {
+  const steps: Record<string, StepAnswers> = {};
+  for (const [stepId, step] of Object.entries(snapshot.steps)) {
+    const answers: Record<string, SavedAnswer> = {};
+    for (const [answerId, answer] of Object.entries(step.answers)) {
+      if (questionRegistry[answerId] === undefined) answers[answerId] = answer;
+    }
+    steps[stepId] = { ...step, answers };
+  }
+  return { steps, recordedScreenOf: snapshot.recordedScreenOf };
+}
+
+/** decision id → the question id that provides it (087: exactly one provider per decision). */
+function questionIdByDecisionId(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [questionId, mod] of Object.entries(questionRegistry)) {
+    for (const id of mod.provides ?? []) {
+      if (!map.has(id)) map.set(id, questionId);
+    }
+  }
+  return map;
+}
+
+const PROPOSAL_SOURCE_LABELS: ReadonlySet<string> = new Set([
+  "langtags", "cldr", "corpus", "axis-fill", "base", "identity", "region", "derived-from-axis", "analysis",
+]);
+
+/**
+ * Spec 088 (T018): rebuild the survey-answer store's question answers from
+ * the restored decision records, so a reload shows the author the answers
+ * they gave (SC-001) even though the persisted `surveyAnswers` slice no
+ * longer carries them. The decision store remains the only SAVED record;
+ * this is a load-time projection into the runner's working state, exactly
+ * as `restoreSurveyAnswerSnapshot` is for the persisted slice. Records
+ * without a `step`, or whose decision no live question provides, are not
+ * projected (they stay visible in the decision trail). A persisted answer
+ * already present for the same question wins.
+ */
+export function rehydrateAnswersFromDecisions(
+  decisions: DecisionSet,
+  base: SurveyAnswerSnapshot,
+  savedAt: number,
+): SurveyAnswerSnapshot {
+  const byDecision = questionIdByDecisionId();
+  const steps: Record<string, StepAnswers> = { ...base.steps };
+  for (const record of Object.values(decisions)) {
+    if (record === undefined || record.step === undefined) continue;
+    const questionId = byDecision.get(record.id);
+    if (questionId === undefined) continue;
+    const stepId = record.step;
+    const existing = steps[stepId];
+    if (existing !== undefined && existing.answers[questionId] !== undefined) continue;
+    const value = record.value as SavedAnswer["value"];
+    let answer: SavedAnswer;
+    if (record.offered !== undefined) {
+      answer = {
+        value,
+        answerType: typeof value === "boolean" ? "boolean" : Array.isArray(value) ? "char-list" : "text",
+        origin: "overturned",
+        proposal: {
+          value: record.offered as SavedAnswer["value"],
+          ...(record.provenance === "extracted" ? { source: "base" as const } : {}),
+        },
+        stage: "confirmed",
+        evidenceKey: null,
+        screenId: questionId,
+        savedAt,
+      };
+    } else if (record.provenance === "extracted" || record.provenance === "default") {
+      const proposalSource =
+        record.provenance === "extracted"
+          ? ("base" as const)
+          : record.source !== undefined && PROPOSAL_SOURCE_LABELS.has(record.source)
+            ? (record.source as NonNullable<SavedAnswer["proposal"]>["source"])
+            : undefined;
+      answer = {
+        value,
+        answerType: typeof value === "boolean" ? "boolean" : Array.isArray(value) ? "char-list" : "text",
+        origin: "proposed",
+        proposal: proposalSource !== undefined ? { value, source: proposalSource } : { value },
+        stage: "confirmed",
+        evidenceKey: null,
+        screenId: questionId,
+        savedAt,
+      };
+    } else {
+      answer = {
+        value,
+        answerType: typeof value === "boolean" ? "boolean" : Array.isArray(value) ? "char-list" : "text",
+        origin: "confirmed",
+        stage: "confirmed",
+        evidenceKey: null,
+        screenId: questionId,
+        savedAt,
+      };
+    }
+    steps[stepId] = {
+      answers: { ...(existing?.answers ?? {}), [questionId]: answer },
+      position: existing?.position ?? null,
+      status: existing?.status ?? { kind: "in-progress" },
+      lastRecorded: existing?.lastRecorded ?? {},
+    };
+  }
+  return { steps, recordedScreenOf: base.recordedScreenOf };
 }
 
 /**
@@ -1307,11 +1432,26 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
     stampPre079Alphabet();
 
+    // decisions (spec 088 FR-007): the decision store is restored from the
+    // envelope's `decisions` slice — for a migrated v1 envelope, the records
+    // the migration built. Applied even when absent ({}), so a project
+    // switch never inherits another project's decisions.
+    applyDecisionSnapshot(envelope.decisions ?? {});
+
     // surveyAnswers (spec 079 R-01, FR-032): optional/additive, restored the
     // same tolerant way. Applied even when absent, so a pre-079 draft (or a
     // project switch) starts from an empty store rather than inheriting another
-    // project's answers.
-    applySurveyAnswerSnapshot(restoreSurveyAnswerSnapshot(envelope.surveyAnswers));
+    // project's answers. Spec 088: the persisted slice no longer carries
+    // survey-question answers, so they are projected back from the restored
+    // decision records (rehydrateAnswersFromDecisions) — the decisions stay
+    // the only saved record.
+    applySurveyAnswerSnapshot(
+      rehydrateAnswersFromDecisions(
+        envelope.decisions ?? {},
+        restoreSurveyAnswerSnapshot(envelope.surveyAnswers),
+        envelope.savedAt,
+      ),
+    );
 
     // decisionRecord (spec 053 FR-005): optional/additive, restored the same
     // tolerant way as phaseBDraft above — a record written before the field

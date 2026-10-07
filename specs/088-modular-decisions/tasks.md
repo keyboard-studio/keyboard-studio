@@ -67,18 +67,18 @@ answers restored; the saved draft holds them only in `decisions` (SC-001).
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Write writer tests in `packages/studio/src/steps/reducer.decisionStore.test.ts`: one record per `provides` id with the answer's value; provenance mapping per research D-05 (no proposal → `asked`; proposal accepted + source `base` → `extracted`; proposal accepted otherwise → `default`; proposal overridden → `asked` with `offered` = the proposal value); `inputs` snapshots the store's current values for the module's `requires`; a synthetic multi-provide module broadcasts its value to each provided id (research §1b)
-- [ ] T012 [P] [US1] Write the StepHost reload test in `packages/studio/src/components/StepHost.test.tsx`: drive the real `StepHost` through an identity completion, snapshot the draft slices, re-apply them into fresh stores, and assert the answers are restored from `decisions` with value and provenance intact
+- [x] T011 [P] [US1] Write writer tests in `packages/studio/src/steps/reducer.decisionStore.test.ts`: one record per `provides` id with the answer's value; provenance mapping per research D-05 (no proposal → `asked`; proposal accepted + source `base` → `extracted`; proposal accepted otherwise → `default`; proposal overridden → `asked` with `offered` = the proposal value); `inputs` snapshots the store's current values for the module's `requires`; a synthetic multi-provide module broadcasts its value to each provided id (research §1b)
+- [x] T012 [P] [US1] Write the StepHost reload test in `packages/studio/src/components/StepHost.test.tsx`: drive the real `StepHost` through an identity completion, snapshot the draft slices, re-apply them into fresh stores, and assert the answers are restored from `decisions` with value and provenance intact
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Implement `recordAnswersAsDecisions(result, stepId)` in `packages/studio/src/steps/reducer.ts` beside `routeAnswersThroughMutate`, per contract C-2 (registry lookup per answer, broadcast per provided id, synchronous, no timer)
-- [ ] T014 [US1] Call `recordAnswersAsDecisions` from `handleComplete` in `packages/studio/src/components/StepHost.tsx`, in the same block as `recordPhase` / `routeAnswersThroughMutate`
-- [ ] T015 [US1] Stop persisting survey-question answers in `packages/studio/src/lib/draftPersistence.ts`: the writer's `surveyAnswers` slice is filtered to within-step position, step status, and gallery-step answers (090's to retire); the reader tolerates both shapes (FR-006)
-- [ ] T016 [US1] Delete `phaseAnswersByStep` from `packages/studio/src/stores/workingCopyStore.ts`: `recordPhase` stops maintaining the per-step ownership map while keeping the non-answer phase-field merge and the Phase C assignments path intact, per the T006 inventory (FR-006, research D-07)
-- [ ] T017 [US1] Add the derived `selectPhaseAnswers(decisions, phase)` selector and re-point the `mergePhaseResults` session derivation and every T006-inventoried answer reader to it, in `packages/studio/src/stores/workingCopyStore.ts` (or `packages/studio/src/steps/evidence.ts` if the depcruise cycle check requires) (FR-006)
-- [ ] T018 [US1] Flip the draft writer to v2 in `packages/studio/src/lib/draftPersistence.ts`: `DRAFT_VERSION` 1 → 2, envelope gains `decisions: getDecisionSnapshot()`, the apply path restores the store via `applyDecisionSnapshot`, and `reset()` of the decision store is wired into the same start-over / new-project paths that reset `surveyAnswerStore` (FR-007) — gated on T008–T010 green
-- [ ] T019 [US1] Write the SC-001 Playwright walk in `packages/studio/e2e/decision-store-reload.spec.ts` per [quickstart.md](quickstart.md): answer identity, track, project_name in `pnpm dev`, reload, assert restoration, then assert the saved localStorage draft (`ks.draft.<key>.v2`) holds the answers only in its `decisions` slice
+- [x] T013 [US1] Implement `recordAnswersAsDecisions(result, stepId)` in `packages/studio/src/steps/reducer.ts` beside `routeAnswersThroughMutate`, per contract C-2 (registry lookup per answer, broadcast per provided id, synchronous, no timer)
+- [x] T014 [US1] Call `recordAnswersAsDecisions` from `handleComplete` in `packages/studio/src/components/StepHost.tsx`, in the same block as `recordPhase` / `routeAnswersThroughMutate`
+- [x] T015 [US1] Stop persisting survey-question answers in `packages/studio/src/lib/draftPersistence.ts`: the writer's `surveyAnswers` slice is filtered to within-step position, step status, and gallery-step answers (090's to retire); the reader tolerates both shapes (FR-006)
+- [ ] T016 [US1] ~~Delete `phaseAnswersByStep` from `packages/studio/src/stores/workingCopyStore.ts`~~ — **STOPPED BY OWNER RULING (2026-10-06, km-lead proposals Q8, adopted by Matthew; ~/workspace/keyboard-studio-notes/modular-decisions-proposals.md)**: premise falsified by the T006 inventory (research.md §4 — `mergePhaseResults` never reads `.answers`; live `phaseResults[].answers` are predominantly gallery/phase answers with non-registry ids that become decisions only in spec 090, so no decision-derived replacement exists in 088). `phaseAnswersByStep` is **retired by spec 090** as a tail task after its US4, not deleted by 088. FR-006's 088 scope is: question answers leave the survey-answer store and the v2 draft slice (T015/T018); `phaseAnswersByStep` carries 090 as its named retirement owner.
+- [ ] T017 [US1] ~~Add the derived `selectPhaseAnswers(decisions, phase)` selector and re-point the `mergePhaseResults` session derivation and every T006-inventoried answer reader to it~~ — **STOPPED BY OWNER RULING (2026-10-06, km-lead proposals Q8)**, same disposition as T016: no decision-derived replacement for phase answers can exist until spec 090 turns gallery/phase answers into decisions; the re-pointing belongs to 090 alongside the `phaseAnswersByStep` retirement.
+- [x] T018 [US1] Flip the draft writer to v2 in `packages/studio/src/lib/draftPersistence.ts`: `DRAFT_VERSION` 1 → 2, envelope gains `decisions: getDecisionSnapshot()`, the apply path restores the store via `applyDecisionSnapshot`, and `reset()` of the decision store is wired into the same start-over / new-project paths that reset `surveyAnswerStore` (FR-007) — gated on T008–T010 green
+- [x] T019 [US1] Write the SC-001 Playwright walk in `packages/studio/e2e/decision-store-reload.spec.ts` per [quickstart.md](quickstart.md): answer identity, track, project_name in `pnpm dev`, reload, assert restoration, then assert the saved localStorage draft (`ks.draft.<key>.v2`) holds the answers only in its `decisions` slice — **evidence note (2026-10-06)**: the spec file is written as specified, but the live walk cannot execute in the implementation sandbox: Chromium 152 (/opt/meta-chromium) refuses every localhost navigation with `net::ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` (tried `localhost` and `127.0.0.1`, with `--disable-features=LocalNetworkAccessChecks,PrivateNetworkAccessChecks,BlockInsecurePrivateNetworkRequests`). SC-001 therefore rests on the T012 store-level evidence through the real StepHost (writer → snapshot → fresh stores → rehydrated answers, value + provenance asserted). The Playwright spec remains the live-app gate wherever a browser that permits localhost is available.
 
 **Checkpoint**: US1 fully functional — completions write decision records, drafts are
 v2 with answers only in `decisions`, reload restores them. (US2 is not required for
@@ -97,7 +97,7 @@ copies are deleted.
 live walk still route `project_name` (copy only) and `touch_seed_source` (asked
 once) correctly.
 
-- [ ] T020 [P] [US2] Add routing tests to `packages/studio/src/steps/advance.test.ts` (fixture construction only — `advance()`'s logic is untouched): adapt track skips `project_name` when the context is fed from a `DecisionSet` with `authoring-track: adapt`; a recorded `touch-seed-source` skips the seed step; no record asks it
+- [x] T020 [P] [US2] Add routing tests to `packages/studio/src/steps/advance.test.ts` (fixture construction only — `advance()`'s logic is untouched): adapt track skips `project_name` when the context is fed from a `DecisionSet` with `authoring-track: adapt`; a recorded `touch-seed-source` skips the seed step; no record asks it
 - [ ] T021 [US2] Feed `advance()` from the decision store at its call sites: `packages/studio/src/components/StepHost.tsx` (post-completion state read) and `packages/studio/src/components/StudioFooter.tsx`, keeping the `AdvanceContext` field names and shapes (`selectedTrack`, `touchSeedSource` become reads of the store snapshot)
 - [ ] T022 [US2] Re-point `packages/studio/src/lib/resolveLocation.ts` to evaluate `gatedBy` over the store snapshot with the `touch-seed-source` record omitted (the C-3.2 view — never stored, never rebuilt from session fields)
 - [ ] T023 [US2] Delete `packages/studio/src/steps/decisionsFromTraversal.ts` and `packages/studio/src/steps/decisionsFromTraversal.test.ts` (FR-004); zero source references remain (SC-002 partial)
@@ -122,7 +122,7 @@ surfaced orphans (SC-003).
 - [ ] T027 [US3] Write the end-to-end migration test in `packages/studio/src/lib/draftPersistence.test.ts`: seed localStorage with the T002 fixture under its `.v1` key, run the real load path, assert the decision store holds the fixture's answers under their decision ids and the project opens (SC-003)
 - [ ] T028 [P] [US3] Write the orphan-accounting test in `packages/studio/src/lib/draftPersistence.test.ts`: a fixture variant whose answers include a question id absent from the registry produces exactly one `migrationOrphans` entry, and records + retained gallery answers + orphans = 100% of the variant's answers (C-4.3)
 - [ ] T029 [P] [US3] Write the disagreement test in `packages/studio/src/lib/draftPersistence.test.ts`: a v1 fixture variant whose `traversal.selectedTrack` disagrees with its log/session copy migrates with the session field's value winning and a console log emitted (no UI surface asserted)
-- [ ] T030 [US3] Surface `migrationOrphans` to the author on load, wired into the load path in `packages/studio/src/StudioShell.tsx` — **BLOCKED on OPEN-088-1** (plan.md): the spec requires orphans be "shown to the author to re-answer" but does not name the surface; the owner names it, then this task's target file/surface is fixed and the T028 test gains a UI assertion. Do not invent a surface.
+- [ ] T030 [US3] Surface `migrationOrphans` to the author on load — **UNBLOCKED BY OWNER RULING (2026-10-06, km-lead proposals Q1 / OPEN-088-1, adopted by Matthew; ~/workspace/keyboard-studio-notes/modular-decisions-proposals.md)**: the surface is the **decision trail**. On v1→v2 migration, each orphaned answer is written as a decision-log entry visible in the trail, carrying its value, following the trail's existing entry shapes and FR-035 degrade behaviour. No new surface, no notice-store machinery.
 
 **Checkpoint**: SC-003 green (T027–T029). US3 is *complete* only when T030 lands —
 088 must not be marked complete with orphans collected-but-unshown.
@@ -165,15 +165,15 @@ registry, and the trail still shows both entries (plus SC-005).
 - **Foundational (Phase 2)**: Depends on Setup. BLOCKS all user stories. T003 → T004 (store uses the extended type); T007 → T008 → T009/T010.
 - **US1 (Phase 3)**: Depends on Foundational. T013 needs T004; T018 needs T008–T010 green (reader before writer, plan R-1).
 - **US2 (Phase 4)**: Depends on US1's writer (records exist to route over) — specifically T013/T014. T024 needs T021/T022/T025's selectors in use first, or the tree won't compile between commits; order within the phase as listed.
-- **US3 (Phase 5)**: Depends on Foundational (T008–T010) and US1's T018 (native v2 to compare against). T030 is blocked on OPEN-088-1, not on code.
+- **US3 (Phase 5)**: Depends on Foundational (T008–T010) and US1's T018 (native v2 to compare against). T030 was unblocked by the owner's 2026-10-06 ruling on OPEN-088-1 (surface: the decision trail — see the T030 line).
 - **US4 (Phase 6)**: Depends on US1 (records keyed by decision exist). Independent of US2/US3 code; may run before Phase 5 if staffed, except T034 reuses T012's StepHost harness additions.
-- **Polish (Phase 7)**: Depends on all story phases except possibly T030; a polish pass with T030 outstanding must report US3 as incomplete.
+- **Polish (Phase 7)**: Depends on all story phases.
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Foundation only. The MVP — shippable alone (routing still uses the session fields, which agree with the records).
 - **US2 (P1)**: US1 (the store must be written before it can be read for routing).
-- **US3 (P2)**: Foundational migration + US1's v2 writer. Orphan *surfacing* (T030) blocked on the owner's OPEN-088-1 ruling.
+- **US3 (P2)**: Foundational migration + US1's v2 writer. Orphan *surfacing* (T030) goes to the decision trail per the owner's 2026-10-06 OPEN-088-1 ruling.
 - **US4 (P2)**: US1. Log re-keying is otherwise self-contained.
 
 ### Within Each User Story
@@ -208,7 +208,7 @@ registry, and the trail still shows both entries (plus SC-005).
 1. Setup + Foundational → store, type, migration reader ready
 2. US1 → answers live in the store; drafts v2 (MVP)
 3. US2 → routing reads the store; duplicates deleted (SC-002)
-4. US3 → v1 drafts migrate with full accounting (SC-003); T030 on the owner's ruling
+4. US3 → v1 drafts migrate with full accounting (SC-003); orphans surface in the decision trail (OPEN-088-1, ruled 2026-10-06)
 5. US4 → log per-decision (SC-005)
 6. Polish → parity unmodified (SC-004), full suite/lint/typecheck green
 
@@ -218,4 +218,4 @@ registry, and the trail still shows both entries (plus SC-005).
 - FR-009 is a hard constraint throughout: `orderParity`, `gateWalkParity`, and
   `steps/manifest` test files are never edited by any task above.
 - No task touches `packages/contracts`, adds a timer, or changes an i18n id (FR-010).
-- OPEN-088-1 (plan.md) blocks exactly one task: T030.
+- OPEN-088-1 (plan.md) was ruled by the owner on 2026-10-06 (km-lead proposals Q1): orphaned v1 answers surface in the decision trail; T030 implements it. Q8 of the same ruling stops T016/T017: `phaseAnswersByStep` is retired by spec 090, not deleted by 088.
