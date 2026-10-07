@@ -656,16 +656,21 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   //   - Nothing installed the autosave until the compile pipeline re-settled,
   //     so every store write between mount and that settle went unpersisted.
-  //   - Worse, the re-commit is NOT a no-op. `doCommit` re-derives the
-  //     instantiation mode from `useSurveySessionStore.selectedTrack`, which
-  //     has ADVANCED since the original commit: the base is confirmed at
-  //     `choose_base`, before the track step exists to answer. So an author on
-  //     the adapt track re-commits as `adapt-existing` over a working copy
-  //     recorded `new-from-base`, and `resolveInstantiationCase` reads
-  //     same-id/different-mode as a genuine base switch and clears
-  //     `phaseResults` (workingCopyStore.ts). A refresh silently discarded the
-  //     survey. The same re-commit also clears the touch-seed choice and
-  //     fires the rebase draft-key migration, neither of which a restore should do.
+  //   - Worse, the re-commit was NOT a no-op. `doCommit` once re-derived
+  //     the instantiation mode from the session's mutable track state,
+  //     which had ADVANCED since the original commit, so an adapt-track
+  //     author re-committed as `adapt-existing` over a working copy
+  //     recorded `new-from-base`, and `resolveInstantiationCase` read
+  //     same-id/different-mode as a genuine base switch and cleared
+  //     `phaseResults` (workingCopyStore.ts) — a refresh silently
+  //     discarded the survey. Specs 089/092 removed that mechanism
+  //     structurally (spec 092 T040/T041): the mode now derives from the
+  //     recorded `authoring-track` decision — the same value that
+  //     produced the restored copy — and the setup gate (FR-004) means
+  //     the first instantiation happens only once that decision exists,
+  //     so a re-commit can no longer re-derive a different mode. The
+  //     pre-seed below stays as the résumé guard regardless: a restore
+  //     should not re-run a commit at all.
   //
   // Both follow from re-running a COMMIT to restore a copy that is already
   // committed. So the restore path now does what the résumé path has always

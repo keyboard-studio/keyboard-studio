@@ -30,6 +30,8 @@ import {
   pickBaseKeyboard,
   chooseAdaptTrack,
   chooseTrackCopy,
+  acceptProjectName,
+  confirmPrefill,
   surveyAdvance,
 } from "./helpers/surveyFlow";
 
@@ -66,6 +68,19 @@ test("spec 092 US1 (adapt): copyright question arrives after the track choice, p
   await field.fill("My Own Holder");
   await surveyAdvance(page).click();
   await expect(field).toBeHidden({ timeout: 15_000 });
+
+  // Spec 092 SC-004 (T042): the working copy was instantiated as an
+  // adaptation at the FIRST commit after the track choice — no page
+  // refresh anywhere in this walk (nothing here calls page.reload) and
+  // no second commit: the flow continues straight through project name
+  // to the prefill confirmation, which renders from the instantiated
+  // working copy. (The instantiation mode itself is asserted at store
+  // level — instantiationMode "adapt-existing" — in the reducer/StepHost
+  // suites; this leg pins that the live flow never needs a refresh or a
+  // re-commit to get there.)
+  await acceptProjectName(page);
+  await confirmPrefill(page);
+  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
 });
 
 test("spec 092 US1 (copy): holder defaults to the author; the copied notice is not offered", async ({
