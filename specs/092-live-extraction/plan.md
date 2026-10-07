@@ -164,3 +164,74 @@ into the runner's post-setup point. No new directories; no engine changes.
 ## Complexity Tracking
 
 No Constitution Check violations — table not required.
+
+## Implementation audit (T001, 092 agent — against cascaded base `81e79756`)
+
+Base verified: merge of `km/derived-steps` @ `54fe4883` (088 close + 089 through
+T024 + its depcruise fix pending restack, see G-6; 090 US1+US2) into
+`km/live-extraction`. Present exactly as planned: 088 `stores/decisionStore.ts`
+(`record/recordAll/forget/set/snapshot/peek`, `selectTrack`/`selectTouchSeedSource`);
+the `Decision` record with `inputs`/`offered`/`source`; 089's `applyDecisionEffects`
+runner + `galleryHost` record-then-apply; `runDecisionFlow` semantics (order,
+gating, extract→validate, source = catalog id → IR-header fallback, throwing
+extract names its module) with **no live caller** (non-test callers are
+`DecisionsDemo` ×2 and `spikeRunner` only — T002 grep snapshot);
+`buildExtractContext(baseIr, baseKeyboard)` against `workingCopyStore`'s
+`baseIr`/`baseKeyboard` slots; `il_copyright_holder` exactly as research R5
+(`requires: ["author-name"]`, `extractCopyrightHolder`, no `validate`);
+`questionRegistry`/`decisionIndex` composition (flow + Phase F + reserve +
+gallery).
+
+**Predecessor gaps and plan deltas (recorded, not silently adapted):**
+
+- **G-1 (091 in flight):** `steps/stepDependencies.ts` is still present and
+  steps are not yet derived. Does not block the pass (it orders by module
+  `requires` via `orderDecisions`); T001's "091 landed" item is unmet and the
+  acceptance walk's placement assertions ride on 091 + CI.
+- **G-2 (090 US3/US4 in flight):** gallery modules for `carved-layout`,
+  `touch-layout`, `physical-layout`, `help-docs`, `deadkeys-defined`,
+  `rule-set` are registered but placeholder (`UnmigratedGalleryRenderer`,
+  no-op `apply`). T037 is **PENDING-PREDECESSOR**: `prefillCarveDispositions`
+  (store action + `CarveGalleryV2` effect) still exists; its conversion waits
+  for 090's carve migration to land via restack.
+- **G-3:** `DecisionRendererProps` (090) carries `provenance`/`source` but no
+  `offered`. T032 extends the type additively with `offered?: unknown`.
+- **G-4:** no module-level lookup-default declaration exists in the landed
+  contract (`runDecisionFlow`'s `default` is value-less). 092 defines it:
+  optional `lookupDefault(ctx)` on `QuestionModule`, returning
+  `{ value, source? }` — introduced in T010, populated by the US2 conversions.
+- **G-5:** T035 names `pb_character_inventory.ts`; 090 deleted it. Its
+  `extract` lives on as `survey/questions/gallery/characterInventory.ts`'s
+  extract. T035 retargets there.
+- **G-6:** the base carries the known depcruise cycle
+  (`survey/types` ↔ `workingCopyStore`); the fix (`030bf59c`) sits on
+  `km/decision-apply` and arrives via a later restack. Not fixed here; local
+  `pnpm lint` depcruise verdicts are read with that caveat (eslint on touched
+  files + focused suites are the local gates; CI is authoritative).
+- **G-7 / OQ-2 RESOLVED:** setup is the `base-keyboard` completion's deferred
+  instantiation (no new `DecisionId` — a record for it would pollute the set
+  093 replays and SC-002 counts). T013's wiring lands in `StudioShell.tsx` +
+  `decisions/liveExtraction.ts`, not `StepHost.tsx` as the task's file list
+  suggested: the instantiation artifact and `doCommit` live in `StudioShell`,
+  which `StepHost` cannot reach. Shape: the single-instantiation effect gates
+  on BOTH `base-keyboard` and `authoring-track` records; `doCommit` then runs
+  the existing `applyStepCompletion("choose_base", …)` apply path with the
+  track known, exactly once (per-base guard unchanged); the extraction pass
+  is invoked at the post-apply point inside `doCommit` (the same point T050
+  later adds `recordBaseContribution` to). FR-004's observable behaviour
+  holds: instantiation only through the apply path, requires both decisions,
+  runs once, track known.
+
+**T002 baseline (pre-change, this base):** the Playwright golden walk is
+CI-gated per the owner's ruling (sandbox Chromium cannot navigate localhost).
+The store-level StepHost golden walk (`tests/steps/stepHost.goldenWalk.test.tsx`,
+2 tests) is **red on this base with a characterised, decisionMutations-only
+delta**: in both tracks, ~4 entries whose committed fixtures say
+`decisionMutations: []` actually record 1–2 `"record"` mutations (plus added
+`"record"` entries in existing lists); zero store-mutation, navigation, or
+content deltas. This is predecessor-cascade fixture staleness (the unified
+spy harness from 089's restack vs fixtures regenerated on parallel branches),
+not a 092 effect — no 092 code existed when measured. The fixtures are NOT
+regenerated on this branch (the oracle belongs to 089/090 and its
+reconciliation rides their restack); per-phase, this suite is re-run and any
+delta beyond the characterised shape is a stop-and-report.

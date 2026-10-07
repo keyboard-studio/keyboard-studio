@@ -12,15 +12,23 @@ report — that is a series failure, not a licence to quietly make the edit.
 
 ## Phase 1: Setup
 
-- [ ] **T001** Verify the stack this spec stands on is landed in this branch: 088's
+- [x] **T001** Verify the stack this spec stands on is landed in this branch: 088's
   `decisionStore` (records carry `inputs`/`offered`), 089's `apply` + patch runner, 090's
   `DecisionRendererProps` (`provenance`/`source`) and `carved-layout` value shape, 091's
   derived steps with `stepDependencies.ts` deleted. Record any predecessor gap in the PR
   description before writing code · packages/studio/src/decisions/, packages/studio/src/steps/
-- [ ] **T002** Capture the pre-change baseline: the 089 golden walk
+  — DONE with gaps recorded in plan.md ("Implementation audit (T001)"): 091 not yet
+  landed (G-1), 090 US3/US4 gallery modules placeholder (G-2, T037 pending-predecessor),
+  plus deltas G-3…G-7 and the OQ-2 resolution.
+- [x] **T002** Capture the pre-change baseline: the 089 golden walk
   (e2e/golden-walk.spec.ts, copy track from `basic_kbdfr`) green and byte-identical, and a
   grep snapshot proving `runDecisionFlow` has no live caller (research R1) ·
   packages/studio/e2e/golden-walk.spec.ts
+  — DONE with a caveat recorded in plan.md: grep snapshot confirms no live caller
+  (DecisionsDemo/spikeRunner only); the Playwright walk is CI-gated (owner ruling);
+  the store-level StepHost walk is red on this base with a characterised
+  decisionMutations-only delta (predecessor-cascade fixture staleness — fixtures NOT
+  regenerated here; reconciliation rides the 089/090 restack).
 
 **Checkpoint:** predecessors present, baseline pinned — the pass can be built.
 
