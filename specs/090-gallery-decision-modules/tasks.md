@@ -81,7 +81,7 @@ the recording of the owner's carve ruling (T003, resolved).
   equals its step's declared `requires` (the parity 091 will rely on) in
   packages/studio/src/decisions/galleryModules.coverage.test.ts (module stubs land with this
   task; their renderers/applies fill in per story)
-- [ ] T009 SC-005 determinism harness: a frozen-stores test utility that runs an `apply`
+- [x] T009 SC-005 determinism harness: a frozen-stores test utility that runs an `apply`
   against a fixed (IR, value, inputs) and fails if any store is read or written, for reuse by
   every story's apply tests, in packages/studio/src/decisions/applyDeterminism.ts (with its
   own test in packages/studio/src/decisions/applyDeterminism.test.ts)
