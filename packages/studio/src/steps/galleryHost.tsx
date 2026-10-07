@@ -23,6 +23,7 @@
 // as ReducerDeps. `lib/galleryHostDeps.ts` composes the live deps from the
 // stores; step wrappers hand them in.
 
+import { createContext, useContext } from "react";
 import type { IRPath, KeyboardIR, HistoryEntryState } from "@keyboard-studio/contracts";
 import type {
   Decision,
@@ -30,7 +31,31 @@ import type {
   DecisionSet,
 } from "../decisions/decisionTypes.ts";
 import type { ApplyContext, GalleryModule, WorkingCopyPatch } from "../survey/types.ts";
-import { assertPatchChannelsAuthorized } from "./reducer.ts";
+import { assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
+
+/**
+ * Step chrome a hosted renderer may need — completion and back navigation.
+ * DecisionRendererProps (FR-001) deliberately carries only the decision
+ * contract, so the host passes the manifest step's navigation through
+ * this context instead: the wrapper (the step's manifest component) gives
+ * it to the host, and renderers that navigate consume it. Renderers that
+ * never navigate (the small pickers) simply ignore it.
+ */
+export interface GalleryStepContextValue {
+  onComplete: (result: unknown) => void;
+  onBack?: () => void;
+}
+
+export const GalleryStepContext = createContext<GalleryStepContextValue | null>(null);
+
+/** The step context the gallery host provided; throws outside a hosted renderer. */
+export function useGalleryStepContext(): GalleryStepContextValue {
+  const ctx = useContext(GalleryStepContext);
+  if (ctx === null) {
+    throw new Error("useGalleryStepContext: renderer is not hosted by GalleryHost");
+  }
+  return ctx;
+}
 
 /** The store touches the host needs, injected (see file header). */
 export interface GalleryHostDeps {
@@ -142,6 +167,8 @@ export interface GalleryHostProps<V> {
   provenance?: DecisionProvenance;
   /** Source recorded alongside the value, when the step has one to name. */
   source?: string;
+  /** Step navigation handed to the renderer via GalleryStepContext. */
+  stepContext?: GalleryStepContextValue;
 }
 
 /**
@@ -163,7 +190,7 @@ export function GalleryHost<V>(props: GalleryHostProps<V>): React.JSX.Element {
       deps,
     );
   };
-  return (
+  const renderer = (
     <Renderer
       value={record?.value as V | undefined}
       onChange={onChange}
@@ -171,5 +198,9 @@ export function GalleryHost<V>(props: GalleryHostProps<V>): React.JSX.Element {
       provenance={record?.provenance ?? "asked"}
       {...(record?.source !== undefined && { source: record.source })}
     />
+  );
+  if (props.stepContext === undefined) return renderer;
+  return (
+    <GalleryStepContext.Provider value={props.stepContext}>{renderer}</GalleryStepContext.Provider>
   );
 }

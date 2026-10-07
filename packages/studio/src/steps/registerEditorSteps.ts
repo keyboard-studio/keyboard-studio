@@ -27,7 +27,7 @@ import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { DeadkeyAdapter } from "../editors/adapters/deadkeyAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
-import { TouchSeedSourcePanel } from "../editors/touchSeedSource/TouchSeedSourcePanel.tsx";
+import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import {
   BaseResolutionAdapter,
   IdentityLiteAdapter,
@@ -217,8 +217,9 @@ export const mechanismsStep: EditorStep = step({
 /**
  * Touch seed source step: side-trail fork for choosing touch surface seed.
  * Gated side trail (stepDependencies.ts); rejoins at the touch carve+add step (FR-013).
- * Renders TouchSeedSourcePanel (T014, spec 035 contracts/seed-source-fork.md) —
- * a bespoke chooser panel, NOT the surface-parameterized carve/add shell, so
+ * Renders TouchSeedSourceHost (T014, spec 035 contracts/seed-source-fork.md;
+ * the gallery host wrapper since spec 090 T012) — a bespoke chooser panel,
+ * NOT the surface-parameterized carve/add shell, so
  * `surface` is omitted (that field only describes the AddPhysicalAdapter /
  * AddTouchAdapter shell pattern the touch step below still uses).
  *
@@ -237,7 +238,7 @@ export const touchSeedSourceStep: EditorStep = step({
   ...stepDependencies("touch_seed_source"),
   title: "Touch Seed Source",
   layout: "full",
-  component: TouchSeedSourcePanel,
+  component: TouchSeedSourceHost,
   specRef: "specs/035-mobile-touch-derivation",
   persistence: "working-copy",
 });

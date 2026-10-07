@@ -379,3 +379,29 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   `questionRegistry`, so registering the gallery module in T008 does not
   trip the duplicate-provider guard. T021 (US2) still retires/folds the
   spike as planned.
+- **D-090-7 — gallery renderers close an import cycle through the registry;
+  `flowModules` extracted to a leaf (T012).** Registering store-coupled
+  renderer components as gallery modules (T011/T012) put them in the
+  registry's import graph, closing a cycle: registry → gallery module →
+  renderer → `workingCopyStore` → `dashboard/completeness` → `steps/stepOrder`
+  → `steps/stepDependencies` → registry. When the graph is entered
+  registry-first (e.g. via `steps/reducer`), `stepDependencies` evaluated
+  while the registry was still initializing and `flowModules` was
+  unpopulated — a hard `TypeError` at module load. Fix, landed with T012:
+  `flowModules` (and `demotedPhaseFModules`) moved verbatim from
+  `survey/questions/registry.ts` into a new leaf
+  `survey/questions/flowModules.ts` (question modules only); the registry
+  imports and re-exports them, and `stepDependencies` imports the leaf.
+  Additionally the A3 channel authorization moved from `steps/reducer.ts`
+  to the leaf `steps/applyAuthorization.ts` (re-exported from reducer.ts)
+  so the gallery host shares it without importing the registry-coupled
+  runner. No behaviour change: stepOrder parity, manifest, questionModules
+  (908 tests across the affected suites), and the runner's own suite are
+  green. Every later gallery story (US2–US4 renderers all read stores)
+  would have hit the same cycle.
+- **D-090-3 label amendment (owner ruling 2026-10-06 22:41 CDT):** "Accept
+  store-level gates; run live captures in CI." The per-slice golden-walk
+  byte-identity check is a CI gate (e2e lane) rather than a pending
+  baseline: slice reports record it as **CI-gated (golden-walk verify in
+  the e2e lane)**, with the in-sandbox gate being StepHost parity +
+  focused suites + tsc/lint as store-level evidence.

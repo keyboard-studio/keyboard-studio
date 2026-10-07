@@ -44,8 +44,8 @@ vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.t
 vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
-vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
-  import("./test/studioShellMocks/TouchSeedSourcePanel.tsx"),
+vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
+  import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
 vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));

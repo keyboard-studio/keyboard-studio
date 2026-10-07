@@ -33,7 +33,12 @@
 // first. Decisions can.
 
 import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
-import { flowModules } from "../survey/questions/registry.ts";
+// flowModules comes from its own leaf module, NOT the registry (spec 090
+// delta D-090-7): the registry's import graph now includes store-coupled
+// gallery renderers, and this module is reachable from stores via
+// dashboard/completeness → stepOrder — importing the registry here would
+// close an initialization cycle.
+import { flowModules } from "../survey/questions/flowModules.ts";
 import type { QuestionModule } from "../survey/types.ts";
 
 interface StepDeclaration {

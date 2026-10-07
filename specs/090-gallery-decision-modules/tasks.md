@@ -112,7 +112,7 @@ on reload, and routing that reads it (touch seed asked once, per 088) behaves as
   packages/studio/src/survey/layout/LayoutStep.tsx; the `savePickedWindowsLayout` write path
   is deleted from packages/studio/src/lib/layoutFamily.ts (its read helpers re-point to the
   decision selector)
-- [ ] T012 [P] [US1] `touch-seed-source` module: module with its asked-while-unrecorded
+- [x] T012 [P] [US1] `touch-seed-source` module: module with its asked-while-unrecorded
   `gatedBy` preserved in packages/studio/src/survey/questions/gallery/touchSeedSource.ts;
   `TouchSeedSourcePanel` reports through `onChange` and loses its session write in
   packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx

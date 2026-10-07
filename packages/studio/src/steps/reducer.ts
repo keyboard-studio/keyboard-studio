@@ -621,77 +621,13 @@ export function recordAnswersAsDecisions(
 // them). Modules without `apply` are skipped. Synchronous; no timer (A8).
 // ---------------------------------------------------------------------------
 
-/**
- * Thrown when a module's `apply()` returns a channel it is not authorized
- * to write (A3). Carries the question id and the offending channel; nothing
- * from the patch is applied — authorization is checked for the whole patch
- * before the sink is called.
- */
-export class ApplyChannelError extends Error {
-  /** The question whose apply returned the unauthorized channel. */
-  readonly questionId: string;
-  /** The unauthorized channel name. */
-  readonly channel: keyof WorkingCopyPatch;
-
-  constructor(questionId: string, channel: keyof WorkingCopyPatch) {
-    super(
-      `apply() for question "${questionId}" returned unauthorized channel "${channel}". ` +
-        `No part of the patch was applied (spec 089, apply-contract A3).`,
-    );
-    this.name = "ApplyChannelError";
-    this.questionId = questionId;
-    this.channel = channel;
-  }
-}
-
-/**
- * The channel authorization table (A3): an overlay channel may be returned
- * only by a module providing the named decision. The `ir` channel is not
- * listed — it is authorized for any module with an `apply` and non-empty
- * declared `writes`, and contained by the checked merge (A4).
- */
-const APPLY_CHANNEL_AUTHORIZATION: ReadonlyArray<{
-  channel: keyof WorkingCopyPatch;
-  decisionId: Decision["id"];
-}> = [
-  { channel: "identity", decisionId: "project-keyboard-id" },
-  { channel: "attribution", decisionId: "copyright-holder" },
-  { channel: "helpDocs", decisionId: "help-welcome-paragraph" },
-  { channel: "historyEntryState", decisionId: "help-welcome-paragraph" },
-];
-
-/**
- * Verify a patch's channels against the A3 authorization table. Returns
- * true when the patch carries at least one channel (the sink should be
- * called); an unauthorized channel throws {@link ApplyChannelError} before
- * anything is applied — no partial patch (A3).
- *
- * Shared by `applyDecisionEffects` below and by the gallery host
- * (steps/galleryHost.tsx, spec 090 T005), which runs gallery modules'
- * applies through exactly the same authorization as question modules'.
- */
-export function assertPatchChannelsAuthorized(
-  questionId: string,
-  mod: { provides?: readonly Decision["id"][]; writes?: readonly IRPath[] },
-  patch: WorkingCopyPatch,
-): boolean {
-  const writes = mod.writes ?? [];
-  const channels = (Object.keys(patch) as Array<keyof WorkingCopyPatch>).filter(
-    (channel) => patch[channel] !== undefined,
-  );
-  if (channels.length === 0) return false;
-  for (const channel of channels) {
-    if (channel === "ir") {
-      if (writes.length === 0) throw new ApplyChannelError(questionId, channel);
-      continue;
-    }
-    const rule = APPLY_CHANNEL_AUTHORIZATION.find((r) => r.channel === channel);
-    if (rule === undefined || !(mod.provides ?? []).includes(rule.decisionId)) {
-      throw new ApplyChannelError(questionId, channel);
-    }
-  }
-  return true;
-}
+// The A3 channel authorization (ApplyChannelError + the table + the
+// check) lives in steps/applyAuthorization.ts — a leaf module — so the
+// gallery host can share it without importing this registry-coupled file
+// (spec 090 T012; see that module's header). Re-exported here for the
+// importers that learned it from the runner (089's tests included).
+export { ApplyChannelError, assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
+import { assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
 
 /**
  * Run the decision effects of a completed step's answers.

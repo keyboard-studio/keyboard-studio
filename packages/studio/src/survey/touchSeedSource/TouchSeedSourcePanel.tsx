@@ -1,11 +1,15 @@
-// TouchSeedSourcePanel — the touch_seed_source fork chooser (spec 035 FR-006).
+// TouchSeedSourcePanel — the touch_seed_source fork chooser (spec 035 FR-006),
+// and the `touch-seed-source` gallery module's renderer (spec 090 T012).
 //
 // Renders the off-spine "touch_seed_source" step (contracts/seed-source-fork.md):
 // lets the author pick "Import & adapt" (keep + adapt the base's shipped touch
 // layout) vs "Reseed from desktop" (discard any shipped touch layout and derive
-// a fresh tablet projection from the locked desktop work). The choice is recorded
-// in surveySessionStore.touchSeedSource; buildTouchLayoutJson's caller reads it
-// to select the Case A/B derivation path (see seed-derivation.md).
+// a fresh tablet projection from the locked desktop work). The choice is the
+// `touch-seed-source` decision: it arrives via DecisionRendererProps and the
+// confirm reports it through onChange — the gallery host
+// (TouchSeedSourceHost, this folder) records it; buildTouchLayoutJson's
+// caller reads the decision to select the Case A/B derivation path (see
+// seed-derivation.md). Step navigation arrives via GalleryStepContext.
 //
 // LIVE PREVIEW — REAL OSK (spec 035 R4b amendment; km-doc records the amendment
 // separately). The right-hand pane no longer renders a homemade keycap grid —
@@ -49,11 +53,12 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { emitTouchLayout } from "@keyboard-studio/engine";
-import type { EditorStepProps } from "../../steps/types.ts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
+import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
+import type { TouchSeedSourceValue } from "../questions/gallery/touchSeedSource.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { type TouchSeedSource } from "../../stores/surveySessionStore.ts";
-import { selectTouchSeedSource, useDecisionStore } from "../../stores/decisionStore.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
@@ -63,7 +68,7 @@ import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact
 import { OSKFrame } from "../../components/OSKFrame.tsx";
 import { PreviewSheet } from "../../components/PreviewSheet.tsx";
 import { PreviewButton } from "../../components/PreviewButton.tsx";
-import { ASSIGN_LOOP_LEFT_PANE_PCT } from "../assignLoop/AssignLoopShell.tsx";
+import { ASSIGN_LOOP_LEFT_PANE_PCT } from "../../editors/assignLoop/AssignLoopShell.tsx";
 import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { BREAKPOINTS } from "../../ui/breakpoints.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
@@ -219,16 +224,17 @@ const fallbackNoteStyle: CSSProperties = {
 // TouchSeedSourcePanel
 // ---------------------------------------------------------------------------
 
-export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
+export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererProps<TouchSeedSourceValue>) {
   const { t } = useLingui();
+  const { onComplete, onBack } = useGalleryStepContext();
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
-  // Spec 088 FR-005: the recorded choice is the `touch-seed-source`
-  // decision in the decision store (the session field is deleted).
-  const storedSeedSource = useDecisionStore((s) => selectTouchSeedSource(s.decisions));
+  // The recorded choice arrives as the renderer's value (spec 090 T012);
+  // null mirrors selectTouchSeedSource's unrecorded case.
+  const storedSeedSource: TouchSeedSource | null = value ?? null;
 
   // Desktop modifications to replay onto the seed preview (spec 035 R3) —
   // same read/derive pattern as TouchGallery's own `mods` memo (carve
@@ -367,12 +373,10 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
     if (selected !== storedSeedSource) {
       useWorkingCopyStore.getState().setTouchDraft(null);
     }
-    useDecisionStore.getState().record({
-      id: "touch-seed-source",
-      value: selected,
-      provenance: "asked",
-      step: "touch_seed_source",
-    });
+    // Spec 090 T012: the record itself is the host's — onChange records the
+    // touch-seed-source decision (provenance "asked", this step) and runs
+    // the module's apply.
+    onChange(selected);
     onComplete(undefined);
   }
 
