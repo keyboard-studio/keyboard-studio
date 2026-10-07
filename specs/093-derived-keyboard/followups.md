@@ -277,3 +277,109 @@ liveExtraction.test.ts (second run returns {seeded: [], offered: []} and
 record objects are identical; an already-standing offer is not
 rewritten). All three files now terminate and pass: panelAdapters 10/10,
 Phase F pair 9/9.
+
+## FINAL PASS (2026-10-07) — T010/T011 STOP: the unblock premise was falsified in substance by 090's landed shape
+
+The hold above said T010/T011 unblock when "090 US4 (touch-layout
+apply, its T042) lands ... making the touch surface a decision value the
+recalculation rule can refresh per item." T042 landed, but its apply is
+a deliberate NO-OP (090 ruling D-090-38): the touch decision's value is
+an ops snapshot whose applied view is built by completion wiring
+(applyTouchCompletionEffects), because 089's WorkingCopyPatch has no
+channel for its outputs (the touchLayoutJson string; the phaseResults
+applied view). The physical-layout module landed the same way. So on
+the final tree:
+
+- Replay/recalculation CANNOT refresh the touch surface per item —
+  there is no touch apply to replay. R1 (automatic touch re-derivation
+  on physical change) is a working-copy procedure (touchSuggest +
+  no-clobber merge over the staleness closure), not a decision fold.
+- `staleSteps` on the final tree is FR-019's revisit closure, computed
+  by workingCopyStore.computeStalenessFromManifest over the manifest's
+  step writes→inputs graph (markStale/clearStale + reopened roots). Its
+  live consumers are step-level semantics, not decision-level ones:
+  the OutputScreen download gate (staleSteps.has("touch")), the
+  MechanismGallery progression path (marks TOUCH stale directly because
+  the manifest graph lacks the mechanisms→touch edge), journey-runner's
+  deep-link revision, and the draft snapshot's serialized slice.
+- T010's "general closure" (093's decision requires-graph closure +
+  provenance rule) is a different graph answering a different question
+  (which DECISIONS re-derive, not which STEPS must be re-walked or
+  gate the download).
+
+Deleting repropagate.ts + the staleSteps slice (T011) on this tree
+would remove R1's only trigger and the download gate's input, with no
+decision-replay replacement in existence. STOP — options for the
+owner/lead: (a) re-scope as a graph-unification project (project the
+decision graph to step level for FR-019's consumers, and re-home R1's
+re-derivation behind a decision-triggered completion effect
+recalculation can invoke); (b) accept the dual-graph state as the
+shipped architecture and retire T010/T011 + FR-005 with the rationale
+recorded (each graph is the one its consumers' semantics need);
+(c) defer until a successor spec gives touch/physical a true apply
+channel (patch-contract extension), making T011 mechanical. R1–R6 stay
+pinned by their contract tests in the meantime. T010/T011 and T024's
+staleSteps gate remain open.
+
+## FINAL PASS (2026-10-07) — US2 draft workstream (T014–T016, T018): SCOPE STOP, one inseparable unit
+
+Not a falsified premise — the spec text is implementable as written —
+but the four tasks stand or fall together, and together they are a
+boot-path restructure that cannot be landed honestly in this pass's
+remaining runway:
+
+- T015 (v3 envelope: starting-point id + decisions only) without T018
+  breaks résumé for every newly saved draft: loadDraft would restore
+  decisions with no working copy and no way to rebuild one.
+- T018 (resume = full replay) must produce startingPointIR from the
+  saved id. The only producer of a base IR is the corpus import/compile
+  pipeline (async, engine-backed); loadDraft runs synchronously,
+  pre-mount, from main.tsx. T018 therefore restructures boot: restore
+  decisions + a pending-resume marker, async-compile the base in the
+  shell, instantiate, replay, install — touching main.tsx's boot
+  contract, the shell résumé effect and its doCommit pre-seed guard,
+  the "My keyboards" envelope scan, cloud restore (applyRemoteDraft),
+  and the SC-003 byte-identity walk. The failure mode of a rushed
+  landing is the worst in the app: real drafts unresumable.
+- T016's migration rebuild-check is T018's replay applied at migration
+  time and inherits the same machinery.
+
+Recommendation: schedule US2's draft workstream as its own pass with
+the boot restructure designed first (where the async compile result
+lands, how the pending-resume state renders, how the scan treats v3
+envelopes before resume completes). T014's fixture can be captured
+from the current branch state at that pass's start, exactly as its
+text requires. FR-004 remains an open spec obligation; T014–T016/T018
+stay unchecked.
+
+## FINAL PASS (2026-10-07) — T017 wire-in residues (landed at 2107dc52)
+
+Two named consequences of the RETAIN + RECALCULATE wire-in, recorded
+for the lead rather than silently absorbed:
+
+1. phaseResults is NOT recalculated. instantiateFromBase still resets
+   the applied-answer cache on a genuine switch, and replay installs
+   IR + overlay channels + the carve slice only. The mechanisms/touch
+   APPLIED VIEWS (which read phaseResults entries, D-090-38) therefore
+   show the fresh base's state after a switch until those steps are
+   revisited, while their DECISIONS — the source of truth — are retained
+   and recalculated. The consent copy promises exactly the decision
+   semantics and nothing about the applied-view cache.
+2. The live validateValue seam remains uninjected in the rebuild
+   wiring (as does recomputeValue — pre-existing T009 note), so the
+   asked-record validate/re-propose verdict on a base switch currently
+   falls back to each module's own validate(value) without the inputs
+   snapshot. The recalculate-side snapshot now covers the A2 union
+   (58504e48), so injecting a snapshot-aware validator later needs no
+   further snapshot work.
+
+## FINAL PASS (2026-10-07) — depcruise remainder
+
+The lead ruling's exemption landed (ce08cd0c): decisions-layer
+violations 6 → 0. Two question-modules-no-bypass-mutate-seam errors
+remain on the final tree (pf_provenance_basis.ts and pf_project_url.ts
+import lib/phaseFSeeds.ts): introduced by 092's own bf08959a, present
+at origin/km/live-extraction, and OUTSIDE the ruling's named set —
+flagged for a ruling extension or a 092-side re-home, not self-exempted
+here. pnpm lint's depcruise step therefore still reports 2 errors, both
+pre-existing upstream state; every other lint component is unaffected.
