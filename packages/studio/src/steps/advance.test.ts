@@ -27,11 +27,28 @@ type WalkStep =
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
 ): { sequence: WalkStep[]; navigateAtEnd: "output" | undefined } {
+  // Spec 088 T020 (fixture construction only): the gate set is a DecisionSet
+  // literal matching the context's track — advance() reads gates from it.
+  const fullCtx = {
+    ...ctx,
+    touchSeedSource: null,
+    allCharactersImplemented: true,
+    decisions:
+      ctx.selectedTrack === null
+        ? {}
+        : {
+            "authoring-track": {
+              id: "authoring-track" as const,
+              value: ctx.selectedTrack,
+              provenance: "asked" as const,
+            },
+          },
+  };
   const sequence: WalkStep[] = ["identity"];
   let current: WalkStep = "identity";
   let navigateAtEnd: "output" | undefined;
   for (let guard = 0; guard < 50; guard++) {
-    const outcome = advance(current, undefined, ctx);
+    const outcome = advance(current, undefined, fullCtx);
     sequence.push(outcome.next as WalkStep);
     if (outcome.navigate !== undefined) navigateAtEnd = outcome.navigate;
     if (outcome.next === "done" || outcome.next === "unsupported") break;
@@ -48,9 +65,15 @@ function walkSpine(
 // finished" success path for the full-walk assertions below; the Phase F
 // hard-gate's own false-branch behavior is covered separately (see "advance:
 // help — hard gate" below).
-const copyCtx = { selectedTrack: "copy" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true };
-const adaptCtx = { selectedTrack: "adapt" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true };
-const unsupported = { selectedTrack: null, identitySupported: false, touchSeedSource: null, allCharactersImplemented: true };
+const copyCtx = {
+  selectedTrack: "copy" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true,
+  decisions: { "authoring-track": { id: "authoring-track" as const, value: "copy", provenance: "asked" as const } },
+};
+const adaptCtx = {
+  selectedTrack: "adapt" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true,
+  decisions: { "authoring-track": { id: "authoring-track" as const, value: "adapt", provenance: "asked" as const } },
+};
+const unsupported = { selectedTrack: null, identitySupported: false, touchSeedSource: null, allCharactersImplemented: true, decisions: {} };
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf
@@ -357,12 +380,26 @@ describe("advance: spine hops", () => {
   });
 
   it("mechanisms → touch directly when a fork choice IS recorded (spec 035 R12 fork memory)", () => {
-    const withChoice = { ...copyCtx, touchSeedSource: "import-adapt" as const };
+    const withChoice = {
+      ...copyCtx,
+      touchSeedSource: "import-adapt" as const,
+      decisions: {
+        ...copyCtx.decisions,
+        "touch-seed-source": { id: "touch-seed-source" as const, value: "import-adapt", provenance: "asked" as const },
+      },
+    };
     expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
   it("mechanisms → touch directly for the other recorded choice too", () => {
-    const withChoice = { ...copyCtx, touchSeedSource: "reseed-from-desktop" as const };
+    const withChoice = {
+      ...copyCtx,
+      touchSeedSource: "reseed-from-desktop" as const,
+      decisions: {
+        ...copyCtx.decisions,
+        "touch-seed-source": { id: "touch-seed-source" as const, value: "reseed-from-desktop", provenance: "asked" as const },
+      },
+    };
     expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
@@ -476,5 +513,54 @@ describe("advance: pure — result is ignored", () => {
     const c = advance("characters", "string-result", copyCtx);
     expect(a.next).toBe(b.next);
     expect(b.next).toBe(c.next);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 088 T020 (US2): routing reads the DecisionSet, not session fields.
+// The contexts below deliberately carry selectedTrack/touchSeedSource values
+// that DISAGREE with their `decisions` — the outcomes must follow the
+// decisions, proving the gate no longer reads the fields.
+// ---------------------------------------------------------------------------
+
+describe("advance: gates read the DecisionSet (spec 088 T020)", () => {
+  it("adapt in the DecisionSet skips project_name even when the field says copy", () => {
+    const outcome = advance("track", undefined, {
+      selectedTrack: "copy",
+      identitySupported: true,
+      touchSeedSource: null,
+      allCharactersImplemented: true,
+      decisions: {
+        "authoring-track": { id: "authoring-track", value: "adapt", provenance: "asked" },
+      },
+    });
+    expect(outcome.next).not.toBe("project_name");
+  });
+
+  it("a recorded touch-seed-source in the DecisionSet routes mechanisms straight to touch", () => {
+    const outcome = advance("mechanisms", undefined, {
+      selectedTrack: "copy",
+      identitySupported: true,
+      touchSeedSource: null,
+      allCharactersImplemented: true,
+      decisions: {
+        "authoring-track": { id: "authoring-track", value: "copy", provenance: "asked" },
+        "touch-seed-source": { id: "touch-seed-source", value: "import-adapt", provenance: "asked" },
+      },
+    });
+    expect(outcome.next).toBe("touch");
+  });
+
+  it("no touch-seed-source record routes mechanisms to the seed chooser", () => {
+    const outcome = advance("mechanisms", undefined, {
+      selectedTrack: "copy",
+      identitySupported: true,
+      touchSeedSource: "import-adapt",
+      allCharactersImplemented: true,
+      decisions: {
+        "authoring-track": { id: "authoring-track", value: "copy", provenance: "asked" },
+      },
+    });
+    expect(outcome.next).toBe("touch_seed_source");
   });
 });

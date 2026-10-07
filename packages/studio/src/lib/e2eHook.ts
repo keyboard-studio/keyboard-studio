@@ -1,7 +1,7 @@
 // e2eHook — flag-gated window hook exposing the live working copy for
 // Playwright assertions. Mirrors the established studio env-flag convention
-// (lib/services.ts VITE_USE_REAL_ENGINE, stores/debugPinsStore.ts VITE_KM_DEBUG,
-// flags/mutateFlag.ts VITE_KM_MUTATE_SEAM): a single import.meta.env read,
+// (lib/services.ts VITE_USE_REAL_ENGINE, stores/debugPinsStore.ts VITE_KM_DEBUG):
+// a single import.meta.env read,
 // guarded so it is SSR/Node-CI safe, plus a URL-param runtime override.
 //
 // Architecture contract:

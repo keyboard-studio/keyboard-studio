@@ -17,9 +17,9 @@ import { render, i18n } from "../../test/renderWithI18n.tsx";
 import type { IRGroup, IRRule, RawKmnFragment, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { ASCII_PUNCTUATION_FLOOR } from "@keyboard-studio/engine";
-import { PunctuationStep } from "./PunctuationStep.tsx";
+import { PunctuationStepHost } from "./PunctuationStepHost.tsx";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 
@@ -67,10 +67,21 @@ afterEach(() => {
   i18n.activate("en");
 });
 
+/** Record the identity decisions a completed identity step records (spec 089:
+ * the survey context / scaffold spec are derived from these, never seeded
+ * into the session store directly). */
+function seedIdentityDecisions(languageCode: string, languageName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: languageName, provenance: "asked" });
+  record({ id: "language-autonym", value: languageName, provenance: "asked" });
+  record({ id: "language-code", value: languageCode, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
+
 describe("PunctuationStep — type-in and Done", () => {
   it("adds typed punctuation to the list and Done emits it as phase-C confirmedInventory", () => {
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     typeAndAdd("! ?");
     expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
@@ -85,7 +96,7 @@ describe("PunctuationStep — type-in and Done", () => {
 
   it("Done with nothing chosen emits an empty confirmedInventory (a valid answer, not a skip)", () => {
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     const done = screen.getByTestId("punctuation-done");
     expect(done.textContent).toContain("Continue without punctuation");
@@ -95,7 +106,7 @@ describe("PunctuationStep — type-in and Done", () => {
 
   it("declines non-punctuation typed input with a visible note and keeps it OUT of the shared draft", () => {
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     typeAndAdd("a !");
     // The "!" is collected; the "a" is declined out loud — a letter absorbed
@@ -107,7 +118,7 @@ describe("PunctuationStep — type-in and Done", () => {
 
   it("clicking a chip removes that pick", () => {
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     typeAndAdd("! ?");
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
@@ -123,7 +134,7 @@ describe("PunctuationStep — shared draft continuity", () => {
     usePhaseBDraftStore.getState().add("«");
     usePhaseBDraftStore.getState().add("a"); // a letter — not this page's category
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     expect(screen.getByText("Your punctuation (1)")).toBeTruthy();
     fireEvent.click(screen.getByTestId("punctuation-done"));
@@ -135,10 +146,7 @@ describe("PunctuationStep — shared draft continuity", () => {
 describe("PunctuationStep — sourced suggestions", () => {
   // useSourcedExemplars only looks up when the session carries a BCP47 tag.
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({
-      bcp47_tag: "hi",
-      language_name: "Hindi",
-    });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("the exemplar punctuation tier arrives already chosen as PROPOSED picks that keep their attribution (spec 075: defaults are the product)", async () => {
@@ -153,7 +161,7 @@ describe("PunctuationStep — sourced suggestions", () => {
       digraphs: [],
     };
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     // Seeded on settle: a PROPOSED pick (dashed attribution), and the
     // suggestion panel, with nothing left to offer, is not rendered at all.
@@ -174,7 +182,7 @@ describe("PunctuationStep — sourced suggestions", () => {
       characters: [{ char: "।", tier: "punctuation" }],
       digraphs: [],
     };
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     // The tier is seeded, so the panel only offers a mark once it is removed.
     fireEvent.click(await screen.findByRole("button", { name: /Remove । / }));
@@ -201,7 +209,7 @@ describe("PunctuationStep — sourced suggestions", () => {
       characters: [{ char: "।", tier: "punctuation" }],
       digraphs: [],
     };
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     fireEvent.click(await screen.findByRole("button", { name: /Remove । / }));
     expect(await screen.findByRole("button", { name: "(U+0964) । dda" })).toBeTruthy();
@@ -215,7 +223,7 @@ describe("PunctuationStep — sourced suggestions", () => {
       characters: [{ char: "क", tier: "main" }],
       digraphs: [],
     };
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText(/No suggested punctuation/)).toBeTruthy();
@@ -225,19 +233,19 @@ describe("PunctuationStep — sourced suggestions", () => {
 
 describe("PunctuationStep — navigation", () => {
   it("renders a Back button only when onBack is supplied", () => {
-    const { unmount } = render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    const { unmount } = render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     expect(screen.queryByTestId("punctuation-back")).toBeNull();
     unmount();
 
     const onBack = vi.fn();
-    render(<PunctuationStep onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("punctuation-back"));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   it("a second Done click never completes twice", () => {
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     fireEvent.click(screen.getByTestId("punctuation-done"));
     fireEvent.click(screen.getByTestId("punctuation-done"));
@@ -271,7 +279,7 @@ describe("PunctuationStep — FR-024: the result stays a phase-C slice", () => {
     wc.recordPhase({ phase: "B", answers: [], confirmedInventory: ["a", "b"] });
 
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
     typeAndAdd("!");
     fireEvent.click(screen.getByTestId("punctuation-done"));
     const result = lastResult(onComplete);
@@ -289,13 +297,13 @@ describe("PunctuationStep — FR-024: the result stays a phase-C slice", () => {
 
 describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("FR-001/FR-003/SC-002: the tier is already chosen on arrival and Done with zero clicks confirms it", async () => {
     mocks.inventory = hindiInventory();
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     const group = await screen.findByTestId("cldr-punctuation-group");
     const chips = group.querySelectorAll('[data-testid="proposed-punctuation-chip"]');
@@ -315,7 +323,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
 
   it("FR-002: the group caption names the supplying source and the resolved locale", async () => {
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     const group = await screen.findByTestId("cldr-punctuation-group");
     expect(group.textContent).toMatch(/CLDR/);
     expect(group.textContent).toMatch(/Hindi/);
@@ -324,7 +332,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
   it("FR-004: every seeded chip is removable by the existing click gesture, with no dialog", async () => {
     mocks.inventory = hindiInventory();
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
 
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
@@ -337,7 +345,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
   it("FR-005: a character the author typed before the seed keeps its author attribution and is never restyled", async () => {
     usePhaseBDraftStore.getState().add("!");
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
 
     expect(usePhaseBDraftStore.getState().provenance["!"]).toBe("author");
@@ -350,7 +358,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
 
   it("says why the CLDR group is absent: no exemplar data at all", async () => {
     mocks.inventory = null;
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
       expect(screen.getByText(/no exemplar data/i)).toBeTruthy();
     });
@@ -360,7 +368,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
 
   it("says why the CLDR group is absent: the source has an empty punctuation tier — a distinct message", async () => {
     mocks.inventory = hindiInventory([]);
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
       expect(screen.getByText(/attests no punctuation/i)).toBeTruthy();
     });
@@ -374,7 +382,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
     usePhaseBDraftStore.getState().add("!");
     mocks.inventory = hindiInventory();
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
@@ -387,7 +395,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
 
   it("a removed proposal reappears in the suggestion panel and ticking it again is an author override (FR-022)", async () => {
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
 
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
@@ -399,7 +407,7 @@ describe("PunctuationStep — seeding the CLDR tier (US1)", () => {
 
   it("the suggestion section appears only while it has something to offer, and ticking the last chip moves focus to the type-in field", async () => {
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
     expect(screen.queryByRole("region", { name: "Suggested punctuation" })).toBeNull();
 
@@ -463,13 +471,13 @@ function chipsIn(group: HTMLElement): string[] {
 
 describe("PunctuationStep — the base-produced group (US2)", () => {
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("FR-006/FR-009: with complete coverage the base group is every produced punctuation char not in the CLDR group, under the base caption", async () => {
     setBase(irProducing("ab.!?"));
     mocks.inventory = hindiInventory(["\u0964", "!"]);
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     const base = await screen.findByTestId("base-punctuation-group");
     expect(chipsIn(base).sort()).toEqual([".", "?"].sort());
@@ -483,7 +491,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
     // U+061B ARABIC SEMICOLON is produced but untrustworthy: it must not appear.
     setBase(irProducing(".\u061B", [OPAQUE]));
     mocks.inventory = null;
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     const base = await screen.findByTestId("base-punctuation-group");
     const chips = chipsIn(base);
@@ -501,7 +509,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
   it("SC-003/FR-010: the two groups are disjoint, the count is the size of their union, and a char in both is rendered once under CLDR annotated as also produced by the base", async () => {
     setBase(irProducing(".!?"));
     mocks.inventory = hindiInventory(["\u0964", "!"]);
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     const cldr = await screen.findByTestId("cldr-punctuation-group");
     const base = await screen.findByTestId("base-punctuation-group");
@@ -523,7 +531,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
   it("FR-011: the missing-side count of the chosen punctuation is visible before Done", async () => {
     setBase(irProducing(".!?"));
     mocks.inventory = hindiInventory(["\u0964", "\u0965", "!"]);
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("base-punctuation-group");
 
     // DANDA and DOUBLE DANDA are chosen but the base cannot type them.
@@ -540,7 +548,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
   it("the base caption carries the always-keep note: removing here declares unsupported, but the base layout still types it", async () => {
     setBase(irProducing(".!?"));
     mocks.inventory = null;
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     const base = await screen.findByTestId("base-punctuation-group");
     expect(within(base).getByText(/still types it/)).toBeTruthy();
   });
@@ -549,7 +557,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
     useWorkingCopyStore.getState().recordPhase({ phase: "C", answers: [], confirmedInventory: [] });
     setBase(irProducing(".!?"));
     mocks.inventory = null;
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
       expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation-base:basic_kbdus");
     });
@@ -559,7 +567,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
 
   it("with no working copy at all, no base group is proposed (the floor is a fallback for an unknowable base, not for a missing one)", async () => {
     mocks.inventory = hindiInventory(["!"]);
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
     expect(screen.queryByTestId("base-punctuation-group")).toBeNull();
     expect(screen.queryByTestId("punctuation-missing-count")).toBeNull();
@@ -573,7 +581,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
 describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)", () => {
   it("a typed single format character is recorded as an accepted invisible, kept out of chars, and announced with a status note — no navigation", () => {
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
     typeAndAdd("\u200D");
 
     expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200D"]).toBe("accepted");
@@ -591,7 +599,7 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
   });
 
   it("punctuation and a format character added in turn are each routed: the mark is chosen, the invisible is handed off", () => {
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     // Typed together, "! " + ZWNJ would segment as one cluster (ZWNJ is a
     // grapheme extender) and be declined as a mixed cluster — see the next
     // test. Added in turn, each takes its own route.
@@ -604,7 +612,7 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
   });
 
   it("a PUNCTUATION mark fused with a format character is declined too — glyphCategory reads the cluster as punctuation, and that must not smuggle the ZWNJ in", () => {
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     typeAndAdd("!\u200C");
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
     expect(usePhaseBDraftStore.getState().punctuation).toEqual([]);
@@ -614,7 +622,7 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
   });
 
   it("a multi-codepoint cluster containing a format character is neither split nor filed — it is declined with a reason", () => {
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     // ZWNJ is a grapheme extender, so "a" + ZWNJ segments as ONE cluster.
     typeAndAdd("a\u200C");
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
@@ -633,12 +641,12 @@ describe("PunctuationStep — format-character hand-off (FR-016, FR-021, FR-025)
 
 describe("PunctuationStep — a removed proposal is never re-proposed (US4)", () => {
   beforeEach(() => {
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("SC-006: removals survive a step revisit and a locale re-resolution; typing a removed mark back makes it the author's own", async () => {
     mocks.inventory = hindiInventory();
-    const first = render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    const first = render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
     fireEvent.click(screen.getByRole("button", { name: /Remove \?/ }));
@@ -648,7 +656,7 @@ describe("PunctuationStep — a removed proposal is never re-proposed (US4)", ()
     first.unmount();
 
     // Revisit: same locale, same seed key — nothing comes back.
-    const second = render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    const second = render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
     expect(usePhaseBDraftStore.getState().punctuation).toEqual(kept);
     expect(screen.queryByRole("button", { name: /Remove !/ })).toBeNull();
@@ -657,7 +665,7 @@ describe("PunctuationStep — a removed proposal is never re-proposed (US4)", ()
     // Re-resolution: a new resolved tag fires a NEW seed — the ledger still
     // vetoes the two removed marks.
     mocks.inventory = { ...hindiInventory(), resolvedTag: "hi-IN" };
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
       expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation:hi-IN");
     });
@@ -679,12 +687,12 @@ describe("PunctuationStep — a removed proposal is never re-proposed (US4)", ()
 
 describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
   it("typed-in picks survive an unmount/remount with the same evidence", () => {
-    const first = render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    const first = render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     typeAndAdd("! ?");
     expect(usePhaseBDraftStore.getState().punctuation).toEqual(["!", "?"]);
     first.unmount();
 
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     expect(usePhaseBDraftStore.getState().punctuation).toEqual(["!", "?"]);
     expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
   });
@@ -717,7 +725,7 @@ describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
 describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence (spec 079 FR-022)", () => {
   beforeEach(() => {
     useSurveyAnswerStore.getState().reset();
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   function confirmedFor(key: string | null): void {
@@ -736,7 +744,7 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
   it("Done records the evidence key the inventory was confirmed on", async () => {
     mocks.inventory = hindiInventory();
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
     fireEvent.click(screen.getByTestId("punctuation-done"));
 
@@ -748,7 +756,7 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
   it("a confirmation on the CURRENT evidence stands: nothing is seeded on top of it", async () => {
     confirmedFor("hi|");
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
@@ -759,7 +767,7 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
   it("a confirmation on OTHER evidence does not: the punctuation defaults are proposed again", async () => {
     confirmedFor("ewo|");
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await screen.findByTestId("cldr-punctuation-group");
     expect(usePhaseBDraftStore.getState().chars).toEqual(expect.arrayContaining(HI_TIER));
@@ -774,12 +782,12 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
 describe("PunctuationStep — shape change: tag change re-proposes, removals survive (spec 079 US3 T048)", () => {
   beforeEach(() => {
     useSurveyAnswerStore.getState().reset();
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   it("a resolved-tag change proposes a new candidate the old tag lacked, while a removed mark stays removed", async () => {
     mocks.inventory = hindiInventory();
-    const first = render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    const first = render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
 
     fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
@@ -789,7 +797,7 @@ describe("PunctuationStep — shape change: tag change re-proposes, removals sur
     // A new resolved tag (e.g. a more specific locale) with one candidate
     // ("…") the original tag never had.
     mocks.inventory = { ...hindiInventory([...HI_TIER, "…"]), resolvedTag: "hi-IN" };
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation:hi-IN");
@@ -813,7 +821,7 @@ describe("PunctuationStep — shape change: tag change re-proposes, removals sur
 describe("PunctuationStep — flagged stale confirmation (spec 079 US3 T079/T080)", () => {
   beforeEach(() => {
     useSurveyAnswerStore.getState().reset();
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+    seedIdentityDecisions("hi", "Hindi");
   });
 
   function confirmedFor(key: string | null): void {
@@ -832,7 +840,7 @@ describe("PunctuationStep — flagged stale confirmation (spec 079 US3 T079/T080
   it("shows a reason cue and the flagged-answers list when confirmed on other evidence, and Done is not blocked", async () => {
     confirmedFor("ewo|");
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await screen.findByTestId("cldr-punctuation-group");
     expect(screen.getByTestId("flagged-answers-list")).toBeTruthy();
@@ -843,7 +851,7 @@ describe("PunctuationStep — flagged stale confirmation (spec 079 US3 T079/T080
     confirmedFor("ewo|");
     mocks.inventory = hindiInventory();
     const onComplete = vi.fn();
-    render(<PunctuationStep onComplete={onComplete} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("cldr-punctuation-group");
 
     fireEvent.click(screen.getByTestId("punctuation-done"));
@@ -855,7 +863,7 @@ describe("PunctuationStep — flagged stale confirmation (spec 079 US3 T079/T080
   it("a confirmation with no recorded key (pre-079) is never flagged", async () => {
     confirmedFor(null);
     mocks.inventory = hindiInventory();
-    render(<PunctuationStep onComplete={vi.fn()} />, { withStepNav: true });
+    render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     await screen.findByTestId("authored-punctuation-chip");
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();

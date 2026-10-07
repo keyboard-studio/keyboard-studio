@@ -71,6 +71,16 @@ export const fixtures: QuestionModule["fixtures"] = {
 const mod: QuestionModule = {
   definition,
   validate,
+  // Decision apply (spec 089 T012): deliberately EMPTY. The track decision
+  // itself is the whole effect — routing reads it through the decision
+  // selectors (088's selectTrack), and nothing is written to the working
+  // copy at this completion. The working-copy setup an adapt selection
+  // implies is spec 092's instantiation concern, and the adapt track's
+  // scaffold consequence (no scaffold spec) is deriveScaffoldSpec's rule
+  // (null unless the track is "copy"), not a write performed here. The
+  // empty apply exists so the module's place in the apply contract is
+  // explicit rather than an omission.
+  apply: () => ({}),
   fixtures,
   inputs: [],
   writes: [],

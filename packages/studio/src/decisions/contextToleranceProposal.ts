@@ -10,12 +10,17 @@
 
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { ProposalLookup } from "./recordSurveyAnswers.ts";
+import {
+  CONTEXT_TOLERANCE_QUESTION_ID,
+  CONTEXT_TOLERANCE_SITES_QUESTION_ID,
+  SITE_ID_SEPARATOR,
+} from "./contextToleranceIds.ts";
 
-export const CONTEXT_TOLERANCE_QUESTION_ID = "marks.context_tolerance";
-export const CONTEXT_TOLERANCE_SITES_QUESTION_ID = "marks.context_tolerance.sites";
-
-/** Separator for the `.sites` answer's accepted rule ids. */
-export const SITE_ID_SEPARATOR = ",";
+export {
+  CONTEXT_TOLERANCE_QUESTION_ID,
+  CONTEXT_TOLERANCE_SITES_QUESTION_ID,
+  SITE_ID_SEPARATOR,
+} from "./contextToleranceIds.ts";
 
 /**
  * Wrap `fallback` so the two context-tolerance question ids resolve against

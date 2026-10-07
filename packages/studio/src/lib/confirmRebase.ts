@@ -47,7 +47,8 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { BaseKeyboard, RemovalCapability, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore, type IdentityPatch } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { getDecisionSnapshot } from "../stores/decisionStore.ts";
+import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
 import { identityLanguagePatch } from "./identityLanguagePatch.ts";
 
 /** User-facing wording for the rebase confirm dialog — the single source of truth for the string. */
@@ -147,7 +148,7 @@ export function confirmRebaseTo(newBaseId: string): boolean {
  * copy starts with no overlay exactly as before.
  */
 export function identitySeedFromSession(base: BaseKeyboard): IdentityPatch | undefined {
-  const result = useSurveySessionStore.getState().identityResult;
+  const result = deriveIdentityResult(getDecisionSnapshot());
   const bcp47 = result?.bcp47.trim() ?? "";
   if (bcp47 === "") return undefined;
   // Language overlay via the shared composition rule (identityLanguagePatch)

@@ -153,8 +153,16 @@ export type DecisionId =
   | "touch-layout"
   | "help-docs";
 
-/** Where a decision's value came from. */
-export type DecisionProvenance = "asked" | "extracted" | "default";
+/**
+ * Where a decision's value came from.
+ *
+ * `"derived"` (spec 088 FR-002) is computed from other decisions. It is
+ * declared here and first written by spec 090; no 088 code path writes it.
+ * This is the studio-local vocabulary — `packages/contracts` exports a
+ * different `DecisionProvenance` for the spec-053 record, and that one does
+ * not gain this member.
+ */
+export type DecisionProvenance = "asked" | "extracted" | "default" | "derived";
 
 /**
  * One resolved fact about the keyboard.
@@ -167,6 +175,25 @@ export interface Decision<T = unknown> {
   value: T;
   provenance: DecisionProvenance;
   source?: string;
+  /**
+   * Spec 088 FR-001: the values of this decision's `requires` as they stood
+   * when it was decided. Absent when the providing module declares no
+   * `requires`. Never mutated after the write — a re-answer replaces the
+   * whole record.
+   */
+  inputs?: Partial<Record<DecisionId, unknown>>;
+  /**
+   * Spec 088 FR-001: the pre-filled value the author overrode (the saved
+   * answer's proposal value when the completed value differs). Absent when
+   * nothing was offered or the offer was accepted unchanged.
+   */
+  offered?: unknown;
+  /**
+   * Spec 088 FR-001: the step that asked the question when this record was
+   * written. Display metadata only — never a key, never read by routing,
+   * ordering, or gating.
+   */
+  step?: string;
 }
 
 /**
@@ -188,6 +215,14 @@ export interface DecisionRendererProps<T = unknown> {
   value: T | undefined;
   onChange: (value: T) => void;
   decisionId: DecisionId;
+  /**
+   * Spec 090 FR-001: the recorded decision's provenance, so a renderer can
+   * badge a value the studio proposed or derived differently from one the
+   * author answered directly. `"asked"` when no decision is recorded yet.
+   */
+  provenance: DecisionProvenance;
+  /** The recorded decision's `source`, when it carries one (e.g. a base id). */
+  source?: string;
 }
 
 /**
@@ -331,11 +366,13 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "tp3-orthography-join": [],
   "typing-approach": [],
   "use-case": [],
+  // spec 090 T023: the marks-treatment module's apply runs the mark
+  // guards, which replace the groups and stores subtrees wholesale.
+  "marks-treatment": [["groups"], ["stores"]],
   // Wizard-step decisions: editor steps write through their own declared
   // `writes` (steps/editorMutate.ts), not through a decision -> IR mapping.
   "windows-layout": [],
   "base-keyboard": [],
-  "marks-treatment": [],
   "punctuation-inventory": [],
   "invisibles-inventory": [],
   "retained-convenience-chars": [],

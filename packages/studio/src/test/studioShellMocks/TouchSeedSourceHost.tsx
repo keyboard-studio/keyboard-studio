@@ -1,21 +1,24 @@
-// Stub for editors/touchSeedSource/TouchSeedSourcePanel.tsx (spec 035), which
-// registerEditorSteps.ts renders for the "touch_seed_source" step. Two confirm
-// paths let a test pick either fork choice — the footer's seed-source-confirm
-// (import-adapt) and an in-body reseed button; each mirrors the real
-// component by setting surveySessionStore.touchSeedSource BEFORE calling
+// Stub for survey/touchSeedSource/TouchSeedSourceHost.tsx (spec 035; the
+// gallery host wrapper since spec 090 T012), which registerEditorSteps.ts
+// renders for the "touch_seed_source" step. Two confirm paths let a test
+// pick either fork choice — the footer's seed-source-confirm (import-adapt)
+// and an in-body reseed button; each mirrors the real component by
+// recording the `touch-seed-source` decision (spec 088) BEFORE calling
 // onComplete. Nav publishes to the footer under the real handles (spec 081).
 
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
-export function TouchSeedSourcePanel({
+export function TouchSeedSourceHost({
   onComplete,
   onBack,
 }: {
   onComplete: (result: unknown) => void;
   onBack?: () => void;
 }) {
-  const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
+  const record = useDecisionStore((s) => s.record);
+  const setTouchSeedSource = (v: "import-adapt" | "reseed-from-desktop") =>
+    record({ id: "touch-seed-source", value: v, provenance: "asked", step: "touch_seed_source" });
   usePublishStepNav({
     ...(onBack !== undefined
       ? { back: { label: "seed-source-back", onClick: onBack, testId: "seed-source-back" } }

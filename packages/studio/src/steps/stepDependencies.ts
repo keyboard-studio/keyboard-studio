@@ -33,7 +33,12 @@
 // first. Decisions can.
 
 import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
-import { flowModules } from "../survey/questions/registry.ts";
+// flowModules comes from its own leaf module, NOT the registry (spec 090
+// delta D-090-7): the registry's import graph now includes store-coupled
+// gallery renderers, and this module is reachable from stores via
+// dashboard/completeness → stepOrder — importing the registry here would
+// close an initialization cycle.
+import { flowModules } from "../survey/questions/flowModules.ts";
 import type { QuestionModule } from "../survey/types.ts";
 
 interface StepDeclaration {
@@ -181,6 +186,17 @@ const resolved: ReadonlyMap<string, StepDependencies> = new Map(
 
 /** The declared step ids, in declaration order (the tie-break order). */
 export const DECLARED_STEP_IDS: readonly StepId[] = Object.keys(DECLARATIONS) as StepId[];
+
+/**
+ * Whether a step settles decisions no question module asks for (its
+ * `settles` list is non-empty) — i.e. it is a gallery/editor step whose
+ * saved answers are not survey-question answers. Used by the spec-088 draft
+ * migration to tell retained gallery answers from orphaned question answers.
+ */
+export function stepHasSettles(id: string): boolean {
+  const decl = (DECLARATIONS as Record<string, StepDeclaration>)[id];
+  return decl?.settles !== undefined && decl.settles.length > 0;
+}
 
 /** A step's dependency declarations. Throws on an undeclared id. */
 export function stepDependencies(id: StepId): StepDependencies {

@@ -25,7 +25,14 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore, getSurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
+import {
+  getDecisionSnapshot,
+  selectTouchSeedSource,
+  useDecisionStore,
+} from "../stores/decisionStore.ts";
+import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
 import {
   usePhaseBDraftStore,
@@ -33,7 +40,6 @@ import {
   resetPhaseBDraftDecisions,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
-import type { IdentityLiteResult } from "../survey/index.ts";
 
 // serverDraftStore's fetch-based transport is mocked at the module boundary
 // (P1-2) so startCloudSync/recordProjectSubmission tests below never touch
@@ -69,6 +75,7 @@ import {
   reconcileProjectIndex,
   DRAFT_INDEX_KEY,
   recordProjectSubmission,
+  migrateDraftEnvelope,
   startCloudSync,
   CLOUD_SYNC_DEBOUNCE_MS,
   MAX_CLOUD_DRAFT_BYTES,
@@ -142,11 +149,11 @@ describe("draftPersistence", () => {
   describe("constants + draftKey", () => {
     it("DRAFT_KEY_PREFIX and DRAFT_VERSION match the documented contract", () => {
       expect(DRAFT_KEY_PREFIX).toBe("ks.draft.");
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2); // spec 088 FR-007: bumped 1 → 2
     });
 
     it("draftKey namespaces and versions the per-project key", () => {
-      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v1");
+      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v2");
     });
   });
 
@@ -642,7 +649,7 @@ describe("draftPersistence", () => {
   });
 
   describe("G-1/G-5: round-trip save + load restores BOTH stores from a single draft", () => {
-    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touchSeedSource, never re-instantiating a second working copy", () => {
+    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touch-seed decision, never re-instantiating a second working copy", () => {
       const base: BaseKeyboard = {
         id: "test_keyboard",
         displayName: "Test Keyboard",
@@ -666,10 +673,16 @@ describe("draftPersistence", () => {
       } as unknown as SurveyPhaseResult);
 
       // Traversal position: two forward hops (history becomes non-trivial) plus
-      // the spec-035 touchSeedSource fork choice (km-frontend-flagged risk (a)).
+      // the spec-035 touch-seed fork choice — since spec 088 that choice is
+      // the `touch-seed-source` decision, not a session field.
       useSurveySessionStore.getState().advance("choose_base");
       useSurveySessionStore.getState().advance("track");
-      useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+      useDecisionStore.getState().record({
+        id: "touch-seed-source",
+        value: "import-adapt",
+        provenance: "asked",
+        step: "touch_seed_source",
+      });
 
       const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
       expect(projectKey).toBe("test_keyboard");
@@ -677,10 +690,11 @@ describe("draftPersistence", () => {
       saveDraft(projectKey!);
       expect(localStorage.getItem(draftKey(projectKey!))).not.toBeNull();
 
-      // Cold reset BOTH stores — nothing left to inherit from; a partial reset
+      // Cold reset the stores — nothing left to inherit from; a partial reset
       // would mask a restore that only APPEARED to work.
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
       expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
 
@@ -705,8 +719,9 @@ describe("draftPersistence", () => {
       const session = useSurveySessionStore.getState();
       expect(session.activeStepId).toBe("track");
       expect(session.history).toEqual(["identity", "choose_base"]);
-      // (a) touchSeedSource round-trips through the traversal snapshot.
-      expect(session.touchSeedSource).toBe("import-adapt");
+      // (a) the touch-seed choice round-trips through the draft's decisions
+      // slice (spec 088 — it no longer rides the traversal snapshot).
+      expect(selectTouchSeedSource(getDecisionSnapshot())).toBe("import-adapt");
 
       expect(wasDraftRestoredThisBoot()).toBe(true);
     });
@@ -1382,18 +1397,16 @@ describe("draftPersistence", () => {
     it("a pre-079 draft (built alphabet, no key) is stamped on load from its restored identity and base (FR-032)", () => {
       const pk = "phaseb-alphabet-key-pre079";
       instantiateMinimal(pk);
+      // Spec 089: the stamp derives the identity from the recorded
+      // decisions (saved into the draft envelope, restored on load).
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "language-name", value: "Test", provenance: "asked" });
+        record({ id: "language-autonym", value: "Test", provenance: "asked" });
+        record({ id: "language-code", value: "tl", provenance: "asked" });
+        record({ id: "target-script", value: "Latn", provenance: "asked" });
+      }
       useSurveySessionStore.setState({
-        identityResult: {
-          autonym: "Test",
-          english: "Test",
-          languageSubtag: "tl",
-          region: "",
-          targetScriptRaw: "Latn",
-          bcp47: "tl-Latn",
-          supported: true,
-          attribution: null,
-          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-        } as never,
         localBase: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
       });
       usePhaseBDraftStore.getState().add("a");
@@ -1401,6 +1414,7 @@ describe("draftPersistence", () => {
       expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
       usePhaseBDraftStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
 
       expect(loadDraft(pk)).toBe(true);
       expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
@@ -1654,20 +1668,18 @@ describe("draftPersistence", () => {
         ir: makeScaffoldedIR(),
       });
 
-      useSurveySessionStore.getState().setScaffoldSpec({
-        keyboardId: "proj_x",
-        displayName: "My Custom Keyboard",
-      });
-      useSurveySessionStore.getState().setIdentityResult({
-        autonym: "Test",
-        english: "Test",
-        languageSubtag: "yo",
-        region: "",
-        targetScriptRaw: "Latn",
-        bcp47: "yo-Latn",
-        supported: true,
-        prefill: {} as unknown as IdentityLiteResult["prefill"],
-      });
+      // Spec 089: the envelope's displayName/languageTag derive from the
+      // recorded decisions (project + identity), not session fields.
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "authoring-track", value: "copy", provenance: "asked" });
+        record({ id: "project-display-name", value: "My Custom Keyboard", provenance: "asked" });
+        record({ id: "project-keyboard-id", value: "proj_x", provenance: "asked" });
+        record({ id: "language-name", value: "Test", provenance: "asked" });
+        record({ id: "language-autonym", value: "Test", provenance: "asked" });
+        record({ id: "language-code", value: "yo", provenance: "asked" });
+        record({ id: "target-script", value: "Latn", provenance: "asked" });
+      }
 
       saveDraft("proj_x");
 
@@ -1679,21 +1691,22 @@ describe("draftPersistence", () => {
     });
 
     // #1578: a same-session switch (no intervening reload) between a
-    // Track-1 scaffolded project (A, whose label comes from
-    // surveySessionStore.scaffoldSpec — deriveProjectLabel's tier 1) and a
-    // plain adapted project (B, whose label falls back to the base's own
-    // displayName) must not let A's scaffoldSpec leak into B's derived
-    // label. `envelope.traversal` (snapshotTraversal/applyTraversalSnapshot)
-    // already carries `scaffoldSpec` as part of its broader
-    // SurveySessionData snapshot and fully overwrites it on every
-    // `loadDraft` call — this pins that behavior so it can't silently
-    // regress.
+    // Track-1 scaffolded project (A, whose label comes from the derived
+    // scaffoldSpec — deriveProjectLabel's tier 1) and a plain adapted
+    // project (B, whose label falls back to the base's own displayName)
+    // must not let A's scaffoldSpec leak into B's derived label.
+    // Spec 089: the scaffoldSpec is derived from the decision set, and the
+    // envelope's per-project decision snapshot (088) is applied wholesale
+    // on every `loadDraft` call — this pins that behavior so it can't
+    // silently regress.
     it("switching FROM a Track-1 scaffolded project TO a plain one, in one session, does not leak the former's scaffoldSpec into the latter's label", () => {
       instantiateMinimal("proj_a");
-      useSurveySessionStore.getState().setScaffoldSpec({
-        keyboardId: "proj_a",
-        displayName: "Testish Keyboard",
-      });
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "authoring-track", value: "copy", provenance: "asked" });
+        record({ id: "project-display-name", value: "Testish Keyboard", provenance: "asked" });
+        record({ id: "project-keyboard-id", value: "proj_a", provenance: "asked" });
+      }
       saveDraft("proj_a");
       expect(
         (JSON.parse(localStorage.getItem(draftKey("proj_a"))!) as DurableDraft).displayName,
@@ -1701,6 +1714,7 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
       const baseB = {
         id: "proj_b",
         displayName: "French Basic",
@@ -1718,12 +1732,12 @@ describe("draftPersistence", () => {
       // The same-session switch: resume A, then resume B — as "My
       // keyboards"'s Resume action does, with no reload in between.
       expect(loadDraft("proj_a")).toBe(true);
-      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+      expect(deriveScaffoldSpec(getDecisionSnapshot())?.displayName).toBe("Testish Keyboard");
 
       expect(loadDraft("proj_b")).toBe(true);
-      // B never scaffolded — its own record has no scaffoldSpec, so resuming
-      // it must clear A's leftover, not leave it standing.
-      expect(useSurveySessionStore.getState().scaffoldSpec).toBeNull();
+      // B never scaffolded — its own decision snapshot has no project
+      // records, so resuming it must clear A's leftover, not leave it standing.
+      expect(deriveScaffoldSpec(getDecisionSnapshot())).toBeNull();
 
       saveDraft("proj_b");
       expect(
@@ -1732,7 +1746,7 @@ describe("draftPersistence", () => {
 
       // Switching back confirms A's own record was never touched either.
       expect(loadDraft("proj_a")).toBe(true);
-      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+      expect(deriveScaffoldSpec(getDecisionSnapshot())?.displayName).toBe("Testish Keyboard");
     });
   });
 
@@ -2430,6 +2444,169 @@ describe("draftPersistence", () => {
         "invisibles.u200c",
       ]);
       expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c", "convenience.x"]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Spec 088: v1 → v2 migration (T009; US3's end-to-end tests live in the
+  // US3 section added with T027–T029).
+  // -------------------------------------------------------------------------
+  describe("spec 088 v1 migration (migrateDraftEnvelope)", () => {
+    const fixtureRaw = readFileSync(
+      path.join(currentDir, "__fixtures__", "v1-draft-18e63aa4.json"),
+      "utf8",
+    );
+
+    it("maps the fixture's identity/track/project_name answers onto decision ids", () => {
+      const result = migrateDraftEnvelope(JSON.parse(fixtureRaw));
+      expect(result).not.toBeNull();
+      const decisions = result!.envelope.decisions ?? {};
+      expect(decisions["language-code"]).toMatchObject({ value: "fr", provenance: "asked", step: "identity" });
+      expect(decisions["copyright-holder"]).toMatchObject({ value: "Fixture Author", provenance: "asked", step: "identity" });
+      expect(decisions["authoring-track"]).toMatchObject({ value: "copy", provenance: "asked", step: "track" });
+      expect(decisions["project-display-name"]).toMatchObject({ value: "Fixture Keyboard", provenance: "asked", step: "project_name" });
+      expect(decisions["project-keyboard-id"]).toMatchObject({ value: "fixture_keyboard", provenance: "asked", step: "project_name" });
+      expect(result!.migrationOrphans).toEqual([]);
+      // The migrated surveyAnswers slice holds no survey-question answers.
+      const steps = result!.envelope.surveyAnswers?.steps ?? {};
+      for (const stepId of ["identity", "track", "project_name"]) {
+        expect(steps[stepId]?.answers ?? {}).toEqual({});
+      }
+    });
+
+    it("is an identity pass-through for a current-version envelope and null for non-objects", () => {
+      const v2 = { version: 2, savedAt: 1 };
+      expect(migrateDraftEnvelope(v2)?.envelope).toEqual(v2);
+      expect(migrateDraftEnvelope(null)).toBeNull();
+      expect(migrateDraftEnvelope("nope")).toBeNull();
+    });
+  });
+
+  describe("spec 088 US3 — v1 draft end-to-end (SC-003) + orphan surfacing (T030)", () => {
+    const fixtureRaw = readFileSync(
+      path.join(currentDir, "__fixtures__", "v1-draft-18e63aa4.json"),
+      "utf8",
+    );
+    const V1_KEY = "ks.draft.fixture_keyboard.v1";
+
+    interface V1FixtureStep {
+      answers?: Record<string, { value?: unknown; [k: string]: unknown }>;
+    }
+    interface V1FixtureDraft {
+      surveyAnswers?: { steps?: Record<string, V1FixtureStep> };
+      traversal?: { selectedTrack?: string };
+      [k: string]: unknown;
+    }
+
+    function fixtureVariant(mutate: (draft: V1FixtureDraft) => void): string {
+      const draft = JSON.parse(fixtureRaw) as V1FixtureDraft;
+      mutate(draft);
+      return JSON.stringify(draft);
+    }
+
+    it("T027: loadDraft finds the .v1 key, migrates it, and opens the project with the answers as decisions", () => {
+      localStorage.setItem(V1_KEY, fixtureRaw);
+
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+
+      const decisions = getDecisionSnapshot();
+      expect(decisions["language-code"]).toMatchObject({ value: "fr", step: "identity" });
+      expect(decisions["copyright-holder"]).toMatchObject({ value: "Fixture Author" });
+      expect(decisions["authoring-track"]).toMatchObject({ value: "copy" });
+      expect(decisions["project-display-name"]).toMatchObject({ value: "Fixture Keyboard" });
+      expect(decisions["project-keyboard-id"]).toMatchObject({ value: "fixture_keyboard" });
+      // The project actually opened: the working copy was restored.
+      expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+    });
+
+    it("T028: an answer whose question id is absent from the registry becomes exactly one orphan — full accounting", () => {
+      const variant = fixtureVariant((draft) => {
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
+      });
+
+      const result = migrateDraftEnvelope(JSON.parse(variant));
+      expect(result).not.toBeNull();
+      expect(result!.migrationOrphans).toEqual([
+        { questionId: "zz_removed_question", stepId: "identity", value: "orphan-value" },
+      ]);
+
+      // 100% accounting: 6 v1 answers = 5 decision records + 0 retained
+      // gallery answers (the fixture has no settles-step answers) + 1 orphan.
+      const totalAnswers = Object.values(
+        (JSON.parse(variant) as V1FixtureDraft).surveyAnswers?.steps ?? {},
+      ).reduce(
+        (n: number, step: V1FixtureStep) => n + Object.keys(step.answers ?? {}).length,
+        0,
+      );
+      const recordCount = Object.keys(result!.envelope.decisions ?? {}).length;
+      const retainedCount = Object.values(result!.envelope.surveyAnswers?.steps ?? {}).reduce(
+        (n: number, step) => n + Object.keys(step.answers ?? {}).length,
+        0,
+      );
+      expect(totalAnswers).toBe(6);
+      expect(recordCount + retainedCount + result!.migrationOrphans.length).toBe(totalAnswers);
+    });
+
+    it("T029: a session-field/answer disagreement migrates with the session value winning, and logs it", () => {
+      const variant = fixtureVariant((draft) => {
+        if (draft.traversal) draft.traversal.selectedTrack = "adapt"; // track_choice answer stays "copy"
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        const result = migrateDraftEnvelope(JSON.parse(variant));
+        expect(result!.envelope.decisions?.["authoring-track"]).toMatchObject({ value: "adapt" });
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("session field for authoring-track disagrees"),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("T030: loading a v1 draft with an orphan writes it to the decision trail, carrying its value, exactly once", () => {
+      const variant = fixtureVariant((draft) => {
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
+      });
+      localStorage.setItem(V1_KEY, variant);
+
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+
+      const orphanEntries = () =>
+        useDecisionLogStore.getState().record.entries.filter(
+          (e) => e.payload.kind === "survey-answer" && e.payload.questionId === "zz_removed_question",
+        );
+      expect(orphanEntries()).toHaveLength(1);
+      expect(orphanEntries()[0]).toMatchObject({
+        stepId: "identity",
+        provenance: { agency: "hand-set" },
+        payload: { kind: "survey-answer", questionId: "zz_removed_question", value: "orphan-value" },
+      });
+
+      // Re-applying the same v1 draft does not duplicate the trail entry.
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+      expect(orphanEntries()).toHaveLength(1);
     });
   });
 

@@ -10,7 +10,7 @@
 // arrives in `ResolveContext`, which is what makes the resolution table a unit
 // test matrix rather than a DOM test (contract §4).
 
-import { decisionsFromTraversal } from "../steps/decisionsFromTraversal.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import type { Step } from "../steps/types.ts";
 import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
@@ -57,6 +57,15 @@ export interface ResolveContext {
   readonly manifest: readonly Step[];
   readonly questionRegistry: QuestionRegistryView;
   readonly traversal: TraversalSnapshot;
+  /**
+   * Spec 088 FR-004 (contract C-3.2): the decision set `gatedBy` is
+   * evaluated over — a VIEW of the decision store's snapshot with the
+   * `touch-seed-source` record omitted, constructed by the caller by
+   * omission from the store snapshot (never stored, never rebuilt from
+   * session fields). The seed is omitted deliberately: a remembered seed
+   * must not strand the jump back to the chooser (see walkedByTrack).
+   */
+  readonly decisions: DecisionSet;
   /** Whether a working copy exists at all. */
   readonly hasProject: boolean;
   /**
@@ -86,19 +95,21 @@ const WIZARD_ROUTE = "survey";
  * skips it (steps/manifest.ts's track-routing docstring). The condition is the
  * step's own `gatedBy` (steps/stepDependencies.ts) — never re-stated here.
  *
- * Only the track is fed to the gate, deliberately. `touch_seed_source`'s gate
+ * The gate is fed the decision set WITHOUT the touch-seed record,
+ * deliberately (spec 088 C-3.2: the caller constructs that view by omission
+ * from the decision-store snapshot). `touch_seed_source`'s gate
  * ("no seed choice recorded") governs whether advance() ROUTES through the
  * chooser, not whether the chooser is a place the author may be: spec 035
  * R12/US2-AS4 keeps a remembered choice changeable, and
  * `backToTouchSeedSource` lands on the chooser with the choice still set.
- * Feeding `touchSeedSource` here would refuse that very location, grey out its
+ * Feeding the seed record here would refuse that very location, grey out its
  * progress dot, and break the decision row's jump to change the seed. A
  * chooser the author never visited is still refused as `beyond-gate`.
  */
-function walkedByTrack(step: Step, traversal: TraversalSnapshot): boolean {
+function walkedByTrack(step: Step, decisions: DecisionSet): boolean {
   if (step.gatedBy === undefined) return true;
-  // No touch-seed argument, deliberately (see above).
-  return step.gatedBy(decisionsFromTraversal(traversal.selectedTrack));
+  // The caller's set omits the touch-seed record, deliberately (see above).
+  return step.gatedBy(decisions);
 }
 
 /**
@@ -204,7 +215,7 @@ export function resolveLocation(loc: Location, ctx: ResolveContext): LocationRes
   if (step === undefined) {
     return refuse(loc, "step-not-in-build", ctx);
   }
-  if (!walkedByTrack(step, ctx.traversal)) {
+  if (!walkedByTrack(step, ctx.decisions)) {
     return refuse(loc, "skipped-by-track", ctx);
   }
   if (!isReached(loc.step, ctx.traversal)) {

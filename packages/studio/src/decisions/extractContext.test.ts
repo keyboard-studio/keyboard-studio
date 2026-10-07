@@ -9,7 +9,9 @@ import { describe, it, expect } from "vitest";
 import { parseKmn } from "@keyboard-studio/engine";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
+import characterInventoryModule from "../survey/questions/gallery/characterInventory.ts";
+import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
+import type { QuestionModule } from "../survey/types.ts";
 import { buildExtractContext } from "./extractContext.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
 
@@ -41,6 +43,12 @@ const modules = [
   "il_target_script",
   "il_author_name",
   "il_copyright_holder",
+  // Providers of the character-inventory module's declared requires
+  // (authoring-track, project-keyboard-id) — runDecisionFlow orders by
+  // requires and throws when one is unprovided (spec 090 T021).
+  "track_choice",
+  "project_keyboard_id",
+  "project_display_name",
 ].map((id) => {
   const mod = questionRegistry[id];
   if (!mod) throw new Error(`question "${id}" not in registry`);
@@ -54,7 +62,7 @@ describe("real catalog keyboard extraction (T020)", () => {
     expect(ir.header.bcp47).toEqual([]);
 
     const decisions = runDecisionFlow({
-      modules: [...modules, pbCharacterInventory],
+      modules: [...modules, characterInventoryModule as unknown as QuestionModule],
       context: buildExtractContext(ir, cameroonCatalog),
       answers: { il_language_english: "Ewondo", il_author_name: "Test Author" },
     });
@@ -79,7 +87,9 @@ describe("real catalog keyboard extraction (T020)", () => {
     const inventory = decisions["character-inventory"];
     expect(inventory?.provenance).toBe("extracted");
     expect(inventory?.source).toBe("sil_cameroon_qwerty");
-    expect(inventory?.value).toEqual(expect.arrayContaining(["a", "b", "ə"]));
+    expect((inventory?.value as CharacterInventoryValue | undefined)?.chars).toEqual(
+      expect.arrayContaining(["a", "b", "ə"]),
+    );
   });
 });
 
