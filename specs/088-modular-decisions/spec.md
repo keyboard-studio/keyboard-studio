@@ -111,8 +111,11 @@ the trail still shows both entries.
   move to a selector over `decisionStore`.
 - **FR-006** Survey-question answers MUST be stored only in `decisionStore`. They leave
   `surveyAnswerStore` (which keeps within-step view position and the gallery answers 090 retires)
-  and `workingCopy.phaseAnswersByStep` (deleted). If `phaseResults` is still read, it becomes a
-  selector derived from `decisionStore`, not stored state.
+  and the v2 draft's persisted `surveyAnswers` slice. `workingCopy.phaseAnswersByStep` is NOT
+  deleted by 088 (owner ruling 2026-10-06 (km-lead proposals Q8): the T006 inventory showed its contents are predominantly
+  gallery/phase answers that become decisions only in 090, so no decision-derived replacement
+  exists yet); it is **retired by 090** as a tail task after 090's US4, and 090 likewise owns
+  re-pointing any `phaseResults` answer readers.
 - **FR-007** Drafts MUST save `decisionStore` as a `decisions` slice keyed by decision id.
   `DRAFT_VERSION` goes from 1 to 2, and loading a v1 draft migrates it per US3.
 - **FR-008** The decision-log slot key MUST become the decision id. The step id is kept as display
@@ -133,7 +136,7 @@ the trail still shows both entries.
 | `decisionsFromTraversal` set | **deleted** | 088 |
 | session `selectedTrack`, `touchSeedSource` | **deleted** | 088 |
 | question answers in `surveyAnswerStore` | **deleted** | 088 |
-| `phaseAnswersByStep` | **deleted** | 088 |
+| `phaseAnswersByStep` | remains — named retirement owner 090 (tail task after its US4; owner ruling 2026-10-06 (km-lead proposals Q8)) | 090 |
 | gallery answers in `surveyAnswerStore`, `phaseBDraftStore` accept/decline | remain | 090 |
 | session `identityResult`, `scaffoldSpec`, help docs | remain | 089 |
 | working-copy overlays | remain | 090 |

@@ -19,7 +19,7 @@ writer in the StepHost seam that writes every survey-question completion into it
 (split per the providing module's `provides`, provenance derived from the saved
 answer's proposal); `gatedBy` evaluated over that store and the two session-field
 copies (`selectedTrack`, `touchSeedSource`) deleted; question answers removed from
-`surveyAnswerStore` persistence and `phaseAnswersByStep` deleted; drafts bumped to
+`surveyAnswerStore` persistence (the draft slice too); drafts bumped to
 version 2 with a `decisions` slice and a v1→v2 migration that maps step-keyed
 answers through `provides` and surfaces — never drops — anything unmapped; and the
 decision log re-keyed by decision id. No visible change: the three parity suites
@@ -58,8 +58,9 @@ gallery steps keep saving as today until 090; session `identityResult` /
 `scaffoldSpec` / help docs stay until 089 (spec ledger).
 
 **Scale/Scope**: One package, ~12 source files touched, 5 deleted-or-shrunk
-(`decisionsFromTraversal.ts` + its test deleted; session fields, `phaseAnswersByStep`
-removed). 121 question modules already declare single-id `provides` (verified) — no
+(`decisionsFromTraversal.ts` + its test deleted; session fields removed;
+`phaseAnswersByStep` NOT removed here — retired by 090, see the Q8 ruling note below).
+121 question modules already declare single-id `provides` (verified) — no
 module annotation changes needed.
 
 ## Constitution Check
@@ -70,7 +71,7 @@ module annotation changes needed.
 |---|---|
 | I — Pattern schema locked | PASS — no `packages/contracts` file changes; the provenance extension is studio-local (FR-002/FR-010). |
 | II — KeyboardIR is the engine spine | PASS — no codec/IR work; no `RawKmnFragment` handling changes. |
-| III — Single persistent working copy | PASS — the working copy is untouched as the one copy; 088 removes an *answer copy inside* it (`phaseAnswersByStep`), it does not add a second copy or any intermediate serialization. Full derived-keyboard replay is 093. |
+| III — Single persistent working copy | PASS — the working copy is untouched as the one copy; 088 removes the answer copy in `surveyAnswerStore`/the draft slice, not `phaseAnswersByStep` (retired by 090 per the Q8 ruling), and it does not add a second copy or any intermediate serialization. Full derived-keyboard replay is 093. |
 | IV — Validator layering / single D3 cycle | PASS — no new timer, no validation path added; the writer runs at completion, outside the debounce cycle (contract C-2.5). |
 | V — VirtualFS only | PASS — drafts remain localStorage envelopes; no host-disk writes. |
 | VI — Team boundaries | PASS — Engine (studio) owns stores, routing, draft persistence. No content-owned surface (prompts, gallery order, catalogs) changes. Declared owner: **Engine team**. |
@@ -117,7 +118,7 @@ packages/studio/src/
 │   ├── decisionStore.ts               # NEW: useDecisionStore + snapshot/apply/peek + track/seed selectors
 │   ├── surveySessionStore.ts          # FR-005: selectedTrack/touchSeedSource + setters + snapshot members deleted
 │   ├── surveyAnswerStore.ts           # FR-006: question answers no longer persisted (position/status/gallery stay)
-│   └── workingCopyStore.ts            # FR-006: phaseAnswersByStep deleted; selectPhaseAnswers derived selector
+│   └── workingCopyStore.ts            # unchanged by 088 (phaseAnswersByStep retired by 090 — Q8 ruling)
 ├── steps/
 │   ├── reducer.ts                     # NEW writer recordAnswersAsDecisions beside routeAnswersThroughMutate
 │   ├── decisionsFromTraversal.ts      # DELETE (FR-004) — and decisionsFromTraversal.test.ts
@@ -155,13 +156,15 @@ tolerant-restore precedent. No new directories, no new packages.
    version-gate/boot-scan changes land *before* anything writes v2, so no build ever
    writes a draft it cannot also read back or migrate (Risk R-1).
 3. **US1 (P1)** — completion writer + StepHost wiring; question answers stop being
-   persisted from `surveyAnswerStore`; `phaseAnswersByStep` deleted with the derived
-   selector; draft v2 write side flips on (writer + reader together).
+   persisted from `surveyAnswerStore`; draft v2 write side flips on (writer +
+   reader together). (`phaseAnswersByStep` deletion/selector re-pointing moved
+   to 090 by the Q8 ruling — T016/T017 stopped.)
 4. **US2 (P1)** — `gatedBy` over the store; `decisionsFromTraversal` deleted;
    session fields/selectors migration incl. the re-homed touch-draft side effect.
 5. **US4 (P2)** — log re-keying by decision id; moved-question StepHost test (SC-005,
-   which also closes US1's AC2); orphan surfacing for US3 (surface per OPEN-088-1
-   once ruled — the collection machinery is in phase 2's tasks regardless).
+   which also closes US1's AC2); orphan surfacing for US3 in the decision trail
+   (OPEN-088-1 ruled 2026-10-06 — see below; the collection machinery is in
+   phase 2's tasks regardless).
 6. **Polish** — parity suites unmodified (SC-004), grep gates (SC-002), Playwright
    walk (SC-001), full studio suite + lint + typecheck.
 
@@ -175,7 +178,10 @@ tolerant-restore precedent. No new directories, no new packages.
   inside the phase merge; multi-step phases depend on replace-only-my-answers
   behaviour (spec 079 D-4). Mitigation: foundational task T006 inventories every
   `recordPhase` caller and every reader of `phaseResults[].answers` before the
-  deletion tasks (T016/T017) are written against that inventory.
+  deletion tasks (T016/T017) are written against that inventory. **Outcome: the
+  inventory falsified the deletion premise (live phase answers are predominantly
+  gallery answers that become decisions only in 090); the owner ruling 2026-10-06 (km-lead proposals Q8) stops
+  T016/T017 and assigns the retirement to 090.**
 - **R-3 Hidden readers of the session fields.** Verified reader list is in research
   §1; a reader missed by it compiles fine (the selector returns the same types) but
   behaves wrong if it read during render from the session closure. Mitigation:
@@ -187,15 +193,19 @@ tolerant-restore precedent. No new directories, no new packages.
 
 ## Open questions (owner's calls — recorded verbatim, NOT decided by this plan)
 
-- **OPEN-088-1** — Spec US3, Acceptance Scenario 2: *"Given a v1 answer whose
-  question no longer exists, When it loads, Then it is shown to the author to
-  re-answer, never dropped (087 Q5 precedent)."* The spec does not name the surface
-  on which the orphaned answer is shown (existing candidates in the app include the
-  decision trail and the reproposal-notice store; neither is named by the spec).
-  **This plan does not choose one.** The migration machinery (task T008, tested by
-  T027–T029) collects and carries orphans regardless; the surfacing task (T030) is
-  written against whichever surface the owner names, and 088 must not be marked
-  complete with orphans collected-but-unshown.
+- **OPEN-088-1 — RESOLVED by owner ruling 2026-10-06 (Matthew, adopting the
+  km-lead proposals, Q1; ~/workspace/keyboard-studio-notes/modular-decisions-proposals.md).**
+  Spec US3, Acceptance Scenario 2: *"Given a v1 answer whose question no longer
+  exists, When it loads, Then it is shown to the author to re-answer, never
+  dropped (087 Q5 precedent)."* The spec did not name the surface. **Ruled: the
+  decision trail.** Each orphaned answer is written as a decision-log entry
+  visible in the trail, carrying its value, following the trail's existing
+  entry shapes and FR-035 degrade behaviour; no new surface, no notice-store
+  machinery. T030 is implemented on that basis.
+- **Q8 (same ruling) — `phaseAnswersByStep` disposition.** The T006 inventory
+  falsified the T016/T017 premise (see R-2's outcome above): the field is
+  **retired by spec 090** as a tail task after its US4, not deleted by 088.
+  FR-006's 088 scope is the surveyAnswerStore + draft-slice removal only.
 
 No other open questions: every other point the research phase surfaced was settled
 by the spec's own text (console-only mismatch logging; session field wins) or is a
