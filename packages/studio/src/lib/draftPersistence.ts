@@ -70,7 +70,7 @@ import {
   useDecisionStore,
 } from "../stores/decisionStore.ts";
 import { deriveIdentityResult, deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
-import { stepHasSettles } from "../steps/stepDependencies.ts";
+import { stepHasSettles } from "../decisions/screenSettles.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { MigrationOrphan } from "./draftTypes.ts";

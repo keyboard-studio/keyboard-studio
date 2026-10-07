@@ -127,8 +127,8 @@ export const trackStep: EditorStep = step({
 
 /**
  * Project name step: ProjectNameStep (copy-track only).
- * Its gatedBy (stepDependencies.ts) makes it a side trail: copy takes it,
- * adapt bypasses it, and both rejoin at the next ungated step.
+ * Its declared screen gate (registry.ts) makes it a side trail: copy
+ * takes it, adapt bypasses it, and both rejoin at the next ungated step.
  * Collects scaffold params displayName + keyboardId — no separate scaffold step.
  * FR-004: header.script is intentionally NOT declared (does not exist in KeyboardIR).
  */
@@ -209,7 +209,7 @@ export const mechanismsStep: EditorStep = step({
 
 /**
  * Touch seed source step: side-trail fork for choosing touch surface seed.
- * Gated side trail (stepDependencies.ts); rejoins at the touch carve+add step (FR-013).
+ * Gated side trail (declared screen gate, registry.ts); rejoins at the touch carve+add step (FR-013).
  * Renders TouchSeedSourceHost (T014, spec 035 contracts/seed-source-fork.md;
  * the gallery host wrapper since spec 090 T012) — a bespoke chooser panel,
  * NOT the surface-parameterized carve/add shell, so

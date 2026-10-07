@@ -1,8 +1,8 @@
 // steps/flowSources.ts — the single authoritative registry of all known survey
 // flows, keyed by flow_id.
 //
-// Spec 024 (ADR-0001): the Flow Map derives drill-downs from the step flowRefs
-// declared in the manifest. Spec 087: every flow's membership is the module list
+// Spec 024 (ADR-0001): the Flow Map derives drill-downs from the flows'
+// screen membership. Spec 087: every flow's membership is the module list
 // registered for it in survey/questions/registry.ts (`flowModules`) and its ORDER
 // is derived from those modules' provides/requires — there are no hand-maintained
 // order lists. This file only adds per-flow metadata (title, phase letter,
@@ -10,10 +10,10 @@
 //
 // Boundary (.dependency-cruiser.cjs steps-layer rule): steps/ MAY import
 // survey/ (registry) and contracts — but NOT dashboard/, stores/, lib/, or
-// components/. dashboard/ reads this file via flowRefs.
+// components/. dashboard/ reads this file for the Flow Map.
 //
 // Status semantics:
-//   "live"     — referenced by at least one manifest step via flowRefs;
+//   "live"     — every module is a member of a derived screen (spec 091);
 //                appears as a live drill-down in the Flow Map.
 //   "proposed" — known to the registry but NOT referenced by any manifest step;
 //                excluded from live drill-downs and from the rendered<->runtime
@@ -101,9 +101,10 @@ export function loadFlowSourceDef(source: FlowSource): FlowDef {
 /**
  * All known survey flows, keyed by flow_id.
  *
- * Adding a flow here does NOT put it in the live drill-downs — it must also be
- * referenced via a manifest step's `flowRefs` field. Status:"proposed" entries
- * are explicitly excluded from live drill-down rendering.
+ * Adding a flow here does NOT put it in the live drill-downs — its modules
+ * must also be members of a derived screen (see the liveness rule below).
+ * Status:"proposed" entries are explicitly excluded from live drill-down
+ * rendering.
  *
  * phase_a_identity is intentionally status:"proposed" and referenced by NO
  * manifest step — this realises the spec-022 demotion. Its modules are
@@ -114,7 +115,7 @@ export function loadFlowSourceDef(source: FlowSource): FlowDef {
  * modules).
  */
 const declaredFlowSources = {
-  // --- Live flows (referenced by manifest step flowRefs) ---
+  // --- Live flows (their modules are members of derived screens) ---
 
   identity_lite: {
     id: "identity_lite",

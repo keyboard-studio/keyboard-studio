@@ -179,6 +179,26 @@ vi.mock("../steps/manifest.ts", () => ({
       component: makeFixedResultStep(SECOND_COPYRIGHT_RESULT),
     },
   ],
+  // Spec 091 T008/T016: steps/stepOrder.ts re-publishes the manifest's
+  // derivation (derivedScreens/screenTrails), and steps/advance.ts reads
+  // the gates from this module — the stub models them for its five steps,
+  // mirroring the real trails (project_name is the gated side trail).
+  derivedScreens: [
+    { id: "identity", kind: "question", group: "identity", decisionIds: ["language-name", "language-region", "language-autonym", "language-code", "target-script", "author-name", "author-email", "copyright-holder"], moduleIds: [], spine: true },
+    { id: "choose_base", kind: "custom", decisionIds: ["base-keyboard"], moduleIds: [], spine: true },
+    { id: "marks", kind: "custom", decisionIds: ["marks-treatment"], moduleIds: [], spine: true },
+    { id: "invisibles", kind: "custom", decisionIds: ["invisibles-inventory"], moduleIds: [], spine: true },
+    { id: "project_name", kind: "question", group: "project_name", decisionIds: ["project-display-name", "project-keyboard-id"], moduleIds: [], spine: false, joinTarget: "characters" },
+  ],
+  screenTrails: new Map([
+    ["identity", { spine: true }],
+    ["choose_base", { spine: true }],
+    ["marks", { spine: true }],
+    ["invisibles", { spine: true }],
+    ["project_name", { spine: false, joinTarget: "characters" }],
+    ["package", { spine: true }],
+  ]),
+  screenGates: new Map(),
 }));
 
 const fakeReducerDeps: ReducerDeps = {

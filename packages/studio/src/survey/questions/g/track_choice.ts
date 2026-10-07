@@ -86,7 +86,7 @@ const mod: QuestionModule = {
   writes: [],
   provides: ["authoring-track"],
   // Spec 091 FR-003 re-homing (Delta P1, revised in phase 4): the track
-  // step's ordering edge lived only in steps/stepDependencies.ts (`requires:
+  // step's ordering edge lived only in the pre-091 step table (`requires:
   // ["base-keyboard"]`). It is declared here as a SCREEN-order requirement —
   // not a module `requires`, which the frozen per-flow ordering contracts
   // (orderParity.test.ts, unmodifiable; SC-002) would see as unresolvable

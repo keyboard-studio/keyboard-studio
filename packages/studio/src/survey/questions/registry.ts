@@ -82,8 +82,8 @@ export const reserveOnlyModules: readonly QuestionModule[] = [
 
 /**
  * The gallery decision modules (spec 090): one module per decision a gallery
- * or editor step settles (the fourteen `settles` ids in
- * steps/stepDependencies.ts). Registered here — so `decisionIndex` resolves
+ * or editor step settles (the fourteen gallery decisions). Registered
+ * here — so `decisionIndex` resolves
  * exactly one provider per gallery decision — but members of NO flow: the
  * gallery host (steps/galleryHost.tsx) renders them, never the SurveyRunner.
  * Module files live under questions/gallery/; the list is composed here, in
@@ -168,8 +168,8 @@ export const decisionModules: readonly QuestionModule[] = [
  * (manifest-level in StudioShell, never a property of the flow's `next`
  * graph) and the touch seed fork (asked only while unrecorded). Spec 087
  * FR-005 forbids a module-level `gatedBy` (conditional visibility comes
- * from `next` only), so these former step-level gates from
- * steps/stepDependencies.ts are declared here, at the composition layer,
+ * from `next` only), so these former step-level gates are declared here,
+ * at the composition layer,
  * keyed by screen id, and passed to `deriveScreens` by its callers. Every
  * other screen's gate is member-derived from routing.
  */

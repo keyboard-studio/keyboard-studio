@@ -1,16 +1,15 @@
 // flowModules — each flow's membership (flow_id -> its question modules),
 // in walk order.
 //
-// Extracted from registry.ts (spec 090 delta D-090-7): steps/stepDependencies
+// Extracted from registry.ts (spec 090 delta D-090-7): the step layer
 // derives step provides from these lists, and it must not import the
 // registry to get them. Gallery decision modules put store-coupled
 // renderer components into the registry's import graph (registry → gallery
 // module → renderer → workingCopyStore → dashboard/completeness →
-// stepOrder → stepDependencies), so a stepDependencies → registry import
-// closed a cycle that left this module's sibling bindings uninitialized
-// when stepDependencies ran during registry load. This module is a leaf:
-// it imports question modules only, and both registry.ts and
-// stepDependencies.ts import it from here.
+// stepOrder), so a step-layer → registry import closed a cycle that left
+// this module's sibling bindings uninitialized when the step layer ran
+// during registry load. This module is a leaf: it imports question
+// modules only, and registry.ts composes the flows from here.
 
 import type { QuestionModule } from "../types.ts";
 

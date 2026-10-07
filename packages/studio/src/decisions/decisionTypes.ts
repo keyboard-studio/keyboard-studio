@@ -137,8 +137,9 @@ export type DecisionId =
   | "typing-approach"
   | "use-case"
   // Wizard-step decisions (spec 087 US4): what an editor step settles that no
-  // question module asks for. Provided/required by steps (steps/stepDependencies.ts)
-  // and ordered by the same orderByDependencies as the questions.
+  // question module asks for. Provided/required by the screens' gallery
+  // modules (spec 090) and ordered by the same orderByDependencies as the
+  // questions.
   | "windows-layout"
   | "base-keyboard"
   | "marks-treatment"

@@ -363,8 +363,8 @@ export interface QuestionModule {
   /**
    * Screen-order requirements (spec 091 FR-003, phase-4 revision): decisions
    * that must be provided by an EARLIER screen for this module's screen to be
-   * placed correctly — the former STEP-layer `requires` from
-   * steps/stepDependencies.ts, re-homed. Distinct from `requires` (a
+   * placed correctly — the former STEP-layer `requires` from the pre-091
+   * step table, re-homed. Distinct from `requires` (a
    * question-order fact inside the flow graph): `screenRequires` is honoured
    * ONLY by `deriveScreens`, which folds it into the full-list sort. It is
    * deliberately invisible to per-flow ordering (orderParity / SC-002 sort a

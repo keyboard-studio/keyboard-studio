@@ -89,6 +89,31 @@ vi.mock("../steps/manifest.ts", () => ({
     { kind: "editor-step", id: "touch_seed_source", title: "Touch seed source", inputs: [], writes: [], component: TrivialStep },
     { kind: "editor-step", id: "help", title: "Help", inputs: [], writes: [], component: TrivialStep },
   ],
+  // steps/stepOrder.ts re-publishes the manifest's derivation (spec 091
+  // T008/T016), so the stub must model these exports too — mirroring the
+  // real screens/trails for the mocked steps above.
+  derivedScreens: [
+    { id: "choose_base", kind: "custom", decisionIds: ["base-keyboard"], moduleIds: [], spine: true },
+    { id: "layout", kind: "custom", decisionIds: ["windows-layout"], moduleIds: [], spine: true },
+    { id: "punctuation", kind: "custom", decisionIds: ["punctuation-inventory"], moduleIds: [], spine: true },
+    { id: "convenience", kind: "custom", decisionIds: ["retained-convenience-chars"], moduleIds: [], spine: true },
+    { id: "deadkeys", kind: "custom", decisionIds: ["deadkeys-defined"], moduleIds: [], spine: true },
+    { id: "rules", kind: "custom", decisionIds: ["rule-set"], moduleIds: [], spine: true },
+    { id: "touch_seed_source", kind: "custom", decisionIds: ["touch-seed-source"], moduleIds: [], spine: false, joinTarget: "touch" },
+    { id: "help", kind: "custom", decisionIds: ["help-docs"], moduleIds: [], spine: true },
+  ],
+  screenTrails: new Map([
+    ["choose_base", { spine: true }],
+    ["layout", { spine: true }],
+    ["punctuation", { spine: true }],
+    ["convenience", { spine: true }],
+    ["deadkeys", { spine: true }],
+    ["rules", { spine: true }],
+    ["touch_seed_source", { spine: false, joinTarget: "touch" }],
+    ["help", { spine: true }],
+    ["package", { spine: true }],
+  ]),
+  screenGates: new Map(),
 }));
 
 const snapshotter: Snapshotter = {

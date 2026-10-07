@@ -83,6 +83,16 @@ vi.mock("../steps/manifest.ts", () => ({
   // screen gates from the manifest module; this fixture's single step is
   // ungated, so the map is empty.
   screenGates: new Map(),
+  // Spec 091 T008/T016: steps/stepOrder.ts re-publishes the manifest's
+  // derivation, so the stub models the derived screen and trails for the
+  // fixture's single step too.
+  derivedScreens: [
+    { id: "touch", kind: "custom", decisionIds: ["touch-layout"], moduleIds: [], spine: true },
+  ],
+  screenTrails: new Map([
+    ["touch", { spine: true }],
+    ["package", { spine: true }],
+  ]),
 }));
 
 import { StepHost } from "../components/StepHost.tsx";

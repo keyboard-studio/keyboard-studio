@@ -206,3 +206,32 @@ export function deriveScreens(
     };
   });
 }
+
+/**
+ * The decisions each screen SETTLES that no question module asks for: the
+ * provides of its custom (non-question) members — the gallery modules
+ * (spec 090). A screen whose members include such a module is a
+ * gallery/editor screen; its settled decisions' saved answers are not
+ * survey-question answers (the distinction the spec-088 draft migration
+ * and the spec-090 decision recorder both read). Pure, like the rest of
+ * this module; the live, memoised binding is decisions/screenSettles.ts.
+ */
+export function settlesByScreen(
+  modules: readonly QuestionModule[],
+  declaredScreenGates?: ReadonlyMap<string, Gate>,
+): ReadonlyMap<string, readonly DecisionId[]> {
+  const byModuleId = new Map(modules.map((m) => [m.definition.id, m] as const));
+  const result = new Map<string, readonly DecisionId[]>();
+  for (const screen of deriveScreens(modules, declaredScreenGates)) {
+    const settles: DecisionId[] = [];
+    for (const moduleId of screen.moduleIds) {
+      const mod = byModuleId.get(moduleId);
+      if (mod === undefined || !isCustom(mod)) continue;
+      for (const id of mod.provides ?? []) {
+        if (screen.decisionIds.includes(id)) settles.push(id);
+      }
+    }
+    result.set(screen.id, settles);
+  }
+  return result;
+}

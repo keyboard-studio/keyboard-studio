@@ -2,7 +2,7 @@
 // screen that now holds that step's decisions (spec 091 FR-004 / SC-005).
 //
 // The inventory is every step id declared on `main` at 18e63aa4 (from
-// stepDependencies.ts DECLARATIONS at that commit, inventoried in
+// the step declaration table in force at that commit, inventoried in
 // research.md). Screen ids were seeded with today's step names (the
 // gallery modules' declared screen keys; the question screens' groups),
 // so every entry is an identity mapping today — the map exists so a

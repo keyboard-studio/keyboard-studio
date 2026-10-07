@@ -298,6 +298,32 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   (5) `steps/stepOrder.parity.test.ts` (the frozen oracle + the T017
   report-only block's membership baseline). Everything else is comments.
   The flip is one commit when the lead releases the hold.
+- **Finishing-phase flip — LANDED (2026-10-07, after spec 090 completed
+  at fee8fb82 / PR #1981; the hold above is discharged).** One commit, as
+  prescribed: stepDependencies.ts deleted; T008 landed in the
+  re-publication shape (steps/manifest.ts holds the one live
+  deriveScreens call; steps/stepOrder.ts re-publishes derivedScreens /
+  screenTrails as STEP_ORDER / STEP_TRAILS — the registry is never read
+  from stepOrder, so Delta P4's cycle cannot re-form, and the
+  deriveScreens standalone canary passes); settles re-homed to
+  decisions/screenSettles.ts (pure `settlesByScreen` in
+  decisions/deriveScreens.ts; lazy memoised live binding — no
+  module-init registry read), consumed by 090's recorder
+  (createStudioDecisionRecorder) and the 088 draft migration
+  (draftPersistence); the coverage oracle re-derived from screens with
+  the table's step requires carried as frozen baseline literals; SC-002's
+  step-layer fixtures contracted from the derived screens; the parity
+  oracle retired into FR-005 baseline form (T017 — the module graph
+  reproduced the frozen 14 tie-break pairs exactly, and no baseline
+  inversion needed an edge explanation). One consumer surface the Phase
+  4 inventory did not name: 090 US5's `settlesForStep` import in the
+  recorder (landed after the inventory) — re-homed with the rest. Three
+  test files' partial manifest mocks (galleryLogEntries, StepHost.test,
+  deepLinkRevision) were extended to model the manifest module's derived
+  exports, since stepOrder now reads them at init through advance.ts.
+  Constitution Article IX corrected in the same commit (T024; footer
+  1.2.0 → 1.3.0 — spec 093's T025 independently set 1.3.0 for its Article
+  III amendment on its branch; the collision resolves at 093's restack).
 - **Delta P5 — the one sort conflates routing edges with requires edges;
   SC-001's edit closes a false cycle.** T009's prescribed edit
   (`il_language_autonym` += `requires: ["base-keyboard"]`) cycles in

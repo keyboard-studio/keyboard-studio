@@ -11,7 +11,6 @@ import { describe, it, expect } from "vitest";
 import { LEGACY_STEP_ID_MAP, resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
 import { derivedScreens, manifest, screenGates } from "../steps/manifest.ts";
 import { declaredScreenGates } from "../survey/questions/registry.ts";
-import { stepDependencies } from "../steps/stepDependencies.ts";
 import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
 import { resolveLocation, type ResolveContext } from "./resolveLocation.ts";
@@ -78,15 +77,37 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
     }
   });
 
-  it("the resolved screen holds the decisions the step provided (stepDependencies oracle)", () => {
-    // The oracle is the pre-091 declaration table (held for deletion at
-    // T016); at the flip its provides lists are carried here as literals.
+  it("the resolved screen holds the decisions the step provided (baseline oracle)", () => {
+    // The oracle is the pre-091 declaration table's provides lists,
+    // carried here as literals at the T016 flip (the table is deleted;
+    // the baseline is main@18e63aa4's step membership, frozen — the same
+    // baseline steps/stepOrder.parity.test.ts asserts equality against).
+    const BASELINE_PROVIDES: Readonly<Record<string, readonly string[]>> = {
+      identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script", "author-name", "author-email", "copyright-holder"],
+      layout: ["windows-layout"],
+      choose_base: ["base-keyboard"],
+      track: ["authoring-track"],
+      project_name: ["project-display-name", "project-keyboard-id"],
+      characters: ["existing-keyboards", "co-installed-keyboards", "discovery-intro", "text-sample", "text-sample-review", "linguist-confirm", "picker-confirm", "standard-letters", "typing-approach", "special-letters-wanted", "special-letters", "special-letters-notes", "latin-digraphs-wanted", "latin-digraphs-list", "punctuation-wanted", "punctuation-list", "digit-set", "char-count", "latin-qwerty-branch", "spare-keys-qwerty", "latin-azerty-branch", "azerty-qz-swap", "spare-keys-azerty", "non-roman-branch", "indic-conjuncts-wanted", "indic-virama", "indic-vowels-separate", "indic-pre-base-vowels", "indic-nukta-wanted", "indic-nukta-detail", "indic-onset-vowels-wanted", "indic-onset-vowels-list", "sea-medials", "sea-stacked-consonants", "rtl-direction-confirm", "rtl-short-vowels", "rtl-special-letters", "syllabic-note", "syllabic-grid", "syllabic-finals-wanted", "syllabic-finals-list", "other-free-entry", "contact-language", "legacy-encoding", "use-case", "additional-methods", "character-inventory"],
+      marks: ["marks-treatment"],
+      punctuation: ["punctuation-inventory"],
+      invisibles: ["invisibles-inventory"],
+      convenience: ["retained-convenience-chars"],
+      carve: ["carved-layout"],
+      deadkeys: ["deadkeys-defined"],
+      rules: ["rule-set"],
+      mechanisms: ["physical-layout"],
+      touch_seed_source: ["touch-seed-source"],
+      touch: ["touch-layout"],
+      help: ["help-welcome-paragraph", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
+      package: [],
+    };
     const screenById = new Map(derivedScreens.map((s) => [s.id, s] as const));
     for (const id of MAIN_STEP_IDS_AT_18E63AA4) {
       if (id === "package") continue; // terminal screen: no decisions
       const screen = screenById.get(resolveLegacyStepId(id))!;
       expect(screen, id).toBeDefined();
-      for (const decisionId of stepDependencies(id).provides) {
+      for (const decisionId of BASELINE_PROVIDES[id] ?? []) {
         expect(screen.decisionIds, `${id} -> ${screen.id}`).toContain(decisionId);
       }
     }

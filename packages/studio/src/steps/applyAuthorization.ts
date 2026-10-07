@@ -6,7 +6,7 @@
 // context). reducer.ts imports the question registry, so hosting the check
 // there put the registry in every gallery module's import graph and closed
 // a cycle (registry → gallery module → renderer → host → reducer →
-// registry) that left `flowModules` uninitialized when stepDependencies
+// registry) that left `flowModules` uninitialized when the step layer
 // loaded through it. This module is a leaf: types only, no registry, no
 // stores.
 

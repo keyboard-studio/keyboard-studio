@@ -5,9 +5,9 @@
 // TouchSeedSourceHost. The step's asked-while-unrecorded gating is a
 // SCREEN gate, declared in the registry's `declaredScreenGates` (spec 091
 // Delta P6: spec 087 FR-005 forbids a module-level gatedBy; the gate is
-// not routing-expressible for a custom screen); the identical `gatedBy`
-// in steps/stepDependencies.ts (landed by 088) remains the live source
-// until spec 091 deletes that file. The decision has no
+// not routing-expressible for a custom screen); the identical step-level
+// `gatedBy` (landed by 088) was retired when spec 091 deleted the step
+// table — the registry declaration above is the one source. The decision has no
 // working-copy effect of its own (the touch
 // step's derivation reads the recorded value), so `apply` is empty.
 // Boundary (FR-003): a gallery module is a pure descriptor — no store

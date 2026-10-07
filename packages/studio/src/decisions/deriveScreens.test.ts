@@ -2,8 +2,8 @@
 //
 // The derivation is pure, so most cases run over synthetic module lists;
 // the frozen-trail and frozen-order cases run over the live registry list
-// (decisionModules) and pin today's wizard against the stepDependencies
-// baseline it replaces.
+// (decisionModules) and pin today's wizard against the pre-091 baseline
+// it replaces (the frozen literals in steps/stepOrder.parity.test.ts).
 
 import { describe, it, expect } from "vitest";
 import type { QuestionModule } from "../survey/types.ts";

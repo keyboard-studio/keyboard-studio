@@ -15,7 +15,7 @@ const CTX = { ir: null, writes: [], decisions: {}, currentHistoryEntryState: nul
 describe("characterInventory module contract", () => {
   it("provides character-inventory, requires the step's declared three, writes nothing", () => {
     expect(characterInventory.provides).toEqual(["character-inventory"]);
-    // Pinned EQUAL to steps/stepDependencies.ts by the FR-002 coverage
+    // Pinned EQUAL to the baseline step requires by the FR-002 coverage
     // test (the 091 parity) — see the module's own comment.
     expect(characterInventory.requires).toEqual([
       "target-script",

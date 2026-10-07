@@ -72,13 +72,18 @@ before any user story.
   characters, marks, punctuation, invisibles, convenience, carve, deadkeys, rules, mechanisms,
   touch_seed_source, touch, help, package — inventoried in research.md) mapped to the screen id
   holding that step's decisions, with `done`/`unsupported` documented as pass-through terminals
-- [ ] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
+- [x] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
   packages/studio/src/steps/stepOrder.ts, keeping the exported shapes identical so existing
   consumers (`stores/workingCopyStore.ts` ranking, `steps/advance.ts`) compile unchanged
   — LANDED in Phase 2, REVERTED in Phase 3 (plan.md Delta P4: the D-090-7
   init-cycle bites under store-first entry orders; the Phase 2 batch
-  masked it). Returns with Phase 4's rewiring (T012–T016) as a stated
-  prerequisite there.
+  masked it). Returned with Phase 4's rewiring (T012–T016) and LANDED at
+  the finishing-phase flip: stepOrder now re-publishes the manifest's
+  derivation (manifest.ts is the one deriveScreens call over the live
+  registry; Delta P4's prerequisite — breaking the completeness →
+  stepOrder-during-registry-evaluation path — was discharged by T014's
+  threading of screenTrails). The deriveScreens standalone canary
+  (the Phase 3 reproducer) passes.
 
 **Checkpoint**: `deriveScreens` is tested pure; stepOrder still serves its consumers, now
 screen-derived. `stepDependencies.ts` still exists but is no longer the source for STEP_ORDER.
@@ -143,20 +148,33 @@ to assert "same order as main unless a `requires` edge says otherwise" (FR-005).
   (also: steps/advance.ts's stepApplies gate read moved to the same screen
   gates — a consumer the task text did not name; manifest.ts publishes
   `screenGates`/`screenTrails` as the one source)
-- [ ] T016 [US2] Delete packages/studio/src/steps/stepDependencies.ts and verify SC-004: zero
+- [x] T016 [US2] Delete packages/studio/src/steps/stepDependencies.ts and verify SC-004: zero
   live references to `stepDependencies`, `flowRefs` or `settles` remain in
   packages/studio/src (grep gate in quickstart.md §1)
-- [ ] T017 [US2] Rewrite packages/studio/src/steps/stepOrder.parity.test.ts per FR-005 —
+  — LANDED at the finishing-phase flip (after spec 090 completed, PR
+  #1981). `settlesForStep`/`stepHasSettles` re-homed to
+  decisions/screenSettles.ts over a pure `settlesByScreen` in
+  decisions/deriveScreens.ts (a screen settles what its gallery members
+  provide), computed lazily so no registry read happens at module-init
+  time; 090's galleryLogEntries suite stays green (9/9). The two other
+  partial manifest mocks (StepHost.test, deepLinkRevision) were extended
+  to model the manifest module's derived exports, as galleryLogEntries'
+  was. SC-004 grep gate verified empty.
+- [x] T017 [US2] Rewrite packages/studio/src/steps/stepOrder.parity.test.ts per FR-005 —
   explicitly replacing the frozen-literal oracle, not regenerating it: carry the `main`@18e63aa4
   screen sequence, membership, trails and lock order over as baseline data; assert the derived
   screens equal the baseline unless a `requires` edge in the current declarations orders the
   pair differently (edge-explained differences are enumerated, not silent); keep the
   documented tie-break-pairs mechanism and the adversarial input-order property, run over
   screens
-  — PARTIAL (Phase 4, per the lead's hold): the FR-005 assertions (order
-  with edge-explained inversions, membership, trails over derived
-  screens) are written and running in the same file, report-only; the
-  frozen-literal oracle's retirement lands with T016's flip.
+  — COMPLETED at the finishing-phase flip: the frozen-literal oracle is
+  retired; the file now asserts FR-005 in baseline form (main@18e63aa4
+  sequence/membership/trails/locks carried as BASELINE_* literals —
+  membership from the deleted table's provides lists, captured
+  mechanically before deletion), order admitted in edge-explained form,
+  tie-break pairs and the adversarial input-order property re-run over
+  deriveScreens itself. The tie-break set reproduced the frozen 14
+  pairs exactly from the module graph.
 - [x] T018 [US2] Rewrite the M2 assertion in packages/studio/src/steps/manifest.test.ts as
   manifest ≡ derived screens (M3–M6 unchanged, evaluated over screens); re-point
   packages/studio/src/decisions/gateWalkParity.test.ts to iterate derived question screens
@@ -207,7 +225,7 @@ screens consistently.
   `legacyStepIds.ts` + resolveLocation to the screen holding that step's decisions, with
   `done`/`unsupported` passing through — in packages/studio/src/lib/resolveLocation.test.ts
   (or a new packages/studio/src/lib/legacyStepIds.test.ts if the suite fits better there)
-- [ ] T024 [P] Correct constitution Article IX's naming of `steps/stepDependencies.ts` in
+- [x] T024 [P] Correct constitution Article IX's naming of `steps/stepDependencies.ts` in
   .specify/memory/constitution.md to name the derived screens as the step source, with the
   version footer bumped, in the same change that deletes the file (Governance: the article
   follows the change that prompts it)

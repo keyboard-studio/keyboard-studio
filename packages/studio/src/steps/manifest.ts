@@ -38,7 +38,6 @@ import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
 import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
-import { STEP_ORDER } from "./stepOrder.ts";
 import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
 import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
 import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
@@ -92,7 +91,8 @@ const charactersStep: Step = {
   // (spec 027 Stage 4; first runtime use of step.component).
   component: CharactersStepHost,
   // phase_b_characters runs inside the characters step (spec 024, Stage 1);
-  // its flowRefs come from stepDependencies.
+  // its modules are intra-step members of the derived characters screen
+  // (spec 091: their `group` names this screen).
   // Right pane swaps from the live OSK preview to the interactive character
   // map for the Phase B build-list screen only (SurveyView further gates this
   // on discoveryMethod === "build-list" — the manual step-by-step path and the
@@ -110,14 +110,14 @@ const charactersStep: Step = {
 // Step declarations: an UNORDERED pool (FR-008)
 //
 // Nothing here says what comes before what. Order, side-trail membership and
-// join targets are derived from provides/requires/gatedBy
-// (steps/stepDependencies.ts -> steps/stepOrder.ts). The comments on individual
-// steps describe WHY a step needs what it needs, not where it sits.
+// join targets are derived from the decision modules' provides / requires /
+// screenRequires (decisions/deriveScreens.ts, spec 091). The comments on
+// individual steps describe WHY a step needs what it needs, not where it sits.
 //
 // Rules still validated on the derived order (validateManifestShape):
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M5 — unique ids.
-//   plus: the pool and the dependency table name exactly the same steps.
+//   plus: the pool and the derived screens name exactly the same steps.
 // ---------------------------------------------------------------------------
 
 const stepPool: readonly Step[] = [
@@ -137,8 +137,9 @@ const stepPool: readonly Step[] = [
   trackStep,
 
   // --- Project name (copy-track only) ---
-  // Gated side trail (stepDependencies): copy-track takes this step, adapt-track
-  // bypasses it, and both reconverge at the next ungated step.
+  // Gated side trail (declared screen gate, registry.ts): copy-track takes
+  // this step, adapt-track bypasses it, and both reconverge at the next
+  // ungated step.
   projectNameStep,
 
   // --- Character inventory (Phase A / Phase B question battery) ---
@@ -404,16 +405,17 @@ export const galleryModuleByStep: ReadonlyMap<string, QuestionModule> = new Map(
 // stays boundary-clean here in steps/.
 //
 // The order itself is not asserted here: it is derived, and stepOrder.parity
-// .test.ts pins the derivation against a frozen literal. What stays here are
-// validations ON the derived order.
+// .test.ts pins the derivation against the main@18e63aa4 baseline (FR-005).
+// What stays here are validations ON the derived order.
 // ---------------------------------------------------------------------------
 
 export function validateManifestShape(): void {
   const ids = manifest.map((s) => s.id);
 
   // The array is the derived order, and every derived side trail can rejoin.
-  if (ids.length !== STEP_ORDER.length || ids.some((id, i) => id !== STEP_ORDER[i])) {
-    throw new Error(`[manifest] manifest order is not the derived STEP_ORDER`);
+  const derivedOrder = [...derivedScreens.map((s) => s.id), "package"];
+  if (ids.length !== derivedOrder.length || ids.some((id, i) => id !== derivedOrder[i])) {
+    throw new Error(`[manifest] manifest order is not the derived screen order`);
   }
   for (const [id, trail] of screenTrails) {
     if (!trail.spine && trail.joinTarget === undefined) {

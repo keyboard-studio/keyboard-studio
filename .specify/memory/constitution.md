@@ -75,14 +75,15 @@ No user-facing survey surface may exist outside the decision registry and the st
 step declares typed IRPath inputs and writes via Step.inputs and Step.writes (steps/types.ts).
 Every IR write routes through the mutate() seam (specs/014-mutate-seam-touch-propagation). The
 decision registry is the single source of order, for questions AND for steps: question modules
-(survey/questions/registry.ts) and wizard steps (steps/stepDependencies.ts) both declare
-provides/requires, and one sort (decisions/orderDecisions.ts `orderByDependencies`) derives every
+and gallery modules (survey/questions/registry.ts) declare provides/requires, and the wizard's
+steps are the screens derived from those declarations (decisions/deriveScreens.ts, spec
+091-derived-steps): one sort (decisions/orderDecisions.ts `orderByDependencies`) derives every
 order (specs/087-decision-backend). No hand-maintained order list, spine flag, or join target
-exists anywhere: a step's side-trail status derives from its `gatedBy`, and its join target from
-its next ungated successor. The step manifest (steps/manifest.ts) is an unordered set of step
+exists anywhere: a screen's side-trail status derives from its derived gate, and its join target
+from its next ungated successor. The step manifest (steps/manifest.ts) is an unordered set of step
 declarations (components, inputs, writes, persistence); it never states what comes before what. A
 plan proposing new survey content MUST include the registry declaration (provides/requires, and
-`gatedBy` where it is conditional) as a functional requirement.
+a declared screen gate where visibility is not routing-expressible) as a functional requirement.
 
 ## Authoring workflow (spec-kit ↔ KM crew)
 
@@ -148,4 +149,4 @@ Amendments to this file follow the change that prompted them: when a spec
 amendment lands (e.g. a new vX.Y.0 recorded in spec-signoff), the relevant
 Article is updated in the same change and the version footer below is bumped.
 
-**Version**: 1.2.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-10-06
+**Version**: 1.3.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-10-07

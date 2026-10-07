@@ -34,7 +34,7 @@ import type {
   RemovalCapability,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
-import { settlesForStep } from "../steps/stepDependencies.ts";
+import { settlesForStep } from "./screenSettles.ts";
 import type { DecisionSet } from "./decisionTypes.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveProjectKeyFromWorkingCopy } from "../lib/draftPersistence.ts";
@@ -113,9 +113,10 @@ export function createStudioDecisionRecorder(
     ...(deps.resolveCompletionScreen !== undefined
       ? { resolveCompletionScreen: deps.resolveCompletionScreen }
       : {}),
-    // spec 090 US5: a step's settled gallery decisions are its `settles`
-    // list (steps/stepDependencies.ts — the one declaration of what a step
-    // settles) resolved against the live decision set. A settles id with
+    // spec 090 US5: a step's settled gallery decisions are its derived
+    // `settles` (decisions/screenSettles.ts — the decisions the screen's
+    // gallery members provide, spec 091) resolved against the live
+    // decision set. A settles id with
     // no record is a decision the step did not settle this session; it
     // contributes no entry, which is the G7 check's "gap" made visible
     // rather than papered over.

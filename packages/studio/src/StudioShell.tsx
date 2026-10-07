@@ -247,9 +247,10 @@ function useRoute(): RouteId {
 // ---------------------------------------------------------------------------
 // SurveyView — manifest-driven survey runtime (T028, FR-009, M1)
 //
-// Step order, spine membership and side-trail join targets are DERIVED from the
-// steps' provides/requires/gatedBy (steps/stepDependencies.ts, steps/stepOrder.ts);
-// lock placement comes from steps/manifest.ts. No SurveyStage union remains — the active step is tracked
+// Step order, spine membership and side-trail join targets are DERIVED from
+// the decision modules' declarations (decisions/deriveScreens.ts, spec 091;
+// published via steps/manifest.ts and steps/stepOrder.ts); lock placement
+// comes from steps/manifest.ts. No SurveyStage union remains — the active step is tracked
 // as a manifest step id (ActiveStepId) with one sub-stage for the "characters"
 // step (which contains an internal prefill→B flow — intra-phase routing handled
 // by the SurveyRunner, legitimately not promoted to manifest steps).
