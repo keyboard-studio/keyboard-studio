@@ -110,8 +110,13 @@ export function replayFromCheckpoint(
   },
 ): { outcome: ReplayOutcome; trail: CheckpointTrail } {
   const resume = resumePointFor(trail, request.order, request.changed);
+  // A resume at index 0 IS a full replay (checkpoint 0 is the starting
+  // point + empty overlay) — and replayKeyboard's contract requires
+  // `startingPointIR`, not `fromState`, at fromIndex 0, so it takes the
+  // full-replay path below rather than the fromState call.
   const usable =
     resume !== undefined &&
+    resume.index > 0 &&
     trail.length === request.order.length + 1 &&
     resume.checkpoint.ir !== undefined;
   if (!usable) {
