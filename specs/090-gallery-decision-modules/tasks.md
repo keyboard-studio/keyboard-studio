@@ -68,10 +68,10 @@ the recording of the owner's carve ruling (T003, resolved).
   runner — the first runtime reader of `module.renderer` — in
   packages/studio/src/steps/galleryHost.tsx, wired into the manifest/StepHost path in
   packages/studio/src/steps/manifest.ts (per-step adapters retire per story, not here)
-- [ ] T006 [P] FR-003 layer 1 (research R4): depcruise forbidden rule — gallery module and
+- [x] T006 [P] FR-003 layer 1 (research R4): depcruise forbidden rule — gallery module and
   `apply` files may not import any store under `stores/` — in .dependency-cruiser.cjs;
   `pnpm depcruise` green
-- [ ] T007 [P] FR-003 layer 2 scaffolding (research R4): ESLint restricted-call-site overlay
+- [x] T007 [P] FR-003 layer 2 scaffolding (research R4): ESLint restricted-call-site overlay
   for renderer component trees plus the call-site checker test with an initially empty
   per-tree identifier list (each story extends it in its own change) in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts
