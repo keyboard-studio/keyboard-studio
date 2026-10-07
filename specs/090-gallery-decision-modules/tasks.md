@@ -385,12 +385,15 @@ neutral either: 093's replay input is decisions only, so a fact held solely in t
 field would be invisible to replay and silently vanish when the derived-keyboard draft
 drops the working-copy slice.)
 
-- [ ] T063 Delete `phaseAnswersByStep` from packages/studio/src/stores/workingCopyStore.ts,
+- [x] T063 Delete `phaseAnswersByStep` from packages/studio/src/stores/workingCopyStore.ts,
   coupled to `recordPhase` ceasing to carry answers (its answer-carrying writes retire with
   the US1–US4 migrations); strip-on-restore for the stale field in pre-090 snapshots: a
   persisted working-copy snapshot that still carries `phaseAnswersByStep` has the field
   dropped on restore in packages/studio/src/lib/persistWorkingCopy.ts and never re-saved;
   closing grep recorded: zero references to `phaseAnswersByStep` in packages/studio/src
+  — Landed (D-090-44): field + D-4 machinery deleted; recordPhase stores no answers;
+  strip-on-restore pinned. Closing grep: zero references in non-test sources (the 6
+  remaining references are tests pinning the absence/strip).
 
 **Checkpoint**: no answer state remains outside decision records — the working copy holds
 only the applied view the decisions produce (until 093 drops the saved slice entirely).

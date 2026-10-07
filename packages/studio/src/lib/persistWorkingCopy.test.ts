@@ -512,6 +512,38 @@ describe("persistWorkingCopy", () => {
       expect(snapshot.deletedTouchKeyIds).toEqual(["phone:default:U_0063"]);
     });
 
+    it("spec 090 T063: a snapshot still carrying the retired answer sidecar has it dropped on restore and never re-saved", () => {
+      const ir = makeScaffoldedIR();
+      const staleSnapshot = {
+        instantiationMode: "new-from-base",
+        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        baseVfsEntries: [],
+        baseIr: ir,
+        identity: null,
+        ir,
+        deletedNodeIds: [],
+        deletedItemIds: [],
+        deletedTouchKeyIds: [],
+        undoStack: [],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        sequenceFlaggedChars: [],
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+        staleSteps: [],
+        validatorFindings: [],
+        axisFills: [],
+        phaseAnswersByStep: { C: { legacy: [] } },
+      } as unknown as WorkingCopySnapshot;
+
+      const patch = prepareWorkingCopySnapshot(staleSnapshot);
+      expect("phaseAnswersByStep" in patch).toBe(false);
+      // And a fresh snapshot of the store never writes the field at all.
+      expect("phaseAnswersByStep" in snapshotWorkingCopyData()).toBe(false);
+    });
+
     it("prepareWorkingCopySnapshot tolerates a pre-existing snapshot missing the field", () => {
       const ir = makeScaffoldedIR();
       const legacySnapshot = {

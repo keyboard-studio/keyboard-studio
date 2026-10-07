@@ -2426,7 +2426,7 @@ describe("draftPersistence", () => {
       expect(after.recordedScreenOf).toEqual({ "entry-1": "attachments" });
     });
 
-    it("T069 (FR-032, US4 scenario 3): a checked-in pre-079 draft restores cleanly — empty answer store, phase answers adopted under \"legacy\", no stamp invented", () => {
+    it("T069 (FR-032, US4 scenario 3): a checked-in pre-079 draft restores cleanly — empty answer store, no stamp invented; its stored phase answers are inert and clear at the next record (spec 090 T063)", () => {
       const fixture = readFileSync(path.join(currentDir, "__fixtures__", "pre079-draft.json"), "utf8");
       const envelope = JSON.parse(fixture) as Record<string, unknown> & { workingCopy: Record<string, unknown>; phaseBDraft: Record<string, unknown> };
       // The fixture really is pre-079: none of the three additive fields.
@@ -2445,20 +2445,20 @@ describe("draftPersistence", () => {
       // No base in the fixture's traversal, so nothing to derive a stamp from.
       expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
 
-      // The phase-C answers recorded before 079 have no owner step; the next
-      // step to record into phase C must not overwrite them (D-4).
+      // Spec 090 T063: the restored phase-C answers sit in the slot as inert
+      // legacy data (no production reader remains), the retired sidecar
+      // never reappears, and the next recordPhase clears the slot's answers
+      // — decision records are the only answer state now.
       const phaseC = () => useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
       expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c"]);
+      expect("phaseAnswersByStep" in useWorkingCopyStore.getState()).toBe(false);
       useWorkingCopyStore
         .getState()
         .recordPhase(
           { phase: "C", answers: [{ questionId: "convenience.x", answerType: "boolean", value: false }] },
           { stepId: "convenience" },
         );
-      expect(useWorkingCopyStore.getState().phaseAnswersByStep["C"]?.["legacy"]?.map((a) => a.questionId)).toEqual([
-        "invisibles.u200c",
-      ]);
-      expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c", "convenience.x"]);
+      expect(phaseC()?.answers).toEqual([]);
     });
   });
 

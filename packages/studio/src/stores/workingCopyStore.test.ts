@@ -32,7 +32,6 @@ import type {
   IRStore,
   KeyboardIR,
   RemovalCapability,
-  SurveyAnswer,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
 import type { SourcedInventory } from "@keyboard-studio/engine";
@@ -692,124 +691,56 @@ describe("workingCopyStore — survey state consistency", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 D-4/R-08: per-step phase answers (phaseAnswersByStep sidecar).
-// recordPhase(result, { stepId }) replaces only ITS OWN step's slice of a
-// phase's answers, never the whole phase — and the phase's derived `answers`
-// is the concatenation of every step's slice in manifest order, "legacy"
-// first.
+// spec 090 T063: the per-step answer sidecar (spec 079 D-4) is deleted and
+// recordPhase no longer carries answers — settled answers live only in the
+// decision store (088). The phase slot keeps the results' non-answer fields,
+// shallow-merged per phase.
 // ---------------------------------------------------------------------------
 
-describe("workingCopyStore — recordPhase per-step answers (phaseAnswersByStep)", () => {
-  it("recording invisibles then convenience into phase C keeps invisibles' answers — a later step's record does not clobber an earlier one's", () => {
-    const invisiblesAnswers: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "zwj" },
-    ];
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: invisiblesAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "invisibles" },
-    );
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    expect(phaseC?.answers).toEqual([...invisiblesAnswers, ...convenienceAnswers]);
-  });
-
-  it("a step re-recording replaces only its OWN list — fewer answers on the re-record leaves no stale ones behind", () => {
+describe("workingCopyStore — recordPhase after the answer sidecar's deletion (T063)", () => {
+  it("stores no answers: a recorded result's answers never reach the phase slot", () => {
     useWorkingCopyStore.getState().recordPhase(
       {
         phase: "C",
-        answers: [
-          { questionId: "invisiblesQ1", answerType: "text", value: "a" },
-          { questionId: "invisiblesQ2", answerType: "text", value: "b" },
-        ],
+        answers: [{ questionId: "invisiblesQ1", answerType: "text", value: "zwj" }],
       } as unknown as SurveyPhaseResult,
       { stepId: "invisibles" },
     );
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    // invisibles re-records with FEWER answers than before (the walk changed).
-    const shrunkInvisibles: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "a-changed" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: shrunkInvisibles } as unknown as SurveyPhaseResult,
-      { stepId: "invisibles" },
-    );
-
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    // No stale "invisiblesQ2" left over from the first record — invisibles'
-    // slice was REPLACED, not merged, and convenience's slice is untouched.
-    expect(phaseC?.answers).toEqual([...shrunkInvisibles, ...convenienceAnswers]);
+    expect(phaseC?.answers).toEqual([]);
+    expect(
+      "phaseAnswersByStep" in useWorkingCopyStore.getState(),
+    ).toBe(false);
   });
 
-  it("derived phaseResults[C].answers is the concatenation in manifest order with 'legacy' first, when a step records without a stepId", () => {
-    const legacyAnswers: SurveyAnswer[] = [
-      { questionId: "legacyQ", answerType: "text", value: "pre-079" },
-    ];
-    // No stepId at all -> owner "legacy".
+  it("two steps recording into one phase keep both steps' non-answer fields (shallow merge)", () => {
     useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: legacyAnswers } as unknown as SurveyPhaseResult,
-    );
-
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    const invisiblesAnswers: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "zwj" },
-    ];
-    // invisibles comes BEFORE convenience in STEP_ORDER — recorded last here to
-    // prove the derived order is manifest order, not recording order.
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: invisiblesAnswers } as unknown as SurveyPhaseResult,
+      { phase: "C", answers: [], selectedPatternIds: ["p1"] } as unknown as SurveyPhaseResult,
       { stepId: "invisibles" },
     );
-
-    const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    expect(phaseC?.answers).toEqual([...legacyAnswers, ...invisiblesAnswers, ...convenienceAnswers]);
-  });
-
-  it("a snapshot without phaseAnswersByStep (e.g. restored pre-079) is adopted as 'legacy', and a subsequent stepId-recording appends alongside it rather than discarding it", () => {
-    const priorAnswers: SurveyAnswer[] = [
-      { questionId: "priorQ", answerType: "text", value: "from-before-079" },
-    ];
-    // Mirrors a restored snapshot: phaseResults holds real prior answers, but
-    // the sidecar is empty (as prepareWorkingCopySnapshot/applyWorkingCopySnapshot
-    // leaves it for a pre-079 draft with no phaseAnswersByStep field).
-    useWorkingCopyStore.setState({
-      phaseResults: [{ phase: "C", answers: priorAnswers } as unknown as SurveyPhaseResult],
-      phaseAnswersByStep: {},
-    });
-
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
     useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
+      { phase: "C", answers: [], computedAxes: { scriptClass: "alphabetic" } } as unknown as SurveyPhaseResult,
       { stepId: "convenience" },
     );
-
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    // The pre-existing answers survive (adopted as "legacy", which sorts
-    // first) and the new step's answers are appended, not lost.
-    expect(phaseC?.answers).toEqual([...priorAnswers, ...convenienceAnswers]);
+    expect(phaseC?.selectedPatternIds).toEqual(["p1"]);
+    expect(phaseC?.computedAxes).toEqual({ scriptClass: "alphabetic" });
+  });
+
+  it("a re-recorded phase replaces its own fields and still carries no answers", () => {
+    useWorkingCopyStore.getState().recordPhase(
+      { phase: "A", answers: [], identity: { keyboardId: "first" } } as unknown as SurveyPhaseResult,
+    );
+    useWorkingCopyStore.getState().recordPhase(
+      {
+        phase: "A",
+        answers: [{ questionId: "q", answerType: "text", value: "v" }],
+        identity: { keyboardId: "second" },
+      } as unknown as SurveyPhaseResult,
+    );
+    const phaseA = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "A");
+    expect(phaseA?.identity?.keyboardId).toBe("second");
+    expect(phaseA?.answers).toEqual([]);
   });
 });
 
