@@ -199,3 +199,49 @@ is adopted as SC-004's method.**
   `lib/serializeWorkingCopy.fragmentBearing.carve.test.ts`).
 - Rationale: constitution Articles II/VII — opaque constructs are preserved,
   never silently dropped, and survey-editing them is out of scope.
+
+## Appendix — T001 prerequisite audit (pipelined implementation start)
+
+Performed at the pipelined start of 093 implementation: this branch restacked
+onto `km/live-extraction` at its then-current head (`d1ea03c1`, the 092 plan
+commit) as merge `24d7af12`. At that moment the predecessor *implementations*
+had not yet cascaded into this branch's tree — 088 is landed on
+`km/modular-decisions`, 089 on `km/decision-apply`, 090 is mid-flight on
+`km/gallery-decision-modules`, and 091/092 have just started, so their Step-0
+restacks (which pull the whole stack up) have not yet reached
+`km/live-extraction`. The audit below is of **this branch's tree**, per
+plan.md's rule: a prerequisite missing here halts the work that consumes it —
+it is not reinvented inside 093.
+
+**Present in this tree (verified):**
+
+- `decisions/orderDecisions.ts` — `indexProviders`, `orderByDependencies`
+  (087): the only graph, per §2. ✔
+- `stores/reproposalNoticeStore.ts` + `decisions/reproposalNotice.ts` — the
+  re-proposal channel T006/T008 consume. ✔
+- `steps/repropagate.ts` + the `staleSteps` slice (12 references in
+  `stores/workingCopyStore.ts`) — the FR-005 deletion targets, present. ✔
+- `steps/mutateApply.ts` — `applyMutatePatch` containment (not the runner,
+  I-4). ✔
+- T002's harness (`decisions/rebuildPerf.measure.ts`, `744b6636`). ✔
+
+**Missing in this tree (verified) — dependent work HALTED:**
+
+| Prerequisite | Evidence here | Blocks |
+|---|---|---|
+| 088 `decisionStore` | `stores/decisionStore.ts` absent | T009 wiring, T018 resume |
+| 088 drafts at v2 | `lib/draftPersistence.ts` has `DRAFT_VERSION = 1`; no `decisions` envelope slice, no migrate-before-gate scan (§6/I-2 machinery) | T014–T016 (a v3 envelope built on a v1 base would reinvent 088) |
+| 088 record extension | `DecisionProvenance` is `asked \| extracted \| default` — no `derived` (088 FR-002); `Decision` has no `inputs?`/`offered?` snapshot | T006 (the provenance rule validates `asked` values against the `inputs` snapshot, §5) |
+| 089 pure `apply` + runner | `applyDecisionEffects` absent everywhere; `WorkingCopyPatch` absent; the module contract in `survey/types.ts` is still the spec-014 mutate seam (`mutate?` + `MutateContext`, no `apply`) | T004 (replay folds the runner's five channels — building it against the mutate seam would be a second, wrong engine) |
+| 090 per-item provenance | Registry modules are 087-shape; collection values carry no per-item `asked/derived/extracted` (090 FR-006) | T006 collections half, T008 scenario 5 |
+| 091 derived steps | `steps/` still pairs `manifest.ts` with `stepDependencies.ts` settles declarations; 091's membership derivation not present | T001's 091 line item; T010 consumer re-pointing surface differs |
+| 092 setup-as-a-decision | Not landed on any branch yet (092 branch is plan-only at audit time) | T017 (held by the lead in any case, with T021) |
+
+**Disposition.** T003 (downstream closure) proceeds now: it is pure reverse
+reachability over the §2 graph, and every input it needs is in this tree.
+Everything else in Phases 2–6 waits for the cascade restack — when
+`km/live-extraction` has absorbed the 088–092 implementations, this audit is
+re-run and the halted tasks unblock in order. The known depcruise cycle on
+the base (`survey/types` ↔ `workingCopyStore`) is likewise a predecessor
+fix arriving via restack; per the lead's instruction it is **not** fixed on
+this branch.
