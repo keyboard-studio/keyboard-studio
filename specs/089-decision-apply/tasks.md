@@ -7,7 +7,7 @@ Dependency-ordered, organized by user story. Each phase's work is grouped into w
 ## Phase 1: Setup
 
 **Wave 1 — independent (different files):**
-- [ ] T001 Verify the 088 dependency at restack: read the landed `decisionStore` API (action names, record shape against 088 FR-001) in packages/studio/src/decisions/decisionStore.ts and record any delta from [data-model.md](data-model.md)'s assumptions as an amendment note in specs/089-decision-apply/plan.md — stop and surface, do not adapt the design silently, if the landed shape differs
+- [ ] T001 Verify the 088 dependency at restack: read the landed `decisionStore` API (action names, record shape against 088 FR-001) in packages/studio/src/stores/decisionStore.ts and record any delta from [data-model.md](data-model.md)'s assumptions as an amendment note in specs/089-decision-apply/plan.md — stop and surface, do not adapt the design silently, if the landed shape differs
 - [ ] T002 [P] Golden-walk script (SC-001, reused by 090–093): scripted Playwright walk — copy track from `basic_kbdfr`, fixed answers, through identity, choose_base, track, project_name, characters (fixed `pb_standard_letters` answer), the default middle steps, and help, then source-zip download and byte comparison; `GOLDEN_WALK_CAPTURE=1` capture mode; capture environment pinned to `VITE_KM_MUTATE_SEAM=1` with the R9 rationale in the file header; any zip entry found to embed a timestamp/version stamp is listed in the header with its evidence · packages/studio/e2e/golden-walk.spec.ts (new), packages/studio/e2e/helpers/surveyFlow.ts (reuse, extend only if a step is not yet drivable)
 
 **⟶ Wait for Wave 1, then:**

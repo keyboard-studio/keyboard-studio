@@ -8,7 +8,7 @@ series rule in [088 spec.md](../088-modular-decisions/spec.md).
 ## Prerequisites
 
 - This branch restacked onto 088's landed `decisionStore`
-  (`packages/studio/src/decisions/decisionStore.ts` exists; DRAFT_VERSION is 2).
+  (`packages/studio/src/stores/decisionStore.ts` exists; DRAFT_VERSION is 2).
 - Sibling `../keyboards` checkout on the fork's `master` (the walk reads
   `basic_kbdfr` from it).
 - `pnpm install` done; studio dev server port 5273 free.
