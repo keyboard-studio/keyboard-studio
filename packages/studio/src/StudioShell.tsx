@@ -115,7 +115,10 @@ import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
 import { runLiveExtractionFromStores } from "./decisions/liveExtraction.ts";
-import { rebuildWorkingCopyFromStores } from "./decisions/rebuildWorkingCopy.ts";
+import {
+  rebuildWorkingCopyFromStores,
+  recalculateForStartingPointChangeFromStores,
+} from "./decisions/rebuildWorkingCopy.ts";
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
@@ -933,16 +936,27 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (instantiatedForBaseIdRef.current === base.id) return;
       instantiatedForBaseIdRef.current = base.id;
 
+      // Spec 093 T017 (owner ruling (b)): a genuine base switch is RETAIN
+      // + RECALCULATE — the decision set is carried over the new base,
+      // not discarded. Capture the outgoing base id BEFORE the commit
+      // below replaces it: after applyStepCompletion the store names
+      // only the new base, and the recalculation at the end of this
+      // callback keys on there having BEEN a different base.
+      const outgoingBaseId =
+        useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+      const isBaseSwitch = outgoingBaseId !== null && outgoingBaseId !== base.id;
+
       // REBASE draft migration (F1's last seam): a genuine base switch mid-
       // session leaves the working copy STILL INSTANTIATED under another
       // project key at the moment of this new commit (start-over resets the
       // stores before the next pick, a résumé pre-seeds
       // `instantiatedForBaseIdRef` so doCommit never fires, and a fresh boot
       // has nothing instantiated — so this really is rebase-specific). On
-      // that path the author has already accepted "Switching base keyboards
-      // will discard your current edits", so the record under the OLD key is
-      // precisely the discarded state — leaving it behind strands a phantom
-      // card in "My keyboards" for a base the author rejected.
+      // that path the record under the OLD key belongs to the project the
+      // author switched AWAY from (its decisions are retained in the set
+      // and recalculated below; the old KEY's record is not this project's
+      // draft anymore) — leaving it behind strands a phantom card in
+      // "My keyboards" for a base the author rejected.
       //
       // This USED TO be a bespoke inline capture-then-compare block here
       // (read the pre-commit key, commit, read the post-commit key, clear the
@@ -1000,6 +1014,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         reducerDepsRef.current,
       );
 
+      // Specs/055 FR-030..FR-035, ordering fixed in spec 093's final pass
+      // (090 US5 residue): record the base-contribution baseline NOW — the
+      // instantiation above has just produced the working copy it
+      // describes. The recorder's old completion-time fire (StepHost's
+      // handleComplete → recordStepCompletion) always ran BEFORE this
+      // callback existed, read a not-yet-instantiated store, and wrote
+      // nothing, so completing choose_base left no base-contribution
+      // entry in the log. doCommit fires once per base id, so each
+      // instantiation — first commit or genuine switch — records exactly
+      // one baseline, describing its own base.
+      recordDecision.recordBaseContributionNow();
+
       // T023: install the durable-draft autosave now that the working copy is
       // instantiated. `deriveProjectKeyFromWorkingCopy` reads the JUST-WRITTEN
       // store state via getState() (identity.keyboardId falls back to
@@ -1041,6 +1067,28 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           "[live-extraction] extraction pass aborted:",
           err instanceof Error ? err.message : String(err),
         );
+      }
+
+      // Spec 093 T017 wire-in (owner ruling (b)): on a genuine base
+      // switch, recalculate the RETAINED decision set against the new
+      // starting point and install the rebuilt working copy — extracted
+      // and default records re-derive from the new bundle, asked answers
+      // are kept whole, and any answer that no longer fits is re-proposed
+      // via `offered`, never silently dropped. This is what the rebase
+      // consent (REBASE_CONFIRM_MESSAGE) now promises; the extraction
+      // pass above runs first so newly-relevant decisions are seeded
+      // before the recalculation visits the full set. A first commit
+      // (no outgoing base) skips it — there is nothing retained to
+      // recalculate, and the incremental path carries the commit.
+      if (isBaseSwitch) {
+        try {
+          recalculateForStartingPointChangeFromStores();
+        } catch (err) {
+          devLog.error(
+            "[starting-point-change] recalculation aborted:",
+            err instanceof Error ? err.message : String(err),
+          );
+        }
       }
     },
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all

@@ -136,11 +136,24 @@ export type RecordQuestionAnswers = (
 
 /**
  * The recorder: callable as the reducer's `recordDecision` (step completion),
- * plus `recordQuestionAnswers` for every earlier Next inside a step.
+ * plus `recordQuestionAnswers` for every earlier Next inside a step, plus
+ * `recordBaseContributionNow` for the post-instantiation baseline (below).
  */
 export interface DecisionRecorder {
   (event: { stepId: string; result: unknown }): void;
   recordQuestionAnswers: RecordQuestionAnswers;
+  /**
+   * Record the base-contribution baseline (specs/055 FR-030..FR-035) from
+   * the CURRENT working copy. Called by StudioShell's doCommit immediately
+   * AFTER instantiation — the only moment the baseline can be read: at
+   * `choose_base` completion time (when the callable above fires) the
+   * working copy does not exist yet, because instantiation waits for both
+   * setup decisions and runs in doCommit (spec 093 final pass, closing
+   * the 090 US5 residue: completing choose_base left no base-contribution
+   * entry). Returns the entry id, or null when no working copy is
+   * instantiated (the record is not papered over).
+   */
+  recordBaseContributionNow: () => string | null;
 }
 
 /**
@@ -223,28 +236,18 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
     // recorded before it are untouched apart from the record-level id.
     log.setKeyboardId(deps.getKeyboardId());
 
-    // specs/055 FR-030..FR-035 (research D-11): the base baseline, recorded once
-    // at `choose_base` completion. This fires here — not from a new event — because
-    // `choose_base`'s instantiation runs inside `applyStepCompletion`, and StepHost
-    // calls `recordStepCompletion` (which reaches this callback) AFTER that, so the
-    // working copy already exists (Constitution Article IV: no new timer/event).
-    // `recordBaseContribution` itself writes no entry when the store shows no
-    // instantiated working copy yet — that null is not papered over here.
-    //
-    // This entry does not join `recordedIds` below: it is not a diff the
-    // snapshotter's boundary capture describes (there is no "before" to compare
-    // against — the working copy did not exist a moment ago), so it gets no
-    // `DecisionImpact` attached.
-    if (stepId === "choose_base") {
-      recordBaseContribution({
-        append: log.append,
-        getBaseKeyboard: deps.getBaseKeyboard,
-        getBaseIr: deps.getBaseIr,
-        getIrAxes: deps.getIrAxes,
-        getInstantiationMode: deps.getInstantiationMode,
-        getRemovalCapabilities: deps.getRemovalCapabilities,
-      });
-    }
+    // specs/055 FR-030..FR-035 (research D-11): the base baseline is NOT
+    // recorded here. It used to fire at `choose_base` completion on the
+    // assumption that instantiation ran inside applyStepCompletion before
+    // this callback — falsified on the live flow (090 US5): StepHost's
+    // handleComplete reaches this callback synchronously, while the actual
+    // instantiation runs later in StudioShell's doCommit (gated on BOTH
+    // setup decisions), so the fire read a not-yet-existent working copy
+    // and `recordBaseContribution` returned null — completing choose_base
+    // left no base-contribution entry. The baseline now records from
+    // doCommit via `recordBaseContributionNow` (attached below), the one
+    // moment the instantiated copy exists. (On a re-confirm the old fire
+    // was worse than null: it described the OUTGOING base.)
 
     // Answers already recorded at an earlier Next are identical revisits here
     // and append nothing, so completion is idempotent (spec 079 R-04).
@@ -309,6 +312,23 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
     const ids = appendAnswers(stepId, answers);
     deps.onScreenRecorded?.(stepId, screenId, ids, hash);
     captureAndAttach(ids);
+  };
+
+  recordDecision.recordBaseContributionNow = () => {
+    const log = useDecisionLogStore.getState();
+    // FR-004: carry the identity onto the record as soon as there is one.
+    log.setKeyboardId(deps.getKeyboardId());
+    // The baseline gets no `DecisionImpact` attached (no captureAndAttach):
+    // it is not a diff the snapshotter's boundary capture describes —
+    // there is no "before" to compare against.
+    return recordBaseContribution({
+      append: log.append,
+      getBaseKeyboard: deps.getBaseKeyboard,
+      getBaseIr: deps.getBaseIr,
+      getIrAxes: deps.getIrAxes,
+      getInstantiationMode: deps.getInstantiationMode,
+      getRemovalCapabilities: deps.getRemovalCapabilities,
+    });
   };
 
   return recordDecision;

@@ -71,6 +71,7 @@ import {
   useDecisionLogStore,
 } from "../decisions/decisionLogStore.ts";
 import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionRecorder.ts";
+import type { DecisionRecorder } from "../decisions/createDecisionRecorder.ts";
 import type { SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getDecisionSnapshot, selectTouchSeedSource } from "../stores/decisionStore.ts";
@@ -357,11 +358,29 @@ function inertSnapshotter(): SourceSnapshotter {
  */
 function realRecorder(
   overrides: { snapshotter?: SourceSnapshotter } = {},
-): ReducerDeps["recordDecision"] {
+): DecisionRecorder {
   return createStudioDecisionRecorder({
     getWorkingCopyState: () => useWorkingCopyStore.getState(),
     snapshotter: overrides.snapshotter ?? inertSnapshotter(),
   });
+}
+
+/**
+ * Complete choose_base the way production does since spec 093's final
+ * pass: the host records the completion (StepHost.handleComplete →
+ * recordStepCompletion), and the base-contribution baseline is fired
+ * LATER, by StudioShell's doCommit, once instantiation has produced the
+ * working copy (`recorder.recordBaseContributionNow()`). The completion
+ * alone no longer writes the baseline — before the fix it fired inside
+ * the completion, read a not-yet-instantiated store, and wrote nothing.
+ */
+function completeChooseBase(
+  recorder: DecisionRecorder,
+  base: BaseKeyboard,
+  ir: KeyboardIR | null,
+): void {
+  recordStepCompletion("choose_base", chooseBaseResult(base, ir), depsWith(recorder));
+  recorder.recordBaseContributionNow();
 }
 
 /**
@@ -1093,7 +1112,7 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     const ir = parseKmn(KMN, `${BASE_ID}.kmn`).ir;
     useWorkingCopyStore.getState().instantiateFromExisting(BASE, { vfs: makeBaseVfs(), ir });
 
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), depsWith(realRecorder()));
+    completeChooseBase(realRecorder(), BASE, ir);
 
     const entry = onlyBaseContribution();
     expect(entry.payload.baseId).toBe(BASE_ID);
@@ -1105,7 +1124,7 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
   it("records the base chosen and what it left in the working copy", () => {
     const ir = instantiate();
 
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), depsWith(realRecorder()));
+    completeChooseBase(realRecorder(), BASE, ir);
 
     const entry = onlyBaseContribution();
     expect(entry.stepId).toBe("choose_base");
@@ -1136,11 +1155,7 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     const ir = instantiateOther(POSTFIX_BASE, POSTFIX_KMN);
     expect(Object.keys(useWorkingCopyStore.getState().irAxes)).toEqual(["markInputOrder"]);
 
-    recordStepCompletion(
-      "choose_base",
-      chooseBaseResult(POSTFIX_BASE, ir),
-      depsWith(realRecorder()),
-    );
+    completeChooseBase(realRecorder(), POSTFIX_BASE, ir);
 
     expect(onlyBaseContribution().payload.derivedAxes).toEqual(["markInputOrder"]);
   });
@@ -1154,11 +1169,7 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     const otherIr = parseKmn(OTHER_KMN, `${OTHER_BASE.id}.kmn`).ir;
     expect(railGlyphGids(otherIr).length).not.toBe(railGlyphGids(ir).length);
 
-    recordStepCompletion(
-      "choose_base",
-      chooseBaseResult(OTHER_BASE, otherIr),
-      depsWith(realRecorder()),
-    );
+    completeChooseBase(realRecorder(), OTHER_BASE, otherIr);
 
     const entry = onlyBaseContribution();
     expect(entry.payload.baseId).toBe(BASE_ID);
@@ -1171,8 +1182,13 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     // The production shape of this: a Track-1 rebase whose confirm the author
     // cancelled, so `instantiateFromBaseIfConfirmed` no-ops and the step
     // completes with the store still empty. There is no working copy to measure.
-    const deps = depsWith(realRecorder());
+    const recorder = realRecorder();
+    const deps = depsWith(recorder);
     recordStepCompletion("choose_base", chooseBaseResult(BASE, null), deps);
+    // doCommit still fires the baseline after a cancelled instantiation —
+    // it reads an empty store and writes nothing (the null is not papered
+    // over at the new fire point either).
+    recorder.recordBaseContributionNow();
 
     // A later step DOES record, so this is an assertion about the absence of a
     // base-contribution entry — not about an inert recorder.
@@ -1190,13 +1206,16 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
   it("keeps the earlier base's contribution as history when the base is swapped", () => {
     // Spec edge case: "the earlier base's contribution remains on the record as
     // history and the new base's is recorded as a superseding baseline".
-    const deps = depsWith(realRecorder());
+    const recorder = realRecorder();
+    const deps = depsWith(recorder);
     const ir = instantiate();
     recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    recorder.recordBaseContributionNow();
     const first = onlyBaseContribution();
 
     const otherIr = instantiateOther(OTHER_BASE, OTHER_KMN);
     recordStepCompletion("choose_base", chooseBaseResult(OTHER_BASE, otherIr), deps);
+    recorder.recordBaseContributionNow();
 
     const entries = baseContributions();
     expect(entries).toHaveLength(2);
@@ -1214,12 +1233,15 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     // so the recorder reads the identical baseline a second time. That must not
     // read as a second decision (SC-002) — only a genuine base SWAP may
     // supersede (the sibling test above).
-    const deps = depsWith(realRecorder());
+    const recorder = realRecorder();
+    const deps = depsWith(recorder);
     const ir = instantiate();
     recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    recorder.recordBaseContributionNow();
     const first = onlyBaseContribution();
 
     recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    recorder.recordBaseContributionNow();
 
     const entries = baseContributions();
     expect(entries).toHaveLength(1);
@@ -1230,8 +1252,10 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
 describe("FR-034 — a stage's counts are interpretable against the baseline", () => {
   it("counts the starting inventory in the same nodes+items unit as keysRemoved", () => {
     const ir = instantiate();
-    const deps = depsWith(realRecorder());
+    const recorder = realRecorder();
+    const deps = depsWith(recorder);
     recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    recorder.recordBaseContributionNow();
     const starting = onlyBaseContribution().payload.startingKeyCount;
 
     // Carve away EVERY unit the rail offers, through the store's per-item
@@ -1251,8 +1275,10 @@ describe("FR-034 — a stage's counts are interpretable against the baseline", (
 
   it("leaves a partial carve readable as a fraction of the baseline", () => {
     const ir = instantiate();
-    const deps = depsWith(realRecorder());
+    const recorder = realRecorder();
+    const deps = depsWith(recorder);
     recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    recorder.recordBaseContributionNow();
     const starting = onlyBaseContribution().payload.startingKeyCount ?? 0;
 
     // One rule node removed out of the whole starting layout — the removal count
@@ -1348,9 +1374,11 @@ describe("SC-013 / FR-032 — a value carried from the base", () => {
 
 describe("FR-033 — the author's replacement supersedes the base's value", () => {
   it("keeps both the carried value and its replacement on the record", () => {
-    const deps = depsWith(realRecorder());
+    const recorder = realRecorder();
+    const deps = depsWith(recorder);
     const ir = instantiate();
     recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
+    recorder.recordBaseContributionNow();
     const baseEntry = onlyBaseContribution();
 
     // The base's script, accepted as offered.

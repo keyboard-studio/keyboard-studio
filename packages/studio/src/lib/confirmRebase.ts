@@ -9,10 +9,12 @@
 // hasUnsavedEdits:
 //   Pure predicate — true when the working copy is instantiated AND carries
 //   edits (carve deletions / recorded survey phases / flagged chars) that a
-//   re-instantiation would discard. Shared by confirmRebaseIfEdited (below)
-//   and needsRebaseConfirm (the SAME-base-aware variant used by SurveyView's
-//   synchronous confirm-click guard — see BaseResolutionAdapter.onConfirm in
-//   editors/adapters/panelAdapters.tsx).
+//   base switch would re-derive under the new base (spec 093 T017: retained
+//   and recalculated, not discarded — the predicate gates the CONSENT, whose
+//   wording is REBASE_CONFIRM_MESSAGE below). Shared by confirmRebaseIfEdited
+//   (below) and needsRebaseConfirm (the SAME-base-aware variant used by
+//   SurveyView's synchronous confirm-click guard — see
+//   BaseResolutionAdapter.onConfirm in editors/adapters/panelAdapters.tsx).
 //
 // confirmRebaseIfEdited:
 //   Returns true  — proceed with instantiation (no edits, or user confirmed).
@@ -51,9 +53,20 @@ import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
 import { identityLanguagePatch } from "./identityLanguagePatch.ts";
 
-/** User-facing wording for the rebase confirm dialog — the single source of truth for the string. */
+/**
+ * User-facing wording for the rebase confirm dialog — the single source of truth for the string.
+ *
+ * Spec 093 T017 (owner ruling (b), 2026-10-07): a base switch is RETAIN +
+ * RECALCULATE — the author's decisions are kept and re-derived against the
+ * new base, and answers that no longer fit are re-proposed, never silently
+ * dropped. The consent copy promises exactly that (it replaced the F1
+ * discard-by-consent wording in the same change that wired the
+ * recalculation into StudioShell's doCommit). The confirm still gates the
+ * switch because the working copy IS rebuilt: extracted values change to
+ * the new base's, and some answers will need a fresh decision.
+ */
 export const REBASE_CONFIRM_MESSAGE =
-  "Switching base keyboards will discard your current edits (carve deletions and survey answers). Continue?";
+  "Switching base keyboards keeps your answers and re-checks them against the new base. Answers that no longer fit will be offered again for your decision — nothing is discarded silently. Continue?";
 
 export function hasUnsavedEdits(): boolean {
   const s = useWorkingCopyStore.getState();
@@ -80,8 +93,9 @@ export function confirmRebaseIfEdited(): boolean {
 
 /**
  * Pure predicate (no window.confirm): would committing `newBaseId` right now
- * discard edits? Always false when `newBaseId` matches the currently
- * instantiated base — a same-base re-confirm is never a discard (see the
+ * switch the base under an edited working copy (and so need the rebase
+ * consent)? Always false when `newBaseId` matches the currently
+ * instantiated base — a same-base re-confirm is never a switch (see the
  * module doc above).
  *
  * Deliberately NOT `instantiationMode`-aware: `resolveInstantiationCase` in

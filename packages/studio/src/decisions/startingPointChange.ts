@@ -31,12 +31,14 @@
 // here. The returned outcome's `trail` is the new trail; a caller that
 // keeps session state adopts it.
 //
-// Deliberately NOT wired into StudioShell's `doCommit`: the live
-// switch-base path is a discard-by-consent flow (the rebase-confirm
-// gate's "Switching base keyboards will discard your current edits"),
-// and recalculating a retained decision set across that consent would
-// change what the author agreed to. The wiring decision is recorded in
-// specs/093-derived-keyboard/followups.md (T017) for the lead.
+// Wiring (owner ruling (b), Matthew 2026-10-07 — supersedes the T017
+// stop recorded in followups.md): a base switch is RETAIN + RECALCULATE.
+// StudioShell's `doCommit` runs the live entry
+// (`recalculateForStartingPointChangeFromStores` in
+// rebuildWorkingCopy.ts, which assembles this same request against the
+// live stores) on a genuine switch, after instantiation and the live
+// extraction pass; the rebase consent copy was reworded in the same
+// change to promise exactly this semantics.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";

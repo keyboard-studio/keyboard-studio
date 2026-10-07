@@ -163,7 +163,11 @@ test.describe("F1 — switch-base rebase confirm", () => {
     await page.waitForTimeout(1_500);
 
     expect(dialogs.dialogCount()).toBe(1);
-    expect(dialogs.lastMessage()).toMatch(/discard your current edits/i);
+    // Spec 093 T017 (owner ruling (b)): the consent promises RETAIN +
+    // RECALCULATE — answers kept and re-checked against the new base,
+    // non-fitting answers re-proposed, nothing silently discarded.
+    expect(dialogs.lastMessage()).toMatch(/keeps your answers/i);
+    expect(dialogs.lastMessage()).not.toMatch(/discard your current edits/i);
 
     // Nothing changed: still at the base picker (wizard did not advance),
     // working copy still on the OLD base, OLD draft key still present, no NEW

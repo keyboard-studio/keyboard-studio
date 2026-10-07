@@ -37,6 +37,7 @@ import {
 } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
+import { recalculateForStartingPointChangeFromStores } from "../decisions/rebuildWorkingCopy.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import {
   buildKmpForDownload,
@@ -241,19 +242,34 @@ export function usePreviewArtifact(): PreviewArtifact {
   // deletions and survey answers. This screen runs its OWN decoupled compile
   // pipeline (see the module comment), whose full run() fires onInstantiate on
   // mount. Re-instantiating from that mount would pop the rebase-confirm dialog
-  // ("Switching base keyboards will discard your current edits…") over work that
-  // is already in the store, and confirming it is destructive: this path only
-  // knows Track 1 instantiateFromBase, so against a Track 2 store it is a
-  // same-id/different-mode "genuine switch" that resets phaseResults + irAxes —
-  // discarding the survey answers and leaving nothing valid to submit. So skip
-  // entirely when the store already holds a working copy for this same base;
-  // only genuinely NEW bases picked via this screen's own picker fall through to
-  // instantiate. Mirrors StudioShell's instantiatedForBaseIdRef gate, keyed on the store
+  // (REBASE_CONFIRM_MESSAGE) over work that is already in the store: this path
+  // only knows Track 1 instantiateFromBase, so against a Track 2 store it is a
+  // same-id/different-mode "genuine switch" that resets phaseResults + irAxes,
+  // leaving nothing valid to submit. So skip entirely when the store already
+  // holds a working copy for this same base; only genuinely NEW bases picked
+  // via this screen's own picker fall through to instantiate. Mirrors
+  // StudioShell's instantiatedForBaseIdRef gate, keyed on the store
   // (survives this screen's own mount/unmount) rather than a per-mount ref.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
     const current = useWorkingCopyStore.getState().baseKeyboard;
     if (current !== null && current.id === base.id) return;
-    instantiateFromBaseIfConfirmed(base, { vfs, ir, removalCapabilities });
+    const isBaseSwitch = current !== null;
+    const proceeded = instantiateFromBaseIfConfirmed(base, { vfs, ir, removalCapabilities });
+    // Spec 093 T017 (owner ruling (b)): this picker is the second live
+    // base-switch path and shows the same rebase consent, so it carries
+    // the same RETAIN + RECALCULATE semantics as StudioShell's doCommit
+    // wire-in — after a genuine switch, recalculate the retained
+    // decision set against the new base and install the rebuilt copy.
+    if (proceeded && isBaseSwitch) {
+      try {
+        recalculateForStartingPointChangeFromStores();
+      } catch (err) {
+        devLog.error(
+          "[starting-point-change] recalculation aborted:",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
   }, []);
 
   // Working-copy transform — projects carve + identity layers into the pick-base

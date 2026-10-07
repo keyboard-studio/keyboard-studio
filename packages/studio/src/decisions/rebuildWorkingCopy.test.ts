@@ -14,6 +14,7 @@ import {
   decisionOrderFor,
   rebuildWorkingCopy,
   rebuildWorkingCopyFromStores,
+  recalculateForStartingPointChangeFromStores,
   resetRebuildTrail,
   type RebuildDeps,
 } from "./rebuildWorkingCopy.ts";
@@ -249,5 +250,59 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
       { comboId: "n1#0", disposition: "block", provenance: "author-override" },
     ]);
     expect(wc.closedKeyboardCard).toBe("accepted");
+  });
+
+  it("recalculateForStartingPointChangeFromStores: retained decisions re-derive against the new base (T017)", () => {
+    // The working copy has JUST been instantiated under the NEW base
+    // (doCommit's order: instantiate → extraction seeds → this entry);
+    // the decision store still carries the set recorded under the old
+    // base, including an extracted record naming the old source.
+    const newBase = makeTestIR({
+      header: {
+        name: "French Basic",
+        keyboardId: "basic_kbdfr",
+        version: "1.0",
+        copyright: "(c) NEW BASE",
+      },
+    });
+    useWorkingCopyStore.setState({
+      baseIr: newBase,
+      ir: newBase,
+      baseKeyboard: {
+        id: "basic_kbdfr",
+        path: "release/basic/basic_kbdfr",
+        script: "Latn",
+        targets: ["windows"],
+        displayName: "French Basic",
+        version: "1.0",
+        languages: ["fr"],
+      } as never,
+    });
+    useDecisionStore.getState().recordAll([
+      rec({ id: "authoring-track", value: "copy", provenance: "asked" }),
+      rec({ id: "author-name", value: "Test Author", provenance: "asked" }),
+      rec({
+        id: "copyright-holder",
+        value: "(c) OLD BASE",
+        provenance: "extracted",
+        source: "basic_kbdus",
+      }),
+    ]);
+
+    const out = recalculateForStartingPointChangeFromStores();
+    expect(out).not.toBeNull();
+
+    // The extracted record was superseded by a re-extraction against the
+    // new bundle, naming the NEW source; the asked record stands whole.
+    const decisions = useDecisionStore.getState().decisions;
+    expect(decisions["copyright-holder"]?.value).toBe("(c) NEW BASE");
+    expect(decisions["copyright-holder"]?.source).toBe("basic_kbdfr");
+    expect(decisions["author-name"]?.value).toBe("Test Author");
+    // The rebuilt working copy was installed from the recalculated set.
+    expect(useWorkingCopyStore.getState().attribution?.copyrightHolder).toBe("(c) NEW BASE");
+  });
+
+  it("recalculateForStartingPointChangeFromStores is a no-op before a starting point exists", () => {
+    expect(recalculateForStartingPointChangeFromStores()).toBeNull();
   });
 });

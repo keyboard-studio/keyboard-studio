@@ -271,3 +271,55 @@ export function rebuildWorkingCopyFromStores(
   installRebuiltState(outcome.state);
   return outcome;
 }
+
+/**
+ * The live entry for a starting-point change (spec 093 T017, owner
+ * ruling (b) — RETAIN + RECALCULATE): called by StudioShell's doCommit
+ * (and the OutputScreen picker's instantiate path) AFTER the new base
+ * has been instantiated and the live extraction pass has seeded the new
+ * bundle's records. The retained decision set is recalculated against
+ * the new starting point — extracted/default records re-derive from the
+ * new bundle, asked records are kept whole and any that no longer fit
+ * gain a re-proposal (`offered`), never a silent drop — and the working
+ * copy is rebuilt by full replay over the new base and installed.
+ *
+ * The request assembly mirrors `recalculateForStartingPointChange`
+ * (startingPointChange.ts — the pure, tested specification of this
+ * operation) inline: that module imports this file's core, so calling
+ * the wrapper from here would close a runtime import cycle. The two
+ * assemblies must stay in step: empty `changed` set, `visitAll`, a
+ * freshly seeded trail (the old trail folds over the OLD starting
+ * point). The fresh trail is adopted as the session trail.
+ *
+ * A no-op (null) before a starting point exists.
+ */
+export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | null {
+  const wc = useWorkingCopyStore.getState();
+  if (wc.baseIr === null) return null;
+  const startingPointIR = wc.baseIr;
+
+  const ctx = buildLiveExtractContext();
+  const source = ctx.catalog?.id ?? ctx.ir?.header.keyboardId ?? ctx.ir?.header.name;
+  const outcome = rebuildWorkingCopy(
+    {
+      modules: Object.values(questionRegistry),
+      extractContext: ctx,
+      ...(source !== undefined ? { source } : {}),
+    },
+    {
+      decisions: getDecisionSnapshot(),
+      changed: new Set<DecisionId>(),
+      startingPointIR,
+      trail: seedTrail(startingPointIR),
+      visitAll: true,
+    },
+  );
+  sessionTrail = outcome.trail;
+  sessionTrailBase = startingPointIR;
+
+  if (outcome.recordsToWrite.length > 0) {
+    useDecisionStore.getState().recordAll(outcome.recordsToWrite);
+  }
+  installRebuiltState(outcome.state);
+  return outcome;
+}
