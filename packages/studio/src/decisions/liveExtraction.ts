@@ -54,14 +54,28 @@ export interface LiveExtractionResult {
   offered: DecisionId[];
 }
 
-/** Snapshot a module's `requires` values from the set as it stands now. */
+/**
+ * Snapshot a module's declared input values from the set as it stands
+ * now: its `requires` (ordering dependencies) ∪ its `snapshotInputs`
+ * (spec 092 G-14 / ruling A2 — data dependencies that are not order
+ * facts, e.g. il_copyright_holder's authoring-track). `requires` first,
+ * so a record's snapshot key order matches the pre-A2 shape for modules
+ * whose dependencies all live in `requires`.
+ */
 function snapshotInputs(
   m: QuestionModule,
   decisions: DecisionSet,
 ): Partial<Record<DecisionId, unknown>> | undefined {
-  if (m.requires === undefined || m.requires.length === 0) return undefined;
+  const declared: DecisionId[] = [];
+  for (const id of m.requires ?? []) {
+    if (!declared.includes(id)) declared.push(id);
+  }
+  for (const id of m.snapshotInputs ?? []) {
+    if (!declared.includes(id)) declared.push(id);
+  }
+  if (declared.length === 0) return undefined;
   const snapshot: Partial<Record<DecisionId, unknown>> = {};
-  for (const required of m.requires) {
+  for (const required of declared) {
     const record = decisions[required];
     if (record !== undefined) snapshot[required] = record.value;
   }

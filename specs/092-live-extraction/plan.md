@@ -368,6 +368,36 @@ gallery).
   of the restack pass (T023, acceptance re-run, G-12 remainder, T037,
   gates, PR) is NOT executed on a tree whose manifest throws at load;
   it resumes on the ruling.
+- **G-14 RULING (lead, 2026-10-07): option (A2) — drop the ordering
+  edge, keep the dependency's information.** The authoring-track
+  dependency is a run-time DATA dependency — already consumed by
+  `seedWhen`, the T013 setup gate, and the inputs snapshot. It was
+  never a screen-order fact (091's frozen baseline sorts identity
+  first, contradicting the screen-order reading), and 091's landed
+  deriveScreens folds screenRequires into the module-level sort, so
+  the previously ruled conversion splits the identity screen and
+  leaves steps/manifest.ts unloadable. The original ruling's intent —
+  the dependency must not be silently lost — is satisfied by A2: the
+  information lives in the three channels that mean what it means;
+  only the ordering channel, where it is false, loses it.
+  **Landed:** `il_copyright_holder.requires` is back to
+  `["author-name"]`; the track dependency is declared on the new
+  `QuestionModule.snapshotInputs` channel (`["authoring-track"]`) —
+  a dedicated DecisionId-space field, because the module's existing
+  `inputs` field is `IRPath[]` over the KeyboardIR address space and
+  cannot carry a DecisionId (the ruling's "inputs declaration" is
+  this channel; the name records what it feeds). The pass's
+  `snapshotInputs` now reads `requires` ∪ `snapshotInputs`
+  (requires first), so the seeded copyright record's `inputs`
+  snapshot is byte-identical to T012's recorded behaviour
+  (`{author-name, authoring-track}`), re-pinned in
+  liveExtraction.test.ts. Verified on the restacked tree:
+  orderParity + sc002 + deriveScreens + manifest + stepOrder.parity
+  + StepHost.derivedScreens + gateWalkParity all green (full-list
+  deriveScreens yields the frozen 17 screens, identity whole,
+  manifest loads). **Precedent flagged for 093:** decision records'
+  `inputs` snapshots may name decisions sourced from a module's
+  `snapshotInputs` declaration, not only `requires`.
 
 ## Implementation outcome (Phase 7, T060–T063)
 

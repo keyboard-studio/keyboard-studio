@@ -374,6 +374,20 @@ export interface QuestionModule {
   screenRequires?: readonly DecisionId[];
 
   /**
+   * Snapshot-only decision dependencies (spec 092 G-14, lead ruling A2):
+   * decisions whose values join the `inputs` snapshot of records this
+   * module seeds — alongside `requires` — WITHOUT becoming ordering
+   * requirements. For a run-time DATA dependency that is not an order
+   * fact: the dependency's information stays auditable on the record
+   * (088 FR-001) while `orderDecisions` / `deriveScreens` never see the
+   * edge. Read by the live extraction pass's snapshot; invisible to
+   * ordering, gating, and the runner. NOT the `inputs` field above —
+   * that is `IRPath[]` over the KeyboardIR address space; this channel
+   * names DecisionIds.
+   */
+  snapshotInputs?: readonly DecisionId[];
+
+  /**
    * Base-keyboard probe: read this module's decisions from the import bundle
    * (spec 087 Q1) instead of asking the author. Return `undefined` when the
    * bundle carries no evidence for the decision. The result runs through
