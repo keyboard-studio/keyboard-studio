@@ -31,7 +31,6 @@ import type { ApplyContext, WorkingCopyPatch } from "../survey/types.ts";
 import type { DesktopModifications, OutputForm } from "@keyboard-studio/engine";
 import { applyMarkGuards, detectBaseMarkMechanism } from "@keyboard-studio/engine";
 import { repropagate } from "./repropagate.ts";
-import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionSet } from "../decisions/decisionTypes.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
@@ -372,12 +371,12 @@ export function applyStepCompletion(
     case MECHANISMS_STEP_ID: {
       deps.lockDesktop();
       // spec-014 US2 (T024): a physical step/lock completion triggers automatic
-      // touch re-propagation, GATED on the mutate flag (flag-off ⇒ byte-identical
-      // to P4b — no re-propagation runs). repropagate() itself short-circuits to
-      // a no-op when the staleness closure is empty (R5). Deps are injected to
-      // respect the steps-layer boundary (no stores/ import here).
+      // touch re-propagation. Spec 089 T021 (OI-1 ruled global): the mutate
+      // flag that used to gate this is deleted — re-propagation runs
+      // unconditionally. repropagate() itself short-circuits to a no-op when
+      // the staleness closure is empty (R5). Deps are injected to respect the
+      // steps-layer boundary (no stores/ import here).
       if (
-        isMutateSeamEnabled() &&
         deps.getStaleSteps !== undefined &&
         deps.getWorkingIR !== undefined &&
         deps.setWorkingIR !== undefined

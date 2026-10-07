@@ -239,7 +239,6 @@ import {
   composeContributorLabel,
   compositionTooltip,
 } from "./existingMethodLabels.ts";
-import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
@@ -5369,9 +5368,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     }
     // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
     // `hand-set` in the working IR so subsequent re-propagation never clobbers
-    // the author's edit. Flag-gated — off ⇒ byte-identical to P4b (no IR write).
+    // the author's edit. Spec 089 T021 (OI-1 ruled global): the mutate flag
+    // that used to gate this is deleted — promotion is unconditional.
     // Logic lives in touchBehavior.ts; this call site stays thin.
-    if (isMutateSeamEnabled() && resolvedHostKey !== null) {
+    if (resolvedHostKey !== null) {
       const store = useWorkingCopyStore.getState();
       const ir = store.ir;
       // INCREMENTAL patch (promote host key to hand-set) — use the

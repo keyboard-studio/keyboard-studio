@@ -60,25 +60,40 @@ recordPhase → recordAnswersAsDecisions → applyDecisionEffects → applyStepC
   exists; do not treat the store-level oracle as a substitute without that
   ruling's cover — it is the ruling that makes it sufficient.
 
-## 3. US2 — the flag deletion (PENDING — held for 088's landing)
+## 3. US2 — the flag deletion (LANDED, after the final restack)
 
-T020–T023 have NOT run yet. They are held until the lead confirms spec 088
-has landed, because T021 touches `steps/reducer.ts`'s mechanisms
-`repropagate` gate and `editors/assignLoop/TouchGallery.tsx`, which 088's
-US2 was editing concurrently. Current state 090 inherits in the meantime:
+T020–T023 landed on the final restacked tree (merge `22288cc5` onto
+`km/modular-decisions` @ `f57d2b88`, containing 088's close at
+`ab034928`):
 
-- `VITE_KM_MUTATE_SEAM` / `flags/mutateFlag.ts` still exist. The runner
-  path is already unconditional (Phase 2 deleted the flag-gated
-  `MutateRequest` branch); the four remaining flag readers are the ones
-  T021 un-gates globally per ruling OI-1 (owner ruling 2026-10-06, Q2 —
-  global, no remainder): mechanisms `repropagate` (reducer), hand-set
-  promotion (TouchGallery), carve seam path + add-gallery derivation
-  (VFS projection).
-- `tests/survey/flagOff.test.ts` was already reduced in Phase 2 to the
-  single mechanisms-repropagate flag-off test (it could not sit
-  non-compiling until US2); T023 owns the final sweep.
-- The three dark behaviours the ruling accepted activating early:
-  repropagate-after-mechanisms, hand-set promotion, seam carve path.
+- `flags/mutateFlag.ts` is deleted; zero references to
+  `VITE_KM_MUTATE_SEAM` remain in source, tests, or e2e (T023 grep gate).
+  The four non-question readers run unconditionally: mechanisms
+  `repropagate` (reducer), hand-set promotion (TouchGallery), the carve
+  seam path and the add-gallery derivation (VFS projection). In the VFS
+  the un-gated seam condition made the legacy flag-off suppression branch
+  provably unreachable (`hasCarveEdit ⇒ hasProjectionEdit`); it was
+  deleted with the gate, and the single-path parity suite pins the seam
+  path's bytes against the committed goldens.
+- `mutate` is retired from the module contract (T020): `MutateContext`
+  and `QuestionModule.mutate` are deleted from `survey/types.ts`;
+  `decisions/impact.ts`'s counterfactual re-derivation re-runs the
+  module's `apply` and takes its `ir` channel; the four reserve modules
+  (iso_code, language_name_english, pa_copyright_holder, primary_script)
+  declare `apply` with their previous mutate bodies verbatim; the
+  spec-087 `mutateDeps` seam in `FlowStepHost` is deleted (it never had
+  a production injector).
+- The flag-shaped suites are single-path (T022): both flagParity files,
+  `reducer.test.ts`, the SC-004 pair (stubEnv only), `impact.test.ts`
+  (plus a positive counterfactual case through pb_standard_letters'
+  apply), `walkEmit.compile.test.ts`; `tests/survey/flagOff.test.ts`
+  was deleted per its own header's instruction.
+- The three dark behaviours the Q2 ruling accepted are now simply the
+  behaviour: repropagate-after-mechanisms, hand-set promotion, seam
+  carve path.
+- One stale pin for the lead's next workflow patch: the CI capture step
+  in `.github/workflows/ci.yml` still passes `VITE_KM_MUTATE_SEAM=1`.
+  Inert since T021 (nothing reads it); captures taken with it are valid.
 
 ## 4. Known remainder: the Phase F `onMount` history derivation
 
@@ -98,15 +113,11 @@ is fully on the runner.
 Verified by A/B against the phase-2 tree / pristine merged base
 (`cab37e02` + 089 phases 1–2), identical before and after US1:
 
-- `src/survey/journey-runner.test.ts` — 3 failures, one root: the runner's
-  `advance()` call sites predate 088's `AdvanceContext.decisions` field
-  (the same root as the one pre-existing tsc error at
-  `journey-runner.ts(820,87)`), so its gate evaluation routes into
-  `pb_discovery_intro` unanswered. 088 US2 call-site territory.
-- `src/steps/decisionsFromTraversal.test.ts` — 2 failures (gate agreement
-  over decision sets). 088 mid-US2 state.
-- `src/lib/draftPersistence.prePrDraft.test.ts` — 1 failure (v1-draft
-  answer restore). 088 US3 migration territory.
+- FIXED BY THE FINAL RESTACK (were failing pre-restack, all 088's):
+  `journey-runner.test.ts` (3 — 088's US2 call-site updates; the matching
+  tsc error is gone too, the tree typechecks clean),
+  `decisionsFromTraversal.test.ts` (2 — the module was deleted by 088),
+  `draftPersistence.prePrDraft.test.ts` (1 — 088's US3 migration).
 - `src/components/MyKeyboardsList.test.tsx` — 1 failure (cloud-list delete
   race), present at the phase-2 head.
 - `src/decisions/successCriteria.sc004*.test.ts` — 4 failures, `ENOENT`

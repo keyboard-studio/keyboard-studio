@@ -8,15 +8,16 @@
 //         test that the reducer is standalone and not called from the adapter files).
 //   R5 — unknown step id is a no-op.
 //
-// R1 and R2 run once with the mutate seam flag (VITE_KM_MUTATE_SEAM) off and once
-// with it on: both write paths sit outside the flag gate (spec 021 T007/T008).
-// The question-answer write path is the decision-apply runner now (spec 089:
-// steps/applyDecisionEffects.test.ts); the one flag-gated part left in this
-// file is touch re-propagation at mechanisms (deleted with the flag in T021).
+// R1 and R2 each run once: both write paths were always outside the flag
+// gate (spec 021 T007/T008), and since spec 089 T021 deleted the flag
+// (OI-1 ruled global) there is no second state to run. The
+// question-answer write path is the decision-apply runner now (spec 089:
+// steps/applyDecisionEffects.test.ts); touch re-propagation at mechanisms
+// is likewise unconditional (T024 block below).
 //
 // Source of truth: specs/012-step-model-manifest/contracts/manifest-reducer.contract.md
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   applyStepCompletion,
   MECHANISMS_STEP_ID,
@@ -80,23 +81,15 @@ function makeDepsMock(): ReducerDeps {
   };
 }
 
-// R1 and R2 are unconditional: they behave the same with the seam flag off and on.
-const SEAM_FLAG_STATES = [
-  ["off", ""],
-  ["on", "1"],
-] as const;
-
 // ---------------------------------------------------------------------------
 // R1 — lock fires at mechanisms step
 // ---------------------------------------------------------------------------
 
-describe.each(SEAM_FLAG_STATES)("R1 — lockDesktop fires at the mechanisms step (seam flag %s)", (_label, flag) => {
+describe("R1 — lockDesktop fires at the mechanisms step", () => {
   let deps: ReducerDeps;
   beforeEach(() => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", flag);
     deps = makeDepsMock();
   });
-  afterEach(() => { vi.unstubAllEnvs(); });
 
   it("calls lockDesktop exactly once, with no arguments, when stepId is 'mechanisms'", () => {
     applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
@@ -128,7 +121,7 @@ describe.each(SEAM_FLAG_STATES)("R1 — lockDesktop fires at the mechanisms step
 // through unchanged; the dep decides null vs a built json string.
 // ---------------------------------------------------------------------------
 
-describe.each(SEAM_FLAG_STATES)("R2 — touch-layout build at the touch step (seam flag %s)", (_label, flag) => {
+describe("R2 — touch-layout build at the touch step", () => {
   let deps: ReducerDeps;
   const baseIr = makeKeyboardIR();
   const baseVfs = makeVirtualFS();
@@ -136,10 +129,8 @@ describe.each(SEAM_FLAG_STATES)("R2 — touch-layout build at the touch step (se
   const EMPTY_MODS = { removals: [], placements: [] };
 
   beforeEach(() => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", flag);
     deps = makeDepsMock();
   });
-  afterEach(() => { vi.unstubAllEnvs(); });
 
   // --- Case A: base ships no touch layout (resolveBaseTouchJson returns undefined) ---
 
@@ -469,12 +460,7 @@ describe("T024 — repropagate() call site no longer injects setTouchLayoutJson"
     deps.getStaleSteps = vi.fn().mockReturnValue(new Set(["touch"]));
     deps.getWorkingIR = vi.fn().mockReturnValue(makeKeyboardIR());
     deps.setWorkingIR = vi.fn();
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
     (mockRepropagate as ReturnType<typeof vi.fn>).mockClear();
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it("calls repropagate() with a deps object that has no setTouchLayoutJson member", () => {
@@ -484,18 +470,19 @@ describe("T024 — repropagate() call site no longer injects setTouchLayoutJson"
     expect("setTouchLayoutJson" in passedDeps).toBe(false);
   });
 
-  // Spec 021 T009: with the flag off, the re-propagation add-on does not run even
-  // though every dep it needs is injected, so only lockDesktop() fires.
-  it("flag off: does not re-propagate; lockDesktop() is the only effect at mechanisms", () => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
+  // Spec 089 T021/T022: re-propagation is unconditional now — the only
+  // remaining condition is that its deps are injected. With the default
+  // deps (no getStaleSteps/getWorkingIR/setWorkingIR), it does not run
+  // and lockDesktop() is the only effect at mechanisms.
+  it("deps absent: does not re-propagate; lockDesktop() is the only effect at mechanisms", () => {
+    const bare = makeDepsMock();
+    applyStepCompletion(MECHANISMS_STEP_ID, undefined, bare);
     expect(mockRepropagate).not.toHaveBeenCalled();
-    expect(deps.lockDesktop).toHaveBeenCalledTimes(1);
-    expect(deps.setWorkingIR).not.toHaveBeenCalled();
-    expect(deps.setTouchLayoutJson).not.toHaveBeenCalled();
-    expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
-    expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+    expect(bare.lockDesktop).toHaveBeenCalledTimes(1);
+    expect(bare.setTouchLayoutJson).not.toHaveBeenCalled();
+    expect(bare.buildTouchLayoutJson).not.toHaveBeenCalled();
+    expect(bare.instantiateFromExisting).not.toHaveBeenCalled();
+    expect(bare.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
   });
 });
 
