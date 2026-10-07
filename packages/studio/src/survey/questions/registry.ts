@@ -344,6 +344,20 @@ export const reserveOnlyModules: readonly QuestionModule[] = [
 ];
 
 /**
+ * The gallery decision modules (spec 090): one module per decision a gallery
+ * or editor step settles (the fourteen `settles` ids in
+ * steps/stepDependencies.ts). Registered here — so `decisionIndex` resolves
+ * exactly one provider per gallery decision — but members of NO flow: the
+ * gallery host (steps/galleryHost.tsx) renders them, never the SurveyRunner.
+ * Module files live under questions/gallery/; the list is composed here, in
+ * registry.ts, because a group file inside gallery/ would itself be globbed
+ * as a module by the shared contract suite (research addendum D-090-4).
+ * Populated by spec 090 T008; the stories (US1–US5) fill in each module's
+ * renderer/apply in place.
+ */
+export const galleryModules: readonly QuestionModule[] = [];
+
+/**
  * The reserve / Leftover set (no-delete guardrail): every module physically
  * under questions/reserve/ — the demoted Phase A battery plus the flow-less
  * pb_mark_input_order.
@@ -367,6 +381,7 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = module
   ...flowModules.track,
   ...flowModules.project_name,
   ...reserveModules,
+  ...galleryModules,
 ]);
 
 /**

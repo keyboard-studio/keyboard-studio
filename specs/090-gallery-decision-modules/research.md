@@ -302,3 +302,79 @@ complete once the ruling is recorded here and in data-model.md.
   churns every import in the studio for no behavioural gain); the narrowing
   is verified by SC-004-style greps for gallery answer ids. Revisit only if
   a reviewer finds the name actively misleading after narrowing.
+
+---
+
+## Addendum — T001 predecessor audit (2026-10-06, implementation start)
+
+State verified on `km/gallery-decision-modules` after the Step-0 restack
+(merge `b71d7c9e` of `km/decision-apply` at its head `ad8e8231`, plus merge
+`0d4c6dd7` of `km/modular-decisions` — the second merge was necessary because
+089 had merged 088 only through phase 3, while 090's tasks presuppose 088
+phases 4–6; both merges are pushed).
+
+**Present and as planned:** 088's `decisionStore` at
+`packages/studio/src/stores/decisionStore.ts` (`record` / `recordAll` /
+`forget` / `reset`, snapshot helpers, contract C-1 import boundary intact);
+the decision-keyed draft slice (draft v2 `decisions`); all fourteen gallery
+`DecisionId`s and the exhaustive `decisionIRPaths` in
+`decisions/decisionTypes.ts`; 089's apply contract types (`ApplyContext`,
+`WorkingCopyPatch`) in `survey/types.ts`; 089's runner `applyDecisionEffects`
+and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
+(`packages/studio/e2e/golden-walk.spec.ts`) and the StepHost parity harness
+(`packages/studio/tests/steps/stepHost.goldenWalk.test.tsx`).
+
+**Deltas recorded (reported to the lead; not silently adapted):**
+
+- **D-090-1 — 089's `apply` is answer-typed.** `QuestionModule.apply` takes
+  `string | string[] | undefined`, and `applyDecisionEffects` iterates
+  step-completion *answers*. Gallery decision values are rich objects
+  (data-model.md), so the T005 gallery host cannot feed them through
+  `applyDecisionEffects` as-is. Resolution inside 090's own surface: gallery
+  modules are typed `GalleryModule<V>` (090, foundational) whose `apply`
+  takes `V | undefined`; the gallery host records the decision, builds the
+  `ApplyContext`, and invokes the module's `apply` directly, reusing the
+  runner's channel authorization (`ApplyChannelError`, contract A3) and the
+  same injected patch sink StudioShell composes for the runner. The single
+  cast to the answer-shaped `QuestionModule` lives at registry composition.
+  If 089's in-flight US1 changes `ApplyContext`, the patch channels, or the
+  module shape, this delta re-opens.
+- **D-090-2 — overlay "applied view" writes are not expressible in
+  `WorkingCopyPatch` (yet).** The A3 authorization table authorizes the
+  overlay channels (`identity`, `attribution`, `helpDocs`,
+  `historyEntryState`) only for their question decisions, and the patch type
+  has no channel for working-copy overlay fields (carve deletions, touch
+  draft). US1 is unaffected (its three applies are IR no-ops — the decisions
+  themselves are the effect). US3/US4 applies that must write overlay fields
+  resolve this at their story boundary: the gallery executor's sink is
+  composed by the step wrapper from the working-copy store's setters,
+  mirroring how StudioShell composes `applyWorkingCopyPatch`. Flagged for
+  the lead; if 089 or 093 (overlay accumulator, cross-spec finding I-1)
+  settles a channel first, 090 adopts it.
+- **D-090-3 — golden-walk baseline capture is PENDING-BASELINE.** The script
+  exists (089 T002), so T001's stop condition is not met; but 089's T003
+  baseline capture is blocked in this environment (sandbox Chromium cannot
+  reach localhost). Per the lead's coordination ruling, per-slice golden-walk
+  gates in 090 run as StepHost parity + focused suites + tsc/lint, with the
+  byte-identical golden-walk check reported PENDING-BASELINE — not passed,
+  not fabricated.
+- **D-090-4 — the contract suite treats `gallery/` as LIVE modules.** The
+  shared suite (`test/questionModuleContract.ts`) globs
+  `survey/questions/*/*.ts` eagerly; only the `reserve/` folder is demoted.
+  Every gallery module file must therefore satisfy the full module contract:
+  filename === `definition.id`, `inputs`/`writes` arrays present, at least
+  one field-shaped fixture (stubs declare a single `undefined` valid fixture
+  — no question-shaped answer exists), and a `definitionContract` snapshot
+  line. No `index.ts` may live inside `gallery/` (it would be globbed as a
+  module named `index`); the group list lives in `registry.ts`, mirroring
+  `reserveOnlyModules`.
+- **D-090-5 — 088 phase 4 already landed part of R1's touch-seed-source
+  row.** The session `touchSeedSource` field and the panel's session write
+  are already gone; `selectTouchSeedSource` reads the `touch-seed-source`
+  decision. T012's remaining work is the host/onChange wiring, verified
+  against the landed code at T010.
+- **D-090-6 — spike `pb_character_inventory` is in no registry list.** It
+  provides `character-inventory` but `decisionIndex` derives only from
+  `questionRegistry`, so registering the gallery module in T008 does not
+  trip the duplicate-provider guard. T021 (US2) still retires/folds the
+  spike as planned.

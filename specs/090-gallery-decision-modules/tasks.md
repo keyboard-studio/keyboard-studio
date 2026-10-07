@@ -28,12 +28,12 @@ story label; story-phase tasks carry theirs; Polish carries none.
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Verify the predecessor state on `km/gallery-decision-modules`: 088's
+- [x] T001 Verify the predecessor state on `km/gallery-decision-modules`: 088's
   `decisionStore` and decision-keyed draft slice, 089's `apply`/runner and the golden-walk
   script + `main` baseline all exist at the locations plan.md names; record any drift in a
   short addendum to specs/090-gallery-decision-modules/research.md. **Stop if the golden
   walk does not exist** — it is not re-invented inside 090 (research R7)
-- [ ] T002 Create the gallery module group skeleton (empty group, registered, no providers
+- [x] T002 Create the gallery module group skeleton (empty group, registered, no providers
   yet) in packages/studio/src/survey/questions/gallery/ and
   packages/studio/src/survey/questions/registry.ts
 
