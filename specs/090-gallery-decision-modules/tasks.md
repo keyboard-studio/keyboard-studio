@@ -449,16 +449,26 @@ log exactly once.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T060 [P] SC-002 final audit: both FR-003 lint layers pass with **zero exceptions**
+- [x] T060 [P] SC-002 final audit: both FR-003 lint layers pass with **zero exceptions**
   across all renderer trees; the closing grep pack — zero `phaseBDraftStore` references
   (SC-004), zero gallery answer ids in `surveyAnswerStore`, zero in-place IR rewrites outside
   an `apply` — run and recorded in specs/090-gallery-decision-modules/plan.md's PR summary
   (and the final PR body)
-- [ ] T061 [P] Duplication-ledger close-out: verify every row of the spec's ledger (gallery
+  — Landed: audit record in plan.md's PR summary. Depcruise zero violations
+  (D-090-45 closed the D-090-7 cycle), audit 4/4, eslint 0 errors; grep pack
+  recorded; the two ruled determinations (D-090-29, D-090-31→D-090-34) cited;
+  T043's identifiers await the same species of ruling from the lead.
+- [x] T061 [P] Duplication-ledger close-out: verify every row of the spec's ledger (gallery
   answers + `phaseBDraftStore` deleted; overlays are decision values with the working copy
   holding only an applied view; in-place rewrites deleted outside modules; `settles` strings
   redundant and parity-pinned for 091) and write any slip into
   specs/090-gallery-decision-modules/followups.md naming the later spec that retires it
+  — Landed: rows verified in followups.md. Row 1's surveyAnswerStore half
+  closed by ruling, not deletion — residue owned by 093; row 2's carve
+  handoff already named in the ledger (093 fold); row 3 verified for
+  completion-time rewrites with the edit-time scope note; row 4 (settles)
+  is 091's deletion, with the modules' declarations parity-pinned by the
+  registry coverage suites.
 - [ ] T062 Full gates and consistency: all package suites, `tsc`, the full `pnpm lint` chain,
   the golden walk, and the StepHost parity test green on the branch head; `/speckit-analyze`
   run over spec ↔ plan ↔ tasks with findings resolved or recorded; companion step marked
