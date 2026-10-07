@@ -22,8 +22,19 @@ import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { WindowsLayoutPicker } from "../../components/WindowsLayoutPicker.tsx";
 import { proposeWindowsLayout, windowsLayoutById } from "../../lib/windowsLayouts.ts";
 import type { LayoutProposalBasis } from "../../lib/windowsLayouts.ts";
-import type { WindowsLayoutValue } from "../questions/gallery/windowsLayout.ts";
 import { phaseHeadingFlush, mutedParaFlush } from "../surveyStyles.ts";
+
+/**
+ * The windows-layout decision value (spec 090 data-model.md). Declared
+ * here, with the renderer, and re-exported by the gallery module
+ * (survey/questions/gallery/windowsLayout.ts): the module imports this
+ * file for the component, so the type must not also flow module → here
+ * (a depcruise no-circular cycle; research addendum D-090-8).
+ */
+export interface WindowsLayoutValue {
+  layoutId: string;
+  origin: "proposed" | "confirmed" | "overturned";
+}
 
 const HEADING_ID = "layout-step-heading";
 const WHY_ID = "layout-step-why";

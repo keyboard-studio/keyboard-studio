@@ -56,7 +56,10 @@ import { emitTouchLayout } from "@keyboard-studio/engine";
 import type { DesktopModifications } from "@keyboard-studio/engine";
 import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
-import type { TouchSeedSourceValue } from "../questions/gallery/touchSeedSource.ts";
+// The value type is 088's canonical declaration in the decision store;
+// importing it from the gallery module instead would close a
+// module↔renderer import cycle (D-090-8).
+import type { TouchSeedSourceValue } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { type TouchSeedSource } from "../../stores/surveySessionStore.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";

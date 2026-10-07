@@ -11,7 +11,10 @@
 // via onChange, recorded and applied by the gallery host.
 
 import type { GalleryModule } from "../../types.ts";
-import { WindowsLayoutRenderer } from "../../layout/LayoutStep.tsx";
+import {
+  WindowsLayoutRenderer,
+  type WindowsLayoutValue,
+} from "../../layout/LayoutStep.tsx";
 
 export const definition = {
   id: "windowsLayout",
@@ -20,11 +23,11 @@ export const definition = {
   audit_label: "Windows layout",
 };
 
-/** The windows-layout decision value (data-model.md). */
-export interface WindowsLayoutValue {
-  layoutId: string;
-  origin: "proposed" | "confirmed" | "overturned";
-}
+// The windows-layout decision value type (data-model.md) is declared with
+// the renderer in survey/layout/LayoutStep.tsx and re-exported for module
+// consumers (D-090-8: declaring it here would close a module↔renderer
+// import cycle — the module already imports the renderer from there).
+export type { WindowsLayoutValue };
 
 const windowsLayout: GalleryModule<WindowsLayoutValue> = {
   definition,

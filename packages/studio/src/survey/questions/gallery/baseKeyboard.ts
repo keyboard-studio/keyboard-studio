@@ -12,7 +12,10 @@
 // via onChange, recorded and applied by the gallery host.
 
 import type { GalleryModule } from "../../types.ts";
-import { BaseKeyboardRenderer } from "../../chooseBase/BaseKeyboardRenderer.tsx";
+import {
+  BaseKeyboardRenderer,
+  type BaseKeyboardValue,
+} from "../../chooseBase/BaseKeyboardRenderer.tsx";
 
 export const definition = {
   id: "baseKeyboard",
@@ -21,11 +24,10 @@ export const definition = {
   audit_label: "Base keyboard",
 };
 
-/** The base-keyboard decision value: the catalog record's identity. */
-export interface BaseKeyboardValue {
-  id: string;
-  name: string;
-}
+// The base-keyboard decision value type is declared with the renderer in
+// survey/chooseBase/BaseKeyboardRenderer.tsx and re-exported for module
+// consumers (D-090-8).
+export type { BaseKeyboardValue };
 
 const baseKeyboard: GalleryModule<BaseKeyboardValue> = {
   definition,

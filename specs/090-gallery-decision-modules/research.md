@@ -405,3 +405,18 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   baseline: slice reports record it as **CI-gated (golden-walk verify in
   the e2e lane)**, with the in-sandbox gate being StepHost parity +
   focused suites + tsc/lint as store-level evidence.
+- **D-090-8 — decision value types live with their renderers (T016 gate
+  fix).** The first three migrated modules each closed a type-only
+  2-cycle (module imports renderer component; renderer imports the value
+  type from the module), which depcruise's `no-circular` counts — the
+  repo total rose 122 → 124 at the US1 gate. Fix: each value type is
+  declared in its renderer file and re-exported by the module
+  (`WindowsLayoutValue` in survey/layout/LayoutStep.tsx,
+  `BaseKeyboardValue` in survey/chooseBase/BaseKeyboardRenderer.tsx);
+  for touch-seed-source the panel now imports 088's canonical
+  `TouchSeedSourceValue` from stores/decisionStore.ts (the module keeps
+  its own identical union — gallery modules may not import stores).
+  Later stories follow the same pattern: value types live with the
+  renderer, modules re-export. Repo total after the fix: 121 (one below
+  the pre-090 base — the touch panel's move also dissolved a
+  pre-existing cycle).

@@ -130,7 +130,7 @@ on reload, and routing that reads it (touch seed asked once, per 088) behaves as
   `apply`s in packages/studio/src/survey/questions/gallery/windowsLayout.test.ts,
   packages/studio/src/survey/questions/gallery/touchSeedSource.test.ts, and
   packages/studio/src/survey/questions/gallery/baseKeyboard.test.ts
-- [ ] T016 [US1] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+- [x] T016 [US1] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US1 PR with the gate results in its body
 
 **Checkpoint**: the host, registry group, and both enforcement layers are proven end-to-end on

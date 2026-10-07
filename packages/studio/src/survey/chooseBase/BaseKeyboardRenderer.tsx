@@ -21,7 +21,18 @@ import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { confirmRebaseTo } from "../../lib/confirmRebase.ts";
 import type { SuggestTarget } from "../../lib/suggestBase.ts";
 import { BaseResolution } from "../../editors/panels/BaseResolution.tsx";
-import type { BaseKeyboardValue } from "../questions/gallery/baseKeyboard.ts";
+
+/**
+ * The base-keyboard decision value: the catalog record's identity.
+ * Declared here, with the renderer, and re-exported by the gallery module
+ * (survey/questions/gallery/baseKeyboard.ts): the module imports this
+ * file for the component, so the type must not also flow module → here
+ * (a depcruise no-circular cycle; research addendum D-090-8).
+ */
+export interface BaseKeyboardValue {
+  id: string;
+  name: string;
+}
 
 /** The preview plumbing the wrapper hands the renderer via step-context extras. */
 export interface BasePreviewExtras {
