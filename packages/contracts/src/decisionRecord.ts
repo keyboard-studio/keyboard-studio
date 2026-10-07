@@ -255,6 +255,24 @@ export interface BaseContribution {
 }
 
 /**
+ * Any JSON value — the shape of a `decision` payload's recorded `value`.
+ *
+ * Deliberately NOT a per-module schema: a gallery decision's value is the
+ * providing module's own type (spec 090), and the record's contract is only
+ * that it is JSON — the same discipline the value already lives under in the
+ * decision store's draft snapshot. Validating module shapes here would couple
+ * the record format to every module's value type and fork the one place that
+ * owns them (the modules themselves).
+ */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+/**
  * What a decision entry is about. `kind` is the discriminant (see the module
  * header, rule 2).
  */
@@ -268,7 +286,22 @@ export type DecisionPayload =
       };
     }[AnswerType]
   | { kind: "editor-action"; actionType: EditorActionType; summary: EditorActionSummary }
-  | BaseContribution;
+  | BaseContribution
+  | {
+      kind: "decision";
+      /** The decision id (spec 088's id space) this entry records. */
+      decisionId: string;
+      /** The module's decision value, as JSON (see {@link JsonValue}). */
+      value: JsonValue;
+      /**
+       * A bounded human-readable account of the decision, produced by the
+       * recording host at record time (spec 090 US5, D-090-48). The trail
+       * renders it verbatim, so no rendering surface needs per-module
+       * knowledge of what the value means. Bounded by
+       * {@link DECISION_SUMMARY_LIMIT} at the schema boundary.
+       */
+      summary: string;
+    };
 
 /**
  * One decision, as recorded.
@@ -332,8 +365,16 @@ export const DECISION_RECORD_FORMAT = "keyboard-studio.decision-record" as const
  * single `path`/`hunks`/`magnitude` lifted into a one-element `files` array.
  * That normalization is a reader concern (specs/055.../contracts/record-shape.contract.md
  * §5) — this module only states the version, it does not perform the read.
+ *
+ * Bumped 2 -> 3 for spec 090 US5 (D-090-48): the payload union gains the
+ * `decision` kind. The delta is purely additive — a v2 record's entries are
+ * already valid v3 entries (they simply contain no `decision` entries), so
+ * the v2 -> v3 read-time normalization advances only the version tag and
+ * transforms nothing. The v1 transforms above stay gated on `version < 2`:
+ * running them over a v2 record would strip editor-action counts that v2
+ * genuinely measured (the FR-005a failure).
  */
-export const DECISION_RECORD_VERSION = 2 as const;
+export const DECISION_RECORD_VERSION = 3 as const;
 
 /** Placeholder `stepId` for a decision recorded before any step is known (FR-004). */
 export const PRE_IDENTITY_STEP_ID = "__pre_identity__" as const;
@@ -345,6 +386,17 @@ export const PRE_IDENTITY_STEP_ID = "__pre_identity__" as const;
  * can disagree.
  */
 export const EDITOR_ACTION_SAMPLE_LIMIT = 12 as const;
+
+/**
+ * Ceiling on a `decision` payload's `summary` (spec 090 US5).
+ * The summary is one human-readable clause, not a rendering
+ * of the value — the value itself rides in the payload — so the bound is
+ * generous for a clause and useless for a dump, which is the point.
+ *
+ * Exported so the recording host truncates to the same literal the schema
+ * enforces instead of two that can disagree.
+ */
+export const DECISION_SUMMARY_LIMIT = 200 as const;
 
 /** Unified-diff context lines per hunk (contract §6). */
 export const DECISION_DIFF_CONTEXT_LINES = 3 as const;

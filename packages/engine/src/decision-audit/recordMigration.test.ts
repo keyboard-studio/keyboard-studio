@@ -171,7 +171,7 @@ describe("normalizeDecisionRecord — v1 fixture (SC-011)", () => {
   });
 });
 
-describe("normalizeDecisionRecord — v2 identity", () => {
+describe("normalizeDecisionRecord — v2 stage (spec 090 US5: tag only)", () => {
   const V2_RECORD: DecisionRecord = {
     format: DECISION_RECORD_FORMAT,
     version: 2,
@@ -209,18 +209,33 @@ describe("normalizeDecisionRecord — v2 identity", () => {
     truncated: null,
   };
 
-  it("passes a version-2 record through unchanged, by reference", () => {
-    expect(normalizeDecisionRecord(V2_RECORD)).toBe(V2_RECORD);
+  it("advances a version-2 record's tag to current, entries untouched", () => {
+    // The v2 -> v3 stage transforms NOTHING (the v3 delta is a purely
+    // additive payload kind a v2 record cannot contain) — but the returned
+    // record still takes the current tag, for the same reason the v1 stage
+    // does: what normalize hands back is current-shaped, and a caller that
+    // stores it must not re-run an older stage over it on the next read.
+    const normalized = normalizeDecisionRecord(V2_RECORD);
+    expect(normalized.version).toBe(DECISION_RECORD_VERSION);
+    expect(normalized.entries).toEqual(V2_RECORD.entries);
+    expect(normalized.entries[0]).toBe(V2_RECORD.entries[0]);
   });
 
-  it("does not strip a v2 record's genuinely-measured absent counts", () => {
-    // v2's `EditorActionSummary` already permits omitting a count that a
-    // producer genuinely did not measure (unrelated to this migration) — the
-    // identity pass-through must not disturb that either.
+  it("does not strip a v2 record's genuinely-measured counts", () => {
+    // The failure this stage exists to avoid: the v1 transforms (unmeasured
+    // counts to absent) running over a v2 record would strip counts v2
+    // genuinely measured — including a measured `keysRemoved: 0` — and
+    // fabricate absence (FR-005a, one stage up).
     const normalized = normalizeDecisionRecord(V2_RECORD);
     const entry = normalized.entries[0]!;
     if (entry.payload.kind !== "editor-action") throw new Error("expected editor-action");
+    expect(entry.payload.summary.keysRemoved).toBe(0);
     expect(entry.payload.summary.keysAdded).toBe(12);
     expect("mechanismsAssigned" in entry.payload.summary).toBe(false);
+  });
+
+  it("passes a current-version record through unchanged, by reference", () => {
+    const current: DecisionRecord = { ...V2_RECORD, version: DECISION_RECORD_VERSION };
+    expect(normalizeDecisionRecord(current)).toBe(current);
   });
 });
