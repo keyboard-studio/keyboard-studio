@@ -213,4 +213,41 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
     // apply-time IR write (workingCopyStore's IdentityPatch contract).
     expect(wc.ir?.header.keyboardId).toBe("base_id");
   });
+
+  it("installs the folded carve slice into the working copy's carve state (D-090-24)", () => {
+    const ir = baseIR();
+    useWorkingCopyStore.setState({ baseIr: ir, ir });
+    useDecisionStore.getState().recordAll([
+      rec({ id: "authoring-track", value: "copy", provenance: "asked" }),
+      rec({
+        id: "carved-layout",
+        value: {
+          removals: [
+            { kind: "node", id: "n1", provenance: "asked" },
+            { kind: "item", id: "i1", provenance: "asked" },
+            { kind: "family", id: "fam1", provenance: "asked" },
+            { kind: "char", id: "é", provenance: "asked" },
+          ],
+          dispositions: [
+            { comboId: "n1#0", disposition: "block", provenance: "author-override" },
+          ],
+          closedKeyboardCard: "accepted",
+        },
+        provenance: "asked",
+      }),
+    ]);
+
+    const out = rebuildWorkingCopyFromStores(["carved-layout"]);
+    expect(out).not.toBeNull();
+
+    const wc = useWorkingCopyStore.getState();
+    expect([...wc.deletedNodeIds]).toEqual(["n1"]);
+    expect([...wc.deletedItemIds]).toEqual(["i1"]);
+    expect([...wc.disabledFamilyIds]).toEqual(["fam1"]);
+    expect([...wc.carveChars]).toEqual(["é"]);
+    expect(wc.carveDispositions).toEqual([
+      { comboId: "n1#0", disposition: "block", provenance: "author-override" },
+    ]);
+    expect(wc.closedKeyboardCard).toBe("accepted");
+  });
 });

@@ -40,6 +40,7 @@ import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
 import { assertPatchChannelsAuthorized } from "../steps/applyAuthorization.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
+import { carveOverlayFromValue, type CarveOverlaySlice } from "./carveOverlay.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { indexProviders } from "./orderDecisions.ts";
 
@@ -47,8 +48,16 @@ import { indexProviders } from "./orderDecisions.ts";
  * The folded non-IR channel state (data-model.md, OverlayState): each
  * channel's last write in derived order, held beside the IR everywhere
  * the IR goes — checkpoints, rebuild results, the installed working copy.
+ *
+ * The `carve` slice is the one overlay member NOT sourced from the patch
+ * channels (spec 093 owned delta, 090 ruling D-090-24): 089's patch
+ * contract has no carve channel and the carve module's `apply` is a
+ * no-op, so the carved-layout decision's VALUE folds into the slice
+ * directly, at its own position in the derived order (see the loop).
  */
-export type OverlayState = Omit<WorkingCopyPatch, "ir">;
+export type OverlayState = Omit<WorkingCopyPatch, "ir"> & {
+  carve?: CarveOverlaySlice;
+};
 
 /** The empty overlay: index 0 of every replay, before any `apply`. */
 export function emptyOverlay(): OverlayState {
@@ -213,6 +222,21 @@ export function replayKeyboard(
             if (decisions[providedId] !== undefined) applied.push(providedId);
           }
         }
+      }
+      // The carve fold (owned delta, D-090-24): the carved-layout value
+      // reconstructs the carve overlay slice. It folds here — at the
+      // decision's own position in the derived order, gated on the
+      // record being active and provided like every other contribution
+      // — because no patch channel can carry it (the module's apply is
+      // a deliberate no-op). One carve decision exists, so the fold is
+      // a whole-slice replace; a replay that never folds one leaves the
+      // accumulator's slice absent and the install leaves the live
+      // carve overlay untouched.
+      if (id === "carved-layout" && providerFor(id) !== undefined) {
+        state = {
+          ir: state.ir,
+          overlay: { ...state.overlay, carve: carveOverlayFromValue(record.value) },
+        };
       }
     }
     checkpoints.push({

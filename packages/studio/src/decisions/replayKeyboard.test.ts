@@ -17,6 +17,7 @@ import {
 import ilCopyrightHolder from "../survey/questions/a/il_copyright_holder.ts";
 import projectKeyboardId from "../survey/questions/g/project_keyboard_id.ts";
 import pfWelcomeParagraph from "../survey/questions/f/pf_welcome_paragraph.ts";
+import carvedLayoutModule from "../survey/questions/gallery/carvedLayout.ts";
 
 const mod = (partial: Partial<QuestionModule> & { id: string }): QuestionModule => ({
   definition: { id: partial.id, type: "text", prompt: partial.id },
@@ -264,5 +265,51 @@ describe("replayKeyboard — real modules (identity/attribution/helpDocs chains)
     expect(out.state.overlay.attribution?.copyrightHolder).toBe("Test Author");
     expect(out.state.overlay.identity?.keyboardId).toBe("testish_new");
     expect(out.state.overlay.helpDocs?.description).toBe("Welcome to the keyboard.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The carve fold (spec 093 owned delta, 090 ruling D-090-24)
+// ---------------------------------------------------------------------------
+
+describe("replayKeyboard — carve-overlay fold", () => {
+  const carveValue = {
+    removals: [
+      { kind: "node", id: "n1", provenance: "asked" },
+      { kind: "char", id: "é", provenance: "asked" },
+    ],
+    dispositions: [],
+    closedKeyboardCard: "accepted",
+  };
+
+  it("folds the carved-layout value into the overlay slice at its own position", () => {
+    const decisions: DecisionSet = {
+      "carved-layout": rec({ id: "carved-layout", value: carveValue }),
+      "language-name": rec({ id: "language-name", value: "Testish" }),
+    };
+    const out = replayKeyboard(providerFromModules([carvedLayoutModule, nameModule]), {
+      decisions,
+      order: ["carved-layout", "language-name"],
+      startingPointIR: baseIR(),
+    });
+    // The checkpoint BEFORE the carve decision carries no slice; the one
+    // after it — and the final state — carry the folded slice.
+    expect(out.checkpoints[0]!.overlay.carve).toBeUndefined();
+    expect(out.checkpoints[1]!.overlay.carve).toBeDefined();
+    expect([...out.state.overlay.carve!.deletedNodeIds]).toEqual(["n1"]);
+    expect([...out.state.overlay.carve!.carveChars]).toEqual(["é"]);
+    expect(out.state.overlay.carve!.closedKeyboardCard).toBe("accepted");
+  });
+
+  it("an inactive carve record folds nothing", () => {
+    const decisions: DecisionSet = {
+      "carved-layout": rec({ id: "carved-layout", value: carveValue, inactive: true }),
+    };
+    const out = replayKeyboard(providerFromModules([carvedLayoutModule]), {
+      decisions,
+      order: ["carved-layout"],
+      startingPointIR: baseIR(),
+    });
+    expect(out.state.overlay.carve).toBeUndefined();
   });
 });

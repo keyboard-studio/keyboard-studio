@@ -188,13 +188,15 @@ export function resetRebuildTrail(): void {
 
 /**
  * Install a rebuilt state as the working copy: the IR replaces the
- * working IR through the overlay-preserving write (the carve-deletion
- * and edit overlays are separate layers, not part of the fold), and each
- * overlay channel the accumulator carries replaces its store slot
- * whole — the same channel order as the 089 patch sink. A channel the
- * replay never folded (no decision wrote it) leaves the store's slot
- * untouched, so instantiation-seeded state (a Track 2 identity, the
- * identity seed) survives until a decision actually writes the channel.
+ * working IR through the overlay-preserving write (the edit overlays
+ * are separate layers, not part of the fold), and each overlay channel
+ * the accumulator carries replaces its store slot whole — the same
+ * channel order as the 089 patch sink. A channel the replay never
+ * folded (no decision wrote it) leaves the store's slot untouched, so
+ * instantiation-seeded state (a Track 2 identity, the identity seed)
+ * survives until a decision actually writes the channel. The carve
+ * slice follows the same rule: it installs only when the replay folded
+ * a carved-layout value (owned delta, D-090-24).
  */
 function installRebuiltState(state: ReplayState): void {
   const wc = useWorkingCopyStore.getState();
@@ -205,6 +207,23 @@ function installRebuiltState(state: ReplayState): void {
   if (overlay.helpDocs !== undefined) wc.setHelpDocs(overlay.helpDocs);
   if (overlay.historyEntryState !== undefined) {
     wc.setHistoryEntryState(overlay.historyEntryState);
+  }
+  if (overlay.carve !== undefined) {
+    // The carve slice installs wholesale — the persist-restore pattern
+    // (the store's carve actions are per-item UI gestures; there is no
+    // bulk action). Fresh Sets/Array so the store never aliases the
+    // checkpoint trail's slice. `undoStack` is session state, not
+    // decision state — the value cannot reconstruct it, and
+    // `carveTouchKeepInert` has no value field (D-090-31); both are
+    // left as they stand.
+    useWorkingCopyStore.setState({
+      deletedNodeIds: new Set(overlay.carve.deletedNodeIds),
+      deletedItemIds: new Set(overlay.carve.deletedItemIds),
+      disabledFamilyIds: new Set(overlay.carve.disabledFamilyIds),
+      carveChars: new Set(overlay.carve.carveChars),
+      carveDispositions: [...overlay.carve.carveDispositions],
+      closedKeyboardCard: overlay.carve.closedKeyboardCard,
+    });
   }
 }
 
