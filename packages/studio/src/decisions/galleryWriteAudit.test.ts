@@ -78,15 +78,12 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
     identifiers: ["saveAnswer"],
   },
   {
-    // US3 (T035, ungated slice): the retired Phase B draft store's hook
-    // is banned in the Phase D trees too — it is retired globally
-    // (SC-004 grep: zero references in src). The action-name bans T035
-    // names (cascadeDelete/cascadeRestore/restoreAll/keepAll/
-    // prefillCarveDispositions/commitDeadkeyOp) are NOT registered:
-    // under the as-built US3 precedent those actions are the decision
-    // values' internal write paths (the carve overlay; the deadkey op
-    // log the decision records), and banning them awaits the lead's
-    // ruling on D-090-24/D-090-27 — see the note after this list.
+    // US3 (T035): the retired Phase B draft store's hook is banned in
+    // the Phase D trees too — it is retired globally (SC-004 grep:
+    // zero references in src). The action-name bans T035's text names
+    // (cascadeDelete/cascadeRestore/restoreAll/keepAll/
+    // prefillCarveDispositions/commitDeadkeyOp) are NOT registered,
+    // by ruling (D-090-31) — see the note after this list.
     story: "US3",
     trees: [
       "editors/carve",
@@ -110,6 +107,19 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
   // the within-step draft state the decision values are composed from.
   // This is a scope determination, not an exception: T060's
   // zero-exceptions assertion reads on the banned category so defined.
+  //
+  // NOT REGISTERED — ruled (T035, D-090-31, lead ruling ratifying
+  // D-090-27): the Phase D action bans T035's text names
+  // (cascadeDelete / cascadeRestore / restoreAll / keepAll /
+  // prefillCarveDispositions / commitDeadkeyOp). Those actions are
+  // the ratified edit-time write paths of the editor-backed
+  // decisions — the carve overlay actions and the deadkey op-log
+  // commit — from which the carved-layout / deadkeys-defined
+  // decisions record at completion. They presumed a host-mediated
+  // design the ruling set aside; registering them would red this
+  // gate against the ratified design. Like the evidence-layer
+  // determination above, this is a scope determination for T060 to
+  // read, not a gap and not an exception.
 ];
 
 /** A single banned call site found in a source text. */

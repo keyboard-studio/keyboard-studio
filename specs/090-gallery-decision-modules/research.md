@@ -1524,3 +1524,18 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   built. Gates at the T032 checkpoint: studio tsc clean;
   questionModules (806) + decisionIRConsistency (393) +
   registry (8) = 1207/1207.
+
+- **D-090-34 — T035 completed under ruling D-090-31.** The ungated
+  slice (the Phase D trees join the `usePhaseBDraftStore` ban in
+  both FR-003 layers) landed at cd7b1f03. The remainder — the six
+  action bans T035's text names — is discharged as a RULED
+  NON-REGISTRATION: the non-registration + rationale is recorded
+  at the T035 site in both list files (the audit test's US3 entry
+  and after-list note; the eslint overlay's US3 comment), as a
+  scope determination for T060 to read — not a gap, not an
+  exception. The named downstream handoff (D-090-30 condition
+  (ii)) is recorded in spec.md's duplication ledger on the
+  "overlays as independent state" row: 093's I-1 overlay
+  accumulator grows a carve-overlay fold; 092's T037 remains
+  pending on carve until that fold exists (with the D-090-33
+  carveTouchKeepInert addendum).

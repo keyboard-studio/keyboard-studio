@@ -258,7 +258,7 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
   packages/studio/src/survey/questions/gallery/ruleSet.ts; `RulesStep` reports the value
   through `onChange` instead of `onComplete(undefined)` in
   packages/studio/src/survey/rules/RulesStep.tsx
-- [ ] T035 [US3] FR-003 identifier list extended with the carve/deadkey write actions
+- [x] T035 [US3] FR-003 identifier list extended with the carve/deadkey write actions
   (`cascadeDelete`, `cascadeRestore`, `restoreAll`, `keepAll`, `prefillCarveDispositions`,
   `commitDeadkeyOp`) in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the migrated

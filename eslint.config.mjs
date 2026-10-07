@@ -69,11 +69,13 @@ const GALLERY_RENDERER_TREES_US2_ANSWER_FREE = [
   "packages/studio/src/survey/convenience/**/*.{ts,tsx}",
 ];
 
-// US3 (T035, ungated slice): the Phase D trees join the global
-// usePhaseBDraftStore ban (the store is deleted; zero references).
-// The action-name bans (cascade*/prefillCarveDispositions/
-// commitDeadkeyOp) are deferred to the lead's ruling on
-// research D-090-24/D-090-27, mirroring the checker test's lists.
+// US3 (T035): the Phase D trees join the global usePhaseBDraftStore
+// ban (the store is deleted; zero references). The action-name bans
+// (cascade*/prefillCarveDispositions/commitDeadkeyOp) are NOT
+// registered, by ruling (research D-090-31): those actions are the
+// ratified edit-time write paths of the editor-backed decisions
+// (the carve overlay; the deadkey op log), not gallery write-arounds.
+// Mirrors the checker test's lists.
 const GALLERY_RENDERER_TREES_US3 = [
   "packages/studio/src/editors/carve/**/*.{ts,tsx}",
   "packages/studio/src/editors/deadkey/**/*.{ts,tsx}",

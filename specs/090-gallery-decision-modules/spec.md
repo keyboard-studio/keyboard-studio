@@ -86,6 +86,16 @@ leave none (HANDOFF G7). Each decision's completion records one.
 | in-place IR rewrites outside modules | **deleted** | 090 |
 | `settles` strings | redundant | 091 |
 
+Named handoff on the "overlays" row (lead ruling D-090-30/D-090-31, 2026-10-07): the
+carve overlay is the one overlay whose applied view is NOT produced by a module `apply`
+(089's contract has no carve-overlay channel; `projectWorkingCopyVfs` remains the
+canonical producer, and the `carved-layout` decision records the overlay at completion).
+**093's I-1 overlay accumulator grows a carve-overlay fold — reconstruct the overlay
+from carved-layout decision values during replay; 092's T037 remains pending on carve
+until that fold exists.** Addendum (D-090-33): if the TouchKeepInertControl surface ever
+mounts, the carved-layout value needs a field for `carveTouchKeepInert` before the fold
+can be complete — it has no live writer today.
+
 ## Success Criteria
 - **SC-001** The golden walk is byte-identical after each user story lands.
 - **SC-002** The lint rule from FR-003 passes with zero exceptions.
