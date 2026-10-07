@@ -246,9 +246,15 @@ screens consistently.
 - [x] T026 Run the full gates from quickstart.md §5 on the phase result: studio typecheck,
   the studio vitest suite through the package (never bare vitest at root), and `pnpm lint`
   including depcruise (the decisions/ derivation must stay cycle-free); fix only 091 fallout
-- [ ] T027 Run `/speckit-analyze` (spec ↔ plan ↔ tasks consistency) and one scoped km-lead
+- [x] T027 Run `/speckit-analyze` (spec ↔ plan ↔ tasks consistency) and one scoped km-lead
   review cycle over the diff before the PR; confirm FR-006 by diffing the i18n catalogs
   (zero message-id changes) and record the check in the PR body
+  — DONE at the finishing phase: analyze consistent (FR-001…FR-006,
+  SC-001…SC-005 each mapped to landed tasks + named tests; 27/27 tasks
+  checked); FR-006 confirmed — zero i18n catalog files in the branch
+  diff; full gates in the PR body (studio tsc clean, depcruise 0
+  violations, full suite 8791 passed / 8 failed = the named budget of
+  4 local-corpus SC-004 + 4 spec-079, verified pre-existing).
 
 ---
 
