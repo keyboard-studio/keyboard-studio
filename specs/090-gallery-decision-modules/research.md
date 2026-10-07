@@ -1910,3 +1910,32 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   stays lazy, now at the host. Depcruise: zero violations
   (1075 modules); tsc 0; CharactersStep + characterInventory
   25/25; golden walk + PhaseB suites 140/140.
+- **D-090-46 — T062 final gates + spec↔plan↔tasks analyze.**
+  Gates at head: tsc 0; root eslint over all packages 0 errors;
+  depcruise zero violations; every `pnpm lint` chain leg green
+  except content-i18n-freshness, which crashes at module load in
+  this worktree's node_modules (`babel-plugin-macros` resolution
+  inside the lingui macro package — an install artifact, before
+  any source is read; CI installs fresh). One chain finding was
+  real and fixed in this pass: test-antipattern-lint flagged a
+  hardcoded order array in carvedLayout.test.ts — rewritten as a
+  property assertion (membership + sortedness), suite 10/10.
+  Golden walk green; StepHost parity green; final-head batches:
+  workingCopy/persist/draft suites (T063), CharactersStep +
+  characterInventory 25/25, StudioShell charmap + questionModules
+  + coverage 855/855. Full-suite classification stands as
+  D-090-42 (only the SC-004 corpus pair reproduces).
+  **Analyze findings:** (1) FR-008 / SC-003 unmet — US5 blocked
+  on the D-090-43 ruling (recorded, with options). (2) FR-005's
+  letter ("rewrites run only inside apply") diverges from the
+  ruled execution shape for US3/US4 (D-090-27/-30/-31/-38:
+  record-from-working-copy + completion-wiring effects, because
+  089's patch channels cannot express R1/R2 or the carve
+  overlay) — the divergence is recorded at each site; whether
+  spec.md's FR-005 text should be amended to the ruled shape is
+  the lead's call. (3) The plan's one-PR-per-story slicing was
+  superseded in execution by the lead's stacked-PR train (one
+  PR per spec at completion, base = predecessor branch) —
+  noted at T045. Everything else cross-checks: FR-001/002/003/
+  004/006/007 landed as specified or as ruled; SC-001/002/004/
+  005 measured green.
