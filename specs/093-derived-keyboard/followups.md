@@ -383,3 +383,24 @@ at origin/km/live-extraction, and OUTSIDE the ruling's named set —
 flagged for a ruling extension or a 092-side re-home, not self-exempted
 here. pnpm lint's depcruise step therefore still reports 2 errors, both
 pre-existing upstream state; every other lint component is unaffected.
+
+## FINAL PASS (2026-10-07) — final verification record
+
+On the final tree (HEAD 0c7b6a07 + this record):
+
+- Full studio suite: 516/520 files passed; 8882 passed / 8 failed /
+  1 skipped (8891 tests). The 8 failures are EXACTLY the named budget,
+  nothing beyond: 4 local-corpus SC-004 (basic_kbdru + arabic_izza in
+  successCriteria.sc004.test.ts and successCriteria.sc004.kmp.test.ts)
+  + 4 spec-079 step failures (InvisiblesStep ×3, PunctuationStep ×1).
+  The three formerly non-terminating flow-driver files terminate and
+  pass inside this run (and were verified solo: panelAdapters 10/10,
+  Phase F pair 9/9).
+- tsc --noEmit (studio): clean (against a freshly force-built contracts
+  dist — the worktree's dist/tsbuildinfo was stale relative to the
+  merged sources; a sandbox artifact, not a tree defect).
+- eslint: 0 errors (touched areas; the one warning the T017 wire-in
+  introduced was fixed by naming recordDecision in doCommit's deps).
+- depcruise: 2 errors, both the pre-existing 092 pf items recorded
+  above; decisions-layer is 0 after the ruling-(a) exemptions.
+- Golden walk (SC-005): 2/2, confirmed (see quickstart.md).
