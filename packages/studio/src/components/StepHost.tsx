@@ -46,10 +46,12 @@ import {
   type ActiveStepId,
 } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { getDecisionSnapshot, selectTouchSeedSource, selectTrack } from "../stores/decisionStore.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { EditorStep } from "../steps/types.ts";
 import {
   applyStepCompletion,
+  recordAnswersAsDecisions,
   recordStepCompletion,
   routeAnswersThroughMutate,
   type ReducerDeps,
@@ -434,6 +436,9 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
       // spec 079 D-4: the step owns its own answers within the phase slot.
       recordPhase(result, { stepId: resolvedStep.id });
       routeAnswersThroughMutate(result, reducerDeps);
+      // Spec 088 FR-003 (contract C-2): the same completion writes one
+      // decision record per provided decision into the decision store.
+      recordAnswersAsDecisions(result, resolvedStep.id, reducerDeps);
     }
 
     // 2. If step has reducer side effects: applyStepCompletion.
@@ -457,18 +462,21 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     //    the post-mutation value; but the React selector closure still holds the
     //    pre-mutation snapshot. getState() returns the current committed store value.
     const postMutationState = useSurveySessionStore.getState();
+    // Spec 088 FR-004/FR-005: routing reads the decision store. The track
+    // and seed values are selectors over the store snapshot (the session
+    // fields they used to be read from are deleted), and the snapshot
+    // itself is the gate set advance() evaluates.
+    const decisions = getDecisionSnapshot();
     // resolvedStep.id is StepBase.id (string). The manifest guarantees all step
     // ids are valid ActiveStepId values, so the cast is safe. advance() is
     // defined in advance.ts with a local ActiveStepId mirror — not imported from
     // stores/ (depcruise boundary preserved).
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     const outcome = advance(resolvedStep.id as Parameters<typeof advance>[0], result, {
-      selectedTrack: postMutationState.selectedTrack,
+      decisions,
+      selectedTrack: selectTrack(decisions),
       identitySupported: postMutationState.identityResult?.supported ?? true,
-      // Structurally identical to advance.ts's local TouchSeedSource mirror
-      // (both "import-adapt" | "reseed-from-desktop" | null) — no cast needed,
-      // same as selectedTrack above (Track mirror).
-      touchSeedSource: postMutationState.touchSeedSource,
+      touchSeedSource: selectTouchSeedSource(decisions),
       allCharactersImplemented,
     });
 
