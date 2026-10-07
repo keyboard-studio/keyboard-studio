@@ -28,9 +28,9 @@ table suggests.
 | carve (`carved-layout`) | `CarveGalleryV2` ([editors/carve/CarveGalleryV2.tsx](../../packages/studio/src/editors/carve/CarveGalleryV2.tsx)) | working-copy overlay actions `cascadeDelete` / `cascadeRestore` / `restoreAll` / `keepAll`, `prefillCarveDispositions` (:703-712, 825); overlay fields `deletedNodeIds`, `deletedItemIds`, `disabledFamilyIds`, `carveChars`, `carveDispositions`, `closedKeyboardCard` ([workingCopyStore.ts:568-651](../../packages/studio/src/stores/workingCopyStore.ts)); `applyCarveMutate` runs in the projection ([projectWorkingCopyVfs.ts:447-504](../../packages/studio/src/lib/projectWorkingCopyVfs.ts)) |
 | deadkeys (`deadkeys-defined`) | deadkey editors ([editors/deadkey/](../../packages/studio/src/editors/deadkey)) | components call `workingCopyStore.commitDeadkeyOp`; the op is turned into a patch by [deadkeyWrite.ts](../../packages/studio/src/editors/deadkey/deadkeyWrite.ts) through `applyMutatePatch` with `DEADKEY_WRITES` ([editorMutate.ts](../../packages/studio/src/steps/editorMutate.ts)) → `setWorkingIR`; the op log lives in `workingCopyStore.deadkeyOverlay.ops` |
 | rules (`rule-set`) | `RulesStep` ([survey/rules/RulesStep.tsx:46](../../packages/studio/src/survey/rules/RulesStep.tsx)) | builder-owned state; `onComplete(undefined)` — no value, no store write, no log entry |
-| mechanisms (`physical-layout`) | `MechanismGallery` ([editors/assignLoop/MechanismGallery.tsx](../../packages/studio/src/editors/assignLoop/MechanismGallery.tsx)) | `recordAssignments` on `workingCopyStore` (:1568, 2646) into `phaseResults`; reducer R1 `lockDesktop()` on completion ([reducer.ts:384-386](../../packages/studio/src/steps/reducer.ts)); `repropagate` refreshes suggested assignments |
+| mechanisms (`physical-layout`) | `MechanismGallery` ([editors/assignLoop/MechanismGallery.tsx](../../packages/studio/src/editors/assignLoop/MechanismGallery.tsx)) | `recordAssignments` on `workingCopyStore` (:1568, 2646) into `phaseResults`; reducer R1 `lockDesktop()` on completion ([reducer.ts:384-386](../../packages/studio/src/steps/reducer.ts)); `repropagate` refreshes suggested assignments. **Re-verified T040 (2026-10-07):** the row holds; only line drift. `recordAssignments` (store type :1046, impl :2092) still writes `MechanismAssignment[]` into the phase-C `phaseResults` entry; the gallery selector is still :1568, call sites now :2646, :3070, :3163, :3189, :3258. R1 now sits at reducer.ts:316-318 and fires `deps.lockDesktop()` plus the staleness-gated `repropagate` in the same case; `lockDesktop()` itself is a bare `set({ desktopLocked: true })` — a store flag, no snapshot. `repropagate` (steps/repropagate.ts) is the spec-014 no-clobber TOUCH re-propagation triggered by physical completion (suggested touch keys refresh; hand-set survive), not a mechanisms-internal refresh. The step is registered via `AddPhysicalAdapter` (registerEditorSteps.ts:210), which completes with `undefined`; journey-runner replays the step by calling `applyStepCompletion("mechanisms", undefined, deps)` directly (journey-runner.ts:766-770). See D-090-38 |
 | touch_seed_source (`touch-seed-source`) | `TouchSeedSourcePanel` ([editors/touchSeedSource/TouchSeedSourcePanel.tsx:359](../../packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx)) | `setTouchSeedSource` on `surveySessionStore` (after 088 this session field is deleted — the panel's write becomes a decision record; see R6 note) |
-| touch (`touch-layout`) | `TouchGallery` ([editors/assignLoop/TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx)) | `setTouchDraft` (:1917, 4115), `deleteTouchKey` (:1781); overlay `keyEditOverlay.ops`, `deletedTouchKeyIds`, `touchDraft`; reducer R2 `setTouchLayoutJson` on completion |
+| touch (`touch-layout`) | `TouchGallery` ([editors/assignLoop/TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx)) | `setTouchDraft` (:1917, 4115), `deleteTouchKey` (:1781); overlay `keyEditOverlay.ops`, `deletedTouchKeyIds`, `touchDraft`; reducer R2 `setTouchLayoutJson` on completion. **Re-verified T040 (2026-10-07):** the row holds; only line drift (`setTouchDraft` selector :1918, call :4116; `deleteTouchKey` selector :1782; store defs :1066 / :898). The overlay types are engine types (`KeyEditOverlay` / `KeyEditOperation` from `@keyboard-studio/engine`); `deletedTouchKeyIds` (store :602) and `touchDraft` (:733) sit on `workingCopyStore`. R2 now sits at reducer.ts:339-390 and consumes a `TouchCompleteResult` assembled by `AddTouchAdapter` (assignments + baseIr + baseVfs + mods + seedSource; mods computed adapter-side via `deriveDesktopModifications`). **Mechanism correction to the row's implication:** `buildTouchLayoutJson` does NOT consume the key-edit ops — its inputs are baseIr + `TouchAssignment[]` + {baseTouchJson, mods, seedSource}, with the spec-035 R11 emission matrix inside the injected dep; the ops replay onto the gallery's derived layout, never into the R2 build. Journey-runner assembles its own payload (assignments: []) and calls `applyStepCompletion` directly (journey-runner.ts:795-803). See D-090-38 |
 | help (`help-docs`, gallery part) | `PhaseFGate` wrapping `PhaseFStepFactoryComponent` ([registerEditorSteps.ts:281](../../packages/studio/src/steps/registerEditorSteps.ts), [PhaseFGate.tsx](../../packages/studio/src/editors/adapters/PhaseFGate.tsx)) | the gate itself only reads session navigation (`backToUnfinishedGallery`); the value writes are the Phase F flow's — 089 moves those into `apply`. 090's help slice is the host/log wiring, not a second write path (see Open Questions Q3) |
 
 **Discrepancies from the HANDOFF table, for the record:**
@@ -1598,3 +1598,82 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   rides on T045's gate run, which must classify the whole suite on
   the US4 head — any failure there beyond the known 4-corpus budget
   reopens T037's accounting.
+- **D-090-38 — T040 executed: R1 rows for mechanisms/touch re-verified
+  (both hold, line drift only — amendments on the rows); the US4
+  execution shape is fixed by the same wall as D-090-12/D-090-24.**
+  `WorkingCopyPatch` channels are ir / identity / attribution /
+  helpDocs / historyEntryState only. Neither `desktopLocked` (a bare
+  store boolean), nor the `touchLayoutJson` string, nor the phase-C
+  `phaseResults` entry is reachable from an `apply` — so T041's
+  "apply performs the R1 lockDesktop effect" and T042's "apply
+  performs the R2 buildTouchLayoutJson + setTouchLayoutJson work"
+  are not implementable inside 089's contract, exactly as T024's
+  "applied view written by apply" was not (D-090-12). Execution
+  under the ruled precedents (D-090-30 option (a); D-090-31
+  ratification of record-from-working-copy for editor-backed
+  decisions):
+  *physical-layout (T041):* value = the phase-C assignment list —
+  contracts `MechanismAssignment[]`, each keeping its `source`
+  provenance (data-model shape `{ assignments }`; the T008 stub's
+  `Record<string,string>` is re-pinned to the gallery's own record
+  shape). Pure builder + `currentPhysicalLayoutValue()` in a survey
+  feature home, shared by recording and rendering (D-090-33
+  pattern). `AddPhysicalAdapter` records
+  `{physical-layout, value, asked}` on completion (CarveAdapter
+  shape). `apply` is a no-op, `writes: []` (assignments touch no IR
+  channel; their applied view is the `phaseResults` entry).
+  `recordAssignments` stays the edit-time write path producing that
+  applied view (D-090-31). R1's two effects — `lockDesktop()` and
+  the staleness-gated `repropagate` — re-home to the step's
+  completion wiring (see below) with identical deps and ordering;
+  the reducer's MECHANISMS case is deleted and `mechanisms` leaves
+  `STEPS_WITH_APPLY_COMPLETION`.
+  *touch-layout (T042):* value =
+  `{ ops: KeyEditOperation[], deletedTouchKeyIds: string[] }`
+  (data-model shape), snapshotted from `keyEditOverlay` +
+  `deletedTouchKeyIds` at completion; builder +
+  `currentTouchLayoutValue()` likewise. `AddTouchAdapter` records
+  on completion. `apply` is a no-op, `writes: []`: the ops replay
+  onto the gallery's derived layout, not the IR (no analogue to
+  deadkeys' IR replay), and the serialized JSON is a derived
+  string with no patch channel. R2's build — inputs already
+  assembled adapter-side (baseIr, baseVfs, mods via
+  `deriveDesktopModifications`, seedSource) — plus
+  `setTouchLayoutJson` and `clearStale("touch")` re-home to the
+  completion wiring with the reducer's exact semantics (baseIr-null
+  clears; warnings logged; a build throw degrades to null, never
+  blocks the transition). The reducer's TOUCH case is deleted and
+  `touch` leaves `STEPS_WITH_APPLY_COMPLETION`. `setTouchDraft` /
+  `deleteTouchKey` stay as the overlay's edit-time writes
+  (D-090-31); `touchDraft` remains the gallery's persisted draft —
+  applied view, not value (data-model).
+  *Shared completion effects:* both re-homed effect sets must fire
+  on BOTH completion paths — the StepHost adapter path and
+  journey-runner's direct replay (it bypasses the adapters:
+  journey-runner.ts:766-770, :795-803) — so they are factored as
+  plain store-driven functions in the adapters' layer, called by
+  the adapters after recording and by journey-runner in place of
+  its `applyStepCompletion` calls for these two steps. ReducerDeps
+  members that serve only R1/R2 (`lockDesktop`,
+  `buildTouchLayoutJson`, `resolveBaseTouchJson`, `getStaleSteps`)
+  are retired from the deps type and both constructions if no
+  other case consumes them.
+  **Flag 1 (lead ruling requested at T043):** T043's three actions
+  (`recordAssignments`, `setTouchDraft`, `deleteTouchKey`) all
+  remain the sanctioned edit-time write paths under this shape —
+  registering FR-003 bans over the assignLoop trees would red the
+  audit against the ratified design, the identical species as
+  US3's six actions, whose non-registration was LEAD-RULED
+  (D-090-31 → D-090-34). No ruling yet names US4's three; T043 is
+  therefore executed as analysis + stop, and proceeds only on the
+  lead's word (registration, or non-registration as a scope
+  determination recorded at both FR-003 sites).
+  **Flag 2 (expected T045 gate adjudication, not drift):** moving
+  R1/R2 from mock-dep reducer calls to real adapter-completion
+  effects means the golden-walk harness (real adapters over mocked
+  galleries) will fire real `desktopLocked` / `touchLayoutJson`
+  store writes at mechanisms/touch where the mocks previously
+  absorbed them — fixture signature deltas at exactly those steps
+  are the D-090-36 family (an intended migration signature), to be
+  adjudicated at the gate, neither pre-regenerated nor treated as
+  regression without a diff read.

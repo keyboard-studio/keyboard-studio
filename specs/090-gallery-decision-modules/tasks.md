@@ -295,8 +295,13 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
 
 **PR slice**: this phase is one PR.
 
-- [ ] T040 [US4] Re-verify research R1's rows for `mechanisms` and `touch` against the landed
-  code; amend specs/090-gallery-decision-modules/research.md if any row drifted
+- [x] T040 [US4] Re-verify research R1's rows for `mechanisms` and `touch` against the landed
+  code; amend specs/090-gallery-decision-modules/research.md if any row drifted — done
+  (D-090-38): both rows hold with line drift only (amendments on the rows); one mechanism
+  correction recorded (the R2 build does not consume the key-edit ops); the US4 execution
+  shape fixed under D-090-12/D-090-30/D-090-31 (no patch channel for the lock flag, the
+  touch JSON string, or the phase-C entry — applies are no-ops, R1/R2 effects re-home to
+  the completion wiring); T043 flagged for a lead ruling (D-090-38 Flag 1)
 - [ ] T041 [US4] `physical-layout` module: value = the assignment list (each assignment keeps
   the provenance it already carries) in
   packages/studio/src/survey/questions/gallery/physicalLayout.ts; `MechanismGallery` reports
