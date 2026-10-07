@@ -12,7 +12,8 @@
 //
 // The per-module semantics are runDecisionFlow's (spec 087), shared by
 // construction: derived order (orderDecisions), gates from conditional
-// `next` routing (effectiveGatedBy), extract → validate with a rejection
+// `next` routing (filterGated, evaluated once over the pre-pass set),
+// extract → validate with a rejection
 // treated as absent, a null extract normalised to absent, source identity
 // preferring the catalog id and falling back to the IR header, and a
 // throwing extract/validate aborting with the module id named. What is new
@@ -28,7 +29,9 @@ import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { deepEqual } from "./deepEqual.ts";
 import type { ExtractContext } from "./extractContext.ts";
 import { buildExtractContext } from "./extractContext.ts";
-import { effectiveGatedBy, orderDecisions } from "./orderDecisions.ts";
+import { filterGated, orderDecisions } from "./orderDecisions.ts";
+import { deriveSurveyContext } from "./identitySelectors.ts";
+import { prefill as prefillWelcomeParagraph } from "../lib/adaptiveDescription.ts";
 
 /** The slice of the decision store the pass writes through. */
 export interface LiveExtractionStore {
@@ -89,20 +92,16 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
   const seeded: DecisionId[] = [];
   const offered: DecisionId[] = [];
 
-  for (const m of orderDecisions(modules)) {
-    // Gate: derived from conditional `next` routing, exactly as the demo
-    // runner evaluates it — against the working set, so a decision seeded
-    // earlier in this same pass can open a later module's gate.
-    const gate = effectiveGatedBy(m, modules);
-    if (gate !== undefined) {
-      let pass: boolean;
-      try {
-        pass = gate(working);
-      } catch (err) {
-        throw namedThrow(m.definition.id, "gatedBy", err);
-      }
-      if (!pass) continue;
-    }
+  // Gating: derived from conditional `next` routing and evaluated ONCE,
+  // upfront, against the store's pre-pass decisions — exactly as the demo
+  // runner evaluates it (filterGated over the initial set). Evaluating
+  // against the accumulating set instead would let a value this pass
+  // seeds (e.g. pf_more_detail_gate's "false" lookup default) close the
+  // gate on the very questions behind it before they are seeded; an
+  // unanswered gate leaves its questions potentially visible, so they
+  // seed now and simply never render if the author closes the gate.
+  const active = filterGated(orderDecisions(modules), store.decisions);
+  for (const m of active) {
     const provided = m.provides;
     if (provided === undefined || provided.length === 0) continue;
 
@@ -209,6 +208,31 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
 export function runLiveExtractionFromStores(): LiveExtractionResult {
   const wc = useWorkingCopyStore.getState();
   const ctx = buildExtractContext(wc.baseIr, wc.baseKeyboard);
+  // Spec 092 (T036): Phase F's derivations read working-copy slices and
+  // two identity-derived values that are not part of the bundle — supply
+  // them from the same stores the old PHASE_F_SEEDS readers read, so the
+  // pf_* modules' extracts/lookup defaults resolve identically.
+  const surveyContext = deriveSurveyContext(useDecisionStore.getState().decisions);
+  const welcomePrefill = prefillWelcomeParagraph({
+    instantiationMode: wc.instantiationMode,
+    baseDocProfile: wc.baseDocProfile,
+    baseWelcomeHtmText: wc.baseWelcomeHtmText,
+    baseHelpPhpText: wc.baseHelpPhpText,
+  });
+  ctx.phaseF = {
+    ...(welcomePrefill !== undefined ? { welcomePrefill } : {}),
+    seeds: {
+      instantiationMode: wc.instantiationMode,
+      baseKeyboard: wc.baseKeyboard,
+      baseVfs: wc.baseVfs,
+    },
+    ...(surveyContext["author_contact"] !== undefined
+      ? { authorContact: surveyContext["author_contact"] }
+      : {}),
+    ...(surveyContext["bcp47_tag"] !== undefined
+      ? { bcp47Tag: surveyContext["bcp47_tag"] }
+      : {}),
+  };
   return runLiveExtraction({
     modules: Object.values(questionRegistry),
     ctx,

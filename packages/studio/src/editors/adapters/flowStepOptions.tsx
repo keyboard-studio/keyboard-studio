@@ -13,7 +13,7 @@
 // EditorStepProps-compatible components that register in registerEditorSteps.ts.
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
-import type { DecisionProposalSource, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
@@ -22,12 +22,10 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 // modules — those stay pure descriptors the standalone content-i18n
 // extractor can load without the engine.
 import {
-  prefill as prefillWelcomeParagraph,
   requiredWhen as requiredWhenWelcomeParagraph,
   type AdaptiveDescriptionContext,
 } from "../../lib/adaptiveDescription.ts";
 import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
-import { proposeProjectUrl, proposeProvenanceBasis, type PhaseFSeedContext } from "../../lib/phaseFSeeds.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
@@ -240,7 +238,9 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 //
 // Context: the decision-derived survey context (deriveSurveyContext, spec 089).
 // usesFindings: true — derives findingsByQuestionId via buildFindingsByQuestionId.
-// Seeds: pf_contact_info from surveyContext.author_contact — see CTX_AUTHOR_CONTACT.
+// Seeds: NONE here since spec 092 (T036) — the pf_* seeds are extracts /
+//   lookup defaults declared on their modules and seeded as decision
+//   records by the live extraction pass; SurveyRunner reads the records.
 // Extract: identity (raw SurveyPhaseResult — the host's applyStepCompletion / advance
 //   already handles the result shape downstream).
 // Effects: none here (spec 089) — pf_welcome_paragraph's apply composes the
@@ -249,22 +249,6 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 // ---------------------------------------------------------------------------
 
 export type PhaseFPayload = SurveyPhaseResult;
-
-/**
- * SurveyContext key carrying the author's public contact, used to PRE-FILL
- * pf_contact_info rather than asking for the same fact a second time.
- *
- * Producer: keyboard attribution ([specs/064-keyboard-attribution](../../../../../specs/064-keyboard-attribution/spec.md))
- * captures an author contact once, in the identity phase, itself pre-filled from
- * the authenticated GitHub profile. Until that lands nothing writes this key, so
- * the seed below resolves to undefined and Phase F behaves exactly as it does
- * today — the seam is inert rather than speculative, and lights up with no
- * further change here.
- *
- * SurveyContext is an open `Record<string, string | undefined>`, so this needs
- * neither a new type nor a change to FlowStepDeps.
- */
-const CTX_AUTHOR_CONTACT = "author_contact";
 
 /**
  * Reads the four working-copy slices `pf_welcome_paragraph`'s `prefill`/
@@ -285,94 +269,15 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
   };
 }
 
-/** The working-copy slices the Phase F text proposals read (lib/phaseFSeeds.ts). */
-function readPhaseFSeedContext(): PhaseFSeedContext {
-  const state = useWorkingCopyStore.getState();
-  return {
-    instantiationMode: state.instantiationMode,
-    baseKeyboard: state.baseKeyboard,
-    baseVfs: state.baseVfs,
-  };
-}
-
 /**
- * One seeded Phase F question: its value resolver plus where the proposal
- * comes from, for the decision trail. The two travel together so a new
- * seeded question can never land in the value list without its source (or
- * an explicit sourceless `source`), and vice versa.
+ * Spec 092 (T036): the PHASE_F_SEEDS table that used to live here is
+ * deleted. Each entry became an `extract` or a `lookupDefault` declared
+ * on its pf_* module (derivations still in lib/phaseFSeeds.ts and
+ * lib/adaptiveDescription.ts), seeded as decision records by the live
+ * extraction pass and read back by SurveyRunner from the records.
+ * pf_credits was deliberately never seeded — thanking ≠ owning — and
+ * stays unseeded.
  */
-interface PhaseFSeedSpec {
-  /** Resolve the proposed value. Receives the flow deps — seeds are contextual. */
-  getValue: (deps: FlowStepDeps) => string | string[] | undefined;
-  /**
-   * Where the proposal comes from, for the decision trail. Absent means a
-   * plain default no data stands behind — still recorded as `tool-proposed`,
-   * just without naming a source (see `AnswerProposal.source`).
-   */
-  source?: DecisionProposalSource;
-}
-
-/**
- * The single registry of Phase F seeded questions. `getSeedValue` and
- * `getSeedSource` below both read this table, so the two lists cannot drift
- * as Phase F grows (km-triage, PR #1927): presence in the table means
- * "seeded", and `source` names the data behind the proposal.
- */
-const PHASE_F_SEEDS: Readonly<Record<string, PhaseFSeedSpec>> = {
-  // spec 079 FR-009: on an adaptation whose base has a usable description,
-  // propose it for confirmation (accept/edit/replace in one action, §3c).
-  // Net-new, copy (Track 1), and a base classified none/minimal all
-  // resolve to undefined here — pf_welcome_paragraph behaves exactly as
-  // before (required, unfilled). See `getRequiredOverride` below, which
-  // waives `required` in exactly this same case.
-  pf_welcome_paragraph: {
-    getValue: () => prefillWelcomeParagraph(readAdaptiveDescriptionContext()),
-    source: "base",
-  },
-
-  // pf_contact_info stays OPTIONAL. Seeding pre-fills the field; it does not
-  // require an answer. The author can clear it, or replace it with a community
-  // channel that is not their own address — several shipped keyboards publish a
-  // language-community contact rather than the author's personal one.
-  pf_contact_info: {
-    getValue: (deps) => {
-      const contact = deps.surveyContext[CTX_AUTHOR_CONTACT];
-      return contact !== undefined && contact !== "" ? contact : undefined;
-    },
-    source: "identity",
-  },
-
-  // Choice questions open with a defensible default so none is left blank.
-  // The author can overturn any of them; blank already meant these values.
-  // pf_more_detail_gate's "No" is a plain default, not something any data
-  // suggested — so it carries no source.
-  pf_more_detail_gate: { getValue: () => "false" },
-  pf_doc_language: {
-    getValue: (deps) => {
-      const tag = deps.surveyContext["bcp47_tag"];
-      const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
-      return primary === "" || primary === "en" ? "english" : "bilingual";
-    },
-    source: "identity",
-  },
-  pf_history_entry: { getValue: () => "confirm", source: "analysis" },
-
-  // Text proposals derived from the starting point (lib/phaseFSeeds.ts).
-  pf_project_url: {
-    getValue: () => proposeProjectUrl(readPhaseFSeedContext()),
-    source: "base",
-  },
-  pf_provenance_basis: {
-    getValue: () => proposeProvenanceBasis(readPhaseFSeedContext()),
-    source: "base",
-  },
-
-  // pf_credits is deliberately NOT in this table. Thanking and owning are
-  // different things: shipped credits sections routinely acknowledge advisors
-  // and contributors who hold no copyright. Pre-filling the holder here would
-  // produce exactly the duplicated boilerplate the question exists to collect
-  // something better than.
-};
 
 /**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
@@ -437,19 +342,14 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
   },
 
   seeds: {
-    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
-      // Single registry above — one entry per seeded question, so the value
-      // and its trail source can never drift apart.
-      return PHASE_F_SEEDS[questionId]?.getValue(deps);
-    },
-
-    getSeedSource(questionId: string): DecisionProposalSource | undefined {
-      return PHASE_F_SEEDS[questionId]?.source;
-    },
-
+    // Spec 092 (T036): no getSeedValue/getSeedSource any more — the pf_*
+    // seeds are decision records now (see the T036 note above), and
+    // SurveyRunner reads them from the store. Only the required override
+    // remains a host concern.
+    //
     // spec 079 FR-009: waives pf_welcome_paragraph's static `required: true`
-    // in exactly the case getSeedValue above proposed a value — every other
-    // question (undefined here) keeps its own static `required`.
+    // in exactly the case the extraction pass seeded a prefill for it —
+    // every other question (undefined here) keeps its own static `required`.
     getRequiredOverride(questionId: string): boolean | undefined {
       if (questionId === "pf_welcome_paragraph") {
         return requiredWhenWelcomeParagraph(readAdaptiveDescriptionContext());

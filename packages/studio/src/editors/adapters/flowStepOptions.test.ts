@@ -36,6 +36,10 @@ import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
 
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { runLiveExtractionFromStores } from "../../decisions/liveExtraction.ts";
+import { buildExtractContext, type ExtractContext } from "../../decisions/extractContext.ts";
+import { questionRegistry } from "../../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type {
   BaseDocumentationProfile,
@@ -275,19 +279,72 @@ describe("trackOptions — record shape", () => {
   });
 });
 
-describe("phaseFOptions.seeds.getSeedValue (choice-question defaults)", () => {
+// ---------------------------------------------------------------------------
+// Spec 092 (T036): Phase F seeds are extracts / lookup defaults declared
+// on the pf_* modules and seeded as decision records by the live
+// extraction pass — the PHASE_F_SEEDS table and phaseFOptions' seed
+// readers are deleted. The helpers below evaluate a question's seed the
+// way production does: arrange the real stores, run the pass, read the
+// record it seeded.
+// ---------------------------------------------------------------------------
+
+function recordFor(questionId: string): Decision | undefined {
+  const decisionId = questionRegistry[questionId]?.provides?.[0];
+  return decisionId !== undefined
+    ? useDecisionStore.getState().decisions[decisionId]
+    : undefined;
+}
+
+function passSeedFor(questionId: string): string | string[] | undefined {
+  useDecisionStore.getState().reset();
+  runLiveExtractionFromStores();
+  const value = recordFor(questionId)?.value;
+  return typeof value === "string" || Array.isArray(value) ? value : undefined;
+}
+
+/**
+ * The production sequence for questions behind the more-detail gate
+ * (spec 092 G-9): the gate is answered "Yes" first, then the pass's
+ * re-run (question-push time in the live runner) seeds them.
+ */
+function passSeedWithGateOpen(questionId: string): string | string[] | undefined {
+  useDecisionStore.getState().reset();
+  useDecisionStore.getState().record({
+    id: "help-more-detail",
+    value: "true",
+    provenance: "asked",
+  });
+  runLiveExtractionFromStores();
+  const value = recordFor(questionId)?.value;
+  return typeof value === "string" || Array.isArray(value) ? value : undefined;
+}
+
+/** Record the identity decisions deriveSurveyContext needs, with the given language code. */
+function recordIdentity(code: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: "Test", provenance: "asked" });
+  record({ id: "language-autonym", value: "Test", provenance: "asked" });
+  record({ id: "language-code", value: code, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+  record({ id: "author-name", value: "Test Author", provenance: "asked" });
+}
+
+describe("pf_* lookup defaults (spec 092 T036)", () => {
   it.each([
     [pfMoreDetailGateMod, "false"],
     [pfDocLanguageMod, "english"],
     [pfHistoryEntryMod, "confirm"],
   ])("seeds a valid default for %#", (mod, expected) => {
-    const { deps } = buildDeps();
-    const seed = phaseFOptions.seeds!.getSeedValue(mod.definition.id, deps);
-    expect(seed).toBe(expected);
-    expect(mod.validate(seed).ok).toBe(true);
+    const dflt = mod.lookupDefault?.(buildExtractContext(null, null));
+    expect(dflt?.value).toBe(expected);
+    expect(mod.validate?.(dflt!.value as string).ok).toBe(true);
+  });
+
+  it("phaseFOptions no longer carries seed readers (records are the seed source)", () => {
+    expect(phaseFOptions.seeds?.getSeedValue).toBeUndefined();
+    expect(phaseFOptions.seeds?.getSeedSource).toBeUndefined();
   });
 });
-
 // ---------------------------------------------------------------------------
 // phaseFOptions.buildContext
 // ---------------------------------------------------------------------------
@@ -441,48 +498,49 @@ describe("phaseFOptions.onMount", () => {
 // behaviour.
 // ---------------------------------------------------------------------------
 
-describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
-  function seed(questionId: string, ctx: Record<string, string | undefined>) {
-    const { deps } = buildDeps({ surveyContext: ctx });
-    return phaseFOptions.seeds?.getSeedValue(questionId, deps);
+describe("pf_contact_info lookup default (spec 092 T036)", () => {
+  function ctxWithContact(authorContact?: string): ExtractContext {
+    const base = buildExtractContext(null, null);
+    if (authorContact === undefined) return base;
+    return {
+      ...base,
+      phaseF: {
+        seeds: { instantiationMode: null, baseKeyboard: null, baseVfs: null },
+        authorContact,
+      },
+    };
   }
 
-  it("declares a seeds block", () => {
-    expect(phaseFOptions.seeds).toBeDefined();
+  it("pre-fills pf_contact_info from the identity author contact, source identity", () => {
+    expect(pfContactInfoMod.lookupDefault?.(ctxWithContact("info@bafutliteracy.org"))).toEqual({
+      value: "info@bafutliteracy.org",
+      source: "identity",
+    });
   });
 
-  it("pre-fills pf_contact_info from surveyContext.author_contact", () => {
-    expect(seed("pf_contact_info", { author_contact: "info@bafutliteracy.org" })).toBe(
-      "info@bafutliteracy.org",
-    );
+  it("returns undefined when the author contact is absent (today's behaviour, unchanged)", () => {
+    expect(pfContactInfoMod.lookupDefault?.(ctxWithContact())).toBeUndefined();
   });
 
-  // Inert-today guarantee: nothing writes author_contact until spec 064 lands.
-  it("returns undefined when author_contact is absent (today's behaviour, unchanged)", () => {
-    expect(seed("pf_contact_info", {})).toBeUndefined();
-  });
-
-  it("returns undefined when author_contact is empty rather than seeding a blank", () => {
-    expect(seed("pf_contact_info", { author_contact: "" })).toBeUndefined();
+  it("returns undefined when the author contact is empty rather than seeding a blank", () => {
+    expect(pfContactInfoMod.lookupDefault?.(ctxWithContact(""))).toBeUndefined();
   });
 
   // Thanking and owning are different: shipped credits sections acknowledge
   // advisors and contributors who hold no copyright, so seeding the holder here
   // would produce duplicated boilerplate.
-  it("does NOT seed pf_credits, even when a holder-ish context value is present", () => {
-    expect(seed("pf_credits", { author_contact: "info@example.org" })).toBeUndefined();
-    expect(seed("pf_credits", { copyright_holder: "SIL Global" })).toBeUndefined();
+  it("does NOT seed pf_credits (no extract, no lookup default)", () => {
+    expect(pfCreditsMod.extract).toBeUndefined();
+    expect(pfCreditsMod.lookupDefault).toBeUndefined();
   });
 
-  it("seeds no free-text Phase F question", () => {
-    for (const id of [
-      "pf_welcome_paragraph",
-      "pf_usage_tip_1",
-      "pf_font_guidance",
-      "pf_project_url",
-    ]) {
-      expect(seed(id, { author_contact: "info@example.org" }), `${id} must not be seeded`).toBeUndefined();
-    }
+  it("seeds no free-text Phase F question from the contact", () => {
+    expect(pfWelcomeParagraphMod.extract?.(ctxWithContact("info@example.org"))).toBeUndefined();
+    expect(questionRegistry["pf_usage_tip_1"]?.extract).toBeUndefined();
+    expect(questionRegistry["pf_usage_tip_1"]?.lookupDefault).toBeUndefined();
+    expect(questionRegistry["pf_font_guidance"]?.extract).toBeUndefined();
+    expect(questionRegistry["pf_font_guidance"]?.lookupDefault).toBeUndefined();
+    expect(pfContactInfoMod.extract).toBeUndefined();
   });
 
   // Pre-filled is not the same as required — the whole point of the answer to
@@ -492,7 +550,6 @@ describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
     expect(pfCreditsMod.definition.required).toBe(false);
   });
 });
-
 // ---------------------------------------------------------------------------
 // phaseFOptions.seeds — pf_welcome_paragraph adaptive description proposal
 // (spec 079 FR-009, US4). Reads the four working-copy slices directly off
@@ -520,12 +577,21 @@ const NONE_PROFILE: BaseDocumentationProfile = {
   welcomeImages: [],
 };
 
-describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spec 079 FR-009)", () => {
+// ---------------------------------------------------------------------------
+// pf_welcome_paragraph adaptive description (spec 079 FR-009 proposal;
+// spec 092 T036: seeded by the extraction pass from the module's extract).
+// The arrangements set REAL store state, as production has it at setup.
+// End-to-end coverage (the seed reaching SurveyRunner's rendered input,
+// and the required-override gating Next) lives in
+// survey/PhaseFAdaptiveDescription.integration.test.tsx (SC-005).
+// ---------------------------------------------------------------------------
+
+describe("pf_welcome_paragraph — adaptive description seed + required override", () => {
   it("declares getRequiredOverride", () => {
     expect(phaseFOptions.seeds?.getRequiredOverride).toBeDefined();
   });
 
-  it("adapt-full: seeds the base's usable description and waives required", () => {
+  it("adapt-full: the pass seeds the base's usable description and required is waived", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
       baseDocProfile: FULL_PROFILE,
@@ -534,7 +600,7 @@ describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spe
     });
     const { deps } = buildDeps();
 
-    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBe(
+    expect(passSeedFor("pf_welcome_paragraph")).toBe(
       "This keyboard lets you type Bafut on any computer.",
     );
     expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(false);
@@ -549,7 +615,7 @@ describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spe
     });
     const { deps } = buildDeps();
 
-    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBeUndefined();
+    expect(passSeedFor("pf_welcome_paragraph")).toBeUndefined();
     // requiredWhen(ctx) always resolves a defined boolean (never undefined) —
     // `true` here means "use the static required:true", the same outcome as
     // no override at all (SurveyRunner's displayQ ends up required either way).
@@ -557,9 +623,10 @@ describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spe
   });
 
   it("copy track (Track 1, instantiationMode never set to adapt-existing): never seeds", () => {
+    useWorkingCopyStore.getState().reset();
     const { deps } = buildDeps();
     // Default reset() state: instantiationMode is null.
-    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBeUndefined();
+    expect(passSeedFor("pf_welcome_paragraph")).toBeUndefined();
     expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(true);
   });
 
@@ -572,7 +639,7 @@ describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spe
     });
     const { deps } = buildDeps();
 
-    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBeUndefined();
+    expect(passSeedFor("pf_welcome_paragraph")).toBeUndefined();
     expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(true);
   });
 
@@ -582,27 +649,46 @@ describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spe
     expect(pfWelcomeParagraphMod.definition.required).toBe(true);
   });
 });
-
 // ---------------------------------------------------------------------------
 // phaseFOptions.seeds.getSeedValue — choice questions always open selected
 // ---------------------------------------------------------------------------
 
-describe("phaseFOptions.seeds.getSeedValue (choice defaults)", () => {
-  const seedFor = (id: string, surveyContext = {}): string | string[] | undefined =>
-    phaseFOptions.seeds!.getSeedValue(id, buildDeps({ surveyContext }).deps);
+// ---------------------------------------------------------------------------
+// Choice questions always open selected — via the pass's records (T036).
+// ---------------------------------------------------------------------------
 
+describe("extraction pass — Phase F choice defaults", () => {
   it("defaults the more-detail gate to No", () => {
-    expect(seedFor("pf_more_detail_gate")).toBe("false");
+    expect(passSeedFor("pf_more_detail_gate")).toBe("false");
   });
 
   it("defaults the help language to English, or bilingual for a non-English keyboard", () => {
-    expect(seedFor("pf_doc_language")).toBe("english");
-    expect(seedFor("pf_doc_language", { bcp47_tag: "en-Latn" })).toBe("english");
-    expect(seedFor("pf_doc_language", { bcp47_tag: "ha-Latn" })).toBe("bilingual");
+    // pf_doc_language sits behind the more-detail gate (G-9): each case
+    // opens the gate first, as the live walk does before the question is
+    // reached.
+    expect(passSeedWithGateOpen("pf_doc_language")).toBe("english");
+    useDecisionStore.getState().reset();
+    recordIdentity("en");
+    useDecisionStore.getState().record({
+      id: "help-more-detail",
+      value: "true",
+      provenance: "asked",
+    });
+    runLiveExtractionFromStores();
+    expect(recordFor("pf_doc_language")?.value).toBe("english");
+    useDecisionStore.getState().reset();
+    recordIdentity("ha");
+    useDecisionStore.getState().record({
+      id: "help-more-detail",
+      value: "true",
+      provenance: "asked",
+    });
+    runLiveExtractionFromStores();
+    expect(recordFor("pf_doc_language")?.value).toBe("bilingual");
   });
 
   it("preselects adding the drafted HISTORY entry", () => {
-    expect(seedFor("pf_history_entry")).toBe("confirm");
+    expect(passSeedFor("pf_history_entry")).toBe("confirm");
   });
 
   it("seeds every bool/radio question in the Phase F question set with a valid option", () => {
@@ -615,7 +701,7 @@ describe("phaseFOptions.seeds.getSeedValue (choice defaults)", () => {
       .filter((d) => d !== undefined && (d.type === "bool" || d.type === "radio"));
     expect(choice.length).toBeGreaterThanOrEqual(3);
     for (const d of choice) {
-      const seed = seedFor(d.id);
+      const seed = passSeedWithGateOpen(d.id);
       expect(seed, d.id).toBeDefined();
       if (d.options !== undefined) {
         expect(d.options.map((o) => o.value), d.id).toContain(seed);
@@ -623,13 +709,18 @@ describe("phaseFOptions.seeds.getSeedValue (choice defaults)", () => {
     }
   });
 });
-
 // ---------------------------------------------------------------------------
 // phaseFOptions.seeds — text proposals derived from the starting point, and the
 // source each seed is recorded with
 // ---------------------------------------------------------------------------
 
-describe("phaseFOptions.seeds — derived text proposals", () => {
+// ---------------------------------------------------------------------------
+// Text proposals derived from the starting point (spec 092 T036: the pf_*
+// modules' extracts, seeded by the pass; source = the base keyboard's id
+// on the extracted record, per contracts/live-extraction.md).
+// ---------------------------------------------------------------------------
+
+describe("extraction pass — Phase F derived text proposals", () => {
   const BASE = makeBaseKeyboard({
     id: "sil_bafut",
     path: "release/sil/sil_bafut",
@@ -646,43 +737,86 @@ describe("phaseFOptions.seeds — derived text proposals", () => {
     useWorkingCopyStore.setState({ instantiationMode, baseKeyboard: BASE, baseVfs });
   }
 
-  const seedFor = (id: string) => phaseFOptions.seeds!.getSeedValue(id, buildDeps().deps);
-
   it("an update proposes the released package's website", () => {
     withBase("adapt-existing");
-    expect(seedFor("pf_project_url")).toBe("https://bafut.org");
-    expect(seedFor("pf_provenance_basis")).toBeUndefined();
+    expect(passSeedWithGateOpen("pf_project_url")).toBe("https://bafut.org");
+    expect(passSeedWithGateOpen("pf_provenance_basis")).toBeUndefined();
   });
 
   it("a copy proposes the copied keyboard as its provenance", () => {
     withBase("new-from-base");
-    expect(seedFor("pf_provenance_basis")).toBe(
+    expect(passSeedWithGateOpen("pf_provenance_basis")).toBe(
       "This keyboard started as a copy of the Bafut keyboard (sil_bafut).",
     );
-    expect(seedFor("pf_project_url")).toBeUndefined();
+    expect(passSeedWithGateOpen("pf_project_url")).toBeUndefined();
   });
 
   it("names a source for every data-backed seed, and none for the plain gate default", () => {
-    const sourceFor = (id: string) => phaseFOptions.seeds!.getSeedSource!(id, buildDeps().deps);
-    expect(sourceFor("pf_welcome_paragraph")).toBe("base");
-    expect(sourceFor("pf_contact_info")).toBe("identity");
-    expect(sourceFor("pf_doc_language")).toBe("identity");
-    expect(sourceFor("pf_history_entry")).toBe("analysis");
-    expect(sourceFor("pf_project_url")).toBe("base");
-    expect(sourceFor("pf_provenance_basis")).toBe("base");
-    expect(sourceFor("pf_more_detail_gate")).toBeUndefined();
+    // Extracted records: provenance "extracted", source = the base's id.
+    withBase("adapt-existing");
+    useWorkingCopyStore.setState({
+      baseDocProfile: FULL_PROFILE,
+      baseWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
+      baseHelpPhpText: null,
+    });
+    useDecisionStore.getState().reset();
+    recordIdentity("bfd");
+    useDecisionStore.getState().record({
+      id: "author-email",
+      value: "info@bafutliteracy.org",
+      provenance: "asked",
+    });
+    useDecisionStore.getState().record({
+      id: "help-more-detail",
+      value: "true",
+      provenance: "asked",
+    });
+    runLiveExtractionFromStores();
+    expect(recordFor("pf_welcome_paragraph")).toMatchObject({
+      provenance: "extracted",
+      source: "sil_bafut",
+    });
+    expect(recordFor("pf_project_url")).toMatchObject({
+      provenance: "extracted",
+      source: "sil_bafut",
+    });
+    // Lookup defaults keep their documented source names.
+    expect(recordFor("pf_contact_info")).toMatchObject({
+      provenance: "default",
+      source: "identity",
+    });
+    expect(recordFor("pf_doc_language")).toMatchObject({
+      provenance: "default",
+      source: "identity",
+    });
+    expect(recordFor("pf_history_entry")).toMatchObject({
+      provenance: "default",
+      source: "analysis",
+    });
+    // In this arrangement the gate record is the author's own planted
+    // answer ("true", asked) — the pass must not have overwritten it.
+    expect(recordFor("pf_more_detail_gate")).toMatchObject({
+      provenance: "asked",
+      value: "true",
+    });
+    // The gate's plain default, on a fresh pass where the author has not
+    // answered it, names no source.
+    useDecisionStore.getState().reset();
+    runLiveExtractionFromStores();
+    const gate = recordFor("pf_more_detail_gate");
+    expect(gate?.provenance).toBe("default");
+    expect(gate?.value).toBe("false");
+    expect(gate?.source).toBeUndefined();
   });
 
-  it("value and source lookups agree on the seeded set: unseeded ids return neither", () => {
-    // Regression guard for km-triage finding 1 (PR #1927): getSeedValue and
-    // getSeedSource both read the single PHASE_F_SEEDS registry, so a
-    // question id can never be seeded without its source or sourced without
-    // a value resolver. Unseeded ids (deliberately unseeded, unknown, or
-    // belonging to another flow) resolve to neither.
-    const { deps } = buildDeps();
-    for (const id of ["pf_credits", "pf_not_a_question", "il_language_code"]) {
-      expect(phaseFOptions.seeds!.getSeedValue(id, deps)).toBeUndefined();
-      expect(phaseFOptions.seeds!.getSeedSource!(id, deps)).toBeUndefined();
-    }
+  it("unseeded ids resolve to no record (deliberately unseeded, unknown, other flows)", () => {
+    // Regression guard for km-triage finding 1 (PR #1927), carried to the
+    // record mechanism: a question can never hold a seeded value without
+    // its record, nor a record without a seeded value — one pass writes both.
+    useWorkingCopyStore.getState().reset();
+    expect(passSeedFor("pf_credits")).toBeUndefined();
+    expect(recordFor("pf_credits")).toBeUndefined();
+    expect(recordFor("pf_not_a_question")).toBeUndefined();
+    expect(passSeedFor("il_language_code")).toBeUndefined();
   });
 });

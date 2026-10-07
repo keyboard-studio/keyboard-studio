@@ -223,6 +223,14 @@ export interface DecisionRendererProps<T = unknown> {
   provenance: DecisionProvenance;
   /** The recorded decision's `source`, when it carries one (e.g. a base id). */
   source?: string;
+  /**
+   * Spec 092: the value the extraction pass placed beside the author's
+   * answer (the record's `offered`), passed through so a renderer can show
+   * the extracted/defaulted value the author did not take — e.g. a
+   * "from <keyboard>" comparison — without computing any seed itself.
+   * Absent when nothing was offered or the offer was accepted unchanged.
+   */
+  offered?: unknown;
 }
 
 /**

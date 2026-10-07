@@ -204,6 +204,7 @@ export function GalleryHost<V>(props: GalleryHostProps<V>): React.JSX.Element {
       decisionId={mod.provides[0]}
       provenance={record?.provenance ?? "asked"}
       {...(record?.source !== undefined && { source: record.source })}
+      {...(record?.offered !== undefined && { offered: record.offered })}
     />
   );
   if (props.stepContext === undefined) return renderer;

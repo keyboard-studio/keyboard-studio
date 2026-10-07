@@ -78,5 +78,19 @@ const mod: QuestionModule = {
   writes: [],
   provides: ["help-doc-language"], requires: ["help-more-detail"],
   specRef: "specs/061-help-docs-generation",
+  // Spec 092 (T036): the documentation-language default is this module's
+  // lookup default, replacing the PHASE_F_SEEDS table entry — derived
+  // from the identity phase's composed BCP47 tag (supplied by the live
+  // wiring as ctx.phaseF.bcp47Tag): an English or tag-less project
+  // documents in English only; anything else documents bilingually. The
+  // author can overturn it.
+  lookupDefault: (ctx) => {
+    const tag = ctx.phaseF?.bcp47Tag;
+    const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
+    return {
+      value: primary === "" || primary === "en" ? "english" : "bilingual",
+      source: "identity",
+    };
+  },
 };
 export default mod;

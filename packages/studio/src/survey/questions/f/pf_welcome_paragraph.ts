@@ -118,5 +118,21 @@ export function apply(_value: string | string[] | undefined, ctx: ApplyContext):
   };
 }
 
-const mod: QuestionModule = { definition, validate, apply, fixtures, inputs: [], writes: [], provides: ["help-welcome-paragraph"] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  apply,
+  fixtures,
+  inputs: [],
+  writes: [],
+  provides: ["help-welcome-paragraph"],
+  // Spec 092 (T036): the starting-point prefill (spec 079 FR-009) is this
+  // module's extract, replacing the PHASE_F_SEEDS table entry. The
+  // derivation itself (lib/adaptiveDescription.ts `prefill`) is
+  // engine-backed and question modules stay engine-free, so the live
+  // wiring computes it into ctx.phaseF.welcomePrefill; the extract reads
+  // it from there. Source "base" in the old table = the pass's extracted
+  // provenance with the base keyboard's id as source.
+  extract: (ctx) => ctx.phaseF?.welcomePrefill,
+};
 export default mod;

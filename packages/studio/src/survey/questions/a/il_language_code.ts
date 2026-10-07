@@ -76,5 +76,12 @@ const mod: QuestionModule = {
   provides: ["language-code"],
   requires: ["language-name"],
   extract: extractLanguageCode,
+  // Spec 092 (T033): the resolved langtags entry's code as a lookup
+  // default (the entry resolution — ISO 639-3 preferred — happens where
+  // the entry is resolved; this declaration names the value + source).
+  lookupDefault: (ctx) => {
+    const code = ctx.identity?.languageCode;
+    return code !== undefined && code !== "" ? { value: code, source: "langtags" } : undefined;
+  },
 };
 export default mod;

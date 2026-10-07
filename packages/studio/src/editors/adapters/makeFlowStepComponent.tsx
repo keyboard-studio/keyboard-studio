@@ -152,7 +152,12 @@ export interface FlowStepOptions<Extracted = unknown> {
    * Optional seeding hooks (e.g. project_name slug derivation).
    */
   seeds?: {
-    getSeedValue: (questionId: string, deps: FlowStepDeps) => string | string[] | undefined;
+    /**
+     * Optional: a flow whose seeds are decision records (spec 092 — the
+     * extraction pass seeds them, SurveyRunner reads the records) omits
+     * this; the factory then passes an always-undefined seed callback.
+     */
+    getSeedValue?: (questionId: string, deps: FlowStepDeps) => string | string[] | undefined;
     /**
      * Where `getSeedValue`'s seed for a question came from, recorded with the
      * saved answer so the decision trail can name it. Optional: without it a
@@ -273,8 +278,8 @@ export function makeFlowStepComponent<Extracted>(
 
     // Stable seeding callbacks (reads deps via ref on each call — no stale closure).
     const getSeedValue = useCallback(
-      options.seeds
-        ? (questionId: string) => options.seeds!.getSeedValue(questionId, depsRef.current)
+      options.seeds?.getSeedValue
+        ? (questionId: string) => options.seeds!.getSeedValue!(questionId, depsRef.current)
         : (_questionId: string) => undefined,
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [],
