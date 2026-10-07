@@ -205,3 +205,30 @@ reads the stores it measures). Options: (a) exempt the named wiring
 modules in .dependency-cruiser.cjs; (b) relocate the FromStores entries
 out of decisions/. Not actioned at close-out — restructuring at the
 end of the stack would churn every downstream branch.
+
+## LEAD RULINGS on the close-out flags (2026-10-07)
+
+**T017 wire-in → option (c).** The recalculation core stays as the
+pinned engine contract (`startingPointChange.test.ts` 6/6); it is NOT
+wired into StudioShell's `doCommit` in this pass. The discard-by-consent
+semantics of the F1 rebase gate are product behaviour: option (b)
+(supersede discard with retain-and-recalculate, rewording the consent)
+is an OWNER call, put to Matthew explicitly by the lead — it is not
+taken by the crew. Wire-in is scheduled for the post-091 restack pass,
+alongside the held set, and lands then under whichever product ruling
+stands: (b) if the owner supersedes, otherwise into a retention-by-
+design path when one exists (option (a)'s shape). Until then no
+FromStores entry is added — no dead code, as the agent left it.
+
+**Depcruise decisions-layer → option (a).** Exempt the named
+store-wiring modules in `.dependency-cruiser.cjs`
+(`liveExtraction.ts`, `rebuildWorkingCopy.ts`,
+`rebuildPerf.measure.ts`). Principle recorded for the series: the
+decisions-layer rule guards the PURE decision core; a decisions
+module's store-wiring half imports the stores it wires by definition
+(the pattern 092 landed and 093 followed). Exemptions are added
+deliberately per wiring half; core modules are never exempted.
+Option (b) (relocate the FromStores entries out of decisions/) is
+rejected: it restructures a layout three landed specs share, at the
+top of the stack, for no behavioural gain. Execution: in 093's final
+restack pass, against the final tree's module set.
