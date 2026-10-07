@@ -12,7 +12,7 @@
 //   1. `applyStepCompletion` from `steps/reducer.ts` — spy via vi.spyOn after
 //      import.  Records which step IDs flow through the reducer.
 //   2. `surveySessionStore` mutators (advance, popHistory, setIdentityResult,
-//      setSurveyContext, setSelectedTrack, setScaffoldSpec, setLocalBase,
+//      setSurveyContext, setScaffoldSpec, setLocalBase,
 //      setCharactersSubStage) — injected via useSurveySessionStore.setState so
 //      the spy still executes the real logic.  Records call order.
 //   3. `workingCopyStore` mutators (recordPhase, setIdentity, lockDesktop,
@@ -76,6 +76,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 
 // ---------------------------------------------------------------------------
 // Mock child survey components — the shared StudioShell harness
@@ -210,6 +211,13 @@ interface WalkEntry {
    * centralised StepHost completion path per research R7).
    */
   workingCopyMutations: string[];
+  /**
+   * Decision-store mutator names in call order (spec 088). The completion
+   * writer (recordAll via StudioShell's injected deps) and the flow
+   * onCommit record for the track step land here — this is where the track
+   * choice is visible now that the session store no longer carries it.
+   */
+  decisionMutations: string[];
   navigateTo: string[];
 }
 
@@ -222,7 +230,6 @@ const SESSION_MUTATOR_NAMES = [
   "popHistory",
   "setIdentityResult",
   "setSurveyContext",
-  "setSelectedTrack",
   "setScaffoldSpec",
   "setLocalBase",
   "setBaseConfirmed",
@@ -245,6 +252,12 @@ const WC_MUTATOR_NAMES = [
   "lockDesktop",
   "setTouchLayoutJson",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Decision-store mutator names to spy on (spec 088)
+// ---------------------------------------------------------------------------
+
+const DECISION_MUTATOR_NAMES = ["record", "recordAll", "forget"] as const;
 
 // ---------------------------------------------------------------------------
 // Recorder factory
@@ -289,12 +302,25 @@ function createRecorder() {
     }
   }
 
+  // 5. Decision-store mutator spies — same pattern (spec 088).
+  const decisionSpies: Record<string, ReturnType<typeof vi.fn>> = {};
+  {
+    const store = useDecisionStore.getState();
+    for (const name of DECISION_MUTATOR_NAMES) {
+      const original = store[name] as (...args: unknown[]) => void;
+      const spy = vi.fn((...args: unknown[]) => original(...args));
+      useDecisionStore.setState({ [name]: spy } as Partial<typeof store>);
+      decisionSpies[name] = spy;
+    }
+  }
+
   /** Clear all spy call records before each step window. */
   function clearAll() {
     applyStepCompletionSpy.mockClear();
     navigateToMock.mockClear();
     for (const spy of Object.values(sessionSpies)) spy.mockClear();
     for (const spy of Object.values(wcSpies)) spy.mockClear();
+    for (const spy of Object.values(decisionSpies)) spy.mockClear();
   }
 
   function beginStep(stepId: string) {
@@ -304,6 +330,7 @@ function createRecorder() {
       applyStepCompletion: [],
       storeMutations: [],
       workingCopyMutations: [],
+      decisionMutations: [],
       navigateTo: [],
     };
   }
@@ -337,6 +364,7 @@ function createRecorder() {
 
     current.storeMutations = collectOrdered(sessionSpies, SESSION_MUTATOR_NAMES);
     current.workingCopyMutations = collectOrdered(wcSpies, WC_MUTATOR_NAMES);
+    current.decisionMutations = collectOrdered(decisionSpies, DECISION_MUTATOR_NAMES);
 
     for (const call of navigateToMock.mock.calls) {
       current.navigateTo.push(String(call[0]));

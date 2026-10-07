@@ -44,15 +44,11 @@ import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts
 // component module here would close the loop even for a type. That extracted
 // leaf has no runtime dependencies at all.
 import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
-import type { SurveyContext, Track } from "../survey/types.ts";
+import type { SurveyContext } from "../survey/types.ts";
 import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
-// Runtime import of the sibling store (one-directional: workingCopyStore.ts
-// does NOT import this module, so this does not create a circular dependency
-// per depcruise's no-circular rule). Used only inside setTouchSeedSource to
-// clear the stale touchDraft when the seed source actually changes (spec 035
-// R12) — the getState() escape-hatch idiom already used elsewhere in this
-// file (see the trailing comment) for cross-store reads/writes.
-import { useWorkingCopyStore } from "./workingCopyStore.ts";
+// Spec 088: this store no longer imports workingCopyStore — its only use
+// was the deleted setTouchSeedSource's touch-draft side effect, which moved
+// to the decision writer's call sites (research D-06).
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 
 // ---------------------------------------------------------------------------
@@ -313,8 +309,9 @@ export interface SurveySessionState {
    */
   surveyContext: SurveyContext;
 
-  /** "copy" | "adapt" chosen at the track step. Null until that step completes. */
-  selectedTrack: Track | null;
+  // Spec 088 FR-005: the authoring track is NOT stored here any more — it
+  // is the `authoring-track` decision in stores/decisionStore.ts, read via
+  // its `selectTrack` selector.
 
   /**
    * Track-1 project metadata set at the project_name step.
@@ -352,16 +349,11 @@ export interface SurveySessionState {
    */
   charactersSubStage: CharactersSubStage;
 
-  /**
-   * The author's choice at the touch_seed_source fork (spec 035 FR-006).
-   * Null means no choice recorded yet — advance() routes into the chooser
-   * step whenever this is null (fork memory, R12). Cleared back to null on a
-   * genuine base re-instantiation (see reducer.ts CHOOSE_BASE_STEP_ID case,
-   * which injects setTouchSeedSource as a ReducerDep so workingCopyStore does
-   * not need to import this store — avoids a circular dependency since
-   * setTouchSeedSource itself reaches into workingCopyStore to clear touchDraft).
-   */
-  touchSeedSource: TouchSeedSource | null;
+  // Spec 088 FR-005: the touch-seed choice is NOT stored here any more —
+  // it is the `touch-seed-source` decision in stores/decisionStore.ts, read
+  // via its `selectTouchSeedSource` selector. Its touch-draft side effect
+  // (research D-06) lives at the decision's writer call sites.
+
 
   /**
    * The author's choice at the Phase B IntroChooser (spec character-map pane
@@ -520,9 +512,6 @@ export interface SurveySessionState {
   /** Plain setter — survey context derived from identity. */
   setSurveyContext: (c: SurveyContext) => void;
 
-  /** Plain setter — chosen track. */
-  setSelectedTrack: (t: Track | null) => void;
-
   /** Plain setter — Track-1 scaffold spec. */
   setScaffoldSpec: (s: ScaffoldSpec | null) => void;
 
@@ -535,14 +524,6 @@ export interface SurveySessionState {
   /** Plain setter — characters step internal substage (spec 027 Stage 4). */
   setCharactersSubStage: (s: CharactersSubStage) => void;
 
-  /**
-   * Setter — the touch_seed_source fork choice (spec 035 R12).
-   * Setting a value DIFFERENT from the current one clears the working-copy
-   * `touchDraft` (its `charTouch` entries reference host keys of the other
-   * seed and would half-apply — see workingCopyStore.touchDraft docstring).
-   * A no-op re-set of the same value does not clear the draft.
-   */
-  setTouchSeedSource: (s: TouchSeedSource | null) => void;
 
   /** Plain setter — the Phase B IntroChooser discovery-method choice. */
   setDiscoveryMethod: (m: DiscoveryMethod | null) => void;
@@ -612,8 +593,8 @@ type SurveySessionData = Omit<
   | "advance" | "popHistory" | "jumpToStep" | "backToTouchSeedSource"
   | "backToUnfinishedGallery" | "backToChooseBase" | "reset" | "hydrate"
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
-  | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
-  | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
+  | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
+  | "setBaseConfirmed" | "setDiscoveryMethod"
   | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
 
@@ -649,12 +630,10 @@ const INITIAL_STATE = {
   identityResult: null,
   identityPhaseResult: null,
   surveyContext: {} as SurveyContext,
-  selectedTrack: null,
   scaffoldSpec: null,
   localBase: null,
   baseConfirmed: false,
   charactersSubStage: "prefill" as CharactersSubStage,
-  touchSeedSource: null as TouchSeedSource | null,
   discoveryMethod: null as DiscoveryMethod | null,
   markedForLaterDesktop: [] as readonly string[],
   markedForLaterTouch: [] as readonly string[],
@@ -837,23 +816,11 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   setIdentityResult: (r) => set({ identityResult: r }),
   setIdentityPhaseResult: (r) => set({ identityPhaseResult: r }),
   setSurveyContext: (c) => set({ surveyContext: c }),
-  setSelectedTrack: (t) => set({ selectedTrack: t }),
   setScaffoldSpec: (s) => set({ scaffoldSpec: s }),
   setLocalBase: (b) => set({ localBase: b }),
   setBaseConfirmed: (v) => set({ baseConfirmed: v }),
   setCharactersSubStage: (s) => set({ charactersSubStage: s }),
 
-  setTouchSeedSource: (s) =>
-    set((state) => {
-      // A genuine change of seed source invalidates any in-progress touch
-      // draft — its charTouch entries reference host keys of the OTHER seed
-      // and would half-apply with warnings (R12). A no-op re-set (same value,
-      // including null -> null) leaves the draft untouched.
-      if (s !== state.touchSeedSource) {
-        useWorkingCopyStore.getState().setTouchDraft(null);
-      }
-      return { touchSeedSource: s };
-    }),
 
   setDiscoveryMethod: (m) => set({ discoveryMethod: m }),
 
@@ -901,12 +868,10 @@ export function snapshotTraversal(): TraversalSnapshot {
     identityResult: s.identityResult,
     identityPhaseResult: s.identityPhaseResult,
     surveyContext: s.surveyContext,
-    selectedTrack: s.selectedTrack,
     scaffoldSpec: s.scaffoldSpec,
     localBase: s.localBase,
     baseConfirmed: s.baseConfirmed,
     charactersSubStage: s.charactersSubStage,
-    touchSeedSource: s.touchSeedSource,
     discoveryMethod: s.discoveryMethod,
     markedForLaterDesktop: s.markedForLaterDesktop,
     markedForLaterTouch: s.markedForLaterTouch,

@@ -9,13 +9,13 @@
 // mods (spec 035 R3 — carve removals + Phase C letter placements) is computed
 // HERE via deriveDesktopModifications rather than inside reducer.ts: steps/
 // may not import lib/ or stores/ (steps-layer boundary), but editors/ may
-// import both. seedSource is read raw from surveySessionStore (possibly
+// import both. seedSource is read from the decision store (possibly
 // null — the reducer's injected buildTouchLayoutJson dep applies the R11
 // Entity-5 default, see lib/touchEmission.ts resolveTouchSeedSource).
 
 import { useMemo } from "react";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { selectTouchSeedSource, useDecisionStore } from "../../stores/decisionStore.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { TouchGallery } from "../assignLoop/TouchGallery.tsx";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
@@ -46,7 +46,8 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   // Raw fork choice (spec 035 FR-006) — may legitimately be null (defensive
   // edge case); the reducer's injected buildTouchLayoutJson dep resolves the
   // Entity-5 default, not this adapter.
-  const seedSource = useSurveySessionStore((s) => s.touchSeedSource);
+  // Spec 088 FR-005: the fork choice is read from the decision store.
+  const seedSource = useDecisionStore((s) => selectTouchSeedSource(s.decisions));
   // Self-sources the same corpus placement map addPhysicalAdapter passes to
   // MechanismGallery (spec §7.6) — TouchGallery only reads its `touch` field
   // (placement-priors v2's corpus-mined longpress hosts) as a tie-breaker

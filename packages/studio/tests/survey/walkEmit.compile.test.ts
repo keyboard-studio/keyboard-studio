@@ -78,6 +78,7 @@ import {
 import { useWorkingCopyStore, bindManifest } from "../../src/stores/workingCopyStore.ts";
 import { manifest } from "../../src/steps/manifest.ts";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { getDecisionSnapshot, selectTouchSeedSource } from "../../src/stores/decisionStore.ts";
 import { irToCharacterView } from "../../src/lib/irToCharacterView.ts";
 import { deriveDesktopModifications } from "../../src/lib/deriveDesktopModifications.ts";
 import { buildTouchLayoutJson } from "../../src/lib/buildTouchLayoutJson.ts";
@@ -219,7 +220,7 @@ function completeTouchStep(assignments: TouchAssignment[]): void {
       baseIr: s.baseIr,
       baseVfs: s.baseVfs,
       mods,
-      seedSource: useSurveySessionStore.getState().touchSeedSource,
+      seedSource: selectTouchSeedSource(getDecisionSnapshot()),
     },
     studioReducerDeps(),
   );

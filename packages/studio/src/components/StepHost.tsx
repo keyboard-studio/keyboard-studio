@@ -456,11 +456,11 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     recordStepCompletion(resolvedStep.id, result, reducerDeps);
 
     // 3. Pure advance policy → next step + optional signals.
-    //    Read selectedTrack and identityResult from getState() — NOT from the
-    //    render-time closure. Adapters (e.g. TrackStepAdapter) call setSelectedTrack()
-    //    synchronously BEFORE invoking onComplete, so the Zustand store already holds
-    //    the post-mutation value; but the React selector closure still holds the
-    //    pre-mutation snapshot. getState() returns the current committed store value.
+    //    Read the routing facts from getState() — NOT from the render-time
+    //    closure. The track step's onCommit records its decision
+    //    synchronously BEFORE invoking onComplete, so the decision store
+    //    already holds the post-mutation value; but a React selector
+    //    closure would still hold the pre-mutation snapshot.
     const postMutationState = useSurveySessionStore.getState();
     // Spec 088 FR-004/FR-005: routing reads the decision store. The track
     // and seed values are selectors over the store snapshot (the session

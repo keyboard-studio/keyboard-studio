@@ -10,6 +10,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -19,6 +20,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -31,19 +33,23 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
     "stepId": "track",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setSelectedTrack",
       "setScaffoldSpec",
       "advance",
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [
       "recordPhase"
+    ],
+    "decisionMutations": [
+      "record",
+      "recordAll"
     ],
     "navigateTo": []
   },
@@ -54,6 +60,7 @@
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -70,6 +77,7 @@
       "recordPhase",
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -81,6 +89,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -94,6 +103,7 @@
       "recordPhase",
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -105,6 +115,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -114,6 +125,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -123,6 +135,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -136,6 +149,7 @@
     "workingCopyMutations": [
       "lockDesktop"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -145,6 +159,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -158,6 +173,7 @@
     "workingCopyMutations": [
       "setTouchLayoutJson"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -171,6 +187,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": [
       "output"
     ]

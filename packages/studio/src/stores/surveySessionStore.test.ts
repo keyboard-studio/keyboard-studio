@@ -63,13 +63,11 @@ describe("surveySessionStore", () => {
     const store = getStore();
     store.advance("choose_base");
     store.advance("track");
-    store.setSelectedTrack("copy");
     store.setScaffoldSpec({ keyboardId: "test_kb", displayName: "Test Keyboard" });
 
     // Confirm non-initial state
     expect(getStore().activeStepId).toBe("track");
     expect(getStore().history.length).toBe(2);
-    expect(getStore().selectedTrack).toBe("copy");
     expect(getStore().scaffoldSpec).toMatchObject({ keyboardId: "test_kb", displayName: "Test Keyboard" });
 
     getStore().reset();
@@ -80,7 +78,6 @@ describe("surveySessionStore", () => {
     expect(s.identityResult).toBeNull();
     expect(s.identityPhaseResult).toBeNull();
     expect(s.surveyContext).toEqual({});
-    expect(s.selectedTrack).toBeNull();
     expect(s.scaffoldSpec).toBeNull();
     expect(s.localBase).toBeNull();
     expect(s.baseConfirmed).toBe(false);
@@ -113,7 +110,6 @@ describe("surveySessionStore", () => {
       identityResult: null,
       identityPhaseResult: null,
       surveyContext: { targetScript: "Latn" } as never,
-      selectedTrack: "copy" as const,
       scaffoldSpec: { keyboardId: "haus_latn", displayName: "Hausa" },
       localBase: null,
       charactersSubStage: "B" as const,
@@ -124,7 +120,6 @@ describe("surveySessionStore", () => {
     const s = getStore();
     expect(s.activeStepId).toBe("track");
     expect(s.history).toEqual(["identity", "choose_base"]);
-    expect(s.selectedTrack).toBe("copy");
     expect(s.scaffoldSpec).toEqual({ keyboardId: "haus_latn", displayName: "Hausa" });
     expect(s.charactersSubStage).toBe("B");
 

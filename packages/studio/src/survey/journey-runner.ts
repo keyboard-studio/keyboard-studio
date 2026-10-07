@@ -818,6 +818,18 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
       }
 
       const outcome = advance(currentStepId as Parameters<typeof advance>[0], result, {
+        // Spec 088 FR-004: gates read a DecisionSet. This harness tracks the
+        // two routing facts as locals (see the header), so it assembles the
+        // equivalent set from them — it replays fixtures, it does not read
+        // the live decision store.
+        decisions: {
+          ...(selectedTrack !== null
+            ? { "authoring-track": { id: "authoring-track" as const, value: selectedTrack, provenance: "asked" as const } }
+            : {}),
+          ...(touchSeedSource !== null
+            ? { "touch-seed-source": { id: "touch-seed-source" as const, value: touchSeedSource, provenance: "asked" as const } }
+            : {}),
+        },
         selectedTrack,
         identitySupported: true,
         touchSeedSource,
