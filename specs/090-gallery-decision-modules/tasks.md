@@ -192,7 +192,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   migrated by US1 + this phase leave the store (zero gallery answer ids remain), and the
   store's header documents the narrowed role (research Q4 — name kept) in
   packages/studio/src/stores/surveyAnswerStore.ts
-- [ ] T027 [US2] FR-003 identifier list extended with the Phase B/C write actions (phaseBDraft
+- [x] T027 [US2] FR-003 identifier list extended with the Phase B/C write actions (phaseBDraft
   accept/decline actions, the marks `saveAnswer` ids, the characters addition write) in
   eslint.config.mjs and packages/studio/src/decisions/galleryWriteAudit.test.ts; SC-004 grep
   recorded: zero references to `phaseBDraftStore`

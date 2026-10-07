@@ -43,6 +43,45 @@ const GALLERY_WRITE_IDENTIFIERS = [
   "setTouchSeedSource",
 ];
 
+// US2 (T027): the Phase B/C renderer trees. Their retired store write path
+// is the deleted phaseBDraftStore (T025): its accept/decline/setter action
+// names survive as pure functions over the decision values and as gallery
+// host hook methods, so the bannable signature is the store hook itself.
+// A `saveAnswer` ban additionally applies to the two trees whose answer
+// writes US2 retired in full (invisibles, convenience). The marks /
+// characters / punctuation trees still call saveAnswer as the spec-079
+// evidence layer — that ban is deferred to the T026 persistence ruling
+// (research D-090-19/D-090-20), mirroring the checker test's lists.
+const GALLERY_RENDERER_TREES_US2 = [
+  "packages/studio/src/survey/CharactersStep.tsx",
+  "packages/studio/src/survey/PhaseB.tsx",
+  "packages/studio/src/survey/CharacterMapPane.tsx",
+  "packages/studio/src/survey/marks/**/*.{ts,tsx}",
+  "packages/studio/src/survey/punctuation/**/*.{ts,tsx}",
+  "packages/studio/src/survey/invisibles/**/*.{ts,tsx}",
+  "packages/studio/src/survey/convenience/**/*.{ts,tsx}",
+];
+const GALLERY_RENDERER_TREES_US2_ANSWER_FREE = [
+  "packages/studio/src/survey/invisibles/**/*.{ts,tsx}",
+  "packages/studio/src/survey/convenience/**/*.{ts,tsx}",
+];
+
+function galleryWriteBanRule(identifiers) {
+  return [
+    "error",
+    ...identifiers.flatMap((name) => [
+      {
+        selector: `CallExpression[callee.name="${name}"]`,
+        message: `Gallery renderer trees must not call store write action "${name}" — report the change through onChange (spec 090 FR-003).`,
+      },
+      {
+        selector: `CallExpression[callee.property.name="${name}"]`,
+        message: `Gallery renderer trees must not call store write action "${name}" — report the change through onChange (spec 090 FR-003).`,
+      },
+    ]),
+  ];
+}
+
 export default [
   {
     ignores: [
@@ -111,24 +150,32 @@ export default [
     // no store-write call sites inside gallery renderer trees — neither a
     // bare call (`saveAnswer(...)`) nor a member call
     // (`store.saveAnswer(...)` / `getState().saveAnswer(...)`). Selectors
-    // are generated from the identifier list; with the scaffolding's empty
-    // list the rule is present but bans nothing yet.
+    // are generated from the identifier list by galleryWriteBanRule.
     files: GALLERY_RENDERER_TREE_GLOBS,
     ignores: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
-      "no-restricted-syntax": [
-        "error",
-        ...GALLERY_WRITE_IDENTIFIERS.flatMap((name) => [
-          {
-            selector: `CallExpression[callee.name="${name}"]`,
-            message: `Gallery renderer trees must not call store write action "${name}" — report the change through onChange (spec 090 FR-003).`,
-          },
-          {
-            selector: `CallExpression[callee.property.name="${name}"]`,
-            message: `Gallery renderer trees must not call store write action "${name}" — report the change through onChange (spec 090 FR-003).`,
-          },
-        ]),
-      ],
+      "no-restricted-syntax": galleryWriteBanRule(GALLERY_WRITE_IDENTIFIERS),
+    },
+  },
+  {
+    // Spec 090 FR-003 layer 2 overlay, US2 (T027): the Phase B/C trees
+    // never touch the deleted phaseBDraftStore hook (see the US2 list
+    // comment above).
+    files: GALLERY_RENDERER_TREES_US2,
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": galleryWriteBanRule(["usePhaseBDraftStore"]),
+    },
+  },
+  {
+    // Spec 090 FR-003 layer 2 overlay, US2 (T027): invisibles and
+    // convenience retired their answer writes in full, so `saveAnswer`
+    // is banned there today. Marks / characters / punctuation follow
+    // with the T026 ruling (research D-090-19/D-090-20).
+    files: GALLERY_RENDERER_TREES_US2_ANSWER_FREE,
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": galleryWriteBanRule(["saveAnswer", "usePhaseBDraftStore"]),
     },
   },
   {

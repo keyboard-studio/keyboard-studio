@@ -49,6 +49,42 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
     ],
     identifiers: ["saveAnswer", "setLocalBase", "setBaseConfirmed", "setTouchSeedSource"],
   },
+  {
+    // US2 (T027): the Phase B/C store write path is retired — T025 deleted
+    // phaseBDraftStore, and its accept/decline/setter actions survive ONLY
+    // as pure functions over the decision values (survey/phaseBDraftOps.ts)
+    // and hook methods that record through the gallery host
+    // (survey/useInventoryDraft.ts). Those names are therefore NOT bannable
+    // (they are the sanctioned decision path now); the bannable signature
+    // of the old write path is the deleted store's hook itself.
+    story: "US2",
+    trees: [
+      "survey/CharactersStep.tsx",
+      "survey/PhaseB.tsx",
+      "survey/CharacterMapPane.tsx",
+      "survey/marks",
+      "survey/punctuation",
+      "survey/invisibles",
+      "survey/convenience",
+    ],
+    identifiers: ["usePhaseBDraftStore"],
+  },
+  {
+    // US2 (T027): the trees whose answer writes US2 retired in full —
+    // invisibles (ops only, never wrote answers) and convenience (its
+    // per-candidate booleans left the store in T024, D-090-17).
+    story: "US2",
+    trees: ["survey/invisibles", "survey/convenience"],
+    identifiers: ["saveAnswer"],
+  },
+  // NOT YET REGISTERED, by design (T027, D-090-20): a `saveAnswer` ban
+  // over the marks / characters / punctuation trees. Those calls are the
+  // spec-079 answer-store evidence layer — marks' per-toggle answers
+  // (D-090-16(2)), characters' addition answers, punctuation's inventory
+  // answer — whose fate is the T026 persistence adjudication (D-090-19),
+  // stopped for the lead's ruling. Registering the ban now would either
+  // red this gate or pre-decide that ruling; the ban (or its ruled
+  // exception) lands with T026's resolution and is asserted at T060.
 ];
 
 /** A single banned call site found in a source text. */

@@ -1019,3 +1019,45 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   differ in what replaces it and in the fate of the evidence layer,
   not in whether the status quo is declarable. **Stopped for the
   lead's ruling.**
+
+- **D-090-20 — T027 executed; the marks/characters/punctuation
+  `saveAnswer` ban is deferred to the T026 ruling (D-090-19), and
+  that deferral is itself a consequence the ruling must price.**
+  Both FR-003 lists are extended in this change.
+  `galleryWriteAudit.test.ts` gains two US2 entries: (1) all Phase
+  B/C renderer trees (CharactersStep, PhaseB, CharacterMapPane,
+  marks/, punctuation/, invisibles/, convenience/) ban
+  `usePhaseBDraftStore` — the deleted store's hook is the precise
+  signature of the retired write path, because the phaseBDraft
+  accept/decline/setter action NAMES survived the migration as pure
+  functions over the values (phaseBDraftOps.ts) and as gallery-host
+  hook methods (useInventoryDraft.ts) and are therefore the
+  sanctioned decision path, not bannable identifiers; (2)
+  invisibles/ + convenience/ additionally ban `saveAnswer` — the
+  two trees whose answer writes US2 retired in full (D-090-17).
+  eslint.config.mjs mirrors both entries as two new overlay blocks
+  (the US1 block refactored onto a shared `galleryWriteBanRule`
+  builder, behaviour unchanged); a planted `saveAnswer(` in the
+  invisibles tree errors under the overlay (verified, plant
+  removed), and the audit test is green (4/4). **Deferred:** a
+  `saveAnswer` ban over marks/ (16 live calls), CharactersStep.tsx
+  (1) and punctuation/ (1). Those calls are the spec-079
+  answer-store evidence layer whose fate IS D-090-19's question;
+  registering the ban today would either red both gates or force
+  option (c) before the lead rules. The deferral is recorded in
+  both list files at the registration site. **Interplay flagged
+  for the ruling:** T060/SC-002 asserts the final FR-003 lists
+  leave ZERO exceptions — under ruling (a) or (b) the evidence
+  layer survives as the store's sanctioned residue, so SC-002's
+  zero-exceptions claim can only be met by carrying this ban
+  exception with the ruling cited, or by reading the evidence
+  layer as outside FR-003's "gallery answer" scope (it is the
+  answer store's own draft surface, spec 079's design, not a
+  gallery write-around); under (c) the ban lands with the
+  elimination and no exception exists. The ruling should say
+  which. **SC-004 grep recorded (T027):** `phaseBDraftStore` —
+  zero references in packages/studio/src and packages/studio/tests
+  (code and tests; reached at T025, D-090-18); remaining repo hits
+  are historical prose only (specs 047/050 as-built documents,
+  engine source comments, one e2e comment narrating the old
+  durability argument).
