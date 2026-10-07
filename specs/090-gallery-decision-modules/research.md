@@ -1711,3 +1711,20 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   applyDecisionEffects ×2 + deepLinkRevision + walk 30/30;
   recorder suites 15/15; eslint 0 errors (4 pre-existing
   StudioShell warnings, untouched lines).
+  **Correction (same day, found by direct re-run):** the batch
+  figure above was wrong — the run that produced "45/45" did not
+  in fact execute reducer.test.ts's R1-era tests (its count
+  cannot be reconciled with the 401 tests in the module +
+  consistency files alone). Direct re-runs after the T041 commit
+  showed reducer.test.ts carrying 4 failures, all R1-mechanism
+  tests the migration should have re-pointed: the R1 describe
+  (lockDesktop via the reducer), R4's probe (re-pointed to
+  choose_base, which still exercises injected deps), R5's stale
+  `deps.lockDesktop` assertion (line removed), and the T024 pair
+  (moved to the effects' new home, `lib/assignLoopCompletion
+  .test.ts`, 3/3 — including the no-setTouchLayoutJson pin).
+  Verified counts after the fix: reducer.test.ts 40/40;
+  questionModules + decisionIRConsistency 401/401; registry 8/8;
+  assignLoopCompletion 3/3. The remaining figures above were
+  single-purpose runs and stand; the full recount rides on
+  T045's gate as before.
