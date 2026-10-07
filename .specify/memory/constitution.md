@@ -28,10 +28,16 @@ emit`). Constructs the codec cannot model are preserved as opaque
 cannot parse fails the whole scaffold — no try/catch around `parse()`.
 
 ### III. Single persistent working copy (v1.3.0 spine)
-One working copy is instantiated when the user selects a keyboard — Track 1
-`instantiateFromBase` (copy/adapt) or Track 2 `instantiateFromExisting`
-(import). Every step mutates that one copy; it is serialized **only at output**.
-No intermediate serialization, no second working copy.
+One working copy exists per project, instantiated when the user selects a
+keyboard — Track 1 `instantiateFromBase` (copy/adapt) or Track 2
+`instantiateFromExisting` (import). It is a **derived cache**: produced by
+replaying the project's decisions over the starting point in dependency
+order, and rebuilt by that replay whenever a decision changes — a change
+recalculates the downstream closure and replays from the checkpoint before
+the first changed decision (spec 093). The decisions are the only stored
+state: drafts save the starting point and the decisions, never the working
+copy, and a reload rebuilds the copy from them. It is serialized **only at
+output**. No intermediate serialization, no second working copy.
 
 ### IV. Validator layering is fixed (spec §10)
 Layer A validity (9 TS-portable + 5 WASM-only checks) and Layer B style live in
@@ -148,4 +154,4 @@ Amendments to this file follow the change that prompted them: when a spec
 amendment lands (e.g. a new vX.Y.0 recorded in spec-signoff), the relevant
 Article is updated in the same change and the version footer below is bumped.
 
-**Version**: 1.2.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-10-06
+**Version**: 1.3.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-10-07
