@@ -23,7 +23,7 @@
 // tests that cover the aria-label this fixes. A pure module with no store,
 // engine, or service imports is mocked by nobody and needs no mock.
 
-import type { IdentityPatch } from "../stores/workingCopyStore.ts";
+import type { IdentityPatch } from "../stores/identityPatch.ts";
 
 /**
  * Resolve the keyboard id that output should name.
