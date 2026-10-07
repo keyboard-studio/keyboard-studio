@@ -36,6 +36,7 @@ import type {
   RemovalCapability,
 } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
+import { applyMutatePatch } from "./steps/mutateApply.ts";
 import {
   shouldEmitTouchLayout,
   resolveTouchSeedSource,
@@ -879,6 +880,26 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // store access, injected so steps/reducer.ts never imports stores/.
       writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
       readDecisionSet: () => getDecisionSnapshot(),
+      // Spec 089 FR-001/FR-002 (apply-contract A4): the checked patch sink.
+      // The `ir` channel's containment-checked merge runs FIRST — a
+      // MutatePatchContainmentError throws before any overlay setter runs,
+      // so a patch is never partially applied. Channels then land in the
+      // contract's order (identity → attribution → helpDocs →
+      // historyEntryState), each a whole-value replace. A null working IR
+      // (not yet instantiated) skips only the `ir` channel; the overlay
+      // channels still apply.
+      applyWorkingCopyPatch: (patch, writes) => {
+        const wc = useWorkingCopyStore.getState();
+        if (patch.ir !== undefined && wc.ir !== null) {
+          wc.setWorkingIR(applyMutatePatch(wc.ir, patch.ir, writes));
+        }
+        if (patch.identity !== undefined) wc.setIdentity(patch.identity);
+        if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
+        if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
+        if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
+      },
+      getDecisions: () => getDecisionSnapshot(),
+      getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
       getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
       getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id,
     }),

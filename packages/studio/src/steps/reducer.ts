@@ -23,14 +23,13 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, RemovalCapability, SurveyAnswer } from "@keyboard-studio/contracts";
-import type { MutateContext } from "../survey/types.ts";
+import type { BaseKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
+import type { ApplyContext, WorkingCopyPatch } from "../survey/types.ts";
 // DesktopModifications is a type from the engine package (a workspace
 // dependency, not an internal studio/src/ layer) — the steps-layer boundary
 // forbids steps/ -> lib/stores/dashboard/components, not other packages.
 import type { DesktopModifications, OutputForm } from "@keyboard-studio/engine";
 import { applyMarkGuards, detectBaseMarkMechanism } from "@keyboard-studio/engine";
-import { applyMutatePatch } from "./mutateApply.ts";
 import { repropagate } from "./repropagate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
@@ -285,6 +284,21 @@ export interface ReducerDeps {
     answers: readonly SurveyAnswer[],
   ) => void;
 
+  // --- decision apply (spec 089 FR-001/FR-002, contracts/apply-contract.md) ---
+  /**
+   * The checked working-copy patch sink (A4). INJECTED for the boundary
+   * reason (StudioShell composes it from the working-copy store's setters):
+   * it performs the `ir` channel's checked merge BEFORE any overlay channel
+   * is written, so a containment failure applies nothing (no partial
+   * patch). Optional, and a no-op when absent — the same load-bearing
+   * optionality as the deps above.
+   */
+  applyWorkingCopyPatch?: (patch: WorkingCopyPatch, writes: readonly IRPath[]) => void;
+  /** Read the live decision set — the `decisions` an apply composes from. */
+  getDecisions?: () => DecisionSet;
+  /** Read the working copy's current HISTORY-entry state (apply context). */
+  getHistoryEntryState?: () => HistoryEntryState | null;
+
   // --- decision store (spec 088 FR-003, contract C-2) ---
   /**
    * Write decision records into the live decision store. INJECTED for the
@@ -301,37 +315,6 @@ export interface ReducerDeps {
   getSavedAnswer?: (stepId: string, questionId: string) => SavedAnswer | undefined;
   /** The starting-point keyboard's id, named as an extracted record's `source`. */
   getBaseKeyboardId?: () => string | undefined;
-}
-
-// ---------------------------------------------------------------------------
-// Mutate request — the payload a question step passes to route its answer
-// through the `mutate()` write seam (spec-014 US1, FR-002/-005).
-// ---------------------------------------------------------------------------
-
-/**
- * A request to apply a single question module's `mutate()` to the working-copy
- * IR. Carried as the `result` payload of `applyStepCompletion` for in-scope
- * question steps. The reducer applies it via `mutateApply` ONLY when the global
- * mutate flag is on; flag-off leaves the P4b declared-only seam unchanged.
- */
-export interface MutateRequest {
-  /** Discriminator so the reducer recognizes a mutate-routed completion. */
-  kind: "mutate";
-  /** The module's `mutate()` implementation (pure patch producer). */
-  mutate: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
-  /** The answer value to apply. */
-  value: string | string[] | undefined;
-  /** The module's declared `writes` — the containment set for the patch (M3). */
-  writes: readonly IRPath[];
-}
-
-function isMutateRequest(r: unknown): r is MutateRequest {
-  return (
-    typeof r === "object" &&
-    r !== null &&
-    (r as { kind?: unknown }).kind === "mutate" &&
-    typeof (r as { mutate?: unknown }).mutate === "function"
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -354,22 +337,6 @@ export function applyStepCompletion(
   result: unknown,
   deps: ReducerDeps,
 ): void {
-  // --- mutate seam (spec-014 T014): route an in-scope question answer through
-  // mutate() when the flag is on. Flag-off ⇒ no mutate() executes (F2/SC-008).
-  if (isMutateRequest(result)) {
-    if (!isMutateSeamEnabled()) return; // P4b declared-only seam — no IR write.
-    const base = deps.getWorkingIR?.() ?? null;
-    if (base === null) return; // no working copy yet — nothing to merge into.
-    const ctx: MutateContext = { ir: base, writes: result.writes };
-    // mutate() is pure; applyMutatePatch enforces containment (M3) and merges
-    // path-scoped (M2). A throw here is intentional — the failure must surface
-    // (M3), never be swallowed. The IR is left unchanged on rejection.
-    const patch = result.mutate(result.value, ctx);
-    const next = applyMutatePatch(base, patch, result.writes);
-    deps.setWorkingIR?.(next);
-    return;
-  }
-
   switch (stepId) {
     // Spec 071 — marks-series completion: apply the generated mark guards
     // (blocking swallow group + stepwise backspace-unwrap stores) to the
@@ -551,21 +518,6 @@ export function applyStepCompletion(
 }
 
 // ---------------------------------------------------------------------------
-// routeAnswersThroughMutate — route in-scope question answers through mutate().
-//
-// Moved from StudioShell.tsx (was private) and exported here so StepHost can
-// call it in the centralized completion path without duplicating the logic.
-// Only question modules with both `mutate` and non-empty `writes` are routed
-// (flag-gated via applyStepCompletion → isMutateSeamEnabled). Answer modules
-// that are display-only or answer-store-only are skipped (no `mutate`/`writes`).
-//
-// spec-014 US1 (T014/T015): route each in-scope question answer through its
-// module's `mutate()` write seam. The reducer gates execution on the global
-// mutate flag (off ⇒ no-op, byte-identical to P4b), so this is safe to call
-// unconditionally. A module without `mutate`/with empty `writes` is skipped.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // recordStepCompletion — the decision-audit seam (spec 053, research D-02).
 //
 // Separate from applyStepCompletion on purpose, and this is the one place the
@@ -606,10 +558,10 @@ export function recordStepCompletion(
  * decision for every survey-question answer in a completed step.
  *
  * Called once per completion from `StepHost.handleComplete`, in the same
- * block as `recordPhase` / `routeAnswersThroughMutate` — no other call site
+ * block as `recordPhase` / `applyDecisionEffects` — no other call site
  * writes question answers into the decision store. For each answer the
  * module is looked up in `questionRegistry` (the same lookup
- * `routeAnswersThroughMutate` performs); an answer with no registry entry
+ * `applyDecisionEffects` performs); an answer with no registry entry
  * writes nothing (C-2.2). Each id in `module.provides` gets one record
  * carrying the answer's value (broadcast — research §1b: the split rule is
  * the module's own, and every live module provides exactly one id),
@@ -657,21 +609,100 @@ export function recordAnswersAsDecisions(
   if (records.length > 0) deps.writeDecisionRecords(records);
 }
 
-export function routeAnswersThroughMutate(
+// ---------------------------------------------------------------------------
+// applyDecisionEffects — the decision-apply runner (spec 089 FR-001/FR-002,
+// contracts/apply-contract.md). The successor to routeAnswersThroughMutate:
+// where that routed answers through the flag-gated `mutate()` seam, this
+// runs each answered module's `apply()` UNCONDITIONALLY (A1 — no flag, no
+// per-module gate) and hands the returned patch to the injected sink.
+//
+// Called from StepHost.handleComplete AFTER recordAnswersAsDecisions (A6:
+// the completion's decisions are recorded first, so ctx.decisions includes
+// them). Modules without `apply` are skipped. Synchronous; no timer (A8).
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when a module's `apply()` returns a channel it is not authorized
+ * to write (A3). Carries the question id and the offending channel; nothing
+ * from the patch is applied — authorization is checked for the whole patch
+ * before the sink is called.
+ */
+export class ApplyChannelError extends Error {
+  /** The question whose apply returned the unauthorized channel. */
+  readonly questionId: string;
+  /** The unauthorized channel name. */
+  readonly channel: keyof WorkingCopyPatch;
+
+  constructor(questionId: string, channel: keyof WorkingCopyPatch) {
+    super(
+      `apply() for question "${questionId}" returned unauthorized channel "${channel}". ` +
+        `No part of the patch was applied (spec 089, apply-contract A3).`,
+    );
+    this.name = "ApplyChannelError";
+    this.questionId = questionId;
+    this.channel = channel;
+  }
+}
+
+/**
+ * The channel authorization table (A3): an overlay channel may be returned
+ * only by a module providing the named decision. The `ir` channel is not
+ * listed — it is authorized for any module with an `apply` and non-empty
+ * declared `writes`, and contained by the checked merge (A4).
+ */
+const APPLY_CHANNEL_AUTHORIZATION: ReadonlyArray<{
+  channel: keyof WorkingCopyPatch;
+  decisionId: Decision["id"];
+}> = [
+  { channel: "identity", decisionId: "project-keyboard-id" },
+  { channel: "attribution", decisionId: "copyright-holder" },
+  { channel: "helpDocs", decisionId: "help-welcome-paragraph" },
+  { channel: "historyEntryState", decisionId: "help-welcome-paragraph" },
+];
+
+/**
+ * Run the decision effects of a completed step's answers.
+ *
+ * For each answer whose module declares `apply`: build the ApplyContext
+ * (the live IR is re-read per answer, so a later apply in the same
+ * completion sees an earlier apply's IR write), call `apply`, verify every
+ * returned channel against the authorization table, and hand the patch to
+ * the injected sink. An unauthorized channel throws {@link ApplyChannelError}
+ * before the sink is called — no partial patch (A3).
+ *
+ * A no-op when the host injected no patch sink.
+ */
+export function applyDecisionEffects(
   result: SurveyPhaseResult,
   deps: ReducerDeps,
 ): void {
+  if (deps.applyWorkingCopyPatch === undefined) return;
+  const decisions: DecisionSet = deps.getDecisions?.() ?? {};
   for (const answer of result.answers) {
     const mod = questionRegistry[answer.questionId];
-    if (mod === undefined) continue;
-    if (mod.mutate === undefined || (mod.writes ?? []).length === 0) continue;
-    const value = answer.value as string | string[] | undefined;
-    const req: MutateRequest = {
-      kind: "mutate",
-      mutate: mod.mutate,
-      value,
-      writes: mod.writes!,
+    if (mod === undefined || mod.apply === undefined) continue;
+    const writes = mod.writes ?? [];
+    const ctx: ApplyContext = {
+      ir: deps.getWorkingIR?.() ?? null,
+      writes,
+      decisions,
+      currentHistoryEntryState: deps.getHistoryEntryState?.() ?? null,
     };
-    applyStepCompletion(answer.questionId, req, deps);
+    const patch = mod.apply(answer.value as string | string[] | undefined, ctx);
+    const channels = (Object.keys(patch) as Array<keyof WorkingCopyPatch>).filter(
+      (channel) => patch[channel] !== undefined,
+    );
+    if (channels.length === 0) continue;
+    for (const channel of channels) {
+      if (channel === "ir") {
+        if (writes.length === 0) throw new ApplyChannelError(answer.questionId, channel);
+        continue;
+      }
+      const rule = APPLY_CHANNEL_AUTHORIZATION.find((r) => r.channel === channel);
+      if (rule === undefined || !(mod.provides ?? []).includes(rule.decisionId)) {
+        throw new ApplyChannelError(answer.questionId, channel);
+      }
+    }
+    deps.applyWorkingCopyPatch(patch, writes);
   }
 }

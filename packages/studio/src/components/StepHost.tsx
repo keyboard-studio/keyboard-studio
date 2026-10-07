@@ -13,7 +13,7 @@
 //
 // CENTRALIZED COMPLETION PATH (contract §2, FR-004):
 //   1. If result is SurveyPhaseResult-shaped: recordPhase(result) +
-//      routeAnswersThroughMutate(result, deps)
+//      recordAnswersAsDecisions(result, deps) + applyDecisionEffects(result, deps)
 //   2. If step.id in STEPS_WITH_APPLY_COMPLETION: applyStepCompletion(id, result, deps)
 //   3. advance(id, result, { selectedTrack, identitySupported, touchSeedSource }) →
 //      { next, navigate?, setCharactersSubStage? }
@@ -50,10 +50,10 @@ import { getDecisionSnapshot, selectTouchSeedSource, selectTrack } from "../stor
 import { manifest } from "../steps/manifest.ts";
 import type { EditorStep } from "../steps/types.ts";
 import {
+  applyDecisionEffects,
   applyStepCompletion,
   recordAnswersAsDecisions,
   recordStepCompletion,
-  routeAnswersThroughMutate,
   type ReducerDeps,
 } from "../steps/reducer.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
@@ -70,7 +70,7 @@ import { useInventoryCoverageGate } from "../hooks/useInventoryCoverageGate.ts";
 
 // ---------------------------------------------------------------------------
 // isSurveyPhaseResult — shape guard for the generic completion path.
-// Guards recordPhase + routeAnswersThroughMutate — these are only called when
+// Guards recordPhase + applyDecisionEffects — these are only called when
 // the result is SurveyPhaseResult-shaped (phase: string, answers: array).
 // ---------------------------------------------------------------------------
 
@@ -431,14 +431,19 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // never wrong.
     pendingBeforeRef.current = { workToDo, visited: useSurveySessionStore.getState().visited };
 
-    // 1. If SurveyPhaseResult-shaped: recordPhase + routeAnswersThroughMutate.
+    // 1. If SurveyPhaseResult-shaped: recordPhase, record the completion's
+    //    decisions, then run their effects (spec 089 contract A6 — recording
+    //    precedes applying, so an apply composes from a decision set that
+    //    includes its own completion's records).
     if (isSurveyPhaseResult(result)) {
       // spec 079 D-4: the step owns its own answers within the phase slot.
       recordPhase(result, { stepId: resolvedStep.id });
-      routeAnswersThroughMutate(result, reducerDeps);
       // Spec 088 FR-003 (contract C-2): the same completion writes one
       // decision record per provided decision into the decision store.
       recordAnswersAsDecisions(result, resolvedStep.id, reducerDeps);
+      // Spec 089 FR-001/FR-002: run each answered module's apply()
+      // unconditionally through the checked patch sink.
+      applyDecisionEffects(result, reducerDeps);
     }
 
     // 2. If step has reducer side effects: applyStepCompletion.

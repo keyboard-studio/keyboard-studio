@@ -10,8 +10,9 @@
 //
 // R1 and R2 run once with the mutate seam flag (VITE_KM_MUTATE_SEAM) off and once
 // with it on: both write paths sit outside the flag gate (spec 021 T007/T008).
-// The flag-gated parts (mutate() requests, touch re-propagation at mechanisms)
-// have their own describes below (spec 014 M3/M6, F1/F2).
+// The question-answer write path is the decision-apply runner now (spec 089:
+// steps/applyDecisionEffects.test.ts); the one flag-gated part left in this
+// file is touch re-propagation at mechanisms (deleted with the flag in T021).
 //
 // Source of truth: specs/012-step-model-manifest/contracts/manifest-reducer.contract.md
 
@@ -24,14 +25,11 @@ import {
   type ReducerDeps,
   type InstantiateResult,
   type TouchCompleteResult,
-  type MutateRequest,
 } from "./reducer.ts";
 import type { BaseKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { repropagate as mockRepropagate } from "./repropagate.ts";
-import langNameMod from "../survey/questions/reserve/language_name_english.ts";
-import desktopFirstNotice from "../survey/questions/reserve/desktop_first_notice.ts";
 
 // T024 (single-writer rule): spy on repropagate() to assert the reducer no
 // longer injects setTouchLayoutJson into RepropagateDeps.
@@ -498,73 +496,6 @@ describe("T024 — repropagate() call site no longer injects setTouchLayoutJson"
     expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
     expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Spec 014 T012/T014 — question answers routed through mutate() (M3/M6, F1/F2)
-// ---------------------------------------------------------------------------
-
-describe("mutate seam — question answers routed through mutate()", () => {
-  function mutateDeps(initialIr: KeyboardIR | null) {
-    let ir = initialIr;
-    const deps: ReducerDeps = {
-      ...makeDepsMock(),
-      getWorkingIR: () => ir,
-      setWorkingIR: vi.fn((next: KeyboardIR) => { ir = next; }),
-    };
-    return { deps, getIr: () => ir };
-  }
-
-  function mutateReq(value: string | string[] | undefined): MutateRequest {
-    return { kind: "mutate", mutate: langNameMod.mutate!, value, writes: langNameMod.writes! };
-  }
-
-  afterEach(() => { vi.unstubAllEnvs(); });
-
-  it("flag off: does not call setWorkingIR and leaves the IR unchanged (F2/SC-008)", () => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-    const base = makeTestIR([]);
-    const { deps, getIr } = mutateDeps(base);
-    applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
-    expect(deps.setWorkingIR).not.toHaveBeenCalled();
-    expect(getIr()!.header.name).toBe(base.header.name);
-  });
-
-  describe("flag on", () => {
-    beforeEach(() => { vi.stubEnv("VITE_KM_MUTATE_SEAM", "1"); });
-
-    it("applies the question's mutate() patch to the working IR without touching the base", () => {
-      const base = makeTestIR([]);
-      const { deps, getIr } = mutateDeps(base);
-      applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
-      expect(deps.setWorkingIR).toHaveBeenCalledTimes(1);
-      expect(getIr()!.header.name).toBe("Bafut");
-      expect(base.header.name).toBe("Test");
-    });
-
-    it("is a no-op (no setWorkingIR) when no working copy exists yet", () => {
-      const { deps } = mutateDeps(null);
-      applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
-      expect(deps.setWorkingIR).not.toHaveBeenCalled();
-    });
-
-    it("an empty answer applies an empty patch (no observable IR change) — M5", () => {
-      const base = makeTestIR([]);
-      const { deps, getIr } = mutateDeps(base);
-      applyStepCompletion("language_name_english", mutateReq(""), deps);
-      expect(getIr()!.header.name).toBe(base.header.name);
-    });
-
-    it("a display-only module (empty writes, no mutate) performs no IR change (AC US1-3)", () => {
-      const base = makeTestIR([]);
-      const { deps, getIr } = mutateDeps(base);
-      expect(desktopFirstNotice.writes).toEqual([]);
-      expect(desktopFirstNotice.mutate).toBeUndefined();
-      applyStepCompletion("desktop_first_notice", undefined, deps);
-      expect(deps.setWorkingIR).not.toHaveBeenCalled();
-      expect(getIr()).toEqual(base);
-    });
   });
 });
 
