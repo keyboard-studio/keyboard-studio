@@ -420,3 +420,32 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   renderer, modules re-export. Repo total after the fix: 121 (one below
   the pre-090 base — the touch panel's move also dissolved a
   pre-existing cycle).
+- **D-090-9 — StepHost golden-walk fixtures regenerated for the US1
+  migration signature (lead adjudication, confirmed intended).** After
+  US1 (T011 windows-layout, T012 touch-seed-source, T013 base-keyboard),
+  the spec 028/029 StepHost oracle fixtures
+  (`tests/steps/__fixtures__/goldenWalk/{copy,adapt}.json`) no longer
+  matched the recorded walk. The implementer stopped the regeneration
+  rather than absorbing an unexamined delta; the lead adjudicated the
+  full delta as T013/US1's intended migration signature and confirmed:
+  - `decisionMutations: []` → `["record"]` at `layout`, `choose_base`,
+    and `touch_seed_source` in both tracks — the three migrated steps
+    now record decisions through the gallery host (expected: this is
+    the migration itself).
+  - `choose_base` `storeMutations` loses **both** `setBaseConfirmed`
+    calls. Evidence this is intended, not a lost behaviour: on this
+    branch no production code reads `baseConfirmed` as a trigger —
+    StudioShell arms off the recorded `base-keyboard` decision
+    (StudioShell.tsx:1082 comment + code); `BaseKeyboardRenderer`
+    records via the host; both `setBaseConfirmed` production callers
+    were deleted in c6902ee9 (T013); the flag and setter survive in
+    surveySessionStore only as persisted draft shape + reset paths.
+    The preview-commit gating tests were re-pointed to the decision
+    trigger in US1 and pass.
+  Fixtures were regenerated via the harness write path
+  (`loadOrWriteFixture`: absent fixture → write) and the regenerated
+  diff was verified entry-by-entry to contain **nothing beyond those
+  two delta shapes** in either track before committing. This oracle is
+  spec 028/029's StepHost mutation-sequence fixture — distinct from
+  spec 089's golden-walk zip baseline, which is untouched by this
+  regeneration.

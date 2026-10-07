@@ -20,20 +20,22 @@
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setBaseConfirmed",
       "setLocalBase",
-      "setBaseConfirmed",
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
@@ -159,7 +161,9 @@
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
