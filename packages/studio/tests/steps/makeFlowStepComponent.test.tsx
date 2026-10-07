@@ -104,10 +104,12 @@ vi.mock("../../src/stores/surveySessionStore.ts", () => ({
 }));
 
 vi.mock("../../src/stores/decisionStore.ts", () => {
-  const state = { decisions: {}, record: mockRecordDecision, forget: mockForgetDecision };
+  // Lazy state: the factory runs at import time (hoisted), before the
+  // top-level mock fns initialize — resolve them at call time instead.
+  const state = () => ({ decisions: {}, record: mockRecordDecision, forget: mockForgetDecision });
   const useDecisionStore = Object.assign(
-    (selector: (s: unknown) => unknown) => selector(state),
-    { getState: () => state },
+    (selector: (s: unknown) => unknown) => selector(state()),
+    { getState: state },
   );
   return {
     useDecisionStore,

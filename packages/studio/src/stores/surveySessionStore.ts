@@ -408,7 +408,7 @@ export interface SurveySessionState {
    * first character" affordance (spec 035 R12 re-entry path). The generic
    * `popHistory` follows the walked-history stack, which lands on
    * "mechanisms" whenever the seed-source fork was SKIPPED this pass (a
-   * recorded, non-stale `touchSeedSource` routes advance() straight from
+   * recorded, non-stale touch-seed choice routes advance() straight from
    * "mechanisms" to "touch" — R12 fork memory) — that would make the choice
    * unreachable after the first pass (violates US2-AS4). This action always
    * resurfaces the "touch_seed_source" chooser instead:
@@ -538,7 +538,7 @@ export interface SurveySessionState {
    * deferred" from "never looked at". Lives HERE (not workingCopyStore, not a
    * new module-scoped Set) because:
    *   (a) it is per-authoring-session traversal state, not keyboard content —
-   *       the same category as activeStepId/history/touchSeedSource above,
+   *       the same category as activeStepId/history above,
    *       never the working copy's own data;
    *   (b) this store already has a serialize/restore seam
    *       (snapshotTraversal/applyTraversalSnapshot, driven by
@@ -581,7 +581,8 @@ export interface SurveySessionState {
 // for — no silent omission from the durable draft.
 //
 // DEVIATION 1 (spec 034 US3 task brief): the data-model.md TraversalSnapshot
-// field list predates spec 035, which added `touchSeedSource` to this store.
+// field list predates spec 035, which added the touch-seed choice to this store
+// (a session field until spec 088 moved it to the decision store).
 // It is included here — a reload mid-touch that lost the seed-source fork
 // choice would silently re-ask a question the author already answered, or
 // worse, mis-resolve the R11/R12 default. `TraversalSnapshot` is exactly this
@@ -840,8 +841,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads
-// inside memoised callbacks (e.g. onInstantiate reads selectedTrack this way).
-// No extra export needed — zustand attaches getState() to the hook directly.
+// inside memoised callbacks. No extra export needed — zustand attaches
+// getState() to the hook directly.
 
 // ---------------------------------------------------------------------------
 // TraversalSnapshot serialize/restore (T017, spec 034 US3)

@@ -2490,8 +2490,17 @@ describe("draftPersistence", () => {
     );
     const V1_KEY = "ks.draft.fixture_keyboard.v1";
 
-    function fixtureVariant(mutate: (draft: Record<string, any>) => void): string {
-      const draft = JSON.parse(fixtureRaw) as Record<string, any>;
+    interface V1FixtureStep {
+      answers?: Record<string, { value?: unknown; [k: string]: unknown }>;
+    }
+    interface V1FixtureDraft {
+      surveyAnswers?: { steps?: Record<string, V1FixtureStep> };
+      traversal?: { selectedTrack?: string };
+      [k: string]: unknown;
+    }
+
+    function fixtureVariant(mutate: (draft: V1FixtureDraft) => void): string {
+      const draft = JSON.parse(fixtureRaw) as V1FixtureDraft;
       mutate(draft);
       return JSON.stringify(draft);
     }
@@ -2513,15 +2522,18 @@ describe("draftPersistence", () => {
 
     it("T028: an answer whose question id is absent from the registry becomes exactly one orphan — full accounting", () => {
       const variant = fixtureVariant((draft) => {
-        draft.surveyAnswers.steps.identity.answers["zz_removed_question"] = {
-          value: "orphan-value",
-          answerType: "text",
-          origin: "confirmed",
-          stage: "confirmed",
-          evidenceKey: null,
-          screenId: "capture",
-          savedAt: 1791334913771,
-        };
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
       });
 
       const result = migrateDraftEnvelope(JSON.parse(variant));
@@ -2533,14 +2545,14 @@ describe("draftPersistence", () => {
       // 100% accounting: 6 v1 answers = 5 decision records + 0 retained
       // gallery answers (the fixture has no settles-step answers) + 1 orphan.
       const totalAnswers = Object.values(
-        (JSON.parse(variant) as Record<string, any>).surveyAnswers.steps,
+        (JSON.parse(variant) as V1FixtureDraft).surveyAnswers?.steps ?? {},
       ).reduce(
-        (n: number, step: any) => n + Object.keys(step.answers ?? {}).length,
+        (n: number, step: V1FixtureStep) => n + Object.keys(step.answers ?? {}).length,
         0,
       );
       const recordCount = Object.keys(result!.envelope.decisions ?? {}).length;
       const retainedCount = Object.values(result!.envelope.surveyAnswers?.steps ?? {}).reduce(
-        (n: number, step: any) => n + Object.keys(step.answers ?? {}).length,
+        (n: number, step) => n + Object.keys(step.answers ?? {}).length,
         0,
       );
       expect(totalAnswers).toBe(6);
@@ -2549,7 +2561,7 @@ describe("draftPersistence", () => {
 
     it("T029: a session-field/answer disagreement migrates with the session value winning, and logs it", () => {
       const variant = fixtureVariant((draft) => {
-        draft.traversal.selectedTrack = "adapt"; // track_choice answer stays "copy"
+        if (draft.traversal) draft.traversal.selectedTrack = "adapt"; // track_choice answer stays "copy"
       });
       const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
       try {
@@ -2565,15 +2577,18 @@ describe("draftPersistence", () => {
 
     it("T030: loading a v1 draft with an orphan writes it to the decision trail, carrying its value, exactly once", () => {
       const variant = fixtureVariant((draft) => {
-        draft.surveyAnswers.steps.identity.answers["zz_removed_question"] = {
-          value: "orphan-value",
-          answerType: "text",
-          origin: "confirmed",
-          stage: "confirmed",
-          evidenceKey: null,
-          screenId: "capture",
-          savedAt: 1791334913771,
-        };
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
       });
       localStorage.setItem(V1_KEY, variant);
 

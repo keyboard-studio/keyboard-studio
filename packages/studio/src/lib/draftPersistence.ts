@@ -1644,6 +1644,13 @@ export function loadDecisionRecordForProject(projectKey: string): boolean {
 export function clearDraft(projectKey: string): void {
   try {
     localStorage.removeItem(draftKey(projectKey));
+    // Spec 088 (C-4.2): a pre-flip draft may still live under the legacy
+    // `.v1` key — a delete must remove the project's record wherever it
+    // is, or the boot scan would re-adopt the orphaned legacy key and
+    // resurrect the deleted project in "My keyboards".
+    if ((DRAFT_VERSION as number) !== LEGACY_DRAFT_VERSION) {
+      localStorage.removeItem(legacyDraftKey(projectKey));
+    }
   } catch {
     // VR-4: quota/security failure — never throw into the authoring flow.
   }
