@@ -27,6 +27,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { screen, cleanup, act } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 import type { ActiveStepId } from "../../src/stores/surveySessionStore.ts";
 import type { ReducerDeps } from "../../src/steps/reducer.ts";
 
@@ -218,23 +219,16 @@ describe('StepHost terminal: "done"', () => {
 
 describe('StepHost terminal: "unsupported"', () => {
   beforeEach(() => {
-    // unsupported branch reads identityResult — seed it so the stub renders.
+    // The unsupported branch derives the identity result from the decision
+    // store (spec 089) — seed the identity decisions so the stub renders:
+    // target-script "Ethi" is UNSUPPORTED, so deriveIdentityResult reports
+    // supported: false with targetScriptRaw "Ethi".
     act(() => {
-      useSurveySessionStore.setState({
-        identityResult: {
-          autonym: "Test",
-          english: "Test",
-          languageSubtag: "te",
-          region: "",
-          targetScriptRaw: "Ethi",
-          bcp47: "te-Ethi",
-          supported: false,
-          prefill: { script: "Ethi", scriptClass: "abugida", routingGroup: "non-roman" },
-          // spec 064: a gated script terminates at il_script_not_supported, before
-          // the attribution questions — so there is nothing to attribute.
-          attribution: null,
-        },
-      });
+      const record = useDecisionStore.getState().record;
+      record({ id: "language-name", value: "Test", provenance: "asked" });
+      record({ id: "language-autonym", value: "Test", provenance: "asked" });
+      record({ id: "language-code", value: "te", provenance: "asked" });
+      record({ id: "target-script", value: "Ethi", provenance: "asked" });
     });
   });
 

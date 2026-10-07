@@ -53,5 +53,16 @@ const mod: QuestionModule = {
   writes: [],
   provides: ["help-contact-info"],
   specRef: "specs/064-keyboard-attribution",
+  // Spec 092 (T036): the author-contact seed (from the identity phase's
+  // attribution, spec 064) is this module's lookup default, replacing the
+  // PHASE_F_SEEDS table entry. Stays OPTIONAL — the author can clear it
+  // or publish a community channel instead. Resolves to absent when no
+  // contact was captured, exactly as the table did.
+  lookupDefault: (ctx) => {
+    const contact = ctx.phaseF?.authorContact;
+    return contact !== undefined && contact !== ""
+      ? { value: contact, source: "identity" }
+      : undefined;
+  },
 };
 export default mod;

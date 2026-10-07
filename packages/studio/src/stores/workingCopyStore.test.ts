@@ -1560,8 +1560,8 @@ describe("workingCopyStore — T078 mode-toggle regression suite (SC-011, FR-036
 // Regression for the Phase-5 MAJOR bug: the mutate-seam write path routed
 // incremental IR patches (US1 mutate-apply, US2 touch re-propagation, US2
 // touch promotion) through setIR, which RESETS deletedNodeIds/deletedItemIds/
-// undoStack. Those writes fire AFTER the carve step, so enabling
-// VITE_KM_MUTATE_SEAM=1 silently WIPED the live carve-deletion overlay that the
+// undoStack. Those writes fire AFTER the carve step, so enabling the
+// mutate seam (then flag-gated) silently WIPED the live carve-deletion overlay that the
 // OSK preview and shipped output project from baseIr + the overlay. The fix
 // routes those writes through setWorkingIR, which updates `ir` ONLY.
 // ---------------------------------------------------------------------------

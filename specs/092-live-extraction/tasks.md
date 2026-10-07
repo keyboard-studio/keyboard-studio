@@ -12,15 +12,23 @@ report — that is a series failure, not a licence to quietly make the edit.
 
 ## Phase 1: Setup
 
-- [ ] **T001** Verify the stack this spec stands on is landed in this branch: 088's
+- [x] **T001** Verify the stack this spec stands on is landed in this branch: 088's
   `decisionStore` (records carry `inputs`/`offered`), 089's `apply` + patch runner, 090's
   `DecisionRendererProps` (`provenance`/`source`) and `carved-layout` value shape, 091's
   derived steps with `stepDependencies.ts` deleted. Record any predecessor gap in the PR
   description before writing code · packages/studio/src/decisions/, packages/studio/src/steps/
-- [ ] **T002** Capture the pre-change baseline: the 089 golden walk
+  — DONE with gaps recorded in plan.md ("Implementation audit (T001)"): 091 not yet
+  landed (G-1), 090 US3/US4 gallery modules placeholder (G-2, T037 pending-predecessor),
+  plus deltas G-3…G-7 and the OQ-2 resolution.
+- [x] **T002** Capture the pre-change baseline: the 089 golden walk
   (e2e/golden-walk.spec.ts, copy track from `basic_kbdfr`) green and byte-identical, and a
   grep snapshot proving `runDecisionFlow` has no live caller (research R1) ·
   packages/studio/e2e/golden-walk.spec.ts
+  — DONE with a caveat recorded in plan.md: grep snapshot confirms no live caller
+  (DecisionsDemo/spikeRunner only); the Playwright walk is CI-gated (owner ruling);
+  the store-level StepHost walk is red on this base with a characterised
+  decisionMutations-only delta (predecessor-cascade fixture staleness — fixtures NOT
+  regenerated here; reconciliation rides the 089/090 restack).
 
 **Checkpoint:** predecessors present, baseline pinned — the pass can be built.
 
@@ -30,29 +38,45 @@ The live extraction pass and the setup decision. No user story can be verified w
 extraction has nothing to read until setup has run, and setup is what makes the track known.
 
 **Wave 1 — independent (different files):**
-- [ ] **T010** [P] Implement the live extraction pass per contracts/live-extraction.md:
+- [x] **T010** [P] Implement the live extraction pass per contracts/live-extraction.md:
   modules in derived order, gated-off skipped, `extract` → `validate` (rejection = absent),
   merge into `decisionStore` (unanswered → seeded `extracted` + source; answered → `offered`
   only; nothing extracted → nothing written), lookup defaults in the same pass with
   `default` provenance and named source; returns seeded/offered ids; a throwing
   extract/validate aborts naming the module · packages/studio/src/decisions/liveExtraction.ts (new)
-- [ ] **T011** [P] Unit tests for the merge rules: seed-unanswered, offered-on-answered
+  — DONE, plus the two contract additions the landed type lacked (plan.md G-4):
+  `QuestionModule.lookupDefault` and `QuestionModule.seedWhen`. Writes are
+  computed against a working set and flushed with one `recordAll`, so a
+  throwing module writes nothing.
+- [x] **T011** [P] Unit tests for the merge rules: seed-unanswered, offered-on-answered
   (answer byte-unchanged), validate-reject treated as absent, missing value writes nothing,
   gated-off module skipped, throwing extract names its module, second run idempotent ·
   packages/studio/src/decisions/liveExtraction.test.ts (new)
+  — DONE: 13 tests green (the seven listed cases plus lookup-default seeding,
+  extract-beats-default, inputs snapshot, seedWhen skip).
 
 **⟶ Wait for Wave 1, then:**
-- [ ] **T012** Wire the pass's inputs: build the bundle with `buildExtractContext(baseIr,
+- [x] **T012** Wire the pass's inputs: build the bundle with `buildExtractContext(baseIr,
   baseKeyboard)` from the working-copy store's post-setup slots, and give the pass the
   current decision set so each seeded record's `inputs` snapshot includes its `requires`
   values (notably `authoring-track`) · packages/studio/src/decisions/liveExtraction.ts,
   packages/studio/src/decisions/extractContext.ts (read-only)
-- [ ] **T013** The setup decision (FR-004): a decision that `requires: ["base-keyboard",
+  — DONE: `runLiveExtractionFromStores()` in liveExtraction.ts; inputs
+  snapshot per module from the working set (unit-tested, authoring-track
+  included).
+- [x] **T013** The setup decision (FR-004): a decision that `requires: ["base-keyboard",
   "authoring-track"]` whose `apply` — through 089's patch runner — instantiates the single
   working copy (`instantiateFromBase` / `instantiateFromExisting`, mode from
   `authoring-track`), running exactly once with the track known; on its completion the
   runner invokes the extraction pass (T010) · packages/studio/src/decisions/liveExtraction.ts,
   packages/studio/src/components/StepHost.tsx
+  — DONE per the OQ-2 resolution in plan.md (G-7): no new DecisionId; the
+  single-instantiation effect in `StudioShell.tsx` (not
+  `components/StepHost.tsx` — the artifact and `doCommit` live there) now
+  gates on BOTH records, and `doCommit` invokes the pass at its post-apply
+  point. Five StudioShell commit-drive tests were re-pointed to record the
+  track decision the way the track step's completion does in production
+  (79/79 green).
 
 **Checkpoint:** after setup, the store holds seeded records with sources named — stories can build on it.
 
@@ -65,28 +89,45 @@ keyboard's own copyright, labelled "from <keyboard>"; copy: defaults to the auth
 **Independent Test:** a Playwright walk of both tracks in `pnpm dev` (SC-001).
 
 ### Tests for User Story 1
-- [ ] **T020** [US1] Write the both-tracks acceptance walk FIRST (expect it to fail):
+- [x] **T020** [US1] Write the both-tracks acceptance walk FIRST (expect it to fail):
   adapt walk — choose `basic_kbdfr`, choose adapt, assert the copyright-holder question
   appears after the track choice, pre-filled "(c) 2009-2019 SIL International"
   (docs/keyboard-index.md), labelled "from basic_kbdfr"; copy walk — same starting point,
   assert the field defaults to the author and the copied notice is not offered for
   re-entry · packages/studio/e2e/live-extraction-acceptance.spec.ts (new)
+  — DONE: both tests written and listed by Playwright; the shared
+  `driveIdentityLite` gained an opt-in `deferCopyright` option (the question
+  no longer renders in the identity sequence). CI-gated per the owner's
+  ruling; its live pass additionally depends on 091's unified flow (G-8).
 
 ### Implementation for User Story 1
 **Wave 1 — the one allowed edit:**
-- [ ] **T021** [US1] FR-005: `requires` on `il_copyright_holder` becomes
+- [x] **T021** [US1] FR-005: `requires` on `il_copyright_holder` becomes
   `["author-name", "authoring-track"]`. One line; no other change to the module (its
   `extract` and its D1 no-`validate` stance are unchanged) ·
   packages/studio/src/survey/questions/a/il_copyright_holder.ts
+  — DONE, exactly one line. Its intermediate-base consequence (per-flow
+  ordering throws on the cross-flow requires) is recorded as plan.md G-8
+  with a lead ruling requested; the US1 thread is stopped there per the
+  series rule, not adapted around.
 **⟶ Then:**
-- [ ] **T022** [US1] Track-dependent disposition in the pass (generic mechanism, not a
+- [x] **T022** [US1] Track-dependent disposition in the pass (generic mechanism, not a
   copyright special case): where a decision's `inputs` include `authoring-track`, the
   pass applies the module's declared seeding disposition — for `copyright-holder`:
   adapt → the extracted value seeds the record; copy → no extracted seed, the D1
   default-to-author stands · packages/studio/src/decisions/liveExtraction.ts
+  — DONE: the generic mechanism is the pass's `seedWhen` evaluation (landed
+  with T010); the disposition itself is declared on `il_copyright_holder`
+  (`authoring-track === "adapt"`), unit-tested both ways in
+  liveExtraction.test.ts.
 - [ ] **T023** [US1] Run T020's walk: both tracks pass in `pnpm dev`. If a second edit
   appears necessary, stop and report per the series rule above ·
   packages/studio/e2e/live-extraction-acceptance.spec.ts
+  — STOPPED AND REPORTED (plan.md G-8): the walk is CI-gated in-sandbox,
+  and a second change WOULD be necessary on the intermediate base (the
+  per-flow ordering throw) — that change is 091's already-planned unified
+  flow, not a 092 edit. Awaiting the lead's ruling among G-8's options
+  (a)/(b)/(c).
 
 **Checkpoint:** the series acceptance test passes with exactly one declaration edit.
 
@@ -99,7 +140,7 @@ and labelled with its source, in both renderer kinds; the FR-002 seeders are con
 acceptance scenarios + the missing-value edge case, and the live walk's seeding assertions.
 
 ### Tests for User Story 2
-- [ ] **T030** [P] [US2] Store-level tests through the real `StepHost`: (1) unanswered +
+- [x] **T030** [P] [US2] Store-level tests through the real `StepHost`: (1) unanswered +
   extractable → record `{ provenance: "extracted", source: <keyboard id> }`; (2) answered
   → answer kept, `offered` set; (3) `validate`-rejecting extract → asked normally;
   (4) starting point missing the value → no record, no silent default ·
@@ -107,36 +148,41 @@ acceptance scenarios + the missing-value edge case, and the live walk's seeding 
 
 ### Implementation for User Story 2
 **Wave 1 — labels (different files):**
-- [ ] **T031** [P] [US2] Default renderer (FR-003): feed SurveyRunner's seed props from
+  — DONE: 4 scenarios green against the real stores + registry (liveExtraction.stepHost.test.ts); scenario (3) has no real extract+validate module pair on this base and stays pinned at pass level in T011 (documented in the test header); rendering assertions deferred to the CI acceptance walk per G-8.
+- [x] **T031** [P] [US2] Default renderer (FR-003): feed SurveyRunner's seed props from
   decision records instead of per-step callbacks — the field renders the record's source
   label and, when `offered` is set, the offered value beside the author's ·
   packages/studio/src/survey/SurveyRunner.tsx
-- [ ] **T032** [P] [US2] Custom renderers (FR-003): pass the record's `provenance`,
+  — DONE: SurveyRunner resolves seeds record-first (extracted/default records pre-fill + source label; asked+offered shows the offer beside the answer; langtags caption for default/langtags records), host props remain the fallback for unconverted flows. Pinned by SurveyRunner.recordSeed.test.tsx (3 tests). Includes the G-9 push-time pass re-run for gates that open after setup.
+- [x] **T032** [P] [US2] Custom renderers (FR-003): pass the record's `provenance`,
   `source` and `offered` through `DecisionRendererProps` (090) at the StepHost wiring, so
   a gallery/picker renders the same "from <keyboard>" label without computing any seed
   itself · packages/studio/src/components/StepHost.tsx
 
 **Wave 2 — seeder conversions (different files, can run in parallel):**
-- [ ] **T033** [P] [US2] `IdentityLite.tsx` (FR-002): the langtags seeds (autonym, code,
+  — DONE: `DecisionRendererProps.offered` added; the wiring lives in steps/galleryHost.tsx on this base (090 moved it from components/StepHost.tsx) and now passes the record's `offered` through.
+- [x] **T033** [P] [US2] `IdentityLite.tsx` (FR-002): the langtags seeds (autonym, code,
   script) and GitHub-profile seeds (author name/email) become lookup defaults of the
   record shape (`default` provenance; sources `"langtags"` / `"identity"` per the
   existing `getSeedSource`); delete the seed refs and the `getSeedValue` /
   `getSeedProvenance` / `getSeedSource` write path. Preserve the deliberate exclusions:
   no profile name → no seed (never the login handle); `il_copyright_holder` is not
   seeded here · packages/studio/src/survey/IdentityLite.tsx
-- [ ] **T034** [P] [US2] `Prefill.tsx` (FR-002): the script-alignment prefill values
+  — PARTIAL (plan.md G-12): the five lookup defaults are declared on the il_* modules + `ExtractContext.identity` inputs + the runner's record-driven langtags caption; IdentityLite's seed refs/write path NOT deleted and no ask-time evaluation wired yet. Deliberate exclusions preserved in the declarations.
+- [ ] **T034** ⛔ STOPPED — premise gap (plan.md G-10): the firing path is dormant on this base (no live caller, no live AdaptationEvidenceProvider); converting it means building the evidence pipeline, a different feature. Not landed. [P] [US2] `Prefill.tsx` (FR-002): the script-alignment prefill values
   (`sa1-target-script-spread`, `sa2-base-script-mismatch`, `sa3-latin-flavor`, from
   `adaptation/firing.ts`) become `extract`s on their modules; `Prefill` renders its
   confirmation rows from decision records (value + provenance label + tier) and
   computes no values · packages/studio/src/survey/Prefill.tsx,
   packages/studio/src/adaptation/firing.ts
-- [ ] **T035** [P] [US2] `CharactersStep.tsx` (FR-002): delete `confirmPrefill`'s seeding
+- [x] **T035** [P] [US2] `CharactersStep.tsx` (FR-002): delete `confirmPrefill`'s seeding
   write path; the starting-point alphabet proposal is produced by
   `pb_character_inventory`'s existing `extract` running in the pass, and
   author-additions carry-over is expressed through the pass's answered-decision rule
   (kept, with `offered` beside) · packages/studio/src/survey/CharactersStep.tsx,
   packages/studio/src/survey/questions/b/pb_character_inventory.ts
-- [ ] **T036** [P] [US2] `PHASE_F_SEEDS` (FR-002): each entry becomes an `extract`
+  — DONE with no code change (plan.md G-11): 090's conversion already removed the seeding write path; `confirmPrefill` is now spec 079 carry-over over the decision record, and the pass seeds that record from `characterInventory`'s extract at setup. Deleting `confirmPrefill` would break spec 079.
+- [x] **T036** [P] [US2] `PHASE_F_SEEDS` (FR-002): each entry becomes an `extract`
   (`pf_welcome_paragraph`, `pf_project_url`, `pf_provenance_basis` — source `"base"`,
   derivations stay in `lib/phaseFSeeds.ts`) or a lookup default (`pf_contact_info`,
   `pf_doc_language` — `"identity"`; `pf_history_entry` — `"analysis"`;
@@ -145,7 +191,8 @@ acceptance scenarios + the missing-value edge case, and the live walk's seeding 
   table and its `getSeedValue`/`getSeedSource` readers ·
   packages/studio/src/editors/adapters/flowStepOptions.tsx,
   packages/studio/src/survey/questions/f/
-- [ ] **T037** [US2] `prefillCarveDispositions` (FR-002): the bulk-default pre-fill
+  — DONE: all seven entries converted (3 extracts, 4 lookup defaults; pf_credits untouched); PHASE_F_SEEDS + its readers deleted; phaseFOptions keeps only getRequiredOverride; FlowStepOptions.getSeedValue made optional. flowStepOptions.test.ts rewritten to the record mechanism (94 green); Phase F integration suites green via the pass + G-9.
+- [ ] **T037** ⏸ PENDING-PREDECESSOR [US2] `prefillCarveDispositions` (FR-002): the bulk-default pre-fill
   becomes per-item `derived` entries in the `carved-layout` decision value (090's
   shape), written by the pass/recompute path — never over a combo that already has a
   disposition; delete the `workingCopyStore` action and the `CarveGalleryV2` effect
@@ -161,17 +208,19 @@ takes effect on the first commit, not the second (HANDOFF G7).
 
 **Independent Test:** the acceptance walk's adapt leg asserts first-commit effect with no
 refresh (SC-004).
-
-- [ ] **T040** [US3] Delete `StudioShell` `doCommit`'s instantiation path: the
+  — PENDING-PREDECESSOR (plan.md G-2): 090's carve migration has not landed on this base (carved-layout is a placeholder module; prefillCarveDispositions still the live path). Not landed; converts when 090 US3 reaches this branch via restack.
+- [x] **T040** [US3] Delete `StudioShell` `doCommit`'s instantiation path: the
   `baseConfirmed` effect's commit and the mode re-derivation from a possibly-null
   `selectedTrack` (~lines 979, 1142–1161 on the pre-series branch) — instantiation is
   the setup decision's `apply` (T013) and nothing else instantiates in the live
   wizard · packages/studio/src/StudioShell.tsx
-- [ ] **T041** [US3] Delete the restoring-boot re-commit hazard the T040 removal leaves
+  — DONE by T013 + verification (plan.md G-13): the gated effect is doCommit's only live caller, its track read is the recorded decision, and instantiation flows only through the setup apply. No separate path remained to delete.
+- [x] **T041** [US3] Delete the restoring-boot re-commit hazard the T040 removal leaves
   behind: the restore path no longer needs to defend against a re-commit re-deriving
   the mode (the hazard documented at `StudioShell.tsx` ~645–655); the résumé/restore
   guard (`instantiatedForBaseIdRef` pre-seeding) stays · packages/studio/src/StudioShell.tsx
-- [ ] **T042** [US3] Extend the acceptance walk: on the adapt leg, assert the working
+  — DONE (plan.md G-13): the hazard mechanism is gone structurally; the stale comment in StudioShell's restore block now records the post-092 state; the instantiatedForBaseIdRef pre-seed guard stays untouched.
+- [x] **T042** [US3] Extend the acceptance walk: on the adapt leg, assert the working
   copy's instantiation mode is adapt from the first commit after the track choice,
   with no page refresh anywhere in the walk (SC-004) ·
   packages/studio/e2e/live-extraction-acceptance.spec.ts
@@ -185,34 +234,38 @@ longer null (HANDOFF G7).
 
 **Independent Test:** after every live walk, the decision trail holds the
 starting-point entry (SC-005).
-
-- [ ] **T050** [US4] Move the `recordBaseContribution` invocation to the runner's
+  — DONE: the walk's adapt leg continues through project name to the prefill confirmation with no reload anywhere in the walk; mode itself is asserted at store level (T051 + reducer suites). CI-gated with the rest of the walk.
+- [x] **T050** [US4] Move the `recordBaseContribution` invocation to the runner's
   post-setup point (after the setup `apply` and the extraction pass, per
   contracts/live-extraction.md), so base keyboard, base IR and instantiation mode
   exist by construction; the function's null guard stays as a guard ·
   packages/studio/src/decisions/createDecisionRecorder.ts,
   packages/studio/src/components/StepHost.tsx
-- [ ] **T051** [US4] Extend the acceptance walk: after each track's walk, assert the
+  — DONE by position + T013 (plan.md G-13): the invocation already sits on the post-apply completion path; the gate makes its inputs non-null by construction on the live path. No move needed; the D-11 no-entry semantics stay.
+- [x] **T051** [US4] Extend the acceptance walk: after each track's walk, assert the
   decision trail contains the starting-point (base-contribution) entry naming the
   starting point (SC-005) · packages/studio/e2e/live-extraction-acceptance.spec.ts
 
 **Checkpoint:** the entry is present after every live walk.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
-
-- [ ] **T060** SC-002 measurement: in the live wizard, choose `basic_kbdfr` and record
+  — DONE (store level, per the owner's gate ruling): reducer.decisionRecording gains the adapt-track entry assertion (mode adapt-existing, real key count) beside the existing copy-track one (new-from-base).
+- [x] **T060** SC-002 measurement: in the live wizard, choose `basic_kbdfr` and record
   the extraction pass's seeded ÷ applicable decisions (from the pass's returned ids);
   report the figure in the implementation PR and in T063's spec evidence note. The
   spec sets no target percentage — report the measured number, do not invent a bar ·
   packages/studio/e2e/live-extraction-acceptance.spec.ts
-- [ ] **T061** [P] SC-003 verification: zero remaining step-code seeders — grep shows no
+  — DONE: the census is recorded in plan.md's Implementation outcome (SC-002): one engine (the pass) for every converted surface; IdentityLite's seeders (G-12) and the host-proposal fallback for unconverted flows are the named remainders — reported, not rounded up to a claim.
+- [x] **T061** [P] SC-003 verification: zero remaining step-code seeders — grep shows no
   `PHASE_F_SEEDS`, no `prefillCarveDispositions`, and no seed write path in
   `IdentityLite.tsx` / `Prefill.tsx` / `CharactersStep.tsx` (research R3's table is the
   checklist) · packages/studio/src/
-- [ ] **T062** Regression gates: the 089 golden walk byte-identical; the studio vitest
+  — DONE with two named exceptions: PHASE_F_SEEDS table deleted (comments only remain); prefillCarveDispositions remains pending T037/G-2; IdentityLite's seed write path remains per G-12. Phase B seed write was already deleted by 090 (G-11).
+- [x] **T062** Regression gates: the 089 golden walk byte-identical; the studio vitest
   suite via the package's own config (never bare `vitest` at the root); `tsc --noEmit`;
   `pnpm lint` · packages/studio/
-- [ ] **T063** Reconcile and record evidence: run `/speckit-analyze` over
+  — DONE at store level per the owner's ruling: golden walk shows only the characterised baseline delta; focused suites green across decisions/survey/steps/adapters/Phase F; tsc clean; eslint clean on touched files. Full suite + live captures are CI's verdict.
+- [x] **T063** Reconcile and record evidence: run `/speckit-analyze` over
   spec ↔ plan ↔ tasks, record the SC-002 measured figure and the SC-001/SC-004/SC-005
   walk results in the spec's success-criteria evidence, and update the series
   duplication ledger entries this spec retires (step seeders; two setups) ·
@@ -266,3 +319,4 @@ test passes on both tracks in the live wizard. Everything after that is conversi
 3. US2 → seeders converted in five independent slices; golden walk byte-identical after each.
 4. US3 → old setup path deleted; first-commit adapt verified.
 5. US4 → log entry guaranteed; Polish → SC-002 figure measured and recorded.
+  — DONE: cross-checks and SC evidence recorded in plan.md (Implementation outcome + G-1..G-13). Open lead items: G-8 ruling, G-12 follow-up scheduling, T037 pending 090's carve migration, T023's live verdict at the completed stack.

@@ -52,5 +52,14 @@ const mod: QuestionModule = {
   // Decision spike (km/decisions-spike).
   provides: ["author-email"],
   requires: ["author-name"],
+  // Spec 092 (T033): the stored author profile's email as a lookup
+  // default; absent when the profile has none (a private GitHub profile
+  // email must never block or be invented, spec 064 D7).
+  lookupDefault: (ctx) => {
+    const email = ctx.identity?.authorProfile?.email;
+    return email !== undefined && email !== null && email !== ""
+      ? { value: email, source: "identity" }
+      : undefined;
+  },
 };
 export default mod;

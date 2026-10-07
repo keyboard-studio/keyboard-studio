@@ -16,7 +16,7 @@
 // R9 (boundary).
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { decisionsFromTraversal } from "./decisionsFromTraversal.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import { manifest } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
 import type { Step } from "./types.ts";
@@ -66,6 +66,12 @@ type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
 // ---------------------------------------------------------------------------
 
 export interface AdvanceContext {
+  /**
+   * Spec 088 FR-004: the live decision set, read from the decision store by
+   * the host. `gatedBy` is evaluated over THIS set and nothing else — no
+   * decision set is rebuilt from session fields anywhere.
+   */
+  readonly decisions: DecisionSet;
   /** "copy" | "adapt" | null — the track selected at the track step. */
   readonly selectedTrack: Track | null;
   /** Whether the identity step's chosen script is supported in v1. */
@@ -173,7 +179,7 @@ export function nextMainLineStepAfter(currentId: string): ActiveStepId {
 function stepApplies(step: Step | undefined, ctx: AdvanceContext): boolean {
   const gate = step?.gatedBy;
   if (gate === undefined) return true;
-  return gate(decisionsFromTraversal(ctx.selectedTrack, ctx.touchSeedSource));
+  return gate(ctx.decisions ?? {});
 }
 
 function stepById(stepId: string): Step | undefined {

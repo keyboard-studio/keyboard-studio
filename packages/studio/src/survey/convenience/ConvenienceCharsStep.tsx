@@ -39,12 +39,17 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { buildProducedSet } from "@keyboard-studio/contracts";
-import type { EditorStepProps } from "../../steps/types.ts";
+import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
+import type {
+  RetainedConvenienceChar,
+  RetainedConvenienceCharsValue,
+} from "./convenienceValue.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
-import { offeredKey, convenienceKey } from "../../steps/evidence.ts";
+import { convenienceKey } from "../../steps/evidence.ts";
 import { useCarveNeededSet } from "../../hooks/useCarveNeededSet.ts";
 import { useGlyphFontStack } from "../useGlyphFontStack.ts";
 import { computeConvenienceGate } from "./convenienceGate.ts";
@@ -108,12 +113,16 @@ function convenienceNotAskedResult(): SurveyPhaseResult {
 
 /** Stable reference for "nothing to offer" — see `candidates` below. */
 const EMPTY_CANDIDATES: ConvenienceCandidate[] = [];
+/** Stable empty set for value records where no candidate was acted on. */
+const EMPTY_ACTED: ReadonlySet<string> = new Set();
 
 // ---------------------------------------------------------------------------
 
-const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
-  { onComplete, onBack }: EditorStepProps,
-) => {
+const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenienceCharsValue>> = ({
+  value,
+  onChange,
+}: DecisionRendererProps<RetainedConvenienceCharsValue>) => {
+  const { onComplete, onBack } = useGalleryStepContext();
   const { t } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
@@ -158,27 +167,80 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
   );
   const unknown = gate?.kind === "unknown";
 
-  // Store-backed (spec 079 T034): one boolean answer per candidate, keyed by
-  // the candidate's `primary` char, in `surveyAnswerStore.steps.convenience`.
-  // `unchecked` is DERIVED from those saved answers, not held in component
-  // state — a toggle calls `saveAnswer` synchronously (FR-001), so the choice
-  // survives an unmount (tab switch) exactly like every other survey answer.
-  // Everything pre-checked (propose-then-confirm): a candidate with no saved
-  // answer, or a saved answer of `true`, is checked by construction.
-  const convenienceAnswers = useSurveyAnswerStore((s) => s.steps["convenience"]?.answers);
-  const saveAnswer = useSurveyAnswerStore((s) => s.saveAnswer);
-  const offeredPrimaries = useMemo(
-    () => new Set(candidates.map((c) => c.primary)),
-    [candidates],
+  // Decision-backed (spec 090 T024, D-090-12; was store-backed per spec 079
+  // T034): the kept set is the recorded `retained-convenience-chars` value,
+  // not per-candidate answer-store booleans. `unchecked` is DERIVED from the
+  // value's `rejected` primaries, not held in component state — a toggle
+  // records synchronously through onChange, so the choice survives an
+  // unmount (tab switch) exactly as the saved answers did. Everything
+  // pre-checked (propose-then-confirm): a candidate the value does not
+  // reject — including one that became surplus only after the value was
+  // recorded — is checked by construction.
+  const retainedByChar = useMemo(
+    () => new Map((value?.retained ?? []).map((i) => [i.char, i.provenance])),
+    [value],
   );
+  const rejectedPrimaries = useMemo(() => new Set(value?.rejected ?? []), [value]);
   const unchecked = useMemo(() => {
     const set = new Set<string>();
     for (const candidate of candidates) {
-      const saved = convenienceAnswers?.[candidate.primary];
-      if (saved !== undefined && saved.value === false) set.add(candidate.primary);
+      if (rejectedPrimaries.has(candidate.primary)) set.add(candidate.primary);
     }
     return set;
-  }, [candidates, convenienceAnswers]);
+  }, [candidates, rejectedPrimaries]);
+
+  /** The recorded provenance for a candidate's chars, or the proposal's. */
+  function provenanceFor(candidate: ConvenienceCandidate): RetainedConvenienceChar["provenance"] {
+    for (const ch of candidate.chars) {
+      const p = retainedByChar.get(ch);
+      if (p !== undefined) return p;
+    }
+    return "extracted";
+  }
+
+  /**
+   * Build the value for a kept-primary set. Candidates the author acted on
+   * in this call carry `asked` provenance; the rest keep their recorded
+   * provenance, or the proposal's (`extracted`) on a first record.
+   */
+  function buildValue(
+    kept: ReadonlySet<string>,
+    acted: ReadonlySet<string>,
+  ): RetainedConvenienceCharsValue {
+    const retained: RetainedConvenienceChar[] = [];
+    const rejected: string[] = [];
+    for (const c of candidates) {
+      if (kept.has(c.primary)) {
+        const provenance = acted.has(c.primary) ? "asked" : provenanceFor(c);
+        for (const ch of c.chars) retained.push({ char: ch, provenance });
+      } else {
+        rejected.push(c.primary);
+      }
+    }
+    return { retained, rejected };
+  }
+
+  function recordValue(kept: ReadonlySet<string>, acted: ReadonlySet<string>): void {
+    onChange(buildValue(kept, acted));
+  }
+
+  // Pre-T024 draft migration: a draft saved before the value existed
+  // carries per-candidate booleans in the answer store. Adopt them into
+  // the value the first time the settled candidate set is known; from
+  // then on the value is the only source. (The answer-store slot itself
+  // is T026's adjudication — this shim reads what restore put there.)
+  const adoptedRef = useRef(false);
+  useEffect(() => {
+    if (adoptedRef.current || value !== undefined || gate?.kind !== "applies") return;
+    const answers = useSurveyAnswerStore.getState().steps["convenience"]?.answers;
+    if (answers === undefined || Object.keys(answers).length === 0) return;
+    adoptedRef.current = true;
+    const kept = new Set(
+      candidates.filter((c) => answers[c.primary]?.value !== false).map((c) => c.primary),
+    );
+    recordValue(kept, EMPTY_ACTED);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gate, value, candidates]);
 
   // Stay TRANSPARENT in the direction of travel on a `not-applicable` pass:
   // complete forward, but on a back-pop (the author pressed Back in the carve
@@ -241,27 +303,29 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
 
   if (gate === null || gate.kind === "not-applicable") return null;
 
-  function saveKept(primary: string, kept: boolean): void {
-    saveAnswer("convenience", primary, {
-      value: kept,
-      answerType: "boolean",
-      origin: "confirmed",
-      stage: "draft",
-      evidenceKey: offeredKey(primary, offeredPrimaries),
-      screenId: "convenience",
-    });
+  function keptPrimaries(): Set<string> {
+    return new Set(candidates.filter((c) => !unchecked.has(c.primary)).map((c) => c.primary));
   }
 
   function toggle(primary: string): void {
-    saveKept(primary, unchecked.has(primary));
+    const kept = keptPrimaries();
+    if (unchecked.has(primary)) kept.add(primary);
+    else kept.delete(primary);
+    recordValue(kept, new Set([primary]));
   }
 
   function complete(): void {
     if (completedRef.current) return;
     completedRef.current = true;
-    const retained = candidates
-      .filter((c) => !unchecked.has(c.primary))
-      .flatMap((c) => c.chars);
+    const kept = keptPrimaries();
+    const retained = candidates.filter((c) => kept.has(c.primary)).flatMap((c) => c.chars);
+    // spec 090 T024 (D-090-12): the completion result is computed FROM the
+    // recorded value — reconcile the record to the current candidate set
+    // first (a toggle-built record already matches; a never-touched pass
+    // has no record yet, and a shape change may have added candidates
+    // since the last toggle).
+    const next = buildValue(kept, EMPTY_ACTED);
+    if (JSON.stringify(next) !== JSON.stringify(value ?? null)) onChange(next);
     // The step was genuinely asked (candidates offered) or its gap was
     // surfaced (`unknown`, nothing to offer) — either way the author has now
     // been through it, so the status moves past "in-progress" (data-model.md
@@ -348,7 +412,8 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
               type="button"
               data-testid="convenience-keep-all"
               onClick={() => {
-                for (const c of candidates) saveKept(c.primary, true);
+                const all = new Set(candidates.map((c) => c.primary));
+                recordValue(all, all);
               }}
               style={secondaryButton}
             >
@@ -358,7 +423,7 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
               type="button"
               data-testid="convenience-keep-none"
               onClick={() => {
-                for (const c of candidates) saveKept(c.primary, false);
+                recordValue(new Set(), new Set(candidates.map((c) => c.primary)));
               }}
               style={secondaryButton}
             >

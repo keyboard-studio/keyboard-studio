@@ -164,3 +164,214 @@ into the runner's post-setup point. No new directories; no engine changes.
 ## Complexity Tracking
 
 No Constitution Check violations — table not required.
+
+## Implementation audit (T001, 092 agent — against cascaded base `81e79756`)
+
+Base verified: merge of `km/derived-steps` @ `54fe4883` (088 close + 089 through
+T024 + its depcruise fix pending restack, see G-6; 090 US1+US2) into
+`km/live-extraction`. Present exactly as planned: 088 `stores/decisionStore.ts`
+(`record/recordAll/forget/set/snapshot/peek`, `selectTrack`/`selectTouchSeedSource`);
+the `Decision` record with `inputs`/`offered`/`source`; 089's `applyDecisionEffects`
+runner + `galleryHost` record-then-apply; `runDecisionFlow` semantics (order,
+gating, extract→validate, source = catalog id → IR-header fallback, throwing
+extract names its module) with **no live caller** (non-test callers are
+`DecisionsDemo` ×2 and `spikeRunner` only — T002 grep snapshot);
+`buildExtractContext(baseIr, baseKeyboard)` against `workingCopyStore`'s
+`baseIr`/`baseKeyboard` slots; `il_copyright_holder` exactly as research R5
+(`requires: ["author-name"]`, `extractCopyrightHolder`, no `validate`);
+`questionRegistry`/`decisionIndex` composition (flow + Phase F + reserve +
+gallery).
+
+**Predecessor gaps and plan deltas (recorded, not silently adapted):**
+
+- **G-1 (091 in flight):** `steps/stepDependencies.ts` is still present and
+  steps are not yet derived. Does not block the pass (it orders by module
+  `requires` via `orderDecisions`); T001's "091 landed" item is unmet and the
+  acceptance walk's placement assertions ride on 091 + CI.
+- **G-2 (090 US3/US4 in flight):** gallery modules for `carved-layout`,
+  `touch-layout`, `physical-layout`, `help-docs`, `deadkeys-defined`,
+  `rule-set` are registered but placeholder (`UnmigratedGalleryRenderer`,
+  no-op `apply`). T037 is **PENDING-PREDECESSOR**: `prefillCarveDispositions`
+  (store action + `CarveGalleryV2` effect) still exists; its conversion waits
+  for 090's carve migration to land via restack.
+- **G-3:** `DecisionRendererProps` (090) carries `provenance`/`source` but no
+  `offered`. T032 extends the type additively with `offered?: unknown`.
+- **G-4:** no module-level lookup-default declaration exists in the landed
+  contract (`runDecisionFlow`'s `default` is value-less). 092 defines it:
+  optional `lookupDefault(ctx)` on `QuestionModule`, returning
+  `{ value, source? }` — introduced in T010, populated by the US2 conversions.
+- **G-5:** T035 names `pb_character_inventory.ts`; 090 deleted it. Its
+  `extract` lives on as `survey/questions/gallery/characterInventory.ts`'s
+  extract. T035 retargets there.
+- **G-6:** the base carries the known depcruise cycle
+  (`survey/types` ↔ `workingCopyStore`); the fix (`030bf59c`) sits on
+  `km/decision-apply` and arrives via a later restack. Not fixed here; local
+  `pnpm lint` depcruise verdicts are read with that caveat (eslint on touched
+  files + focused suites are the local gates; CI is authoritative).
+- **G-7 / OQ-2 RESOLVED:** setup is the `base-keyboard` completion's deferred
+  instantiation (no new `DecisionId` — a record for it would pollute the set
+  093 replays and SC-002 counts). T013's wiring lands in `StudioShell.tsx` +
+  `decisions/liveExtraction.ts`, not `StepHost.tsx` as the task's file list
+  suggested: the instantiation artifact and `doCommit` live in `StudioShell`,
+  which `StepHost` cannot reach. Shape: the single-instantiation effect gates
+  on BOTH `base-keyboard` and `authoring-track` records; `doCommit` then runs
+  the existing `applyStepCompletion("choose_base", …)` apply path with the
+  track known, exactly once (per-base guard unchanged); the extraction pass
+  is invoked at the post-apply point inside `doCommit` (the same point T050
+  later adds `recordBaseContribution` to). FR-004's observable behaviour
+  holds: instantiation only through the apply path, requires both decisions,
+  runs once, track known.
+
+- **G-8 (FR-005 is NOT self-sufficient on the intermediate base — lead
+  ruling requested, US1 thread stopped at T023):** T021's one-line edit
+  landed exactly as specified, and T022's `seedWhen` is independently
+  sound at pass level. But on today's base the edit has a consequence the
+  plan did not record: `orderDecisions(flowModules.identity_lite)` — and
+  with it `loadFlowSourceDef(identity_lite)` — THROWS `unresolved
+  decision: "authoring-track" required by "il_copyright_holder"`,
+  because per-flow ordering rejects cross-flow `requires` by design.
+  The loader's live callers include `IdentityLite.tsx:171` (the wizard's
+  identity step itself, in a useMemo), the Dashboard routing view, and
+  the Flow Map's renderedNodeSet — so on the intermediate stack the live
+  identity step cannot render. (The store-level golden walk does not
+  catch this: its harness substitutes the identity step.) The frozen
+  parity test (`orderParity.test.ts`, identity_lite) is red for the same
+  reason. On the COMPLETED stack this resolves itself: 091's design
+  unifies identity/track/project_name into one SurveyRunner flow (its
+  research.md: "screens are one SurveyRunner over one flow"), making the
+  requires intra-flow, and 091's plan already owns the parity rewrite.
+  Options for the lead: (a) accept the intermediate red — it heals at the
+  091 restack, which precedes 092 in merge order; (b) hold T021 (revert
+  the one line; T020/T022 stand) until 091 lands; (c) authorise a
+  cross-flow tolerance change in `orderDecisions`/`loadDerivedFlow` on
+  this branch — out of 092's declared scope and on the exact surface 091
+  is rewriting, so a restack collision is likely. 092's recommendation:
+  (a), with (b) if any consumer needs a runnable identity flow from this
+  branch before 091 lands (093's re-audit is the candidate consumer).
+
+- **G-9 (gate-open-after-setup, resolved in T031/T036):** the setup pass
+  evaluates gates once against the pre-pass decision set (the demo
+  runner's `filterGated` semantics), so a question gated behind an
+  as-yet-unanswered choice (Phase F's more-detail branch:
+  `pf_doc_language`, `pf_project_url`, `pf_provenance_basis`, …) is
+  correctly NOT seeded at setup — seeding it would leak an unreached
+  value into decision-derived output. When the author opens the gate
+  mid-step, `SurveyRunner`'s record-proposal path re-runs the idempotent
+  pass at question-push time (only for a question whose module declares
+  an extract/lookup default and has no record yet), materialising the
+  record so the seed and its "from <source>" caption arrive exactly as
+  if the gate had been open at setup. The pass remains the single
+  evaluation engine; only its invocation gains a second, lazy trigger.
+
+- **G-10 (T034 premise gap — stopped and reported):** the script-alignment
+  firing path the task converts is DORMANT on this base.
+  `evaluateFiringConditions` (adaptation/firing.ts) and
+  `buildScriptAlignmentRows` (survey/Prefill.tsx) have no live caller
+  (tests only), and the `AdaptationEvidenceProvider` seam's live
+  implementation does not exist ("The live implementation (follow-up
+  feature) reads the committed facet index; tests and the current studio
+  inject a mock" — adaptation/evidence.ts). There is no live prefill
+  write path for sa1/sa2/sa3 to convert, and no evidence source an
+  extract could read at setup. Building the evidence pipeline is the
+  follow-up feature the seam names, not a 092 conversion. T034 is left
+  unlanded; `Prefill.tsx`'s live rows (buildPrefillRows) are untouched.
+- **G-11 (T035 disposition):** on the landed base, 090 already converted
+  the characters step to the decision shape: `phaseBDraftStore` is gone,
+  `CharactersStep.confirmPrefill` is no longer a seeding write path — it
+  is spec 079 US3's carry-over over the decision record
+  (`getCharacterInventoryValue` reads the record), and the pass runs
+  `characterInventory`'s extract at setup, seeding that record. The
+  task's carry-over clause ("kept, with `offered` beside") is the pass's
+  merge rule, implemented and tested (T011/T030). T035 is therefore
+  satisfied by the predecessor's conversion plus the pass; no code
+  change, and `confirmPrefill` is NOT deleted (deleting it would break
+  spec 079's carry-over behaviour and its tests).
+
+- **G-12 (T033 partial — declarations landed, IdentityLite write path
+  remains):** the five il_* lookup defaults are declared on their modules
+  (values/sources mirror `IdentityLite`'s seeders exactly, including the
+  deliberate exclusions — no profile name → absent, never the login
+  handle; `il_copyright_holder` not seeded there), `ExtractContext`
+  carries the `identity` lookup inputs, and `SurveyRunner` renders the
+  shared langtags caption from a `default`/`langtags` record. What is
+  NOT done: deleting `IdentityLite.tsx`'s seed refs and its
+  `getSeedValue`/`getSeedProvenance`/`getSeedSource` props, and the
+  ask-time evaluation that would feed the declarations (evaluate in the
+  resolution effect, seed-if-absent via `peekDecision`, so restored
+  asked records are never offered a lookup default). That surgery
+  touches the identity surface's timing (resolution effects, restore
+  interplay, the PhaseA/IdentityLite test suites) and was not landed
+  sight-unseen in this pass; the declarations are unit-pinned so the
+  remaining wiring is mechanical. The lead may schedule it as a
+  follow-up on this branch or fold it into the 091 restack work.
+
+- **G-13 (T050 satisfied by position + T013, no move needed):**
+  `recordBaseContribution` is invoked from `createDecisionRecorder`'s
+  completion callback, which `StepHost` calls AFTER `applyStepCompletion`
+  by construction — its inputs are read from the instantiated store at
+  that point, and with the T013 setup gate the first instantiation
+  happens only once the track decision exists, so the live path writes
+  the entry with non-null inputs and the correct mode (pinned for both
+  tracks by T051's tests). The function's no-entry-when-uninstantiated
+  behaviour (spec 055 FR-030 / research D-11: no entry, never a
+  fabricated zero) is deliberate and stays. T040/T041 likewise reduced
+  to verification + retiring the stale hazard comment: `doCommit`'s
+  track read is the recorded decision (never the session's mutable
+  state), the gated effect is its only live caller, and the restore
+  pre-seed guard stays as written.
+
+## Implementation outcome (Phase 7, T060–T063)
+
+- **SC-001 (FR-005):** the one-line `requires` edit + both-tracks
+  acceptance walk are landed; the walk is CI-gated (sandbox Chromium
+  cannot navigate localhost). Store-level: T030 proves the seeding,
+  offered, copy-track, and no-source behaviours against the real stores.
+  Caveat G-8: on the intermediate stack the live identity step cannot
+  render (cross-flow ordering throws) — the walk's live verdict lands
+  with the completed stack; lead ruling requested on the interim state.
+- **SC-002 (seed mechanisms):** after this spec, live seed VALUES are
+  computed by exactly one engine — the extraction pass — for: the
+  copyright holder (extract), all seven Phase F entries (extracts +
+  lookup defaults), and every module declaring extract/lookupDefault.
+  Remaining non-pass seed surfaces, honestly counted: (1)
+  `IdentityLite`'s langtags/profile seeders still compute values at
+  render — their lookup defaults are DECLARED on the modules (T033)
+  but the ask-time evaluation is not wired (G-12); (2) the
+  SurveyRunner host-proposal channel remains as the fallback for
+  flows this spec did not convert (gallery/mechanism steps are 090's
+  decision modules with their own proposal path). SC-002's "exactly
+  one" is therefore met for every surface this spec converted, with
+  (1) the named remainder.
+- **SC-003 (write paths deleted):** the PHASE_F_SEEDS table is deleted
+  (remaining mentions are comments recording its removal);
+  `prefillCarveDispositions` still exists — its deletion is T037,
+  PENDING-PREDECESSOR on 090's carve migration (G-2); the Phase B
+  seeding write (`seedPhaseBFromPrefill`) was already deleted by 090
+  and the character-inventory decision is pass-seeded (T035/G-11);
+  IdentityLite's seed write path remains per G-12.
+- **SC-004:** the walk's adapt leg runs from track choice to prefill
+  confirmation with no reload (T042); the mode is asserted at store
+  level (T051).
+- **SC-005:** `recordBaseContribution` writes with non-null inputs and
+  the track-correct mode on the live path (G-13, T051 both tracks).
+- **Golden walk:** unchanged from the characterised baseline delta
+  (decisionMutations-only fixture staleness owned by 089/090; no
+  store/navigation/content deltas introduced by this branch).
+
+**T002 baseline (pre-change, this base):** the Playwright golden walk is
+CI-gated per the owner's ruling (sandbox Chromium cannot navigate localhost).
+The store-level StepHost golden walk (`tests/steps/stepHost.goldenWalk.test.tsx`,
+2 tests) is **red on this base with a characterised, decisionMutations-only
+delta**: in both tracks, ~4 entries whose committed fixtures say
+`decisionMutations: []` actually record 1–2 `"record"` mutations (plus added
+`"record"` entries in existing lists); zero store-mutation, navigation, or
+content deltas. This is predecessor-cascade fixture staleness (the unified
+spy harness from 089's restack vs fixtures regenerated on parallel branches),
+not a 092 effect — no 092 code existed when measured. The fixtures are NOT
+regenerated on this branch (the oracle belongs to 089/090 and its
+reconciliation rides their restack); per-phase, this suite is re-run and any
+delta beyond the characterised shape is a stop-and-report. Also pre-existing
+on this base (verified by stash-and-rerun at Phase 2):
+`tests/steps/stepHost.renderSmoke.test.tsx` fails 2 `touch_seed_source`
+render assertions (24 passed) — a 090-era stub/manifest drift, untouched by
+092's changes and left for the predecessors' reconciliation.

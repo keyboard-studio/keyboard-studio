@@ -8,15 +8,14 @@
 // (survey-back / survey-advance, spec 081).
 //
 //   track: track-copy / track-adapt buttons complete with a SurveyPhaseResult
-//     carrying track_choice. The factory's extract -> onCommit then fires
-//     setSelectedTrack (+ setScaffoldSpec(null) on adapt) BEFORE the host
-//     advance.
+//     carrying track_choice. Spec 089: the factory forwards the result
+//     untouched; the host records the authoring-track decision, from which
+//     the track is derived at advance.
 //   project_name: survey-advance completes with project_display_name
-//     "Test Keyboard" + project_keyboard_id "test_keyboard", so the factory
-//     extract yields {displayName, keyboardId} and onCommit fires
-//     setScaffoldSpec + setIdentity.
+//     "Test Keyboard" + project_keyboard_id "test_keyboard"; the host
+//     records the project decisions and project_keyboard_id's apply lands
+//     setIdentity on the working copy.
 //   phase_f_helpdocs: survey-advance completes with an empty phase result.
-//     No factory onCommit (PhaseF has no pre-onComplete store writes).
 //
 // Any other flow renders an inert `flow-stub-<id>` marker.
 

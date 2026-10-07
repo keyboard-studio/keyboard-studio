@@ -55,5 +55,15 @@ const mod: QuestionModule = {
   // routing — never both by hand).
   provides: ["author-name"],
   requires: ["target-script"],
+  // Spec 092 (T033): the stored author profile's name as a lookup default
+  // (spec 064 FR-001: propose-then-confirm, never a blank form). Absent
+  // when the profile has no name — ASK rather than substitute the login
+  // handle, which is not a copyright holder.
+  lookupDefault: (ctx) => {
+    const name = ctx.identity?.authorProfile?.name;
+    return name !== undefined && name !== null && name !== ""
+      ? { value: name, source: "identity" }
+      : undefined;
+  },
 };
 export default mod;

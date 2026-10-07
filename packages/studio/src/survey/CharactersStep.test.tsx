@@ -9,7 +9,7 @@
 //   (e) findings derived from seeded validatorFindings equal buildFindingsByQuestionId
 //       of the same input
 //
-// Strategy: mock Prefill and PhaseB at the survey/index level (shallow stubs that
+// Strategy: mock Prefill and PhaseB at the file level (shallow stubs that
 // record callbacks and render unique testids). Seed stores via getState()/setState.
 // Reset both stores between cases.
 
@@ -17,6 +17,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../stores/phaseBDraftStore.ts";
@@ -37,10 +38,11 @@ const { mockPrefillConfirmRef, mockPrefillBackRef, mockPhaseBCompleteRef, mockPh
   }));
 
 // ---------------------------------------------------------------------------
-// Mock survey/index.ts — shallow stubs for Prefill and PhaseB
+// Mock Prefill/PhaseB at the file level — shallow stubs
+// (CharactersStep imports the files directly since spec 090 T021)
 // ---------------------------------------------------------------------------
 
-vi.mock("./index.ts", () => ({
+vi.mock("./Prefill.tsx", () => ({
   Prefill: ({
     onConfirm,
     onBack,
@@ -63,6 +65,9 @@ vi.mock("./index.ts", () => ({
       </div>
     );
   },
+}));
+
+vi.mock("./PhaseB.tsx", () => ({
   PhaseB: ({
     onComplete,
     onBack,
@@ -103,7 +108,7 @@ vi.mock("./index.ts", () => ({
 // Import component under test AFTER vi.mock declarations
 // ---------------------------------------------------------------------------
 
-import { CharactersStep } from "./CharactersStep.tsx";
+import { CharactersStepHost } from "./CharactersStepHost.tsx";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -135,12 +140,25 @@ const fakeBase = {
 /** alphabetKey (steps/evidence.ts) of fakeIdentity + fakeBase: bcp47|script|variant|baseId. */
 const CURRENT_KEY = "tl-Latn|Latn|Latn|basic_kbdus";
 
-/** Seed surveySessionStore with identity + base so prefill guard passes. */
+/** The identity decisions a completed identity step records for `identity`
+ * (spec 089: CharactersStep derives the identity result + survey context
+ * from these — the derived context for the fake identity is exactly the
+ * { language_name: "Test Language", routing_group: "qwerty-qwertz",
+ * script_family: "Latn" } the session store used to be seeded with). */
+function seedIdentity(identity: typeof fakeIdentity & { region?: string }): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: identity.english, provenance: "asked" });
+  record({ id: "language-autonym", value: identity.autonym, provenance: "asked" });
+  record({ id: "language-code", value: identity.languageSubtag, provenance: "asked" });
+  record({ id: "language-region", value: identity.region ?? "", provenance: "asked" });
+  record({ id: "target-script", value: identity.targetScriptRaw, provenance: "asked" });
+}
+
+/** Seed identity decisions + session base so the prefill guard passes. */
 function seedSessionStore() {
+  seedIdentity(fakeIdentity);
   useSurveySessionStore.setState({
-    identityResult: fakeIdentity,
     localBase: fakeBase,
-    surveyContext: { language_name: "Test Language", routing_group: "qwerty-qwertz", script_family: "Latn" },
     charactersSubStage: "prefill",
   });
 }
@@ -165,22 +183,23 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("CharactersStep — prefill -> PhaseB -> complete", () => {
-  it("renders Prefill at substage 'prefill', then PhaseB after confirm, then emits result on complete", () => {
+  it("renders Prefill at substage 'prefill', then PhaseB after confirm, then emits result on complete", async () => {
     seedSessionStore();
     const onComplete = vi.fn();
     const onBack = vi.fn();
 
-    render(<CharactersStep onComplete={onComplete} onBack={onBack} />);
+    render(<CharactersStepHost onComplete={onComplete} onBack={onBack} />);
 
     // Initial render shows Prefill
     expect(screen.getByTestId("mock-prefill")).toBeTruthy();
     expect(screen.queryByTestId("mock-phase-b")).toBeNull();
 
-    // Confirm transitions to PhaseB
+    // Confirm transitions to PhaseB — which mounts behind a lazy boundary
+    // since spec 090 T021, so await its mount.
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     expect(screen.queryByTestId("mock-prefill")).toBeNull();
-    expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
+    expect(await screen.findByTestId("mock-phase-b")).toBeTruthy();
 
     // PhaseB complete emits result via onComplete; props.onBack not called
     fireEvent.click(screen.getByTestId("phaseB-complete"));
@@ -203,7 +222,7 @@ describe("CharactersStep — PhaseB back returns to prefill", () => {
     const onComplete = vi.fn();
     const onBack = vi.fn();
 
-    render(<CharactersStep onComplete={onComplete} onBack={onBack} />);
+    render(<CharactersStepHost onComplete={onComplete} onBack={onBack} />);
 
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
@@ -226,7 +245,7 @@ describe("CharactersStep — prefill back calls props.onBack", () => {
     const onComplete = vi.fn();
     const onBack = vi.fn();
 
-    render(<CharactersStep onComplete={onComplete} onBack={onBack} />);
+    render(<CharactersStepHost onComplete={onComplete} onBack={onBack} />);
 
     expect(screen.getByTestId("mock-prefill")).toBeTruthy();
     fireEvent.click(screen.getByTestId("prefill-back"));
@@ -249,7 +268,7 @@ describe("CharactersStep — carve-back re-entry at PhaseB", () => {
     const onComplete = vi.fn();
     const onBack = vi.fn();
 
-    render(<CharactersStep onComplete={onComplete} onBack={onBack} />);
+    render(<CharactersStepHost onComplete={onComplete} onBack={onBack} />);
 
     // Must open directly at PhaseB, not Prefill
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
@@ -278,7 +297,7 @@ describe("CharactersStep — findingsByQuestionId prop passed to PhaseB", () => 
     ];
     useWorkingCopyStore.setState({ validatorFindings: fakeFindings });
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
 
     // PhaseB must have received findingsByQuestionId.
     expect(mockPhaseBFindingsRef.current).toBeDefined();
@@ -315,10 +334,10 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     seedAlphabet(["é", "ŋ", "ɔ"]);
 
     // First mount, then a route-change-shaped unmount/remount.
-    const first = render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    const first = render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
     first.unmount();
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
 
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
     expect(usePhaseBDraftStore.getState().chars).toEqual(["é", "ŋ", "ɔ"]);
@@ -330,7 +349,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     // Built for another language: the stamp no longer matches.
     usePhaseBDraftStore.getState().setAlphabetEvidenceKey("xx-Latn|Latn|Latn|basic_kbdus");
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     expect(screen.getByTestId("mock-prefill")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("prefill-confirm"));
@@ -345,7 +364,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     seedAlphabet(["é"]);
     usePhaseBDraftStore.getState().setAlphabetEvidenceKey(CURRENT_KEY);
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
     expect(usePhaseBDraftStore.getState().chars).toEqual(["é"]);
 
@@ -358,7 +377,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     seedAlphabet(["é", "ŋ"]);
     expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     // (A draft saved before spec 079 is stamped on restore instead — see
@@ -369,7 +388,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
 
   it("a first build (empty alphabet) stamps the current key", () => {
     seedSessionStore();
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe(CURRENT_KEY);
   });
@@ -390,7 +409,7 @@ describe("CharactersStep — sub-screen position survives a leave-and-return (sp
   it("build-list path: advancing to the PhaseB sub-screen, then unmount/remount with the same evidence, leaves position and the rendered sub-screen unchanged", () => {
     seedSessionStore();
 
-    const first = render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    const first = render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     expect(screen.getByTestId("mock-prefill")).toBeTruthy();
     expect(useSurveyAnswerStore.getState().steps["characters"]?.position).toBe("prefill");
 
@@ -403,7 +422,7 @@ describe("CharactersStep — sub-screen position survives a leave-and-return (sp
 
     // Unmount/remount with the same evidence (identity + base unchanged).
     first.unmount();
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
 
     // Rendered sub-screen unchanged: still PhaseB, not back at Prefill.
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
@@ -421,7 +440,7 @@ describe("CharactersStep — sub-screen position survives a leave-and-return (sp
     // before the remount that reads it).
     useSurveyAnswerStore.getState().setPosition("characters", "build-list");
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
 
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
     expect(screen.queryByTestId("mock-prefill")).toBeNull();
@@ -481,7 +500,7 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
     seedBuiltDraft();
     const before = draftFacts();
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
@@ -499,13 +518,13 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
       // The author backs out of characters entirely (Back from Phase B, Back
       // from prefill) and comes forward again from the earlier step: the host
       // applies advance.ts's `setCharactersSubStage: "prefill"` and remounts.
-      const first = render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+      const first = render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
       fireEvent.click(screen.getByTestId("phaseB-back"));
       fireEvent.click(screen.getByTestId("prefill-back"));
       first.unmount();
       useSurveySessionStore.getState().setCharactersSubStage("prefill");
 
-      render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
       expect(screen.getByTestId("mock-prefill")).toBeTruthy();
       fireEvent.click(screen.getByTestId("prefill-confirm"));
 
@@ -513,11 +532,14 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
     },
   );
 
+  // Spec 089: the identity cases re-record the identity decisions with one
+  // fact changed (the derived identity follows); the base case still patches
+  // the session's localBase.
   it.each([
-    ["bcp47", { identityResult: { ...fakeIdentity, bcp47: "tm-Latn" } }],
-    ["script", { identityResult: { ...fakeIdentity, prefill: { ...fakeIdentity.prefill, script: "Cyrl" } } }],
-    ["variant", { identityResult: { ...fakeIdentity, targetScriptRaw: "fonipa" } }],
-    ["base", { localBase: { ...fakeBase, id: "basic_kbdfr" } }],
+    ["bcp47", () => seedIdentity({ ...fakeIdentity, languageSubtag: "tm" })],
+    ["script", () => seedIdentity({ ...fakeIdentity, targetScriptRaw: "Cyrl" })],
+    ["variant", () => seedIdentity({ ...fakeIdentity, targetScriptRaw: "fonipa" })],
+    ["base", () => useSurveySessionStore.setState({ localBase: { ...fakeBase, id: "basic_kbdfr" } })],
   ])(
     "(T039/T059) a changed %s takes the changed branch: proposal chars cleared, old punctuation seeds cleared, new stamp, author addition carried over (R-07)",
     (_what, patch) => {
@@ -525,9 +547,9 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
       useSurveySessionStore.setState({ charactersSubStage: "B" });
       seedBuiltDraft();
 
-      render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
       fireEvent.click(screen.getByTestId("phaseB-back"));
-      act(() => useSurveySessionStore.setState(patch));
+      act(patch);
       fireEvent.click(screen.getByTestId("prefill-confirm"));
 
       const s = usePhaseBDraftStore.getState();
@@ -570,7 +592,7 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     useSurveySessionStore.setState({ charactersSubStage: "B" });
     seedBuiltDraftWithLatinAddition();
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
     // Base changes (still Latin script) — the addition fits.
     act(() => useSurveySessionStore.setState({ localBase: { ...fakeBase, id: "basic_kbdfr" } }));
@@ -587,17 +609,12 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     useSurveySessionStore.setState({ charactersSubStage: "B" });
     seedBuiltDraftWithLatinAddition();
 
-    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
-    act(() =>
-      useSurveySessionStore.setState({
-        identityResult: {
-          ...fakeIdentity,
-          bcp47: "tl-Cyrl",
-          prefill: { ...fakeIdentity.prefill, script: "Cyrl" },
-        },
-      }),
-    );
+    // Re-record the identity decisions with the Cyrillic target script —
+    // the derived identity composes bcp47 "tl-Cyrl" with prefill.script
+    // "Cyrl", the shape this test used to patch into the session store.
+    act(() => seedIdentity({ ...fakeIdentity, targetScriptRaw: "Cyrl" }));
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     const s = usePhaseBDraftStore.getState();

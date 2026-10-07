@@ -1,0 +1,37 @@
+{
+  "workflow": "speckit",
+  "specName": "Decision store — one record per decision",
+  "branch": "km/modular-decisions",
+  "currentStep": "implement",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:54:10.251Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:54:10.380Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "claude",
+      "at": "2026-10-07T03:19:58.462Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "claude",
+      "at": "2026-10-07T03:20:03.845Z"
+    }
+  ]
+}

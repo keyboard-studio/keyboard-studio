@@ -134,6 +134,21 @@ module.exports = {
       to:   { path: '^packages/studio/src/(stores|editors|lib)/' },
     },
     {
+      name: 'gallery-modules-no-store-writes',
+      comment:
+        'Spec 090 FR-003 layer 1: gallery decision modules (survey/questions/gallery/) ' +
+        'are pure descriptors — provides/requires, a typed apply returning a patch, and ' +
+        'a renderer that receives its decision value via props and reports changes via ' +
+        'onChange. They must not import any store: the gallery host (steps/galleryHost.tsx) ' +
+        'is the only write path for a gallery decision. (The broader ' +
+        'question-modules-no-bypass-mutate-seam rule already forbids stores/ for all of ' +
+        'survey/questions/; this rule names the gallery invariant so a future relaxation ' +
+        'of the broad rule cannot silently reopen it.)',
+      severity: 'error',
+      from: { path: '^packages/studio/src/survey/questions/gallery/' },
+      to:   { path: '^packages/studio/src/stores/' },
+    },
+    {
       name: 'renderer-no-direct-editor-import',
       comment:
         'The SPA renderer (StudioShell.tsx) and its step-host mediating layer ' +

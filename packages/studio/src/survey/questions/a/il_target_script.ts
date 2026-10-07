@@ -164,5 +164,11 @@ const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes
   provides: ["target-script"],
   requires: ["language-code"],
   extract: extractTargetScript,
+  // Spec 092 (T033): the resolved langtags entry's script (already mapped
+  // to a target-script option value at resolution time) as a lookup default.
+  lookupDefault: (ctx) => {
+    const script = ctx.identity?.targetScript;
+    return script !== undefined && script !== "" ? { value: script, source: "langtags" } : undefined;
+  },
 };
 export default mod;

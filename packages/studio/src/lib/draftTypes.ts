@@ -30,6 +30,7 @@ import type { WorkingCopySnapshot } from "./persistWorkingCopy.ts";
 import type { PhaseBDraftSnapshot } from "../stores/phaseBDraftStore.ts";
 import type { DecisionRecordSnapshot } from "../decisions/decisionLogStore.ts";
 import type { SurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 
 /** Lightweight peek at a stored draft, for a future resume-affordance. */
 export interface DraftMeta {
@@ -140,4 +141,25 @@ export interface DurableDraft {
    * store, so every step shows its proposal and nothing is invented (FR-032).
    */
   surveyAnswers?: SurveyAnswerSnapshot;
+  /**
+   * Spec 088 FR-007: the decision store's snapshot — the ONLY saved record
+   * of survey-question answers from draft version 2 on. Optional in the type
+   * so the v1→v2 migration output and partial envelopes type-check; every
+   * native v2 draft the writer produces carries it.
+   */
+  decisions?: DecisionSet;
+  /**
+   * Spec 088 US3 / contract C-4.3: v1 answers the migration could not map to
+   * a decision (their question no longer exists). Carried on the migrated
+   * envelope for the load path to surface to the author — never dropped, and
+   * never persisted past the load (the v2 writer does not write this field).
+   */
+  migrationOrphans?: MigrationOrphan[];
+}
+
+/** One unmappable v1 answer, kept by the migration for surfacing (C-4.3). */
+export interface MigrationOrphan {
+  questionId: string;
+  stepId: string;
+  value: unknown;
 }

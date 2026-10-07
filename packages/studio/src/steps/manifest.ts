@@ -25,14 +25,16 @@
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
-import { CharactersStep } from "../survey/CharactersStep.tsx";
-import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
+import { galleryModules } from "../survey/questions/registry.ts";
+import type { QuestionModule } from "../survey/types.ts";
+import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
+import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
 import { stepDependencies } from "./stepDependencies.ts";
 import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
-import { PunctuationStep } from "../survey/punctuation/PunctuationStep.tsx";
-import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
-import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
+import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
+import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
+import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
 import {
   identityStep,
   layoutStep,
@@ -78,9 +80,11 @@ const charactersStep: Step = {
   // step. (The session-level ScriptPrefill is a non-IR signal — not an irPath —
   // so it carries no C5 obligation; irPath('header','script') does not exist.)
   writes: [irPath("header", "bcp47")],
-  // CharactersStep component — self-contained prefill/PhaseB substage adapter
+  // CharactersStepHost — the gallery host around CharactersStep, the
+  // character-inventory module's renderer (spec 090 T021); the component
+  // itself remains the self-contained prefill/PhaseB substage adapter
   // (spec 027 Stage 4; first runtime use of step.component).
-  component: CharactersStep,
+  component: CharactersStepHost,
   // phase_b_characters runs inside the characters step (spec 024, Stage 1);
   // its flowRefs come from stepDependencies.
   // Right pane swaps from the live OSK preview to the interactive character
@@ -150,7 +154,7 @@ const stepPool: readonly Step[] = [
     // spec 078: the step's own write is the context-tolerance decision; these
     // are the paths the separate apply effect commits the accepted rules to.
     writes: [...CONTEXT_TOLERANCE_WRITES],
-    component: MarksSeriesStep,
+    component: MarksStepHost,
     specRef: ["specs/071-marks-question-series", "specs/052-marks-treatment-question"],
     evidence: {
       inputs: ["the confirmed alphabet: its bases, marks and attested combinations"],
@@ -164,8 +168,8 @@ const stepPool: readonly Step[] = [
   // character map's letters/numerals/marks fold points at (the alphabet map
   // deliberately withholds punctuation — see CharacterMapPane.tsx). Same
   // build-list anatomy as Phase B — suggestions, type-in, right-pane character
-  // map (scope "punctuation") — all toggling the shared phaseBDraftStore
-  // draft. Emits its picks as confirmedInventory on a phase:"C" result (see
+  // map (scope "punctuation") — all toggling the shared Phase B/C draft (the
+  // character-inventory decision value since spec 090). Emits its picks as confirmedInventory on a phase:"C" result (see
   // PunctuationStep.tsx for why not "B"), which the merged session unions in,
   // shielding them from carve and placing any the base cannot type.
   {
@@ -175,7 +179,7 @@ const stepPool: readonly Step[] = [
     title: "Punctuation",
     inputs: [],
     writes: [],
-    component: PunctuationStep,
+    component: PunctuationStepHost,
     // Right pane swaps to the interactive character map, as on the Phase B
     // build-list screen — but unconditionally: this step has no
     // discoveryMethod fork (SurveyView's gate special-cases "characters" only).
@@ -203,7 +207,7 @@ const stepPool: readonly Step[] = [
     title: "Invisible characters",
     inputs: [],
     writes: [],
-    component: InvisiblesStep,
+    component: InvisiblesStepHost,
     specRef: ["specs/075-punctuation-defaults"],
     evidence: { inputs: ["the invisible-character candidates offered"], keyFn: "invisibles" },
     persistence: "phase-b-draft",
@@ -225,7 +229,7 @@ const stepPool: readonly Step[] = [
     title: "Convenience letters",
     inputs: [],
     writes: [],
-    component: ConvenienceCharsStep,
+    component: ConvenienceStepHost,
     specRef: "specs/051-carve-orthography-trim",
     evidence: {
       inputs: ["surplus basic-Latin candidates on the base", "whether the orthography signal is known"],
@@ -293,6 +297,27 @@ export const manifest: readonly Step[] = ((): readonly Step[] => {
   return found;
   });
 })();
+
+/**
+ * Gallery-hosted steps (spec 090 T005): step id → the gallery module that
+ * settles the step's gallery decision. Derived, not listed: a step appears
+ * here exactly when one of the decisions in its `provides` (the step's
+ * `settles`, spread from stepDependencies) is provided by a registered
+ * gallery module. Step wrappers and StepHost resolve their module through
+ * this map and render it via the gallery host (steps/galleryHost.tsx);
+ * per-step adapters retire per story (US1–US5), not here. A step settling
+ * two gallery decisions would be ambiguous — the coverage test
+ * (decisions/galleryModules.coverage.test.ts) pins one provider per
+ * settles id, and no step settles more than one.
+ */
+export const galleryModuleByStep: ReadonlyMap<string, QuestionModule> = new Map(
+  manifest.flatMap((step) => {
+    const mod = galleryModules.find((m) =>
+      (m.provides ?? []).some((id) => (step.provides ?? []).includes(id)),
+    );
+    return mod === undefined ? [] : [[step.id, mod] as const];
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M3, M5, layout).

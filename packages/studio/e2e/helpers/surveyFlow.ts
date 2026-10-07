@@ -199,6 +199,14 @@ export async function driveIdentityLite(
      * on that default rather than passing this explicitly.
      */
     authorName?: string;
+    /**
+     * Spec 092 FR-005: once `il_copyright_holder` requires the
+     * authoring-track decision, the copyright question no longer renders in
+     * the identity sequence — it arrives after the track choice (spec 091's
+     * derived order). Set this when the walk answers the copyright question
+     * at its post-track position instead of here.
+     */
+    deferCopyright?: boolean;
   },
 ): Promise<void> {
   const english = options?.english ?? "Test";
@@ -268,8 +276,12 @@ export async function driveIdentityLite(
 
   // Q8: Copyright holder — optional, TERMINAL (`next: null`); left blank
   // (D1 defaults it to the author name). This hands off to the layout step.
-  await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
-  await surveyAdvance(page).click();
+  // Skipped entirely when deferCopyright is set (spec 092): the question
+  // does not render in this sequence anymore.
+  if (options?.deferCopyright !== true) {
+    await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
+    await surveyAdvance(page).click();
+  }
 
   // Community-layout step (spec 076 A4): sits between identity and the base
   // picker. Confirm the studio's suggested Windows layout (the default,

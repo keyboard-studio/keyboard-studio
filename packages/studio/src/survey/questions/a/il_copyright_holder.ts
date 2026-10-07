@@ -10,8 +10,9 @@
 // NOT required: per D1 the holder defaults to the author name when left blank,
 // so an author who is also the rights holder confirms one field instead of two.
 
-import type { QuestionModule } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
 import type { ExtractContext } from "../../../decisions/extractContext.ts";
+import { deriveAttribution } from "../../../decisions/identitySelectors.ts";
 import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 
 // help_text extends the demoted module's rather than replacing it (HANDOFF-CONTENT
@@ -96,14 +97,41 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
+/**
+ * Decision apply (spec 089 T011): the identity step's attribution lands on
+ * the working copy from the recorded decisions — `extractAttribution`'s
+ * rule composed over `ctx.decisions` by `deriveAttribution` (holder
+ * defaults to the author name, D1). No author name recorded ⇒ no channel:
+ * the working copy's attribution stays exactly as it was. This replaces
+ * IdentityLiteAdapter's completion-time `setAttribution` write.
+ */
+export function apply(_value: string | string[] | undefined, ctx: ApplyContext): WorkingCopyPatch {
+  const attribution = deriveAttribution(ctx.decisions);
+  return attribution === null ? {} : { attribution };
+}
+
 const mod: QuestionModule = {
   definition,
   fixtures,
+  apply,
   inputs: [],
   writes: [],
   // Decision spike (km/decisions-spike).
   provides: ["copyright-holder"],
-  requires: ["author-name"],
+  // Spec 092 FR-005 (the series acceptance test): the authoring-track
+  // decision is also required — the track decides what the starting
+  // point's copyright may do here (seed on adapt, never offered on copy),
+  // and the derived order (spec 087/091) now places this question after
+  // the track choice, where the extraction pass has already run.
+  requires: ["author-name", "authoring-track"],
   extract: extractCopyrightHolder,
+  // Spec 092 T022: the track-dependent seeding disposition, declared here
+  // rather than special-cased in the pass. Adapt: the extracted notice
+  // seeds the question (pre-filled, labelled with its source). Copy: NO
+  // seed and NO `offered` — the copied keyboard's notice is retained by
+  // the attribution machinery (D1 leaves the holder defaulting to the
+  // author), and offering it for re-entry is the D4 duplicate-holder
+  // hazard this module's help text exists to prevent.
+  seedWhen: (decisions) => decisions["authoring-track"]?.value === "adapt",
 };
 export default mod;

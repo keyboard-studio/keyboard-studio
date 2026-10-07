@@ -106,7 +106,6 @@ import {
   unionAggregatedCarveIds,
 } from "../steps/editorMutate.ts";
 
-import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
 import {
@@ -434,29 +433,25 @@ export function projectWorkingCopyVfs(
   const activeDispositions = carveDispositions.filter((d) =>
     carveIdSet.has(d.comboId),
   );
-  const hasSuppression = activeDispositions.length > 0;
-
   // 1a/1b: Whole-node deletions + store-slot removals + VFS re-emit.
   //
   // T015 carve pipeline (suppression → slot removals → filter, carvePipeline.ts
-  // in the engine). When dispositions are present (hasSuppression), the
-  // pipeline derives the carved IR from the PRE-carve baseIr — the T013
-  // constraint: guard selector chars are read from the pre-removal stores and
-  // are unrecoverable after slot removal. The pipeline runs either inside
-  // applyCarveToVfs (carvePipeline opts, flag-off path) or through the mutate
-  // seam (applyCarveMutate, flag-on path); both derive byte-identical IRs.
+  // in the engine). When dispositions are present, the pipeline derives the
+  // carved IR from the PRE-carve baseIr — the T013 constraint: guard selector
+  // chars are read from the pre-removal stores and are unrecoverable after
+  // slot removal. Since spec 089 T021 the pipeline runs through the mutate
+  // seam (applyCarveMutate) whenever there is a projection edit; the legacy
+  // derivation below survives only for the no-projection-edit case
+  // (slot-item nul-rewrites first via applyStoreSlotRemovals, then whole-node
+  // deletions inside applyCarveToVfs).
   //
-  // Without dispositions, the legacy derivation is preserved exactly:
-  // slot-item nul-rewrites first (applyStoreSlotRemovals), then whole-node
-  // deletions inside applyCarveToVfs — content-identical to pre-T015 behavior.
-  //
-  // The slot partition above is kept for the no-suppression legacy path and
-  // for the keycap cascade (step 1.5), which is driven off baseIr.
+  // The slot partition above is kept for that legacy path and for the keycap
+  // cascade (step 1.5), which is driven off baseIr.
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
 
   // spec-014 T016c — carve IR-projection via the single mutate() write seam.
   //
-  // Flag-on: derive the deletion-filtered carve IR through applyCarveMutate
+  // Derive the deletion-filtered carve IR through applyCarveMutate
   // (which routes the carve patch through applyMutatePatch / CARVE_WRITES) and
   // hand THAT pre-filtered IR to applyCarveToVfs with an empty deletion set so
   // the emit step only serializes — the seam, not applyCarveToVfs's internal
@@ -498,9 +493,12 @@ export function projectWorkingCopyVfs(
 
   let carveResult: ApplyCarveToVfsResult;
   // The post-carve IR, for the add-gallery mutate derivation (step 2) — only
-  // used as the mutate base, never re-emitted.
+  // used as the mutate base, never re-emitted. Spec 089 T021: the seam path
+  // below is THE carve path (the flag that selected it is deleted, OI-1
+  // ruled global); the legacy flag-off suppression branch it shadowed was
+  // unreachable under the un-gated condition and is deleted with it.
   let carveIr: KeyboardIR;
-  if (isMutateSeamEnabled() && !entryGroupDeleted && hasProjectionEdit) {
+  if (!entryGroupDeleted && hasProjectionEdit) {
     // Seam path (T015): applyCarveMutate runs the shared pipeline
     // (suppression → slot removals → filter) from the pre-carve baseIr.
     // effectiveItemIds already carries the #1809 §1 aggregated union, so
@@ -514,6 +512,11 @@ export function projectWorkingCopyVfs(
       {
         dispositions: activeDispositions,
         loud: carveLoud,
+        // The pipeline's slot-removal warnings (blocked stores, skips) are
+        // part of this projection's warning surface — the legacy path
+        // pushed applyStoreSlotRemovals' warnings directly, and the seam
+        // path must surface the same set (spec 089 T021 fix).
+        onWarnings: (w) => warnings.push(...w),
       },
     );
     carveIr = seamIr;
@@ -528,21 +531,6 @@ export function projectWorkingCopyVfs(
     carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
       irRewritten: true,
     });
-  } else if (!entryGroupDeleted && hasCarveEdit && hasSuppression) {
-    // T015 legacy (flag-off) path with suppression: the shared pipeline runs
-    // inside applyCarveToVfs on the PRE-carve baseIr. Do NOT pre-apply slot
-    // removals here (T013 constraint — guard selector chars come from the
-    // pre-removal stores).
-    carveResult = applyCarveToVfs(vfs, keyboardId, baseIr, deletedNodeIds, {
-      carvePipeline: {
-        // #1809 §1: the pipeline must see the aggregated union, not the raw
-        // incremental set.
-        deletedItemIds: effectiveItemIds,
-        dispositions: activeDispositions,
-        loud: carveLoud,
-      },
-    });
-    carveIr = carveResult.derivedIr ?? baseIr;
   } else {
     // Legacy path without suppression — unchanged pre-T015 behavior:
     // slot-item nul-rewrites first, then whole-node deletions inside
@@ -745,29 +733,28 @@ export function projectWorkingCopyVfs(
     // spec-014 T017 — add-gallery IR projection via the single mutate() seam.
     //
     // The reference emit above is text-based (applyAssignmentsToVfs writes the
-    // injected .kmn directly, byte-identical in both flag states). When the flag
-    // is on we ALSO derive the canonical assignment IR through the mutate() write
-    // path: parse the just-written .kmn back to IR and route its physical-assignment
-    // arrays (groups[]/stores[]) through applyAddGalleryMutate (applyMutatePatch /
-    // ADD_GALLERY_WRITES). This makes mutate() the single IR write route for the
-    // add surface (M6/SC-001) and enforces declared-writes containment (M3) — the
-    // patch can never reach header, comments, or the deferred keycap/touch targets.
-    // The derived IR is intentionally NOT re-emitted: the text artifact stays
-    // byte-identical to the flag-off path. Keycap-label / touch-layout projection
-    // is deferred to US2.
-    if (isMutateSeamEnabled()) {
-      const kmnText = readVfsText(vfs, `source/${keyboardId}.kmn`);
-      if (kmnText !== undefined) {
-        try {
-          const assignedIr = parseKmn(kmnText, keyboardId).ir;
-          // Route through the seam; a containment violation (M3) surfaces here.
-          applyAddGalleryMutate(carveIr, assignedIr);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          warnings.push(
-            `[project-working-copy] add-gallery mutate-seam derivation skipped: ${msg}`,
-          );
-        }
+    // injected .kmn directly). We ALSO derive the canonical assignment IR
+    // through the mutate() write path — unconditionally since spec 089 T021
+    // deleted the flag (OI-1 ruled global): parse the just-written .kmn back
+    // to IR and route its physical-assignment arrays (groups[]/stores[])
+    // through applyAddGalleryMutate (applyMutatePatch / ADD_GALLERY_WRITES).
+    // This makes mutate() the single IR write route for the add surface
+    // (M6/SC-001) and enforces declared-writes containment (M3) — the patch
+    // can never reach header, comments, or the deferred keycap/touch targets.
+    // The derived IR is intentionally NOT re-emitted: the text artifact is
+    // the same one the pre-flag path produced. Keycap-label / touch-layout
+    // projection is deferred to US2.
+    const kmnText = readVfsText(vfs, `source/${keyboardId}.kmn`);
+    if (kmnText !== undefined) {
+      try {
+        const assignedIr = parseKmn(kmnText, keyboardId).ir;
+        // Route through the seam; a containment violation (M3) surfaces here.
+        applyAddGalleryMutate(carveIr, assignedIr);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(
+          `[project-working-copy] add-gallery mutate-seam derivation skipped: ${msg}`,
+        );
       }
     }
   }

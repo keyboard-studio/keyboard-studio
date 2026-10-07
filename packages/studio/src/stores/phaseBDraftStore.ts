@@ -1,837 +1,202 @@
-// phaseBDraftStore — shared draft-alphabet accumulator for Phase B build-list.
+// phaseBDraftStore — INTERIM BRIDGE (spec 090 T021; DELETED by T025).
 //
-// The Phase B build-list screen renders TWO panes that both mutate the SAME
-// accumulating alphabet: BuildListView (center pane — CLDR suggestions +
-// type-in chip editor) and CharacterMapPane (right pane — browse-and-toggle
-// character map, spec character-map pane work). Lifting the list out of
-// BuildListView's local useState into a store lets both panes read/toggle the
-// same array without prop drilling across the pane-swap boundary (StudioShell's
-// SurveyView renders CharacterMapPane independently of BuildListView).
+// Until US2 this file was the Phase B draft accumulator store. The
+// canonical draft state is now the `character-inventory` +
+// `invisibles-inventory` decision values (research D-090-10), edited
+// through survey/useInventoryDraft.ts and computed by
+// survey/phaseBDraftOps.ts. This module preserves the old store's
+// public interface — a read mirror over the decision records, with the
+// actions delegating to the inventory ops — so the consumers T022/T025
+// have not rewired yet (the punctuation and invisibles steps, draft
+// persistence, and their tests) keep working against the SAME values
+// during the story. Nothing new should import this file.
 //
-// Three-store model (spec 071): the designer's PICKS are canonical — each pick
-// is one whole grapheme (plus a declared role for private-use characters).
-// Everything else is derived from the picks on every mutation:
-//   - `bases` / `marks` / `attestedStacks` / `declaredRoles` — the three-store
-//     ConfirmedAlphabet split (a precomposed pick contributes its base, its
-//     marks, and its ordered attested stack);
-//   - `chars` — the legacy flat NFC list every pre-046 consumer keeps reading.
-// Deriving (rather than mutating stores independently) means removing a pick
-// can never leave an orphaned mark behind: a mark stays only while some
-// remaining pick still implies it.
-//
-// Lifecycle: reset() is called from ../survey/CharactersStep.tsx on the
-// prefill -> B substage transition (a fresh alphabet each time the build-list
-// screen is entered) — NOT on every render of BuildListView/CharacterMapPane.
-// A component rerender (e.g. clicking one character) must never evaporate
-// prior picks.
-//
-// All chars stored here are NFC-normalized and deduplicated via nfcDedup
-// (../survey/charNormUtils.ts), matching the normalization already applied by
-// BuildListView's CharChipEditor/SuggestionPanel before this store existed.
-//
-// No host-disk writes. No persistence of its own (like surveySessionStore,
-// draft persistence is driven externally, not from this module).
-//
-// Durable-draft fold-in (P0 fix): a reload/OAuth-redirect return mid-build-list
-// previously restored `discoveryMethod`/`charactersSubStage` (via
-// surveySessionStore's TraversalSnapshot) WITHOUT this store's `chars`, landing
-// the author back on the build-list screen with an empty alphabet — silently
-// discarding everything they'd added. `snapshotPhaseBDraft`/
-// `applyPhaseBDraftSnapshot` below mirror the snapshotTraversal/
-// applyTraversalSnapshot idiom in ../stores/surveySessionStore.ts so
-// ../lib/draftPersistence.ts can fold the picks into the same DurableDraft
-// envelope and restore them here before the build-list screen ever renders.
+// Records written through these actions carry the `characters` step
+// attribution (the draft's home step); T022 rewires the punctuation and
+// invisibles steps to the inventory surface with their own attribution,
+// and T025 deletes this bridge and re-points draft persistence.
 
 import { create } from "zustand";
 import type { AttestedStack, ConfirmedAlphabet, DeclaredRole } from "@keyboard-studio/contracts";
-import { makeConfirmedAlphabet, stackKey, toUPlusNotation, parseUPlusNotation } from "@keyboard-studio/contracts";
 import type { SourcedInventory } from "@keyboard-studio/engine";
-import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
-import { casePairOf, isFormatChar, nfcDedup } from "../survey/charNormUtils.ts";
-import { DEFAULT_PHASE_B_FONT, type PhaseBFontValue } from "../survey/surveyStyles.ts";
+import {
+  draftConfirmedAlphabet as confirmedAlphabetOf,
+  invisibleDecisionsOf,
+  snapshotFromValues,
+  valuesFromSnapshot,
+  type InvisibleDecision,
+  type LastPickContribution,
+  type PhaseBDraftSnapshotShape,
+} from "../survey/phaseBDraftOps.ts";
+import type { PhaseBFontValue } from "../survey/surveyStyles.ts";
+import { useDecisionStore } from "./decisionStore.ts";
+import {
+  getCharacterInventoryValue,
+  getInvisiblesInventoryValue,
+  inventoryOps,
+  peekLastPick,
+  recordCharacterInventoryValue,
+  recordInvisiblesInventoryValue,
+} from "../survey/useInventoryDraft.ts";
 
-/**
- * Where a character in the draft came from (spec 044 FR-017).
- *
- * `"author"` is the STRONGEST claim: a character the designer typed or picked
- * survives any re-seed, and removing it is not treated as rejecting a proposal.
- * The rest are proposal origins. `"text"` is not produced here — it is reserved
- * for the text-sample surface owned by spec 050, and is present so 044 does not
- * bake in the assumption that exemplars are the only proposal source. Proposal
- * sources UNION rather than override (see `seedFromProposal`).
- *
- * `"base"` and `"ascii-floor"` (spec 075) attribute punctuation proposed from
- * the base keyboard's own output, or from the fixed basic-ASCII floor that
- * stands in for it when that output cannot be fully determined. Single-valued
- * by design: a character both CLDR and the base attest is seeded once, under
- * the first source, and "also produced by the base" is derived at render time.
- */
-export type DraftProvenance =
-  | SourcedInventory["source"]
-  | "author"
-  | "text"
-  | "base"
-  | "ascii-floor";
+export type {
+  DraftProvenance,
+  InvisibleDecision,
+  LastPickContribution,
+} from "../survey/phaseBDraftOps.ts";
+import type { DraftProvenance } from "../survey/phaseBDraftOps.ts";
 
-/** An author's decision about one invisible (format) character, keyed by `U+XXXX`. */
-export type InvisibleDecision = "accepted" | "declined";
-
-/** One designer pick: a whole grapheme, plus the declared role for PUA picks. */
-interface DraftPick {
-  grapheme: string;
-  role?: DeclaredRole;
-}
-
-/** What one pick just contributed — drives the "just added" highlight (US5). */
-export interface LastPickContribution {
-  grapheme: string;
-  addedBases: string[];
-  addedMarks: string[];
-  addedStack: AttestedStack | null;
-}
+/** The old store's snapshot shape (see phaseBDraftOps.ts for the mapping). */
+export type PhaseBDraftSnapshot = PhaseBDraftSnapshotShape;
 
 export interface PhaseBDraftState {
-  /** Legacy flat NFC alphabet (derived from the picks; kept for every pre-046 consumer). */
   chars: string[];
-  /** Three-store split derived from the picks (spec 071). */
   bases: string[];
   marks: string[];
   attestedStacks: AttestedStack[];
   declaredRoles: Record<string, DeclaredRole>;
-  /**
-   * Derived category arrays for the alphabet breakdown (spec 047, FR-004/005).
-   * Every captured non-letter, non-mark, non-PUA pick is routed to exactly one
-   * of these by Unicode General Category; `bases` holds true letters only. The
-   * flat `chars` list below remains the COMPLETE inventory (FR-013).
-   */
   numbers: string[];
   punctuation: string[];
   symbols: string[];
   separators: string[];
   controls: string[];
-  /** The most recent add()'s contribution, for the visible-decomposition highlight. */
   lastPick: LastPickContribution | null;
-
-  /**
-   * Per-character origin (spec 044 FR-004/FR-017), keyed by NFC grapheme.
-   * Drives the proposed-vs-authored affordance. Only characters currently in
-   * the draft appear here.
-   */
   provenance: Record<string, DraftProvenance>;
-
-  /**
-   * Multi-letter units the exemplar source wrote as `{..}` clusters — Ewondo's
-   * `dz`/`kp`/`ng`/`nk`/`ts`.
-   *
-   * A SIBLING of `chars`, never a member of it. The letters that make up a
-   * cluster are what the author types, and the exemplar parse already
-   * contributes them individually; the cluster itself is a fact ABOUT the
-   * orthography, not a character to place on a key. It is recorded here so it
-   * survives to the phase result (and from there to the session) instead of
-   * being discarded with the parse — see
-   * `SurveyPhaseResult.attestedDigraphs` for what later operations want it for.
-   *
-   * Accumulates across seeds (proposal sources union, like `provenance`), and
-   * takes no part in the pick/derive model: nothing downstream of `picks`
-   * reads it.
-   */
   exemplarDigraphs: string[];
-
-  /**
-   * Letters the author added from the exemplar loanword (auxiliary) tier,
-   * with their case pairs, NFC. A sibling of `chars`, never inside it: these
-   * are not picks, so they never reach the alphabet stores. Build-list Done
-   * emits them as `loanwordChars` and folds them into `confirmedInventory`,
-   * which keeps them needed without making them alphabet letters.
-   */
   loanwordChars: string[];
-
-  /** Add a loanword letter (NFC). No-op when it is already a loanword or an alphabet letter. */
-  addLoanword: (c: string) => void;
-
-  /** Remove a loanword letter (NFC). An edit, never a rejection. */
-  removeLoanword: (c: string) => void;
-
-  /**
-   * Proposed characters the author removed. STICKY: `seedFromProposal` and
-   * `seedProposals` must never re-propose these, so declining a suggestion
-   * once is not undone by a later re-derivation, a step revisit, a locale
-   * re-resolution or a reload (spec 075 SC-006). Removing an AUTHORED
-   * character does not add it here — re-proposal was never at issue for a
-   * character the author typed; and an author add always wins over an entry
-   * here (FR-022: typing a removed mark by hand overrides the rejection).
-   *
-   * Unbounded by design: a keyed NFC set with no pruning. An entry for a
-   * character no source proposes any more is inert and costs bytes only, and
-   * the size is bounded by the number of distinct characters an author has
-   * ever removed — small, and per working copy.
-   */
   rejected: string[];
-
-  /**
-   * The confidence each proposal source was seeded at, keyed by source
-   * (spec 044 FR-017). Recorded per SOURCE rather than per character because
-   * `SourcedInventory` resolves one confidence for the whole winning side —
-   * every character it yields shares it. Drives the chip wording
-   * ("from CLDR" vs "from SLDR (machine-generated — please check)");
-   * confidence never filters anything.
-   */
   proposalConfidence: Record<string, string>;
-
-  /**
-   * True once the author has declined the exemplar discovery method for this
-   * working copy (spec 044 FR-016a). Sticky across Phase B re-entry: the offer
-   * is never re-asserted as the default, though the apply affordance stays
-   * reachable on page 2.
-   */
   exemplarMethodDeclined: boolean;
-
-  /**
-   * Seed keys already applied through `seedProposals` (spec 075). STICKY: a
-   * proposal set is seeded once per key (`"punctuation:" + resolvedTag`,
-   * `"punctuation-base:" + baseKey`), so revisiting the step never re-runs a
-   * seed and the FR-023 "already completed before the feature" guard is
-   * evaluated once. Re-proposal of a REMOVED character is prevented by
-   * `rejected`, not by this list.
-   */
   seededProposals: string[];
-
-  /**
-   * The evidence key (steps/evidence.ts `alphabetKey`: `bcp47|script|variant|
-   * baseId`) the current alphabet was built from (spec 079 R-07). STICKY:
-   * stamped when the alphabet is first built, kept by `reset()`, cleared only
-   * by `resetPhaseBDraftDecisions()`. The characters prefill confirm compares it
-   * with the current key, so passing through an unchanged prefill never clears
-   * the alphabet (FR-020); a different key is a real shape change. Absent until
-   * the first build, and in drafts saved before spec 079.
-   */
   alphabetEvidenceKey?: string | undefined;
-
-  /**
-   * The author's decisions about invisible (format) characters, keyed by
-   * `U+XXXX` notation (spec 075 FR-013/FR-018). STICKY. `"accepted"` characters
-   * reach the phase-C confirmed inventory through `phaseCConfirmedInventory()`
-   * — they are deliberately NOT pushed into `chars`, so they never land in the
-   * unrendered `controls` bucket (FR-014). A key that is absent was never asked
-   * or never answered; `"declined"` is a recorded refusal.
-   */
   invisibleDecisions: Record<string, InvisibleDecision>;
-
-  /**
-   * The font applied to every character glyph rendered while building the
-   * alphabet (chip editor, suggestion chips, character map) — set via the
-   * font-selection dropdown at the top of the Phase B build-list step.
-   */
   selectedFont: PhaseBFontValue;
 
-  /**
-   * Add one whole-grapheme pick (NFC-normalized, deduped). A decomposable pick
-   * visibly contributes its base, its mark(s), and the attested stack; a
-   * private-use pick should carry the designer's declared `role` (FR-004) —
-   * without one it is treated as a letter until classified.
-   */
   add: (c: string, opts?: { role?: DeclaredRole }) => void;
-
-  /** Remove one pick (NFC-normalized before comparison). Derived stores recompute. */
   remove: (c: string) => void;
-
-  /** Add if absent, remove if present (NFC-normalized before comparison). */
   toggle: (c: string) => void;
-
-  /**
-   * Add a character on behalf of a PROPOSAL source rather than the author.
-   * Separate from `add` so the ordinary UI path can never accidentally record a
-   * pick as machine-proposed — `add` always means "the author did this".
-   */
   addProposed: (c: string, source: DraftProvenance, opts?: { role?: DeclaredRole }) => void;
-
-  /** Replace the whole list wholesale (drop-in for the old setChars callers). */
   setAll: (next: string[]) => void;
-
-  /** Set the font applied to all Phase B character glyphs. */
   setSelectedFont: (font: PhaseBFontValue) => void;
-
-  /**
-   * Seed the draft from a sourced exemplar inventory (spec 044 FR-016).
-   *
-   * Seeds the `main` tier plus 047's existing case-counterpart derivation, so
-   * accepting fills a usable alphabet in one action rather than a lowercase-only
-   * half of one. The other three tiers are offered separately in their own 047
-   * breakdown sections; they are deliberately not folded in here.
-   *
-   * Contract:
-   *  - **Idempotent** — calling it twice with the same inventory is a no-op the
-   *    second time.
-   *  - **Never clobbers an author pick** — a character the designer typed keeps
-   *    `"author"` provenance even if a proposal also contains it.
-   *  - **Respects `rejected`** — a proposed character the author removed is not
-   *    re-proposed.
-   *  - **Unions, does not override** — a second proposal source composes with
-   *    this one; each character keeps its own attribution.
-   *
-   * @param inv   the sourced inventory to propose from
-   * @param bcp47 target tag, forwarded to the case-counterpart derivation so
-   *              the Turkic dotted-I system is not mangled
-   */
   seedFromProposal: (inv: SourcedInventory, bcp47?: string) => void;
-
-  /** Record that the author declined the exemplar method (FR-016a). Sticky. */
   declineExemplarMethod: () => void;
-
-  /**
-   * Seed a proposal set once per `seedKey` (spec 075 FR-001/FR-006). Every
-   * character goes through the same path `addProposed` uses, so a `rejected`
-   * character is vetoed (FR-022) and an `"author"` entry is never downgraded
-   * (FR-005). A repeated key is a no-op; the key is recorded either way.
-   */
   seedProposals: (chars: readonly string[], source: DraftProvenance, seedKey: string) => void;
-
-  /** Record that the author wants this invisible character (`U+XXXX`). Never touches `chars`. */
   acceptInvisible: (notation: string) => void;
-
-  /** Record that the author declined this invisible character (`U+XXXX`). Never touches `chars`. */
   declineInvisible: (notation: string) => void;
-
-  /**
-   * Carry-over (spec 075 FR-017): every format character (General Category
-   * Cf) an earlier code-point entry filed into the `controls` bucket becomes
-   * an `"accepted"` invisible decision and leaves `chars`, so it is offered
-   * once, pre-selected, and appears in one answer instead of two. Not a
-   * rejection — `rejected` is untouched. Idempotent.
-   */
   adoptControlsAsInvisibles: () => void;
-
-  /** Stamp the evidence key the alphabet is built from (spec 079 R-07). */
   setAlphabetEvidenceKey: (key: string) => void;
-
-  /** Clear back to an empty alphabet (font selection is left untouched). */
+  addLoanword: (c: string) => void;
+  removeLoanword: (c: string) => void;
   reset: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Pure derivation: picks -> { chars, bases, marks, attestedStacks, declaredRoles }
-// ---------------------------------------------------------------------------
+type PhaseBDraftData = Omit<
+  PhaseBDraftState,
+  | "add"
+  | "remove"
+  | "toggle"
+  | "addProposed"
+  | "setAll"
+  | "setSelectedFont"
+  | "seedFromProposal"
+  | "declineExemplarMethod"
+  | "seedProposals"
+  | "acceptInvisible"
+  | "declineInvisible"
+  | "adoptControlsAsInvisibles"
+  | "setAlphabetEvidenceKey"
+  | "addLoanword"
+  | "removeLoanword"
+  | "reset"
+>;
 
-interface DerivedStores {
-  chars: string[];
-  bases: string[];
-  marks: string[];
-  attestedStacks: AttestedStack[];
-  declaredRoles: Record<string, DeclaredRole>;
-  numbers: string[];
-  punctuation: string[];
-  symbols: string[];
-  separators: string[];
-  controls: string[];
-}
+const ops = inventoryOps("characters");
 
-function isPrivateUseGrapheme(g: string): boolean {
-  for (const ch of g) {
-    const cp = ch.codePointAt(0);
-    if (cp !== undefined && isPrivateUseCodePoint(cp)) return true;
-  }
-  return false;
-}
+const actions: Omit<PhaseBDraftState, keyof PhaseBDraftData> = {
+  add: (c, opts) => ops.add(c, opts),
+  remove: (c) => ops.remove(c),
+  toggle: (c) => ops.toggle(c),
+  addProposed: (c, source, opts) => ops.addProposed(c, source, opts),
+  setAll: (next) => ops.setAll(next),
+  setSelectedFont: (font) => ops.setSelectedFont(font),
+  seedFromProposal: (inv, bcp47) => ops.seedFromProposal(inv, bcp47),
+  declineExemplarMethod: () => ops.declineExemplarMethod(),
+  seedProposals: (chars, source, seedKey) => ops.seedProposals(chars, source, seedKey),
+  acceptInvisible: (notation) => ops.acceptInvisible(notation),
+  declineInvisible: (notation) => ops.declineInvisible(notation),
+  adoptControlsAsInvisibles: () => ops.adoptControlsAsInvisibles(),
+  setAlphabetEvidenceKey: (key) => ops.setAlphabetEvidenceKey(key),
+  addLoanword: (c) => ops.addLoanword(c),
+  removeLoanword: (c) => ops.removeLoanword(c),
+  reset: () => ops.reset(),
+};
 
-function deriveStores(picks: DraftPick[]): DerivedStores {
-  const chars: string[] = [];
-  const bases: string[] = [];
-  const marks: string[] = [];
-  const attestedStacks: AttestedStack[] = [];
-  const declaredRoles: Record<string, DeclaredRole> = {};
-  const numbers: string[] = [];
-  const punctuation: string[] = [];
-  const symbols: string[] = [];
-  const separators: string[] = [];
-  const controls: string[] = [];
-  const charSeen = new Set<string>();
-  const baseSeen = new Set<string>();
-  const markSeen = new Set<string>();
-  const stackSeen = new Set<string>();
-  // One deduping pusher per derived category array (first-appearance order).
-  const pushInto = (arr: string[], seen: Set<string>) => (v: string): void => {
-    if (!seen.has(v)) {
-      seen.add(v);
-      arr.push(v);
-    }
-  };
-  const pushNumber = pushInto(numbers, new Set<string>());
-  const pushPunctuation = pushInto(punctuation, new Set<string>());
-  const pushSymbol = pushInto(symbols, new Set<string>());
-  const pushSeparator = pushInto(separators, new Set<string>());
-  const pushControl = pushInto(controls, new Set<string>());
-
-  const pushChar = (g: string): void => {
-    if (!charSeen.has(g)) {
-      charSeen.add(g);
-      chars.push(g);
-    }
-  };
-  const pushBase = (b: string): void => {
-    if (!baseSeen.has(b)) {
-      baseSeen.add(b);
-      bases.push(b);
-    }
-  };
-  const pushMark = (m: string): void => {
-    if (!markSeen.has(m)) {
-      markSeen.add(m);
-      marks.push(m);
-    }
-  };
-  const pushStack = (s: AttestedStack): void => {
-    const key = stackKey(s);
-    if (!stackSeen.has(key)) {
-      stackSeen.add(key);
-      attestedStacks.push(s);
-    }
-  };
-
-  for (const pick of picks) {
-    const nfc = pick.grapheme.normalize("NFC");
-    pushChar(nfc);
-
-    if (isPrivateUseGrapheme(nfc)) {
-      // No linguistic data exists — the designer's declared role decides
-      // (FR-004); an unclassified PUA pick behaves as a letter until asked.
-      const role = pick.role ?? declaredRoles[nfc] ?? "letter";
-      declaredRoles[nfc] = role;
-      if (role === "mark") pushMark(nfc);
-      else pushBase(nfc);
-      continue;
-    }
-    if (isCombiningMarkChar(nfc)) {
-      pushMark(nfc);
-      continue;
-    }
-    const decomposition = decomposeGrapheme(nfc);
-    if (decomposition !== null) {
-      pushBase(decomposition.base);
-      for (const m of decomposition.marks) pushMark(m);
-      pushStack({ base: decomposition.base, marks: decomposition.marks });
-      continue;
-    }
-    // Non-mark, non-PUA, non-decomposable: route by Unicode General Category
-    // (spec 047, FR-004/FR-005) so only true letters — and multi-letter
-    // digraphs, which classify as `letter` — land in the Letters `bases`.
-    // Digits/punctuation/symbols/separators/controls get their own derived
-    // section arrays; the flat `chars` above still holds the COMPLETE
-    // inventory the recorded confirmedInventory is taken from (FR-013).
-    switch (glyphCategory(nfc)) {
-      case "letter":
-        pushBase(nfc);
-        break;
-      case "number":
-        pushNumber(nfc);
-        break;
-      case "punctuation":
-        pushPunctuation(nfc);
-        break;
-      case "symbol":
-        pushSymbol(nfc);
-        break;
-      case "separator":
-        pushSeparator(nfc);
-        break;
-      case "control":
-        pushControl(nfc);
-        break;
-    }
-  }
-
+function mirrorFields(): PhaseBDraftData {
+  const character = getCharacterInventoryValue();
+  const invisibles = getInvisiblesInventoryValue();
   return {
-    chars,
-    bases,
-    marks,
-    attestedStacks,
-    declaredRoles,
-    numbers,
-    punctuation,
-    symbols,
-    separators,
-    controls,
+    chars: character.chars,
+    bases: character.bases,
+    marks: character.marks,
+    attestedStacks: character.attestedStacks,
+    declaredRoles: character.declaredRoles,
+    numbers: character.numbers,
+    punctuation: character.punctuation,
+    symbols: character.symbols,
+    separators: character.separators,
+    controls: character.controls,
+    lastPick: peekLastPick(),
+    provenance: character.provenance,
+    exemplarDigraphs: character.exemplarDigraphs,
+    loanwordChars: character.loanwordChars,
+    rejected: character.rejected,
+    proposalConfidence: character.proposalConfidence,
+    exemplarMethodDeclined: character.exemplarMethodDeclined,
+    seededProposals: character.seededProposals,
+    alphabetEvidenceKey: character.alphabetEvidenceKey,
+    invisibleDecisions: invisibleDecisionsOf(invisibles),
+    selectedFont: character.selectedFont,
   };
 }
 
-/** Contribution diff for the just-added grapheme (visible decomposition, US5). */
-function contribution(
-  before: DerivedStores,
-  after: DerivedStores,
-  grapheme: string
-): LastPickContribution {
-  const beforeBases = new Set(before.bases);
-  const beforeMarks = new Set(before.marks);
-  const beforeStacks = new Set(before.attestedStacks.map((s) => stackKey(s)));
-  const addedStack = after.attestedStacks.find((s) => !beforeStacks.has(stackKey(s))) ?? null;
-  return {
-    grapheme: grapheme.normalize("NFC"),
-    addedBases: after.bases.filter((b) => !beforeBases.has(b)),
-    addedMarks: after.marks.filter((m) => !beforeMarks.has(m)),
-    addedStack,
-  };
-}
-
-// Canonical picks live module-side alongside the store (zustand state carries
-// only the derived arrays consumers subscribe to).
-let picks: DraftPick[] = [];
-
-export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
-  chars: [],
-  bases: [],
-  marks: [],
-  attestedStacks: [],
-  declaredRoles: {},
-  numbers: [],
-  punctuation: [],
-  symbols: [],
-  separators: [],
-  controls: [],
-  lastPick: null,
-  provenance: {},
-  exemplarDigraphs: [],
-  loanwordChars: [],
-  rejected: [],
-  proposalConfidence: {},
-  exemplarMethodDeclined: false,
-  seededProposals: [],
-  invisibleDecisions: {},
-  selectedFont: DEFAULT_PHASE_B_FONT,
-
-  add: (c, opts) => {
-    addWithProvenance(set, get, c, "author", opts);
-  },
-
-  addProposed: (c, source, opts) => {
-    addWithProvenance(set, get, c, source, opts);
-  },
-
-  remove: (c) => {
-    const nfc = c.normalize("NFC");
-    const origin = get().provenance[nfc];
-    picks = picks.filter((p) => p.grapheme !== nfc);
-    const chars = get().chars.filter((x) => x !== nfc);
-    const provenance = { ...get().provenance };
-    delete provenance[nfc];
-    // Removing a PROPOSED character is a rejection — remember it so a later
-    // re-derivation does not put it straight back. Removing an AUTHORED one is
-    // just an edit; it was never going to be re-proposed.
-    const isProposal = origin !== undefined && origin !== "author";
-    const rejected =
-      isProposal && !get().rejected.includes(nfc) ? [...get().rejected, nfc] : get().rejected;
-    set({ ...deriveStores(picks), chars, provenance, rejected, lastPick: null });
-  },
-
-  toggle: (c) => {
-    const nfc = c.normalize("NFC");
-    if (get().chars.includes(nfc)) {
-      get().remove(nfc);
-    } else {
-      get().add(nfc);
-    }
-  },
-
-  // Pinned contract (see phaseBDraftStore.test.ts): `chars` takes the input
-  // VERBATIM — no dedupe, no NFC-normalization; that is the caller's job. The
-  // three-store split still derives from a normalized/deduped pick rebuild,
-  // since the stores are canonical-model data, not a display list.
-  setAll: (next) => {
-    const deduped = nfcDedup([], next);
-    const roles = { ...usePhaseBDraftStore.getState().declaredRoles };
-    picks = deduped.map((grapheme) => {
-      const role = roles[grapheme];
-      return role !== undefined ? { grapheme, role } : { grapheme };
-    });
-    // Provenance follows the new list: retained characters keep their origin,
-    // anything newly present came from the author (setAll is the chip-editor /
-    // snapshot-restore path, never a proposal), and entries for removed
-    // characters are dropped. A wholesale replace is NOT a per-character
-    // rejection, so `rejected` is untouched here — `remove()` owns that.
-    const prior = usePhaseBDraftStore.getState().provenance;
-    const provenance: Record<string, DraftProvenance> = {};
-    for (const g of deduped) provenance[g] = prior[g] ?? "author";
-    set({ ...deriveStores(picks), chars: next, provenance, lastPick: null });
-  },
-
-  setSelectedFont: (font) => set({ selectedFont: font }),
-
-  addLoanword: (c) => {
-    const nfc = c.normalize("NFC");
-    if (nfc.length === 0) return;
-    const { loanwordChars, chars } = get();
-    if (loanwordChars.includes(nfc) || chars.includes(nfc)) return;
-    set({ loanwordChars: [...loanwordChars, nfc] });
-  },
-
-  removeLoanword: (c) => {
-    const nfc = c.normalize("NFC");
-    set({ loanwordChars: get().loanwordChars.filter((x) => x !== nfc) });
-  },
-
-  seedFromProposal: (inv, bcp47) => {
-    // The main tier only — the alphabet. The auxiliary (loanword) tier is
-    // offered, unselected, in BuildListView's Loanwords section; punctuation
-    // and numbers reach the author through their own steps and sections.
-    const mainChars = inv.characters.filter((c) => c.tier === "main").map((c) => c.char);
-    // 047's case derivation: the sources attest lowercase, but an alphabet
-    // without its uppercase half is not one the author can accept and move on
-    // from. `casePairOf` carries the Turkic-aware fold.
-    const proposed = nfcDedup(
-      [],
-      mainChars.flatMap((ch) => casePairOf(ch, bcp47)),
-    );
-    // The source's `{..}` clusters ride alongside, NOT into the alphabet: the
-    // parse already contributed each cluster's constituent letters to
-    // `inv.characters`, so "dz" would be a third thing to place on a key when
-    // the author only needs `d` and `z`. Union across seeds, so applying a
-    // second source (or re-applying via the page-2 affordance) accumulates
-    // rather than replaces — matching how provenance treats proposal sources.
-    set({
-      proposalConfidence: { ...get().proposalConfidence, [inv.source]: inv.confidence },
-      exemplarDigraphs: nfcDedup(get().exemplarDigraphs, inv.digraphs),
-    });
-    for (const ch of proposed) {
-      addWithProvenance(set, get, ch, inv.source);
-    }
-  },
-
-  declineExemplarMethod: () => set({ exemplarMethodDeclined: true }),
-
-  seedProposals: (chars, source, seedKey) => {
-    if (get().seededProposals.includes(seedKey)) return;
-    set({ seededProposals: [...get().seededProposals, seedKey] });
-    for (const ch of chars) addWithProvenance(set, get, ch, source);
-  },
-
-  setAlphabetEvidenceKey: (key) => set({ alphabetEvidenceKey: key }),
-
-  acceptInvisible: (notation) => {
-    const key = normalizeNotation(notation);
-    if (key === null) return;
-    set({ invisibleDecisions: { ...get().invisibleDecisions, [key]: "accepted" } });
-  },
-
-  declineInvisible: (notation) => {
-    const key = normalizeNotation(notation);
-    if (key === null) return;
-    set({ invisibleDecisions: { ...get().invisibleDecisions, [key]: "declined" } });
-  },
-
-  adoptControlsAsInvisibles: () => {
-    const carried = get().controls.filter(isFormatChar);
-    if (carried.length === 0) return;
-    const invisibleDecisions = { ...get().invisibleDecisions };
-    const provenance = { ...get().provenance };
-    const carriedSet = new Set(carried);
-    for (const c of carried) {
-      invisibleDecisions[toUPlusNotation(c)] = "accepted";
-      delete provenance[c];
-    }
-    picks = picks.filter((p) => !carriedSet.has(p.grapheme));
-    const chars = get().chars.filter((c) => !carriedSet.has(c));
-    // Migration, not rejection: `rejected` is deliberately left alone.
-    set({ ...deriveStores(picks), chars, provenance, invisibleDecisions, lastPick: null });
-  },
-
-  reset: () => {
-    picks = [];
-    set({
-      chars: [],
-      bases: [],
-      marks: [],
-      attestedStacks: [],
-      declaredRoles: {},
-      numbers: [],
-      punctuation: [],
-      symbols: [],
-      separators: [],
-      controls: [],
-      lastPick: null,
-      provenance: {},
-      exemplarDigraphs: [],
-      loanwordChars: [],
-      proposalConfidence: {},
-      // `rejected`, `exemplarMethodDeclined`, `seededProposals`,
-      // `invisibleDecisions` and `alphabetEvidenceKey` deliberately SURVIVE a
-      // reset: each records a
-      // decision the author made about proposals, and reset() runs on every
-      // entry to the build-list screen. Clearing them would re-propose
-      // characters the author already removed, re-assert an offer they already
-      // declined, re-run a seed they already saw, and forget which invisible
-      // characters they accepted or refused. resetPhaseBDraftDecisions() clears
-      // them for a genuinely new working copy.
-    });
-  },
+export const usePhaseBDraftStore = create<PhaseBDraftState>()(() => ({
+  ...mirrorFields(),
+  ...actions,
 }));
 
-/**
- * Shared add path for both the author (`add`) and proposal sources
- * (`addProposed`).
- *
- * Provenance only ever strengthens: once a character is `"author"` it stays
- * `"author"`, so an author's pick survives a re-seed. A character already
- * present from one proposal source keeps that source rather than being
- * overwritten by a second — proposal sources UNION (spec 044 T053), and each
- * character keeps the attribution the UI shows next to it.
- */
-function addWithProvenance(
-  set: (partial: Partial<PhaseBDraftState>) => void,
-  get: () => PhaseBDraftState,
-  c: string,
-  origin: DraftProvenance,
-  opts?: { role?: DeclaredRole },
-): void {
-  const nfc = c.normalize("NFC");
-  if (nfc.length === 0) return;
-
-  const isProposal = origin !== "author";
-  // A proposal never resurrects something the author explicitly removed.
-  if (isProposal && get().rejected.includes(nfc)) return;
-
-  // An explicit author add always UPGRADES the origin to "author" — the
-  // designer touching a proposed character makes it theirs, and it must then
-  // survive any re-seed. A proposal add never overwrites an existing origin, so
-  // the first source to attest a character keeps the attribution the UI shows.
-  const existing = get().provenance[nfc];
-  const nextOrigin: DraftProvenance = origin === "author" ? "author" : (existing ?? origin);
-  const provenance = { ...get().provenance, [nfc]: nextOrigin };
-
-  const chars = nfcDedup(get().chars, [c]);
-  if (!picks.some((p) => p.grapheme === nfc)) {
-    const before = deriveStores(picks);
-    picks = [...picks, { grapheme: nfc, ...(opts?.role !== undefined ? { role: opts.role } : {}) }];
-    const after = deriveStores(picks);
-    set({ ...after, chars, provenance, lastPick: contribution(before, after, nfc) });
-  } else {
-    set({ chars, provenance });
-  }
-}
-
-/**
- * Canonical `U+XXXX` key for `invisibleDecisions`: the contracts parser
- * (`parseUPlusNotation` — optional `U+`/`u+` prefix, 4-6 hex digits, rejects
- * surrogates and noncharacters) validates, `toUPlusNotation` canonicalises.
- * Returns null for anything that is not a well-formed code point, so a
- * malformed key can never be recorded.
- */
-function normalizeNotation(notation: string): string | null {
-  const ch = parseUPlusNotation(notation.trim());
-  return ch === null ? null : toUPlusNotation(ch);
-}
+// Every decision-record change re-mirrors the draft's data fields (the
+// actions are stable identities and are never part of the mirror).
+useDecisionStore.subscribe(() => {
+  usePhaseBDraftStore.setState(mirrorFields());
+});
 
 /**
  * Clear the sticky proposal decisions (`rejected`, `exemplarMethodDeclined`,
- * `seededProposals`, `invisibleDecisions`, `alphabetEvidenceKey`).
- *
- * Those are per-working-copy, not per-visit: `reset()` runs every time the
- * build-list screen is entered and must not undo them. Call this when a genuinely
- * new working copy is instantiated.
+ * `seededProposals`, `invisibleDecisions`, `alphabetEvidenceKey`) — called
+ * when a genuinely new working copy is instantiated.
  */
 export function resetPhaseBDraftDecisions(): void {
-  usePhaseBDraftStore.setState({
-    rejected: [],
-    exemplarMethodDeclined: false,
-    seededProposals: [],
-    invisibleDecisions: {},
-    alphabetEvidenceKey: undefined,
-  });
+  ops.resetDecisions();
 }
 
 /** The three-store ConfirmedAlphabet the current draft resolves to (spec 071). */
 export function draftConfirmedAlphabet(): ConfirmedAlphabet {
-  const s = usePhaseBDraftStore.getState();
-  return makeConfirmedAlphabet({
-    bases: s.bases,
-    marks: s.marks,
-    attestedStacks: s.attestedStacks,
-    declaredRoles: s.declaredRoles,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// PhaseBDraftSnapshot serialize/restore — draft-persistence fold-in (P0 fix)
-//
-// Mirrors the snapshotTraversal/applyTraversalSnapshot idiom in
-// ../stores/surveySessionStore.ts. `chars` is already a plain string array (no
-// Set/binary), so no encoding is needed beyond JSON.stringify/JSON.parse.
-// `declaredRoles` rides along additively (spec 071) so a restored draft keeps
-// its PUA classifications; old snapshots without the field restore fine.
-// ---------------------------------------------------------------------------
-
-/** Serializable snapshot of this store's accumulating alphabet + font choice. */
-export interface PhaseBDraftSnapshot {
-  chars: string[];
-  declaredRoles?: Record<string, DeclaredRole>;
-  /** Per-character origin (spec 044). Absent in pre-044 snapshots. */
-  provenance?: Record<string, DraftProvenance>;
-  /**
-   * Exemplar-attested `{..}` clusters. Absent in snapshots taken before they
-   * were recorded. Restored directly rather than through `setAll` — they are
-   * not picks and must not reach the alphabet.
-   */
-  exemplarDigraphs?: string[];
-  /**
-   * Loanword-tier letters the author added. Absent in older snapshots.
-   * Restored directly, like `exemplarDigraphs` — they are not picks.
-   */
-  loanwordChars?: string[];
-  /** Proposals the author removed. Absent in pre-044 snapshots. */
-  rejected?: string[];
-  /** Per-source confidence of the proposals seeded. Absent in pre-044 snapshots. */
-  proposalConfidence?: Record<string, string>;
-  /** Whether the exemplar method was declined. Absent in pre-044 snapshots. */
-  exemplarMethodDeclined?: boolean;
-  /** Seed keys already applied (spec 075). Absent in pre-075 snapshots. */
-  seededProposals?: string[];
-  /** Invisible-character decisions keyed by `U+XXXX` (spec 075). Absent in pre-075 snapshots. */
-  invisibleDecisions?: Record<string, InvisibleDecision>;
-  /** The evidence key the alphabet was built from (spec 079). Absent in pre-079 snapshots. */
-  alphabetEvidenceKey?: string | undefined;
-  selectedFont: PhaseBFontValue;
+  return confirmedAlphabetOf(getCharacterInventoryValue());
 }
 
 /** Build a serializable snapshot of the CURRENT phase-B draft alphabet. */
 export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
-  const s = usePhaseBDraftStore.getState();
-  return {
-    chars: s.chars,
-    declaredRoles: s.declaredRoles,
-    provenance: s.provenance,
-    exemplarDigraphs: s.exemplarDigraphs,
-    loanwordChars: s.loanwordChars,
-    rejected: s.rejected,
-    proposalConfidence: s.proposalConfidence,
-    exemplarMethodDeclined: s.exemplarMethodDeclined,
-    seededProposals: s.seededProposals,
-    invisibleDecisions: s.invisibleDecisions,
-    ...(s.alphabetEvidenceKey !== undefined ? { alphabetEvidenceKey: s.alphabetEvidenceKey } : {}),
-    selectedFont: s.selectedFont,
-  };
+  return snapshotFromValues(getCharacterInventoryValue(), getInvisiblesInventoryValue());
 }
 
 /**
- * Patch a `PhaseBDraftSnapshot` directly into the phase-B draft store. Restores
- * declared roles first so the pick rebuild keeps PUA classifications, then
- * flows the char list through the same `setAll` replace path
- * BuildListView/CharacterMapPane already call, and restores the font choice via
- * `setSelectedFont`.
+ * Restore a stored snapshot by recording the decision values it maps to
+ * (the old store patched its own state; the values are the state now).
+ * Draft persistence drives the durable-draft restore through here until
+ * T025 re-points it at the decisions slice + the legacy-slice migration.
  */
 export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
-  // Restore the sticky proposal decisions and the prior provenance BEFORE
-  // setAll: setAll preserves the origin of any character already known and
-  // attributes the rest to the author, so a restored draft keeps its
-  // proposed-vs-authored distinction instead of flattening to "author".
-  usePhaseBDraftStore.setState({
-    declaredRoles: snapshot.declaredRoles ?? {},
-    provenance: snapshot.provenance ?? {},
-    exemplarDigraphs: snapshot.exemplarDigraphs ?? [],
-    loanwordChars: snapshot.loanwordChars ?? [],
-    rejected: snapshot.rejected ?? [],
-    proposalConfidence: snapshot.proposalConfidence ?? {},
-    exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,
-    seededProposals: snapshot.seededProposals ?? [],
-    invisibleDecisions: snapshot.invisibleDecisions ?? {},
-    alphabetEvidenceKey: snapshot.alphabetEvidenceKey,
-  });
-  usePhaseBDraftStore.getState().setAll(snapshot.chars);
-  usePhaseBDraftStore.getState().setSelectedFont(snapshot.selectedFont);
+  const { character, invisibles } = valuesFromSnapshot(snapshot);
+  recordCharacterInventoryValue(character, "characters");
+  recordInvisiblesInventoryValue(invisibles, "characters");
 }

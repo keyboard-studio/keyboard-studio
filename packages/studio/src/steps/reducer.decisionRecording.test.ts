@@ -73,7 +73,7 @@ import {
 import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionRecorder.ts";
 import type { SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { getDecisionSnapshot, selectTouchSeedSource } from "../stores/decisionStore.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveDesktopModifications } from "../lib/deriveDesktopModifications.ts";
 import { toRailNodes } from "../lib/irToCarveNodes.ts";
@@ -281,7 +281,8 @@ function touchCompleteResult(assignments: readonly MechanismAssignment[]): unkno
       baseIr === null
         ? { removals: [], placements: [] }
         : deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults),
-    seedSource: useSurveySessionStore.getState().touchSeedSource,
+    // Spec 088: the fork choice is read from the decision store.
+    seedSource: selectTouchSeedSource(getDecisionSnapshot()),
   };
 }
 
@@ -1084,6 +1085,23 @@ function soleEditorSummary(): EditorActionSummary {
 }
 
 describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
+  it("spec 092 T051: on the adapt track the entry's mode is adapt-existing and its inputs are non-null", () => {
+    // The setup gate (spec 092 FR-004/T013) means instantiation — and so
+    // this completion — happens only once the track decision exists, so
+    // the entry is written from a fully instantiated copy: real base id,
+    // real starting key count, and the mode matching the chosen track.
+    const ir = parseKmn(KMN, `${BASE_ID}.kmn`).ir;
+    useWorkingCopyStore.getState().instantiateFromExisting(BASE, { vfs: makeBaseVfs(), ir });
+
+    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), depsWith(realRecorder()));
+
+    const entry = onlyBaseContribution();
+    expect(entry.payload.baseId).toBe(BASE_ID);
+    expect(entry.payload.instantiationMode).toBe("adapt-existing");
+    expect(entry.payload.startingKeyCount).toBe(railGlyphGids(ir).length);
+    expect(entry.payload.startingKeyCount).toBeGreaterThan(0);
+  });
+
   it("records the base chosen and what it left in the working copy", () => {
     const ir = instantiate();
 

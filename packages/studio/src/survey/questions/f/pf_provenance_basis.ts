@@ -16,6 +16,7 @@
 //     layout."
 
 import type { QuestionModule } from "../../types.ts";
+import { proposeProvenanceBasis } from "../../../lib/phaseFSeeds.ts";
 
 export const definition = {
   id: "pf_provenance_basis",
@@ -60,5 +61,18 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-provenance-basis"], requires: ["help-more-detail"] };
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  provides: ["help-provenance-basis"],
+  requires: ["help-more-detail"],
+  // Spec 092 (T036): the starting-point provenance basis is this module's
+  // extract, replacing the PHASE_F_SEEDS table entry; the derivation
+  // stays in lib/phaseFSeeds.ts and reads the wiring-supplied seed
+  // context. Source "base" in the old table = extracted provenance with
+  // the base keyboard's id as source.
+  extract: (ctx) => (ctx.phaseF ? proposeProvenanceBasis(ctx.phaseF.seeds) : undefined),
+};
 export default mod;
