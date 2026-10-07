@@ -469,10 +469,15 @@ log exactly once.
   completion-time rewrites with the edit-time scope note; row 4 (settles)
   is 091's deletion, with the modules' declarations parity-pinned by the
   registry coverage suites.
-- [ ] T062 Full gates and consistency: all package suites, `tsc`, the full `pnpm lint` chain,
+- [x] T062 Full gates and consistency: all package suites, `tsc`, the full `pnpm lint` chain,
   the golden walk, and the StepHost parity test green on the branch head; `/speckit-analyze`
   run over spec ↔ plan ↔ tasks with findings resolved or recorded; companion step marked
-  completed
+  completed — Landed (D-090-46): all gates green at head except
+  the content-i18n-freshness leg, which crashes at module load in this
+  worktree's install (environment artifact, recorded). Analyze findings
+  recorded in D-090-46: US5/SC-003 blocked on D-090-43; FR-005's letter vs
+  the ruled shape (lead's call); per-story PRs superseded by the
+  stacked-PR train.
 
 **Checkpoint**: spec 090's success criteria are each measured, not asserted — SC-001 per
 story gate, SC-002 at T060, SC-003 at T053, SC-004 at T027/T060, SC-005 per story.

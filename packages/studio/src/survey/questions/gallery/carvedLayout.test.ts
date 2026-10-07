@@ -131,7 +131,11 @@ describe("carvedLayoutValueFromOverlay", () => {
       snapshot({ deletedNodeIds: new Set(["rule-7", "rule-9", "rule-2"]) }),
     );
     expect(a).toEqual(b);
-    expect(a.removals.map((r) => r.id)).toEqual(["rule-2", "rule-7", "rule-9"]);
+    // Canonical form as a property, not a snapshot: the same three
+    // removals, in sorted id order regardless of click order.
+    const ids = a.removals.map((r) => r.id);
+    expect(new Set(ids)).toEqual(new Set(["rule-9", "rule-2", "rule-7"]));
+    expect(ids).toEqual([...ids].sort());
   });
 
   it("keeps an orphaned hand-set removal (its target no longer exists) — never dropped", () => {
