@@ -313,17 +313,23 @@ runner (rejected — FR-005: "must not remain stored copies"); put selectors in
 exactly this state; a pure module beside `decisionStore` is testable and matches
 088's placement of derived state).
 
-### R7 — Flag deletion is sequenced last and split by OI-1
+### R7 — Flag deletion is sequenced last; scope RULED global (OI-1)
 
 **Decision:** the runner's flag check is removed in US1's runner task (R3). The
-deletion of `flags/mutateFlag.ts` itself, and the un-gating of the four
-non-question sites, form the final two tasks of US2 and are **blocked on the
-owner's OI-1 ruling** (plan.md). Under a global ruling, each site loses its
-`isMutateSeamEnabled()` condition and the flag-parity tests
+deletion of `flags/mutateFlag.ts` itself, and the un-gating of the non-question
+sites, form the final two tasks of US2. Their scope was open under OI-1 and is
+now **ruled: GLOBAL deletion** (owner ruling 2026-10-06, km-lead proposals Q2).
+Every `isMutateSeamEnabled()` site becomes unconditional in 089 — each site
+loses its condition, and the flag-parity tests
 (`projectWorkingCopyVfs.flagParity.test.ts`, `serializeWorkingCopy.flagParity.test.ts`)
-are retired with the flag; under a runner-only ruling, those sites keep reading a
-gate and T021/T022 close as partially-unmet FR-003, recorded in the PR body —
-the plan does not silently pick either.
+are retired with the flag; T021/T022 proceed as written, unblocked. The
+runner-only alternative (un-gate only the question-answer runner, leave the
+other sites gated until 090, FR-003/SC-002 closing partially unmet in 089) is
+the **rejected alternative under the ruling**: it would leave the flag's
+deletion owned by no spec, since 090's task list never mentions the flag.
+Accepted risk of the global ruling: three currently-dark behaviours activate
+in 089 — repropagate after mechanisms, hand-set promotion, and the seam carve
+path as the only path (see the Risks entry below).
 
 ### R8 — SC-001 baseline: script first, capture on the pre-089 stacked base, compare bytes
 
@@ -338,13 +344,17 @@ found to embed a timestamp/version stamp is listed in the spec file with its
 evidence before the baseline is accepted (the HISTORY heading version is derived
 from the base's own version, `deriveHistoryVersion`, so it is stable for a fixed
 base). The baseline is captured **before the first 089 code change**, on this
-branch's stacked base (088 as landed — see OI-2), by running the same script with
+branch's stacked base (088 as landed — OI-2, ruled: owner ruling 2026-10-06, km-lead proposals Q3), by running the same script with
 `GOLDEN_WALK_CAPTURE=1`; the capture run and the verify run are the same code path.
 The store-level golden walk (`stepHost.goldenWalk.test.tsx`) remains as the
 mutation-sequence oracle: its fixtures are updated **only** where 089 changes the
 sequence by design (session setters gone, apply effects in their place), each
 fixture diff justified in the commit message — the Playwright byte comparison is
-the arbiter when the two disagree.
+the arbiter when the two disagree. Under the same OI-2 ruling, T003 also captures
+the baseline on literal `main` and diffs the two zips as a one-time proof: an
+empty diff closes the baseline-identity question permanently; a non-empty diff
+leaves the stacked-base capture standing (it is the ruling) and the differing
+surface is named in the baseline record.
 
 **Rationale:** SC-001 is explicit that the script is added by this spec and reused
 by 090–093; capturing the baseline after changing the write path would make the
@@ -394,8 +404,11 @@ one already-live module would miss the point of US2).
 - **project_name seeds.** FR-031's recorded-answer seeds read `scaffoldSpec`;
   under R6 they read the same facts from decisions. The display-name re-derivation
   ref (`displayNameRef`) is per-mount UI state and is untouched.
-- **OI-1 scope.** A global flag ruling pulls carve/touch/projection behaviour
-  changes into 089's diff; the golden walk (copy track, fixed answers) may not
-  exercise carve/touch deeply enough to arbitrate them — the flag-parity tests
-  are the evidence there, and they are deleted by the same ruling, so the ruling
-  should be made with that trade-off in view.
+- **OI-1 scope (ruled global).** The global flag ruling (owner ruling 2026-10-06,
+  km-lead proposals Q2) pulls carve/touch/projection behaviour changes into 089's
+  diff — three currently-dark behaviours activate: repropagate after mechanisms,
+  hand-set promotion, and the seam carve path as the only path. The golden walk
+  (copy track, fixed answers) may not exercise carve/touch deeply enough to
+  arbitrate them — the flag-parity tests are the evidence there, and they are
+  deleted by the same ruling. That trade-off was in view when the ruling was
+  made, and it is accepted.
