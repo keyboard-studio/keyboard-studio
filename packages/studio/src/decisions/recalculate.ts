@@ -96,6 +96,16 @@ export interface RecalculateRequest {
   changed: ReadonlySet<DecisionId>;
   /** The derived order (`orderByDependencies` over the registry). */
   order: readonly DecisionId[];
+  /**
+   * Visit EVERY record in the set, not just the downstream closure of
+   * `changed` (spec 093 T017: a starting-point change is a recalculation
+   * whose cause sits outside the decision graph — every record is
+   * downstream of it). The `changed` exemption still applies to any id
+   * in `changed`; starting-point callers pass an empty set, so no record
+   * stands exempt. Absent/false = the closure behaviour every other
+   * caller relies on.
+   */
+  visitAll?: boolean;
 }
 
 export interface RecalculateResult {
@@ -342,8 +352,12 @@ export function recalculate(
 
   // Visit set: the closure, plus every currently-inactive record (its
   // gate may have cleared even when it sits outside this change's
-  // requires-closure — gates ride routing, not `requires`).
+  // requires-closure — gates ride routing, not `requires`). Under
+  // `visitAll` (T017) the set is the whole record set.
   const visit = new Set<DecisionId>(closure);
+  if (request.visitAll === true) {
+    for (const id of Object.keys(working)) visit.add(id as DecisionId);
+  }
   for (const [id, record] of Object.entries(working)) {
     if (record !== undefined && record.inactive === true) {
       visit.add(id as DecisionId);

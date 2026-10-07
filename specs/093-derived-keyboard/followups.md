@@ -56,6 +56,40 @@ Unblocks when: the same 090 US3/US4 conversions land. The v3 work
 then proceeds exactly as tasked (fixture, envelope, boot-scan
 migration with .v2/.v1 key chaining, replay resume, SC-003 walk).
 
+## T017 — core LANDED; live wire-in STOPPED (needs a lead/owner call)
+
+Landed: `decisions/startingPointChange.ts` —
+`recalculateForStartingPointChange(deps, { decisions, startingPointIR })`
+is the T009 rebuild with the widest closure: empty `changed` set (the
+cause sits outside the decision graph), a new `visitAll` flag on the
+recalculate/rebuild requests (every record visited; gates land outside
+any requires closure), a freshly seeded trail, and a full replay from
+checkpoint 0 over the new starting point. Tests:
+`startingPointChange.test.ts` 6/6 (re-extract names the new source;
+defaults recompute; valid asked kept by reference with its old source;
+invalid asked kept + re-proposed via `offered`; full-replay state +
+fresh trail; visitAll gate flips + no-visitAll control).
+
+NOT wired into StudioShell, on evidence: the only live
+starting-point-change moment is `doCommit` on a genuine base switch,
+and that path is a **discard-by-consent** flow — the F1 rebase gate has
+the author accept "Switching base keyboards will discard your current
+edits" (BaseResolutionAdapter.confirmRebaseTo) before doCommit runs,
+and doCommit's own comments frame the switch as abandoning the old
+project's state (autosave teardown/reinstall under the new key). A
+retained-set recalculation wired in after the extraction pass would
+silently change what the author consented to. Options for the lead:
+(a) wire the core into a path where decisions are retained BY DESIGN
+across a starting-point swap (e.g. resume/migration when the stored
+starting point no longer matches the corpus base) — no such signal
+exists on this tree today; (b) supersede the switch-base product
+semantics by owner ruling (recalculation instead of discard) and
+reword the rebase consent accordingly — not 093's call to make
+unilaterally; (c) leave the core as the engine contract and wire it in
+the post-091 restack pass, when the unified flow settles what a base
+switch means. 093's recommendation: (a)/(c) — the semantics are
+implemented and pinned; the product question is the open item.
+
 ## OWNED DELTA — carve-overlay fold (090 ruling D-090-24, relayed by the lead 2026-10-07)
 
 090's carve module ships as value + extract + step-side recording with

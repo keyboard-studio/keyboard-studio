@@ -76,6 +76,14 @@ export interface RebuildRequest {
   startingPointIR: KeyboardIR;
   /** The session's checkpoint trail for the current starting point. */
   trail: CheckpointTrail;
+  /**
+   * Forwarded to the recalculation pass (spec 093 T017): visit every
+   * record, not just the closure of `changed`. Set only by the
+   * starting-point-change entry, together with a freshly seeded trail —
+   * the resume set then covers the whole order and the replay is a full
+   * replay from checkpoint 0.
+   */
+  visitAll?: boolean;
 }
 
 export interface RebuildOutcome {
@@ -128,7 +136,12 @@ export function rebuildWorkingCopy(
       ...(deps.source !== undefined ? { source: deps.source } : {}),
       isActive,
     },
-    { decisions: request.decisions, changed: request.changed, order },
+    {
+      decisions: request.decisions,
+      changed: request.changed,
+      order,
+      ...(request.visitAll === true ? { visitAll: true } : {}),
+    },
   );
 
   const recordsToWrite: Decision[] = [];
