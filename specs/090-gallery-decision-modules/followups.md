@@ -33,9 +33,24 @@ rewrite outside a module. Recorded so the row is not read broader
 than the ruled end-state (see also the D-090-34 note in
 galleryWriteAudit.test.ts).
 
-## US5 / SC-003 — blocked on the D-090-43 ruling
+## US5 / SC-003 — D-090-43 ruled (a); G7 gallery gaps closed; starting-point residue REMAINS
 
-T050–T054 await the lead's ruling on the decision-log payload
-(options in D-090-43). Until then SC-003 (one log entry per
-decision) is unmet for the six G7 decisions; the entries' absence
-is the HANDOFF G7 gap persisting, not a new regression.
+The format question was ruled (a) — a real `decision` payload kind — and
+US5 landed (research.md D-090-48; tasks T050–T053). The six G7 gallery gaps
+(windows-layout, rule-set, touch-seed-source, deadkeys-defined,
+punctuation-inventory, retained-convenience-chars) are verified closed at
+the store level in decisions/galleryLogEntries.test.ts, and SC-003's live
+walk is authored for CI (e2e/decision-log.spec.ts).
+
+The HANDOFF G7 **starting-point** item remains open, verified still
+reproducing at T051 (2026-10-07): completing choose_base leaves NO
+base-contribution log entry, because the recorder fires synchronously
+inside StepHost's completion handling — before StudioShell's doCommit
+effect instantiates the working copy — and `recordBaseContribution`
+returns null whenever the working copy's base/instantiation fields are
+unset. The mechanism and its null condition predate 090 (spec 053/088);
+the fix belongs with whoever owns the recorder/instantiation ordering
+(088's recorder composition, or 092's live-extraction pass), not with the
+gallery modules. The store-level pin lives in galleryLogEntries.test.ts
+("HANDOFF G7 starting-point verification"); the live-walk spec
+deliberately asserts nothing about base-contribution presence.

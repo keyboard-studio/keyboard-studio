@@ -426,13 +426,17 @@ settled decision, checked against the decision list — no gaps, no duplicates.
   had no referent in the landed code (verified in D-090-48: no answer carries a gallery
   decision; the C-5 answer slots and the decision slots are disjoint), so nothing was
   removed — exactly-once holds by construction.
-- [ ] T051 [P] [US5] Close the named G7 gaps: entries verified present for `windows-layout`,
+- [x] T051 [P] [US5] Close the named G7 gaps: entries verified present for `windows-layout`,
   `rule-set`, `touch-seed-source`, `deadkeys-defined`, `punctuation-inventory`,
   `retained-convenience-chars` in a store-level test through the real `StepHost` in
   packages/studio/src/decisions/galleryLogEntries.test.ts; the HANDOFF G7 starting-point
   entry (`recordBaseContribution` timing) is verified in the same walk — if it is still null
   after 088/089, record it in specs/090-gallery-decision-modules/followups.md rather than
   fixing it here (it belongs to the 088/092 boundary)
+  — Landed: 9/9 green — all six gaps plus help-docs verified (exactly one live
+  decision-kind entry per settled value; unchanged re-completion a no-op; changed
+  value supersedes). The starting-point entry is STILL null (recorder fires before
+  instantiation) — recorded as an open residue in followups.md, not fixed here.
 - [x] T052 [P] [US5] `help-docs` gallery-host registration (research Q3 boundary): the
   `PhaseFGate` step is hosted so gate completion records the `help-docs` log entry, with no
   second write path beside 089's flow `apply`s, in
