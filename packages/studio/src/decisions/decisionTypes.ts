@@ -366,11 +366,13 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "tp3-orthography-join": [],
   "typing-approach": [],
   "use-case": [],
+  // spec 090 T023: the marks-treatment module's apply runs the mark
+  // guards, which replace the groups and stores subtrees wholesale.
+  "marks-treatment": [["groups"], ["stores"]],
   // Wizard-step decisions: editor steps write through their own declared
   // `writes` (steps/editorMutate.ts), not through a decision -> IR mapping.
   "windows-layout": [],
   "base-keyboard": [],
-  "marks-treatment": [],
   "punctuation-inventory": [],
   "invisibles-inventory": [],
   "retained-convenience-chars": [],

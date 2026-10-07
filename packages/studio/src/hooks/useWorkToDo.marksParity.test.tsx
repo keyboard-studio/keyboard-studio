@@ -8,7 +8,7 @@ import { screen, cleanup, act } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { groupMarkClasses, proposeAttachments } from "@keyboard-studio/engine";
-import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
+import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { reconciledAttachmentChecked } from "../survey/marks/marksViews.ts";
 import { marksAttachmentKey } from "../steps/evidence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -48,7 +48,7 @@ describe("MarksSeriesStep attachment checkboxes agree with the shared reconciled
     });
 
     act(() => {
-      render(<MarksSeriesStep onComplete={() => {}} />);
+      render(<MarksStepHost onComplete={() => {}} />);
     });
     const checkbox = screen.getAllByRole("checkbox")[0] as HTMLInputElement;
     expect(checkbox.checked).toBe(false);

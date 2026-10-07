@@ -873,10 +873,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // spec-014 US2 (T024): the staleness closure drives touch re-propagation
       // on physical-step completion. Read via getState() (no re-render churn).
       getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
-      // Spec 046 R10: record (never act on) the base-content migration need
-      // when base-plus-mark output is chosen over a ready-made-form base.
-      setMarksMigrationNeeded: (needed) =>
-        useSurveySessionStore.getState().setMarksMigrationNeeded(needed),
       // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
       // everything else here; the reducer knows only that it has a callback.
       recordDecision,

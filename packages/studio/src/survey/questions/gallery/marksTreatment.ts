@@ -1,16 +1,35 @@
 // marksTreatment — gallery decision module for `marks-treatment` (spec 090).
 //
-// Stub landed with T008 so the FR-002 coverage test pins this decision's
-// provider from the start; the real renderer/apply fill in with T023 (US2).
-// The value is the composite of the marks-series answers plus the
-// context-tolerance outcome; its apply performs applyMarkGuards and the
-// context-tolerance patch. T023 retires the reducer's MARKS handler.
+// The value is the marks-series answer composite plus, once the series
+// completes, the completion payload (worklist + output form) and the
+// context-tolerance station's decision (survey/marks/marksValue.ts,
+// design record D-090-11).
+//
+// Apply performs the mark guards (spec 071 FR-021) from the completion
+// payload — the same commit point as the retired reducer MARKS handler:
+// while `completion` is null (every answer record before completion,
+// and any answer record after one, which clears it) apply is a no-op, so
+// the guards can never run against a partial worklist. applyMarkGuards
+// is idempotent (it strips and rebuilds its own generated artifacts), so
+// a later value record carrying the same completion — the
+// context-tolerance hook's appliedFingerprint re-record — re-running
+// apply changes nothing. The context-tolerance patch itself stays with
+// its effect (hooks/useContextToleranceApply.ts), which needs the live
+// analysis a pure apply cannot await; T023 re-keyed that effect's
+// decision source to this value's `contextTolerance`.
+//
 // Boundary (FR-003): a gallery module is a pure descriptor — no store
 // imports; the value arrives via DecisionRendererProps and changes leave
 // via onChange, recorded and applied by the gallery host.
 
+import { applyMarkGuards } from "@keyboard-studio/engine";
+import { irPath, type IRPath, type KeyboardIR } from "@keyboard-studio/contracts";
+
 import type { GalleryModule } from "../../types.ts";
-import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
+import { MarksSeriesStep } from "../../marks/MarksSeriesStep.tsx";
+import type { MarksTreatmentValue } from "../../marks/marksValue.ts";
+
+export type { MarksCompletion, MarksTreatmentValue } from "../../marks/marksValue.ts";
 
 export const definition = {
   id: "marksTreatment",
@@ -19,28 +38,25 @@ export const definition = {
   audit_label: "Marks treatment",
 };
 
-/**
- * The marks-treatment decision value (data-model.md): the marks-series
- * answers as one composite, plus the context-tolerance station's outcome
- * (null until that station runs). Answer ids are the existing marks_*
- * question ids — no i18n id changes.
- */
-export interface MarksTreatmentValue {
-  answers: Readonly<Record<string, string | string[] | undefined>>;
-  contextToleranceOutcome: string | null;
-}
+/** The IR subtrees the mark guards replace wholesale (guard group + unwrap stores). */
+const MARKS_WRITES: readonly IRPath[] = [irPath("groups"), irPath("stores")];
 
 const marksTreatment: GalleryModule<MarksTreatmentValue> = {
   definition,
   provides: ["marks-treatment"],
   requires: ["character-inventory"],
   inputs: [],
-  // decisionIRPaths maps this decision to [] today; a story that gives the
-  // module real IR writes updates decisionIRPaths in the same change
-  // (decisionIRConsistency.test.ts pins the two together).
-  writes: [],
-  apply: () => ({}),
-  renderer: UnmigratedGalleryRenderer,
+  writes: MARKS_WRITES,
+  apply: (value: MarksTreatmentValue | undefined, ctx) => {
+    if (value === undefined || value.completion === null || ctx.ir === null) return {};
+    const guarded = applyMarkGuards(ctx.ir, value.completion.worklist, value.completion.outputForm);
+    if (guarded.ir === ctx.ir) return {};
+    const ir: Partial<KeyboardIR> = {};
+    if (guarded.ir.groups !== ctx.ir.groups) ir.groups = guarded.ir.groups;
+    if (guarded.ir.stores !== ctx.ir.stores) ir.stores = guarded.ir.stores;
+    return { ir };
+  },
+  renderer: MarksSeriesStep,
   fixtures: {
     valid: [{ value: undefined, note: "no decision recorded yet" }],
     invalid: [],

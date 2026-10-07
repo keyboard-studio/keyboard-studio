@@ -28,7 +28,7 @@ import type { Step } from "./types.ts";
 import { galleryModules } from "../survey/questions/registry.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
-import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
+import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
 import { stepDependencies } from "./stepDependencies.ts";
 import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
@@ -154,7 +154,7 @@ const stepPool: readonly Step[] = [
     // spec 078: the step's own write is the context-tolerance decision; these
     // are the paths the separate apply effect commits the accepted rules to.
     writes: [...CONTEXT_TOLERANCE_WRITES],
-    component: MarksSeriesStep,
+    component: MarksStepHost,
     specRef: ["specs/071-marks-question-series", "specs/052-marks-treatment-question"],
     evidence: {
       inputs: ["the confirmed alphabet: its bases, marks and attested combinations"],

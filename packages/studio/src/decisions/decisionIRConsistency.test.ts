@@ -138,7 +138,6 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "use-case",
   "windows-layout",
   "base-keyboard",
-  "marks-treatment",
   "punctuation-inventory",
   "invisibles-inventory",
   "retained-convenience-chars",

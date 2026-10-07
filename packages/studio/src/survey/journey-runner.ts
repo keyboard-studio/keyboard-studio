@@ -627,8 +627,8 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
         case "invisibles": {
           // No modular flow and no gallery-action-summary shape for these —
           // see module header. applyStepCompletion("marks", {}, deps) is a
-          // genuine no-op here (an empty payload has no marksWorklist, so
-          // reducer.ts's MARKS_STEP_ID case breaks early), mirroring a
+          // genuine no-op here (spec 090 T023 retired the reducer's marks
+          // case — the guards ride the decision value's apply), mirroring a
           // marks-free alphabet's real auto-skip.
           if (currentStepId === "marks") applyStepCompletion("marks", {}, deps);
           result = undefined;

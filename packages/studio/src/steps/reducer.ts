@@ -22,14 +22,13 @@
 // and lib helpers the reducer needs — nothing more.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
 import type { ApplyContext, WorkingCopyPatch } from "../survey/types.ts";
 // DesktopModifications is a type from the engine package (a workspace
 // dependency, not an internal studio/src/ layer) — the steps-layer boundary
 // forbids steps/ -> lib/stores/dashboard/components, not other packages.
-import type { DesktopModifications, OutputForm } from "@keyboard-studio/engine";
-import { applyMarkGuards, detectBaseMarkMechanism } from "@keyboard-studio/engine";
+import type { DesktopModifications } from "@keyboard-studio/engine";
 import { repropagate } from "./repropagate.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionSet } from "../decisions/decisionTypes.ts";
@@ -52,13 +51,6 @@ export const MECHANISMS_STEP_ID = "mechanisms" as const;
 
 /** Step id for the Touch (Phase E) step — fires buildTouchLayoutJson on complete. */
 export const TOUCH_STEP_ID = "touch" as const;
-
-/**
- * Step id for the marks series (spec 071) — applies the generated mark guards
- * (blocking swallow rules + stepwise backspace-unwrap stores) to the working
- * IR and records the R10 migration-need flag on complete.
- */
-export const MARKS_STEP_ID = "marks" as const;
 
 /**
  * Step id for the choose-base step — fires the copy/adapt instantiation on complete.
@@ -119,19 +111,6 @@ export interface TouchCompleteResult {
    * for the same reason as `mods`.
    */
   seedSource?: "import-adapt" | "reseed-from-desktop" | null;
-}
-
-// ---------------------------------------------------------------------------
-// Marks-series completion payload (spec 071) — the SurveyPhaseResult the
-// series step reports, extended with the chosen output form (studio-local
-// payload extension, like TouchCompleteResult; the locked contract types are
-// untouched).
-// ---------------------------------------------------------------------------
-
-export interface MarksCompleteResult extends SurveyPhaseResult {
-  marksWorklist?: PlacementWorklist;
-  /** The S4 whole-keyboard decision ("ready-made" | "base-plus-mark"). */
-  marksOutputForm?: OutputForm;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,14 +208,6 @@ export interface ReducerDeps {
    * path-scoped `mutate()` patch merge.
    */
   getWorkingIR?: () => KeyboardIR | null;
-  /**
-   * Record the spec-046 R10 consequence: the designer picked the
-   * base-plus-mark output form while adapting a base whose own content uses
-   * ready-made forms — converting that existing content is a follow-on
-   * migration need, recorded here and not acted on. Optional (session-flag
-   * setter injected by the host).
-   */
-  setMarksMigrationNeeded?: (needed: boolean) => void;
   /**
    * Write the merged IR back to the working copy via the OVERLAY-PRESERVING
    * store setter (`setWorkingIR`, NOT `setIR`). These are incremental patches to
@@ -337,35 +308,10 @@ export function applyStepCompletion(
   deps: ReducerDeps,
 ): void {
   switch (stepId) {
-    // Spec 071 — marks-series completion: apply the generated mark guards
-    // (blocking swallow group + stepwise backspace-unwrap stores) to the
-    // working IR, and record the R10 migration-need flag when base-plus-mark
-    // was chosen over a ready-made-form base. All engine-pure; no raw .kmn.
-    case MARKS_STEP_ID: {
-      // `result` may genuinely be absent (a step completed with nothing to
-      // report, e.g. spec 032's journey-corpus harness driving a step the
-      // real UI would auto-skip) — read through optional chaining rather
-      // than destructuring/property-accessing an `undefined` cast directly.
-      // CHOOSE_BASE_STEP_ID below shares this same "result may be absent"
-      // reasoning, though its RESPONSE differs (warns before skipping,
-      // since a missing base there is a foreseen caller error rather than
-      // an expected no-op) — the two cases guard for the same reason, not
-      // in the same way.
-      const payload = result as Partial<MarksCompleteResult> | undefined;
-      const worklist = payload?.marksWorklist;
-      if (worklist === undefined) break;
-      const ir = deps.getWorkingIR?.() ?? null;
-      if (ir === null) break;
-      const outputForm = payload?.marksOutputForm ?? "base-plus-mark";
-      if (outputForm === "base-plus-mark" && detectBaseMarkMechanism(ir) === "precomposed") {
-        deps.setMarksMigrationNeeded?.(true);
-      }
-      const guarded = applyMarkGuards(ir, worklist, outputForm);
-      if (guarded.ir !== ir) {
-        deps.setWorkingIR?.(guarded.ir);
-      }
-      break;
-    }
+    // (No marks case: spec 090 T023 retired it. The marks-treatment
+    // module's apply runs the mark guards from the decision value's
+    // completion payload, and MarksStepHost mirrors the R10 migration
+    // determination into the session.)
 
     // R1 — lock gate: fire lockDesktop() after Mechanisms completes.
     case MECHANISMS_STEP_ID: {
@@ -397,8 +343,8 @@ export function applyStepCompletion(
     // which may import lib/touchEmission.ts; this reducer may not). The one
     // gate this reducer still owns is baseIr === null (nothing to build from).
     case TOUCH_STEP_ID: {
-      // Same "result may genuinely be absent" reasoning as MARKS_STEP_ID
-      // above — destructuring an `undefined` cast directly throws.
+      // "Result may genuinely be absent" — destructuring an `undefined`
+      // cast directly throws.
       const payload = (result as Partial<TouchCompleteResult> | undefined) ?? {};
       const {
         assignments = [],

@@ -667,3 +667,71 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   as the merge gate: see the merge commit / story report for the
   tally (focused merge-seam battery: 292/292 + tsc clean at commit
   time).
+
+- **D-090-16 — T023 marks-treatment landed (implements D-090-11).**
+  `marksTreatment.ts` is a real module: renderer `MarksSeriesStep`
+  (converted to `DecisionRendererProps<MarksTreatmentValue>`, hosted by
+  new `survey/marks/MarksStepHost.tsx`), `writes: [groups, stores]`,
+  `apply` runs `applyMarkGuards` from the value's completion payload
+  only (no-op while `completion` is null, when the IR is null, and
+  when the guarded IR is unchanged). The value types + record surface
+  live in new `survey/marks/marksValue.ts` (D-090-8 leaf: the module
+  imports the renderer, the renderer and the tolerance hook import the
+  helpers). Refinements to D-090-11's letter, all forced by the
+  contracts: (1) `completion` carries a third field, `migrationNeeded`:
+  the R10 determination must be computed from the PRE-guard IR at the
+  completion report (the reducer's exact input — `detectBaseMarkMechanism`
+  scans rule outputs, and the guards add rules, so a post-apply read
+  is not provably the same), and apply has no session channel; the
+  renderer computes it, `MarksStepHost` mirrors it into
+  `session.marksMigrationNeeded` with the reducer's only-ever-true
+  semantics. The flag has no in-app reader (verified by grep); it is
+  persisted draft shape. (2) The value's `answers` composite is
+  recorded at the step's existing decision-record commit points (each
+  station's Next via `recordValue`, and completion) — NOT per toggle:
+  marks answers carry spec 079's draft→confirmed evidence lifecycle,
+  and the per-toggle writes remain the answer-store evidence layer
+  (T026 adjudicates its fate, as with characters' addition flags).
+  The composite is the full derived `answersForStation` set in record
+  form, so an intermediate record after a completed pass is what
+  clears `completion` (D-090-11's stale-payload rule). (3) The value's
+  `contextTolerance` mirrors the session merge's last-wins semantics:
+  a completion reporting no tolerance decision PRESERVES the value's
+  existing decision (`effectiveTolerance = resolved ?? prior`), never
+  clears it — clearing would make the re-keyed apply hook remove a
+  fix the session still considers decided. The prior is read
+  value-first with the session derivation as fallback (drafts restored
+  from before the value existed); intermediate records adopt the
+  effective prior into the value. (4) `answers` values include
+  booleans (attachment/stacking answers) — the stub's
+  `string | string[]` widened accordingly.
+  `useContextToleranceApply` re-keyed per D-090-11: decision source is
+  the value's `contextTolerance`; `markApplied` re-records the value
+  with `appliedFingerprint` through the stub decide path (no-op
+  apply — stamping must not re-run the guards); the patch still
+  commits via `applyMutatePatch` vs `CONTEXT_TOLERANCE_WRITES`.
+  Reducer: MARKS case, `MARKS_STEP_ID`, `MarksCompleteResult` and the
+  `setMarksMigrationNeeded` dep retired (StudioShell wiring removed);
+  `decisionIRPaths["marks-treatment"] = [["groups"],["stores"]]` and
+  the id left `IR_LESS_DECISIONS` (the consistency test's own
+  instruction). One new depcruise cycle appeared (registry → module →
+  renderer → decisions/contextToleranceProposal → recordSurveyAnswers
+  → decisionLogStore → registry) and was broken by leaf extraction:
+  the three tolerance question-id constants moved to new
+  `decisions/contextToleranceIds.ts` (re-exported from
+  contextToleranceProposal.ts); depcruise back to the post-merge
+  baseline 131. Tests: reducer marks block deleted, its assertions
+  ported to new `survey/questions/gallery/marksTreatment.test.tsx`
+  (contract, apply guards/no-ops/idempotence, host flag mirror);
+  marks suites + useWorkToDo.marksParity re-pointed to MarksStepHost;
+  the tolerance hook's suite re-seeds via the decision record. Gates:
+  tsc clean; eslint 0 errors; focused batteries green (marks family +
+  module + hook + reducer 161; decisions 1129 passed with ONLY the 4
+  known pre-existing local-corpus SC-004 failures; src/steps 407/407;
+  StudioShell + previewCommitGating + MechanismGallery.progression +
+  deepLinkRevision green; parity trio green unmodified). Golden walk:
+  fresh-walk classification vs committed fixtures shows ONLY the
+  already-reported post-merge signature (D-090-15(d)) — zero marks
+  delta (both walk alphabets are marks-free; the marks step records
+  no entry in either walk). Regeneration remains T029's action. The
+  2 touch_seed_source renderSmoke failures persist (pre-existing).

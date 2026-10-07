@@ -169,7 +169,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   accept/decline as value edits through `onChange` in
   packages/studio/src/survey/punctuation/PunctuationStep.tsx and
   packages/studio/src/survey/invisibles/InvisiblesStep.tsx
-- [ ] T023 [US2] `marks-treatment` module: the composite value of data-model.md in
+- [x] T023 [US2] `marks-treatment` module: the composite value of data-model.md in
   packages/studio/src/survey/questions/gallery/marksTreatment.ts; `MarksSeriesStep` and
   `ContextToleranceStation` report through `onChange` in
   packages/studio/src/survey/marks/MarksSeriesStep.tsx and
