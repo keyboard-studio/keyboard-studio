@@ -179,6 +179,46 @@ describe("recalculate — scenario 2: default/derived recompute", () => {
     expect(out.recomputed).toEqual([]);
     expect(out.decisions["target-script"]).toBe(decisions["target-script"]);
   });
+
+  it("stamps the A2 union snapshot (requires ∪ snapshotInputs) on a landed record", () => {
+    // Spec 093 final pass (092 A2 precedent adoption): the snapshot
+    // recalculate writes — and validates against — covers the module's
+    // snapshot-only data dependencies too, exactly as the live
+    // extraction pass seeds them. A requires-only stamp would strip
+    // `authoring-track` from the record's derivation provenance.
+    const derivedScript = mod({
+      id: "q_script_union",
+      provides: ["target-script"],
+      requires: ["language-code"],
+      snapshotInputs: ["authoring-track"],
+    });
+    const modules = [nameModule, codeModule, derivedScript];
+    const decisions: DecisionSet = {
+      "language-code": rec({ id: "language-code", value: "lg2", provenance: "asked" }),
+      "authoring-track": rec({ id: "authoring-track", value: "copy", provenance: "asked" }),
+      "target-script": rec({
+        id: "target-script",
+        value: "from-lg",
+        provenance: "derived",
+        inputs: { "language-code": "lg", "authoring-track": "copy" },
+      }),
+    };
+    const out = recalculate(
+      {
+        providerFor: providerFromModules(modules),
+        modules,
+        extractContext: CTX,
+        recomputeValue: (_mod, _record, current) =>
+          `from-${String(current["language-code"]?.value)}`,
+      },
+      { decisions, changed: new Set<DecisionId>(["language-code"]), order: ORDER },
+    );
+    expect(out.recomputed).toEqual(["target-script"]);
+    expect(out.decisions["target-script"]?.inputs).toEqual({
+      "language-code": "lg2",
+      "authoring-track": "copy",
+    });
+  });
 });
 
 describe("recalculate — scenario 3: asked kept when valid", () => {

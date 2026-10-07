@@ -123,14 +123,33 @@ export interface RecalculateResult {
   orphaned: DecisionId[];
 }
 
-/** Snapshot a module's `requires` values from a set, the writers' rule. */
+/**
+ * Snapshot a module's declared input values from a set: `requires` ∪
+ * `snapshotInputs` — the spec 092 A2 channel, adopted here from the live
+ * extraction pass's precedent (spec 093 final pass, decision recorded in
+ * followups.md). Recalculate is a snapshot WRITER (it re-stamps `inputs`
+ * on every record whose value it lands) and a snapshot READER (it
+ * validates `asked` records against the new snapshot); a requires-only
+ * snapshot would strip the A2 keys the extraction pass seeded — falsifying
+ * the record's derivation provenance and making the two writers disagree
+ * on the same record's shape — and would validate against a snapshot
+ * missing declared data dependencies. `requires` first, so key order
+ * matches the extraction pass's snapshot for the same module.
+ */
 function snapshotInputs(
   mod: QuestionModule,
   decisions: DecisionSet,
 ): Decision["inputs"] {
-  if (mod.requires === undefined || mod.requires.length === 0) return undefined;
+  const declared: DecisionId[] = [];
+  for (const id of mod.requires ?? []) {
+    if (!declared.includes(id)) declared.push(id);
+  }
+  for (const id of mod.snapshotInputs ?? []) {
+    if (!declared.includes(id)) declared.push(id);
+  }
+  if (declared.length === 0) return undefined;
   const snapshot: NonNullable<Decision["inputs"]> = {};
-  for (const required of mod.requires) {
+  for (const required of declared) {
     const record = decisions[required];
     if (record !== undefined) snapshot[required] = record.value;
   }
