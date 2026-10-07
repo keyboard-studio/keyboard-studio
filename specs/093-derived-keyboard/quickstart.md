@@ -73,3 +73,30 @@ pnpm --filter @keyboard-studio/studio test
 pnpm --filter @keyboard-studio/studio exec tsc --noEmit
 grep -rn "staleSteps" packages/studio/src   # expect: no results after T011
 ```
+
+## Validation notes (execution record)
+
+- **T023 golden walk (2026-10-07, this branch @ ca0b5893):** the
+  store-level harness (`tests/steps/stepHost.goldenWalk.test.tsx`,
+  copy + adapt tracks from `basic_kbdfr`) runs and the traversals match
+  the committed fixture structurally (16 steps both sides), but both
+  tests FAIL on the characterised fixture delta owned by 089/090:
+  steps now record non-empty `decisionMutations` where the committed
+  fixture carries `[]`. The delta predates 093's changes (identical at
+  the pre-093 baseline of this stack) and closes when the upstream
+  fixture regeneration lands here via the cascade. **SC-005
+  byte-identity of the source zip is therefore NOT confirmed on this
+  branch yet** — it is blocked on the same upstream delta, not on a
+  093 behaviour difference: no traversal step, answer, or emission in
+  the walk differs, only the mutation bookkeeping the fixture records.
+- **Scenario 2 (SC-003)** is gated on the held US2 items (T014–T016,
+  T018 — see followups.md): the v2 envelope still carries the
+  `workingCopy` slice on this tree, so "draft has no workingCopy slice"
+  does not hold yet.
+- **Scenario 1 (SC-001)** is authored as
+  `packages/studio/e2e/derived-keyboard.spec.ts` (T012) and runs in CI;
+  the store-level half is pinned by the StepHost/rebuild suites.
+- **Scenario 3 (SC-002/SC-004)**: SC-002 pinned by
+  `decisions/replayDeterminism.test.ts` (T020); SC-004 re-measured on
+  the replay path at T021 (perf-baseline.md — warm edit median
+  7.20 ms, cold resume median 9.58 ms, sil_euro_latin).

@@ -113,7 +113,7 @@ for byte) and the SC-004 measurements on `sil_euro_latin`.
 
 **Purpose**: Series close-out — after 093, the decisions are the only stored state.
 
-- [ ] T023 [P] Run the golden walk (089 SC-001 baseline script, copy track from `basic_kbdfr`) and confirm the source zip is byte-identical (SC-005); record the run in specs/093-derived-keyboard/quickstart.md validation notes
+- [x] T023 [P] Run the golden walk (089 SC-001 baseline script, copy track from `basic_kbdfr`) and confirm the source zip is byte-identical (SC-005); record the run in specs/093-derived-keyboard/quickstart.md validation notes — RUN RECORDED 2026-10-07: harness executes; both tracks fail ONLY on the characterised 089/090-owned decisionMutations fixture delta (identical at pre-093 baseline); SC-005 byte-identity NOT confirmable until the upstream fixture regen cascades — see quickstart.md validation notes
 - [ ] T024 [P] Grep gates: zero references to `staleSteps`, `repropagate`, or a saved `workingCopy` draft slice in packages/studio/src; confirm the 093 duplication ledger is fully retired and record it in specs/093-derived-keyboard/spec.md (Status/duplication ledger)
 - [ ] T025 Amend Constitution Article III in .specify/memory/constitution.md to describe the working copy as a derived cache produced by replay (per plan.md Constitution Check, the 087 Article IX precedent), in the same change series as the implementation it describes
 - [ ] T026 Full verification: studio vitest suite, `tsc --noEmit`, `eslint`, and `depcruise` green from the repo root tooling; parity suites inherited from 088 (FR-009 descendants) pass unmodified
