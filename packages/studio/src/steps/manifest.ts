@@ -25,7 +25,8 @@
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
-import { galleryModules } from "../survey/questions/registry.ts";
+import { decisionModules, galleryModules } from "../survey/questions/registry.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
 import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
@@ -279,23 +280,43 @@ const stepPool: readonly Step[] = [
 ];
 
 /**
- * The steps in derived order: the pool sorted by STEP_ORDER (which is derived
- * from each step's provides/requires, never listed by hand). A pool/table
- * mismatch is a hard error at module load.
+ * Build the manifest from a module list (spec 091 T010 — the registry seam
+ * SC-001 needs): derive the screens from the supplied modules (default:
+ * the live registry's `decisionModules`), append the ruled terminal
+ * "package" screen, and arrange the step pool in that order. A derived
+ * screen with no pool declaration is a hard error. A supplied list may
+ * legitimately repeat a pool step (a split question run yields two
+ * screens with the same host) — the pool/screen bijection is asserted
+ * only for the default build, below.
+ */
+export function buildManifest(
+  modules: readonly QuestionModule[] = decisionModules,
+): readonly Step[] {
+  const screenOrder = [...deriveScreens(modules).map((s) => s.id), "package"];
+  return screenOrder.map((id) => {
+    const found = stepPool.find((s) => s.id === id);
+    if (found === undefined) {
+      throw new Error(
+        `[manifest] screen "${id}" derived from the module list has no step declaration in the pool`,
+      );
+    }
+    return found;
+  });
+}
+
+/**
+ * The steps in derived order: the pool arranged by the derived screen
+ * order (never listed by hand). A pool/screen mismatch in the LIVE
+ * registry is a hard error at module load.
  */
 export const manifest: readonly Step[] = ((): readonly Step[] => {
-  if (stepPool.length !== STEP_ORDER.length) {
+  const built = buildManifest();
+  if (built.length !== stepPool.length) {
     throw new Error(
-      `[manifest] ${stepPool.length} steps declared but ${STEP_ORDER.length} in stepDependencies`,
+      `[manifest] ${stepPool.length} steps declared but ${built.length} screens derived from the live registry`,
     );
   }
-  return STEP_ORDER.map((id) => {
-  const found = stepPool.find((s) => s.id === id);
-  if (found === undefined) {
-    throw new Error(`[manifest] step "${id}" is declared in stepDependencies but has no step`);
-  }
-  return found;
-  });
+  return built;
 })();
 
 /**

@@ -256,12 +256,43 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   index. This file is 087 machinery, not a named 091 task — flagged for
   ratification; reversible in one commit if the lead prefers the
   external-providers treatment inside the sort itself.
-- **T008 outcome — the D-090-7 init-cycle did not bite.** `stepOrder.ts`
-  now derives `STEP_ORDER` / `STEP_TRAILS` from `deriveScreens` over the
-  registry's `decisionModules` (plus the ruled terminal `package`), and
-  the Phase 2 gate batch (survey + decisions + steps + dashboard suites,
-  131 files / 4192 tests, all green) shows no TDZ or partially-initialised
-  registry failure under any entry order those suites exercise. The
-  depcruise cycle edge is type-level at runtime. If a future 090 restack
-  changes the gallery renderers' store imports, this is the first place
-  to re-check.
+- **T008 outcome — SUPERSEDED by Delta P4 below.** The Phase 2 report
+  claimed the D-090-7 init-cycle did not bite, on the evidence of the
+  131-file gate batch. That evidence was misleading (see P4); the claim
+  is withdrawn.
+
+- **Delta P4 — T008 reverted: the D-090-7 init-cycle DOES bite, and the
+  Phase 2 batch masked it.** In Phase 3, `deriveScreens.test.ts` failed
+  STANDALONE at module load: `TypeError: items is not iterable` at
+  `orderDecisions.ts` ← `deriveScreens` ← `steps/stepOrder.ts:41` ←
+  `dashboard/completeness.ts:27` — stepOrder's top level read the
+  registry's `decisionModules` while the registry was still evaluating
+  (registry → gallery renderer → stores → completeness → stepOrder), so
+  the binding was undefined. Bisect-verified: the failure reproduces at
+  the Phase 2 commit with all Phase 3 changes reverted, standalone; the
+  131-file batch passed because shared workers had already completed
+  registry evaluation via earlier files. Per the audit's own contingency,
+  T008 is reverted: `stepOrder.ts` again derives from
+  `stepDependencies.ts` (which reads only the cycle-safe `flowModules`
+  leaf, per D-090-7), with the `deriveStepStructure` relocation kept.
+  **Phase 4 prerequisite:** when T012–T016 delete `stepDependencies.ts`
+  and re-point the store/dashboard consumers, the screen-derived
+  STEP_ORDER must land together with breaking the
+  completeness/workingCopyStore → stepOrder-during-registry-evaluation
+  path (or an equivalent leaf-level module list); T008's one-file change
+  cannot land safely on its own.
+- **Delta P5 — the one sort conflates routing edges with requires edges;
+  SC-001's edit closes a false cycle.** T009's prescribed edit
+  (`il_language_autonym` += `requires: ["base-keyboard"]`) cycles in
+  `orderByDependencies`: autonym →(requires) baseKeyboard →(requires)
+  il_language_code, and il_language_code is autonym's routing successor
+  (`next: "il_language_code"`), so the routing-predecessor edge closes
+  the loop. A moved question's `next` is stale by construction — the
+  move is the point of the edit — and FR-001 makes `requires` the
+  placement authority. Fix in `decisions/orderDecisions.ts`
+  (`routingPredecessors`): a routing edge u → v is dropped for ordering
+  when u already transitively requires a decision v provides. Inert on
+  conflict-free inputs (a live conflict is a cycle today, so no current
+  declaration set contains one); `orderParity.test.ts` stays green
+  unmodified. This is 087 sort semantics, not a named 091 task — flagged
+  for ratification alongside P3.

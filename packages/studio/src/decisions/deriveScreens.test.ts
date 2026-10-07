@@ -323,3 +323,41 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
     }
   });
 });
+
+describe("US1 one-edit (SC-001, pure level) — T009", () => {
+  // The one-line edit: il_language_autonym gains requires: ["base-keyboard"]
+  // in a test registry. Nothing else changes.
+  const editedModules = decisionModules.map((m) =>
+    m.definition.id === "il_language_autonym"
+      ? { ...m, requires: [...(m.requires ?? []), "base-keyboard" as DecisionId] }
+      : m,
+  );
+
+  it("baseline: the autonym sits in the single identity screen", () => {
+    const identityScreens = deriveScreens(decisionModules).filter((s) => s.id === "identity");
+    expect(identityScreens).toHaveLength(1);
+    expect(identityScreens[0]!.moduleIds).toContain("il_language_autonym");
+  });
+
+  it("the edit moves the autonym after choose_base, in a second identity-labelled screen", () => {
+    const screens = deriveScreens(editedModules);
+    const ids = screens.map((s) => s.id);
+    const identityIdx = ids.flatMap((id, i) => (id === "identity" ? [i] : []));
+    expect(identityIdx).toHaveLength(2);
+    // choose_base sits between the two identity screens.
+    expect(ids.indexOf("choose_base")).toBeGreaterThan(identityIdx[0]!);
+    expect(ids.indexOf("choose_base")).toBeLessThan(identityIdx[1]!);
+    const [first, second] = identityIdx.map((i) => screens[i]!);
+    expect(first!.group).toBe("identity");
+    expect(second!.group).toBe("identity");
+    expect(first!.moduleIds).not.toContain("il_language_autonym");
+    expect(second!.moduleIds).toContain("il_language_autonym");
+    expect(second!.decisionIds).toContain("language-autonym");
+    // Nothing else moved: the remaining sequence is the baseline sequence.
+    expect(ids.filter((id) => id !== "identity")).toEqual(
+      deriveScreens(decisionModules)
+        .map((s) => s.id)
+        .filter((id) => id !== "identity"),
+    );
+  });
+});

@@ -72,9 +72,13 @@ before any user story.
   characters, marks, punctuation, invisibles, convenience, carve, deadkeys, rules, mechanisms,
   touch_seed_source, touch, help, package — inventoried in research.md) mapped to the screen id
   holding that step's decisions, with `done`/`unsupported` documented as pass-through terminals
-- [x] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
+- [ ] T008 Re-derive `STEP_ORDER` and `STEP_TRAILS` from `deriveScreens` output in
   packages/studio/src/steps/stepOrder.ts, keeping the exported shapes identical so existing
   consumers (`stores/workingCopyStore.ts` ranking, `steps/advance.ts`) compile unchanged
+  — LANDED in Phase 2, REVERTED in Phase 3 (plan.md Delta P4: the D-090-7
+  init-cycle bites under store-first entry orders; the Phase 2 batch
+  masked it). Returns with Phase 4's rewiring (T012–T016) as a stated
+  prerequisite there.
 
 **Checkpoint**: `deriveScreens` is tested pure; stepOrder still serves its consumers, now
 screen-derived. `stepDependencies.ts` still exists but is no longer the source for STEP_ORDER.
@@ -90,15 +94,15 @@ place, with nothing else edited.
 `il_language_autonym`. The derived steps show it after `choose_base`, the identity screen
 splits into two screens both labelled `identity`, and the diff touches one line.
 
-- [ ] T009 [US1] Write the one-edit test first (it must fail against step-membership as
+- [x] T009 [US1] Write the one-edit test first (it must fail against step-membership as
   currently wired): test-registry module list with the added edge, asserting the autonym lands
   after the `choose_base` screen in a second `identity`-labelled screen, in
   packages/studio/src/decisions/deriveScreens.test.ts
-- [ ] T010 [US1] Add the registry seam the SC-001 test needs: building the manifest/screen list
+- [x] T010 [US1] Add the registry seam the SC-001 test needs: building the manifest/screen list
   from a supplied module list (defaulting to the live registry) in
   packages/studio/src/steps/manifest.ts, consumed by packages/studio/src/components/StepHost.tsx
   without changing its default behaviour
-- [ ] T011 [US1] Write the SC-001 store-level test driving the real `StepHost` with the test
+- [x] T011 [US1] Write the SC-001 store-level test driving the real `StepHost` with the test
   registry from T009 — screen sequence reflects the one-line edit, and reverting the edit
   restores the baseline sequence — in
   packages/studio/src/components/StepHost.derivedScreens.test.tsx

@@ -63,11 +63,52 @@ function routingPredecessors<T>(
 ): Map<string, Set<string>> {
   const ids = items.map((i) => node(i).id);
   const idSet = new Set(ids);
+
+  // Spec 091 (Delta P5): a routing edge u -> v that the requires graph
+  // already contradicts — u transitively requires a decision v provides,
+  // so u must sort AFTER v — carries no usable order: honouring both is
+  // a dependency cycle. The requires edge is the author's declared
+  // placement (FR-001; SC-001 moves a question by adding exactly such an
+  // edge, leaving its `next` pointing at its old successor), so the
+  // routing edge is dropped for ordering, the way a documented loop-back
+  // is. Inert on conflict-free inputs: a live conflict is a cycle today,
+  // so no current declaration set contains one.
+  const byId = new Map(items.map((i) => [node(i).id, i] as const));
+  const providerOf = new Map<string, string>();
+  for (const item of items) {
+    const n = node(item);
+    for (const p of n.provides ?? []) {
+      if (!providerOf.has(p)) providerOf.set(p, n.id);
+    }
+  }
+  const reachCache = new Map<string, Set<string>>();
+  const requiresReach = (start: string): Set<string> => {
+    const cached = reachCache.get(start);
+    if (cached !== undefined) return cached;
+    const seen = new Set<string>();
+    const walk = (id: string): void => {
+      const item = byId.get(id);
+      if (item === undefined) return;
+      for (const r of node(item).requires ?? []) {
+        const provider = providerOf.get(r);
+        if (provider !== undefined && !seen.has(provider)) {
+          seen.add(provider);
+          walk(provider);
+        }
+      }
+    };
+    walk(start);
+    reachCache.set(start, seen);
+    return seen;
+  };
+
   const out = new Map<string, RouteEdge[]>();
   const hasInbound = new Set<string>();
   for (const item of items) {
     const n = node(item);
-    const edges = (n.routesTo ?? []).filter((e) => idSet.has(e.to) && e.to !== n.id);
+    const edges = (n.routesTo ?? []).filter(
+      (e) => idSet.has(e.to) && e.to !== n.id && !requiresReach(n.id).has(e.to),
+    );
     out.set(n.id, edges);
     for (const e of edges) if (!e.loopBack) hasInbound.add(e.to);
   }
