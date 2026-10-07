@@ -162,7 +162,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   now-unused spike renderer deleted — in packages/studio/src/survey/questions/b/pb_character_inventory.ts,
   packages/studio/src/survey/characters/InventoryRenderer.tsx, and
   packages/studio/src/test/sc004Harness.ts
-- [ ] T022 [P] [US2] `punctuation-inventory` + `invisibles-inventory` modules with
+- [x] T022 [P] [US2] `punctuation-inventory` + `invisibles-inventory` modules with
   `InventoryDecisionValue` (per-item provenance, FR-006) in
   packages/studio/src/survey/questions/gallery/punctuationInventory.ts and
   packages/studio/src/survey/questions/gallery/invisiblesInventory.ts; the components report

@@ -17,8 +17,8 @@
 // a right-to-left author and COLLAPSED — never hidden — for everyone else, so
 // an LTR author who genuinely needs a direction mark can still find it.
 //
-// Decisions live in the draft store's sticky `invisibleDecisions`
-// (keyed `U+XXXX`), NOT in `chars`: an accepted character reaches the phase-C
+// Decisions live in the invisibles-inventory decision record's sticky
+// decisions (keyed `U+XXXX`), NOT in `chars`: an accepted character reaches the phase-C
 // confirmed inventory through `phaseCConfirmedInventory()` and never lands in
 // the `controls` bucket again (FR-014). On first render every `\p{Cf}`
 // character an earlier code-point entry left in `controls` is carried over
@@ -47,11 +47,13 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { parseUPlusNotation } from "@keyboard-studio/contracts";
-import type { EditorStepProps } from "../../steps/types.ts";
+import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../../stores/phaseBDraftStore.ts";
+import { useInventoryDraft } from "../useInventoryDraft.ts";
+import type { InventoryDecisionValue } from "../phaseBDraftOps.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 import { isFormatChar } from "../charNormUtils.ts";
 import type { SurveyContext } from "../types.ts";
@@ -191,7 +193,10 @@ function CandidateRow({ candidate, checked, onToggle }: CandidateRowProps) {
 // InvisiblesStep
 // ---------------------------------------------------------------------------
 
-const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
+const INVISIBLES_STEP_ID = "invisibles";
+
+const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue>> = () => {
+  const { onComplete, onBack } = useGalleryStepContext();
   const { t } = useLingui();
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
@@ -200,11 +205,15 @@ const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
     [phaseResults, surveyContext],
   );
 
-  const controls = usePhaseBDraftStore((s) => s.controls);
-  const invisibleDecisions = usePhaseBDraftStore((s) => s.invisibleDecisions);
-  const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
-  const declineInvisible = usePhaseBDraftStore((s) => s.declineInvisible);
-  const adoptControlsAsInvisibles = usePhaseBDraftStore((s) => s.adoptControlsAsInvisibles);
+  // The shared Phase B/C draft, as decision values (spec 090 T022): the
+  // toggles are the bound ops, recorded through the gallery host under
+  // this step's attribution.
+  const draft = useInventoryDraft(INVISIBLES_STEP_ID);
+  const controls = draft.controls;
+  const invisibleDecisions = draft.invisibleDecisions;
+  const acceptInvisible = draft.ops.acceptInvisible;
+  const declineInvisible = draft.ops.declineInvisible;
+  const adoptControlsAsInvisibles = draft.ops.adoptControlsAsInvisibles;
 
   // Carry-over (FR-017): capture what the code-point field left in `controls`
   // BEFORE adopting it, so the candidate list keeps offering those characters

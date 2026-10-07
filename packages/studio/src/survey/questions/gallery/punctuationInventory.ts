@@ -1,15 +1,21 @@
-// punctuationInventory — gallery decision module for `punctuation-inventory` (spec 090).
+// punctuationInventory — gallery decision module for `punctuation-inventory`
+// (spec 090).
 //
-// Stub landed with T008 so the FR-002 coverage test pins this decision's
-// provider from the start; the real renderer/apply fill in with T022 (US2).
-// Accepted/declined punctuation proposed from the confirmed alphabet
-// and the base keyboard.
-// Boundary (FR-003): a gallery module is a pure descriptor — no store
-// imports; the value arrives via DecisionRendererProps and changes leave
-// via onChange, recorded and applied by the gallery host.
+// The value is an InventoryDecisionValue (accepted/declined with per-item
+// provenance, FR-006), declared with the shared draft ops in
+// survey/phaseBDraftOps.ts and re-exported here for module consumers.
+//
+// The value is maintained as a PROJECTION of the character-inventory
+// value (research D-090-10(d)): the PunctuationStep's edits are draft ops
+// over the shared accumulator (survey/useInventoryDraft.ts), and the hook
+// re-records this value from the character value after each mutation —
+// accepted = the draft's punctuation category, declined = the
+// rejected-punctuation ledger with the provenance captured at removal.
+// Renderer: `survey/punctuation/PunctuationStep.tsx`, hosted.
 
 import type { GalleryModule } from "../../types.ts";
-import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
+import type { InventoryDecisionValue } from "../../phaseBDraftOps.ts";
+import { PunctuationStep } from "../../punctuation/PunctuationStep.tsx";
 
 export const definition = {
   id: "punctuationInventory",
@@ -18,22 +24,7 @@ export const definition = {
   audit_label: "Punctuation inventory",
 };
 
-import type { DecisionProvenance } from "../../../decisions/decisionTypes.ts";
-
-/** One inventory item with its per-item provenance (FR-006). */
-export interface InventoryItem {
-  char: string;
-  provenance: DecisionProvenance;
-}
-
-/**
- * The inventory decision value (data-model.md): what the author accepted
- * and what they declined, each item carrying its own provenance.
- */
-export interface InventoryDecisionValue {
-  accepted: InventoryItem[];
-  declined: InventoryItem[];
-}
+export type { InventoryDecisionValue, InventoryItem } from "../../phaseBDraftOps.ts";
 
 const punctuationInventory: GalleryModule<InventoryDecisionValue> = {
   definition,
@@ -45,7 +36,7 @@ const punctuationInventory: GalleryModule<InventoryDecisionValue> = {
   // (decisionIRConsistency.test.ts pins the two together).
   writes: [],
   apply: () => ({}),
-  renderer: UnmigratedGalleryRenderer,
+  renderer: PunctuationStep,
   fixtures: {
     valid: [{ value: undefined, note: "no decision recorded yet" }],
     invalid: [],

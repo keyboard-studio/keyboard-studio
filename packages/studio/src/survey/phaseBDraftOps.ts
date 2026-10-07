@@ -635,6 +635,11 @@ function withInvisibleDecision(
   decision: InvisibleDecision,
   provenance: InventoryItemProvenance,
 ): InventoryDecisionValue {
+  // Already decided this way: a no-op (the old store absorbed a redundant
+  // toggle silently; as a decision value it must not record a duplicate
+  // version of the same value).
+  const current = decision === "accepted" ? value.accepted : value.declined;
+  if (current.some((i) => i.char === ch)) return value;
   const accepted = value.accepted.filter((i) => i.char !== ch);
   const declined = value.declined.filter((i) => i.char !== ch);
   if (decision === "accepted") accepted.push({ char: ch, provenance });

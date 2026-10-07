@@ -24,8 +24,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
-import { PunctuationStep } from "./punctuation/PunctuationStep.tsx";
-import { InvisiblesStep } from "./invisibles/InvisiblesStep.tsx";
+import { PunctuationStepHost } from "./punctuation/PunctuationStepHost.tsx";
+import { InvisiblesStepHost } from "./invisibles/InvisiblesStepHost.tsx";
 import { CharacterMapPane } from "./CharacterMapPane.tsx";
 import {
   BIDI_CONTROL_CODE_POINTS,
@@ -96,7 +96,7 @@ describe("SC-004 / SC-009 — every offered invisible is observable through ever
     const notation = toUPlusNotation(char);
 
     it(`${notation} typed into the punctuation box is handed off, never silently dropped`, () => {
-      render(<PunctuationStep onComplete={vi.fn()} />);
+      render(<PunctuationStepHost onComplete={vi.fn()} />);
       fireEvent.change(screen.getByLabelText("Punctuation to add"), { target: { value: char } });
       fireEvent.click(screen.getByRole("button", { name: "+ Add" }));
       expect(classify(cp)).toBe("handed-off");
@@ -114,7 +114,7 @@ describe("SC-004 / SC-009 — every offered invisible is observable through ever
     });
 
     it(`${notation} toggled on the invisibles step is confirmed into the phase-C inventory`, () => {
-      render(<InvisiblesStep onComplete={vi.fn()} />);
+      render(<InvisiblesStepHost onComplete={vi.fn()} />);
       const hex = cp.toString(16).toLowerCase().padStart(4, "0");
       if (screen.queryByTestId(`invisible-candidate-${hex}`) === null) {
         fireEvent.click(screen.getByTestId("invisibles-bidi-expand"));
@@ -125,7 +125,7 @@ describe("SC-004 / SC-009 — every offered invisible is observable through ever
   }
 
   it("the classifier itself reports a character nothing received as silent (so a missing route cannot pass)", () => {
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStepHost onComplete={vi.fn()} />);
     expect(classify(0x2061)).toBe("silent");
   });
 });
@@ -137,7 +137,7 @@ describe("SC-004 carry-over leg — a saved code-point invisible stays observabl
     applyPhaseBDraftSnapshot({ chars: ["‌", "a"], selectedFont: DEFAULT_PHASE_B_FONT });
     expect(usePhaseBDraftStore.getState().controls).toEqual(["‌"]);
 
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStepHost onComplete={vi.fn()} />);
     expect(classify(0x200c)).toBe("confirmed");
     expect(phaseCConfirmedInventory().filter((c) => c === "‌")).toHaveLength(1);
     expect(screen.getAllByTestId("invisible-candidate-200c")).toHaveLength(1);
@@ -150,7 +150,7 @@ describe("SC-004 carry-over leg — a saved code-point invisible stays observabl
       invisibleDecisions: { "U+00AD": "accepted" },
       selectedFont: DEFAULT_PHASE_B_FONT,
     });
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStepHost onComplete={vi.fn()} />);
     expect(classify(0x00ad)).toBe("confirmed");
     expect(screen.getByTestId("invisible-candidate-00ad").getAttribute("aria-checked")).toBe("true");
     expect(phaseCConfirmedInventory()).toEqual(["!", "­"]);

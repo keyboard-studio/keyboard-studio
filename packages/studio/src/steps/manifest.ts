@@ -32,8 +32,8 @@ import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
 import { stepDependencies } from "./stepDependencies.ts";
 import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
-import { PunctuationStep } from "../survey/punctuation/PunctuationStep.tsx";
-import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
+import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
+import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
 import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
 import {
   identityStep,
@@ -168,8 +168,8 @@ const stepPool: readonly Step[] = [
   // character map's letters/numerals/marks fold points at (the alphabet map
   // deliberately withholds punctuation — see CharacterMapPane.tsx). Same
   // build-list anatomy as Phase B — suggestions, type-in, right-pane character
-  // map (scope "punctuation") — all toggling the shared phaseBDraftStore
-  // draft. Emits its picks as confirmedInventory on a phase:"C" result (see
+  // map (scope "punctuation") — all toggling the shared Phase B/C draft (the
+  // character-inventory decision value since spec 090). Emits its picks as confirmedInventory on a phase:"C" result (see
   // PunctuationStep.tsx for why not "B"), which the merged session unions in,
   // shielding them from carve and placing any the base cannot type.
   {
@@ -179,7 +179,7 @@ const stepPool: readonly Step[] = [
     title: "Punctuation",
     inputs: [],
     writes: [],
-    component: PunctuationStep,
+    component: PunctuationStepHost,
     // Right pane swaps to the interactive character map, as on the Phase B
     // build-list screen — but unconditionally: this step has no
     // discoveryMethod fork (SurveyView's gate special-cases "characters" only).
@@ -207,7 +207,7 @@ const stepPool: readonly Step[] = [
     title: "Invisible characters",
     inputs: [],
     writes: [],
-    component: InvisiblesStep,
+    component: InvisiblesStepHost,
     specRef: ["specs/075-punctuation-defaults"],
     evidence: { inputs: ["the invisible-character candidates offered"], keyFn: "invisibles" },
     persistence: "phase-b-draft",

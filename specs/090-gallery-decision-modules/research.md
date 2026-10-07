@@ -598,3 +598,26 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   renderSmoke failures reproduce identically at the pre-T021 HEAD
   (b7bcbbc4) — predecessor-surface state (089 watch item), untouched
   here.
+
+- **D-090-14 — T022 landed as designed (2026-10-07).** The
+  punctuation/invisibles modules are real (renderers hosted via
+  PunctuationStepHost/InvisiblesStepHost); both steps read and edit
+  through `useInventoryDraft` under their own attribution — the
+  punctuation value stays the D-090-10(d) projection, maintained by the
+  hook. No new static cycles (127 → 127: neither step's graph reaches
+  flowSources/the registry, so no lazy edge was needed here — the
+  T021 cycle was PhaseB-specific). Golden-walk delta UNCHANGED from
+  T021 (the walk's punctuation/invisibles hops record nothing new:
+  exemplar seeding never settles in the harness and the invisibles
+  carry-over is a no-op on an empty controls bucket). One op-level
+  refinement: `withInvisibleDecision` now returns the value unchanged
+  when the item already carries that decision — the old store absorbed
+  redundant toggles silently; as decision records they would have
+  minted duplicate versions of the same value. Harness fallout, for
+  the record: `tests/steps/makeFlowStepComponent.test.tsx`'s partial
+  store mocks grew `getDecisionSnapshot` + `subscribe` +
+  working-copy `getState` — the global test setup auto-resets the
+  draft facade, whose reset now flows through the gallery host deps.
+  That file also carries 2 PRE-EXISTING eslint errors (unused
+  `beforeEach`/`EditorStepProps` imports, present at the pre-T022
+  HEAD) — left untouched as out-of-scope.

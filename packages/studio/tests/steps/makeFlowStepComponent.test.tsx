@@ -109,24 +109,38 @@ vi.mock("../../src/stores/decisionStore.ts", () => {
   const state = () => ({ decisions: {}, record: mockRecordDecision, forget: mockForgetDecision });
   const useDecisionStore = Object.assign(
     (selector: (s: unknown) => unknown) => selector(state()),
-    { getState: state },
+    // subscribe: the interim draft facade (spec 090 T021) subscribes at
+    // module scope; a no-op subscription is inert for these tests.
+    { getState: state, subscribe: () => () => {} },
   );
   return {
     useDecisionStore,
+    // The inventory-draft surface (spec 090 T021/T022) reads decision
+    // snapshots at module scope in the registry's import graph.
+    getDecisionSnapshot: () => ({}),
     selectTrack: () => null,
     selectTouchSeedSource: () => null,
   };
 });
 
-vi.mock("../../src/stores/workingCopyStore.ts", () => ({
-  useWorkingCopyStore: (selector: (s: unknown) => unknown) => {
-    const store = {
-      validatorFindings: [],
-      setIdentity: mockSetIdentity,
-    };
-    return selector(store);
-  },
-}));
+vi.mock("../../src/stores/workingCopyStore.ts", () => {
+  // Lazy like the decisionStore mock above: the factory is hoisted, so
+  // mockSetIdentity is resolved at call time, not factory time.
+  const store = () => ({
+    validatorFindings: [],
+    setIdentity: mockSetIdentity,
+    // Read by the gallery host deps when the global test setup resets the
+    // (decision-backed) draft facade after each test (spec 090 T021).
+    ir: null,
+    historyEntryState: undefined,
+  });
+  return {
+    useWorkingCopyStore: Object.assign(
+      (selector: (s: unknown) => unknown) => selector(store()),
+      { getState: store },
+    ),
+  };
+});
 
 vi.mock("../../src/lint/lintToQuestion.ts", () => ({
   buildFindingsByQuestionId: () => ({}),
