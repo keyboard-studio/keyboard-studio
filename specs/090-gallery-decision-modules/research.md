@@ -1867,3 +1867,27 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   (T052's help-docs entry included), so US5 is blocked as a
   whole; T063 + Polish proceed meanwhile (T063's "strictly
   last" yields to the stop rather than idling the spec).
+- **D-090-44 — T063 landed: `phaseAnswersByStep` deleted.**
+  The field, its `PhaseAnswersByStep` type, and the whole
+  spec-079 D-4 ownership machinery (`ownersOf`,
+  `concatPhaseAnswers`, `LEGACY_ANSWER_OWNER`) are out of
+  workingCopyStore; `recordPhase` now shallow-merges the
+  result's non-answer fields per phase and stores `answers: []`
+  — no answer state remains in the working copy (the result
+  object still flows to recordAnswersAsDecisions /
+  applyDecisionEffects / the trail recorder directly from
+  StepHost, untouched). Verified beforehand: no production
+  code reads stored phase-slot answers (the cross-spec R-2
+  finding). Persistence: the field is out of the snapshot
+  types and both (de)serializers; a pre-090 snapshot carrying
+  it has it dropped on restore and never re-saved (pinned in
+  persistWorkingCopy.test.ts). Closing grep: zero references
+  in non-test sources; the 6 remaining references are tests
+  pinning the absence/strip. The 079 D-4 store tests were
+  replaced by T063 pins (no answers stored, per-phase shallow
+  merge keeps both steps' fields); the pre-079 draft test's
+  D-4 tail was re-pinned to the new semantics. Gates: tsc 0;
+  eslint clean on changed files; workingCopyStore 153/153 +
+  persistWorkingCopy (185 combined), draftPersistence 112/112,
+  decisionRecord/prePrDraft/journey/consistency 403/403,
+  walkEmit + StepHost green.
