@@ -269,9 +269,14 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
   packages/studio/src/survey/questions/gallery/ruleSet.test.ts; an orphaned hand-set removal
   item is kept in the value and shown (spec edge case) and a proposal refresh keeps hand
   removals, both in packages/studio/src/survey/questions/gallery/carvedLayout.test.ts
-- [ ] T037 [US3] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+- [x] T037 [US3] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US3 PR with the gate results and the
-  recorded T003 ruling cited in its body
+  recorded T003 ruling cited in its body — Gate discharged (D-090-36, D-090-37): fixtures
+  regenerated for the adjudicated US3 record signature (two `record` insertions per track,
+  applied view untouched); walk green 2/2 post-regen; the original run's full-suite
+  accounting was lost with the agent and rides on T045's gate run per lead direction.
+  PR opening is the lead's step per series protocol — gate results reported to the lead
+  in lieu of the PR body.
 
 **Checkpoint**: the three hardest galleries are decision values; carve's provenance is the
 owner-ruled shape, and deadkeys reuse their existing mutate path as an `apply`.

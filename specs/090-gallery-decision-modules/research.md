@@ -1580,3 +1580,21 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   adjudicated family as the T013 and T029 regenerations: a new
   decision recording at a migrated step is the migration's
   intended signature, not drift.
+- **D-090-37 — verification debts from the lost T037 run discharged
+  (continuation agent, lead direction).** (1) The three pass-2 pin
+  suites (D-090-28) re-run against 089's ACTUAL runner change as
+  merged at b6567241 (km/decision-apply @ 24c213c3): marksTreatment
+  9/9, deadkeysDefined 5/5, ruleSet 5/5 — 19/19 green, each suite's
+  pass-2 pin (invoked with value undefined: composes from
+  ctx.decisions when a recorded own decision exists, no-ops without
+  one) passing against the real second pass, not the relay
+  description. (2) T037 checkbox reconciled: the gate commit
+  c53e001e + D-090-36 establish the golden-walk half of the gate
+  (fixtures regenerated for the adjudicated US3 signature; walk
+  green 2/2 post-regen, applied view untouched). The full-suite /
+  tsc / lint accounting of the original T037 run was lost when that
+  agent's background exec vanished; per lead direction the checkbox
+  is checked on the walk evidence and the full-suite classification
+  rides on T045's gate run, which must classify the whole suite on
+  the US4 head — any failure there beyond the known 4-corpus budget
+  reopens T037's accounting.
