@@ -126,3 +126,21 @@ While the held items stand, `staleSteps`/`repropagate` references in
 packages/studio/src are non-zero by design (the machinery is live).
 The saved-`workingCopy`-slice reference likewise remains until US2
 unblocks. Counts recorded in spec.md's duplication ledger at T027.
+Measured 2026-10-07 @ 9add4260 (packages/studio/src only): `staleSteps`
+71 references, `repropagate` 25 references, `workingCopy` 31 references
+across lib/persistWorkingCopy.ts + lib/draftPersistence.ts. The gate
+stays PARTIAL (checkbox unchecked) until the held items land.
+
+## T026 — depcruise decisions-layer items (series-level call for the lead)
+
+Full depcruise on this tree: 142 violations = 134 no-circular (none
+through any 093-authored file; upstream stack state) + 6
+decisions-layer + 2 question-modules-no-bypass (Phase F modules,
+upstream). The 6 decisions-layer are all the series' live-wiring
+pattern — a decisions module's store-wiring half imports the stores it
+wires: liveExtraction.ts ×2 (092, landed), rebuildWorkingCopy.ts ×2
+(093 T009), rebuildPerf.measure.ts ×2 (093's measurement harness,
+reads the stores it measures). Options: (a) exempt the named wiring
+modules in .dependency-cruiser.cjs; (b) relocate the FromStores entries
+out of decisions/. Not actioned at close-out — restructuring at the
+end of the stack would churn every downstream branch.
