@@ -457,9 +457,16 @@ settled decision, checked against the decision list — no gaps, no duplicates.
   one live decision-kind entry with a bounded summary. Base-contribution presence is
   deliberately NOT asserted (the followups.md starting-point residue). Authored for CI
   per the standing live-capture ruling; typechecked locally, executed in CI.
-- [ ] T054 [US5] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
+- [x] T054 [US5] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US5 PR with the SC-003 walk results in its
   body
+  — Landed (D-090-49 has the full accounting): golden-walk fixtures re-captured with the
+  sole delta of T052's help-step record, parity green; studio 8729 passed / 8 failed —
+  the 4 budgeted SC-004 corpus failures plus 4 spec-079 step failures verified identical
+  at the pre-US5 base `625c3f43` (pre-existing, not US5 regressions, named in the PR body);
+  engine 3720/24 skipped/1 environmental failure (unfetched SLDR corpus); contracts
+  872/872; tsc clean; eslint 0 errors; depcruise zero violations. PR opened on
+  `km/decision-apply`.
 
 **Checkpoint**: the decision trail is complete — every decision the studio settles is in the
 log exactly once.

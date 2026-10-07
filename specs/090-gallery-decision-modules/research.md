@@ -2041,3 +2041,41 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   editor-action entries beside the new decision entries — the
   editor entry occupies the step's editor slot, not the
   decision's slot, and SC-003's exactly-one is per decision.
+- **D-090-49 — US5 landed; T054 gate accounting (2026-10-07).**
+  US5 (T050–T054) is complete under the D-090-48 ruling, in nine commits
+  (`ab9a59a9`..`49c55c49` plus this entry's commit): FR-005 amended;
+  contracts `decision` payload kind + DECISION_RECORD_VERSION 3 with
+  staged normalization; engine + studio consumers; completion-time
+  recording (decisions/recordGalleryDecisions.ts via the
+  createDecisionRecorder → createStudioDecisionRecorder chain,
+  `settlesForStep` as the canonical step→settles source); T051's
+  StepHost-level G7 verification (9/9 — the six gaps plus help-docs,
+  exactly-once and supersession pinned; the G7 starting-point residue
+  confirmed still reproducing and recorded in followups.md, unfixed);
+  T052's PhaseFGate help-docs registration; T053's CI live-walk spec
+  (e2e/decision-log.spec.ts). Gate numbers, exact: studio full suite
+  8729 passed / 8 failed / 1 skipped (8738) — the 8 are the 4 budgeted
+  SC-004 local-corpus failures (`basic_kbdru`/`arabic_izza` in
+  successCriteria.sc004{,.kmp}) PLUS 4 spec-079 step failures
+  (InvisiblesStep ×3: D-4/R-08 phase-C slot, RTL bidi proposal, RTL
+  direction-controls expansion; PunctuationStep ×1: D-4/R-08 phase-C
+  slot). The 4 spec-079 failures were verified byte-identical at the
+  pre-US5 base `625c3f43` (same 4 failed / 53 passed in isolation), so
+  they are pre-existing branch state, not US5 regressions; the brief's
+  "exactly 4" budget understated the branch's pre-existing count by
+  those 4, and fixing spec-079 step behaviour is outside US5's scope —
+  named here and in the PR body rather than absorbed. Engine suite:
+  3720 passed / 24 skipped / 1 failed — the failure is
+  character-discovery/exemplarCodegen determinism, which requires the
+  fetched SLDR corpus (`packages/engine/data/sldr/sldr` absent in this
+  worktree; environmental, subsystem untouched by this spec). Contracts
+  872/872. Golden walk: store-level fixtures re-captured with the sole
+  delta of T052's help-step decision `record` (both tracks); parity
+  green in compare mode (2/2); emitted files unchanged. tsc clean
+  (contracts/engine/studio); eslint 0 errors on changed files (5
+  warnings, all outside the US5 hunks); depcruise zero violations
+  (1442 modules); i18n-catalog-lint, spec-number-lint,
+  content-i18n-lint OK. `content-i18n-freshness` still crashes in this
+  worktree on the D-090-46 install artifact (`babel-plugin-macros`
+  module-not-found at load, before any content is read); CI installs
+  fresh. Spec 090 is 49/49; the PR bases on `km/decision-apply`.
