@@ -75,7 +75,7 @@ the recording of the owner's carve ruling (T003, resolved).
   for renderer component trees plus the call-site checker test with an initially empty
   per-tree identifier list (each story extends it in its own change) in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts
-- [ ] T008 FR-002 coverage test: all fourteen `settles` ids from
+- [x] T008 FR-002 coverage test: all fourteen `settles` ids from
   packages/studio/src/steps/stepDependencies.ts have exactly one registered provider module
   declaring `provides` / `requires` / `apply` / `renderer`, and each module's `requires`
   equals its step's declared `requires` (the parity 091 will rely on) in

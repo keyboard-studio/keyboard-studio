@@ -21,9 +21,24 @@
 // `orderDecisions` where the provides/requires graph is silent, so keep the
 // entries in walk order (decisions/orderParity.test.ts pins the result).
 
-import type { QuestionModule } from "../types.ts";
+import type { GalleryModule, QuestionModule } from "../types.ts";
 import type { DecisionId } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
+
+import windowsLayoutModule from "./gallery/windowsLayout.ts";
+import baseKeyboardModule from "./gallery/baseKeyboard.ts";
+import characterInventoryModule from "./gallery/characterInventory.ts";
+import marksTreatmentModule from "./gallery/marksTreatment.ts";
+import punctuationInventoryModule from "./gallery/punctuationInventory.ts";
+import invisiblesInventoryModule from "./gallery/invisiblesInventory.ts";
+import retainedConvenienceCharsModule from "./gallery/retainedConvenienceChars.ts";
+import carvedLayoutModule from "./gallery/carvedLayout.ts";
+import deadkeysDefinedModule from "./gallery/deadkeysDefined.ts";
+import ruleSetModule from "./gallery/ruleSet.ts";
+import physicalLayoutModule from "./gallery/physicalLayout.ts";
+import touchSeedSourceModule from "./gallery/touchSeedSource.ts";
+import touchLayoutModule from "./gallery/touchLayout.ts";
+import helpDocsModule from "./gallery/helpDocs.ts";
 
 import il_language_english from "./a/il_language_english.ts";
 import il_language_region from "./a/il_language_region.ts";
@@ -354,8 +369,43 @@ export const reserveOnlyModules: readonly QuestionModule[] = [
  * as a module by the shared contract suite (research addendum D-090-4).
  * Populated by spec 090 T008; the stories (US1–US5) fill in each module's
  * renderer/apply in place.
+ *
+ * Gallery modules are authored as GalleryModule<V> (apply/renderer typed on
+ * the decision's real value type); the cast to the heterogeneous
+ * QuestionModule happens once, here, at registry composition (research
+ * addendum D-090-1).
  */
-export const galleryModules: readonly QuestionModule[] = [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const galleryModuleList: readonly GalleryModule<any>[] = [
+  windowsLayoutModule,
+  baseKeyboardModule,
+  characterInventoryModule,
+  marksTreatmentModule,
+  punctuationInventoryModule,
+  invisiblesInventoryModule,
+  retainedConvenienceCharsModule,
+  carvedLayoutModule,
+  deadkeysDefinedModule,
+  ruleSetModule,
+  physicalLayoutModule,
+  touchSeedSourceModule,
+  touchLayoutModule,
+  helpDocsModule,
+];
+
+export const galleryModules: readonly QuestionModule[] = galleryModuleList.map(
+  (m) => m as QuestionModule,
+);
+
+/**
+ * The typed gallery module for a decision id, for the gallery host and its
+ * wrappers — the registry-side counterpart of `decisionIndex` that keeps
+ * the value type. Returns undefined for decisions no gallery module settles.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function galleryModuleFor(decisionId: DecisionId): GalleryModule<any> | undefined {
+  return galleryModuleList.find((m) => m.provides[0] === decisionId);
+}
 
 /**
  * The reserve / Leftover set (no-delete guardrail): every module physically
