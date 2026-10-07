@@ -324,7 +324,7 @@ jobs:
       # golden-walk-baseline artifact below), this step skips and the
       # verify step compares against the committed baseline.
       - name: Golden-walk baseline capture (from PR base, if uncommitted)
-        if: github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == ''
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -332,7 +332,7 @@ jobs:
           persist-credentials: false
 
       - name: Capture golden-walk baseline on base code
-        if: github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == ''
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
         run: |
           cp packages/studio/e2e/golden-walk.spec.ts .golden-base/packages/studio/e2e/
           cp -r packages/studio/e2e/helpers .golden-base/packages/studio/e2e/
@@ -410,7 +410,7 @@ jobs:
       # missing (never a vacuous pass). Last in the job so its
       # results.json does not displace the main lane's summary above.
       - name: Playwright (spec 089 golden walk, verify)
-        if: hashFiles('packages/studio/e2e/golden-walk.spec.ts') != ''
+        if: ${{ !cancelled() && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
         env:
           VITE_KM_MUTATE_SEAM: "1"
         run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk
