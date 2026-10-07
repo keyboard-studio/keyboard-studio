@@ -8,7 +8,6 @@ import { screen, fireEvent, act, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";

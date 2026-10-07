@@ -9,7 +9,6 @@ import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { installDialogShim } from "../dialogShim.ts";
 import {

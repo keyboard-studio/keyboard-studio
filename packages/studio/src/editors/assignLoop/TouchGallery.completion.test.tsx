@@ -8,7 +8,6 @@ import { screen, fireEvent, act, waitFor, within } from "@testing-library/react"
 import { render } from "../../test/renderWithI18n.tsx";
 import { TouchGallery } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";

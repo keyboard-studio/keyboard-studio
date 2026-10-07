@@ -61,7 +61,7 @@ records + retained gallery answers + orphans equals the fixture's answer count.
 
 ```bash
 pnpm --filter @keyboard-studio/studio test -- decisions/orderParity decisions/gateWalkParity steps/manifest steps/stepOrder.parity
-git diff --stat <088-base> -- packages/studio/src/decisions/orderParity.test.ts \
+git diff --stat 07356c2f -- packages/studio/src/decisions/orderParity.test.ts \
   packages/studio/src/decisions/gateWalkParity.test.ts packages/studio/src/steps/manifest.test.ts
 ```
 

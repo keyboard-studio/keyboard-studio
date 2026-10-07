@@ -73,7 +73,6 @@ import {
 import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionRecorder.ts";
 import type { SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { getDecisionSnapshot, selectTouchSeedSource } from "../stores/decisionStore.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveDesktopModifications } from "../lib/deriveDesktopModifications.ts";
