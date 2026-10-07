@@ -735,3 +735,56 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   delta (both walk alphabets are marks-free; the marks step records
   no entry in either walk). Regeneration remains T029's action. The
   2 touch_seed_source renderSmoke failures persist (pre-existing).
+
+- **D-090-17 — T024 retained-convenience-chars landed (implements
+  D-090-12; the tasks text's "applied view written by apply" is NOT
+  followed — D-090-12 ruled it outside 089's contract, flagged at the
+  T022/T023 checkpoints).** The module is real (renderer
+  `ConvenienceCharsStep` converted to `DecisionRendererProps`, new
+  `ConvenienceStepHost`, manifest swapped; `apply: () => ({})`,
+  `writes: []` — decisionIRPaths unchanged). Toggles record the value
+  live through onChange; the per-candidate boolean answers LEAVE
+  `surveyAnswerStore` (the step's `setStatus` calls stay — step status
+  is not a gallery answer). The completion result's
+  `retainedConvenienceChars` is computed from the recorded value:
+  `complete()` reconciles the record to the current candidate set
+  (record-if-changed) and builds the result from that same set, so
+  `recordPhase`'s session derivation and carve's read are unchanged.
+  Three design points the stub did not pin down: (1) **the value
+  carries `rejected: string[]`** alongside `retained` — the answer
+  booleans encoded a tri-state (saved-false = rejected; no record =
+  propose-then-confirm default), and a retained-only value would
+  silently un-keep any candidate that became surplus after the record
+  (the shape-change case, pinned by ConvenienceCharsStep.test's
+  spec-079 T048/T079 suite). A candidate in neither list is kept by
+  default. Same solution as the character inventory's `rejected`
+  field (T021). (2) **Per-item provenance (FR-006):** a candidate the
+  author acted on (toggle, keep-all, keep-none) records its chars as
+  `asked`; untouched candidates keep their recorded provenance or,
+  on a first record (including the completion reconciliation), the
+  proposal's `extracted`. (3) **Pre-T024 draft migration is a
+  step-level adoption shim:** restore cannot rebuild the value (the
+  candidate set is a live gate computation, unknown at restore time),
+  so the step, on its first settled `applies` render with no recorded
+  value but legacy answer-store booleans present, adopts them into
+  the value once (provenance `extracted`). T026 must keep the
+  convenience answers readable for this shim or retire it with the
+  slot. The not-applicable path records NO value (absent =
+  never-asked, mirroring the result's absent field — a `{retained: []}`
+  record would falsely read as "asked, kept nothing"); the `unknown`
+  path completes through `complete()` and records `{retained: []}`.
+  The manifest `persistence: "answer-store"` declaration is unchanged:
+  the step's status slot (not-asked/finished + evidence key) remains
+  answer-store state; T026 adjudicates the declaration. Value types
+  live in new `survey/convenience/convenienceValue.ts` (D-090-8 leaf),
+  re-exported by the module. Gates: tsc clean; eslint 0 errors (one
+  pre-existing lingui warning on untouched code); depcruise 131
+  (baseline holds, no new cycle); convenience battery 424/424 (incl.
+  the shape-change and unmount-persistence suites, coverage +
+  consistency); src/steps + useWorkToDo + carve 457/457;
+  surveyWriteObservability 57/57; StudioShell + draftPersistence
+  green. Golden walk: fresh-walk classification is byte-identical to
+  the T023 classification (the 7 known post-merge-signature deltas
+  per track) — T024 adds zero delta (convenience is not a walk step).
+  The 2 goldenWalk + 2 renderSmoke failures are the known pending
+  T029 regeneration and pre-existing items respectively.

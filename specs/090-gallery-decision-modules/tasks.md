@@ -176,7 +176,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   packages/studio/src/survey/marks/ContextToleranceStation.tsx; `apply` performs
   `applyMarkGuards` and the context-tolerance patch, and the reducer's MARKS handler is
   retired in packages/studio/src/steps/reducer.ts
-- [ ] T024 [P] [US2] `retained-convenience-chars` module in
+- [x] T024 [P] [US2] `retained-convenience-chars` module in
   packages/studio/src/survey/questions/gallery/retainedConvenienceChars.ts;
   `ConvenienceCharsStep` reports through `onChange` in
   packages/studio/src/survey/convenience/ConvenienceCharsStep.tsx; the

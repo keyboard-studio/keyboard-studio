@@ -34,7 +34,7 @@ import { stepDependencies } from "./stepDependencies.ts";
 import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
 import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
 import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
-import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
+import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
 import {
   identityStep,
   layoutStep,
@@ -229,7 +229,7 @@ const stepPool: readonly Step[] = [
     title: "Convenience letters",
     inputs: [],
     writes: [],
-    component: ConvenienceCharsStep,
+    component: ConvenienceStepHost,
     specRef: "specs/051-carve-orthography-trim",
     evidence: {
       inputs: ["surplus basic-Latin candidates on the base", "whether the orthography signal is known"],
