@@ -1959,3 +1959,85 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   audit gate stays green unregistered, as it was. Flag 2 needed
   no ruling (the lead confirmed the T045 fixture deltas are
   adjudicated at the gate by diff read; D-090-39/-40 stand).
+- **D-090-48 — T050's mechanism RULED by the lead (2026-10-07):
+  option (a), a real `decision` payload kind; US5 unblocked.**
+  The trail records decisions, not renderings of them: option
+  (b)'s synthesized survey-answers would pollute answer
+  bookkeeping with fabricated answers (rejected); (d) leaves the
+  HANDOFF G7 gap open across the downstream stack (rejected);
+  (c) was already rejected semantically in D-090-43. The format
+  amendment happens NOW, inside the stacked series that owns the
+  format, rather than after merge when consumers pin v2.
+  Ruled shape: contracts payload kind
+  `{kind:"decision", decisionId, value, summary}` — `value` is
+  the module's decision value as JSON (contracts validates it
+  as a JSON value via a recursive `JsonValue` schema, NOT
+  per-module schemas); `summary` is a bounded human-readable
+  string (DECISION_SUMMARY_LIMIT) produced by the recording
+  host, so trail rendering (headline / DecisionEntryRow /
+  prSummary) needs no per-module knowledge. Supersession:
+  `slotKeyOf` keys the kind by decisionId (the C-5 form,
+  step-independent); `payloadsEqual` compares decision values
+  by deep equality. `DECISION_RECORD_VERSION` bumps 2 → 3 with
+  staged read-time normalization: the v1 transforms (editor
+  count stripping, flat-impact lift) apply only to `version < 2`
+  records; a v2 record's entries load unchanged (they simply
+  contain no decision-kind entries) and only the version tag
+  advances — re-running the v1 transforms over v2 entries would
+  strip genuinely measured counts, the FR-005a failure
+  recordMigration.ts's header warns about.
+  **Scope determination (lead):** the contracts / engine /
+  trail-rendering files this requires are in-scope for T050
+  under this ruling, beyond 090's originally named files.
+  **Consumer census** (every `DecisionPayload` consumer,
+  verified by grep + read; disposition per consumer):
+  FIXED for the new kind — contracts/decisionRecord.ts (kind +
+  JsonValue + version), contracts/schemas.ts (payload arm +
+  guard), engine/decision-audit/record.ts (serialize arm —
+  the base-contribution fall-through would have corrupted the
+  entry), engine/decision-audit/recordMigration.ts (staged
+  normalization), engine/decision-audit/prSummary.ts (decision
+  arm returns the recorded summary), studio
+  decisionLogStore.ts (slotKeyOf + payloadsEqual arms),
+  studio headline.ts + DecisionEntryRow.tsx (headline renders
+  the summary verbatim — author-facing content, the
+  payload.value exemption), studio stageGroups.ts +
+  DecisionTrailView.tsx (a stage of decision entries rolls up
+  as decisions, not "answers"), studio
+  historyProposalSeed.ts (explicit ignore arm — gallery
+  decisions contribute neither characters nor editor counts).
+  TOLERATES unchanged (verified ignore/guard arms): engine
+  shed.ts + sidecar.ts (payload-agnostic), studio impact.ts +
+  counterfactualProjection.ts + progressDots.ts +
+  StudioShell's recorded-hash scan (survey-answer guards skip
+  the kind), crashCallerContext.ts (reads `kind` as a string),
+  DecisionEntryRow's jump location (non-survey entries locate
+  by step).
+  **Recording design (R6 executed):** decision-driven at step
+  completion — `createDecisionRecorder` gains an injected
+  `getStepDecisions(stepId)` (composed by
+  createStudioDecisionRecorder from `settlesForStep` + the
+  live decision set, wired in StudioShell), and a new
+  recordGalleryDecisions.ts appends exactly one entry per
+  settled gallery decision of the completing step. The log's
+  own append semantics make it exactly-once: same slot +
+  deep-equal value + same provenance is the identical-revisit
+  no-op; a changed value supersedes. Provenance maps from the
+  decision record's vocabulary (asked → hand-set; extracted →
+  base-derived/base; default → tool-proposed (+ source when it
+  names a DecisionProposalSource); derived → tool-proposed).
+  The entries join the boundary capture's co-decision set
+  (FR-019 joint attribution), like the editor entry does.
+  **Premise determination on T050's removal clause:** "answer-
+  driven recording for migrated steps is removed in reducer.ts"
+  has no referent in the landed code — verified: no survey
+  answer carries a gallery question id (gallery modules are in
+  no flow) and no non-gallery module provides any of the
+  fourteen ids, so `recordAnswersAsDecisions` cannot write a
+  gallery decision and nothing double-records today. No
+  removal is made; exactly-once holds by construction (C-5
+  answer slots and decision slots are disjoint key spaces).
+  The carve / mechanisms / touch steps keep their spec-053
+  editor-action entries beside the new decision entries — the
+  editor entry occupies the step's editor slot, not the
+  decision's slot, and SC-003's exactly-one is per decision.
