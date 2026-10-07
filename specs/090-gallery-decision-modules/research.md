@@ -1061,3 +1061,26 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   are historical prose only (specs 047/050 as-built documents,
   engine source comments, one e2e comment narrating the old
   durability argument).
+
+- **D-090-21 — T028 verified: what remained after T025's early
+  discharge.** T025's suite rename (phaseBDraftStore.test.ts →
+  survey/phaseBDraftOps.test.ts, D-090-18) discharged the ops-level
+  re-point; the marks contract + guards-determinism suite landed at
+  T023 and the convenience contract at T024. Verified present and
+  green at this checkpoint: marksTreatment.test.tsx (8 cases,
+  incl. `runApplyDeterministically` over the guards + the
+  context-tolerance patch), retainedConvenienceChars.test.ts
+  (contract + no-op apply), and the T028 reload test — already
+  present as draftPersistence.test.ts's round-trip family ("the
+  build-list alphabet folds into the durable draft round-trip",
+  decisions-carried since T021: restores the in-progress alphabet,
+  digraphs, and font from the `decisions` slice; the legacy-slice
+  variants beside it are T025's migration tests). Written new at
+  T028, in the house contract shape: characterInventory.test.ts
+  (contract — requires pinned to the step's declared three; no-op
+  apply determinism; extract probe: undefined on null/empty IR,
+  produced set seeded with `base` provenance, deterministic),
+  punctuationInventory.test.ts and invisiblesInventory.test.ts
+  (contract + deterministic no-op apply over InventoryDecisionValue
+  fixtures). Batch: the five gallery suites + draftPersistence
+  130/130.

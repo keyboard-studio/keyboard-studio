@@ -196,7 +196,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   accept/decline actions, the marks `saveAnswer` ids, the characters addition write) in
   eslint.config.mjs and packages/studio/src/decisions/galleryWriteAudit.test.ts; SC-004 grep
   recorded: zero references to `phaseBDraftStore`
-- [ ] T028 [US2] Tests: contract + determinism for the five modules (the marks `apply`
+- [x] T028 [US2] Tests: contract + determinism for the five modules (the marks `apply`
   determinism case covers both the guards and the context-tolerance patch) in
   packages/studio/src/survey/questions/gallery/characterInventory.test.ts,
   packages/studio/src/survey/questions/gallery/marksTreatment.test.ts,
