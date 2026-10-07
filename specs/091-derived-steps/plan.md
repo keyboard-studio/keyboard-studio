@@ -370,3 +370,50 @@ Verified against the landed tree (merge 54fe4883), not the plan's assumptions:
   restore module-level gates; (b) express the project_name fork as
   cross-flow routing on `track_choice` (changes what the live runner
   reads — 092's territory, not attempted).
+
+## Phase 6 record (2026-10-07) — T023/T025/T026 outcomes
+
+- **T023** landed: `lib/legacyStepIds.test.ts` — all 18 inventoried ids
+  resolve through the map + `resolveLocation` to the screen holding the
+  step's decisions (oracle provides ⊆ derived screen decisionIds);
+  `done`/`unsupported` pass through.
+- **T025** landed: `docs/architecture.md` (manifest shape without
+  `flowRefs`; order derivation now names `deriveScreens`) and
+  `docs/carve-gallery-flow.md` §1 updated; no other live docs referenced
+  the retired machinery (specs/archive excluded per the task).
+- **T026 full gates**: studio suite 494 files / 8724 tests — 8708 passed,
+  1 skipped, 15 failed, classified by bisection against the Step-0 merge
+  commit `54fe4883` (temp worktree, symlinked node_modules):
+  - **091 fallout, fixed**: `StudioShell.test.tsx` M4/M4b ×2 (asserted
+    `step.gatedBy`, deleted by T014; now read the derived `screenGates`).
+    File green standalone (66/66) after the fix.
+  - **Inherited from the stacked 090 in-flight base** (all fail
+    identically at `54fe4883`): registry inventory 114→128 and membership
+    groups (the 14 gallery modules are 090's migration state),
+    marksTreatment definition-contract snapshot (writes [] → [groups,
+    stores] from 090's US2), windowsLayout renderer provenance test,
+    goldenWalk ×2 (an extra `record` mutation at the layout step —
+    090's gallery recording vs the committed fixture), renderSmoke ×2
+    (touch_seed_source stub host), orphan-input-lint ×1. These belong to
+    090's completion and its restack, not to 091; NOT fixed here.
+  - **Pre-existing local-corpus SC-004** ×4 (arabic_izza, basic_kbdru),
+    documented since 088.
+  - `tsc --noEmit` clean. `pnpm lint`: eslint stage 0 errors (398
+    warnings, repo-wide norm); depcruise reports 130 `no-circular`
+    errors, every chain running through the inherited
+    `survey/types → workingCopyStore → stepOrder → stepDependencies →
+    flowModules` cycle named in the kickoff brief (fix `030bf59c` lands
+    via 090's merge of km/decision-apply) — no chain passes through any
+    091 derivation module; the derivation stays cycle-free. Downstream
+    custom lints were not reached past depcruise, except
+    `i18n-catalog-lint`, run standalone: PASS (catalogs in sync, ids in
+    order — independent FR-006 confirmation; the branch diff also shows
+    zero message-id changes: the only descriptor change is the
+    SCREEN_TITLE_MESSAGES map KEY `phase_f_helpdocs` → `help`, id
+    `step.phaseF.title` byte-identical).
+- **Held, unchanged**: T016 (deletion + flip inventory above), T017
+  landing gate (report-only block green in the full run), T019 (live
+  verification), T024 (constitution, lands with T016). T027's
+  spec↔plan↔tasks self-analyze is consistent (every FR has landing
+  tasks; open items are exactly the four holds); the km-lead review
+  cycle and the PR are the lead's step.

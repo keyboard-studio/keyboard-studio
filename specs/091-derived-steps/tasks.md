@@ -202,7 +202,7 @@ screens consistently.
 
 **Purpose**: Close the remaining success criteria and the series-level obligations.
 
-- [ ] T023 [P] Write the SC-005 inventory test: a test that lists every step id on `main` at
+- [x] T023 [P] Write the SC-005 inventory test: a test that lists every step id on `main` at
   18e63aa4 (the 18 ids in research.md, named in the test) and asserts each resolves through
   `legacyStepIds.ts` + resolveLocation to the screen holding that step's decisions, with
   `done`/`unsupported` passing through — in packages/studio/src/lib/resolveLocation.test.ts
@@ -211,10 +211,10 @@ screens consistently.
   .specify/memory/constitution.md to name the derived screens as the step source, with the
   version footer bumped, in the same change that deletes the file (Governance: the article
   follows the change that prompts it)
-- [ ] T025 [P] Sweep docs/ and the dashboard/Flow Map docs for live references to
+- [x] T025 [P] Sweep docs/ and the dashboard/Flow Map docs for live references to
   `stepDependencies.ts`, `flowRefs` and `settles` as current machinery and update or retire
   them (historical spec text under specs/_archive and landed spec docs are not rewritten)
-- [ ] T026 Run the full gates from quickstart.md §5 on the phase result: studio typecheck,
+- [x] T026 Run the full gates from quickstart.md §5 on the phase result: studio typecheck,
   the studio vitest suite through the package (never bare vitest at root), and `pnpm lint`
   including depcruise (the decisions/ derivation must stay cycle-free); fix only 091 fallout
 - [ ] T027 Run `/speckit-analyze` (spec ↔ plan ↔ tasks consistency) and one scoped km-lead

@@ -1547,7 +1547,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 //   2. The survey advances through steps in manifest order.
 //   3. applyStepCompletion is called (side effects fire) for mechanisms/touch.
 
-import { manifest } from "./steps/manifest.ts";
+import { manifest, screenGates } from "./steps/manifest.ts";
 import { STEP_TRAILS } from "./steps/stepOrder.ts";
 import * as StudioShellModule from "./StudioShell.tsx";
 
@@ -1587,7 +1587,9 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
   it("project_name is a derived side trail (gated) rejoining at 'characters' (M4b, P0 fix)", () => {
     const projName = manifest.find((s) => s.id === "project_name");
     expect(projName).toBeDefined();
-    expect(projName?.gatedBy).toBeDefined();
+    // Spec 091 T014/T015: steps no longer carry gatedBy — the gate is the
+    // derived screen gate published as screenGates by steps/manifest.ts.
+    expect(screenGates.get("project_name")).toBeDefined();
     expect(STEP_TRAILS.get("project_name")).toEqual({ spine: false, joinTarget: "characters" });
   });
 
@@ -1603,7 +1605,8 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
   it("touch_seed_source is a derived side trail (gated) rejoining at 'touch' (M4)", () => {
     const seedSource = manifest.find((s) => s.id === "touch_seed_source");
     expect(seedSource).toBeDefined();
-    expect(seedSource?.gatedBy).toBeDefined();
+    // Spec 091 T014/T015: the gate is the derived screen gate (screenGates).
+    expect(screenGates.get("touch_seed_source")).toBeDefined();
     expect(STEP_TRAILS.get("touch_seed_source")).toEqual({ spine: false, joinTarget: "touch" });
   });
 
