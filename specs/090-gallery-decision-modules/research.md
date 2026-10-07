@@ -1780,3 +1780,22 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   ×2 + scroll + smoke green; deepLinkRevision 4/4; progression +
   TouchGallery.suggestions 42/42; eslint 0 errors on changed
   files.
+- **D-090-41 — T044 landed: contract + determinism tests for both
+  US4 modules.** `physicalLayout.test.ts` / `touchLayout.test.ts`:
+  module contract (provides/requires/writes/renderer/extract),
+  the no-op applies under the SC-005 frozen-stores harness
+  (`runApplyDeterministically`) with pass-2 pins, value-builder
+  tests (selector fidelity + copy semantics for physical;
+  snapshot copy + deletion-order for touch), store-level
+  `current*Value` reads, and the spec-014 R6 scenario at store
+  level through the real R1 completion path. R6's refresh
+  observable, as the landed architecture actually implements it:
+  Case B scaffolding preserves the existing layout and augments
+  deadkey successors — so the scenario's input change is a new
+  S-02 pattern (successor "ç" for K_C, engine longpress fixture
+  shape), the refresh is the gained `sk[]` entry on the
+  physical-suggested key, hand-set keys survive byte-identical,
+  and the orphaned hand-set key (authored "ʒ" on K_Z, which no
+  desktop derivation produces — a from-scratch scaffold gives
+  K_Z only template content) is kept with its content intact.
+  16/16 green; tsc 0; eslint clean.

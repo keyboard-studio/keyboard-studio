@@ -337,12 +337,16 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
   `deleteTouchKey` in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the assignLoop
   trees
-- [ ] T044 [US4] Tests: contract + determinism for both `apply`s (R1 lock effect, R2 JSON
+- [x] T044 [US4] Tests: contract + determinism for both `apply`s (R1 lock effect, R2 JSON
   build) in packages/studio/src/survey/questions/gallery/physicalLayout.test.ts and
   packages/studio/src/survey/questions/gallery/touchLayout.test.ts; a store-level scenario in
   packages/studio/src/survey/questions/gallery/touchLayout.test.ts: suggested keys refresh on
   an input change, hand-set keys survive, an orphaned hand-set key is kept and shown
-  (spec 014 R6)
+  (spec 014 R6) — Landed (D-090-41): contract + SC-005 determinism + pass-2
+  pins for both no-op applies (the R1/R2 effects themselves are pinned in
+  lib/assignLoopCompletion.test.ts), value-builder tests, and the R6
+  scenario at store level through the real completion path (refresh =
+  deadkey-successor augmentation, the landed Case B mechanism). 16/16.
 - [ ] T045 [US4] **Gate + PR**: golden walk byte-identical; StepHost golden-walk parity green;
   studio suite, `tsc`, `pnpm lint` green; open the US4 PR with the gate results in its body
 
