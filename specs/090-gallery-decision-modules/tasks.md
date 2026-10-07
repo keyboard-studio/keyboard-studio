@@ -188,7 +188,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   `phaseBDraft` slice (written between 088 landing and this change) migrates its
   accept/decline state into the inventory decision values on load, with unmappable entries
   surfaced, never dropped (087 Q5 precedent)
-- [ ] T026 [US2] Narrow `surveyAnswerStore` to within-step view position: the gallery answers
+- [x] T026 [US2] Narrow `surveyAnswerStore` to within-step view position: the gallery answers
   migrated by US1 + this phase leave the store (zero gallery answer ids remain), and the
   store's header documents the narrowed role (research Q4 — name kept) in
   packages/studio/src/stores/surveyAnswerStore.ts

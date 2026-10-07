@@ -1446,3 +1446,29 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   reconstruct the overlay from carved-layout decision values
   during replay; 092's T037 (prefillCarveDispositions) remains
   pending on carve until that fold exists.
+
+- **D-090-32 — T026 executed under ruling D-090-29 (option (a)).**
+  `steps/types.ts`: `"decision-store"` added to
+  `PersistenceDeclaration` (with the vocabulary note; `phase-b-draft`
+  stays as defined-but-unused 079 vocabulary). `steps/manifest.ts`:
+  characters / marks / punctuation / invisibles / convenience
+  re-declared `decision-store`, each manifest comment naming its
+  answer-store residue (characters: sub-screen position +
+  manual-path answers; marks: per-toggle evidence answers +
+  step-status slot; punctuation: one evidence answer; invisibles:
+  none — writes retired in full at T022; convenience: step-status
+  slot + the legacy-boolean adoption shim's read source).
+  `specs/079-.../step-classification.md`: the five rows amended in
+  lockstep plus the amendment note recording that spec 090
+  superseded those cells. `surveyAnswerStore.ts` header now
+  documents the narrowed role (no gallery DECISION is held there;
+  the evidence layer + status/position residue + shim source are
+  the sanctioned remainder). Census re-verified at execution: the
+  only gallery `saveAnswer` call sites left in src are the evidence
+  layer itself (MarksSeriesStep per-toggle, CharactersStep:147
+  additions, PunctuationStep:481 inventory answer) — zero gallery
+  decision values in the store. FR-003 sites updated per the
+  ruling's scope determination (D-090-29): the deferred
+  marks/characters/punctuation `saveAnswer` bans are recorded as
+  NOT registered in both list files, as a scope determination for
+  T060 to read, not an exception.

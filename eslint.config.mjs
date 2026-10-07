@@ -50,8 +50,11 @@ const GALLERY_WRITE_IDENTIFIERS = [
 // A `saveAnswer` ban additionally applies to the two trees whose answer
 // writes US2 retired in full (invisibles, convenience). The marks /
 // characters / punctuation trees still call saveAnswer as the spec-079
-// evidence layer — that ban is deferred to the T026 persistence ruling
-// (research D-090-19/D-090-20), mirroring the checker test's lists.
+// evidence layer — and no ban applies to them: the T026 ruling
+// (research D-090-29) determined that layer is spec 079's own draft
+// surface, outside FR-003's banned category (gallery components writing
+// answers in place of decision records). Mirrors the checker test's
+// lists.
 const GALLERY_RENDERER_TREES_US2 = [
   "packages/studio/src/survey/CharactersStep.tsx",
   "packages/studio/src/survey/PhaseB.tsx",
@@ -184,8 +187,9 @@ export default [
   {
     // Spec 090 FR-003 layer 2 overlay, US2 (T027): invisibles and
     // convenience retired their answer writes in full, so `saveAnswer`
-    // is banned there today. Marks / characters / punctuation follow
-    // with the T026 ruling (research D-090-19/D-090-20).
+    // is banned there today. Marks / characters / punctuation do NOT
+    // follow: their saveAnswer calls are the spec-079 evidence layer,
+    // ruled outside the banned category (research D-090-29).
     files: GALLERY_RENDERER_TREES_US2_ANSWER_FREE,
     ignores: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {

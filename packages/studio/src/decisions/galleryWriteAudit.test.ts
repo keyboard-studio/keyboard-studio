@@ -98,14 +98,18 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
     ],
     identifiers: ["usePhaseBDraftStore"],
   },
-  // NOT YET REGISTERED, by design (T027, D-090-20): a `saveAnswer` ban
-  // over the marks / characters / punctuation trees. Those calls are the
-  // spec-079 answer-store evidence layer — marks' per-toggle answers
-  // (D-090-16(2)), characters' addition answers, punctuation's inventory
-  // answer — whose fate is the T026 persistence adjudication (D-090-19),
-  // stopped for the lead's ruling. Registering the ban now would either
-  // red this gate or pre-decide that ruling; the ban (or its ruled
-  // exception) lands with T026's resolution and is asserted at T060.
+  // NOT REGISTERED — ruled scope determination (T026, D-090-29, lead
+  // ruling on D-090-19/D-090-20): there is no `saveAnswer` ban over the
+  // marks / characters / punctuation trees, and none is pending. Those
+  // calls are the spec-079 answer-store evidence layer — marks'
+  // per-toggle answers (D-090-16(2)), characters' addition answers,
+  // punctuation's inventory answer — which is spec 079's own draft
+  // surface (the answer store's sanctioned narrowed role after T026),
+  // not a gallery write-around: FR-003's ban targets gallery components
+  // writing answers IN PLACE OF decision records, and these calls are
+  // the within-step draft state the decision values are composed from.
+  // This is a scope determination, not an exception: T060's
+  // zero-exceptions assertion reads on the banned category so defined.
 ];
 
 /** A single banned call site found in a source text. */
