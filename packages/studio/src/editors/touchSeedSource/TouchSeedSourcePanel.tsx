@@ -40,8 +40,9 @@
 // selection than the currently recorded choice, while an in-progress touch
 // draft exists, warns before the confirm click — surfaced via the confirm
 // button's label/state, not a browser dialog (no window.confirm in this repo).
-// The actual touchDraft clear happens in surveySessionStore.setTouchSeedSource
-// (already wired) — this panel only decides whether to show the warning.
+// The actual touchDraft clear happens in this panel's confirm handler, at
+// the moment the new seed decision is recorded (spec 088 D-06) — the
+// warning here only decides whether to show it first.
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -51,7 +52,8 @@ import { emitTouchLayout } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore, type TouchSeedSource } from "../../stores/surveySessionStore.ts";
+import { type TouchSeedSource } from "../../stores/surveySessionStore.ts";
+import { selectTouchSeedSource, useDecisionStore } from "../../stores/decisionStore.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
@@ -224,8 +226,9 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
-  const storedSeedSource = useSurveySessionStore((s) => s.touchSeedSource);
-  const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
+  // Spec 088 FR-005: the recorded choice is the `touch-seed-source`
+  // decision in the decision store (the session field is deleted).
+  const storedSeedSource = useDecisionStore((s) => selectTouchSeedSource(s.decisions));
 
   // Desktop modifications to replay onto the seed preview (spec 035 R3) —
   // same read/derive pattern as TouchGallery's own `mods` memo (carve
@@ -356,7 +359,20 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
   const showDraftWarning = isChangingRecordedChoice && touchDraft !== null;
 
   function handleConfirm(): void {
-    setTouchSeedSource(selected);
+    // Spec 088 T026 (research D-06): recording a DIFFERENT seed value clears
+    // the working copy's touch draft HERE, at the decision's writer — its
+    // charTouch entries reference host keys of the other seed and would
+    // half-apply. A no-op re-confirm of the same value leaves it untouched.
+    // (This side effect used to ride on the session store's seed setter.)
+    if (selected !== storedSeedSource) {
+      useWorkingCopyStore.getState().setTouchDraft(null);
+    }
+    useDecisionStore.getState().record({
+      id: "touch-seed-source",
+      value: selected,
+      provenance: "asked",
+      step: "touch_seed_source",
+    });
     onComplete(undefined);
   }
 

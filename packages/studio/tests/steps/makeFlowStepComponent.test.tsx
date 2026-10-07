@@ -88,10 +88,12 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
 // copy's history-entry state + validator findings. It writes NOTHING.
 // ---------------------------------------------------------------------------
 
+
 vi.mock("../../src/stores/surveySessionStore.ts", () => ({
   useSurveySessionStore: (selector: (s: unknown) => unknown) => {
     const store = {
       localBase: { displayName: "Test Base" },
+
     };
     return selector(store);
   },
@@ -110,6 +112,7 @@ vi.mock("../../src/stores/decisionStore.ts", () => ({
   },
   selectTrack: () => null,
 }));
+
 
 vi.mock("../../src/stores/workingCopyStore.ts", () => ({
   useWorkingCopyStore: (selector: (s: unknown) => unknown) => {
@@ -208,6 +211,7 @@ describe("makeFlowStepComponent", () => {
     it("forwards the UNTOUCHED SurveyPhaseResult to onComplete when extract succeeds (spec 089)", async () => {
       const onCompleteSpy = vi.fn();
 
+
       const TrackComponent = makeFlowStepComponent(buildTrackOptions());
 
       await act(async () => {
@@ -217,6 +221,7 @@ describe("makeFlowStepComponent", () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId("fsh-complete"));
       });
+
 
       // onComplete receives the UNTOUCHED SurveyPhaseResult, not the extracted
       // `{ track: "copy" }` — StepHost's generic completion path (recordPhase /

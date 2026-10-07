@@ -44,9 +44,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useDecisionStore } from "../stores/decisionStore.ts";
 import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import {
+  decisionsWithoutTouchSeed,
+  selectTrack,
+  useDecisionStore,
+} from "../stores/decisionStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
@@ -103,7 +107,10 @@ export function StudioFooter() {
   // ---------------------------------------------------------------------------
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   const history = useSurveySessionStore((s) => s.history);
-  const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
+  // Spec 088 FR-005: the track is a decision-store selector now; the
+  // session field it used to be read from is deleted. (Reads the `decisions`
+  // subscription from the project-label block above.)
+  const selectedTrack = selectTrack(decisions);
   // `visited` is the high-water mark `isReached` now keys on (see
   // surveySessionStore.ts). Omitting it here is not a cosmetic gap: the ROW
   // would go on rendering the author's finished-but-jumped-behind stages as
@@ -155,12 +162,14 @@ export function StudioFooter() {
         selectedTrack,
         visited,
       } as unknown as ResolveContext["traversal"],
+      // Spec 088 C-3.2: the gate view over the decision store, seed omitted.
+      decisions: decisionsWithoutTouchSeed(decisions),
       hasProject,
       // Without this, a dot naming a gallery character would refuse itself as
       // `question-not-in-build` — a character has no questionRegistry entry.
       stepPositions: stepPositionIds(walks),
     }),
-    [activeStepId, history, selectedTrack, visited, hasProject, walks],
+    [activeStepId, history, selectedTrack, decisions, visited, hasProject, walks],
   );
 
   // spec 079 R-10/T062: which step's mark(s) show a "work waiting" badge,

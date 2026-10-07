@@ -63,19 +63,19 @@ describe("surveySessionStore", () => {
     const store = getStore();
     store.advance("choose_base");
     store.advance("track");
-    store.setSelectedTrack("copy");
+
 
     // Confirm non-initial state
     expect(getStore().activeStepId).toBe("track");
     expect(getStore().history.length).toBe(2);
-    expect(getStore().selectedTrack).toBe("copy");
+
 
     getStore().reset();
 
     const s = getStore();
     expect(s.activeStepId).toBe("identity");
     expect(s.history).toEqual([]);
-    expect(s.selectedTrack).toBeNull();
+
     expect(s.localBase).toBeNull();
     expect(s.baseConfirmed).toBe(false);
     // Spec 089 T017: the identity/scaffold slots are gone from the session
@@ -84,6 +84,10 @@ describe("surveySessionStore", () => {
     expect("identityPhaseResult" in s).toBe(false);
     expect("surveyContext" in s).toBe(false);
     expect("scaffoldSpec" in s).toBe(false);
+    // Spec 088 FR-005: the track and touch-seed slots are likewise gone —
+    // they are decisions now (authoring-track / touch-seed-source).
+    expect("selectedTrack" in s).toBe(false);
+    expect("touchSeedSource" in s).toBe(false);
   });
 
   // hydrate() bulk-restores every value slot from a serialized draft
@@ -92,7 +96,7 @@ describe("surveySessionStore", () => {
     const snapshot = {
       activeStepId: "track" as const,
       history,
-      selectedTrack: "copy" as const,
+
       localBase: null,
       charactersSubStage: "B" as const,
     };
@@ -102,7 +106,7 @@ describe("surveySessionStore", () => {
     const s = getStore();
     expect(s.activeStepId).toBe("track");
     expect(s.history).toEqual(["identity", "choose_base"]);
-    expect(s.selectedTrack).toBe("copy");
+
     expect(s.charactersSubStage).toBe("B");
 
     // The restored history is a copy — advancing must not mutate the snapshot's array.

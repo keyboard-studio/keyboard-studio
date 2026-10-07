@@ -32,6 +32,7 @@ import {
   selectTouchSeedSource,
   useDecisionStore,
 } from "../stores/decisionStore.ts";
+import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
 import {
   usePhaseBDraftStore,
@@ -2478,6 +2479,134 @@ describe("draftPersistence", () => {
       expect(migrateDraftEnvelope(v2)?.envelope).toEqual(v2);
       expect(migrateDraftEnvelope(null)).toBeNull();
       expect(migrateDraftEnvelope("nope")).toBeNull();
+    });
+  });
+
+  describe("spec 088 US3 — v1 draft end-to-end (SC-003) + orphan surfacing (T030)", () => {
+    const fixtureRaw = readFileSync(
+      path.join(currentDir, "__fixtures__", "v1-draft-18e63aa4.json"),
+      "utf8",
+    );
+    const V1_KEY = "ks.draft.fixture_keyboard.v1";
+
+    interface V1FixtureStep {
+      answers?: Record<string, { value?: unknown; [k: string]: unknown }>;
+    }
+    interface V1FixtureDraft {
+      surveyAnswers?: { steps?: Record<string, V1FixtureStep> };
+      traversal?: { selectedTrack?: string };
+      [k: string]: unknown;
+    }
+
+    function fixtureVariant(mutate: (draft: V1FixtureDraft) => void): string {
+      const draft = JSON.parse(fixtureRaw) as V1FixtureDraft;
+      mutate(draft);
+      return JSON.stringify(draft);
+    }
+
+    it("T027: loadDraft finds the .v1 key, migrates it, and opens the project with the answers as decisions", () => {
+      localStorage.setItem(V1_KEY, fixtureRaw);
+
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+
+      const decisions = getDecisionSnapshot();
+      expect(decisions["language-code"]).toMatchObject({ value: "fr", step: "identity" });
+      expect(decisions["copyright-holder"]).toMatchObject({ value: "Fixture Author" });
+      expect(decisions["authoring-track"]).toMatchObject({ value: "copy" });
+      expect(decisions["project-display-name"]).toMatchObject({ value: "Fixture Keyboard" });
+      expect(decisions["project-keyboard-id"]).toMatchObject({ value: "fixture_keyboard" });
+      // The project actually opened: the working copy was restored.
+      expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+    });
+
+    it("T028: an answer whose question id is absent from the registry becomes exactly one orphan — full accounting", () => {
+      const variant = fixtureVariant((draft) => {
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
+      });
+
+      const result = migrateDraftEnvelope(JSON.parse(variant));
+      expect(result).not.toBeNull();
+      expect(result!.migrationOrphans).toEqual([
+        { questionId: "zz_removed_question", stepId: "identity", value: "orphan-value" },
+      ]);
+
+      // 100% accounting: 6 v1 answers = 5 decision records + 0 retained
+      // gallery answers (the fixture has no settles-step answers) + 1 orphan.
+      const totalAnswers = Object.values(
+        (JSON.parse(variant) as V1FixtureDraft).surveyAnswers?.steps ?? {},
+      ).reduce(
+        (n: number, step: V1FixtureStep) => n + Object.keys(step.answers ?? {}).length,
+        0,
+      );
+      const recordCount = Object.keys(result!.envelope.decisions ?? {}).length;
+      const retainedCount = Object.values(result!.envelope.surveyAnswers?.steps ?? {}).reduce(
+        (n: number, step) => n + Object.keys(step.answers ?? {}).length,
+        0,
+      );
+      expect(totalAnswers).toBe(6);
+      expect(recordCount + retainedCount + result!.migrationOrphans.length).toBe(totalAnswers);
+    });
+
+    it("T029: a session-field/answer disagreement migrates with the session value winning, and logs it", () => {
+      const variant = fixtureVariant((draft) => {
+        if (draft.traversal) draft.traversal.selectedTrack = "adapt"; // track_choice answer stays "copy"
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        const result = migrateDraftEnvelope(JSON.parse(variant));
+        expect(result!.envelope.decisions?.["authoring-track"]).toMatchObject({ value: "adapt" });
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("session field for authoring-track disagrees"),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("T030: loading a v1 draft with an orphan writes it to the decision trail, carrying its value, exactly once", () => {
+      const variant = fixtureVariant((draft) => {
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
+      });
+      localStorage.setItem(V1_KEY, variant);
+
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+
+      const orphanEntries = () =>
+        useDecisionLogStore.getState().record.entries.filter(
+          (e) => e.payload.kind === "survey-answer" && e.payload.questionId === "zz_removed_question",
+        );
+      expect(orphanEntries()).toHaveLength(1);
+      expect(orphanEntries()[0]).toMatchObject({
+        stepId: "identity",
+        provenance: { agency: "hand-set" },
+        payload: { kind: "survey-answer", questionId: "zz_removed_question", value: "orphan-value" },
+      });
+
+      // Re-applying the same v1 draft does not duplicate the trail entry.
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+      expect(orphanEntries()).toHaveLength(1);
     });
   });
 

@@ -54,8 +54,15 @@ const REGISTRY = {
   some_optional_question: {},
 };
 
+function decisionsForTrack(track: "copy" | "adapt" | null | undefined): ResolveContext["decisions"] {
+  // Spec 088: gates read the decision set; the fixture's track lives there.
+  return track === null || track === undefined
+    ? {}
+    : { "authoring-track": { id: "authoring-track" as const, value: track, provenance: "asked" as const } };
+}
+
 function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
-  return {
+  const base: ResolveContext = {
     manifest,
     questionRegistry: REGISTRY,
     traversal: traversal({
@@ -63,9 +70,18 @@ function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
       history: ["identity", "layout", "choose_base", "track"],
       selectedTrack: "adapt",
     }),
+    decisions: decisionsForTrack("adapt"),
     hasProject: true,
-    ...overrides,
   };
+  const merged = { ...base, ...overrides };
+  // A test overriding only the traversal still means its track: re-derive
+  // the gate set from the merged traversal unless decisions were overridden.
+  if (overrides.decisions === undefined && overrides.traversal !== undefined) {
+    merged.decisions = decisionsForTrack(
+      (overrides.traversal as { selectedTrack?: "copy" | "adapt" | null }).selectedTrack,
+    );
+  }
+  return merged;
 }
 
 function answerEntry(

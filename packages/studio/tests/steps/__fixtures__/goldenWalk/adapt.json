@@ -10,6 +10,9 @@
       "recordPhase",
       "setAttribution"
     ],
+    "decisionMutations": [
+      "recordAll"
+    ],
     "navigateTo": []
   },
   {
@@ -19,6 +22,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -31,6 +35,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -44,6 +49,9 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [
+      "recordAll"
+    ],
     "navigateTo": []
   },
   {
@@ -53,6 +61,7 @@
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -69,6 +78,7 @@
       "recordPhase",
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -80,6 +90,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -93,6 +104,7 @@
       "recordPhase",
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -104,6 +116,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -113,6 +126,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -122,6 +136,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -135,6 +150,7 @@
     "workingCopyMutations": [
       "lockDesktop"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -144,6 +160,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -158,6 +175,7 @@
       "setTouchLayoutJson",
       "setHistoryEntryState"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -171,6 +189,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": [
       "output"
     ]

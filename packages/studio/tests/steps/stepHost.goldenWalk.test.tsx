@@ -14,6 +14,7 @@
 //   2. `surveySessionStore` mutators (advance, popHistory, setLocalBase,
 //      setBaseConfirmed, setCharactersSubStage) AND `decisionStore` mutators
 //      (record, recordAll, forget) — injected via the stores' setState so
+
 //      the spy still executes the real logic.  Records call order.
 //      Spec 089: the identity/track/project effects that used to be session
 //      setters (setIdentityResult, setSurveyContext, setSelectedTrack,
@@ -217,6 +218,13 @@ interface WalkEntry {
    * centralised StepHost completion path per research R7).
    */
   workingCopyMutations: string[];
+  /**
+   * Decision-store mutator names in call order (spec 088). The completion
+   * writer (recordAll via StudioShell's injected deps) and the flow
+   * onCommit record for the track step land here — this is where the track
+   * choice is visible now that the session store no longer carries it.
+   */
+  decisionMutations: string[];
   navigateTo: string[];
 }
 
@@ -227,6 +235,7 @@ interface WalkEntry {
 const SESSION_MUTATOR_NAMES = [
   "advance",
   "popHistory",
+
   "setLocalBase",
   "setBaseConfirmed",
   "setCharactersSubStage",
@@ -294,7 +303,10 @@ function createRecorder() {
     }
   }
 
-  // 3b. Decision-store mutator spies — same pattern (spec 089).
+  // 3b. Decision-store mutator spies — same pattern (specs 088+089). One
+  // installation feeds BOTH collections: storeMutations (interleaved with
+  // the session/working-copy calls, via storeSpies below — the A6 order
+  // evidence) and decisionMutations (the decision-only view, spec 088).
   const decisionSpies: Record<string, ReturnType<typeof vi.fn>> = {};
   {
     const store = useDecisionStore.getState();
@@ -325,6 +337,7 @@ function createRecorder() {
     navigateToMock.mockClear();
     for (const spy of Object.values(storeSpies)) spy.mockClear();
     for (const spy of Object.values(wcSpies)) spy.mockClear();
+    for (const spy of Object.values(decisionSpies)) spy.mockClear();
   }
 
   function beginStep(stepId: string) {
@@ -334,6 +347,7 @@ function createRecorder() {
       applyStepCompletion: [],
       storeMutations: [],
       workingCopyMutations: [],
+      decisionMutations: [],
       navigateTo: [],
     };
   }
@@ -367,6 +381,7 @@ function createRecorder() {
 
     current.storeMutations = collectOrdered(storeSpies, STORE_MUTATOR_NAMES);
     current.workingCopyMutations = collectOrdered(wcSpies, WC_MUTATOR_NAMES);
+    current.decisionMutations = collectOrdered(decisionSpies, DECISION_MUTATOR_NAMES);
 
     for (const call of navigateToMock.mock.calls) {
       current.navigateTo.push(String(call[0]));

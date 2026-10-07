@@ -34,6 +34,7 @@ import pfHistoryEntryMod from "../../survey/questions/f/pf_history_entry.ts";
 import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
+
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { Decision, DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type {
@@ -55,6 +56,7 @@ function decisionSet(values: Partial<Record<DecisionId, unknown>>): DecisionSet 
   }
   return set;
 }
+
 
 function buildDeps(overrides?: Partial<FlowStepDeps>): { deps: FlowStepDeps } {
   const deps: FlowStepDeps = {
@@ -98,7 +100,7 @@ describe("trackOptions.buildContext", () => {
 // ---------------------------------------------------------------------------
 
 describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () => {
-  it("seeds track_choice from the session's recorded selectedTrack", () => {
+  it("seeds track_choice from the recorded track (deps.selectedTrack)", () => {
     const { deps } = buildDeps({ selectedTrack: "adapt" });
     expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
   });
@@ -269,6 +271,7 @@ describe("trackOptions.extract", () => {
 describe("trackOptions — record shape", () => {
   it("declares no onCommit", () => {
     expect("onCommit" in trackOptions).toBe(false);
+
   });
 });
 

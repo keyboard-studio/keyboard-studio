@@ -11,7 +11,10 @@
  *      project-display-name / project-keyboard-id records, and the
  *      persisted `surveyAnswers` slice holds NO survey-question answers.
  *   2. Reload the page: the draft is restored (the app resumes the project
- *      instead of restarting at identity) and the decisions are unchanged.
+ *      at the step the walk reached — the characters step's prefill
+ *      confirmation, "Confirm the basics", whose forward control is
+ *      `prefill-confirm`, not a SurveyRunner `survey-advance`) instead of
+ *      restarting at identity, and the decisions are unchanged.
  *
  * The store-level half of SC-001 (records restored with value + provenance
  * through the real StepHost) is pinned by StepHost.test.tsx (spec 088 T012);
@@ -54,6 +57,10 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
   await chooseTrackCopy(page);
   await acceptProjectName(page);
 
+  // The walk now sits on the characters step's prefill confirmation — the
+  // surface the reload below must return to.
+  await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 15_000 });
+
   // The autosave lands shortly after the project_name completion.
   await page.waitForTimeout(1_500);
   const draft = await readSavedDraft(page);
@@ -80,9 +87,11 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
   }
 
   await page.reload();
-  // The restored draft resumes the project: the survey chrome is back and
-  // the draft on disk still carries the same decisions.
-  await expect(page.getByTestId("survey-advance")).toBeVisible({ timeout: 90_000 });
+  // The restored draft resumes the project at the same surface (the
+  // prefill confirmation, showing the restored base keyboard), and the
+  // draft on disk still carries the same decisions.
+  await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText("French Basic (basic_kbdfr)")).toBeVisible();
   const after = await readSavedDraft(page);
   expect(after.decisions?.["language-code"]?.value).toBe("fr");
   expect(after.decisions?.["authoring-track"]?.value).toBe("copy");

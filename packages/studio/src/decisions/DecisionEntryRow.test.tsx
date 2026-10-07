@@ -477,6 +477,7 @@ function jumpCtxWith(activeStepId: string, hasProject = true): ResolveContext {
     manifest,
     questionRegistry: JUMP_REGISTRY,
     traversal: jumpTraversal(activeStepId),
+    decisions: {},
     hasProject,
   };
 }

@@ -209,6 +209,7 @@ import {
 import { FindPanel, type FindPanelResult } from "./keyGrid/FindPanel.tsx";
 import { useModeContextCarry } from "./keyGrid/useModeContextCarry.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { selectTouchSeedSource, useDecisionStore } from "../../stores/decisionStore.ts";
 import { collateInventory, loanwordsLast } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import {
@@ -1758,7 +1759,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
+  // Spec 088 FR-005: the recorded seed choice is a decision-store record.
+  const touchSeedSourceStored = useDecisionStore((s) => selectTouchSeedSource(s.decisions));
 
   // "Mark for later review" — authoring metadata only (surveySessionStore),
   // never the working copy. Touch-gallery counterpart of MechanismGallery's

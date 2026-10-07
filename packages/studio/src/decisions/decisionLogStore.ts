@@ -35,6 +35,7 @@ import {
   type DecisionRecord,
 } from "@keyboard-studio/contracts";
 import { normalizeDecisionRecord } from "@keyboard-studio/engine";
+import { questionRegistry } from "../survey/questions/registry.ts";
 
 /**
  * A decision to record. The store owns `entryId`, `recordedAt`, and `supersedes`
@@ -137,17 +138,30 @@ const SLOT_DELIMITER = "\u0000";
  * The "slot" a decision occupies, for deciding whether a new decision replaces
  * an earlier one.
  *
- * A survey answer's slot is its question within its step; an editor action's is
- * its editor within its step. Two different questions in the same step are two
- * slots and never supersede each other — which is exactly why the slot is not
- * just `stepId`. The single-letter middle part discriminates the payload kinds,
- * so a question and an editor that happen to share an id are still two slots.
+ * A survey answer's slot is its DECISION (spec 088 FR-008, contract C-5):
+ * the question id resolves through the registry's `provides` to the decision
+ * the question answers, and the slot is keyed by that decision id — so the
+ * same decision answered from a different step supersedes, and two different
+ * decisions on one step never do. (Multi-provide questions key by their
+ * first provided id; every entry for the question shares the slot either
+ * way.) A question id that no longer resolves — a migrated orphan, a
+ * question from a newer build — keeps the legacy step-based slot below, so
+ * its history is preserved rather than merged into a wrong decision
+ * (C-5.2). An editor action's slot is its editor within its step. The
+ * single-letter middle part discriminates the payload kinds, so a question
+ * and an editor that happen to share an id are still two slots.
  *
- * The key is compared with `===` and never parsed back apart.
+ * The key is compared with `===` and never parsed back apart — and never
+ * persisted: keys are computed from the live registry on every read, so a
+ * restored record re-keys itself with no stored migration.
  */
 export function slotKeyOf(stepId: string, payload: DecisionPayload): string {
   const d = SLOT_DELIMITER;
-  if (payload.kind === "survey-answer") return `${stepId}${d}q${d}${payload.questionId}`;
+  if (payload.kind === "survey-answer") {
+    const decisionId = questionRegistry[payload.questionId]?.provides?.[0];
+    if (decisionId !== undefined) return `${decisionId}${d}q${d}${decisionId}`;
+    return `${stepId}${d}q${d}${payload.questionId}`;
+  }
   if (payload.kind === "editor-action") return `${stepId}${d}e${d}${payload.actionType}`;
   // base-contribution (specs/055-legible-decision-trail D-11), recorded once at
   // `choose_base` by recordBaseContribution.ts. The slot only needs to exist

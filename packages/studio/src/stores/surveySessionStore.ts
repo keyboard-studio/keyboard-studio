@@ -43,14 +43,11 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 // lib/stepWalk.ts), and IdentityLite.tsx renders SurveyRunner, so importing the
 // component module here would close the loop even for a type. That extracted
 // leaf has no runtime dependencies at all.
-import type { Track } from "../survey/types.ts";
-// Runtime import of the sibling store (one-directional: workingCopyStore.ts
-// does NOT import this module, so this does not create a circular dependency
-// per depcruise's no-circular rule). Used only inside setTouchSeedSource to
-// clear the stale touchDraft when the seed source actually changes (spec 035
-// R12) — the getState() escape-hatch idiom already used elsewhere in this
-// file (see the trailing comment) for cross-store reads/writes.
-import { useWorkingCopyStore } from "./workingCopyStore.ts";
+// Spec 088: this store no longer imports workingCopyStore — its only use
+// was the deleted setTouchSeedSource's touch-draft side effect, which moved
+// to the decision writer's call sites (research D-06). Spec 089: the identity
+// result/context/scaffold types are likewise gone with the fields they typed
+// — those values are derived from the decision store (T017).
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 
 // ---------------------------------------------------------------------------
@@ -299,8 +296,9 @@ export interface SurveySessionState {
   // decision store (decisions/identitySelectors.ts: deriveIdentityResult,
   // deriveIdentityResume, deriveSurveyContext, deriveScaffoldSpec).
 
-  /** "copy" | "adapt" chosen at the track step. Null until that step completes. */
-  selectedTrack: Track | null;
+  // Spec 088 FR-005: the authoring track is NOT stored here any more — it
+  // is the `authoring-track` decision in stores/decisionStore.ts, read via
+  // its `selectTrack` selector.
 
   /**
    * Local base selection that drives the compile pipeline immediately on pick.
@@ -332,16 +330,11 @@ export interface SurveySessionState {
    */
   charactersSubStage: CharactersSubStage;
 
-  /**
-   * The author's choice at the touch_seed_source fork (spec 035 FR-006).
-   * Null means no choice recorded yet — advance() routes into the chooser
-   * step whenever this is null (fork memory, R12). Cleared back to null on a
-   * genuine base re-instantiation (see reducer.ts CHOOSE_BASE_STEP_ID case,
-   * which injects setTouchSeedSource as a ReducerDep so workingCopyStore does
-   * not need to import this store — avoids a circular dependency since
-   * setTouchSeedSource itself reaches into workingCopyStore to clear touchDraft).
-   */
-  touchSeedSource: TouchSeedSource | null;
+  // Spec 088 FR-005: the touch-seed choice is NOT stored here any more —
+  // it is the `touch-seed-source` decision in stores/decisionStore.ts, read
+  // via its `selectTouchSeedSource` selector. Its touch-draft side effect
+  // (research D-06) lives at the decision's writer call sites.
+
 
   /**
    * The author's choice at the Phase B IntroChooser (spec character-map pane
@@ -396,7 +389,7 @@ export interface SurveySessionState {
    * first character" affordance (spec 035 R12 re-entry path). The generic
    * `popHistory` follows the walked-history stack, which lands on
    * "mechanisms" whenever the seed-source fork was SKIPPED this pass (a
-   * recorded, non-stale `touchSeedSource` routes advance() straight from
+   * recorded, non-stale touch-seed choice routes advance() straight from
    * "mechanisms" to "touch" — R12 fork memory) — that would make the choice
    * unreachable after the first pass (violates US2-AS4). This action always
    * resurfaces the "touch_seed_source" chooser instead:
@@ -491,8 +484,7 @@ export interface SurveySessionState {
    */
   hydrate: (snapshot: SurveySessionSnapshot) => void;
 
-  /** Plain setter — chosen track. */
-  setSelectedTrack: (t: Track | null) => void;
+
 
   /** Plain setter — local base driving the compile pipeline. */
   setLocalBase: (b: BaseKeyboard | null) => void;
@@ -503,14 +495,6 @@ export interface SurveySessionState {
   /** Plain setter — characters step internal substage (spec 027 Stage 4). */
   setCharactersSubStage: (s: CharactersSubStage) => void;
 
-  /**
-   * Setter — the touch_seed_source fork choice (spec 035 R12).
-   * Setting a value DIFFERENT from the current one clears the working-copy
-   * `touchDraft` (its `charTouch` entries reference host keys of the other
-   * seed and would half-apply — see workingCopyStore.touchDraft docstring).
-   * A no-op re-set of the same value does not clear the draft.
-   */
-  setTouchSeedSource: (s: TouchSeedSource | null) => void;
 
   /** Plain setter — the Phase B IntroChooser discovery-method choice. */
   setDiscoveryMethod: (m: DiscoveryMethod | null) => void;
@@ -525,7 +509,7 @@ export interface SurveySessionState {
    * deferred" from "never looked at". Lives HERE (not workingCopyStore, not a
    * new module-scoped Set) because:
    *   (a) it is per-authoring-session traversal state, not keyboard content —
-   *       the same category as activeStepId/history/touchSeedSource above,
+   *       the same category as activeStepId/history above,
    *       never the working copy's own data;
    *   (b) this store already has a serialize/restore seam
    *       (snapshotTraversal/applyTraversalSnapshot, driven by
@@ -568,7 +552,8 @@ export interface SurveySessionState {
 // for — no silent omission from the durable draft.
 //
 // DEVIATION 1 (spec 034 US3 task brief): the data-model.md TraversalSnapshot
-// field list predates spec 035, which added `touchSeedSource` to this store.
+// field list predates spec 035, which added the touch-seed choice to this store
+// (a session field until spec 088 moved it to the decision store).
 // It is included here — a reload mid-touch that lost the seed-source fork
 // choice would silently re-ask a question the author already answered, or
 // worse, mis-resolve the R11/R12 default. `TraversalSnapshot` is exactly this
@@ -579,8 +564,8 @@ type SurveySessionData = Omit<
   SurveySessionState,
   | "advance" | "popHistory" | "jumpToStep" | "backToTouchSeedSource"
   | "backToUnfinishedGallery" | "backToChooseBase" | "reset" | "hydrate"
-  | "setSelectedTrack" | "setLocalBase" | "setCharactersSubStage"
-  | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
+  | "setLocalBase" | "setCharactersSubStage"
+  | "setBaseConfirmed" | "setDiscoveryMethod"
   | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
 
@@ -613,11 +598,10 @@ const INITIAL_STATE = {
   visited: ["identity"] as readonly ActiveStepId[],
   lastNavigation: "advance" as const,
   marksMigrationNeeded: false,
-  selectedTrack: null,
+
   localBase: null,
   baseConfirmed: false,
   charactersSubStage: "prefill" as CharactersSubStage,
-  touchSeedSource: null as TouchSeedSource | null,
   discoveryMethod: null as DiscoveryMethod | null,
   markedForLaterDesktop: [] as readonly string[],
   markedForLaterTouch: [] as readonly string[],
@@ -797,22 +781,11 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
 
-  setSelectedTrack: (t) => set({ selectedTrack: t }),
+
   setLocalBase: (b) => set({ localBase: b }),
   setBaseConfirmed: (v) => set({ baseConfirmed: v }),
   setCharactersSubStage: (s) => set({ charactersSubStage: s }),
 
-  setTouchSeedSource: (s) =>
-    set((state) => {
-      // A genuine change of seed source invalidates any in-progress touch
-      // draft — its charTouch entries reference host keys of the OTHER seed
-      // and would half-apply with warnings (R12). A no-op re-set (same value,
-      // including null -> null) leaves the draft untouched.
-      if (s !== state.touchSeedSource) {
-        useWorkingCopyStore.getState().setTouchDraft(null);
-      }
-      return { touchSeedSource: s };
-    }),
 
   setDiscoveryMethod: (m) => set({ discoveryMethod: m }),
 
@@ -832,8 +805,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads
-// inside memoised callbacks (e.g. onInstantiate reads selectedTrack this way).
-// No extra export needed — zustand attaches getState() to the hook directly.
+// inside memoised callbacks. No extra export needed — zustand attaches
+// getState() to the hook directly.
 
 // ---------------------------------------------------------------------------
 // TraversalSnapshot serialize/restore (T017, spec 034 US3)
@@ -857,11 +830,10 @@ export function snapshotTraversal(): TraversalSnapshot {
     visited: s.visited,
     lastNavigation: s.lastNavigation,
     marksMigrationNeeded: s.marksMigrationNeeded,
-    selectedTrack: s.selectedTrack,
+
     localBase: s.localBase,
     baseConfirmed: s.baseConfirmed,
     charactersSubStage: s.charactersSubStage,
-    touchSeedSource: s.touchSeedSource,
     discoveryMethod: s.discoveryMethod,
     markedForLaterDesktop: s.markedForLaterDesktop,
     markedForLaterTouch: s.markedForLaterTouch,
