@@ -223,12 +223,15 @@
       "help"
     ],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [
       "recordPhase"
     ],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": [
       "output"
     ]
