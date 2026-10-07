@@ -56,7 +56,7 @@ the recording of the owner's carve ruling (T003, resolved).
   specs/090-gallery-decision-modules/research.md (R8) and
   specs/090-gallery-decision-modules/data-model.md (removal-item shape marked RULED).
   T030/T032 proceed against this shape when their turn comes — no stop gate remains
-- [ ] T004 FR-001 contract: `DecisionRendererProps` gains `provenance` and `source`; the
+- [x] T004 FR-001 contract: `DecisionRendererProps` gains `provenance` and `source`; the
   `QuestionModule.renderer` literal `"default"` becomes `"question"` per the spec's wording
   (research R3/Q2 — RULED: rename per FR-001, owner ruling 2026-10-06, km-lead proposals
   Q5; the keep-`"default"` alternative is rejected under the ruling) in

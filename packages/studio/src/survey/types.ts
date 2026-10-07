@@ -394,9 +394,12 @@ export interface QuestionModule {
 
   /**
    * Custom renderer for bulk decisions (e.g. a character-inventory picker).
-   * Absent (or "default") = the standard question field; a component dissolves
+   * Absent (or "question") = the standard question field; a component dissolves
    * a large editor panel into the same module registry. Size lives in the
-   * renderer, not the module system.
+   * renderer, not the module system. (Spec 090 FR-001: the literal was renamed
+   * from "default" to "question" — owner ruling 2026-10-06, km-lead proposals
+   * Q5 — because gallery modules always carry a component, and "question"
+   * names what the literal actually selects.)
    *
    * Typed as DecisionRendererProps<any>: modules in one registry carry
    * different answer types T, so the field is heterogeneous by design — the
@@ -404,7 +407,7 @@ export interface QuestionModule {
    * declares its own T (e.g. DecisionRendererProps<string[]>).
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  renderer?: "default" | React.ComponentType<DecisionRendererProps<any>>;
+  renderer?: "question" | React.ComponentType<DecisionRendererProps<any>>;
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {
@@ -416,4 +419,25 @@ export interface QuestionModule {
       expectedCode?: string;
     }>;
   };
+}
+
+/**
+ * A gallery decision module (spec 090): a QuestionModule whose decision value
+ * is a rich object rather than a question answer. `apply` and `renderer` are
+ * typed against the decision's real value type `V`; everything else (definition,
+ * provides/requires, inputs/writes, fixtures) is the plain module contract.
+ *
+ * 089's runner (`applyDecisionEffects`) is answer-shaped — it iterates
+ * step-completion answers typed `string | string[] | undefined` — so gallery
+ * modules are NOT run through it. The gallery host (steps/galleryHost.tsx)
+ * records the decision and invokes `apply` directly with an ApplyContext,
+ * reusing the runner's channel authorization and patch sink (research
+ * addendum D-090-1). The single cast back to the heterogeneous
+ * `QuestionModule` happens where the registry composes `galleryModules`.
+ */
+export interface GalleryModule<V> extends Omit<QuestionModule, "apply" | "renderer"> {
+  /** The decision this module settles — exactly one, by construction. */
+  provides: [DecisionId];
+  apply?: (value: V | undefined, ctx: ApplyContext) => WorkingCopyPatch;
+  renderer: React.ComponentType<DecisionRendererProps<V>>;
 }

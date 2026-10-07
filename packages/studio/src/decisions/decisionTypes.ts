@@ -215,6 +215,14 @@ export interface DecisionRendererProps<T = unknown> {
   value: T | undefined;
   onChange: (value: T) => void;
   decisionId: DecisionId;
+  /**
+   * Spec 090 FR-001: the recorded decision's provenance, so a renderer can
+   * badge a value the studio proposed or derived differently from one the
+   * author answered directly. `"asked"` when no decision is recorded yet.
+   */
+  provenance: DecisionProvenance;
+  /** The recorded decision's `source`, when it carries one (e.g. a base id). */
+  source?: string;
 }
 
 /**
