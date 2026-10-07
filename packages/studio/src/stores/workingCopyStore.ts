@@ -15,7 +15,7 @@
 //     loaded keyboard's identity and sets instantiationMode = "adapt-existing".
 //   - Both instantiate entry points also clear the per-working-copy Phase B
 //     proposal decisions (resetPhaseBDraftDecisions, spec 044 FR-016a), which
-//     deliberately survive phaseBDraftStore's own per-visit reset().
+//     deliberately survive the inventory draft's own per-visit reset.
 //   - `setIdentity()` overlays a post-instantiation identity patch.
 //   - No host-disk writes. VirtualFS lives as a React-state reference.
 //   - Worker boundary upheld: WASM is not imported here.
@@ -66,8 +66,46 @@ import {
   type TouchAssignment,
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
-import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
+import { useDecisionStore } from "./decisionStore.ts";
+import {
+  emptyCharacterInventoryValue,
+  emptyInventoryDecisionValue,
+  resetDraftDecisions,
+  type CharacterInventoryValue,
+} from "../survey/phaseBDraftOps.ts";
 import { useGuardIntentStore } from "./guardIntentStore.ts";
+
+/**
+ * Clear the Phase B proposal decisions (spec 044 FR-016a) at
+ * instantiation. Was `resetPhaseBDraftDecisions` on the retired facade
+ * (spec 090 T025); implemented here over leaf modules only — the
+ * decision store and the pure ops — because workingCopyStore sits
+ * UNDER the gallery host deps in the import graph (an import of the
+ * inventory hook would close the old facade cycle in a new shape).
+ * Behaviour parity with the decide-path version: both inventory
+ * modules' applies are no-ops, and the character transform touches
+ * only sticky fields (never `chars`), so no punctuation-projection
+ * maintenance is owed; records keep their existing provenance, and a
+ * character record is materialized from the empty value when none
+ * exists yet, exactly as the decide path materialized it.
+ */
+function resetPhaseBDraftDecisions(): void {
+  const store = useDecisionStore.getState();
+  const char = store.decisions["character-inventory"];
+  if (char !== undefined) {
+    store.record({ ...char, value: resetDraftDecisions(char.value as CharacterInventoryValue) });
+  } else {
+    store.record({
+      id: "character-inventory",
+      value: resetDraftDecisions(emptyCharacterInventoryValue()),
+      provenance: "asked",
+    });
+  }
+  const inv = store.decisions["invisibles-inventory"];
+  if (inv !== undefined) {
+    store.record({ ...inv, value: emptyInventoryDecisionValue() });
+  }
+}
 import type { Step } from "../steps/types.ts";
 import { STEP_ORDER } from "../steps/stepOrder.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
@@ -2297,8 +2335,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Phase B proposal decisions are per-working-copy (spec 044 FR-016a), not
-    // per-session: they survive phaseBDraftStore.reset() (which runs on every
-    // entry to the build-list screen) and are cleared HERE instead. Without
+    // per-session: they survive the inventory draft's reset() (which runs on
+    // every entry to the build-list screen) and are cleared HERE instead. Without
     // this, declining the exemplar offer — or removing a proposed character —
     // on one keyboard would silently carry into the next one started in the
     // same browser session. Placed after the shouldNoop guard so a redundant
@@ -2378,8 +2416,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Per-working-copy Phase B proposal decisions — see the identical call in
-    // instantiateFromBase above for why this cannot live in
-    // phaseBDraftStore.reset().
+    // instantiateFromBase above for why this cannot live in the inventory
+    // draft's reset().
     resetPhaseBDraftDecisions();
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({

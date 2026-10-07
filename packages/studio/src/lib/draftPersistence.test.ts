@@ -34,11 +34,8 @@ import {
 } from "../stores/decisionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
-import {
-  usePhaseBDraftStore,
-  snapshotPhaseBDraft,
-  resetPhaseBDraftDecisions,
-} from "../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, getInvisiblesInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
+import { snapshotFromValues } from "../survey/phaseBDraftOps.ts";
 import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
 
 // serverDraftStore's fetch-based transport is mocked at the module boundary
@@ -919,21 +916,21 @@ describe("draftPersistence", () => {
     });
   });
 
-  describe("P0 fix: phaseBDraftStore.chars folds into the durable draft round-trip", () => {
+  describe("P0 fix: the build-list alphabet folds into the durable draft round-trip (decisions-carried since spec 090; legacy slice migrates at T025)", () => {
     it("restores the in-progress build-list alphabet on load, not an empty array (km-review P0 — no silent discard of the author's typed/toggled chars)", () => {
       const pk = "phaseb-draft-project";
       instantiateMinimal(pk);
       useSurveySessionStore.getState().setDiscoveryMethod("build-list");
       useSurveySessionStore.getState().setCharactersSubStage("B");
-      usePhaseBDraftStore.getState().setAll(["a", "b", "ɛ"]);
+      inventoryOps("characters").setAll(["a", "b", "ɛ"]);
 
       saveDraft(pk);
 
       // Cold reset ALL THREE stores — nothing left to inherit from.
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+      resetInventoryDraft();
+      expect(getCharacterInventoryValue().chars).toEqual([]);
 
       expect(loadDraft(pk)).toBe(true);
 
@@ -942,13 +939,13 @@ describe("draftPersistence", () => {
       expect(session.discoveryMethod).toBe("build-list");
       expect(session.charactersSubStage).toBe("B");
       // ...AND the alphabet the author had already built is intact, not blanked.
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "b", "ɛ"]);
+      expect(getCharacterInventoryValue().chars).toEqual(["a", "b", "ɛ"]);
     });
 
     it("restores exemplar-attested digraphs alongside the alphabet, never into it", () => {
       const pk = "phaseb-draft-digraphs";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().seedFromProposal({
+      inventoryOps("characters").seedFromProposal({
         resolvedTag: "ewo",
         source: "cldr",
         confidence: "approved",
@@ -962,33 +959,38 @@ describe("draftPersistence", () => {
       saveDraft(pk);
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual([]);
+      resetInventoryDraft();
+      expect(getCharacterInventoryValue().exemplarDigraphs).toEqual([]);
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual(["dz", "kp"]);
+      expect(getCharacterInventoryValue().exemplarDigraphs).toEqual(["dz", "kp"]);
       // The clusters are a fact about the orthography, not characters to type —
       // the alphabet still holds only their constituent letters.
-      expect(usePhaseBDraftStore.getState().chars).not.toContain("dz");
-      expect(usePhaseBDraftStore.getState().chars).toContain("d");
+      expect(getCharacterInventoryValue().chars).not.toContain("dz");
+      expect(getCharacterInventoryValue().chars).toContain("d");
     });
 
-    it("a phaseBDraft record written before digraphs were recorded restores to an empty list, not undefined", () => {
+    it("a legacy slice written before digraphs were recorded migrates to an empty list, not undefined (spec 090 T025 slice migration)", () => {
       const pk = "phaseb-draft-legacy-digraphs";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().setAll(["a"]);
       saveDraft(pk);
 
+      // Simulate a pre-T025 record: the inventory rides the legacy
+      // phaseBDraft slice (here: no exemplarDigraphs field), and the
+      // decisions slice carries no inventory records.
       const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
-      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
-      delete phaseBDraft.exemplarDigraphs;
+      const decisions = envelope.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      envelope.phaseBDraft = { chars: ["a"] };
       localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual([]);
+      expect(getCharacterInventoryValue().exemplarDigraphs).toEqual([]);
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
     });
 
     it("a pre-fix record with no phaseBDraft field restores to an empty alphabet (backward compat — additive optional field, not a version bump)", () => {
@@ -1003,77 +1005,84 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().setAll(["stale"]); // must be cleared by restore, not left dangling
+      inventoryOps("characters").setAll(["stale"]); // must be cleared by restore, not left dangling
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+      expect(getCharacterInventoryValue().chars).toEqual([]);
     });
 
-    it("a pre-font-change record whose phaseBDraft has no selectedFont field restores to DEFAULT_PHASE_B_FONT (backward compat — additive optional field, not a version bump)", () => {
+    it("a legacy slice with no selectedFont field migrates to DEFAULT_PHASE_B_FONT (backward compat — additive optional field, not a version bump)", () => {
       const pk = "phaseb-draft-legacy-font";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().setAll(["a"]);
       saveDraft(pk);
 
-      // Simulate a record written before selectedFont was added to phaseBDraft.
+      // Simulate a pre-T025 record whose slice predates selectedFont.
       const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
-      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
-      delete phaseBDraft.selectedFont;
+      const decisions = envelope.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      envelope.phaseBDraft = { chars: ["a"] };
       localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().setSelectedFont("charis-sil"); // must be overwritten by restore, not left dangling
+      inventoryOps("characters").setSelectedFont("charis-sil"); // must be overwritten by restore, not left dangling
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+      expect(getCharacterInventoryValue().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
     });
 
-    it("a malformed selectedFont value (not one of the known FONT_OPTIONS) restores to DEFAULT_PHASE_B_FONT rather than propagating garbage", () => {
+    it("a malformed selectedFont in a legacy slice migrates to DEFAULT_PHASE_B_FONT and surfaces as a decision-trail orphan, never dropped (spec 090 T025)", () => {
       const pk = "phaseb-draft-malformed-font";
       instantiateMinimal(pk);
       saveDraft(pk);
 
       const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
-      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
-      phaseBDraft.selectedFont = "comic-sans";
+      const decisions = envelope.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      envelope.phaseBDraft = { chars: [], selectedFont: "comic-sans" };
       localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+      inventoryOps("characters").setSelectedFont("charis-sil");
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+      expect(getCharacterInventoryValue().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+      const orphanIds = useDecisionLogStore
+        .getState()
+        .record.entries.map((e) => (e.payload.kind === "survey-answer" ? e.payload.questionId : null));
+      expect(orphanIds).toContain("phaseBDraft.selectedFont");
     });
 
     it("a valid persisted selectedFont ('charis-sil') round-trips intact through save + load", () => {
       const pk = "phaseb-draft-valid-font";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+      inventoryOps("characters").setSelectedFont("charis-sil");
       saveDraft(pk);
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
+      resetInventoryDraft();
+      inventoryOps("characters").setSelectedFont(DEFAULT_PHASE_B_FONT);
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().selectedFont).toBe("charis-sil");
+      expect(getCharacterInventoryValue().selectedFont).toBe("charis-sil");
     });
 
-    it("installDraftAutosave also debounce-saves a phaseBDraftStore mutation (same 500ms window, no new timer)", () => {
+    it("installDraftAutosave also debounce-saves an inventory decision mutation (same 500ms window, no new timer)", () => {
       vi.useFakeTimers();
       const pk = "phaseb-draft-autosave";
       instantiateMinimal(pk);
 
       const teardown = installDraftAutosave(pk);
-      usePhaseBDraftStore.getState().add("q");
+      inventoryOps("characters").add("q");
 
       vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
       const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
-      expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+      expect((saved.decisions?.["character-inventory"]?.value as { chars: string[] }).chars).toEqual(["q"]);
 
       teardown();
     });
@@ -1231,7 +1240,7 @@ describe("draftPersistence", () => {
       expect(localStorage.getItem(draftKey(pk))).toBeNull();
     });
 
-    it("AUTOSAVE_DEBOUNCE_MS is 500 and a burst across working copy, survey session, phaseBDraft and surveyAnswer schedules exactly one save (single-cycle invariant)", () => {
+    it("AUTOSAVE_DEBOUNCE_MS is 500 and a burst across working copy, survey session, decisions and surveyAnswer schedules exactly one save (single-cycle invariant)", () => {
       expect(AUTOSAVE_DEBOUNCE_MS).toBe(500);
 
       vi.useFakeTimers();
@@ -1244,7 +1253,7 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().lockDesktop();
       useSurveySessionStore.getState().advance("choose_base");
-      usePhaseBDraftStore.getState().add("q");
+      inventoryOps("characters").add("q");
       useSurveyAnswerStore.getState().setPosition("identity", "q1");
 
       vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
@@ -1255,7 +1264,7 @@ describe("draftPersistence", () => {
       const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
       expect(saved.workingCopy.desktopLocked).toBe(true);
       expect(saved.traversal.activeStepId).toBe("choose_base");
-      expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+      expect((saved.decisions?.["character-inventory"]?.value as { chars: string[] }).chars).toEqual(["q"]);
       expect(saved.surveyAnswers?.steps["identity"]?.position).toBe("q1");
 
       teardown();
@@ -1307,7 +1316,7 @@ describe("draftPersistence", () => {
     // proposed chip to "author". Pinned as a full save -> cold reset -> load
     // round trip: every sticky field equals what was saved.
     function seedStickyDraft(): void {
-      const store = usePhaseBDraftStore.getState();
+      const store = inventoryOps("characters");
       store.seedFromProposal({
         resolvedTag: "ewo",
         source: "cldr",
@@ -1331,15 +1340,15 @@ describe("draftPersistence", () => {
     function coldReset(): void {
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
+      resetInventoryDraft();
+      resetInventoryDecisions();
     }
 
     it("restores rejected, provenance, proposalConfidence, exemplarMethodDeclined and declaredRoles exactly as saved", () => {
       const pk = "phaseb-draft-sticky-fields";
       instantiateMinimal(pk);
       seedStickyDraft();
-      const before = snapshotPhaseBDraft();
+      const before = snapshotFromValues(getCharacterInventoryValue(), getInvisiblesInventoryValue());
       // Sanity: the fixture really exercises every sticky field.
       expect(before.rejected).toEqual(["z"]);
       expect(before.provenance).toMatchObject({ d: "cldr", q: "author" });
@@ -1351,11 +1360,11 @@ describe("draftPersistence", () => {
 
       saveDraft(pk);
       coldReset();
-      expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-      expect(usePhaseBDraftStore.getState().provenance).toEqual({});
+      expect(getCharacterInventoryValue().rejected).toEqual([]);
+      expect(getCharacterInventoryValue().provenance).toEqual({});
 
       expect(loadDraft(pk)).toBe(true);
-      const after = snapshotPhaseBDraft();
+      const after = snapshotFromValues(getCharacterInventoryValue(), getInvisiblesInventoryValue());
       expect(after.chars).toEqual(before.chars);
       expect(after.rejected).toEqual(before.rejected);
       expect(after.provenance).toEqual(before.provenance);
@@ -1374,8 +1383,8 @@ describe("draftPersistence", () => {
       coldReset();
       expect(loadDraft(pk)).toBe(true);
 
-      usePhaseBDraftStore.getState().addProposed("z", "cldr");
-      expect(usePhaseBDraftStore.getState().chars).not.toContain("z");
+      inventoryOps("characters").addProposed("z", "cldr");
+      expect(getCharacterInventoryValue().chars).not.toContain("z");
     });
   });
 
@@ -1383,15 +1392,15 @@ describe("draftPersistence", () => {
     it("restores a string alphabetEvidenceKey", () => {
       const pk = "phaseb-alphabet-key";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().add("a");
-      usePhaseBDraftStore.getState().setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
+      inventoryOps("characters").add("a");
+      inventoryOps("characters").setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
       saveDraft(pk);
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      resetInventoryDraft();
+      resetInventoryDecisions();
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
     });
 
     it("a pre-079 draft (built alphabet, no key) is stamped on load from its restored identity and base (FR-032)", () => {
@@ -1409,32 +1418,39 @@ describe("draftPersistence", () => {
       useSurveySessionStore.setState({
         localBase: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
       });
-      usePhaseBDraftStore.getState().add("a");
+      inventoryOps("characters").add("a");
       saveDraft(pk);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
-      usePhaseBDraftStore.getState().reset();
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
+      resetInventoryDraft();
       useSurveySessionStore.getState().reset();
       useDecisionStore.getState().reset();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
     });
 
-    it("drops a non-string alphabetEvidenceKey rather than coercing it", () => {
+    it("drops a non-string alphabetEvidenceKey in a legacy slice rather than coercing it (and surfaces it as an orphan, spec 090 T025)", () => {
       const pk = "phaseb-alphabet-key-bad";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().add("a");
       saveDraft(pk);
-      const raw = JSON.parse(localStorage.getItem(draftKey(pk))!) as { phaseBDraft: Record<string, unknown> };
-      raw.phaseBDraft.alphabetEvidenceKey = 42;
+      // Pre-T025 record shape: the key rides the legacy slice, malformed.
+      const raw = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
+      const decisions = raw.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      raw.phaseBDraft = { chars: ["a"], alphabetEvidenceKey: 42 };
       localStorage.setItem(draftKey(pk), JSON.stringify(raw));
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
+      resetInventoryDraft();
+      resetInventoryDecisions();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
+      const orphanIds = useDecisionLogStore
+        .getState()
+        .record.entries.map((e) => (e.payload.kind === "survey-answer" ? e.payload.questionId : null));
+      expect(orphanIds).toContain("phaseBDraft.alphabetEvidenceKey");
     });
   });
 
@@ -1444,33 +1460,32 @@ describe("draftPersistence", () => {
     it("seed, remove N, save, cold-reset, load, re-seed: the chosen list is tier minus N and the ledger still lists the N", () => {
       const pk = "phaseb-punctuation-rejections";
       instantiateMinimal(pk);
-      const store = usePhaseBDraftStore.getState();
+      const store = inventoryOps("characters");
       store.seedProposals(TIER, "cldr", "punctuation:hi");
       store.remove("!");
       store.remove("?");
-      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
 
       saveDraft(pk);
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
-      expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-      expect(usePhaseBDraftStore.getState().seededProposals).toEqual([]);
+      resetInventoryDraft();
+      resetInventoryDecisions();
+      expect(getCharacterInventoryValue().rejected).toEqual([]);
+      expect(getCharacterInventoryValue().seededProposals).toEqual([]);
 
       expect(loadDraft(pk)).toBe(true);
-      const after = usePhaseBDraftStore.getState();
-      expect(after.punctuation).toEqual(["\u0964", "\u0965"]);
-      expect(after.rejected).toEqual(["!", "?"]);
-      expect(after.seededProposals).toEqual(["punctuation:hi"]);
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(getCharacterInventoryValue().rejected).toEqual(["!", "?"]);
+      expect(getCharacterInventoryValue().seededProposals).toEqual(["punctuation:hi"]);
 
       // The same key is a no-op after reload; a NEW key (re-resolution) seeds
       // again and the restored ledger still vetoes the removed marks.
-      after.seedProposals(TIER, "cldr", "punctuation:hi");
-      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
-      after.seedProposals(TIER, "cldr", "punctuation:hi-IN");
-      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
-      expect(usePhaseBDraftStore.getState().rejected).toEqual(["!", "?"]);
+      inventoryOps("characters").seedProposals(TIER, "cldr", "punctuation:hi");
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
+      inventoryOps("characters").seedProposals(TIER, "cldr", "punctuation:hi-IN");
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(getCharacterInventoryValue().rejected).toEqual(["!", "?"]);
     });
   });
 
@@ -1543,7 +1558,7 @@ describe("draftPersistence", () => {
       saveDraft(resumed); // create resumed's own real record to resume into
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
+      resetInventoryDraft();
       expect(resumeProject(resumed)).toBe(true);
       expect(resolveActiveProjectKey()).toBe(resumed);
 
@@ -2426,9 +2441,9 @@ describe("draftPersistence", () => {
       expect(() => loadDraft("pre079")).not.toThrow();
       expect(useSurveyAnswerStore.getState().steps).toEqual({});
       expect(useSurveyAnswerStore.getState().recordedScreenOf).toEqual({});
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "ŋ"]);
+      expect(getCharacterInventoryValue().chars).toEqual(["a", "ŋ"]);
       // No base in the fixture's traversal, so nothing to derive a stamp from.
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
 
       // The phase-C answers recorded before 079 have no owner step; the next
       // step to record into phase C must not overwrite them (D-4).

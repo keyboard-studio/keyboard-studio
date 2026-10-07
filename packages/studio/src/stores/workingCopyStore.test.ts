@@ -19,7 +19,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
@@ -2082,7 +2082,7 @@ describe("workingCopyStore — sequenceFlaggedChars", () => {
 // Per-working-copy Phase B proposal decisions (spec 044 FR-016a)
 //
 // `rejected` and `exemplarMethodDeclined` deliberately survive
-// phaseBDraftStore's own reset() — that runs on every entry to the build-list
+// the inventory draft's own reset() — that runs on every entry to the build-list
 // screen, and clearing them there would re-propose characters the author just
 // removed. They are per-WORKING-COPY, so the two instantiate entry points
 // clear them instead. Without that wiring the decisions were effectively
@@ -2100,16 +2100,16 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
   };
 
   afterEach(() => {
-    resetPhaseBDraftDecisions();
+    resetInventoryDecisions();
   });
 
   /** Seed a proposal, reject one of its characters, and decline the offer. */
   function declineAndReject(): void {
-    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
-    usePhaseBDraftStore.getState().remove("ɔ");
-    usePhaseBDraftStore.getState().declineExemplarMethod();
-    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    inventoryOps("characters").seedFromProposal(BM_INVENTORY, "bm");
+    inventoryOps("characters").remove("ɔ");
+    inventoryOps("characters").declineExemplarMethod();
+    expect(getCharacterInventoryValue().rejected).toContain("ɔ");
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
   }
 
   it("instantiateFromBase clears them for a new working copy", () => {
@@ -2121,8 +2121,8 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
     useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
 
-    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    expect(getCharacterInventoryValue().rejected).toEqual([]);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 
   it("instantiateFromExisting clears them for a new working copy", () => {
@@ -2133,8 +2133,8 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
     useWorkingCopyStore.getState().instantiateFromExisting(keyboardB, { vfs, ir: makeTestIR([]) });
 
-    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    expect(getCharacterInventoryValue().rejected).toEqual([]);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 
   it("a character rejected on keyboard A is proposed normally on keyboard B", () => {
@@ -2145,11 +2145,11 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
     useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
     // Entering B's build-list screen: the per-visit reset, then a fresh seed.
-    usePhaseBDraftStore.getState().reset();
-    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
+    resetInventoryDraft();
+    inventoryOps("characters").seedFromProposal(BM_INVENTORY, "bm");
 
-    expect(usePhaseBDraftStore.getState().chars).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().provenance["ɔ"]).toBe("cldr");
+    expect(getCharacterInventoryValue().chars).toContain("ɔ");
+    expect(getCharacterInventoryValue().provenance["ɔ"]).toBe("cldr");
   });
 
   it("a redundant re-fire of the SAME instantiate does not discard a live decision", () => {
@@ -2161,8 +2161,8 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     // Case 1 of resolveInstantiationCase: same id AND same mode -> full no-op.
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
 
-    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    expect(getCharacterInventoryValue().rejected).toContain("ɔ");
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
   });
 });
 

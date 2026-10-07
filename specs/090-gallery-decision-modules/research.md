@@ -788,3 +788,88 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   per track) — T024 adds zero delta (convenience is not a walk step).
   The 2 goldenWalk + 2 renderSmoke failures are the known pending
   T029 regeneration and pre-existing items respectively.
+
+- **D-090-18 — T025 phaseBDraftStore deleted; the draft slice is gone
+  from the written envelope; legacy slices migrate into the inventory
+  decision values on load.** `stores/phaseBDraftStore.ts` is deleted
+  and grep for `phaseBDraftStore` is 0 across src and tests (the
+  T027/SC-004 condition, reached here). The real production consumers
+  were few and are re-pointed at the decision values:
+  `hooks/useWorkToDo.ts` (alphabetEvidenceKey — a `useDecisionStore`
+  selector + `getCharacterInventoryValue()`), `lib/crashCallerContext.ts`
+  (chars length), `survey/phaseCInventory.ts` (invisibleDecisions via
+  `invisibleDecisionsOf(getInvisiblesInventoryValue())`),
+  `survey/useGlyphFontStack.ts` (selectedFont via a decision-store
+  selector), `src/test/draftSeeds.ts` (`resetInventoryDraft()`).
+  `stores/workingCopyStore.ts` keeps a module-private leaf named
+  `resetPhaseBDraftDecisions` over `useDecisionStore` +
+  phaseBDraftOps only: workingCopyStore sits UNDER the gallery host
+  deps in the import graph, so importing the inventory hook would
+  close the old facade cycle in a new shape; behaviour parity holds
+  because both modules' applies are no-ops and `resetDraftDecisions`
+  never touches `chars`. `useInventoryDraft.ts` gains the public
+  surface the facade's callers used: `resetInventoryDecisions()`,
+  `resetInventoryDraft()`, `restoreInventoryFromSnapshot(snapshot)`.
+  **Envelope:** `DurableDraft.phaseBDraft` and the `buildEnvelope`
+  write are removed (no DRAFT_VERSION bump — the field was always
+  optional/additive). `loadDraft`, after `applyDecisionSnapshot`, runs
+  the slice migration ONLY when the envelope's decisions carry no
+  inventory records (when they do, the slice is a stale duplicate of
+  the canonical records and is ignored). `parsePhaseBDraftSlice` keeps
+  the old tolerant field-by-field semantics, but every unmappable
+  entry (non-string array members, invalid declaredRoles /
+  invisibleDecisions values, non-string provenance / confidence /
+  alphabetEvidenceKey, invalid selectedFont, unknown slice keys,
+  non-array / non-record field values) is collected as a
+  `MigrationOrphan` with questionId `phaseBDraft.<field>` (record-entry
+  drops: `phaseBDraft.<field>.<key>`), stepId `characters` — surfaced,
+  never dropped (087 Q5 / 088 T030 precedent). **Ordering catch, found
+  by the new tests:** the orphans must be appended AFTER the
+  decisionRecord restore, whose `hydrate` replaces the log — the first
+  implementation appended inside the migration and the hydrate erased
+  them; `migratePhaseBDraftSlice` now RETURNS its orphans and loadDraft
+  appends them together with the envelope's own migrationOrphans, the
+  position 088 already used for the same reason. **Autosave:** both
+  facade subscriptions (autosave installer, cloud sync) moved to
+  `useDecisionStore.subscribe` with an identical trigger set — the
+  facade only ever changed when decisions changed, and every decision
+  change already scheduled a save through it. **Manifest:** the
+  `persistence: "phase-b-draft"` declarations on characters /
+  punctuation / invisibles are KEPT. They are pinned by
+  `manifest.persistence.test.ts` against the spec-079 persistence
+  table (the kind union is spec-079 vocabulary in `steps/types.ts`);
+  renaming the kind amends that table, which is T026's persistence
+  adjudication alongside marks/convenience (T024 precedent,
+  D-090-17). **Tests:** the sweep re-pointed 20 files mechanically
+  (ops via `inventoryOps("characters")`, reads via
+  `getCharacterInventoryValue()` / `invisibleDecisionsOf(...)`,
+  snapshot via `snapshotFromValues(...)`); the 946-line store suite is
+  RENAMED `stores/phaseBDraftStore.test.ts` →
+  `survey/phaseBDraftOps.test.ts` with a `draft()` adapter (the old
+  getState() shape over the values + ops) — this discharges most of
+  T028's formal re-point early; T028 should verify what remains.
+  draftPersistence's legacy-field tests are rewritten as migration
+  tests (hand-built slice + inventory stripped from decisions), two of
+  them asserting the orphan lands in the decision log
+  (`phaseBDraft.selectedFont`, `phaseBDraft.alphabetEvidenceKey`). The
+  phaseCInventory malformed-key test changes its malformed classes:
+  the value carries ITEMS and keys are derived via `toUPlusNotation`,
+  so stored-key garbage cannot exist; the carry-able malformed entries
+  are a lone surrogate (U+DFFF) and a noncharacter (U+FDD0), both
+  rejected by `parseUPlusNotation` — asserted ignored. Gates: tsc
+  clean; eslint 0 errors on changed files; focused suites green
+  (draftPersistence + phaseCInventory 118/118; the re-point batch
+  incl. workingCopyStore / phaseBDraftOps / surveyWriteObservability /
+  punctuation / invisibles / convenience green; StudioShell family
+  66 + 71; PhaseB / CharacterMapPane / BuildListView / marks
+  textSample 127/127; useWorkToDo 4/4); parity trio green UNMODIFIED;
+  decisions 974 passed with ONLY the 4 known pre-existing local-corpus
+  SC-004 failures (basic_kbdru + arabic_izza, both sc004 suites);
+  depcruise 131 → **127** (exactly the 4 facade-family cycles dying;
+  the remaining count still carries the 089-side shared cycle —
+  registry → … → survey/types → workingCopyStore → completeness —
+  whose fix `030bf59c` on km/decision-apply arrives with the next
+  merge; post-merge number reported at that checkpoint). Golden walk:
+  fresh-walk classification byte-identical to T023/T024 (the 7 known
+  post-merge-signature deltas per track) — T025 adds zero delta;
+  fixtures restored (regeneration remains T029's action).

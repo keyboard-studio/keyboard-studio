@@ -35,13 +35,15 @@ import {
   useSurveySessionStore,
 } from "../stores/surveySessionStore.ts";
 import {
-  applyPhaseBDraftSnapshot,
-  snapshotPhaseBDraft,
-  usePhaseBDraftStore,
-  type DraftProvenance,
-  type InvisibleDecision,
-  type PhaseBDraftSnapshot,
-} from "../stores/phaseBDraftStore.ts";
+  getCharacterInventoryValue,
+  inventoryOps,
+  restoreInventoryFromSnapshot,
+} from "../survey/useInventoryDraft.ts";
+import type {
+  DraftProvenance,
+  InvisibleDecision,
+  PhaseBDraftSnapshotShape,
+} from "../survey/phaseBDraftOps.ts";
 import {
   applySurveyAnswerSnapshot,
   getSurveyAnswerSnapshot,
@@ -61,7 +63,12 @@ import {
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 import { alphabetKeyOf } from "../steps/evidence.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import { applyDecisionSnapshot, getDecisionSnapshot, peekDecision } from "../stores/decisionStore.ts";
+import {
+  applyDecisionSnapshot,
+  getDecisionSnapshot,
+  peekDecision,
+  useDecisionStore,
+} from "../stores/decisionStore.ts";
 import { deriveIdentityResult, deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { stepHasSettles } from "../steps/stepDependencies.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
@@ -808,7 +815,6 @@ export function saveDraft(projectKey: string): void {
     languageTag,
     workingCopy: snapshotWorkingCopyData(),
     traversal: snapshotTraversal(),
-    phaseBDraft: snapshotPhaseBDraft(),
     // spec 053 FR-005: the decision trail survives a reload. Written unshed —
     // localStorage has room, and the author's own machine should keep the full
     // detail. The cloud-size shed happens on the sync path only (see the flush
@@ -909,19 +915,6 @@ function stringEntries(v: unknown): Record<string, string> {
   return out;
 }
 
-/** The string members of an array, or `[]` for anything that is not one. */
-function stringArray(v: unknown): string[] {
-  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-}
-
-/**
- * Rebuild a full {@link PhaseBDraftSnapshot} from whatever a stored envelope
- * carries, field by field and tolerantly: a record written before a field
- * existed, or one with a malformed value, restores that field to its empty
- * default and keeps everything else. Every sticky decision field is forwarded
- * so `applyPhaseBDraftSnapshot` never falls back to its own defaults for a
- * field the envelope actually saved.
- */
 /**
  * A draft saved before spec 079 carries a built alphabet but no
  * `alphabetEvidenceKey`. Unstamped means "first build" to the characters
@@ -930,49 +923,183 @@ function stringArray(v: unknown): string[] {
  * (spec 079 R-07, FR-032). Runs after the traversal restore it reads.
  */
 function stampPre079Alphabet(): void {
-  const draft = usePhaseBDraftStore.getState();
+  const draft = getCharacterInventoryValue();
   if (draft.alphabetEvidenceKey !== undefined || draft.chars.length === 0) return;
   const { localBase } = useSurveySessionStore.getState();
   const identityResult = deriveIdentityResult(getDecisionSnapshot());
   if (identityResult === null || localBase === null) return;
-  draft.setAlphabetEvidenceKey(alphabetKeyOf(identityResult, localBase));
+  inventoryOps("characters").setAlphabetEvidenceKey(alphabetKeyOf(identityResult, localBase));
 }
 
-function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
+/**
+ * Append migration orphans to the decision trail (spec 088 T030;
+ * OPEN-088-1 ruled by the owner 2026-10-06, km-lead proposals Q1: the
+ * trail is the surface). Each orphan — a value this build could not map
+ * — is appended as an ordinary survey-answer entry carrying its value,
+ * so the author can see what the old draft held and re-answer it in the
+ * current questions. The entry uses the trail's existing shape
+ * throughout: the unresolvable question id renders through the trail's
+ * normal degraded-label path (FR-035), and provenance is "hand-set" —
+ * the truthful floor for a value the author gave, with no proposal
+ * evidence surviving migration (the same floor recordSurveyAnswers
+ * uses). Appending is idempotent: the log's append() no-ops an
+ * identical (slot, payload, provenance) revisit, so re-applying the
+ * same migrated envelope cannot duplicate entries.
+ */
+function appendMigrationOrphans(orphans: readonly MigrationOrphan[]): void {
+  for (const orphan of orphans) {
+    const value = orphan.value;
+    // DecisionPayload's survey-answer variant is discriminated by
+    // answerType, so the payload is built per value shape.
+    const payload: DecisionPayload =
+      typeof value === "boolean"
+        ? { kind: "survey-answer", questionId: orphan.questionId, answerType: "boolean", value }
+        : Array.isArray(value)
+          ? {
+              kind: "survey-answer",
+              questionId: orphan.questionId,
+              answerType: "char-list",
+              value: value as string[],
+            }
+          : {
+              kind: "survey-answer",
+              questionId: orphan.questionId,
+              answerType: "text",
+              value: value as string,
+            };
+    useDecisionLogStore.getState().append({
+      stepId: orphan.stepId,
+      payload,
+      provenance: { agency: "hand-set" },
+    });
+  }
+}
+
+/**
+ * Migrate a legacy `phaseBDraft` slice into the inventory decision
+ * values (spec 090 T025): parse tolerantly and record the mapped
+ * values. The unmappable entries are RETURNED, not appended here: the
+ * caller appends them after the decisionRecord restore, whose hydrate
+ * would otherwise replace the log and erase them (the same reason the
+ * envelope's own migrationOrphans append runs last). A record with no
+ * slice migrates nothing.
+ */
+function migratePhaseBDraftSlice(raw: unknown): MigrationOrphan[] {
+  if (raw === undefined) return [];
+  const { snapshot, orphans } = parsePhaseBDraftSlice(raw);
+  restoreInventoryFromSnapshot(snapshot);
+  return orphans;
+}
+
+/** The slice fields the v2 phase-B draft slice could carry (spec 090 T025). */
+const PHASE_B_SLICE_KEYS: ReadonlySet<string> = new Set([
+  "chars",
+  "declaredRoles",
+  "provenance",
+  "exemplarDigraphs",
+  "loanwordChars",
+  "rejected",
+  "proposalConfidence",
+  "exemplarMethodDeclined",
+  "seededProposals",
+  "invisibleDecisions",
+  "alphabetEvidenceKey",
+  "selectedFont",
+]);
+
+/**
+ * Parse a legacy `phaseBDraft` slice (spec 090 T025 migration) field by
+ * field and tolerantly — the retired `restorePhaseBDraftSnapshot`
+ * semantics: a malformed field restores to its empty default and keeps
+ * everything else. The one change T025 makes: entries the tolerant parse
+ * cannot map into the decision values are no longer dropped silently —
+ * each is returned as a {@link MigrationOrphan} so the restore can
+ * surface it in the decision trail (the 088 T030 surface; never dropped,
+ * 087 Q5 precedent).
+ */
+function parsePhaseBDraftSlice(raw: unknown): {
+  snapshot: PhaseBDraftSnapshotShape;
+  orphans: MigrationOrphan[];
+} {
+  const orphans: MigrationOrphan[] = [];
+  const orphan = (field: string, value: unknown): void => {
+    orphans.push({
+      questionId: `phaseBDraft.${field}`,
+      stepId: "characters",
+      value: Array.isArray(value) ? value.map((v) => String(v)) : String(value),
+    });
+  };
   const pb = isPlainRecord(raw) ? raw : {};
+  for (const key of Object.keys(pb)) {
+    if (!PHASE_B_SLICE_KEYS.has(key)) orphan(key, pb[key]);
+  }
+  /** The string members of an array field; unmappable members become orphans. */
+  const keptStrings = (field: string, v: unknown): string[] => {
+    if (!Array.isArray(v)) {
+      if (v !== undefined) orphan(field, v);
+      return [];
+    }
+    const dropped = v.filter((x) => typeof x !== "string");
+    if (dropped.length > 0) orphan(field, dropped);
+    return v.filter((x): x is string => typeof x === "string");
+  };
+  /** The string entries of a record field; non-string values become orphans. */
+  const keptEntries = (field: string, v: unknown): Record<string, string> => {
+    const out: Record<string, string> = {};
+    if (!isPlainRecord(v)) {
+      if (v !== undefined) orphan(field, v);
+      return out;
+    }
+    for (const [k, val] of Object.entries(v)) {
+      if (typeof val === "string") out[k] = val;
+      else orphan(`${field}.${k}`, val);
+    }
+    return out;
+  };
   const declaredRoles: Record<string, DeclaredRole> = {};
-  for (const [k, v] of Object.entries(stringEntries(pb.declaredRoles))) {
+  for (const [k, v] of Object.entries(keptEntries("declaredRoles", pb.declaredRoles))) {
     if (v === "letter" || v === "mark") declaredRoles[k] = v;
+    else orphan(`declaredRoles.${k}`, v);
   }
   const invisibleDecisions: Record<string, InvisibleDecision> = {};
-  for (const [k, v] of Object.entries(stringEntries(pb.invisibleDecisions))) {
+  for (const [k, v] of Object.entries(keptEntries("invisibleDecisions", pb.invisibleDecisions))) {
     if (v === "accepted" || v === "declined") invisibleDecisions[k] = v;
+    else orphan(`invisibleDecisions.${k}`, v);
+  }
+  if (pb.alphabetEvidenceKey !== undefined && typeof pb.alphabetEvidenceKey !== "string") {
+    orphan("alphabetEvidenceKey", pb.alphabetEvidenceKey);
+  }
+  if (pb.selectedFont !== undefined && !isPhaseBFontValue(pb.selectedFont)) {
+    orphan("selectedFont", pb.selectedFont);
   }
   return {
-    chars: stringArray(pb.chars),
-    declaredRoles,
-    // Provenance values are an open string union at the storage boundary; the
-    // store only ever compares them against "author", so an unknown origin
-    // simply renders as a proposal from an unnamed source rather than being
-    // dropped and silently re-attributed to the author.
-    provenance: stringEntries(pb.provenance) as Record<string, DraftProvenance>,
-    // Kept OUT of `chars` on the way back in, exactly as on the way out — the
-    // clusters' constituent letters are the alphabet; the clusters are a note
-    // about it.
-    exemplarDigraphs: stringArray(pb.exemplarDigraphs),
-    // Loanword-tier letters: also kept out of `chars`, for the same reason —
-    // they are needed, but they are not the alphabet.
-    loanwordChars: stringArray(pb.loanwordChars),
-    rejected: stringArray(pb.rejected),
-    proposalConfidence: stringEntries(pb.proposalConfidence),
-    exemplarMethodDeclined: pb.exemplarMethodDeclined === true,
-    // spec 075 sticky fields — same tolerant treatment, same reason.
-    seededProposals: stringArray(pb.seededProposals),
-    invisibleDecisions,
-    // spec 079 R-07: a non-string key is dropped, never coerced — an absent
-    // key reads as "not yet stamped", which the prefill confirm handles.
-    ...(typeof pb.alphabetEvidenceKey === "string" ? { alphabetEvidenceKey: pb.alphabetEvidenceKey } : {}),
-    selectedFont: isPhaseBFontValue(pb.selectedFont) ? pb.selectedFont : DEFAULT_PHASE_B_FONT,
+    orphans,
+    snapshot: {
+      chars: keptStrings("chars", pb.chars),
+      declaredRoles,
+      // Provenance values are an open string union at the storage boundary; the
+      // store only ever compares them against "author", so an unknown origin
+      // simply renders as a proposal from an unnamed source rather than being
+      // dropped and silently re-attributed to the author.
+      provenance: keptEntries("provenance", pb.provenance) as Record<string, DraftProvenance>,
+      // Kept OUT of `chars` on the way back in, exactly as on the way out — the
+      // clusters' constituent letters are the alphabet; the clusters are a note
+      // about it.
+      exemplarDigraphs: keptStrings("exemplarDigraphs", pb.exemplarDigraphs),
+      // Loanword-tier letters: also kept out of `chars`, for the same reason —
+      // they are needed, but they are not the alphabet.
+      loanwordChars: keptStrings("loanwordChars", pb.loanwordChars),
+      rejected: keptStrings("rejected", pb.rejected),
+      proposalConfidence: keptEntries("proposalConfidence", pb.proposalConfidence),
+      exemplarMethodDeclined: pb.exemplarMethodDeclined === true,
+      // spec 075 sticky fields — same tolerant treatment, same reason.
+      seededProposals: keptStrings("seededProposals", pb.seededProposals),
+      invisibleDecisions,
+      // spec 079 R-07: a non-string key is dropped, never coerced — an absent
+      // key reads as "not yet stamped", which the prefill confirm handles.
+      ...(typeof pb.alphabetEvidenceKey === "string" ? { alphabetEvidenceKey: pb.alphabetEvidenceKey } : {}),
+      selectedFont: isPhaseBFontValue(pb.selectedFont) ? pb.selectedFont : DEFAULT_PHASE_B_FONT,
+    },
   };
 }
 
@@ -1038,7 +1165,7 @@ function restoreStepStatus(raw: unknown): StepStatus {
 
 /**
  * Rebuild the {@link SurveyAnswerSnapshot} a stored envelope carries, modelled
- * on {@link restorePhaseBDraftSnapshot} (spec 079 FR-032): an unknown step id is
+ * on {@link parsePhaseBDraftSlice} (spec 079 FR-032): an unknown step id is
  * kept verbatim (forward-compat), a malformed answer is DROPPED so that one
  * question shows its proposal, and a missing field yields an empty store.
  */
@@ -1416,15 +1543,14 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     useWorkingCopyStore.setState(workingCopyState);
     applyTraversalSnapshot(envelope.traversal);
 
-    // phaseBDraft (P0 fix): optional/additive field — a pre-this-change record
-    // has none, and a malformed one (non-array `chars`) is tolerated rather
-    // than discarding an otherwise-good record, since it's not load-bearing
-    // for working-copy/traversal correctness the way `traversal`'s shape is.
-    // Either case restores to an empty alphabet, same as today's behaviour.
-    // `selectedFont` (font-selection dropdown addition) is validated the same
-    // tolerant way — a pre-this-change record has no such field, and an
-    // unrecognized value falls back to the default rather than discarding the
-    // record.
+    // The legacy phaseBDraft slice (P0 fix; removed from the written
+    // envelope by spec 090 T025): a record saved before T025 may carry
+    // one, and a malformed field is tolerated rather than discarding an
+    // otherwise-good record, since it's not load-bearing for
+    // working-copy/traversal correctness the way `traversal`'s shape is.
+    // `selectedFont` is validated the same tolerant way — an
+    // unrecognized value falls back to the default rather than
+    // discarding the record (and is surfaced as a migration orphan).
     //
     // The STICKY decision fields ride along the same way (spec 044 FR-017;
     // the gap was surfaced by spec 075 US4): `saveDraft` has always written
@@ -1440,23 +1566,26 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     // switch never inherits another project's decisions.
     //
     // ORDER (specs 089 T017 + 090 T021, both landed on this): the
-    // decisions restore runs BEFORE the phase-B slice restore below.
+    // decisions restore runs BEFORE the phase-B slice migration below.
     // Spec 089: stampPre079Alphabet derives the identity it stamps from
     // the decision store (it read the traversal-restored session field
     // before T017, which is why this ordering used to be safe).
     // Spec 090: since T021 the Phase B draft IS the character-inventory /
-    // invisibles-inventory decision records, so the two restores write
-    // the same state: when the envelope's decisions already carry the
-    // inventory records they are canonical (the slice was folded from
-    // them at save time) and the slice restore is skipped; for envelopes
-    // saved before the records existed (every pre-090 draft) the slice
-    // restore below is what creates them.
+    // invisibles-inventory decision records. T025 removed the slice from
+    // the written envelope; a record saved between the P0 fix and T025
+    // may still carry one. When the envelope's decisions already carry
+    // the inventory records they are canonical (the slice was folded
+    // from them at save time) and the slice is a stale duplicate — it is
+    // ignored. When they don't (every pre-090 draft), the slice holds
+    // the only copy and migrates into the values, with unmappable
+    // entries surfaced as decision-trail orphans, never dropped.
     applyDecisionSnapshot(envelope.decisions ?? {});
     const decisionsCarryInventory =
       envelope.decisions?.["character-inventory"] !== undefined ||
       envelope.decisions?.["invisibles-inventory"] !== undefined;
+    let sliceOrphans: MigrationOrphan[] = [];
     if (!decisionsCarryInventory) {
-      applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
+      sliceOrphans = migratePhaseBDraftSlice((envelope as unknown as Record<string, unknown>).phaseBDraft);
     }
     stampPre079Alphabet();
 
@@ -1494,44 +1623,11 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     }
 
     // migrationOrphans → the decision trail (spec 088 T030; OPEN-088-1
-    // ruled by the owner 2026-10-06, km-lead proposals Q1: the trail is the
-    // surface). Each orphaned v1 answer — a question this build no longer
-    // has — is appended as an ordinary survey-answer entry carrying its
-    // value, so the author can see what the old draft held and re-answer
-    // it in the current questions. The entry uses the trail's existing
-    // shape throughout: the unresolvable question id renders through the
-    // trail's normal degraded-label path (FR-035), and provenance is
-    // "hand-set" — the truthful floor for a value the author gave, with
-    // no proposal evidence surviving migration (the same floor
-    // recordSurveyAnswers uses). Appending is idempotent: the log's
-    // append() no-ops an identical (slot, payload, provenance) revisit,
-    // so re-applying the same migrated envelope cannot duplicate entries.
-    for (const orphan of envelope.migrationOrphans ?? []) {
-      const value = orphan.value;
-      // DecisionPayload's survey-answer variant is discriminated by
-      // answerType, so the payload is built per value shape.
-      const payload: DecisionPayload =
-        typeof value === "boolean"
-          ? { kind: "survey-answer", questionId: orphan.questionId, answerType: "boolean", value }
-          : Array.isArray(value)
-            ? {
-                kind: "survey-answer",
-                questionId: orphan.questionId,
-                answerType: "char-list",
-                value: value as string[],
-              }
-            : {
-                kind: "survey-answer",
-                questionId: orphan.questionId,
-                answerType: "text",
-                value: value as string,
-              };
-      useDecisionLogStore.getState().append({
-        stepId: orphan.stepId,
-        payload,
-        provenance: { agency: "hand-set" },
-      });
-    }
+    // ruled by the owner 2026-10-06, km-lead proposals Q1: the trail is
+    // the surface) — see appendMigrationOrphans. The legacy phase-B
+    // slice's orphans (spec 090 T025) join them here, after the
+    // decisionRecord hydrate above, for the same reason.
+    appendMigrationOrphans([...sliceOrphans, ...(envelope.migrationOrphans ?? [])]);
 
     return { ok: true };
   } catch {
@@ -1878,7 +1974,7 @@ export function installDraftAutosave(projectKey: string): () => void {
 
   const unsubscribeWorkingCopy = useWorkingCopyStore.subscribe(scheduleSave);
   const unsubscribeSurveySession = useSurveySessionStore.subscribe(scheduleSave);
-  const unsubscribePhaseBDraft = usePhaseBDraftStore.subscribe(scheduleSave);
+  const unsubscribePhaseBDraft = useDecisionStore.subscribe(scheduleSave);
   // spec 079 FR-034: saved answers ride this same timer — no second one.
   const unsubscribeSurveyAnswers = useSurveyAnswerStore.subscribe(scheduleSave);
 
@@ -2281,7 +2377,7 @@ export function startCloudSync(getToken: () => string | null): () => void {
 
   const unsubscribeWorkingCopy = useWorkingCopyStore.subscribe(schedule);
   const unsubscribeSurveySession = useSurveySessionStore.subscribe(schedule);
-  const unsubscribePhaseBDraft = usePhaseBDraftStore.subscribe(schedule);
+  const unsubscribePhaseBDraft = useDecisionStore.subscribe(schedule);
   if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", onVisibilityChange);
   }

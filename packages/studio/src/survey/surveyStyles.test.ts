@@ -2,7 +2,7 @@
 // surveyStyles.ts: FONT_OPTIONS, DEFAULT_PHASE_B_FONT, phaseBFontStack, and
 // isPhaseBFontValue. Scope: the pure lookup/fallback/guard logic in
 // isolation — the dropdown UI and store wiring that consume these are
-// covered in Dropdown.test.tsx / phaseBDraftStore.test.ts /
+// covered in Dropdown.test.tsx / phaseBDraftOps.test.ts /
 // draftPersistence.test.ts respectively; do not re-cover them here.
 
 import { describe, it, expect } from "vitest";

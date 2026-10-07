@@ -16,7 +16,8 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { writingDirectionFrom } from "./InvisiblesStep.tsx";
 import { InvisiblesStepHost } from "./InvisiblesStepHost.tsx";
 import { invisibleCandidatesFor } from "./invisibleCandidates.ts";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, getInvisiblesInventoryValue, inventoryOps, resetInventoryDecisions } from "../../survey/useInventoryDraft.ts";
+import { invisibleDecisionsOf } from "../../survey/phaseBDraftOps.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
@@ -34,7 +35,7 @@ function markRtl(): void {
 }
 
 beforeEach(() => {
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 afterEach(() => {
@@ -74,11 +75,11 @@ describe("InvisiblesStep — checkbox toggles bound to invisibleDecisions", () =
     expect(zwnj.getAttribute("aria-checked")).toBe("false");
 
     fireEvent.click(zwnj);
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("accepted");
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
 
     fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("declined");
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("declined");
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("false");
   });
 
@@ -94,7 +95,7 @@ describe("InvisiblesStep — checkbox toggles bound to invisibleDecisions", () =
 
 describe("InvisiblesStep — the result (FR-014, FR-018, FR-024)", () => {
   it("accepted characters reach phaseCConfirmedInventory() and never enter chars or controls", () => {
-    usePhaseBDraftStore.getState().add("!");
+    inventoryOps("characters").add("!");
     const onComplete = vi.fn();
     render(<InvisiblesStepHost onComplete={onComplete} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
@@ -104,8 +105,8 @@ describe("InvisiblesStep — the result (FR-014, FR-018, FR-024)", () => {
     expect(result.phase).toBe("C");
     expect(result.confirmedInventory).toEqual(["!", "‌"]);
     expect(result.confirmedInventory).toEqual(phaseCConfirmedInventory());
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
-    expect(usePhaseBDraftStore.getState().controls).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual(["!"]);
+    expect(getCharacterInventoryValue().controls).toEqual([]);
   });
 
   it("carries one boolean answer per offered candidate, so a declined offer is false rather than absent", () => {
@@ -142,17 +143,17 @@ describe("InvisiblesStep — the result (FR-014, FR-018, FR-024)", () => {
 
 describe("InvisiblesStep — carry-over of code-point entries (FR-017)", () => {
   it("a format character pre-loaded into the draft's controls bucket is offered once, pre-selected, and removed from chars", () => {
-    const s = usePhaseBDraftStore.getState();
+    const s = inventoryOps("characters");
     s.add("⁡"); // FUNCTION APPLICATION — Cf, in neither offered list
     s.add("‌"); // ZWNJ — a fixed-five member reached by code point
     s.add("!");
-    expect(usePhaseBDraftStore.getState().controls).toEqual(["⁡", "‌"]);
+    expect(getCharacterInventoryValue().controls).toEqual(["⁡", "‌"]);
 
     const onComplete = vi.fn();
     render(<InvisiblesStepHost onComplete={onComplete} />, { withStepNav: true });
 
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
-    expect(usePhaseBDraftStore.getState().controls).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual(["!"]);
+    expect(getCharacterInventoryValue().controls).toEqual([]);
     expect(screen.getAllByTestId("invisible-candidate-2061")).toHaveLength(1);
     expect(screen.getByTestId("invisible-candidate-2061").getAttribute("aria-checked")).toBe("true");
     expect(screen.getAllByTestId("invisible-candidate-200c")).toHaveLength(1);
@@ -171,13 +172,13 @@ describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
   it("an accepted candidate survives an unmount/remount with the same evidence", () => {
     const first = render(<InvisiblesStepHost onComplete={vi.fn()} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("accepted");
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
 
     first.unmount();
     render(<InvisiblesStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("accepted");
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
   });
 
@@ -215,7 +216,7 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
   it("a writing-direction change to RTL proposes the bidi candidates while an earlier LTR decision survives", () => {
     const first = render(<InvisiblesStepHost onComplete={vi.fn()} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200c")); // an always-offered candidate
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("accepted");
     first.unmount();
 
     // Shape change: the author is now known to be RTL — new bidi candidates
@@ -227,7 +228,7 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
     render(<InvisiblesStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
     // The earlier decision survives untouched.
-    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("accepted");
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
     // The bidi group is now expanded with its candidates newly offered,
     // defaulting to unchecked (proposed, not "reproposed" — nothing was ever

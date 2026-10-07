@@ -182,7 +182,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
   packages/studio/src/survey/convenience/ConvenienceCharsStep.tsx; the
   `workingCopyStore.session.retainedConvenienceChars` mirror becomes an applied view written
   by `apply` (carve's read is unchanged) in packages/studio/src/stores/workingCopyStore.ts
-- [ ] T025 [US2] Delete `phaseBDraftStore`: store file and its draft slice in
+- [x] T025 [US2] Delete `phaseBDraftStore`: store file and its draft slice in
   packages/studio/src/stores/phaseBDraftStore.ts, packages/studio/src/lib/draftTypes.ts, and
   packages/studio/src/lib/draftPersistence.ts — a saved v2 draft that still carries a
   `phaseBDraft` slice (written between 088 landing and this change) migrates its

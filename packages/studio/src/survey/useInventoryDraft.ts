@@ -3,7 +3,7 @@
 //
 // The characters, punctuation and invisibles steps and StudioShell's
 // CharacterMapPane all edit ONE accumulator. Until US2 that accumulator
-// was `stores/phaseBDraftStore.ts`; now the canonical state is the
+// was a standalone zustand draft store; now the canonical state is the
 // `character-inventory` + `invisibles-inventory` decision records in
 // `decisionStore`, mutated only through the pure ops in
 // phaseBDraftOps.ts and recorded only through the gallery host's decide
@@ -51,11 +51,13 @@ import {
   setAlphabetEvidenceKey,
   setSelectedFont,
   toggleChar,
+  valuesFromSnapshot,
   type CharacterInventoryValue,
   type DraftProvenance,
   type InventoryDecisionValue,
   type InventoryItemProvenance,
   type LastPickContribution,
+  type PhaseBDraftSnapshotShape,
 } from "./phaseBDraftOps.ts";
 
 // ---------------------------------------------------------------------------
@@ -211,6 +213,33 @@ export function recordInvisiblesInventoryValue(
   stepId: string,
 ): void {
   decideGalleryValue(INVISIBLES_MODULE, next, { provenance: "asked" }, stepId, deps());
+}
+
+/**
+ * Clear the sticky proposal decisions (`rejected`, `exemplarMethodDeclined`,
+ * `seededProposals`, `invisibleDecisions`, `alphabetEvidenceKey`) — called
+ * when a genuinely new working copy is instantiated (spec 044 FR-016a).
+ * Was `resetPhaseBDraftDecisions` on the retired facade (spec 090 T025).
+ */
+export function resetInventoryDecisions(): void {
+  inventoryOps("characters").resetDecisions();
+}
+
+/** Reset the whole inventory draft to its empty values (the old store's `reset()`). */
+export function resetInventoryDraft(): void {
+  inventoryOps("characters").reset();
+}
+
+/**
+ * Restore a legacy phase-B snapshot (the retired draft slice's shape) by
+ * recording the decision values it maps to — the v2-draft migration in
+ * lib/draftPersistence.ts (spec 090 T025) drives the durable-draft
+ * restore through here.
+ */
+export function restoreInventoryFromSnapshot(snapshot: PhaseBDraftSnapshotShape): void {
+  const { character, invisibles } = valuesFromSnapshot(snapshot);
+  recordCharacterInventoryValue(character, "characters");
+  recordInvisiblesInventoryValue(invisibles, "characters");
 }
 
 /**

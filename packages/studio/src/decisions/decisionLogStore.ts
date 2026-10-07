@@ -20,7 +20,7 @@
 // linear history rather than five siblings all claiming to replace the original.
 //
 // No persistence of its own — draftPersistence.ts snapshots and rehydrates this
-// store, the same arrangement phaseBDraftStore.ts has.
+// store, the same arrangement the decision store has.
 
 import { create } from "zustand";
 import {
@@ -282,8 +282,8 @@ function highestSeq(entries: readonly DecisionEntry[]): number {
   return max;
 }
 
-// Monotonic id counter, module-side like phaseBDraftStore's `picks`: it is
-// bookkeeping, not state any component subscribes to.
+// Monotonic id counter, module-side: it is bookkeeping, not state any
+// component subscribes to.
 let seq = 0;
 
 /** Reset the id counter. Exported for tests that assert on exact entry ids. */

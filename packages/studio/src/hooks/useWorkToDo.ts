@@ -32,7 +32,10 @@ import { deriveCharacterFlags } from "../survey/characterFlags.ts";
 import { derivePunctuationFlags } from "../survey/punctuation/punctuationFlags.ts";
 import { useSourcedExemplars } from "../survey/useSourcedExemplars.ts";
 import { punctuationKey } from "../steps/evidence.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import {
+  getCharacterInventoryValue,
+} from "../survey/useInventoryDraft.ts";
+import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
 import { selectWorkToDo, type WorkItem, type NotAskedGateInput, type FlaggedAnswerInput } from "../steps/workToDo.ts";
 import type { StepId } from "../steps/answerTypes.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
@@ -57,7 +60,11 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
   const bcp47 = useDecisionStore((s) => deriveSurveyContext(s.decisions).bcp47_tag);
   const marksStepAnswers = useSurveyAnswerStore((s) => s.steps.marks);
   const charactersStepAnswers = useSurveyAnswerStore((s) => s.steps.characters);
-  const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
+  const alphabetEvidenceKey = useDecisionStore(
+    (s) =>
+      (s.decisions["character-inventory"]?.value as CharacterInventoryValue | undefined)
+        ?.alphabetEvidenceKey,
+  );
   const punctuationInventoryAnswer = useSurveyAnswerStore(
     (s) => s.steps.punctuation?.answers["punctuation.inventory"],
   );
@@ -248,7 +255,7 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
 
   const charactersFlagged = deriveCharacterFlags(
     surveyAnswers.steps.characters?.answers ?? EMPTY_ANSWERS,
-    usePhaseBDraftStore.getState().alphabetEvidenceKey ?? "",
+    getCharacterInventoryValue().alphabetEvidenceKey ?? "",
   );
 
   const notAsked: Record<StepId, NotAskedGateInput> = {};
