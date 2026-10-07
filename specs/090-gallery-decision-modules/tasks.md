@@ -413,6 +413,12 @@ settled decision, checked against the decision list — no gaps, no duplicates.
   in packages/studio/src/steps/galleryHost.tsx and
   packages/studio/src/decisions/createStudioDecisionRecorder.ts; answer-driven recording for
   migrated steps is removed so nothing double-records in packages/studio/src/steps/reducer.ts
+  — **STOPPED for a lead ruling (D-090-43)**: the landed recorder keys survey-answer
+  supersession slots by decision id; no log payload kind can carry a gallery decision
+  value (survey-answer values are scalar/string-list typed). Options (a) new contracts
+  payload kind, (b) synthesized summary-string survey-answer entries, (d) defer US5 —
+  recorded with risks in research.md. T051–T053 ride this mechanism and are blocked
+  with it.
 - [ ] T051 [P] [US5] Close the named G7 gaps: entries verified present for `windows-layout`,
   `rule-set`, `touch-seed-source`, `deadkeys-defined`, `punctuation-inventory`,
   `retained-convenience-chars` in a store-level test through the real `StepHost` in

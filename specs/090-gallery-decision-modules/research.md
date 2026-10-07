@@ -1830,3 +1830,40 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   the ratified record-from-working-copy design, so registering
   them would red the audit against the ruling — the US3 species,
   whose disposition was ruled non-registration (D-090-31/-34).
+- **D-090-43 — T050 STOPPED for a lead ruling: its premise about
+  the recorder does not hold in the landed code.** T050 assumes a
+  "decision-id-keyed recorder 088 established" through which the
+  gallery host can record one log entry per settled decision.
+  What 088 actually established (decisionLogStore.ts slot keying,
+  FR-008/C-5) is that a *survey-answer* entry's supersession slot
+  is keyed by the decision id its question provides. The log's
+  payload union (contracts decisionRecord.ts) has exactly three
+  kinds — survey-answer, editor-action, base-contribution — and
+  survey-answer values are typed per AnswerType (text / select /
+  boolean / char-list / char-single / key-name / store-content:
+  strings, string lists, booleans). Gallery decision values
+  (rule-set additions, deadkey ops, carve dispositions, physical
+  assignments, touch ops) fit none of them, and no payload kind
+  carries a decision id + value. So there is no recorder call
+  the host can make today that records a gallery decision.
+  Options: **(a)** a new contracts payload kind
+  `{kind:"decision", decisionId, …}` + zod schema + slotKeyOf /
+  payloadsEqual arms + engine normalization + trail rendering
+  (DecisionEntryRow/catalog) — the only option satisfying
+  SC-003 as written; risk: it amends the 053/055 record format
+  (DECISION_RECORD_VERSION, sidecar consumers) and is larger
+  than 090's named files. **(b)** the host synthesizes
+  survey-answer entries (answerType "text", value = a bounded
+  human summary of the decision) — fits today's types and slot
+  keying, exactly one entry per decision; risk: the trail
+  records a rendering, not the decision value, and the
+  recorder's proposal-based provenance + 079 screen-recording
+  side effects must be kept from polluting answer bookkeeping.
+  **(c)** editor-action summaries — rejected semantically
+  (counts shape; renders as an edit, not a decision).
+  **(d)** defer US5's entries to a followup and close 090
+  without them, SC-003 recorded unmet; risk: the G7 gap
+  persists into the PR. T051/T052/T053 all ride this mechanism
+  (T052's help-docs entry included), so US5 is blocked as a
+  whole; T063 + Polish proceed meanwhile (T063's "strictly
+  last" yields to the stop rather than idling the spec).
