@@ -27,7 +27,7 @@ import {
   zoomPercent,
 } from "./CharacterMapPane.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup } from "@keyboard-studio/contracts";
@@ -123,12 +123,23 @@ const TEST_BASE = {
   version: "1.0",
 };
 
+/** Record the identity decisions a completed identity step records (spec 089:
+ * the survey context / scaffold spec are derived from these, never seeded
+ * into the session store directly). */
+function seedIdentityDecisions(languageCode: string, languageName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: languageName, provenance: "asked" });
+  record({ id: "language-autonym", value: languageName, provenance: "asked" });
+  record({ id: "language-code", value: languageCode, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
+
 function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
   useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
   });
-  useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+  seedIdentityDecisions(bcp47.split("-")[0]!, languageName);
 }
 
 /** Seed a base whose IR PRODUCES the given glyphs (one rule per char). */
@@ -143,7 +154,7 @@ function seedBaseProducing(produced: string[], bcp47 = "yo", languageName = "Yor
     vfs: { files: new Map() },
     ir: makeTestIR([group]),
   });
-  useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+  seedIdentityDecisions(bcp47.split("-")[0]!, languageName);
 }
 
 // ---------------------------------------------------------------------------
@@ -495,7 +506,7 @@ describe("CharacterMapPane — data path", () => {
 describe("CharacterMapPane — short-circuit (no verified character list)", () => {
   it("baseIr === null: renders the no-verified-list message and never calls characterMapGroups", () => {
     // No instantiateFromBase call — baseIr stays null (workingCopyStore default).
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "yo", language_name: "Yoruba" });
+    seedIdentityDecisions("yo", "Yoruba");
     render(<CharacterMapPane />);
 
     expect(screen.getByText(/No verified character list for Yoruba/i)).toBeTruthy();
@@ -826,7 +837,7 @@ describe("CharacterMapPane — search filter", () => {
       },
     ]);
     act(() => {
-      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "yo", language_name: "Yoruba2" });
+      seedIdentityDecisions("yo", "Yoruba2");
     });
 
     await waitFor(() => {
@@ -987,7 +998,7 @@ describe("CharacterMapPane — search filter", () => {
     // (act + setSurveyContext) — this re-triggers the fetch effect, which
     // resets searchFilters to ALL_FILTERS (and closes the filters panel).
     act(() => {
-      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "fr", language_name: "French" });
+      seedIdentityDecisions("fr", "French");
     });
 
     await waitFor(() => {
@@ -1514,7 +1525,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
     // (act + setSurveyContext) — this re-triggers the fetch effect, which
     // resets hiddenGroups at ~line 210.
     act(() => {
-      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "fr", language_name: "French" });
+      seedIdentityDecisions("fr", "French");
     });
 
     await waitFor(() => {

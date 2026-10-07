@@ -20,6 +20,7 @@ import { snapshotTraversal, useSurveySessionStore } from "../stores/surveySessio
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { decisionsWithoutTouchSeed, getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { stepPositionIds } from "./stepWalk.ts";
 
 export interface JumpOptions {
@@ -121,6 +122,8 @@ export function liveResolveContext(): ResolveContext {
     manifest,
     questionRegistry,
     traversal: snapshotTraversal(),
+    // Spec 088 C-3.2: the gate view over the decision store, seed omitted.
+    decisions: decisionsWithoutTouchSeed(getDecisionSnapshot()),
     hasProject: useWorkingCopyStore.getState().baseKeyboard !== null,
     // Within-step stops for the stages whose walks are not flow questions
     // (a gallery's characters). Without this a footer dot naming a character

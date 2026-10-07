@@ -16,8 +16,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, silEuroLatin } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import {
   hasUnsavedEdits,
   identitySeedFromSession,
@@ -186,58 +185,64 @@ describe("instantiateFromBaseIfConfirmed", () => {
 // Identity seed — the identity step's language reaches a new Track 1 copy
 // ---------------------------------------------------------------------------
 
-/** The identity-lite answers for a language, as the identity step records them. */
-function identityResult(bcp47: string, english: string): IdentityLiteResult {
-  return {
-    autonym: english,
-    english,
-    languageSubtag: bcp47.split("-")[0] ?? "",
-    region: "",
-    targetScriptRaw: "Latn",
-    bcp47,
-    supported: true,
-  } as IdentityLiteResult;
+/**
+ * Record the identity decisions for a language, as the identity step's
+ * completion records them (spec 089: identitySeedFromSession derives the
+ * identity result from these). The derived composed tag is "bfd-Latn" —
+ * the tag the real identity step composes from these answers; the old
+ * hand-written fixture stored "bfd" verbatim, which no real run produced.
+ */
+function seedIdentityDecisions(bcp47: string, english: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: english, provenance: "asked" });
+  record({ id: "language-autonym", value: english, provenance: "asked" });
+  record({ id: "language-code", value: bcp47.split("-")[0] ?? "", provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
+
+function clearIdentityDecisions(): void {
+  useDecisionStore.getState().reset();
 }
 
 describe("identitySeedFromSession", () => {
   afterEach(() => {
-    useSurveySessionStore.getState().setIdentityResult(null);
+    clearIdentityDecisions();
   });
 
   it("carries the composed tag, the English name, and the base's own display name", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     expect(identitySeedFromSession(basicKbdus)).toEqual({
       displayName: basicKbdus.displayName,
-      bcp47: "bfd",
+      bcp47: "bfd-Latn",
       languageName: "Bafut",
     });
   });
 
   it("seeds no keyboard id: choosing one is the author's act", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     expect(identitySeedFromSession(basicKbdus)).not.toHaveProperty("keyboardId");
   });
 
   it("is undefined when the identity step recorded no tag", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("", "Test"));
+    seedIdentityDecisions("", "Test");
     expect(identitySeedFromSession(basicKbdus)).toBeUndefined();
-    useSurveySessionStore.getState().setIdentityResult(null);
+    clearIdentityDecisions();
     expect(identitySeedFromSession(basicKbdus)).toBeUndefined();
   });
 });
 
 describe("instantiateFromBaseIfConfirmed — identity seed", () => {
   afterEach(() => {
-    useSurveySessionStore.getState().setIdentityResult(null);
+    clearIdentityDecisions();
   });
 
   it("starts the working copy with the identity step's language", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     useWorkingCopyStore.getState().reset();
     expect(instantiateFromBaseIfConfirmed(basicKbdus, payload)).toBe(true);
     expect(useWorkingCopyStore.getState().identity).toEqual({
       displayName: basicKbdus.displayName,
-      bcp47: "bfd",
+      bcp47: "bfd-Latn",
       languageName: "Bafut",
     });
   });
@@ -249,7 +254,7 @@ describe("instantiateFromBaseIfConfirmed — identity seed", () => {
   });
 
   it("does not count the seed as an edit, so a base switch needs no confirm", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     useWorkingCopyStore.getState().reset();
     instantiateFromBaseIfConfirmed(basicKbdus, payload);
     expect(hasUnsavedEdits()).toBe(false);

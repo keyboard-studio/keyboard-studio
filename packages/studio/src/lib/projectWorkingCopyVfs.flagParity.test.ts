@@ -1,14 +1,14 @@
-// T011 / spec-014 flag-parity — the working-copy projection produces a
-// BYTE-IDENTICAL emitted .kmn and .keyman-touch-layout side-car whether the
-// mutate seam flag is on or off.
-//
-// Flag-off runs today's path (applyStoreSlotRemovals + applyCarveToVfs's internal
-// filter; text-based mechanism injection). Flag-on also routes the carve and
-// add-gallery IR derivations through the single mutate() write seam
-// (applyCarveMutate / applyAddGalleryMutate → applyMutatePatch). Both must emit
-// identical artifacts for the same edits (M6/SC-008). One scenario table covers
-// carve, add-gallery (spec 014 T017), touch inject and the whole spine (spec 021
-// T010-T012); each row also asserts its edit really changed the output.
+// T011 / spec-014 flag-parity, made single-path by spec 089 T022 (OI-1
+// ruled global — the flag is deleted): the working-copy projection routes
+// the carve and add-gallery IR derivations through the single mutate()
+// write seam (applyCarveMutate / applyAddGalleryMutate → applyMutatePatch),
+// unconditionally. This suite's scenario table — written when it asserted
+// flag-on === flag-off byte parity — now asserts the seam path's emitted
+// .kmn and .keyman-touch-layout side-car directly; the byte expectations
+// are the same ones parity pinned (M6/SC-008). One scenario table covers
+// carve, add-gallery (spec 014 T017), touch inject and the whole spine
+// (spec 021 T010-T012); each row also asserts its edit really changed the
+// output.
 //
 // This file does NOT mock @keyboard-studio/engine — it exercises the real emit
 // pipeline so the comparison is on actual emitted bytes.
@@ -17,7 +17,7 @@
 //   specs/014-mutate-seam-touch-propagation/contracts/mutate-seam.contract.md (M6)
 //   specs/014-mutate-seam-touch-propagation/contracts/flag-and-validator.contract.md (F2)
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -147,9 +147,8 @@ interface Scenario {
   effect: (out: Projected) => void;
 }
 
-/** Run the real projection for one scenario and one flag state. */
-function project(seamOn: boolean, sc: Omit<Scenario, "name" | "effect">): Projected {
-  vi.stubEnv("VITE_KM_MUTATE_SEAM", seamOn ? "1" : "");
+/** Run the real projection for one scenario. */
+function project(sc: Omit<Scenario, "name" | "effect">): Projected {
   const vfs = sc.scaffoldBase === true ? stubKmnVfs("kb", SCAFFOLD_KMN) : stubKmnVfs("kb");
   const assignments = [...(sc.assignments ?? [])];
   projectWorkingCopyVfs({
@@ -168,10 +167,6 @@ function project(seamOn: boolean, sc: Omit<Scenario, "name" | "effect">): Projec
     touch: vfs.get("source/kb.keyman-touch-layout")?.content as string | undefined,
   };
 }
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 /** The whole spine in one run: carve (whole-node + store-slot) + add-gallery + touch inject. */
 const FULL_SPINE: Omit<Scenario, "name" | "effect"> = {
@@ -301,25 +296,21 @@ const SCENARIOS: readonly Scenario[] = [
   },
 ];
 
-describe("projectWorkingCopyVfs — seam flag parity (flag-on === flag-off emit)", () => {
-  it.each(SCENARIOS)("emits byte-identical .kmn and touch side-car with the seam on vs off — $name", (sc) => {
-    const off = project(false, sc);
-    const on = project(true, sc);
-    expect(typeof off.kmn).toBe("string");
-    expect(on.kmn).toBe(off.kmn);
-    expect(on.touch).toBe(off.touch);
-    sc.effect(off);
+describe("projectWorkingCopyVfs — seam projection output (single path, spec 089)", () => {
+  it.each(SCENARIOS)("emits the pinned .kmn and touch side-car — $name", (sc) => {
+    const out = project(sc);
+    expect(typeof out.kmn).toBe("string");
+    sc.effect(out);
   });
 
   it("preserves the entry-group safety gate under the seam (deleting the entry group warns + skips, no re-emit)", () => {
     // group#main is the entry group (first non-readonly). Deleting it must warn
-    // and leave the VFS unchanged in BOTH flag states.
+    // and leave the VFS unchanged.
     const overlay = { deletedNodeIds: new Set(["group#main"]) };
 
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-    const offVfs = stubKmnVfs("kb");
-    const offRes = projectWorkingCopyVfs({
-      vfs: offVfs,
+    const vfs = stubKmnVfs("kb");
+    const res = projectWorkingCopyVfs({
+      vfs,
       keyboardId: "kb",
       baseIr: makeFixtureIr(),
       deletedNodeIds: overlay.deletedNodeIds,
@@ -329,24 +320,9 @@ describe("projectWorkingCopyVfs — seam flag parity (flag-on === flag-off emit)
       identity: null,
     });
 
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
-    const onVfs = stubKmnVfs("kb");
-    const onRes = projectWorkingCopyVfs({
-      vfs: onVfs,
-      keyboardId: "kb",
-      baseIr: makeFixtureIr(),
-      deletedNodeIds: overlay.deletedNodeIds,
-      deletedItemIds: new Set(),
-      assignments: [],
-      getPattern: () => undefined,
-      identity: null,
-    });
-
-    // Both paths warn (entry-group gate) and leave the fetched stub untouched.
-    expect(onRes.warnings).toEqual(offRes.warnings);
-    expect(onRes.warnings.some((w) => w.includes("entry group"))).toBe(true);
-    expect(onVfs.get("source/kb.kmn")?.content).toBe(offVfs.get("source/kb.kmn")?.content);
-    expect(onVfs.get("source/kb.kmn")?.content).toBe("c stub\n"); // never re-emitted
+    // The path warns (entry-group gate) and leaves the fetched stub untouched.
+    expect(res.warnings.some((w) => w.includes("entry group"))).toBe(true);
+    expect(vfs.get("source/kb.kmn")?.content).toBe("c stub\n"); // never re-emitted
   });
 });
 
@@ -378,22 +354,18 @@ function golden(name: string): string {
   return readFileSync(resolve(FIXTURES, name), "utf8");
 }
 
-function projectFullSpine(seamOn: boolean): Projected {
-  return project(seamOn, FULL_SPINE);
+function projectFullSpine(): Projected {
+  return project(FULL_SPINE);
 }
 
-describe("projectWorkingCopyVfs — FULL-SPINE flag parity (carve + add-gallery + touch inject)", () => {
-  it("matches the committed golden artifacts in BOTH flag states (regression pin)", () => {
+describe("projectWorkingCopyVfs — FULL-SPINE projection (carve + add-gallery + touch inject)", () => {
+  it("matches the committed golden artifacts (regression pin)", () => {
     const goldenKmn = golden("fullSpine.kmn");
     const goldenTouch = golden("fullSpine.keyman-touch-layout");
 
-    const off = projectFullSpine(false);
-    expect(off.kmn).toBe(goldenKmn);
-    expect(off.touch).toBe(goldenTouch);
-
-    const on = projectFullSpine(true);
-    expect(on.kmn).toBe(goldenKmn);
-    expect(on.touch).toBe(goldenTouch);
+    const out = projectFullSpine();
+    expect(out.kmn).toBe(goldenKmn);
+    expect(out.touch).toBe(goldenTouch);
   });
 
   // Hardening pass #1 — CRLF guard. The byte-identical guarantee is meaningless
@@ -428,42 +400,22 @@ describe("projectWorkingCopyVfs — FULL-SPINE flag parity (carve + add-gallery 
     expect(goldenTouch).not.toContain("defaultHint");
   });
 
-  // Hardening pass #4 — validator-verdict equality across flag states.
-  //
-  // The byte-identical .kmn assertion already implies an identical validator
-  // verdict, but only transitively. This asserts the verdict DIRECTLY: run the
-  // real Layer-A engine validator (runAllChecks — pure, text-over-.kmn) over the
-  // full-spine projected .kmn in BOTH flag states and assert the SAME finding set.
-  // This closes "bytes match" → "validator verdict matches" and guards against a
-  // future US5 wiring that reads VITE_KM_MUTATE_SEAM and could diverge the verdict
-  // even while the emitted bytes stay equal.
-  it("the Layer-A validator verdict over the full-spine .kmn is identical in both flag states", () => {
-    const off = projectFullSpine(false);
-    const on = projectFullSpine(true);
-
-    const offFindings: LintFinding[] = runAllChecks(off.kmn);
-    const onFindings: LintFinding[] = runAllChecks(on.kmn);
-
-    // The whole finding set (codes + severities + locations) must match exactly.
-    expect(onFindings).toEqual(offFindings);
+  // Hardening pass #4 — validator verdict, asserted DIRECTLY (not just
+  // transitively through the byte-identical golden): run the real Layer-A
+  // engine validator (runAllChecks — pure, text-over-.kmn) over the
+  // full-spine projected .kmn.
+  it("the Layer-A validator verdict over the full-spine .kmn is clean (and the validator is wired)", () => {
+    const out = projectFullSpine();
+    const findings: LintFinding[] = runAllChecks(out.kmn);
 
     // The full-spine projected .kmn is a VALID keyboard, so a correct Layer-A
     // validator produces ZERO findings over it. (It once produced a few, but
     // those were false positives from keyword-shaped text — index(), deadkey(),
     // any() — inside a `c` comment; removed by the validator's stripNonCode
-    // pass.) Keep the equality above non-vacuous by confirming the validator is
+    // pass.) Keep the assertion non-vacuous by confirming the validator is
     // actually wired: a deliberately-broken variant (an out-of-range codepoint,
     // real code — not in a comment or quote) yields a finding.
-    expect(offFindings).toEqual([]);
-    expect(runAllChecks(off.kmn + "\n+ [K_A] > U+110000\n").length).toBeGreaterThan(0);
-
-    // Mirror the dashboard's unshippablePrefixes signal: the BLOCKING subset
-    // (the input checkSpinePrefixShippability reads) is likewise flag-invariant.
-    // isBlockingFinding is private to completeness.ts, so its predicate is
-    // replicated here (origin !== "upstream" && severity in {error,fatal}); this
-    // is exactly the rule that drives report.unshippablePrefixes.
-    const blocking = (f: LintFinding): boolean =>
-      f.origin !== "upstream" && (f.severity === "error" || f.severity === "fatal");
-    expect(onFindings.filter(blocking)).toEqual(offFindings.filter(blocking));
+    expect(findings).toEqual([]);
+    expect(runAllChecks(out.kmn + "\n+ [K_A] > U+110000\n").length).toBeGreaterThan(0);
   });
 });

@@ -10,8 +10,9 @@
 // NOT required: per D1 the holder defaults to the author name when left blank,
 // so an author who is also the rights holder confirms one field instead of two.
 
-import type { QuestionModule } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
 import type { ExtractContext } from "../../../decisions/extractContext.ts";
+import { deriveAttribution } from "../../../decisions/identitySelectors.ts";
 import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 
 // help_text extends the demoted module's rather than replacing it (HANDOFF-CONTENT
@@ -96,9 +97,23 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
+/**
+ * Decision apply (spec 089 T011): the identity step's attribution lands on
+ * the working copy from the recorded decisions — `extractAttribution`'s
+ * rule composed over `ctx.decisions` by `deriveAttribution` (holder
+ * defaults to the author name, D1). No author name recorded ⇒ no channel:
+ * the working copy's attribution stays exactly as it was. This replaces
+ * IdentityLiteAdapter's completion-time `setAttribution` write.
+ */
+export function apply(_value: string | string[] | undefined, ctx: ApplyContext): WorkingCopyPatch {
+  const attribution = deriveAttribution(ctx.decisions);
+  return attribution === null ? {} : { attribution };
+}
+
 const mod: QuestionModule = {
   definition,
   fixtures,
+  apply,
   inputs: [],
   writes: [],
   // Decision spike (km/decisions-spike).

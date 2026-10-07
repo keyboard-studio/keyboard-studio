@@ -3,12 +3,15 @@
     "stepId": "identity",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setIdentityResult",
-      "setSurveyContext",
+      "recordAll",
       "advance"
     ],
     "workingCopyMutations": [
-      "recordPhase"
+      "recordPhase",
+      "setAttribution"
+    ],
+    "decisionMutations": [
+      "recordAll"
     ],
     "navigateTo": []
   },
@@ -19,31 +22,37 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setBaseConfirmed",
       "setLocalBase",
-      "setBaseConfirmed",
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
     "stepId": "track",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setSelectedTrack",
-      "setScaffoldSpec",
+      "recordAll",
       "advance",
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [
       "recordPhase"
+    ],
+    "decisionMutations": [
+      "recordAll"
     ],
     "navigateTo": []
   },
@@ -54,6 +63,7 @@
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -70,6 +80,7 @@
       "recordPhase",
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -81,6 +92,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -94,6 +106,7 @@
       "recordPhase",
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -105,6 +118,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -114,6 +128,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -123,6 +138,7 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -136,6 +152,7 @@
     "workingCopyMutations": [
       "lockDesktop"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -145,6 +162,9 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
@@ -156,8 +176,10 @@
       "advance"
     ],
     "workingCopyMutations": [
-      "setTouchLayoutJson"
+      "setTouchLayoutJson",
+      "setHistoryEntryState"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -171,6 +193,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": [
       "output"
     ]

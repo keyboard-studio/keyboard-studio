@@ -8,14 +8,16 @@
 //         test that the reducer is standalone and not called from the adapter files).
 //   R5 — unknown step id is a no-op.
 //
-// R1 and R2 run once with the mutate seam flag (VITE_KM_MUTATE_SEAM) off and once
-// with it on: both write paths sit outside the flag gate (spec 021 T007/T008).
-// The flag-gated parts (mutate() requests, touch re-propagation at mechanisms)
-// have their own describes below (spec 014 M3/M6, F1/F2).
+// R1 and R2 each run once: both write paths were always outside the flag
+// gate (spec 021 T007/T008), and since spec 089 T021 deleted the flag
+// (OI-1 ruled global) there is no second state to run. The
+// question-answer write path is the decision-apply runner now (spec 089:
+// steps/applyDecisionEffects.test.ts); touch re-propagation at mechanisms
+// is likewise unconditional (T024 block below).
 //
 // Source of truth: specs/012-step-model-manifest/contracts/manifest-reducer.contract.md
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   applyStepCompletion,
   MECHANISMS_STEP_ID,
@@ -24,14 +26,11 @@ import {
   type ReducerDeps,
   type InstantiateResult,
   type TouchCompleteResult,
-  type MutateRequest,
 } from "./reducer.ts";
 import type { BaseKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { repropagate as mockRepropagate } from "./repropagate.ts";
-import langNameMod from "../survey/questions/reserve/language_name_english.ts";
-import desktopFirstNotice from "../survey/questions/reserve/desktop_first_notice.ts";
 
 // T024 (single-writer rule): spy on repropagate() to assert the reducer no
 // longer injects setTouchLayoutJson into RepropagateDeps.
@@ -82,23 +81,15 @@ function makeDepsMock(): ReducerDeps {
   };
 }
 
-// R1 and R2 are unconditional: they behave the same with the seam flag off and on.
-const SEAM_FLAG_STATES = [
-  ["off", ""],
-  ["on", "1"],
-] as const;
-
 // ---------------------------------------------------------------------------
 // R1 — lock fires at mechanisms step
 // ---------------------------------------------------------------------------
 
-describe.each(SEAM_FLAG_STATES)("R1 — lockDesktop fires at the mechanisms step (seam flag %s)", (_label, flag) => {
+describe("R1 — lockDesktop fires at the mechanisms step", () => {
   let deps: ReducerDeps;
   beforeEach(() => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", flag);
     deps = makeDepsMock();
   });
-  afterEach(() => { vi.unstubAllEnvs(); });
 
   it("calls lockDesktop exactly once, with no arguments, when stepId is 'mechanisms'", () => {
     applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
@@ -130,7 +121,7 @@ describe.each(SEAM_FLAG_STATES)("R1 — lockDesktop fires at the mechanisms step
 // through unchanged; the dep decides null vs a built json string.
 // ---------------------------------------------------------------------------
 
-describe.each(SEAM_FLAG_STATES)("R2 — touch-layout build at the touch step (seam flag %s)", (_label, flag) => {
+describe("R2 — touch-layout build at the touch step", () => {
   let deps: ReducerDeps;
   const baseIr = makeKeyboardIR();
   const baseVfs = makeVirtualFS();
@@ -138,10 +129,8 @@ describe.each(SEAM_FLAG_STATES)("R2 — touch-layout build at the touch step (se
   const EMPTY_MODS = { removals: [], placements: [] };
 
   beforeEach(() => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", flag);
     deps = makeDepsMock();
   });
-  afterEach(() => { vi.unstubAllEnvs(); });
 
   // --- Case A: base ships no touch layout (resolveBaseTouchJson returns undefined) ---
 
@@ -471,12 +460,7 @@ describe("T024 — repropagate() call site no longer injects setTouchLayoutJson"
     deps.getStaleSteps = vi.fn().mockReturnValue(new Set(["touch"]));
     deps.getWorkingIR = vi.fn().mockReturnValue(makeKeyboardIR());
     deps.setWorkingIR = vi.fn();
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
     (mockRepropagate as ReturnType<typeof vi.fn>).mockClear();
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it("calls repropagate() with a deps object that has no setTouchLayoutJson member", () => {
@@ -486,85 +470,19 @@ describe("T024 — repropagate() call site no longer injects setTouchLayoutJson"
     expect("setTouchLayoutJson" in passedDeps).toBe(false);
   });
 
-  // Spec 021 T009: with the flag off, the re-propagation add-on does not run even
-  // though every dep it needs is injected, so only lockDesktop() fires.
-  it("flag off: does not re-propagate; lockDesktop() is the only effect at mechanisms", () => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
+  // Spec 089 T021/T022: re-propagation is unconditional now — the only
+  // remaining condition is that its deps are injected. With the default
+  // deps (no getStaleSteps/getWorkingIR/setWorkingIR), it does not run
+  // and lockDesktop() is the only effect at mechanisms.
+  it("deps absent: does not re-propagate; lockDesktop() is the only effect at mechanisms", () => {
+    const bare = makeDepsMock();
+    applyStepCompletion(MECHANISMS_STEP_ID, undefined, bare);
     expect(mockRepropagate).not.toHaveBeenCalled();
-    expect(deps.lockDesktop).toHaveBeenCalledTimes(1);
-    expect(deps.setWorkingIR).not.toHaveBeenCalled();
-    expect(deps.setTouchLayoutJson).not.toHaveBeenCalled();
-    expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
-    expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Spec 014 T012/T014 — question answers routed through mutate() (M3/M6, F1/F2)
-// ---------------------------------------------------------------------------
-
-describe("mutate seam — question answers routed through mutate()", () => {
-  function mutateDeps(initialIr: KeyboardIR | null) {
-    let ir = initialIr;
-    const deps: ReducerDeps = {
-      ...makeDepsMock(),
-      getWorkingIR: () => ir,
-      setWorkingIR: vi.fn((next: KeyboardIR) => { ir = next; }),
-    };
-    return { deps, getIr: () => ir };
-  }
-
-  function mutateReq(value: string | string[] | undefined): MutateRequest {
-    return { kind: "mutate", mutate: langNameMod.mutate!, value, writes: langNameMod.writes! };
-  }
-
-  afterEach(() => { vi.unstubAllEnvs(); });
-
-  it("flag off: does not call setWorkingIR and leaves the IR unchanged (F2/SC-008)", () => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-    const base = makeTestIR([]);
-    const { deps, getIr } = mutateDeps(base);
-    applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
-    expect(deps.setWorkingIR).not.toHaveBeenCalled();
-    expect(getIr()!.header.name).toBe(base.header.name);
-  });
-
-  describe("flag on", () => {
-    beforeEach(() => { vi.stubEnv("VITE_KM_MUTATE_SEAM", "1"); });
-
-    it("applies the question's mutate() patch to the working IR without touching the base", () => {
-      const base = makeTestIR([]);
-      const { deps, getIr } = mutateDeps(base);
-      applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
-      expect(deps.setWorkingIR).toHaveBeenCalledTimes(1);
-      expect(getIr()!.header.name).toBe("Bafut");
-      expect(base.header.name).toBe("Test");
-    });
-
-    it("is a no-op (no setWorkingIR) when no working copy exists yet", () => {
-      const { deps } = mutateDeps(null);
-      applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
-      expect(deps.setWorkingIR).not.toHaveBeenCalled();
-    });
-
-    it("an empty answer applies an empty patch (no observable IR change) — M5", () => {
-      const base = makeTestIR([]);
-      const { deps, getIr } = mutateDeps(base);
-      applyStepCompletion("language_name_english", mutateReq(""), deps);
-      expect(getIr()!.header.name).toBe(base.header.name);
-    });
-
-    it("a display-only module (empty writes, no mutate) performs no IR change (AC US1-3)", () => {
-      const base = makeTestIR([]);
-      const { deps, getIr } = mutateDeps(base);
-      expect(desktopFirstNotice.writes).toEqual([]);
-      expect(desktopFirstNotice.mutate).toBeUndefined();
-      applyStepCompletion("desktop_first_notice", undefined, deps);
-      expect(deps.setWorkingIR).not.toHaveBeenCalled();
-      expect(getIr()).toEqual(base);
-    });
+    expect(bare.lockDesktop).toHaveBeenCalledTimes(1);
+    expect(bare.setTouchLayoutJson).not.toHaveBeenCalled();
+    expect(bare.buildTouchLayoutJson).not.toHaveBeenCalled();
+    expect(bare.instantiateFromExisting).not.toHaveBeenCalled();
+    expect(bare.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
   });
 });
 
@@ -636,106 +554,8 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
 });
 
 // ---------------------------------------------------------------------------
-// Spec 071 — marks-series completion applies the mark guards
+// Spec 071 — marks-series completion applies the mark guards: RETIRED here
+// (spec 090 T023). The guards moved to the marks-treatment module's apply;
+// the assertions live in survey/questions/gallery/marksTreatment.test.tsx.
 // ---------------------------------------------------------------------------
 
-describe("applyStepCompletion — marks (spec 071, US8)", () => {
-  const ACUTE = "́";
-
-  function marksDeps() {
-    let ir: KeyboardIR | null = null;
-    const deps = {
-      ...makeDepsMock(),
-      getWorkingIR: () => ir,
-      setWorkingIR: (next: KeyboardIR) => {
-        ir = next;
-      },
-      setMarksMigrationNeeded: vi.fn(),
-    };
-    return {
-      deps,
-      seed: (next: KeyboardIR) => {
-        ir = next;
-      },
-      current: () => ir,
-    };
-  }
-
-  function irWithRule(output: string): KeyboardIR {
-    return makeTestIR([
-      {
-        nodeId: "g-main",
-        name: "main",
-        usingKeys: true,
-        rules: [
-          {
-            nodeId: "r1",
-            context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-            output: [{ kind: "char", value: output }],
-          },
-        ],
-      },
-    ]);
-  }
-
-  it("applies blocking guard rules to the working IR (FR-021)", () => {
-    const { deps, seed, current } = marksDeps();
-    seed(irWithRule("a"));
-    applyStepCompletion(
-      "marks",
-      {
-        phase: "C",
-        answers: [],
-        marksWorklist: {
-          ownLetterUnits: ["a", "k"],
-          markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
-          blockedCombinations: [{ base: "k", mark: ACUTE }],
-        },
-        marksOutputForm: "base-plus-mark",
-      },
-      deps,
-    );
-    const guard = current()?.groups.find((g) => g.name === "generated_marks_guard");
-    expect(guard?.rules).toHaveLength(1);
-  });
-
-  it("records the R10 migration flag when base-plus-mark is chosen over a precomposed base", () => {
-    const { deps, seed } = marksDeps();
-    seed(irWithRule("é")); // base emits ready-made forms
-    applyStepCompletion(
-      "marks",
-      {
-        phase: "C",
-        answers: [],
-        marksWorklist: {
-          ownLetterUnits: [],
-          markUnits: [],
-          blockedCombinations: [],
-        },
-        marksOutputForm: "base-plus-mark",
-      },
-      deps,
-    );
-    expect(deps.setMarksMigrationNeeded).toHaveBeenCalledWith(true);
-  });
-
-  it("does nothing without a worklist or without a working IR", () => {
-    const { deps } = marksDeps(); // ir stays null
-    applyStepCompletion(
-      "marks",
-      { phase: "C", answers: [], marksWorklist: { ownLetterUnits: [], markUnits: [], blockedCombinations: [] } },
-      deps,
-    );
-    expect(deps.setMarksMigrationNeeded).not.toHaveBeenCalled();
-  });
-
-  // A `result` of literally `undefined` previously threw
-  // (`payload.marksWorklist` read off an `undefined`-cast value) — surfaced
-  // by the journey-corpus harness (spec 032) driving a marks-free alphabet's
-  // real auto-skip.
-  it("does nothing and does not throw when result is undefined", () => {
-    const { deps } = marksDeps();
-    expect(() => applyStepCompletion("marks", undefined, deps)).not.toThrow();
-    expect(deps.setMarksMigrationNeeded).not.toHaveBeenCalled();
-  });
-});

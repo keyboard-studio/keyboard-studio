@@ -14,7 +14,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import type { BaseKeyboard, ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { createCharacterDiscoveryService } from "@keyboard-studio/engine";
 import type { CldrLoader } from "@keyboard-studio/engine";
-import { MarksSeriesStep } from "./MarksSeriesStep.tsx";
+import { MarksStepHost } from "./MarksStepHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
@@ -41,7 +41,7 @@ async function alphabetFromSample(sample: string): Promise<ConfirmedAlphabet> {
 function renderSeries(alphabet: ConfirmedAlphabet): void {
   useWorkingCopyStore.getState().recordPhase({ phase: "B", answers: [], alphabet });
   act(() => {
-    render(<MarksSeriesStep onComplete={() => {}} />, { withStepNav: true });
+    render(<MarksStepHost onComplete={() => {}} />, { withStepNav: true });
   });
 }
 

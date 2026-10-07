@@ -2,26 +2,30 @@
 // flowStepOptions.tsx (spec 029 Stage 6, T005).
 //
 // makeFlowStepComponent.test.tsx exercises the FACTORY against synthetic
-// buildTrackOptions()/buildSeedOptions() records, so trackOptions.extract,
-// trackOptions.onCommit, and the whole of phaseFOptions were never run at
-// all. This file drives the exported records directly, wiring their
-// FlowStepDeps callbacks to the REAL zustand stores (wrapped in vi.fn spies
-// so we can assert both call semantics and the resulting store state), reset
-// between tests per the surveySessionStore.test.ts idiom.
+// buildTrackOptions()/buildSeedOptions() records, so trackOptions.extract
+// and the whole of phaseFOptions were never run at all. This file drives
+// the exported records directly against the REAL zustand stores, reset
+// between tests by the global test setup.
+//
+// Spec 089: the records no longer carry onCommit — a completion's store
+// effects are the question modules' applies (the identity composition is
+// pinned in decisions/identitySelectors.test.ts; the Phase F composition in
+// decisions/helpDocsFromDecisions.test.ts; the runner in
+// steps/applyDecisionEffects.test.ts). What remains here is what the
+// records still own: buildContext, seeds, extract, and phaseF's onMount
+// HISTORY-proposal derivation.
 //
 // projectNameOptions seed policy (English-preferred keyboard id, FR-031) is
 // covered below; end-to-end SurveyRunner coverage remains in
 // PhaseProjectName.integration.test.tsx.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   trackOptions,
   phaseFOptions,
-  extractHelpDocs,
   projectNameOptions,
   slugRetainsMostLetters,
 } from "./flowStepOptions.tsx";
-import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import { createVirtualFS, makeBaseKeyboard, slugifyKeyboardId } from "@keyboard-studio/contracts";
 import pfMoreDetailGateMod from "../../survey/questions/f/pf_more_detail_gate.ts";
@@ -30,73 +34,42 @@ import pfHistoryEntryMod from "../../survey/questions/f/pf_history_entry.ts";
 import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import type { Decision, DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type {
   BaseDocumentationProfile,
-  HelpDocsAnswers,
   HistoryEntryState,
-  SurveyAnswer,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
-// Deps factory — wires FlowStepDeps callbacks to the REAL stores (via
-// vi.fn spies that call through), so onCommit assertions verify both "was it
-// called" and "did the store actually change".
+// Deps factory — plain FlowStepDeps values over a hand-built decision set
+// (spec 089: the records read derived values, never store setters).
 // ---------------------------------------------------------------------------
 
-function buildDeps(overrides?: Partial<FlowStepDeps>): {
-  deps: FlowStepDeps;
-  setSelectedTrackSpy: ReturnType<typeof vi.fn>;
-  setScaffoldSpecSpy: ReturnType<typeof vi.fn>;
-  setIdentitySpy: ReturnType<typeof vi.fn>;
-  setHelpDocsSpy: ReturnType<typeof vi.fn>;
-  setHistoryEntryStateSpy: ReturnType<typeof vi.fn>;
-} {
-  const setSelectedTrackSpy = vi.fn(
-    (t: "copy" | "adapt" | null) => useSurveySessionStore.getState().setSelectedTrack(t),
-  );
-  const setScaffoldSpecSpy = vi.fn(
-    (s: { keyboardId: string; displayName: string } | null) =>
-      useSurveySessionStore.getState().setScaffoldSpec(s),
-  );
-  const setIdentitySpy = vi.fn(
-    (patch: { keyboardId: string; displayName: string }) =>
-      useWorkingCopyStore.getState().setIdentity(patch),
-  );
-  const setHelpDocsSpy = vi.fn(
-    (patch: HelpDocsAnswers | null) => useWorkingCopyStore.getState().setHelpDocs(patch),
-  );
-  const setHistoryEntryStateSpy = vi.fn(
-    (state: HistoryEntryState | null) => useWorkingCopyStore.getState().setHistoryEntryState(state),
-  );
+/** Build a DecisionSet from raw values, as recordAnswersAsDecisions records them. */
+function decisionSet(values: Partial<Record<DecisionId, unknown>>): DecisionSet {
+  const set: Partial<Record<DecisionId, Decision<unknown>>> = {};
+  for (const [id, value] of Object.entries(values)) {
+    set[id as DecisionId] = { id: id as DecisionId, value, provenance: "asked" };
+  }
+  return set;
+}
 
+
+function buildDeps(overrides?: Partial<FlowStepDeps>): { deps: FlowStepDeps } {
   const deps: FlowStepDeps = {
     localBase: null,
-    identityResult: null,
+    decisions: {},
     surveyContext: {},
-    setSelectedTrack: setSelectedTrackSpy,
-    setScaffoldSpec: setScaffoldSpecSpy,
-    setIdentity: setIdentitySpy,
     findingsByQuestionId: {},
     displayNameRef: { current: "" },
     selectedTrack: null,
-    scaffoldSpec: null,
-    setHelpDocs: setHelpDocsSpy,
     historyEntryState: null,
-    setHistoryEntryState: setHistoryEntryStateSpy,
     ...overrides,
   };
-
-  return {
-    deps,
-    setSelectedTrackSpy,
-    setScaffoldSpecSpy,
-    setIdentitySpy,
-    setHelpDocsSpy,
-    setHistoryEntryStateSpy,
-  };
+  return { deps };
 }
 
 function buildResult(
@@ -127,7 +100,7 @@ describe("trackOptions.buildContext", () => {
 // ---------------------------------------------------------------------------
 
 describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () => {
-  it("seeds track_choice from the session's recorded selectedTrack", () => {
+  it("seeds track_choice from the recorded track (deps.selectedTrack)", () => {
     const { deps } = buildDeps({ selectedTrack: "adapt" });
     expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
   });
@@ -159,14 +132,17 @@ describe("slugRetainsMostLetters", () => {
 });
 
 describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)", () => {
-  const bafutIdentity = {
-    autonym: "Bɨfɨɨ̀",
-    english: "Bafut",
-    bcp47: "bfd",
-  };
+  // Spec 089: the identity the seeds read is derived from the recorded
+  // decisions (language-autonym / language-name / target-script).
+  const bafutDecisions = decisionSet({
+    "language-autonym": "Bɨfɨɨ̀",
+    "language-name": "Bafut",
+    "language-code": "bfd",
+    "target-script": "Latn",
+  });
 
   it("seeds project_display_name from the autonym", () => {
-    const { deps } = buildDeps({ identityResult: bafutIdentity });
+    const { deps } = buildDeps({ decisions: bafutDecisions });
     expect(projectNameOptions.seeds!.getSeedValue("project_display_name", deps)).toBe(
       "Bɨfɨɨ̀",
     );
@@ -174,7 +150,7 @@ describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)"
 
   it("seeds project_keyboard_id from the English name when the display name is the autonym", () => {
     const { deps } = buildDeps({
-      identityResult: bafutIdentity,
+      decisions: bafutDecisions,
       displayNameRef: { current: "Bɨfɨɨ̀" },
     });
     expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
@@ -186,7 +162,12 @@ describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)"
 
   it("falls back to the display-name slug when English is empty", () => {
     const { deps } = buildDeps({
-      identityResult: { autonym: "Hausa", english: "", bcp47: "ha" },
+      decisions: decisionSet({
+        "language-autonym": "Hausa",
+        "language-name": "",
+        "language-code": "ha",
+        "target-script": "Latn",
+      }),
       displayNameRef: { current: "Hausa" },
     });
     expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
@@ -196,11 +177,12 @@ describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)"
 
   it("re-derives from an edited display name that slugifies cleanly", () => {
     const { deps } = buildDeps({
-      identityResult: {
-        autonym: "Ewondo",
-        english: "Ewondo",
-        bcp47: "ewo",
-      },
+      decisions: decisionSet({
+        "language-autonym": "Ewondo",
+        "language-name": "Ewondo",
+        "language-code": "ewo",
+        "target-script": "Latn",
+      }),
       displayNameRef: { current: "Ewondo (AZERTY)" },
     });
     expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
@@ -210,9 +192,15 @@ describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)"
 
   it("FR-031: a previously-recorded keyboardId wins over any re-derived seed", () => {
     const { deps } = buildDeps({
-      identityResult: bafutIdentity,
+      decisions: decisionSet({
+        "language-autonym": "Bɨfɨɨ̀",
+        "language-name": "Bafut",
+        "language-code": "bfd",
+        "target-script": "Latn",
+        "project-display-name": "Bɨfɨɨ̀",
+        "project-keyboard-id": "custom_bfd",
+      }),
       displayNameRef: { current: "Bɨfɨɨ̀" },
-      scaffoldSpec: { keyboardId: "custom_bfd", displayName: "Bɨfɨɨ̀" },
     });
     expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
       "custom_bfd",
@@ -221,8 +209,14 @@ describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)"
 
   it("FR-031: a previously-recorded displayName wins for project_display_name", () => {
     const { deps } = buildDeps({
-      identityResult: bafutIdentity,
-      scaffoldSpec: { keyboardId: "bafut", displayName: "My Bafut Keyboard" },
+      decisions: decisionSet({
+        "language-autonym": "Bɨfɨɨ̀",
+        "language-name": "Bafut",
+        "language-code": "bfd",
+        "target-script": "Latn",
+        "project-display-name": "My Bafut Keyboard",
+        "project-keyboard-id": "bafut",
+      }),
     });
     expect(projectNameOptions.seeds!.getSeedValue("project_display_name", deps)).toBe(
       "My Bafut Keyboard",
@@ -270,62 +264,14 @@ describe("trackOptions.extract", () => {
 });
 
 // ---------------------------------------------------------------------------
-// trackOptions.onCommit
+// trackOptions — record shape (spec 089: no onCommit; effects are the
+// recorded authoring-track decision + track_choice's empty apply)
 // ---------------------------------------------------------------------------
 
-describe("trackOptions.onCommit", () => {
-  it("copy track: calls setSelectedTrack('copy') and does NOT call setScaffoldSpec", () => {
-    const { deps, setSelectedTrackSpy, setScaffoldSpecSpy } = buildDeps();
-    const extracted: TrackPayload = { track: "copy" };
+describe("trackOptions — record shape", () => {
+  it("declares no onCommit", () => {
+    expect("onCommit" in trackOptions).toBe(false);
 
-    trackOptions.onCommit!(extracted, deps);
-
-    expect(setSelectedTrackSpy).toHaveBeenCalledExactlyOnceWith("copy");
-    expect(setScaffoldSpecSpy).not.toHaveBeenCalled();
-    expect(useSurveySessionStore.getState().selectedTrack).toBe("copy");
-  });
-
-  it("adapt track: calls setSelectedTrack('adapt') AND setScaffoldSpec(null)", () => {
-    const { deps, setSelectedTrackSpy, setScaffoldSpecSpy } = buildDeps();
-    const extracted: TrackPayload = { track: "adapt" };
-
-    trackOptions.onCommit!(extracted, deps);
-
-    expect(setSelectedTrackSpy).toHaveBeenCalledExactlyOnceWith("adapt");
-    expect(setScaffoldSpecSpy).toHaveBeenCalledExactlyOnceWith(null);
-    expect(useSurveySessionStore.getState().selectedTrack).toBe("adapt");
-    expect(useSurveySessionStore.getState().scaffoldSpec).toBeNull();
-  });
-
-  it("adapt track: setSelectedTrack fires BEFORE setScaffoldSpec (R7-style ordering within onCommit)", () => {
-    const callOrder: string[] = [];
-    const { deps } = buildDeps({
-      setSelectedTrack: vi.fn((t) => {
-        callOrder.push("setSelectedTrack");
-        useSurveySessionStore.getState().setSelectedTrack(t);
-      }),
-      setScaffoldSpec: vi.fn((s) => {
-        callOrder.push("setScaffoldSpec");
-        useSurveySessionStore.getState().setScaffoldSpec(s);
-      }),
-    });
-
-    trackOptions.onCommit!({ track: "adapt" }, deps);
-
-    expect(callOrder).toEqual(["setSelectedTrack", "setScaffoldSpec"]);
-  });
-
-  it("copy track: a pre-existing scaffoldSpec is left untouched (copy does not clear it)", () => {
-    useSurveySessionStore.getState().setScaffoldSpec({ keyboardId: "existing_kb", displayName: "Existing" });
-    const { deps, setScaffoldSpecSpy } = buildDeps();
-
-    trackOptions.onCommit!({ track: "copy" }, deps);
-
-    expect(setScaffoldSpecSpy).not.toHaveBeenCalled();
-    expect(useSurveySessionStore.getState().scaffoldSpec).toEqual({
-      keyboardId: "existing_kb",
-      displayName: "Existing",
-    });
   });
 });
 
@@ -412,7 +358,7 @@ describe("phaseFOptions.extract", () => {
 });
 
 // ---------------------------------------------------------------------------
-// phaseFOptions — record shape (flowRef / title / usesFindings / no onCommit)
+// phaseFOptions — record shape (flowRef / title / usesFindings / onCommit)
 // ---------------------------------------------------------------------------
 
 describe("phaseFOptions — record shape", () => {
@@ -421,46 +367,8 @@ describe("phaseFOptions — record shape", () => {
     expect(phaseFOptions.usesFindings).toBe(true);
   });
 
-  it("declares an onCommit (spec 061: wires help-docs answers into the working copy)", () => {
-    expect(phaseFOptions.onCommit).toBeDefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// phaseFOptions.onCommit (spec 061)
-// ---------------------------------------------------------------------------
-
-function buildResultG(answers: SurveyAnswer[]): SurveyPhaseResult {
-  return { phase: "G", answers };
-}
-
-describe("phaseFOptions.onCommit", () => {
-  it("calls setHelpDocs when the required description is answered", () => {
-    const { deps, setHelpDocsSpy } = buildDeps();
-    const result = buildResultG([
-      { questionId: "pf_welcome_paragraph", answerType: "text", value: "A keyboard for Piaroa." },
-    ]);
-
-    phaseFOptions.onCommit!(result, deps);
-
-    expect(setHelpDocsSpy).toHaveBeenCalledExactlyOnceWith({
-      description: "A keyboard for Piaroa.",
-      usageTips: [],
-    });
-    expect(useWorkingCopyStore.getState().helpDocs).toEqual({
-      description: "A keyboard for Piaroa.",
-      usageTips: [],
-    });
-  });
-
-  it("does NOT call setHelpDocs when the description is blank", () => {
-    const { deps, setHelpDocsSpy } = buildDeps();
-    const result = buildResultG([]);
-
-    phaseFOptions.onCommit!(result, deps);
-
-    expect(setHelpDocsSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().helpDocs).toBeNull();
+  it("declares no onCommit (spec 089: pf_welcome_paragraph's apply wires the help-docs decisions into the working copy)", () => {
+    expect("onCommit" in phaseFOptions).toBe(false);
   });
 });
 
@@ -476,11 +384,12 @@ describe("phaseFOptions.onMount", () => {
   });
 
   it("derives a fresh 'proposed' state on first mount (previous === null)", () => {
-    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: null });
+    const { deps } = buildDeps({ historyEntryState: null });
 
     phaseFOptions.onMount!(deps);
 
-    expect(setHistoryEntryStateSpy).toHaveBeenCalledTimes(1);
+    // Spec 089: the write goes through the working-copy store directly
+    // (no FlowStepDeps setter) — assert the resulting store state.
     const written = useWorkingCopyStore.getState().historyEntryState;
     expect(written?.status).toBe("proposed");
     expect(written?.proposal.version).toBe("1.0"); // no baseIr set -> "1.0" default
@@ -495,11 +404,13 @@ describe("phaseFOptions.onMount", () => {
       proposal: { version: "1.0", dateIso: "2020-01-01", bullets: ["Initial release."] },
       editedBullets: null,
     };
-    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: previous });
+    useWorkingCopyStore.setState({ historyEntryState: previous });
+    const { deps } = buildDeps({ historyEntryState: previous });
 
     phaseFOptions.onMount!(deps);
 
-    expect(setHistoryEntryStateSpy).not.toHaveBeenCalled();
+    // Same object reference: no write happened.
+    expect(useWorkingCopyStore.getState().historyEntryState).toBe(previous);
   });
 
   it("a version bump (adaptation) re-derives the heading but PRESERVES the original dateIso and status", () => {
@@ -509,216 +420,14 @@ describe("phaseFOptions.onMount", () => {
       proposal: { version: "1.0", dateIso: "2020-01-01", bullets: ["Initial release."] },
       editedBullets: null,
     };
-    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: previous });
+    const { deps } = buildDeps({ historyEntryState: previous });
 
     phaseFOptions.onMount!(deps);
 
-    expect(setHistoryEntryStateSpy).toHaveBeenCalledTimes(1);
     const written = useWorkingCopyStore.getState().historyEntryState;
     expect(written?.proposal.version).toBe("1.1"); // bumpKeyboardVersion("1.0")
     expect(written?.proposal.dateIso).toBe("2020-01-01"); // preserved, not re-stamped
     expect(written?.status).toBe("confirmed"); // carried forward untouched
-  });
-});
-
-// ---------------------------------------------------------------------------
-// phaseFOptions.onCommit — pf_history_entry confirm/edit/dismiss (spec 079 US5)
-// ---------------------------------------------------------------------------
-
-function historyResult(
-  action: "confirm" | "edit" | "dismiss" | "",
-  bulletsText?: string,
-): SurveyPhaseResult {
-  const answers: SurveyAnswer[] = [];
-  if (action !== "") {
-    answers.push({ questionId: "pf_history_entry", answerType: "select", value: action });
-  }
-  if (bulletsText !== undefined) {
-    answers.push({ questionId: "pf_history_entry_bullets", answerType: "text", value: bulletsText });
-  }
-  return buildResultG(answers);
-}
-
-const PROPOSED: HistoryEntryState = {
-  status: "proposed",
-  proposal: { version: "1.0", dateIso: "2026-01-15", bullets: ["Initial release."] },
-  editedBullets: null,
-};
-
-describe("phaseFOptions.onCommit — pf_history_entry", () => {
-  it("confirm: reaches the store as status 'confirmed', editedBullets cleared", () => {
-    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: PROPOSED });
-
-    phaseFOptions.onCommit!(historyResult("confirm"), deps);
-
-    expect(setHistoryEntryStateSpy).toHaveBeenCalledExactlyOnceWith({
-      ...PROPOSED,
-      status: "confirmed",
-      editedBullets: null,
-    });
-    expect(useWorkingCopyStore.getState().historyEntryState?.status).toBe("confirmed");
-  });
-
-  it("edit: reaches the store as status 'edited' with the author's parsed bullets", () => {
-    const { deps } = buildDeps({ historyEntryState: PROPOSED });
-
-    phaseFOptions.onCommit!(historyResult("edit", "My rewritten bullet.\nA second one."), deps);
-
-    const written = useWorkingCopyStore.getState().historyEntryState;
-    expect(written?.status).toBe("edited");
-    expect(written?.editedBullets).toEqual(["My rewritten bullet.", "A second one."]);
-  });
-
-  it("dismiss: reaches the store as status 'dismissed', editedBullets cleared", () => {
-    const { deps } = buildDeps({ historyEntryState: PROPOSED });
-
-    phaseFOptions.onCommit!(historyResult("dismiss"), deps);
-
-    expect(useWorkingCopyStore.getState().historyEntryState?.status).toBe("dismissed");
-    expect(useWorkingCopyStore.getState().historyEntryState?.editedBullets).toBeNull();
-  });
-
-  it("blank/absent answer (not yet decided): does NOT touch the store", () => {
-    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: PROPOSED });
-
-    phaseFOptions.onCommit!(historyResult(""), deps);
-
-    expect(setHistoryEntryStateSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().historyEntryState).toBeNull(); // reset() default
-  });
-
-  it("does nothing when historyEntryState is null (onMount never ran — defensive)", () => {
-    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: null });
-
-    phaseFOptions.onCommit!(historyResult("confirm"), deps);
-
-    expect(setHistoryEntryStateSpy).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// extractHelpDocs (spec 061 US1/US3/US4)
-// ---------------------------------------------------------------------------
-
-function textAnswer(questionId: string, value: string): SurveyAnswer {
-  return { questionId, answerType: "text", value };
-}
-
-describe("extractHelpDocs — US1 required description", () => {
-  it("returns { description, usageTips: [] } when only the description is answered", () => {
-    const result = buildResultG([textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa.")]);
-    expect(extractHelpDocs(result)).toEqual({
-      description: "A keyboard for Piaroa.",
-      usageTips: [],
-    });
-  });
-
-  it("returns undefined when the description is absent", () => {
-    expect(extractHelpDocs(buildResultG([]))).toBeUndefined();
-  });
-
-  it("returns undefined when the description is whitespace-only", () => {
-    const result = buildResultG([textAnswer("pf_welcome_paragraph", "   ")]);
-    expect(extractHelpDocs(result)).toBeUndefined();
-  });
-});
-
-describe("extractHelpDocs — US3 optional default-path answers", () => {
-  it("captures usageTips from pf_usage_tip_1/_2, credits, contactInfo", () => {
-    const result = buildResultG([
-      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
-      textAnswer("pf_usage_tip_1", "Type slowly at first."),
-      textAnswer("pf_usage_tip_2", "Long-press for accents."),
-      textAnswer("pf_credits", "Jane Doe"),
-      textAnswer("pf_contact_info", "jane@example.com"),
-    ]);
-    expect(extractHelpDocs(result)).toEqual({
-      description: "A keyboard for Piaroa.",
-      usageTips: ["Type slowly at first.", "Long-press for accents."],
-      credits: "Jane Doe",
-      contactInfo: "jane@example.com",
-    });
-  });
-
-  it("does NOT read pf_usage_tip_3/_4/_5 — only _1/_2 are reachable (research D-11)", () => {
-    const result = buildResultG([
-      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
-      textAnswer("pf_usage_tip_3", "should never be read"),
-    ]);
-    expect(extractHelpDocs(result)?.usageTips).toEqual([]);
-  });
-
-  it("splits a two-line pf_project_url answer into projectHomeUrl/projectHelpUrl", () => {
-    const result = buildResultG([
-      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
-      textAnswer("pf_project_url", "https://example.com\nhttps://example.com/help"),
-    ]);
-    expect(extractHelpDocs(result)).toEqual({
-      description: "A keyboard for Piaroa.",
-      usageTips: [],
-      projectHomeUrl: "https://example.com",
-      projectHelpUrl: "https://example.com/help",
-    });
-  });
-
-  it("populates only projectHomeUrl when pf_project_url has a single line", () => {
-    const result = buildResultG([
-      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
-      textAnswer("pf_project_url", "https://example.com"),
-    ]);
-    const extracted = extractHelpDocs(result);
-    expect(extracted?.projectHomeUrl).toBe("https://example.com");
-    expect(extracted?.projectHelpUrl).toBeUndefined();
-  });
-});
-
-describe("extractHelpDocs — US4 opt-in additional-detail battery", () => {
-  it("captures all eleven opt-in fields when answered (FR-011/FR-014)", () => {
-    const result = buildResultG([
-      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
-      textAnswer("pf_design_rationale", "a"),
-      textAnswer("pf_font_guidance", "b"),
-      textAnswer("pf_canonical_order", "c"),
-      textAnswer("pf_script_glossary", "d"),
-      textAnswer("pf_example_words", "e"),
-      textAnswer("pf_scope_variety", "f"),
-      textAnswer("pf_provenance_basis", "g"),
-      textAnswer("pf_troubleshooting", "h"),
-      textAnswer("pf_known_limitations", "i"),
-      textAnswer("pf_related_keyboards", "j"),
-      textAnswer("pf_further_reading", "k"),
-    ]);
-    expect(extractHelpDocs(result)).toEqual({
-      description: "A keyboard for Piaroa.",
-      usageTips: [],
-      designRationale: "a",
-      fontGuidance: "b",
-      canonicalOrder: "c",
-      scriptGlossary: "d",
-      exampleWords: "e",
-      scopeVariety: "f",
-      provenanceBasis: "g",
-      troubleshooting: "h",
-      knownLimitations: "i",
-      relatedKeyboards: "j",
-      furtherReading: "k",
-    });
-  });
-
-  // Acceptance Scenario 2 (spec.md US4): validates the EXISTING survey
-  // routing carries through unchanged, not new generation logic — a
-  // Latin-script session never reaches pf_canonical_order, so it is simply
-  // absent from the result's answers; a non-Latin-script session's result
-  // carries it. extractHelpDocs's own job is only to read what is present.
-  it("includes canonicalOrder only when the survey routed the author to it", () => {
-    const nonLatin = buildResultG([
-      textAnswer("pf_welcome_paragraph", "A keyboard for Dagbani."),
-      textAnswer("pf_canonical_order", "Base then mark, left to right."),
-    ]);
-    expect(extractHelpDocs(nonLatin)?.canonicalOrder).toBe("Base then mark, left to right.");
-
-    const latin = buildResultG([textAnswer("pf_welcome_paragraph", "A keyboard for French.")]);
-    expect(extractHelpDocs(latin)?.canonicalOrder).toBeUndefined();
   });
 });
 

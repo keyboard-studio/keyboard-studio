@@ -22,18 +22,18 @@
 // and lib helpers the reducer needs — nothing more.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, RemovalCapability, SurveyAnswer } from "@keyboard-studio/contracts";
-import type { MutateContext } from "../survey/types.ts";
+import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
+import type { ApplyContext, WorkingCopyPatch } from "../survey/types.ts";
 // DesktopModifications is a type from the engine package (a workspace
 // dependency, not an internal studio/src/ layer) — the steps-layer boundary
 // forbids steps/ -> lib/stores/dashboard/components, not other packages.
-import type { DesktopModifications, OutputForm } from "@keyboard-studio/engine";
-import { applyMarkGuards, detectBaseMarkMechanism } from "@keyboard-studio/engine";
-import { applyMutatePatch } from "./mutateApply.ts";
+import type { DesktopModifications } from "@keyboard-studio/engine";
 import { repropagate } from "./repropagate.ts";
-import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import type { Decision, DecisionSet } from "../decisions/decisionTypes.ts";
+import { answerProvenance } from "../decisions/answerProvenance.ts";
+import type { SavedAnswer } from "./answerTypes.ts";
 
 /**
  * The empty/no-op DesktopModifications — used as the TOUCH_STEP_ID case's
@@ -51,13 +51,6 @@ export const MECHANISMS_STEP_ID = "mechanisms" as const;
 
 /** Step id for the Touch (Phase E) step — fires buildTouchLayoutJson on complete. */
 export const TOUCH_STEP_ID = "touch" as const;
-
-/**
- * Step id for the marks series (spec 071) — applies the generated mark guards
- * (blocking swallow rules + stepwise backspace-unwrap stores) to the working
- * IR and records the R10 migration-need flag on complete.
- */
-export const MARKS_STEP_ID = "marks" as const;
 
 /**
  * Step id for the choose-base step — fires the copy/adapt instantiation on complete.
@@ -121,19 +114,6 @@ export interface TouchCompleteResult {
 }
 
 // ---------------------------------------------------------------------------
-// Marks-series completion payload (spec 071) — the SurveyPhaseResult the
-// series step reports, extended with the chosen output form (studio-local
-// payload extension, like TouchCompleteResult; the locked contract types are
-// untouched).
-// ---------------------------------------------------------------------------
-
-export interface MarksCompleteResult extends SurveyPhaseResult {
-  marksWorklist?: PlacementWorklist;
-  /** The S4 whole-keyboard decision ("ready-made" | "base-plus-mark"). */
-  marksOutputForm?: OutputForm;
-}
-
-// ---------------------------------------------------------------------------
 // Injected dependencies (replacing direct lib/stores imports)
 //
 // All deps are functions — the caller injects concrete implementations.
@@ -164,14 +144,14 @@ export interface ReducerDeps {
   ) => void;
   /**
    * Clear the recorded touch_seed_source fork choice (spec 035 R12: a genuine
-   * base re-instantiation invalidates it). Injected as a surveySessionStore
-   * action so this reducer.ts (steps/) does not import stores/ directly, and
-   * so workingCopyStore does not need to import surveySessionStore (which
-   * would create a circular dependency with surveySessionStore's own
-   * setTouchSeedSource reaching into workingCopyStore to clear touchDraft).
+   * base re-instantiation invalidates it). Spec 088: the choice is the
+   * `touch-seed-source` decision now — the host's implementation removes the
+   * record from the decision store AND clears the working copy's touch draft
+   * (research D-06: the side effect rides with the decision's writers).
+   * Injected so this reducer.ts (steps/) does not import stores/ directly.
    * Optional so tests that don't care about the fork can omit it.
    */
-  setTouchSeedSource?: (v: "import-adapt" | "reseed-from-desktop" | null) => void;
+  clearTouchSeedChoice?: () => void;
 
   // --- Lib helpers (from lib/buildTouchLayoutJson + lib/resolveBaseTouchJson) ---
   /**
@@ -229,14 +209,6 @@ export interface ReducerDeps {
    */
   getWorkingIR?: () => KeyboardIR | null;
   /**
-   * Record the spec-046 R10 consequence: the designer picked the
-   * base-plus-mark output form while adapting a base whose own content uses
-   * ready-made forms — converting that existing content is a follow-on
-   * migration need, recorded here and not acted on. Optional (session-flag
-   * setter injected by the host).
-   */
-  setMarksMigrationNeeded?: (needed: boolean) => void;
-  /**
    * Write the merged IR back to the working copy via the OVERLAY-PRESERVING
    * store setter (`setWorkingIR`, NOT `setIR`). These are incremental patches to
    * the working IR and must preserve the carve-deletion overlay
@@ -281,37 +253,38 @@ export interface ReducerDeps {
     screenId: string,
     answers: readonly SurveyAnswer[],
   ) => void;
-}
 
-// ---------------------------------------------------------------------------
-// Mutate request — the payload a question step passes to route its answer
-// through the `mutate()` write seam (spec-014 US1, FR-002/-005).
-// ---------------------------------------------------------------------------
+  // --- decision apply (spec 089 FR-001/FR-002, contracts/apply-contract.md) ---
+  /**
+   * The checked working-copy patch sink (A4). INJECTED for the boundary
+   * reason (StudioShell composes it from the working-copy store's setters):
+   * it performs the `ir` channel's checked merge BEFORE any overlay channel
+   * is written, so a containment failure applies nothing (no partial
+   * patch). Optional, and a no-op when absent — the same load-bearing
+   * optionality as the deps above.
+   */
+  applyWorkingCopyPatch?: (patch: WorkingCopyPatch, writes: readonly IRPath[]) => void;
+  /** Read the live decision set — the `decisions` an apply composes from. */
+  getDecisions?: () => DecisionSet;
+  /** Read the working copy's current HISTORY-entry state (apply context). */
+  getHistoryEntryState?: () => HistoryEntryState | null;
 
-/**
- * A request to apply a single question module's `mutate()` to the working-copy
- * IR. Carried as the `result` payload of `applyStepCompletion` for in-scope
- * question steps. The reducer applies it via `mutateApply` ONLY when the global
- * mutate flag is on; flag-off leaves the P4b declared-only seam unchanged.
- */
-export interface MutateRequest {
-  /** Discriminator so the reducer recognizes a mutate-routed completion. */
-  kind: "mutate";
-  /** The module's `mutate()` implementation (pure patch producer). */
-  mutate: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
-  /** The answer value to apply. */
-  value: string | string[] | undefined;
-  /** The module's declared `writes` — the containment set for the patch (M3). */
-  writes: readonly IRPath[];
-}
-
-function isMutateRequest(r: unknown): r is MutateRequest {
-  return (
-    typeof r === "object" &&
-    r !== null &&
-    (r as { kind?: unknown }).kind === "mutate" &&
-    typeof (r as { mutate?: unknown }).mutate === "function"
-  );
+  // --- decision store (spec 088 FR-003, contract C-2) ---
+  /**
+   * Write decision records into the live decision store. INJECTED for the
+   * same boundary reason as every dep above (`steps/` may not import
+   * `stores/`): StudioShell points this at `useDecisionStore.recordAll`.
+   * Optional, and a no-op when absent — the same load-bearing optionality
+   * as `recordDecision` (a session run without it must produce a
+   * byte-identical keyboard).
+   */
+  writeDecisionRecords?: (records: readonly Decision[]) => void;
+  /** Read the live decision set (for a record's `inputs` snapshot). */
+  readDecisionSet?: () => DecisionSet;
+  /** Read one saved answer (for its pre-fill proposal, research D-05). */
+  getSavedAnswer?: (stepId: string, questionId: string) => SavedAnswer | undefined;
+  /** The starting-point keyboard's id, named as an extracted record's `source`. */
+  getBaseKeyboardId?: () => string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,63 +307,22 @@ export function applyStepCompletion(
   result: unknown,
   deps: ReducerDeps,
 ): void {
-  // --- mutate seam (spec-014 T014): route an in-scope question answer through
-  // mutate() when the flag is on. Flag-off ⇒ no mutate() executes (F2/SC-008).
-  if (isMutateRequest(result)) {
-    if (!isMutateSeamEnabled()) return; // P4b declared-only seam — no IR write.
-    const base = deps.getWorkingIR?.() ?? null;
-    if (base === null) return; // no working copy yet — nothing to merge into.
-    const ctx: MutateContext = { ir: base, writes: result.writes };
-    // mutate() is pure; applyMutatePatch enforces containment (M3) and merges
-    // path-scoped (M2). A throw here is intentional — the failure must surface
-    // (M3), never be swallowed. The IR is left unchanged on rejection.
-    const patch = result.mutate(result.value, ctx);
-    const next = applyMutatePatch(base, patch, result.writes);
-    deps.setWorkingIR?.(next);
-    return;
-  }
-
   switch (stepId) {
-    // Spec 071 — marks-series completion: apply the generated mark guards
-    // (blocking swallow group + stepwise backspace-unwrap stores) to the
-    // working IR, and record the R10 migration-need flag when base-plus-mark
-    // was chosen over a ready-made-form base. All engine-pure; no raw .kmn.
-    case MARKS_STEP_ID: {
-      // `result` may genuinely be absent (a step completed with nothing to
-      // report, e.g. spec 032's journey-corpus harness driving a step the
-      // real UI would auto-skip) — read through optional chaining rather
-      // than destructuring/property-accessing an `undefined` cast directly.
-      // CHOOSE_BASE_STEP_ID below shares this same "result may be absent"
-      // reasoning, though its RESPONSE differs (warns before skipping,
-      // since a missing base there is a foreseen caller error rather than
-      // an expected no-op) — the two cases guard for the same reason, not
-      // in the same way.
-      const payload = result as Partial<MarksCompleteResult> | undefined;
-      const worklist = payload?.marksWorklist;
-      if (worklist === undefined) break;
-      const ir = deps.getWorkingIR?.() ?? null;
-      if (ir === null) break;
-      const outputForm = payload?.marksOutputForm ?? "base-plus-mark";
-      if (outputForm === "base-plus-mark" && detectBaseMarkMechanism(ir) === "precomposed") {
-        deps.setMarksMigrationNeeded?.(true);
-      }
-      const guarded = applyMarkGuards(ir, worklist, outputForm);
-      if (guarded.ir !== ir) {
-        deps.setWorkingIR?.(guarded.ir);
-      }
-      break;
-    }
+    // (No marks case: spec 090 T023 retired it. The marks-treatment
+    // module's apply runs the mark guards from the decision value's
+    // completion payload, and MarksStepHost mirrors the R10 migration
+    // determination into the session.)
 
     // R1 — lock gate: fire lockDesktop() after Mechanisms completes.
     case MECHANISMS_STEP_ID: {
       deps.lockDesktop();
       // spec-014 US2 (T024): a physical step/lock completion triggers automatic
-      // touch re-propagation, GATED on the mutate flag (flag-off ⇒ byte-identical
-      // to P4b — no re-propagation runs). repropagate() itself short-circuits to
-      // a no-op when the staleness closure is empty (R5). Deps are injected to
-      // respect the steps-layer boundary (no stores/ import here).
+      // touch re-propagation. Spec 089 T021 (OI-1 ruled global): the mutate
+      // flag that used to gate this is deleted — re-propagation runs
+      // unconditionally. repropagate() itself short-circuits to a no-op when
+      // the staleness closure is empty (R5). Deps are injected to respect the
+      // steps-layer boundary (no stores/ import here).
       if (
-        isMutateSeamEnabled() &&
         deps.getStaleSteps !== undefined &&
         deps.getWorkingIR !== undefined &&
         deps.setWorkingIR !== undefined
@@ -411,8 +343,8 @@ export function applyStepCompletion(
     // which may import lib/touchEmission.ts; this reducer may not). The one
     // gate this reducer still owns is baseIr === null (nothing to build from).
     case TOUCH_STEP_ID: {
-      // Same "result may genuinely be absent" reasoning as MARKS_STEP_ID
-      // above — destructuring an `undefined` cast directly throws.
+      // "Result may genuinely be absent" — destructuring an `undefined`
+      // cast directly throws.
       const payload = (result as Partial<TouchCompleteResult> | undefined) ?? {};
       const {
         assignments = [],
@@ -502,7 +434,7 @@ export function applyStepCompletion(
         deps.instantiateFromExisting(base, { ...opts, vfs, ir });
         // spec 035 R12: a genuine (re-)instantiation invalidates any previously
         // recorded touch_seed_source choice — the fork must be re-asked.
-        deps.setTouchSeedSource?.(null);
+        deps.clearTouchSeedChoice?.();
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
         // instantiateFromBaseIfConfirmed no-ops (returns false) on a redundant
@@ -518,7 +450,7 @@ export function applyStepCompletion(
           ? deps.instantiateFromBaseIfConfirmed(base, opts, { skipConfirm: true })
           : deps.instantiateFromBaseIfConfirmed(base, opts);
         if (instantiated) {
-          deps.setTouchSeedSource?.(null);
+          deps.clearTouchSeedChoice?.();
         }
       }
       break;
@@ -529,21 +461,6 @@ export function applyStepCompletion(
       break;
   }
 }
-
-// ---------------------------------------------------------------------------
-// routeAnswersThroughMutate — route in-scope question answers through mutate().
-//
-// Moved from StudioShell.tsx (was private) and exported here so StepHost can
-// call it in the centralized completion path without duplicating the logic.
-// Only question modules with both `mutate` and non-empty `writes` are routed
-// (flag-gated via applyStepCompletion → isMutateSeamEnabled). Answer modules
-// that are display-only or answer-store-only are skipped (no `mutate`/`writes`).
-//
-// spec-014 US1 (T014/T015): route each in-scope question answer through its
-// module's `mutate()` write seam. The reducer gates execution on the global
-// mutate flag (off ⇒ no-op, byte-identical to P4b), so this is safe to call
-// unconditionally. A module without `mutate`/with empty `writes` is skipped.
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // recordStepCompletion — the decision-audit seam (spec 053, research D-02).
@@ -581,21 +498,112 @@ export function recordStepCompletion(
   deps.recordDecision?.({ stepId, result });
 }
 
-export function routeAnswersThroughMutate(
+/**
+ * Spec 088 FR-003 (contract C-2): write one decision record per provided
+ * decision for every survey-question answer in a completed step.
+ *
+ * Called once per completion from `StepHost.handleComplete`, in the same
+ * block as `recordPhase` / `applyDecisionEffects` — no other call site
+ * writes question answers into the decision store. For each answer the
+ * module is looked up in `questionRegistry` (the same lookup
+ * `applyDecisionEffects` performs); an answer with no registry entry
+ * writes nothing (C-2.2). Each id in `module.provides` gets one record
+ * carrying the answer's value (broadcast — research §1b: the split rule is
+ * the module's own, and every live module provides exactly one id),
+ * `step` = the completing step, `inputs` = the store's current values for
+ * the module's `requires`, and provenance per research D-05 (derived from
+ * the saved answer's proposal via `answerProvenance`).
+ *
+ * Synchronous; no timer, no async work, no validation pass (C-2.5, D3
+ * untouched). A no-op when the host injected no decision-store dep.
+ */
+export function recordAnswersAsDecisions(
+  result: SurveyPhaseResult,
+  stepId: string,
+  deps: ReducerDeps,
+): void {
+  if (deps.writeDecisionRecords === undefined) return;
+  const current: DecisionSet = deps.readDecisionSet?.() ?? {};
+  const records: Decision[] = [];
+  for (const answer of result.answers) {
+    const mod = questionRegistry[answer.questionId];
+    if (mod === undefined || mod.provides === undefined || mod.provides.length === 0) continue;
+    const saved = deps.getSavedAnswer?.(stepId, answer.questionId);
+    const mapped = answerProvenance(answer.value, saved?.proposal, deps.getBaseKeyboardId?.());
+    let inputs: Decision["inputs"];
+    if (mod.requires !== undefined && mod.requires.length > 0) {
+      const snapshot: NonNullable<Decision["inputs"]> = {};
+      for (const required of mod.requires) {
+        const record = current[required];
+        if (record !== undefined) snapshot[required] = record.value;
+      }
+      if (Object.keys(snapshot).length > 0) inputs = snapshot;
+    }
+    for (const id of mod.provides) {
+      records.push({
+        id,
+        value: answer.value,
+        provenance: mapped.provenance,
+        ...(mapped.source !== undefined && { source: mapped.source }),
+        ...(mapped.offered !== undefined && { offered: mapped.offered }),
+        ...(inputs !== undefined && { inputs }),
+        step: stepId,
+      });
+    }
+  }
+  if (records.length > 0) deps.writeDecisionRecords(records);
+}
+
+// ---------------------------------------------------------------------------
+// applyDecisionEffects — the decision-apply runner (spec 089 FR-001/FR-002,
+// contracts/apply-contract.md). The successor to routeAnswersThroughMutate:
+// where that routed answers through the flag-gated `mutate()` seam, this
+// runs each answered module's `apply()` UNCONDITIONALLY (A1 — no flag, no
+// per-module gate) and hands the returned patch to the injected sink.
+//
+// Called from StepHost.handleComplete AFTER recordAnswersAsDecisions (A6:
+// the completion's decisions are recorded first, so ctx.decisions includes
+// them). Modules without `apply` are skipped. Synchronous; no timer (A8).
+// ---------------------------------------------------------------------------
+
+// The A3 channel authorization (ApplyChannelError + the table + the
+// check) lives in steps/applyAuthorization.ts — a leaf module — so the
+// gallery host can share it without importing this registry-coupled file
+// (spec 090 T012; see that module's header). Re-exported here for the
+// importers that learned it from the runner (089's tests included).
+export { ApplyChannelError, assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
+import { assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
+
+/**
+ * Run the decision effects of a completed step's answers.
+ *
+ * For each answer whose module declares `apply`: build the ApplyContext
+ * (the live IR is re-read per answer, so a later apply in the same
+ * completion sees an earlier apply's IR write), call `apply`, verify every
+ * returned channel against the authorization table, and hand the patch to
+ * the injected sink. An unauthorized channel throws {@link ApplyChannelError}
+ * before the sink is called — no partial patch (A3).
+ *
+ * A no-op when the host injected no patch sink.
+ */
+export function applyDecisionEffects(
   result: SurveyPhaseResult,
   deps: ReducerDeps,
 ): void {
+  if (deps.applyWorkingCopyPatch === undefined) return;
+  const decisions: DecisionSet = deps.getDecisions?.() ?? {};
   for (const answer of result.answers) {
     const mod = questionRegistry[answer.questionId];
-    if (mod === undefined) continue;
-    if (mod.mutate === undefined || (mod.writes ?? []).length === 0) continue;
-    const value = answer.value as string | string[] | undefined;
-    const req: MutateRequest = {
-      kind: "mutate",
-      mutate: mod.mutate,
-      value,
-      writes: mod.writes!,
+    if (mod === undefined || mod.apply === undefined) continue;
+    const writes = mod.writes ?? [];
+    const ctx: ApplyContext = {
+      ir: deps.getWorkingIR?.() ?? null,
+      writes,
+      decisions,
+      currentHistoryEntryState: deps.getHistoryEntryState?.() ?? null,
     };
-    applyStepCompletion(answer.questionId, req, deps);
+    const patch = mod.apply(answer.value as string | string[] | undefined, ctx);
+    if (!assertPatchChannelsAuthorized(answer.questionId, mod, patch)) continue;
+    deps.applyWorkingCopyPatch(patch, writes);
   }
 }

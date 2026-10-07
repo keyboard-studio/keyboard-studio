@@ -209,6 +209,7 @@ import {
 import { FindPanel, type FindPanelResult } from "./keyGrid/FindPanel.tsx";
 import { useModeContextCarry } from "./keyGrid/useModeContextCarry.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { selectTouchSeedSource, useDecisionStore } from "../../stores/decisionStore.ts";
 import { collateInventory, loanwordsLast } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import {
@@ -238,7 +239,6 @@ import {
   composeContributorLabel,
   compositionTooltip,
 } from "./existingMethodLabels.ts";
-import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
@@ -1758,7 +1758,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
+  // Spec 088 FR-005: the recorded seed choice is a decision-store record.
+  const touchSeedSourceStored = useDecisionStore((s) => selectTouchSeedSource(s.decisions));
 
   // "Mark for later review" — authoring metadata only (surveySessionStore),
   // never the working copy. Touch-gallery counterpart of MechanismGallery's
@@ -5367,9 +5368,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     }
     // spec-014 FR-014/R4: a manual edit to the host touch key PROMOTES it to
     // `hand-set` in the working IR so subsequent re-propagation never clobbers
-    // the author's edit. Flag-gated — off ⇒ byte-identical to P4b (no IR write).
+    // the author's edit. Spec 089 T021 (OI-1 ruled global): the mutate flag
+    // that used to gate this is deleted — promotion is unconditional.
     // Logic lives in touchBehavior.ts; this call site stays thin.
-    if (isMutateSeamEnabled() && resolvedHostKey !== null) {
+    if (resolvedHostKey !== null) {
       const store = useWorkingCopyStore.getState();
       const ir = store.ir;
       // INCREMENTAL patch (promote host key to hand-set) — use the

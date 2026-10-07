@@ -554,7 +554,7 @@ describe("persistWorkingCopy", () => {
 
   describe("keyEditOverlay / touchEditorMode persistence (T058)", () => {
     it("DRAFT_VERSION stays 1 — these fields are additive, not a version bump", () => {
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2); // spec 088 FR-007
     });
 
     it("round-trip through sessionStorage snapshot/rehydrate", () => {

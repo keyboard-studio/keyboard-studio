@@ -311,8 +311,52 @@ jobs:
         working-directory: packages/studio
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright (boot-smoke + copy-edit)
-        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit
+      - name: Playwright (boot-smoke + copy-edit + spec 088 live gate)
+        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit decision-store-reload
+
+      # Spec 089 SC-001 golden walk (owner ruling 2026-10-06: store-level
+      # gates in the sandbox; live captures run in CI). The baseline zip is
+      # captured from the PR's BASE ref — the pre-change code — because the
+      # implementation sandbox's Chromium cannot navigate localhost. The
+      # walk spec + helpers are additive files, copied onto the base
+      # checkout; capture runs only while no baseline is committed. Once
+      # the captured zip is committed to the branch (from the
+      # golden-walk-baseline artifact below), this step skips and the
+      # verify step compares against the committed baseline.
+      - name: Golden-walk baseline capture (from PR base, if uncommitted)
+        if: github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .golden-base
+          persist-credentials: false
+
+      - name: Capture golden-walk baseline on base code
+        if: github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == ''
+        run: |
+          cp packages/studio/e2e/golden-walk.spec.ts .golden-base/packages/studio/e2e/
+          cp -r packages/studio/e2e/helpers .golden-base/packages/studio/e2e/
+          mkdir -p .golden-base/packages/studio/e2e/fixtures/golden-walk
+          cp packages/studio/e2e/fixtures/golden-walk/README.md .golden-base/packages/studio/e2e/fixtures/golden-walk/
+          cd .golden-base
+          pnpm install --frozen-lockfile
+          pnpm run codegen-charnames
+          pnpm --filter "@keyboard-studio/studio^..." build
+          cd packages/studio
+          npx playwright install --with-deps chromium
+          GOLDEN_WALK_CAPTURE=1 VITE_KM_MUTATE_SEAM=1 npx playwright test e2e/golden-walk.spec.ts --project=desktop
+          cp e2e/fixtures/golden-walk/basic-kbdfr-copy.zip "$GITHUB_WORKSPACE/packages/studio/e2e/fixtures/golden-walk/"
+
+      - name: Upload captured golden-walk baseline
+        if: always() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-walk-baseline
+          path: packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip
+          if-no-files-found: ignore
+
+      # (The golden-walk verify step sits at the very end of this job, so
+      # its results.json does not displace the main lane's summary below.)
 
       # One-screen result table on the run page: counts plus each failing
       # test's first line per error, from the json reporter (CI-only, see
@@ -361,3 +405,12 @@ jobs:
             packages/studio/test-results/
           retention-days: 14
           if-no-files-found: ignore
+
+      # Spec 089 SC-001, verify mode: fails loudly when the baseline is
+      # missing (never a vacuous pass). Last in the job so its
+      # results.json does not displace the main lane's summary above.
+      - name: Playwright (spec 089 golden walk, verify)
+        if: hashFiles('packages/studio/e2e/golden-walk.spec.ts') != ''
+        env:
+          VITE_KM_MUTATE_SEAM: "1"
+        run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk

@@ -2,9 +2,17 @@
 // These describe the static question-module definition shape (survey/questions/**) —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
-import type { DecisionProposalSource, IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
+import type {
+  Attribution,
+  DecisionProposalSource,
+  HelpDocsAnswers,
+  HistoryEntryState,
+  IRPath,
+  KeyboardIR,
+} from "@keyboard-studio/contracts";
+import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../decisions/extractContext.ts";
+import type { IdentityPatch } from "../stores/workingCopyStore.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -173,21 +181,49 @@ export interface OutputWrite {
 }
 
 /**
- * Context passed to a module's `mutate()` (spec-014, mutate-seam.contract.md).
+ * Context passed to a module's `apply()` (spec 089, contracts/apply-contract.md).
  *
- * The contract leaves the exact field set to the reducer apply site (gated task
- * T014); kept deliberately minimal here — the read-only current `KeyboardIR`
- * snapshot plus the module's own declared `writes` containment set, which the
- * reducer asserts the returned patch stays within.
- *
- * TODO(P5): extend with whatever the reducer apply path (steps/mutateApply.ts)
- * needs once T014 lands — do NOT over-build the shape ahead of that gate.
+ * Everything an apply may read, and nothing it may write directly: the
+ * working copy's current IR (null before instantiation), the module's own
+ * declared `writes` containment set, the FULL decision set as recorded
+ * before this completion's applies run (the completion's own records
+ * included — recording precedes applying, contract A6), and the working
+ * copy's current HISTORY-entry state (the one channel whose next value is
+ * a function of its previous value).
  */
-export interface MutateContext {
-  /** Read-only snapshot of the working-copy IR at apply time. `mutate()` MUST NOT mutate it. */
-  readonly ir: KeyboardIR;
-  /** The module's declared `writes` paths — the only IR locations the returned patch may touch. */
+export interface ApplyContext {
+  /** Current working-copy IR, or null before instantiation. `apply()` MUST NOT mutate it. */
+  readonly ir: KeyboardIR | null;
+  /** The module's declared `writes` paths — the only IR locations the patch's `ir` channel may touch. */
   readonly writes: readonly IRPath[];
+  /** The recorded decisions, including this completion's (A6: record, then apply). */
+  readonly decisions: DecisionSet;
+  /** The working copy's current HISTORY-entry state, or null before it is first derived. */
+  readonly currentHistoryEntryState: HistoryEntryState | null;
+}
+
+/**
+ * The multi-channel result of a module's `apply()` (spec 089 FR-001).
+ *
+ * Every channel is optional; absence means "no write on this channel".
+ * Channels are whole-value replaces — the apply builds the complete next
+ * slice value from `ctx.decisions` (plus `ctx.currentHistoryEntryState`
+ * for the history channel), never a diff. Which channels a module may
+ * return is fixed by the authorization table in contracts/apply-contract.md
+ * (A3): the runner rejects an unauthorized channel with `ApplyChannelError`
+ * and applies nothing.
+ */
+export interface WorkingCopyPatch {
+  /** IR patch, merged under the module's declared `writes` via the checked merge (A4). */
+  ir?: Partial<KeyboardIR>;
+  /** The working copy's identity slice (whole-value replace). */
+  identity?: IdentityPatch;
+  /** The working copy's attribution slice (whole-value replace). */
+  attribution?: Attribution;
+  /** The working copy's help-docs slice (whole-value replace). */
+  helpDocs?: HelpDocsAnswers;
+  /** The working copy's HISTORY-entry state slice (whole-value replace). */
+  historyEntryState?: HistoryEntryState;
 }
 
 /**
@@ -260,30 +296,21 @@ export interface QuestionModule {
   outputs?: readonly OutputWrite[];
 
   /**
-   * Optional IR mutation hook — the question-module IR write seam (spec-014,
-   * mutate-seam.contract.md). RATIFIED SIGNATURE; the implementation in any
-   * module and the reducer apply path remain GATED (task T014) — modules keep
-   * their stubs and nothing calls this yet.
-   *
-   * Contract:
-   *  - PURE: returns a `Partial<KeyboardIR>` patch; MUST NOT mutate `ctx.ir`
-   *    in place or perform side effects (M1/FR-002).
-   *  - The reducer applies the patch as a path-scoped DEEP merge restricted to
-   *    the module's declared `writes` `IRPath`s; nested siblings under a shared
-   *    parent are preserved, not branch-replaced (M2/Q9).
-   *  - Writing outside the declared `writes` is a FAIL-FAST whole-patch
-   *    rejection in all builds — never a partial apply, never swallowed, IR
-   *    left unchanged (M3/Q11/FR-003).
-   *  - IDEMPOTENT: applying the same `value` against the same IR twice is
-   *    byte-identical to applying it once (M4/FR-004).
-   *  - An empty patch `{}` is valid and merges to a no-op (M5); display-only
-   *    (empty `writes`) modules leave `mutate` absent (FR-007).
-   *
-   * Reducer apply path: steps/reducer.ts `applyStepCompletion` →
-   * steps/mutateApply.ts — OUT of scope for the contract surface (gated T014).
+   * The question module's decision-effect hook (spec 089 FR-001,
+   * contracts/apply-contract.md). PURE: computes the completion's effect on
+   * the working copy from the recorded decisions and returns it as a
+   * {@link WorkingCopyPatch}; MUST NOT mutate `ctx` or perform side effects.
+   * The runner (`applyDecisionEffects` in steps/reducer.ts) executes it
+   * unconditionally for every answered module that declares it, after the
+   * completion's decisions are recorded (A6). Channel authorization is
+   * fixed by the contract's table (A3) — returning an unauthorized channel
+   * throws `ApplyChannelError` and applies nothing. An empty patch `{}` is
+   * valid and writes nothing. Modules whose decisions have no working-copy
+   * effect omit `apply` entirely.
    */
-  mutate?: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
+  apply?: (value: string | string[] | undefined, ctx: ApplyContext) => WorkingCopyPatch;
 
+  
   /**
    * Which spec unit(s) govern this question module (spec 031 FR-002). Same
    * vocabulary and shape as Step.specRef (steps/types.ts): `§N` / `§Na` or
@@ -321,9 +348,12 @@ export interface QuestionModule {
 
   /**
    * Custom renderer for bulk decisions (e.g. a character-inventory picker).
-   * Absent (or "default") = the standard question field; a component dissolves
+   * Absent (or "question") = the standard question field; a component dissolves
    * a large editor panel into the same module registry. Size lives in the
-   * renderer, not the module system.
+   * renderer, not the module system. (Spec 090 FR-001: the literal was renamed
+   * from "default" to "question" — owner ruling 2026-10-06, km-lead proposals
+   * Q5 — because gallery modules always carry a component, and "question"
+   * names what the literal actually selects.)
    *
    * Typed as DecisionRendererProps<any>: modules in one registry carry
    * different answer types T, so the field is heterogeneous by design — the
@@ -331,7 +361,7 @@ export interface QuestionModule {
    * declares its own T (e.g. DecisionRendererProps<string[]>).
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  renderer?: "default" | React.ComponentType<DecisionRendererProps<any>>;
+  renderer?: "question" | React.ComponentType<DecisionRendererProps<any>>;
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {
@@ -343,4 +373,25 @@ export interface QuestionModule {
       expectedCode?: string;
     }>;
   };
+}
+
+/**
+ * A gallery decision module (spec 090): a QuestionModule whose decision value
+ * is a rich object rather than a question answer. `apply` and `renderer` are
+ * typed against the decision's real value type `V`; everything else (definition,
+ * provides/requires, inputs/writes, fixtures) is the plain module contract.
+ *
+ * 089's runner (`applyDecisionEffects`) is answer-shaped — it iterates
+ * step-completion answers typed `string | string[] | undefined` — so gallery
+ * modules are NOT run through it. The gallery host (steps/galleryHost.tsx)
+ * records the decision and invokes `apply` directly with an ApplyContext,
+ * reusing the runner's channel authorization and patch sink (research
+ * addendum D-090-1). The single cast back to the heterogeneous
+ * `QuestionModule` happens where the registry composes `galleryModules`.
+ */
+export interface GalleryModule<V> extends Omit<QuestionModule, "apply" | "renderer"> {
+  /** The decision this module settles — exactly one, by construction. */
+  provides: [DecisionId];
+  apply?: (value: V | undefined, ctx: ApplyContext) => WorkingCopyPatch;
+  renderer: React.ComponentType<DecisionRendererProps<V>>;
 }

@@ -1,7 +1,7 @@
 // Per-question module: primary_script (Phase A)
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 
-import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
+import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
@@ -125,12 +125,13 @@ function asScript(value: string | string[] | undefined): string {
  * is a no-op. An empty answer is a no-op (M5). When no language subtag exists yet,
  * the script alone is written so a later `iso_code` answer can prepend the language.
  */
-export function mutate(
+export function apply(
   value: string | string[] | undefined,
-  ctx: MutateContext,
-): Partial<KeyboardIR> {
+  ctx: ApplyContext,
+): WorkingCopyPatch {
   const script = asScript(value);
   if (script === "" || script === "Other") return {};
+  if (ctx.ir === null) return {};
 
   const current = ctx.ir.header.bcp47[0];
   const subtags =
@@ -139,7 +140,7 @@ export function mutate(
   const lang = subtags[0] ?? "";
   if (lang === "") {
     // No language yet — write the script alone (iso_code will prepend the lang).
-    return { header: { bcp47: [script] } as KeyboardIR["header"] };
+    return { ir: { header: { bcp47: [script] } as KeyboardIR["header"] } };
   }
 
   // BCP-47: a script subtag is exactly 4 ASCII letters and, when present, sits
@@ -151,13 +152,13 @@ export function mutate(
   const tail = isScriptSubtag(subtags[1]) ? subtags.slice(2) : subtags.slice(1);
 
   const tag = [lang, script, ...tail].join("-");
-  return { header: { bcp47: [tag] } as KeyboardIR["header"] };
+  return { ir: { header: { bcp47: [tag] } as KeyboardIR["header"] } };
 }
 
 const mod: QuestionModule = {
   definition,
   validate,
-  mutate,
+  apply,
   fixtures,
   inputs: [],
   writes: [irPath("header", "bcp47")],
