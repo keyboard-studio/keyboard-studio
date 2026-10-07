@@ -232,3 +232,15 @@ Option (b) (relocate the FromStores entries out of decisions/) is
 rejected: it restructures a layout three landed specs share, at the
 top of the stack, for no behavioural gain. Execution: in 093's final
 restack pass, against the final tree's module set.
+
+**OWNER RULING on T017 (Matthew, 2026-10-07): option (b) STANDS.**
+Base switch becomes retain + recalculate. When 093's final restack
+pass wires the core into StudioShell's `doCommit`, the F1 rebase
+consent is reworded in the same change: it must no longer promise
+discard ("Switching base keyboards will discard your current edits")
+— it states that the author's decisions are retained and recalculated
+against the new base, and that answers which no longer fit are
+re-proposed (the core's `offered` path), never silently dropped.
+Exact strings are the implementer's, against that requirement. The
+wire-in remains scheduled for the final pass (post-091 restack), not
+a standalone change on this tree.
