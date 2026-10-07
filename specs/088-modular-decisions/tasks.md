@@ -28,8 +28,8 @@ in priority order.
 
 **Purpose**: Establish the green baseline and the one fixture SC-003 depends on.
 
-- [ ] T001 Confirm the baseline is green on `km/modular-decisions` before any change: run `decisions/orderParity.test.ts`, `decisions/gateWalkParity.test.ts`, `steps/manifest.test.ts`, `steps/advance.test.ts`, `steps/decisionsFromTraversal.test.ts`, `lib/draftPersistence.test.ts`, `decisions/decisionLogStore.test.ts` and `components/StepHost.test.tsx` via the studio package's vitest config and record the pass counts in the phase commit message
-- [ ] T002 Capture the v1 draft fixture from `main` @ 18e63aa4 (pre-088 code: check that commit out in a scratch worktree, drive the live save path with identity + track + project_name answered on the copy track, export the resulting `DurableDraft`) into `packages/studio/src/lib/__fixtures__/v1-draft-18e63aa4.json`, following the `lib/__fixtures__/pre079-draft.json` precedent; the fixture MUST have `version: 1` and MUST NOT be hand-edited after capture
+- [x] T001 Confirm the baseline is green on `km/modular-decisions` before any change: run `decisions/orderParity.test.ts`, `decisions/gateWalkParity.test.ts`, `steps/manifest.test.ts`, `steps/advance.test.ts`, `steps/decisionsFromTraversal.test.ts`, `lib/draftPersistence.test.ts`, `decisions/decisionLogStore.test.ts` and `components/StepHost.test.tsx` via the studio package's vitest config and record the pass counts in the phase commit message
+- [x] T002 Capture the v1 draft fixture from `main` @ 18e63aa4 (pre-088 code: check that commit out in a scratch worktree, drive the live save path with identity + track + project_name answered on the copy track, export the resulting `DurableDraft`) into `packages/studio/src/lib/__fixtures__/v1-draft-18e63aa4.json`, following the `lib/__fixtures__/pre079-draft.json` precedent; the fixture MUST have `version: 1` and MUST NOT be hand-edited after capture
 
 **Checkpoint**: Baseline green; fixture captured and committed.
 
