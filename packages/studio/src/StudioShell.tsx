@@ -120,6 +120,7 @@ import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
+import { runLiveExtractionFromStores } from "./decisions/liveExtraction.ts";
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
@@ -1050,6 +1051,24 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // Same-key commits (P1 repeat settle never reaches here; F2 refresh
       // re-commit derives the same key) are no-ops by that same-key check.
       promotePendingAutosave();
+
+      // Spec 092 (FR-001, contracts/live-extraction.md): the live
+      // extraction pass runs HERE — synchronously, once, immediately after
+      // the setup decision's apply above has instantiated the working copy
+      // (the store's baseIr/baseKeyboard slots are now populated) and the
+      // track is known. It seeds unanswered decisions from the starting
+      // point and offers extracted values beside existing answers. A
+      // throwing extract aborts the pass with nothing written (the pass
+      // is atomic); log at error level so the defect is loud, not silent —
+      // the same convention as the reducer's adapt-instantiation failure.
+      try {
+        runLiveExtractionFromStores();
+      } catch (err) {
+        devLog.error(
+          "[live-extraction] extraction pass aborted:",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
     },
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
@@ -1084,6 +1103,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // the confirm click, after the F1 rebase gate — the same moment the
   // flag used to flip).
   const baseKeyboardDecision = useDecisionStore((s) => s.decisions["base-keyboard"]);
+
+  // Spec 092 FR-004 (the setup decision): instantiation waits for BOTH of
+  // the setup decision's inputs — the `base-keyboard` decision above and
+  // the `authoring-track` decision — so the working copy is set up exactly
+  // once, with the track known (HANDOFF G7: previously this effect fired
+  // on the base confirmation alone and `doCommit` read a still-null track,
+  // so the adapt track only took effect on a second commit). Subscribed so
+  // the effect below re-checks when the track is recorded, in either order.
+  const authoringTrackDecision = useDecisionStore((s) => s.decisions["authoring-track"]);
 
   // Pattern map for the working-copy transform — needed from Phase F onwards so
   // mechanism assignments are projected into the OSK preview.
@@ -1157,7 +1185,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
   //
-  // Runs `doCommit` once BOTH are true:
+  // Runs `doCommit` once ALL are true (the third is spec 092 FR-004's
+  // setup-decision gate):
   //   - the author has confirmed a base — the recorded `base-keyboard`
   //     decision (spec 090 T013; recorded by BaseKeyboardRenderer's confirm
   //     through the gallery host, which has already synchronously resolved
@@ -1188,6 +1217,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     const decisionValue = baseKeyboardDecision?.value as { id?: unknown } | undefined;
     const decisionId = typeof decisionValue?.id === "string" ? decisionValue.id : undefined;
     if (decisionId === undefined) return;
+    // Spec 092 FR-004: the setup decision requires the authoring track as
+    // well as the base — do not instantiate until both are recorded. The
+    // track step follows choose_base in the flow, so on a fresh walk this
+    // gate is what moves instantiation from the base confirmation (track
+    // still null — the G7 hazard) to the track's completion.
+    if (authoringTrackDecision === undefined) return;
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localBase;
     if (art && lb && art.base.id === lb.id && lb.id === decisionId) {
@@ -1204,7 +1239,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // above) — omitted from deps to mirror the existing escape-hatch
     // convention in this file (e.g. the reducerDeps memo above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseKeyboardDecision, artifactStage]);
+  }, [baseKeyboardDecision, authoringTrackDecision, artifactStage]);
 
   // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {

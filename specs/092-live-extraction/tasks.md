@@ -38,29 +38,45 @@ The live extraction pass and the setup decision. No user story can be verified w
 extraction has nothing to read until setup has run, and setup is what makes the track known.
 
 **Wave 1 — independent (different files):**
-- [ ] **T010** [P] Implement the live extraction pass per contracts/live-extraction.md:
+- [x] **T010** [P] Implement the live extraction pass per contracts/live-extraction.md:
   modules in derived order, gated-off skipped, `extract` → `validate` (rejection = absent),
   merge into `decisionStore` (unanswered → seeded `extracted` + source; answered → `offered`
   only; nothing extracted → nothing written), lookup defaults in the same pass with
   `default` provenance and named source; returns seeded/offered ids; a throwing
   extract/validate aborts naming the module · packages/studio/src/decisions/liveExtraction.ts (new)
-- [ ] **T011** [P] Unit tests for the merge rules: seed-unanswered, offered-on-answered
+  — DONE, plus the two contract additions the landed type lacked (plan.md G-4):
+  `QuestionModule.lookupDefault` and `QuestionModule.seedWhen`. Writes are
+  computed against a working set and flushed with one `recordAll`, so a
+  throwing module writes nothing.
+- [x] **T011** [P] Unit tests for the merge rules: seed-unanswered, offered-on-answered
   (answer byte-unchanged), validate-reject treated as absent, missing value writes nothing,
   gated-off module skipped, throwing extract names its module, second run idempotent ·
   packages/studio/src/decisions/liveExtraction.test.ts (new)
+  — DONE: 13 tests green (the seven listed cases plus lookup-default seeding,
+  extract-beats-default, inputs snapshot, seedWhen skip).
 
 **⟶ Wait for Wave 1, then:**
-- [ ] **T012** Wire the pass's inputs: build the bundle with `buildExtractContext(baseIr,
+- [x] **T012** Wire the pass's inputs: build the bundle with `buildExtractContext(baseIr,
   baseKeyboard)` from the working-copy store's post-setup slots, and give the pass the
   current decision set so each seeded record's `inputs` snapshot includes its `requires`
   values (notably `authoring-track`) · packages/studio/src/decisions/liveExtraction.ts,
   packages/studio/src/decisions/extractContext.ts (read-only)
-- [ ] **T013** The setup decision (FR-004): a decision that `requires: ["base-keyboard",
+  — DONE: `runLiveExtractionFromStores()` in liveExtraction.ts; inputs
+  snapshot per module from the working set (unit-tested, authoring-track
+  included).
+- [x] **T013** The setup decision (FR-004): a decision that `requires: ["base-keyboard",
   "authoring-track"]` whose `apply` — through 089's patch runner — instantiates the single
   working copy (`instantiateFromBase` / `instantiateFromExisting`, mode from
   `authoring-track`), running exactly once with the track known; on its completion the
   runner invokes the extraction pass (T010) · packages/studio/src/decisions/liveExtraction.ts,
   packages/studio/src/components/StepHost.tsx
+  — DONE per the OQ-2 resolution in plan.md (G-7): no new DecisionId; the
+  single-instantiation effect in `StudioShell.tsx` (not
+  `components/StepHost.tsx` — the artifact and `doCommit` live there) now
+  gates on BOTH records, and `doCommit` invokes the pass at its post-apply
+  point. Five StudioShell commit-drive tests were re-pointed to record the
+  track decision the way the track step's completion does in production
+  (79/79 green).
 
 **Checkpoint:** after setup, the store holds seeded records with sources named — stories can build on it.
 

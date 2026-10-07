@@ -234,4 +234,8 @@ spy harness from 089's restack vs fixtures regenerated on parallel branches),
 not a 092 effect — no 092 code existed when measured. The fixtures are NOT
 regenerated on this branch (the oracle belongs to 089/090 and its
 reconciliation rides their restack); per-phase, this suite is re-run and any
-delta beyond the characterised shape is a stop-and-report.
+delta beyond the characterised shape is a stop-and-report. Also pre-existing
+on this base (verified by stash-and-rerun at Phase 2):
+`tests/steps/stepHost.renderSmoke.test.tsx` fails 2 `touch_seed_source`
+render assertions (24 passed) — a 090-era stub/manifest drift, untouched by
+092's changes and left for the predecessors' reconciliation.

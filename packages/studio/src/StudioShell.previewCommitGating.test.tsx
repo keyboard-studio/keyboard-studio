@@ -120,6 +120,24 @@ function confirmedBaseId(): string | undefined {
 
 const instantiateSpy = instantiateFromBaseIfConfirmed as ReturnType<typeof vi.fn>;
 
+/**
+ * Spec 092 FR-004: instantiation (doCommit) waits for the setup decision's
+ * second input — the `authoring-track` decision — as well as the base
+ * confirmation. In production the track step's completion records it right
+ * after choose_base; these drives collapse the wizard to the choose_base
+ * step, so record it the same way the track completion does. "copy"
+ * preserves the instantiation mode these tests were written against.
+ */
+function recordTrackDecision() {
+  act(() => {
+    useDecisionStore.getState().record({
+      id: "authoring-track",
+      value: "copy",
+      provenance: "asked",
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -217,6 +235,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     settleFor(BASE_B);
 
     fireEvent.click(screen.getByTestId("commit"));
+    recordTrackDecision();
 
     expect(instantiateSpy).toHaveBeenCalledTimes(1);
     expect(instantiateSpy).toHaveBeenCalledWith(
@@ -239,6 +258,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     fireEvent.click(screen.getByTestId("preview-b"));
     settleFor(BASE_B);
     fireEvent.click(screen.getByTestId("commit"));
+    recordTrackDecision();
 
     expect(instantiateSpy).toHaveBeenCalledTimes(1);
     expect(confirmedBaseId()).toBe(BASE_B.id);
@@ -274,6 +294,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     // No settleFor() yet — the compile is still "in flight" for base B.
 
     fireEvent.click(screen.getByTestId("commit"));
+    recordTrackDecision();
     expect(confirmedBaseId()).toBe(BASE_B.id);
     expect(instantiateSpy).not.toHaveBeenCalled();
 
@@ -384,6 +405,7 @@ describe("SurveyView — preview-before-commit capture-ref + commit gating", () 
     // Re-preview to B WITHOUT letting B settle yet, then commit immediately.
     fireEvent.click(screen.getByTestId("preview-b"));
     fireEvent.click(screen.getByTestId("commit"));
+    recordTrackDecision();
 
     // pendingArtifactRef still holds A's settled artifact (stale) while
     // localBase is now B — the id mismatch guard must block instantiation.

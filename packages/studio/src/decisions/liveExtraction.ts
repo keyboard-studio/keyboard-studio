@@ -1,0 +1,217 @@
+// Live extraction pass (spec 092, contracts/live-extraction.md).
+//
+// Runs ONCE, synchronously inside the setup commit, immediately after the
+// setup decision's apply has instantiated the working copy: every
+// applicable module's `extract` (and, failing that, its `lookupDefault`)
+// runs over the starting-point bundle and merges into 088's decisionStore —
+// seeding unanswered decisions with their source named, and placing the
+// value beside (`offered`) an answer the author already gave, never over
+// it. Extracted values are never applied silently (088 HANDOFF: "Values
+// from the starting point become defaults the author knowingly confirms,
+// changes or overturns").
+//
+// The per-module semantics are runDecisionFlow's (spec 087), shared by
+// construction: derived order (orderDecisions), gates from conditional
+// `next` routing (effectiveGatedBy), extract → validate with a rejection
+// treated as absent, a null extract normalised to absent, source identity
+// preferring the catalog id and falling back to the IR header, and a
+// throwing extract/validate aborting with the module id named. What is new
+// here is only the MERGE into a live, partially-answered store — the demo
+// runner resolves a whole flow in one pure pass and has no `offered`
+// concept, so it cannot be reused wholesale (research R1).
+
+import type { QuestionModule } from "../survey/types.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
+import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
+import { deepEqual } from "./deepEqual.ts";
+import type { ExtractContext } from "./extractContext.ts";
+import { buildExtractContext } from "./extractContext.ts";
+import { effectiveGatedBy, orderDecisions } from "./orderDecisions.ts";
+
+/** The slice of the decision store the pass writes through. */
+export interface LiveExtractionStore {
+  readonly decisions: DecisionSet;
+  recordAll: (rs: readonly Decision[]) => void;
+}
+
+export interface LiveExtractionDeps {
+  /** The live registry, any order — the pass walks it in derived order. */
+  modules: readonly QuestionModule[];
+  /** The starting-point bundle, built post-setup (buildExtractContext). */
+  ctx: ExtractContext;
+  store: LiveExtractionStore;
+}
+
+export interface LiveExtractionResult {
+  /** Decision ids the pass seeded (records it wrote as extracted/default). */
+  seeded: DecisionId[];
+  /** Decision ids whose existing answer gained an `offered` value. */
+  offered: DecisionId[];
+}
+
+/** Snapshot a module's `requires` values from the set as it stands now. */
+function snapshotInputs(
+  m: QuestionModule,
+  decisions: DecisionSet,
+): Partial<Record<DecisionId, unknown>> | undefined {
+  if (m.requires === undefined || m.requires.length === 0) return undefined;
+  const snapshot: Partial<Record<DecisionId, unknown>> = {};
+  for (const required of m.requires) {
+    const record = decisions[required];
+    if (record !== undefined) snapshot[required] = record.value;
+  }
+  return snapshot;
+}
+
+function namedThrow(moduleId: string, what: string, err: unknown): Error {
+  return new Error(
+    `${what} for module "${moduleId}" threw: ${err instanceof Error ? err.message : String(err)}`,
+  );
+}
+
+/**
+ * Run the extraction pass. All writes are computed against a working copy
+ * of the store and flushed with one `recordAll` at the end, so a throwing
+ * module aborts the pass with NOTHING written — a broken extractor is a
+ * loud defect, never a partial seed. Idempotent over an unchanged store +
+ * bundle: pass-written records are re-seeded with identical values, and
+ * author answers only gain/update `offered`.
+ */
+export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResult {
+  const { modules, ctx, store } = deps;
+  const source =
+    ctx.catalog?.id ?? ctx.ir?.header.keyboardId ?? ctx.ir?.header.name;
+
+  const working: Record<string, Decision<unknown>> = { ...store.decisions };
+  const writes: Decision[] = [];
+  const seeded: DecisionId[] = [];
+  const offered: DecisionId[] = [];
+
+  for (const m of orderDecisions(modules)) {
+    // Gate: derived from conditional `next` routing, exactly as the demo
+    // runner evaluates it — against the working set, so a decision seeded
+    // earlier in this same pass can open a later module's gate.
+    const gate = effectiveGatedBy(m, modules);
+    if (gate !== undefined) {
+      let pass: boolean;
+      try {
+        pass = gate(working);
+      } catch (err) {
+        throw namedThrow(m.definition.id, "gatedBy", err);
+      }
+      if (!pass) continue;
+    }
+    const provided = m.provides;
+    if (provided === undefined || provided.length === 0) continue;
+
+    // Declared seeding disposition (spec 092): false = this module's value
+    // must not seed or be offered at all under the current decisions
+    // (e.g. the copyright holder on the copy track).
+    if (m.seedWhen !== undefined) {
+      let allowed: boolean;
+      try {
+        allowed = m.seedWhen(working);
+      } catch (err) {
+        throw namedThrow(m.definition.id, "seedWhen", err);
+      }
+      if (!allowed) continue;
+    }
+
+    // Extract, then validate: an extracted value the question itself would
+    // reject is treated as absent (087 fix 4). A null extract is absent.
+    let value: unknown;
+    let provenance: Decision<unknown>["provenance"] | undefined;
+    let valueSource: string | undefined;
+    if (m.extract !== undefined) {
+      try {
+        value = m.extract(ctx);
+      } catch (err) {
+        throw namedThrow(m.definition.id, "extract()", err);
+      }
+      if (value === null) value = undefined;
+      if (value !== undefined) {
+        provenance = "extracted";
+        valueSource = source;
+      }
+    }
+    // Lookup default: only when the starting point carried no evidence.
+    if (value === undefined && m.lookupDefault !== undefined) {
+      let dflt: { value: unknown; source?: string } | undefined;
+      try {
+        dflt = m.lookupDefault(ctx);
+      } catch (err) {
+        throw namedThrow(m.definition.id, "lookupDefault()", err);
+      }
+      if (dflt !== undefined && dflt.value !== undefined && dflt.value !== null) {
+        value = dflt.value;
+        provenance = "default";
+        valueSource = dflt.source;
+      }
+    }
+    if (value === undefined || provenance === undefined) continue;
+
+    if (m.validate !== undefined) {
+      let result;
+      try {
+        result = m.validate(value as string | string[] | undefined);
+      } catch (err) {
+        throw namedThrow(m.definition.id, "validate()", err);
+      }
+      if (!result.ok) continue;
+    }
+
+    const inputs = snapshotInputs(m, working);
+    for (const p of provided) {
+      const existing = working[p];
+      if (
+        existing === undefined ||
+        existing.provenance === "extracted" ||
+        existing.provenance === "default"
+      ) {
+        // Unanswered, or a record this pass (or a previous one) seeded:
+        // (re-)seed. Author-shaped records (asked/derived) never reach
+        // this branch — they are answered by definition here.
+        const record: Decision = {
+          id: p,
+          value,
+          provenance,
+          ...(valueSource !== undefined ? { source: valueSource } : {}),
+          ...(inputs !== undefined ? { inputs } : {}),
+        };
+        working[p] = record;
+        writes.push(record);
+        seeded.push(p);
+      } else if (!deepEqual(existing.value, value)) {
+        // Already answered: the author's record stands untouched except
+        // for `offered` — the extracted/defaulted value beside the answer,
+        // never over it. An identical value is not an offer.
+        const record: Decision = { ...existing, offered: value };
+        working[p] = record;
+        writes.push(record);
+        offered.push(p);
+      }
+    }
+  }
+
+  store.recordAll(writes);
+  return { seeded, offered };
+}
+
+/**
+ * The live wiring (T012): build the bundle from the working-copy store's
+ * post-setup slots (`baseIr`, `baseKeyboard`) and run the pass over the
+ * live registry against the live decision store. Called from the setup
+ * commit (StudioShell's `doCommit`, spec 092 T013) — synchronously, once
+ * per instantiation, never on a timer or per step.
+ */
+export function runLiveExtractionFromStores(): LiveExtractionResult {
+  const wc = useWorkingCopyStore.getState();
+  const ctx = buildExtractContext(wc.baseIr, wc.baseKeyboard);
+  return runLiveExtraction({
+    modules: Object.values(questionRegistry),
+    ctx,
+    store: useDecisionStore.getState(),
+  });
+}

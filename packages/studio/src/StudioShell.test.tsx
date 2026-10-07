@@ -1054,6 +1054,17 @@ describe("F6 wiring: promotePendingAutosave", () => {
       }
     });
 
+    // Spec 092 FR-004: doCommit now also waits for the authoring-track
+    // decision (the setup decision's second input, recorded by the track
+    // step's completion in production) — record it before confirming.
+    act(() => {
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: "copy",
+        provenance: "asked",
+      });
+    });
+
     // Commit — fires doCommit → promotePendingAutosave.
     fireEvent.click(screen.getByTestId("base-confirm"));
 

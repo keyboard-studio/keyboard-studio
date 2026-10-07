@@ -347,6 +347,33 @@ export interface QuestionModule {
   extract?: (ctx: ExtractContext) => unknown;
 
   /**
+   * Lookup default (spec 092): a value this module's decisions take when the
+   * starting point carries no evidence — resolved from a lookup (langtags,
+   * the stored author profile, an analysis) rather than from the bundle's
+   * keyboard. Runs in the live extraction pass only when `extract` produced
+   * nothing; the result runs through `validate()` and becomes
+   * `{ provenance: "default", source: <the lookup's name> }` under the same
+   * merge rules as an extraction (seed unanswered, `offered` beside an
+   * answer). Return `undefined` when the lookup has no value — a missing
+   * value is never silently defaulted. `source` names the lookup using the
+   * vocabulary the step seeders already used ("langtags", "identity",
+   * "base", "analysis"); omit it for a plain default with no named source.
+   */
+  lookupDefault?: (ctx: ExtractContext) => { value: unknown; source?: string } | undefined;
+
+  /**
+   * Seeding disposition (spec 092): whether this module's extracted/defaulted
+   * value may seed (or be offered beside) a decision at all, given the
+   * decisions resolved when the extraction pass reaches this module. Absent
+   * = always seed. Returning false skips the module entirely in the pass —
+   * no seed, no `offered` (e.g. `il_copyright_holder` on the copy track: the
+   * copied notice is retained by the attribution machinery and must not be
+   * offered for re-entry). The mechanism is generic; the track rule lives in
+   * the module's declaration, never in the pass.
+   */
+  seedWhen?: (decisions: DecisionSet) => boolean;
+
+  /**
    * Custom renderer for bulk decisions (e.g. a character-inventory picker).
    * Absent (or "question") = the standard question field; a component dissolves
    * a large editor panel into the same module registry. Size lives in the
