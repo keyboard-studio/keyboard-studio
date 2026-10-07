@@ -24,9 +24,9 @@
 //      records, via workingCopyStore.recordAssignments; then the mechanisms
 //      step completes through the re-homed completion effects (lockDesktop).
 //   4. One touch assignment — a longpress in TouchGallery's
-//      buildTouchMechanismRef shape, completed through the real reducer's touch
-//      step with the same deps StudioShell injects (R11 emission matrix +
-//      buildTouchLayoutJson + setTouchLayoutJson) and the mods
+//      buildTouchMechanismRef shape, completed through the re-homed touch
+//      completion effects (R11 emission matrix + buildTouchLayoutJson +
+//      setTouchLayoutJson, lib/assignLoopCompletion.ts) and the mods
 //      AddTouchAdapter derives.
 //   5. Output — buildSourceZipForDownload (the real download path:
 //      projectWorkingCopyForOutput -> projectWorkingCopyVfs -> compile ->
@@ -82,17 +82,13 @@ import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 import { getDecisionSnapshot, selectTouchSeedSource } from "../../src/stores/decisionStore.ts";
 import { irToCharacterView } from "../../src/lib/irToCharacterView.ts";
 import { deriveDesktopModifications } from "../../src/lib/deriveDesktopModifications.ts";
-import { buildTouchLayoutJson } from "../../src/lib/buildTouchLayoutJson.ts";
-import { resolveBaseTouchJson } from "../../src/lib/resolveBaseTouchJson.ts";
 import { findTouchLayoutPath } from "../../src/lib/findTouchLayoutPath.ts";
-import { resolveTouchSeedSource, shouldEmitTouchLayout } from "../../src/lib/touchEmission.ts";
 import { buildSourceZipForDownload } from "../../src/lib/buildOutputBundle.ts";
+import { type ReducerDeps } from "../../src/steps/reducer.ts";
 import {
-  applyStepCompletion,
-  TOUCH_STEP_ID,
-  type ReducerDeps,
-} from "../../src/steps/reducer.ts";
-import { applyPhysicalCompletionEffects } from "../../src/lib/assignLoopCompletion.ts";
+  applyPhysicalCompletionEffects,
+  applyTouchCompletionEffects,
+} from "../../src/lib/assignLoopCompletion.ts";
 import { PATTERN_DEADKEY, PATTERN_RALT } from "../../src/editors/assignLoop/patternIds.ts";
 
 // ---------------------------------------------------------------------------
@@ -177,26 +173,8 @@ function carveCharacter(ch: string): string[] {
 function studioReducerDeps(): ReducerDeps {
   const wc = () => useWorkingCopyStore.getState();
   return {
-    clearStale: (id) => wc().clearStale(id),
-    setTouchLayoutJson: (json) => wc().setTouchLayoutJson(json),
     instantiateFromBase: (b, o) => wc().instantiateFromBase(b, o),
     instantiateFromExisting: (b, o) => wc().instantiateFromExisting(b, o),
-    // Mirrors StudioShell's wrapper: resolve the seed source, apply the R11
-    // emission matrix, then call the real buildTouchLayoutJson.
-    buildTouchLayoutJson: (baseIrArg, assignments, opts) => {
-      const seedSource = resolveTouchSeedSource(opts.seedSource, opts.baseTouchJson !== undefined);
-      if (!shouldEmitTouchLayout(seedSource, opts.mods, assignments.length > 0)) {
-        return { json: null, warnings: [] };
-      }
-      return buildTouchLayoutJson(baseIrArg, assignments, {
-        ...(seedSource !== "reseed-from-desktop" && opts.baseTouchJson !== undefined
-          ? { baseTouchJson: opts.baseTouchJson }
-          : {}),
-        mods: opts.mods,
-        seedSource,
-      });
-    },
-    resolveBaseTouchJson: (v) => resolveBaseTouchJson(v),
     instantiateFromBaseIfConfirmed: () => {
       throw new Error("not used by this oracle");
     },
@@ -205,24 +183,22 @@ function studioReducerDeps(): ReducerDeps {
   };
 }
 
-/** AddTouchAdapter.handleComplete -> the reducer's touch step. */
+/** AddTouchAdapter.handleComplete -> the touch completion effects (spec 090
+ * T042: R2 re-homed from the reducer to lib/assignLoopCompletion.ts, whose
+ * build wrapper is StudioShell's former deps wrapper verbatim). */
 function completeTouchStep(assignments: TouchAssignment[]): void {
   const s = useWorkingCopyStore.getState();
   const mods =
     s.baseIr === null
       ? { removals: [], placements: [] }
       : deriveDesktopModifications(s.baseIr, s.deletedNodeIds, s.deletedItemIds, s.phaseResults);
-  applyStepCompletion(
-    TOUCH_STEP_ID,
-    {
-      assignments,
-      baseIr: s.baseIr,
-      baseVfs: s.baseVfs,
-      mods,
-      seedSource: selectTouchSeedSource(getDecisionSnapshot()),
-    },
-    studioReducerDeps(),
-  );
+  applyTouchCompletionEffects({
+    assignments,
+    baseIr: s.baseIr,
+    baseVfs: s.baseVfs,
+    mods,
+    seedSource: selectTouchSeedSource(getDecisionSnapshot()),
+  });
 }
 
 // ---------------------------------------------------------------------------

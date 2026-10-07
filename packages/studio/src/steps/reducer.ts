@@ -4,9 +4,10 @@
 // performs survey-level side effects when a step completes. It is keyed by
 // step id and encapsulates the THREE inline side effects currently in SurveyView:
 //
-//   R1 — lock gate: fires lockDesktop() when the "mechanisms" step completes.
-//   R2 — touch-layout build: runs buildTouchLayoutJson + setTouchLayoutJson at
-//          the "touch" step, with the same Case-A/B and graceful degradation.
+//   R1 — RETIRED (spec 090 T041): the lock gate re-homed to
+//          lib/assignLoopCompletion.ts (applyPhysicalCompletionEffects).
+//   R2 — RETIRED (spec 090 T042): the touch-layout build re-homed to
+//          lib/assignLoopCompletion.ts (applyTouchCompletionEffects).
 //   R3 — copy/adapt instantiation: routes Track 2 → instantiateFromExisting,
 //          Track 1/default → instantiateFromBaseIfConfirmed at the "choose_base"
 //          step (today: onInstantiate in StudioShell.tsx:240-253).
@@ -22,40 +23,27 @@
 // and lib helpers the reducer needs — nothing more.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
 import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
-// DesktopModifications is a type from the engine package (a workspace
-// dependency, not an internal studio/src/ layer) — the steps-layer boundary
-// forbids steps/ -> lib/stores/dashboard/components, not other packages.
-import type { DesktopModifications } from "@keyboard-studio/engine";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionSet } from "../decisions/decisionTypes.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
 import type { SavedAnswer } from "./answerTypes.ts";
 
-/**
- * The empty/no-op DesktopModifications — used as the TOUCH_STEP_ID case's
- * default when a caller's payload omits `mods` (defensive; every real caller
- * — AddTouchAdapter — always supplies it).
- */
-const EMPTY_DESKTOP_MODIFICATIONS: DesktopModifications = { removals: [], placements: [] };
-
 // ---------------------------------------------------------------------------
 // Step ids that carry side effects (keyed constants — never inline strings)
 // ---------------------------------------------------------------------------
-
-/** Step id for the Mechanisms (physical assignment) step — fires lockDesktop() on complete. */
-export const MECHANISMS_STEP_ID = "mechanisms" as const;
-
-/** Step id for the Touch (Phase E) step — fires buildTouchLayoutJson on complete. */
-export const TOUCH_STEP_ID = "touch" as const;
-
-/**
- * Step id for the choose-base step — fires the copy/adapt instantiation on complete.
- * (Corresponds to today's "base" SurveyStage and the onInstantiate callback.)
- */
-export const CHOOSE_BASE_STEP_ID = "choose_base" as const;
+// The constants live in the leaf module stepIds.ts (the galleries read
+// them, and a gallery → reducer import would cycle through the question
+// registry — spec 090 T042); re-exported here so existing imports of
+// this module keep working.
+export {
+  MECHANISMS_STEP_ID,
+  TOUCH_STEP_ID,
+  CHOOSE_BASE_STEP_ID,
+} from "./stepIds.ts";
+import { CHOOSE_BASE_STEP_ID } from "./stepIds.ts";
 
 // ---------------------------------------------------------------------------
 // Instantiation result — passed to the reducer when choose_base completes.
@@ -84,35 +72,6 @@ export interface InstantiateResult {
 }
 
 // ---------------------------------------------------------------------------
-// Touch-completion result — passed to the reducer when the touch step completes.
-// ---------------------------------------------------------------------------
-
-export interface TouchCompleteResult {
-  /** Non-inherited touch assignments from Phase E (pre-filtered by TouchGallery). */
-  assignments: TouchAssignment[];
-  /** The base IR at lock time (post-lockDesktop snapshot). */
-  baseIr: KeyboardIR | null;
-  /** The base VFS (for resolving the shipped .keyman-touch-layout, if any). */
-  baseVfs: VirtualFS | null;
-  /**
-   * Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
-   * removals + Phase C individual letter placements. Computed by the touch
-   * step's adapter (AddTouchAdapter) via deriveDesktopModifications so this
-   * reducer (steps/) never imports lib/ or stores/ directly. Optional so
-   * existing/mocked callers that don't care about the replay can omit it —
-   * the reducer defaults to the empty (no-op) modifications.
-   */
-  mods?: DesktopModifications;
-  /**
-   * The author's raw touch_seed_source fork choice (spec 035 FR-006), or null
-   * if the fork was never recorded (defensive — the R11 Entity-5 default is
-   * applied inside the injected buildTouchLayoutJson dep, not here). Optional
-   * for the same reason as `mods`.
-   */
-  seedSource?: "import-adapt" | "reseed-from-desktop" | null;
-}
-
-// ---------------------------------------------------------------------------
 // Injected dependencies (replacing direct lib/stores imports)
 //
 // All deps are functions — the caller injects concrete implementations.
@@ -121,16 +80,8 @@ export interface TouchCompleteResult {
 
 export interface ReducerDeps {
   // --- Store actions (from workingCopyStore) ---
-  // (lockDesktop retired at spec 090 T041: R1 re-homed to
-  // lib/assignLoopCompletion.ts — D-090-38.)
-  /** Persist the serialized touch layout JSON at Phase E completion (R2). */
-  setTouchLayoutJson: (json: string | null) => void;
-  /**
-   * Clear a step's stale marker (removes it as a re-opened root and recomputes
-   * the staleness closure). Called at Touch completion (R2) so re-completing
-   * the touch step clears the re-review flag a prior Mechanisms edit set on it.
-   */
-  clearStale: (stepId: string) => void;
+  // (lockDesktop retired at spec 090 T041, setTouchLayoutJson + clearStale
+  // at T042: R1/R2 re-homed to lib/assignLoopCompletion.ts — D-090-38.)
   /** Track 1 instantiation — copy from base, new identity. */
   instantiateFromBase: (
     base: BaseKeyboard,
@@ -152,39 +103,10 @@ export interface ReducerDeps {
    */
   clearTouchSeedChoice?: () => void;
 
-  // --- Lib helpers (from lib/buildTouchLayoutJson + lib/resolveBaseTouchJson) ---
-  /**
-   * Derive (and, per the spec 035 R11 emission matrix, decide whether to
-   * emit) the .keyman-touch-layout JSON string from a base IR + assignments.
-   * Two derivation paths: Case A (generate from scratch, replaying `mods`)
-   * and Case B (faithful edit onto the shipped layout, replaying `mods`
-   * first). Returns { json, warnings }; json is null when the R11 matrix says
-   * "don't emit" OR the emit pipeline failed — the reducer treats both
-   * identically (omit the stored layout).
-   *
-   * THIS is the one call site (injected from StudioShell.tsx, which may
-   * import lib/touchEmission.ts) that applies the R11 matrix for the output
-   * path — this reducer (steps/) may not import lib/ directly, so the
-   * gating logic lives inside the injected implementation, not here.
-   */
-  buildTouchLayoutJson: (
-    baseIr: KeyboardIR,
-    assignments: ReadonlyArray<TouchAssignment>,
-    opts: {
-      /** Present ⇒ the base ships a shipped touch layout to adapt (Case B candidate). */
-      baseTouchJson?: string;
-      /** Desktop modifications to replay onto the seed (spec 035 R3). */
-      mods: DesktopModifications;
-      /** Raw fork choice — may be null; the dep resolves the R11 default. */
-      seedSource: "import-adapt" | "reseed-from-desktop" | null;
-    },
-  ) => { json: string | null; warnings: string[] };
-
-  /**
-   * Resolve the base keyboard's shipped .keyman-touch-layout JSON string from
-   * a VFS. Returns undefined when vfs is null or the file is absent/binary.
-   */
-  resolveBaseTouchJson: (vfs: VirtualFS | null) => string | undefined;
+  // --- Lib helpers ---
+  // (buildTouchLayoutJson + resolveBaseTouchJson retired at spec 090
+  // T042: the R2 build now composes them directly in
+  // lib/assignLoopCompletion.ts — D-090-38.)
 
   /**
    * Track 1 instantiation helper that guards against rebase without user
@@ -313,61 +235,11 @@ export function applyStepCompletion(
     // re-propagation effects re-homed to lib/assignLoopCompletion.ts,
     // fired by the adapter and by journey-runner's replay — D-090-38.)
 
-    // R2 — touch-layout build: mirrors StudioShell.tsx handlePhaseEComplete.
-    // Spec 035 R11: the reducer no longer gates the build on "assignments is
-    // empty" — that decision (the R11 emission matrix) now lives inside the
-    // injected deps.buildTouchLayoutJson (constructed in StudioShell.tsx,
-    // which may import lib/touchEmission.ts; this reducer may not). The one
-    // gate this reducer still owns is baseIr === null (nothing to build from).
-    case TOUCH_STEP_ID: {
-      // "Result may genuinely be absent" — destructuring an `undefined`
-      // cast directly throws.
-      const payload = (result as Partial<TouchCompleteResult> | undefined) ?? {};
-      const {
-        assignments = [],
-        baseIr = null,
-        baseVfs = null,
-        mods = EMPTY_DESKTOP_MODIFICATIONS,
-        seedSource = null,
-      } = payload;
+    // (No touch case: spec 090 T042 retired R2. The touch-layout
+    // decision records step-side in AddTouchAdapter, and the build +
+    // stale-clear effects re-homed to lib/assignLoopCompletion.ts,
+    // fired by the adapter and by journey-runner's replay — D-090-38.)
 
-      if (baseIr === null) {
-        // No working IR to derive from — clear the stored touch layout (KMW
-        // uses its native default).
-        deps.setTouchLayoutJson(null);
-      } else {
-        try {
-          const baseTouchJson = deps.resolveBaseTouchJson(baseVfs);
-          const { json, warnings } = deps.buildTouchLayoutJson(baseIr, assignments, {
-            ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
-            mods,
-            seedSource,
-          });
-          if (warnings.length > 0) {
-            devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson warnings:", warnings);
-          }
-          // json is null when the R11 matrix said "don't emit" OR the emit
-          // pipeline threw — omit rather than injecting null/empty either way.
-          deps.setTouchLayoutJson(json);
-        } catch (err) {
-          devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson threw unexpectedly:", err);
-          // Per spec, the transition proceeds regardless of build failure.
-          // Graceful degradation: no touch layout → KMW falls back to shipped file or its default.
-          deps.setTouchLayoutJson(null);
-        }
-      }
-      // Re-completing the touch step resolves whatever re-review flag was set
-      // on it (e.g. by a Mechanisms edit after unlock — MechanismGallery marks
-      // "touch" stale directly, since the production manifest gives "touch"
-      // inputs: [] and a mechanisms→touch stale-propagation edge does not
-      // exist). Clearing here, not on entry, means the flag survives until
-      // the user has actually re-reviewed and re-completed the step.
-      deps.clearStale(TOUCH_STEP_ID);
-      break;
-    }
-
-    // R3 — copy/adapt instantiation: mirrors StudioShell.tsx onInstantiate (lines 240-253).
-    // Routes Track 2 → instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
     case CHOOSE_BASE_STEP_ID: {
       const payload = result as Partial<InstantiateResult> | undefined;
       // Guard: result must carry a base keyboard. Without it, instantiation

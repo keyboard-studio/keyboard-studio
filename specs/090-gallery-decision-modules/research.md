@@ -1728,3 +1728,55 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   assignLoopCompletion 3/3. The remaining figures above were
   single-purpose runs and stand; the full recount rides on
   T045's gate as before.
+- **D-090-40 — T042 landed: touch-layout module migrated under
+  the D-090-38 shape; golden-walk fixture delta adjudicated
+  INTENDED (the mechanisms signature, one step later).** Value
+  home `survey/assignLoop/touchLayoutValue.ts` (ops copied from
+  `keyEditOverlay.ops`, `deletedTouchKeyIds` Set→list in deletion
+  order); renderer `TouchDecisionRenderer` (TouchGallery requires
+  `onBack`; the decision host owns navigation, so the gallery's
+  Back is inert there — the adapter's defensive fallback
+  inverted, commented in place). AddTouchAdapter records
+  `{touch-layout, provenance: "asked"}`, fires
+  `applyTouchCompletionEffects(payload)`, and still passes the
+  payload to onComplete (the spec-053 audit recorder reads the
+  assignments from it). The R2 effects in
+  `lib/assignLoopCompletion.ts` compose the reducer's semantics
+  with StudioShell's former deps wrapper VERBATIM
+  (`buildTouchLayoutJsonForStep`: seed resolution, R11 gate,
+  reseed never passes the shipped layout); `TouchCompleteResult`
+  moved there from reducer.ts. Reducer TOUCH case deleted;
+  `touch` left `STEPS_WITH_APPLY_COMPLETION`; ReducerDeps
+  `setTouchLayoutJson` / `clearStale` / `buildTouchLayoutJson` /
+  `resolveBaseTouchJson` retired (type, StudioShell incl. its
+  wrapper, journey-runner incl. its stubs, test constructions).
+  Journey replay now builds what the live path builds for the
+  same inputs (the former stub always returned null; with the
+  journey's seed choice the R11 matrix still emits on the reseed
+  path — journey suites green 9/9 as observed). R2's reducer-era
+  coverage moved to `lib/assignLoopCompletion.test.ts` (Case A/B,
+  reseed R10 pass-through ban, don't-emit, throw→null, stale
+  cleared on every path; 10/10 with the physical pins).
+  deepLinkRevision's trivial touch step re-pointed to fire the
+  effects like the adapter (its staleness assertion is the R2
+  clearStale behaviour). **Fixture adjudication:** both tracks
+  delta ONLY at the touch step — `applyStepCompletion ["touch"]
+  → []`, `decisionMutations [] → ["record"]`, `workingCopy
+  Mutations` still carrying `setTouchLayoutJson` unchanged;
+  regenerated through the harness; walk green 2/2.
+  **Cycle found + fixed:** the two new renderers closed an import
+  cycle — gallery → `steps/reducer.ts` (step-id constants) →
+  question registry → modules → renderers → gallery — leaving a
+  module undefined at registry construction
+  (questionModules.test.ts collection failure; the walk's entry
+  order masked it, and it had existed since T041's physical
+  renderer). The constants moved to the leaf `steps/stepIds.ts`
+  (imports nothing); reducer re-exports them; both galleries
+  import the leaf. questionModules green 806/806 after the fix.
+  Gates: tsc 0; depcruise over the new graph clean (650 modules);
+  reducer 27/27; assignLoopCompletion 10/10; walkEmit 4/4;
+  decisionIRConsistency 393/393; galleryModules.coverage 44/44;
+  registry 8/8; journey-runner 9/9; StepHost + applyDecisionEffects
+  ×2 + scroll + smoke green; deepLinkRevision 4/4; progression +
+  TouchGallery.suggestions 42/42; eslint 0 errors on changed
+  files.

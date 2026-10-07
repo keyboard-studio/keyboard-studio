@@ -133,7 +133,7 @@ import {
   deriveSeedLayout,
 } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
-import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { TOUCH_STEP_ID } from "../../steps/stepIds.ts";
 import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
 import { cursorCharIn } from "../../lib/stepWalk.ts";
 import { peekStepCursor } from "../../stores/stepWalkStore.ts";

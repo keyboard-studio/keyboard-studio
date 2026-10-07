@@ -318,13 +318,21 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
   replay; `recordAssignments` remains the gallery's edit-time write path
   (the D-090-31 record-from-working-copy pattern). Golden-walk fixture
   delta at mechanisms adjudicated intended (D-090-39).
-- [ ] T042 [US4] `touch-layout` module: value = key-edit ops + `deletedTouchKeyIds`, per-key
+- [x] T042 [US4] `touch-layout` module: value = key-edit ops + `deletedTouchKeyIds`, per-key
   provenance in spec 014's vocabulary unchanged, in
   packages/studio/src/survey/questions/gallery/touchLayout.ts; `TouchGallery` reports through
   `onChange` instead of `setTouchDraft` / `deleteTouchKey` in
   packages/studio/src/editors/assignLoop/TouchGallery.tsx; `apply` performs the R2
   `buildTouchLayoutJson` + `setTouchLayoutJson` work and the reducer's R2 hook is retired in
-  packages/studio/src/steps/reducer.ts
+  packages/studio/src/steps/reducer.ts — Landed under the D-090-38 execution
+  shape (D-090-40): apply is a no-op (R2's build never consumes the ops and
+  its output has no patch channel); R2 re-homed to completion wiring
+  (`lib/assignLoopCompletion.ts`) fired by AddTouchAdapter after recording
+  step-side and by journey-runner's replay; `setTouchDraft`/`deleteTouchKey`
+  remain the gallery's edit-time write paths. Golden-walk fixture delta at
+  touch adjudicated intended. A registry import cycle the new renderers
+  closed (gallery → reducer constants → registry) was broken by moving the
+  step-id constants to the leaf `steps/stepIds.ts`.
 - [ ] T043 [US4] FR-003 identifier list extended with `recordAssignments`, `setTouchDraft`,
   `deleteTouchKey` in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the assignLoop

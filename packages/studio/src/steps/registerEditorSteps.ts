@@ -247,7 +247,9 @@ export const touchSeedSourceStep: EditorStep = step({
 
 /**
  * Touch step: TouchGallery (touch key assignment — Phase E).
- * The reducer fires buildTouchLayoutJson when this step completes.
+ * On completion AddTouchAdapter records the touch-layout decision and
+ * fires the build effects (lib/assignLoopCompletion.ts; the reducer's
+ * R2 hook retired at spec 090 T042 — D-090-38).
  * Seeds from locked physical layout; inputs stays [] to avoid C2 cycle (FR-002).
  * TOUCH_WRITES: touchLayout...keys[] + touchLayout.nodeIds[] (editorMutate.ts).
  */

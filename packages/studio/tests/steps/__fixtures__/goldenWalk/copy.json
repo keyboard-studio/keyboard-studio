@@ -203,17 +203,18 @@
   },
   {
     "stepId": "touch",
-    "applyStepCompletion": [
-      "touch"
-    ],
+    "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [
       "setTouchLayoutJson",
       "setHistoryEntryState"
     ],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
