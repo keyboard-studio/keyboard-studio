@@ -38,7 +38,18 @@ export interface GalleryWriteAuditEntry {
  * migration task extends it with the trees it migrated and the write
  * actions those trees used to call (research R4's identifier list).
  */
-export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [];
+export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
+  {
+    story: "US1",
+    trees: [
+      "survey/layout/LayoutStep.tsx",
+      "survey/touchSeedSource/TouchSeedSourcePanel.tsx",
+      "survey/chooseBase/BaseKeyboardRenderer.tsx",
+      "editors/panels/BaseResolution.tsx",
+    ],
+    identifiers: ["saveAnswer", "setLocalBase", "setBaseConfirmed", "setTouchSeedSource"],
+  },
+];
 
 /** A single banned call site found in a source text. */
 export interface WriteCallSite {

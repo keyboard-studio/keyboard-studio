@@ -26,10 +26,21 @@ const GALLERY_RENDERER_TREE_GLOBS = [
   "packages/studio/src/survey/questions/gallery/**/*.{ts,tsx}",
   "packages/studio/src/steps/galleryHost.tsx",
   // Per-story renderer trees are appended here as each story migrates.
+  // US1 (T014): the three migrated small-picker renderers.
+  "packages/studio/src/survey/layout/LayoutStep.tsx",
+  "packages/studio/src/survey/touchSeedSource/TouchSeedSourcePanel.tsx",
+  "packages/studio/src/survey/chooseBase/BaseKeyboardRenderer.tsx",
+  "packages/studio/src/editors/panels/BaseResolution.tsx",
 ];
 const GALLERY_WRITE_IDENTIFIERS = [
   // Store write actions a renderer tree must never call (research R4 list).
   // Extended per story in the same change that extends the checker test.
+  // US1 (T014): the layout step's answer write, the base picker's session
+  // writes, and the touch-seed session write (already retired by 088).
+  "saveAnswer",
+  "setLocalBase",
+  "setBaseConfirmed",
+  "setTouchSeedSource",
 ];
 
 export default [

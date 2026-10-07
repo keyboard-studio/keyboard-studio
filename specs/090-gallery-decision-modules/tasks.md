@@ -116,17 +116,17 @@ on reload, and routing that reads it (touch seed asked once, per 088) behaves as
   `gatedBy` preserved in packages/studio/src/survey/questions/gallery/touchSeedSource.ts;
   `TouchSeedSourcePanel` reports through `onChange` and loses its session write in
   packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx
-- [ ] T013 [US1] `base-keyboard` module: module in
+- [x] T013 [US1] `base-keyboard` module: module in
   packages/studio/src/survey/questions/gallery/baseKeyboard.ts;
   `BaseResolutionAdapter` reports through `onChange` and stops calling `setLocalBase` /
   `setBaseConfirmed` in packages/studio/src/editors/adapters/panelAdapters.tsx; StudioShell's
   R3 working-copy setup reads the recorded decision (setup behaviour unchanged — setup as a
   decision's `apply` is 092) in packages/studio/src/StudioShell.tsx
-- [ ] T014 [US1] Extend the FR-003 identifier list with US1's write actions (`saveAnswer` for
+- [x] T014 [US1] Extend the FR-003 identifier list with US1's write actions (`saveAnswer` for
   the layout step, `setLocalBase`, `setBaseConfirmed`, the touch-seed session write) in
   eslint.config.mjs and packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green
   over the three migrated trees
-- [ ] T015 [US1] Tests: module contract + frozen-stores determinism for the three modules'
+- [x] T015 [US1] Tests: module contract + frozen-stores determinism for the three modules'
   `apply`s in packages/studio/src/survey/questions/gallery/windowsLayout.test.ts,
   packages/studio/src/survey/questions/gallery/touchSeedSource.test.ts, and
   packages/studio/src/survey/questions/gallery/baseKeyboard.test.ts
