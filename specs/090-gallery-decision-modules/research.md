@@ -1539,3 +1539,21 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   accumulator grows a carve-overlay fold; 092's T037 remains
   pending on carve until that fold exists (with the D-090-33
   carveTouchKeepInert addendum).
+
+- **D-090-35 — T036 executed: contract + determinism for the three
+  US3 applies.** deadkeysDefined.test.ts and ruleSet.test.ts were
+  written with T033/T034 (replay determinism, live-state no-op,
+  splice order, carve-non-resurrection, pass-2 pins — re-run here,
+  5 + 5 green). carvedLayout.test.ts is new (10 tests): the module
+  contract (provides/requires/writes/renderer/extract-undefined);
+  the ruled no-op apply under the SC-005 frozen-stores harness
+  (`runApplyDeterministically`) and under a pass-2 invocation; the
+  value builder — the four sets mapped to one kind-discriminated
+  list with dispositions + card verbatim, canonical (kind, id)
+  ordering so click order cannot change the recorded value, an
+  orphaned hand-set removal kept verbatim (spec edge case — the
+  builder snapshots the overlay and never filters against a target
+  list), a proposal refresh (dispositions re-prefilled under a new
+  card state) leaving hand removals identical, and the empty
+  overlay recording an empty value; plus `currentCarvedLayoutValue`
+  against the live store. 20/20 across the three suites.

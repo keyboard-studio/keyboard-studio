@@ -263,7 +263,7 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
   `commitDeadkeyOp`) in eslint.config.mjs and
   packages/studio/src/decisions/galleryWriteAudit.test.ts; audit green over the migrated
   trees
-- [ ] T036 [US3] Tests: contract + determinism for the three `apply`s in
+- [x] T036 [US3] Tests: contract + determinism for the three `apply`s in
   packages/studio/src/survey/questions/gallery/carvedLayout.test.ts,
   packages/studio/src/survey/questions/gallery/deadkeysDefined.test.ts, and
   packages/studio/src/survey/questions/gallery/ruleSet.test.ts; an orphaned hand-set removal
