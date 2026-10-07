@@ -83,6 +83,11 @@ first implementation task; the invariant is that **no Phase B state the step
 reads today lives outside this value** after US2, except renderer-internal
 draft state (research R3). The spike module `pb_character_inventory` is
 retired into this module (research R2); its `extract` is the candidate seed.
+**Mapping recorded (T020, research D-090-10):** the value carries the derived
+split plus `exemplarDigraphs`, `loanwordChars`, `rejected`,
+`proposalConfidence`, `exemplarMethodDeclined`, `seededProposals`,
+`alphabetEvidenceKey`, `selectedFont`; `lastPick` stays renderer-internal and
+`invisibleDecisions` moves to the `invisibles-inventory` value.
 
 ### `MarksTreatmentValue`
 A composite (research R1): per-mark attachment choices

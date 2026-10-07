@@ -150,7 +150,7 @@ decision, `phaseBDraftStore` no longer exists, and the keyboard source matches `
 
 **PR slice**: this phase is one PR.
 
-- [ ] T020 [US2] Re-verify research R1's rows for `characters`, `marks`, `punctuation`,
+- [x] T020 [US2] Re-verify research R1's rows for `characters`, `marks`, `punctuation`,
   `invisibles`, `convenience` against the landed code (including every `saveAnswer` id
   `MarksSeriesStep` writes — research R1's composite warning); amend
   specs/090-gallery-decision-modules/research.md if any row drifted

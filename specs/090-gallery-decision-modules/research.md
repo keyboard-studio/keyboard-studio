@@ -20,11 +20,11 @@ table suggests.
 | layout (`windows-layout`) | [LayoutStep.tsx](../../packages/studio/src/survey/layout/LayoutStep.tsx) | `savePickedWindowsLayout` ([layoutFamily.ts:92-104](../../packages/studio/src/lib/layoutFamily.ts)) → `surveyAnswerStore.saveAnswer("layout", "host_layout", …)`, called at LayoutStep.tsx:69,73 with a confirmed/overturned flag |
 | choose_base (`base-keyboard`) | `BaseResolutionAdapter` ([panelAdapters.tsx:188](../../packages/studio/src/editors/adapters/panelAdapters.tsx)) | `setLocalBase` / `setBaseConfirmed` on `surveySessionStore` (:191-192, 211-220); working-copy setup happens later in StudioShell → reducer R3 |
 | touch_seed_source (`touch-seed-source`) | `TouchSeedSourcePanel` ([editors/touchSeedSource/TouchSeedSourcePanel.tsx](../../packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx)) | **Drifted since R1 was written (T010 re-verification, 2026-10-06):** 088 already deleted the session `touchSeedSource` field; the panel now records the decision directly (`useDecisionStore.record` in `handleConfirm`, with the R12/D-06 touch-draft clearing beside it). T012's remaining work is only the host/onChange wiring |
-| characters (`character-inventory`) | `CharactersStep` + `PhaseB` | `phaseBDraftStore` (accept/decline, draft picks — see [phaseBDraftStore.ts](../../packages/studio/src/stores/phaseBDraftStore.ts)); `saveAnswer` for per-grapheme additions (CharactersStep.tsx:121-125); session sub-stage setters |
-| marks (`marks-treatment`) | `MarksSeriesStep` | **Many** `saveAnswer` ids, not one: `marks_attachment.*`, `marks_treatment.class.*`, `marks_treatment.mark.*`, `marks_treatment.promoted`, `marks_treatment.input_order`, `marks_output_form.form`, `marks_stacking.*` (MarksSeriesStep.tsx:354-632, plus prefill writes :976-1032); reducer MARKS handler runs `applyMarkGuards` → `setWorkingIR` ([reducer.ts:358-382](../../packages/studio/src/steps/reducer.ts)); context tolerance is a station inside the series ([ContextToleranceStation.tsx](../../packages/studio/src/survey/marks/ContextToleranceStation.tsx)) whose patch goes through `CONTEXT_TOLERANCE_WRITES` |
-| punctuation (`punctuation-inventory`) | `PunctuationStep` | `phaseBDraftStore`; one inventory `saveAnswer` (PunctuationStep.tsx:467) |
-| invisibles (`invisibles-inventory`) | `InvisiblesStep` | `phaseBDraftStore` only: `acceptInvisible` / `declineInvisible` per notation; no `saveAnswer` |
-| convenience (`retained-convenience-chars`) | `ConvenienceCharsStep` | `saveAnswer("convenience", …)` (ConvenienceCharsStep.tsx:245); the retained set is also mirrored in `workingCopyStore.session.retainedConvenienceChars` (read by carve) |
+| characters (`character-inventory`) | `CharactersStep` + `PhaseB` | `phaseBDraftStore` (accept/decline, draft picks — see [phaseBDraftStore.ts](../../packages/studio/src/stores/phaseBDraftStore.ts)); `saveAnswer` for per-grapheme additions (CharactersStep.tsx:121-125); session sub-stage setters. **Re-verified T020 (2026-10-06):** row holds. The additions are the `characters.addition.<ch>` reproposal flags (spec 079): written by `confirmPrefill` (CharactersStep) and re-saved by PhaseB.tsx:943 when the author reconfirms a flagged addition; read by `deriveCharacterFlags` + `hooks/useWorkToDo.ts`. The draft store's full consumer set is larger than this row: CharacterMapPane (shell preview pane), PunctuationStep, InvisiblesStep, `phaseCInventory.ts`, `useGlyphFontStack` (font), `lib/draftPersistence.ts` (snapshot fold-in + two subscribe sites), `lib/crashCallerContext.ts` — see D-090-10 |
+| marks (`marks-treatment`) | `MarksSeriesStep` | **Many** `saveAnswer` ids, not one: `marks_attachment.*`, `marks_treatment.class.*`, `marks_treatment.mark.*`, `marks_treatment.promoted`, `marks_treatment.input_order`, `marks_output_form.form`, `marks_stacking.*` (MarksSeriesStep.tsx:354-632, plus prefill writes :976-1032); reducer MARKS handler runs `applyMarkGuards` → `setWorkingIR` ([reducer.ts:358-382](../../packages/studio/src/steps/reducer.ts)); context tolerance is a station inside the series ([ContextToleranceStation.tsx](../../packages/studio/src/survey/marks/ContextToleranceStation.tsx)) whose patch goes through `CONTEXT_TOLERANCE_WRITES`. **Re-verified T020 (2026-10-06):** ids hold; prefill writes actually run :976-1057. Two mechanism drifts: (1) the reducer MARKS handler (now reducer.ts:345-371) consumes the completion **result payload** (`MarksCompleteResult.marksWorklist` / `marksOutputForm`), not the answers, and also sets `marksMigrationNeeded` via `detectBaseMarkMechanism`; the step reads its own answers back at :273 and builds the result's `answers` from them. (2) Context tolerance is **not** a reducer path: the decision rides the phase result (`marksContextTolerance` → `session.marksContextTolerance`) and a separate effect, `hooks/useContextToleranceApply.ts`, commits IR + `contextToleranceOverlay` through `applyMutatePatch` against `CONTEXT_TOLERANCE_WRITES` ([steps/contextToleranceWrites.ts](../../packages/studio/src/steps/contextToleranceWrites.ts), declared on the marks manifest entry) and stamps `appliedFingerprint` back onto the phase result. See D-090-11 |
+| punctuation (`punctuation-inventory`) | `PunctuationStep` | `phaseBDraftStore`; one inventory `saveAnswer` (PunctuationStep.tsx:467). **Re-verified T020 (2026-10-06):** holds — the answer is `punctuation.inventory`, written only in `complete()`, value = the phase-C confirmed inventory; its load-bearing field is the spec 079 `evidenceKey` (FR-023 guard reads it back). The step's live edits are all draft-store ops (`add`/`addProposed`/`remove`/`seedProposals`/`acceptInvisible`) |
+| invisibles (`invisibles-inventory`) | `InvisiblesStep` | `phaseBDraftStore` only: `acceptInvisible` / `declineInvisible` per notation; no `saveAnswer`. **Re-verified T020 (2026-10-06):** holds exactly (zero `saveAnswer` in the file) |
+| convenience (`retained-convenience-chars`) | `ConvenienceCharsStep` | `saveAnswer("convenience", …)` (ConvenienceCharsStep.tsx:245); the retained set is also mirrored in `workingCopyStore.session.retainedConvenienceChars` (read by carve). **Re-verified T020 (2026-10-06):** the saveAnswer is per-candidate **boolean** answers keyed by candidate primary char (`saveKept`, :245), plus `setStatus` calls (step status — stays in the narrowed store, T026); the retained set is derived at `complete()` from candidates − unchecked. The session mirror is not a store field anyone writes directly: it is the field-wise `recordPhase` derivation over the phase-C result's `retainedConvenienceChars`; readers are CarveGalleryV2 (:745) and `survey/journey-runner.ts` (:708). See D-090-12 |
 | carve (`carved-layout`) | `CarveGalleryV2` ([editors/carve/CarveGalleryV2.tsx](../../packages/studio/src/editors/carve/CarveGalleryV2.tsx)) | working-copy overlay actions `cascadeDelete` / `cascadeRestore` / `restoreAll` / `keepAll`, `prefillCarveDispositions` (:703-712, 825); overlay fields `deletedNodeIds`, `deletedItemIds`, `disabledFamilyIds`, `carveChars`, `carveDispositions`, `closedKeyboardCard` ([workingCopyStore.ts:568-651](../../packages/studio/src/stores/workingCopyStore.ts)); `applyCarveMutate` runs in the projection ([projectWorkingCopyVfs.ts:447-504](../../packages/studio/src/lib/projectWorkingCopyVfs.ts)) |
 | deadkeys (`deadkeys-defined`) | deadkey editors ([editors/deadkey/](../../packages/studio/src/editors/deadkey)) | components call `workingCopyStore.commitDeadkeyOp`; the op is turned into a patch by [deadkeyWrite.ts](../../packages/studio/src/editors/deadkey/deadkeyWrite.ts) through `applyMutatePatch` with `DEADKEY_WRITES` ([editorMutate.ts](../../packages/studio/src/steps/editorMutate.ts)) → `setWorkingIR`; the op log lives in `workingCopyStore.deadkeyOverlay.ops` |
 | rules (`rule-set`) | `RulesStep` ([survey/rules/RulesStep.tsx:46](../../packages/studio/src/survey/rules/RulesStep.tsx)) | builder-owned state; `onComplete(undefined)` — no value, no store write, no log entry |
@@ -449,3 +449,90 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   spec 028/029's StepHost mutation-sequence fixture — distinct from
   spec 089's golden-walk zip baseline, which is untouched by this
   regeneration.
+- **D-090-10 — the Phase B/C accumulator pattern (T020 design, US2).**
+  T020's re-verification (R1 rows above) shows the Phase B draft is not
+  a per-step store: one accumulator is edited from four step trees
+  (characters, punctuation, invisibles, and CharacterMapPane — a
+  StudioShell preview-pane component outside every step tree) and read
+  by `phaseCInventory`, `invisiblesFlags`, `useWorkToDo`,
+  `useGlyphFontStack`, `crashCallerContext`, and draft persistence.
+  US2 therefore migrates it as follows. (a) The store's pure logic
+  (pick derivation, provenance-strengthening adds, seed contracts)
+  moves verbatim-in-behaviour to pure functions over the decision
+  values in `survey/phaseBDraftOps.ts`. (b) A shared hook,
+  `survey/useInventoryDraft.ts`, subscribes to the `character-inventory`
+  and `invisibles-inventory` records in `decisionStore` and exposes the
+  field/op surface the components use today; each op computes the next
+  value purely and records it through `decideGalleryValue` — the
+  gallery host's own exported decide core (steps/galleryHost.tsx) with
+  `buildGalleryHostDeps()` — under the editing step's attribution.
+  This is the host write path, not a store write: FR-003's audit bans
+  store write actions, and none is called. Each step is additionally
+  hosted via `GalleryHost` for its own module, and its own-value edits
+  go through the renderer's `onChange` exactly as in US1. (c) Field
+  mapping, `PhaseBDraftState` → values (T021's field-for-field task):
+  `CharacterInventoryValue` keeps the foundational derived split
+  (`chars`, `bases`, `marks`, `attestedStacks`, `declaredRoles`,
+  `numbers`, `punctuation`, `symbols`, `separators`, `controls`,
+  `provenance`) and gains the draft meta that must survive reload and
+  re-entry: `exemplarDigraphs`, `loanwordChars`, `rejected`,
+  `proposalConfidence`, `exemplarMethodDeclined`, `seededProposals`,
+  `alphabetEvidenceKey`, `selectedFont`. Excluded: `lastPick`
+  (transient highlight — renderer-internal, research R3) and
+  `invisibleDecisions` (→ the invisibles value). (d) Inventory item
+  provenance (FR-006) maps from draft provenance at the op that
+  records it: `author → asked`, `base → extracted`, `text → extracted`,
+  `cldr | sldr | ascii-floor → derived` — mirroring the ruled carve
+  semantics (extracted = read from the starting point, derived = a
+  computed proposal, asked = a hand decision). The punctuation value
+  is maintained by the draft hook as a projection of the draft's
+  punctuation slice + the rejected-punctuation ledger (provenance
+  captured at removal time, before the draft forgets it), recorded
+  when a punctuation record exists or the editing step is
+  `punctuation`. The invisibles value is written by the explicit
+  accept/decline ops (adopt-controls carry-over items are `derived`).
+  (e) A saved v2 draft's `phaseBDraft` slice (T025) maps onto these
+  values field-for-field by the same table; entries that cannot map
+  are surfaced as decision-trail orphans (088's T030 mechanism, 087 Q5
+  precedent), never dropped.
+- **D-090-11 — marks `apply` fires on the completion payload (T023).**
+  Today `applyMarkGuards` runs once, at step completion, from the
+  result payload — never per answer. Recording answers live (the plan's
+  rule: onChange at the same commit points as today's writes) must not
+  move the guards earlier: a partial series would guard a partial
+  worklist, and re-guarding is not proven idempotent. So
+  `MarksTreatmentValue` carries `answers` (the composite, recorded on
+  every answer edit, `completion: null`) plus, set by the renderer's
+  completion report, `completion: { worklist, outputForm }`; `apply`
+  returns `{}` while `completion` is null and performs the guards (and
+  the `marksMigrationNeeded` determination) from the payload when it
+  is set — the same commit point as today's reducer MARKS handler,
+  which T023 retires. An answer edit after completion clears
+  `completion` in the same report, so a stale payload can never
+  re-apply. The context-tolerance half keeps its existing effect
+  shape (it needs the live analysis + overlay state, which a pure
+  `apply(value, ctx)` cannot await): `useContextToleranceApply`
+  re-keys its decision source from `session.marksContextTolerance`
+  (a phase-result field) to the `marks-treatment` decision value's
+  `contextTolerance` (the full contracts decision shape — the
+  foundational stub's `contextToleranceOutcome: string | null` is
+  widened in T023, as the stub anticipated), and its
+  `appliedFingerprint` bookkeeping re-records the decision instead of
+  mutating a phase result. The patch itself still commits through
+  `applyMutatePatch` against `CONTEXT_TOLERANCE_WRITES`, unchanged.
+- **D-090-12 — the convenience mirror is a value-sourced result
+  (T024).** `WorkingCopyPatch` (089 contract A3) has no session
+  channel, and the A3 table authorizes channels per decision — adding
+  one amends 089's contract, outside 090's mandate (the D-090-2
+  wrapper-sink route cannot carry the value either: the sink signature
+  is `(patch, writes)`). T024 therefore makes the mirror an applied
+  view in the sense data-model.md allows ("an applied view **or a
+  selector over this value**"): toggles record
+  `RetainedConvenienceCharsValue` live through `onChange` (the
+  per-candidate boolean answers leave `surveyAnswerStore`); the step's
+  completion result — whose `retainedConvenienceChars` field is what
+  `recordPhase` derives `session.retainedConvenienceChars` from — is
+  computed **from the recorded value**, not from answer-store
+  booleans. Carve's read is unchanged, per the task. The answer-store
+  record that disappears is the second record; the session field
+  remains a derivation, now of the decision.
