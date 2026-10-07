@@ -182,6 +182,17 @@ const resolved: ReadonlyMap<string, StepDependencies> = new Map(
 /** The declared step ids, in declaration order (the tie-break order). */
 export const DECLARED_STEP_IDS: readonly StepId[] = Object.keys(DECLARATIONS) as StepId[];
 
+/**
+ * Whether a step settles decisions no question module asks for (its
+ * `settles` list is non-empty) — i.e. it is a gallery/editor step whose
+ * saved answers are not survey-question answers. Used by the spec-088 draft
+ * migration to tell retained gallery answers from orphaned question answers.
+ */
+export function stepHasSettles(id: string): boolean {
+  const decl = (DECLARATIONS as Record<string, StepDeclaration>)[id];
+  return decl?.settles !== undefined && decl.settles.length > 0;
+}
+
 /** A step's dependency declarations. Throws on an undeclared id. */
 export function stepDependencies(id: StepId): StepDependencies {
   const found = resolved.get(id);

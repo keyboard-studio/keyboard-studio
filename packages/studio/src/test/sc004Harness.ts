@@ -13,9 +13,9 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
 import { runDecisionFlow } from "../decisions/decisionFlow.ts";
 import { buildExtractContext } from "../decisions/extractContext.ts";
-import { orderDecisions } from "../decisions/orderDecisions.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { applyStepCompletion, type MutateRequest, type ReducerDeps } from "../steps/reducer.ts";
+import { applyDecisionEffects, type ReducerDeps } from "../steps/reducer.ts";
+import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { identityLanguagePatch } from "../lib/identityLanguagePatch.ts";
 
@@ -168,28 +168,41 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
 
     // --- 3. apply the answers ----------------------------------------
     const store = useWorkingCopyStore;
-    const deps = {
-      getWorkingIR: () => store.getState().baseIr,
-      setWorkingIR: (next) => store.getState().setWorkingIR(next),
-    } as ReducerDeps;
 
-    // 3a. mutate-declaring modules go through the real reducer seam.
-    let mutated = 0;
-    for (const m of orderDecisions(ADAPT_MODULES)) {
-      if (m.mutate === undefined || m.writes === undefined) continue;
-      const pid = m.provides?.[0];
-      const d = pid === undefined ? undefined : decisions[pid];
-      if (d === undefined || d.value === undefined) continue;
-      const req: MutateRequest = {
-        kind: "mutate",
-        mutate: m.mutate,
-        value: d.value as string,
-        writes: m.writes,
-      };
-      applyStepCompletion(m.definition.id, req, deps);
-      mutated++;
-    }
-    expect(mutated, "at least one module applied through the mutate seam").toBeGreaterThan(0);
+    // 3a. apply-declaring modules go through the real decision-apply runner
+    // (spec 089: the successor to the mutate seam this step used before).
+    // The sink mirrors StudioShell's production composition — the checked
+    // `ir` merge first, then the overlay channels.
+    let applied = 0;
+    const deps = {
+      getWorkingIR: () => store.getState().ir,
+      getDecisions: () => decisions,
+      getHistoryEntryState: () => store.getState().historyEntryState,
+      applyWorkingCopyPatch: (patch, writes) => {
+        applied++;
+        const wc = store.getState();
+        if (patch.ir !== undefined && wc.ir !== null) {
+          wc.setWorkingIR(applyMutatePatch(wc.ir, patch.ir, writes));
+        }
+        if (patch.identity !== undefined) wc.setIdentity(patch.identity);
+        if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
+        if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
+        if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
+      },
+    } as ReducerDeps;
+    applyDecisionEffects(
+      {
+        phase: "B",
+        answers: [
+          { questionId: "il_language_english", answerType: "text", value: "Test Language" },
+          { questionId: "il_author_name", answerType: "text", value: "Test Author" },
+          { questionId: "track_choice", answerType: "select", value: "adapt" },
+          { questionId: "pb_standard_letters", answerType: "select", value: "basic-az" },
+        ],
+      },
+      deps,
+    );
+    expect(applied, "at least one module applied through the decision-apply runner").toBeGreaterThan(0);
 
     // 3b. identity / characters: the setters the adapters call.
     const language = {

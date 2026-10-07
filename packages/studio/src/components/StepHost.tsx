@@ -13,7 +13,7 @@
 //
 // CENTRALIZED COMPLETION PATH (contract §2, FR-004):
 //   1. If result is SurveyPhaseResult-shaped: recordPhase(result) +
-//      routeAnswersThroughMutate(result, deps)
+//      recordAnswersAsDecisions(result, deps) + applyDecisionEffects(result, deps)
 //   2. If step.id in STEPS_WITH_APPLY_COMPLETION: applyStepCompletion(id, result, deps)
 //   3. advance(id, result, { selectedTrack, identitySupported, touchSeedSource }) →
 //      { next, navigate?, setCharactersSubStage? }
@@ -46,12 +46,14 @@ import {
   type ActiveStepId,
 } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { getDecisionSnapshot, selectTouchSeedSource, selectTrack } from "../stores/decisionStore.ts";
 import { manifest } from "../steps/manifest.ts";
 import type { EditorStep } from "../steps/types.ts";
 import {
+  applyDecisionEffects,
   applyStepCompletion,
+  recordAnswersAsDecisions,
   recordStepCompletion,
-  routeAnswersThroughMutate,
   type ReducerDeps,
 } from "../steps/reducer.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
@@ -68,7 +70,7 @@ import { useInventoryCoverageGate } from "../hooks/useInventoryCoverageGate.ts";
 
 // ---------------------------------------------------------------------------
 // isSurveyPhaseResult — shape guard for the generic completion path.
-// Guards recordPhase + routeAnswersThroughMutate — these are only called when
+// Guards recordPhase + applyDecisionEffects — these are only called when
 // the result is SurveyPhaseResult-shaped (phase: string, answers: array).
 // ---------------------------------------------------------------------------
 
@@ -429,11 +431,19 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // never wrong.
     pendingBeforeRef.current = { workToDo, visited: useSurveySessionStore.getState().visited };
 
-    // 1. If SurveyPhaseResult-shaped: recordPhase + routeAnswersThroughMutate.
+    // 1. If SurveyPhaseResult-shaped: recordPhase, record the completion's
+    //    decisions, then run their effects (spec 089 contract A6 — recording
+    //    precedes applying, so an apply composes from a decision set that
+    //    includes its own completion's records).
     if (isSurveyPhaseResult(result)) {
       // spec 079 D-4: the step owns its own answers within the phase slot.
       recordPhase(result, { stepId: resolvedStep.id });
-      routeAnswersThroughMutate(result, reducerDeps);
+      // Spec 088 FR-003 (contract C-2): the same completion writes one
+      // decision record per provided decision into the decision store.
+      recordAnswersAsDecisions(result, resolvedStep.id, reducerDeps);
+      // Spec 089 FR-001/FR-002: run each answered module's apply()
+      // unconditionally through the checked patch sink.
+      applyDecisionEffects(result, reducerDeps);
     }
 
     // 2. If step has reducer side effects: applyStepCompletion.
@@ -457,18 +467,21 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     //    the post-mutation value; but the React selector closure still holds the
     //    pre-mutation snapshot. getState() returns the current committed store value.
     const postMutationState = useSurveySessionStore.getState();
+    // Spec 088 FR-004/FR-005: routing reads the decision store. The track
+    // and seed values are selectors over the store snapshot (the session
+    // fields they used to be read from are deleted), and the snapshot
+    // itself is the gate set advance() evaluates.
+    const decisions = getDecisionSnapshot();
     // resolvedStep.id is StepBase.id (string). The manifest guarantees all step
     // ids are valid ActiveStepId values, so the cast is safe. advance() is
     // defined in advance.ts with a local ActiveStepId mirror — not imported from
     // stores/ (depcruise boundary preserved).
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     const outcome = advance(resolvedStep.id as Parameters<typeof advance>[0], result, {
-      selectedTrack: postMutationState.selectedTrack,
+      decisions,
+      selectedTrack: selectTrack(decisions),
       identitySupported: postMutationState.identityResult?.supported ?? true,
-      // Structurally identical to advance.ts's local TouchSeedSource mirror
-      // (both "import-adapt" | "reseed-from-desktop" | null) — no cast needed,
-      // same as selectedTrack above (Track mirror).
-      touchSeedSource: postMutationState.touchSeedSource,
+      touchSeedSource: selectTouchSeedSource(decisions),
       allCharactersImplemented,
     });
 

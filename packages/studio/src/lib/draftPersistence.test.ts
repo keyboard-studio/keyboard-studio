@@ -26,6 +26,11 @@ import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keybo
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore, getSurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
+import {
+  getDecisionSnapshot,
+  selectTouchSeedSource,
+  useDecisionStore,
+} from "../stores/decisionStore.ts";
 import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
 import {
   usePhaseBDraftStore,
@@ -69,6 +74,7 @@ import {
   reconcileProjectIndex,
   DRAFT_INDEX_KEY,
   recordProjectSubmission,
+  migrateDraftEnvelope,
   startCloudSync,
   CLOUD_SYNC_DEBOUNCE_MS,
   MAX_CLOUD_DRAFT_BYTES,
@@ -142,11 +148,11 @@ describe("draftPersistence", () => {
   describe("constants + draftKey", () => {
     it("DRAFT_KEY_PREFIX and DRAFT_VERSION match the documented contract", () => {
       expect(DRAFT_KEY_PREFIX).toBe("ks.draft.");
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2); // spec 088 FR-007: bumped 1 → 2
     });
 
     it("draftKey namespaces and versions the per-project key", () => {
-      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v1");
+      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v2");
     });
   });
 
@@ -642,7 +648,7 @@ describe("draftPersistence", () => {
   });
 
   describe("G-1/G-5: round-trip save + load restores BOTH stores from a single draft", () => {
-    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touchSeedSource, never re-instantiating a second working copy", () => {
+    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touch-seed decision, never re-instantiating a second working copy", () => {
       const base: BaseKeyboard = {
         id: "test_keyboard",
         displayName: "Test Keyboard",
@@ -666,10 +672,16 @@ describe("draftPersistence", () => {
       } as unknown as SurveyPhaseResult);
 
       // Traversal position: two forward hops (history becomes non-trivial) plus
-      // the spec-035 touchSeedSource fork choice (km-frontend-flagged risk (a)).
+      // the spec-035 touch-seed fork choice — since spec 088 that choice is
+      // the `touch-seed-source` decision, not a session field.
       useSurveySessionStore.getState().advance("choose_base");
       useSurveySessionStore.getState().advance("track");
-      useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+      useDecisionStore.getState().record({
+        id: "touch-seed-source",
+        value: "import-adapt",
+        provenance: "asked",
+        step: "touch_seed_source",
+      });
 
       const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
       expect(projectKey).toBe("test_keyboard");
@@ -677,10 +689,11 @@ describe("draftPersistence", () => {
       saveDraft(projectKey!);
       expect(localStorage.getItem(draftKey(projectKey!))).not.toBeNull();
 
-      // Cold reset BOTH stores — nothing left to inherit from; a partial reset
+      // Cold reset the stores — nothing left to inherit from; a partial reset
       // would mask a restore that only APPEARED to work.
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
       expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
 
@@ -705,8 +718,9 @@ describe("draftPersistence", () => {
       const session = useSurveySessionStore.getState();
       expect(session.activeStepId).toBe("track");
       expect(session.history).toEqual(["identity", "choose_base"]);
-      // (a) touchSeedSource round-trips through the traversal snapshot.
-      expect(session.touchSeedSource).toBe("import-adapt");
+      // (a) the touch-seed choice round-trips through the draft's decisions
+      // slice (spec 088 — it no longer rides the traversal snapshot).
+      expect(selectTouchSeedSource(getDecisionSnapshot())).toBe("import-adapt");
 
       expect(wasDraftRestoredThisBoot()).toBe(true);
     });
@@ -2430,6 +2444,41 @@ describe("draftPersistence", () => {
         "invisibles.u200c",
       ]);
       expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c", "convenience.x"]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Spec 088: v1 → v2 migration (T009; US3's end-to-end tests live in the
+  // US3 section added with T027–T029).
+  // -------------------------------------------------------------------------
+  describe("spec 088 v1 migration (migrateDraftEnvelope)", () => {
+    const fixtureRaw = readFileSync(
+      path.join(currentDir, "__fixtures__", "v1-draft-18e63aa4.json"),
+      "utf8",
+    );
+
+    it("maps the fixture's identity/track/project_name answers onto decision ids", () => {
+      const result = migrateDraftEnvelope(JSON.parse(fixtureRaw));
+      expect(result).not.toBeNull();
+      const decisions = result!.envelope.decisions ?? {};
+      expect(decisions["language-code"]).toMatchObject({ value: "fr", provenance: "asked", step: "identity" });
+      expect(decisions["copyright-holder"]).toMatchObject({ value: "Fixture Author", provenance: "asked", step: "identity" });
+      expect(decisions["authoring-track"]).toMatchObject({ value: "copy", provenance: "asked", step: "track" });
+      expect(decisions["project-display-name"]).toMatchObject({ value: "Fixture Keyboard", provenance: "asked", step: "project_name" });
+      expect(decisions["project-keyboard-id"]).toMatchObject({ value: "fixture_keyboard", provenance: "asked", step: "project_name" });
+      expect(result!.migrationOrphans).toEqual([]);
+      // The migrated surveyAnswers slice holds no survey-question answers.
+      const steps = result!.envelope.surveyAnswers?.steps ?? {};
+      for (const stepId of ["identity", "track", "project_name"]) {
+        expect(steps[stepId]?.answers ?? {}).toEqual({});
+      }
+    });
+
+    it("is an identity pass-through for a current-version envelope and null for non-objects", () => {
+      const v2 = { version: 2, savedAt: 1 };
+      expect(migrateDraftEnvelope(v2)?.envelope).toEqual(v2);
+      expect(migrateDraftEnvelope(null)).toBeNull();
+      expect(migrateDraftEnvelope("nope")).toBeNull();
     });
   });
 

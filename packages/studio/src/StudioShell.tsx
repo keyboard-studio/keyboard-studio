@@ -36,6 +36,7 @@ import type {
   RemovalCapability,
 } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
+import { applyMutatePatch } from "./steps/mutateApply.ts";
 import {
   shouldEmitTouchLayout,
   resolveTouchSeedSource,
@@ -75,7 +76,8 @@ import {
 } from "./stores/viewStateStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useStepNavStore } from "./stores/stepNavStore.ts";
-import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
+import { useSurveyAnswerStore, peekStepAnswers } from "./stores/surveyAnswerStore.ts";
+import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/decisionStore.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import {
   useKeyboardArtifact,
@@ -350,10 +352,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
-  // Injected into reducerDeps (spec 035 R12) so reducer.ts can clear the
-  // touch_seed_source fork choice on a genuine base re-instantiation without
-  // steps/ importing stores/ directly.
-  const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
+  // Injected into reducerDeps (spec 035 R12, re-homed by spec 088 T026) so
+  // reducer.ts can clear the touch_seed_source fork choice on a genuine base
+  // re-instantiation without steps/ importing stores/ directly. The choice
+  // is the `touch-seed-source` DECISION now: clearing removes the record AND
+  // clears the working copy's touch draft (research D-06 — the side effect
+  // the deleted session setter used to perform).
+  const clearTouchSeedChoice = useCallback(() => {
+    useDecisionStore.getState().forget("touch-seed-source");
+    useWorkingCopyStore.getState().setTouchDraft(null);
+  }, []);
 
   // githubTokenRef lets the cloud-draft-sync loop (draftPersistence.ts's
   // startCloudSync) read the current token lazily (from the single
@@ -818,7 +826,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
-      setTouchSeedSource,
+      clearTouchSeedChoice,
       // Spec 035 R11: this wrapper is the ONE call site (of the two — the
       // other is TouchGallery's preview/lint memos) that applies the
       // emission matrix for the output path. It resolves the Entity-5
@@ -868,6 +876,32 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // everything else here; the reducer knows only that it has a callback.
       recordDecision,
       recordQuestionAnswers: recordDecision.recordQuestionAnswers,
+      // Spec 088 FR-003 (contract C-2): the completion writer's decision
+      // store access, injected so steps/reducer.ts never imports stores/.
+      writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
+      readDecisionSet: () => getDecisionSnapshot(),
+      // Spec 089 FR-001/FR-002 (apply-contract A4): the checked patch sink.
+      // The `ir` channel's containment-checked merge runs FIRST — a
+      // MutatePatchContainmentError throws before any overlay setter runs,
+      // so a patch is never partially applied. Channels then land in the
+      // contract's order (identity → attribution → helpDocs →
+      // historyEntryState), each a whole-value replace. A null working IR
+      // (not yet instantiated) skips only the `ir` channel; the overlay
+      // channels still apply.
+      applyWorkingCopyPatch: (patch, writes) => {
+        const wc = useWorkingCopyStore.getState();
+        if (patch.ir !== undefined && wc.ir !== null) {
+          wc.setWorkingIR(applyMutatePatch(wc.ir, patch.ir, writes));
+        }
+        if (patch.identity !== undefined) wc.setIdentity(patch.identity);
+        if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
+        if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
+        if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
+      },
+      getDecisions: () => getDecisionSnapshot(),
+      getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
+      getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
+      getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id,
     }),
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [
@@ -876,7 +910,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
-      setTouchSeedSource,
+      clearTouchSeedChoice,
       recordDecision,
     ],
   );
@@ -976,7 +1010,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // this same callback — so nothing needs pinning here.
 
       // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
-      const track = useSurveySessionStore.getState().selectedTrack;
+      const track = selectTrack(getDecisionSnapshot());
       applyStepCompletion(
         "choose_base",
         {
@@ -1272,6 +1306,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // Saved answers and within-step positions belong to the abandoned project
     // (spec 080 FR-033: one of the only two reset sites).
     useSurveyAnswerStore.getState().reset();
+    // Spec 088 FR-007: the decision records belong to the abandoned project
+    // too — reset in the same start-over path as the answer store.
+    useDecisionStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
