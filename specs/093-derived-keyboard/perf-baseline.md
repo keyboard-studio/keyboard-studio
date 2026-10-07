@@ -82,6 +82,67 @@ so that comparison has a "before".
 
 ## T021 — replay-path re-measurement
 
-_To be appended by task T021 when the replay path lands, using the identical
-harness and run count, presented against the same PROPOSED thresholds as
-evidence for ruling (b)._
+Executed 2026-10-07 (branch `km/derived-keyboard`). The harness was
+reconciled to the post-089/090 tree as part of this task: the pre-089
+`mutate` seam references are gone, and the character inventory is
+extracted via spec 090's gallery module (`extractCharacterInventory` —
+the retired spike module's own extract, lifted) and recorded as the
+extracted decision directly, because the gallery module's `requires`
+(project-keyboard-id et al.) are outside the SC-004 adapt set and the
+flow runner rightly refuses unresolved requirements. Setup otherwise
+identical to T002: same corpus package, same adapt decision flow, same
+RUNS = 15 / WARMUPS = 3, same output projection + .kmn read; the
+projected .kmn is again 12,701 chars, so the measured state is the
+T002 state.
+
+What is timed changed, by design — it is the replay path (spec 093
+T009 wiring) that replaced the measured path:
+
+- **edit (warm)** — flip the `standard-letters` decision in the live
+  decision store, `rebuildWorkingCopyFromStores` with the session
+  checkpoint trail live (incremental rebuild from the checkpoint
+  before the changed decision), then project.
+- **resume (cold)** — restore the decision snapshot into the store,
+  drop the checkpoint trail, `rebuildWorkingCopyFromStores` over every
+  recorded id (full replay from the starting point), then project.
+  Snapshot clones are prepared outside the timed region.
+
+### Execution (the fully captured run)
+
+Conditions: Node v24.20.0, vitest (jsdom environment) — not a browser;
+linux 7.0.0-39-generic; AMD EPYC 9D25 (shared 2 vCPU VM — the same
+contention caveat as T002 applies). Decision count: 8.
+
+| scenario | median | mean | min | max | runs |
+| --- | --- | --- | --- | --- | --- |
+| edit (warm) | **7.20 ms** | 9.74 ms | 4.03 ms | 26.31 ms | 15 |
+| resume (cold) | **9.58 ms** | 15.65 ms | 5.78 ms | 44.57 ms | 15 |
+
+Edit series (ms): 6.41, 19.75, 18.48, 6.37, 9.30, 7.20, 4.50, 26.31,
+9.20, 5.79, 9.16, 6.69, 5.42, 7.45, 4.03.
+Resume series (ms): 6.39, 7.86, 33.34, 19.32, 23.66, 44.57, 13.27,
+8.93, 9.58, 8.54, 6.65, 9.06, 10.52, 5.78, 27.29.
+
+A first execution in the same session (partially captured) gave an
+edit median of 7.58 ms — consistent with the recorded run.
+
+### Reading against the PROPOSED thresholds (evidence only)
+
+Both medians sit far inside the still-PROPOSED numbers: warm edit at
+~7 ms against the proposed <300 ms, cold resume at ~10 ms against the
+proposed <2 s. The replay path is in the same range as the T002
+pre-093 baseline (edit single-digit-to-tens of ms, resume ~10 ms) —
+rebuilding from decisions costs no more than the snapshot-restore path
+it replaced, on this corpus. The thresholds remain PROPOSED; nothing
+here converts them into a gate, per ruling (b).
+
+### T022 — rebuild cache: NOT REQUIRED
+
+FR-006's disposable resume cache is conditional on these measurements
+requiring it. They do not: cold full replay medians ~10 ms on the
+largest realistic corpus package, two orders of magnitude inside the
+proposed resume budget. No cache is implemented; if a future corpus or
+decision-set size changes that picture, the cache design in the task
+(keyed by starting point id + decision set, discarded on any
+disagreement with the T020 determinism check) remains the shape to
+build.
