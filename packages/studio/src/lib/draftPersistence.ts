@@ -58,6 +58,11 @@ import {
 } from "../decisions/decisionLogStore.ts";
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
 import { alphabetKeyOf } from "../steps/evidence.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
+import { stepHasSettles } from "../steps/stepDependencies.ts";
+import { answerProvenance } from "../decisions/answerProvenance.ts";
+import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
+import type { MigrationOrphan } from "./draftTypes.ts";
 // Re-exported (not just imported) so existing external consumers of this
 // module (draftPersistence.test.ts, StudioShell.tsx, etc.) keep importing
 // `DurableDraft`/`ProjectIndexEntry`/`DraftMeta` from here unchanged, even
@@ -405,14 +410,21 @@ export function reconcileProjectIndex(): number {
     return 0; // VR-4: a security/quota failure must never throw into boot.
   }
 
-  const suffix = `.v${DRAFT_VERSION}`;
+  // Spec 088 (C-4.2): the boot scan also finds envelopes under the legacy
+  // `.v1` suffix, so a pre-bump draft is adopted (and migrated on load)
+  // instead of becoming invisible when DRAFT_VERSION moves to 2.
+  const suffixes =
+    DRAFT_VERSION === LEGACY_DRAFT_VERSION
+      ? [`.v${DRAFT_VERSION}`]
+      : [`.v${DRAFT_VERSION}`, `.v${LEGACY_DRAFT_VERSION}`];
   const indexed = new Set(readProjectIndex().map((e) => e.projectKey));
   let adopted = 0;
 
   for (const key of keys) {
     // `ks.draft.active` (no `.v1` suffix) and `ks.draftIndex.v1` (different
     // prefix — "ks.draftI" !== "ks.draft.") both fall out here.
-    if (!key.startsWith(DRAFT_KEY_PREFIX) || !key.endsWith(suffix)) continue;
+    const suffix = suffixes.find((s) => key.endsWith(s));
+    if (!key.startsWith(DRAFT_KEY_PREFIX) || suffix === undefined) continue;
     const projectKey = key.slice(DRAFT_KEY_PREFIX.length, key.length - suffix.length);
     if (projectKey === "" || indexed.has(projectKey)) continue;
     // The reserved pending-slot record is excluded from the index BY NAME,
@@ -431,8 +443,10 @@ export function reconcileProjectIndex(): number {
     try {
       const raw = localStorage.getItem(key);
       if (raw === null) continue;
-      const envelope = JSON.parse(raw) as DurableDraft;
-      if (envelope === null || typeof envelope !== "object") continue;
+      const parsed = JSON.parse(raw) as DurableDraft;
+      if (parsed === null || typeof parsed !== "object") continue;
+      // Spec 088 (C-4.2): migrate before the version gate.
+      const envelope = migrateIfLegacy(parsed);
       if (envelope.version !== DRAFT_VERSION) continue;
       if (typeof envelope.savedAt !== "number") continue;
       if (envelope.traversal === null || typeof envelope.traversal !== "object") continue;
@@ -464,14 +478,16 @@ export function reconcileProjectIndex(): number {
  */
 function readEnvelopeForReconciliation(projectKey: string): DurableDraft | null {
   try {
-    const raw = localStorage.getItem(draftKey(projectKey));
+    const raw = readRawDraft(projectKey);
     if (raw === null) return null;
     const parsed = JSON.parse(raw) as DurableDraft;
     if (parsed === null || typeof parsed !== "object") return null;
-    if (parsed.version !== DRAFT_VERSION) return null;
-    if (typeof parsed.savedAt !== "number") return null;
-    if (parsed.workingCopy === null || typeof parsed.workingCopy !== "object") return null;
-    return parsed;
+    // Spec 088 (C-4.2): migrate before the version gate, legacy key included.
+    const envelope = migrateIfLegacy(parsed);
+    if (envelope.version !== DRAFT_VERSION) return null;
+    if (typeof envelope.savedAt !== "number") return null;
+    if (envelope.workingCopy === null || typeof envelope.workingCopy !== "object") return null;
+    return envelope;
   } catch {
     return null;
   }
@@ -1034,6 +1050,171 @@ export function restoreSurveyAnswerSnapshot(raw: unknown): SurveyAnswerSnapshot 
 }
 
 /**
+ * The draft format version spec 088 migrates FROM (FR-007: 1 → 2). Kept as a
+ * named constant so the boot scan and the legacy-key fallback can find v1
+ * envelopes after `DRAFT_VERSION` flips — the version is embedded in the
+ * localStorage key suffix, so a v1 draft under `.v1` is invisible to a reader
+ * that only looks under the current suffix (research §1a, plan Risk R-1).
+ */
+export const LEGACY_DRAFT_VERSION = 1 as const;
+
+/** localStorage key for `projectKey`'s legacy (v1) draft, if one exists. */
+function legacyDraftKey(projectKey: string): string {
+  return `${DRAFT_KEY_PREFIX}${projectKey}.v${LEGACY_DRAFT_VERSION}`;
+}
+
+export interface MigrateDraftResult {
+  envelope: DurableDraft;
+  migrationOrphans: MigrationOrphan[];
+}
+
+/**
+ * Spec 088 (FR-007 / US3, contract C-4): migrate a stored envelope to the
+ * current draft version. Pure — no store or localStorage access.
+ *
+ * A v1 envelope's survey-question answers become decision records: each
+ * answer's question id resolves through `questionRegistry[qid].provides`
+ * (research D-08 — the registry is the only question→decision map), with
+ * provenance per the D-05 mapping and `step` set from the v1 step key. The
+ * session copies become records too: `traversal.selectedTrack` →
+ * `authoring-track`, `traversal.touchSeedSource` → `touch-seed-source`; on a
+ * disagreement with an answer-derived record the session field wins (it is
+ * what the author last saw) and the mismatch is logged to the console
+ * (C-4.4 — no on-screen warning). Answers on gallery/editor steps (steps
+ * with `settles`) are retained in the migrated `surveyAnswers` slice until
+ * spec 090 retires them; an answer that resolves nowhere else is collected
+ * into `migrationOrphans`, never dropped (C-4.3).
+ *
+ * Any non-v1 envelope is returned unchanged (the caller's version gates then
+ * apply exactly as before), and a non-object input returns null.
+ *
+ * The migrated envelope is stamped with the CURRENT `DRAFT_VERSION`: while
+ * the writer still writes v1 this keeps native v1 loading behaviour
+ * unchanged (tasks T010 before T018); once the writer flips to 2, migrated
+ * envelopes are indistinguishable from native v2 envelopes downstream.
+ */
+export function migrateDraftEnvelope(raw: unknown): MigrateDraftResult | null {
+  if (!isPlainRecord(raw)) return null;
+  const source = raw as unknown as DurableDraft;
+  if (source.version !== LEGACY_DRAFT_VERSION) {
+    return { envelope: source, migrationOrphans: [] };
+  }
+
+  const decisions: Partial<Record<DecisionId, Decision<unknown>>> = {};
+  const orphans: MigrationOrphan[] = [];
+  const wc = isPlainRecord(raw.workingCopy) ? raw.workingCopy : null;
+  const baseKeyboard = wc !== null && isPlainRecord(wc.baseKeyboard) ? wc.baseKeyboard : null;
+  const baseSourceName = typeof baseKeyboard?.id === "string" ? baseKeyboard.id : undefined;
+
+  // 1. Answers → records (or retained gallery answers, or orphans).
+  let migratedSurveyAnswers = source.surveyAnswers;
+  if (source.surveyAnswers !== undefined && isPlainRecord(raw.surveyAnswers)) {
+    const rawSteps = isPlainRecord(raw.surveyAnswers.steps) ? raw.surveyAnswers.steps : {};
+    const steps: Record<string, StepAnswers> = {};
+    for (const [stepId, rawStep] of Object.entries(rawSteps)) {
+      const step = source.surveyAnswers.steps[stepId] as StepAnswers | undefined;
+      if (step === undefined || !isPlainRecord(rawStep)) continue;
+      const retained: Record<string, SavedAnswer> = {};
+      const rawAnswers = isPlainRecord(rawStep.answers) ? rawStep.answers : {};
+      for (const [questionId, rawAnswer] of Object.entries(rawAnswers)) {
+        if (!isPlainRecord(rawAnswer) || !("value" in rawAnswer)) continue;
+        const answer = step.answers[questionId] as SavedAnswer | undefined;
+        if (answer === undefined) continue;
+        const mod = questionRegistry[questionId];
+        if (mod !== undefined && mod.provides !== undefined && mod.provides.length > 0) {
+          const mapped = answerProvenance(answer.value, answer.proposal, baseSourceName);
+          for (const id of mod.provides) {
+            decisions[id] = {
+              id,
+              value: answer.value,
+              provenance: mapped.provenance,
+              ...(mapped.source !== undefined && { source: mapped.source }),
+              ...(mapped.offered !== undefined && { offered: mapped.offered }),
+              step: stepId,
+            };
+          }
+        } else if (stepHasSettles(stepId)) {
+          retained[questionId] = answer;
+        } else {
+          orphans.push({ questionId, stepId, value: answer.value });
+        }
+      }
+      steps[stepId] = { ...step, answers: retained };
+    }
+    migratedSurveyAnswers = { ...source.surveyAnswers, steps };
+  }
+
+  // 2. Session fields → records; the session field wins a disagreement.
+  const traversal = isPlainRecord(raw.traversal) ? raw.traversal : null;
+  const sessionRecord = (
+    id: DecisionId,
+    value: unknown,
+    fallbackStep: string,
+  ): void => {
+    const existing = decisions[id];
+    if (existing !== undefined && !Object.is(existing.value, value)) {
+      console.warn(
+        `[WARN] draft migration: session field for ${id} disagrees with the saved answer; the session field wins.`,
+      );
+    }
+    decisions[id] = {
+      id,
+      value,
+      provenance: "asked",
+      ...(existing?.step !== undefined ? { step: existing.step } : { step: fallbackStep }),
+    };
+  };
+  if (typeof traversal?.selectedTrack === "string") {
+    sessionRecord("authoring-track", traversal.selectedTrack, "track");
+  }
+  if (typeof traversal?.touchSeedSource === "string") {
+    sessionRecord("touch-seed-source", traversal.touchSeedSource, "touch_seed_source");
+  }
+
+  const envelope: DurableDraft = {
+    ...source,
+    version: DRAFT_VERSION,
+    decisions: decisions as DecisionSet,
+    ...(migratedSurveyAnswers !== undefined && { surveyAnswers: migratedSurveyAnswers }),
+    ...(orphans.length > 0 && { migrationOrphans: orphans }),
+  };
+  return { envelope, migrationOrphans: orphans };
+}
+
+
+/**
+ * Reader-side migration gate (C-4.2): migrate only an envelope whose
+ * version is not the current one. While `DRAFT_VERSION` is still 1, native
+ * v1 drafts load exactly as before (T010 precedes the T018 writer flip);
+ * once the writer flips to 2, every stored v1 envelope is legacy and is
+ * migrated before any version gate sees it.
+ */
+function migrateIfLegacy(envelope: DurableDraft): DurableDraft {
+  if (envelope.version === DRAFT_VERSION) return envelope;
+  const migrated = migrateDraftEnvelope(envelope);
+  return migrated !== null ? migrated.envelope : envelope;
+}
+
+/**
+ * Read a project's raw stored draft text, current-version key first and —
+ * once `DRAFT_VERSION` has moved past 1 — the legacy `.v1` key second, so a
+ * v1 draft written before the version bump is still found and migrated
+ * (contract C-4.2). Returns null when neither key holds a draft.
+ */
+function readRawDraft(projectKey: string): string | null {
+  try {
+    const current = localStorage.getItem(draftKey(projectKey));
+    if (current !== null) return current;
+    if (DRAFT_VERSION !== LEGACY_DRAFT_VERSION) {
+      return localStorage.getItem(legacyDraftKey(projectKey));
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Outcome of {@link applyEnvelopeToStores}. `"no-real-work"` (VR-2) is
  * distinguished from `"corrupt"` (VR-1 version mismatch, VR-3 bad traversal
  * shape, or a throw during the store-apply itself) because `loadDraft`
@@ -1057,7 +1238,11 @@ type ApplyEnvelopeOutcome =
  * the `wasDraftRestoredThisBoot()` / `restoredDraftSavedAt()` boot flags —
  * those are `loadDraft`-only side effects layered on top by its caller.
  */
-function applyEnvelopeToStores(envelope: DurableDraft, pendingSlotKey: string): ApplyEnvelopeOutcome {
+function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): ApplyEnvelopeOutcome {
+  // Spec 088 (C-4.2): a v1 envelope is migrated BEFORE any version gate
+  // runs, so the VR-1 check below only ever sees current-version envelopes
+  // or genuinely foreign versions.
+  const envelope: DurableDraft = migrateIfLegacy(input);
   if (envelope.version !== DRAFT_VERSION) {
     // VR-1: version mismatch — discard, do not attempt to migrate.
     return { ok: false, reason: "corrupt" };
@@ -1178,12 +1363,9 @@ function applyEnvelopeToStores(envelope: DurableDraft, pendingSlotKey: string): 
  * and the boot-restore flags on top.
  */
 export function loadDraft(projectKey: string): boolean {
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(draftKey(projectKey));
-  } catch {
-    return false;
-  }
+  // Spec 088 (C-4.2): readRawDraft also finds the legacy `.v1` key, and
+  // applyEnvelopeToStores migrates a v1 envelope before its version gate.
+  const raw = readRawDraft(projectKey);
   if (raw === null) return false;
 
   // VR-3 (P0 fix): the ENTIRE parse-through-apply body is one try/catch, not
@@ -1249,12 +1431,9 @@ export function applyRemoteDraft(envelope: DurableDraft | null): boolean {
  * rather than navigating to an empty trail.
  */
 export function loadDecisionRecordForProject(projectKey: string): boolean {
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(draftKey(projectKey));
-  } catch {
-    return false;
-  }
+  // readRawDraft: a v1 record's decisionRecord passes through migration
+  // unchanged (spec 088 data-model §5.4), so the legacy key is a valid source.
+  const raw = readRawDraft(projectKey);
   if (raw === null) return false;
   try {
     const envelope = JSON.parse(raw) as DurableDraft;
@@ -1678,16 +1857,13 @@ export function loadDraftMeta(): DraftMeta | null {
   const projectKey = resolveActiveProjectKey();
   if (projectKey === null) return null;
 
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(draftKey(projectKey));
-  } catch {
-    return null;
-  }
+  const raw = readRawDraft(projectKey);
   if (raw === null) return null;
 
   try {
-    const envelope = JSON.parse(raw) as DurableDraft;
+    const parsed = JSON.parse(raw) as DurableDraft;
+    // Spec 088 (C-4.2): migrate before the version gate, legacy key included.
+    const envelope = migrateIfLegacy(parsed);
     if (
       envelope.version !== DRAFT_VERSION ||
       envelope.workingCopy === null ||

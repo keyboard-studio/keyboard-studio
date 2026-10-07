@@ -214,3 +214,43 @@ target and keeps the phase-field merge working (D-07).
   `lib/__fixtures__/pre079-draft.json` and `prePrDraft.json`, consumed by
   `lib/draftPersistence.test.ts:2401`. Capturing the 088 fixture from `main` @
   18e63aa4 is a setup task (T002), not a research blocker.
+
+## 4. T006 inventory — `recordPhase` callers and `phaseResults` answer readers
+
+Appended by the 088 implementation (T006). Production callers of `recordPhase`
+(workingCopyStore) outside tests:
+
+| Caller | What it records |
+|---|---|
+| `components/StepHost.tsx:435` | Every manifest-step completion that is `SurveyPhaseResult`-shaped, with `{ stepId }` — the only caller whose answers are survey-question answers |
+| `hooks/useContextToleranceApply.ts:53` | Re-records a marks phase entry to stamp `marksContextTolerance.appliedFingerprint` (non-answer field) |
+| `survey/journey-runner.ts` (several) | Journey/walk harness completions, same shape as StepHost's |
+| `survey/PhaseB.tsx:966,1491` | Emits inventory fields on the Phase B result (non-answer fields ride the merge) |
+
+All other call sites are tests seeding phase state directly.
+
+Readers of `phaseResults[p].answers` / `phaseAnswersByStep` in production code:
+
+| Reader | What it actually consumes |
+|---|---|
+| `lib/persistWorkingCopy.ts:403,500` | Snapshot/restore of the `phaseAnswersByStep` sidecar itself |
+| `survey/invisibles/InvisiblesStep.tsx` (`writingDirectionFrom`) | Phase-slot answers by *answer-level* question id (`writing_direction`, `pb_rtl_direction_confirm`, `invisibles.u200c`, …) — phase/gallery answers, not registry-module answers |
+| `stores/workingCopyStore.ts` (`recordPhase`, `ownersOf`) | The ownership merge itself |
+| `mergePhaseResults` (contracts `surveySession.ts`) | **Does not read `.answers` at all** — the session derivation consumes axes, inventories and other non-answer fields |
+
+**Finding that changes T016/T017 (reported, not worked around):** the plan
+(D-07) assumes a phase's question answers can be derived from `decisionStore`
+via `selectPhaseAnswers(decisions, phase)`, with `mergePhaseResults` as the
+named reader to re-point. Against the code: (a) `mergePhaseResults` never
+reads answers; (b) the live contents of the phase slots' `answers` are
+predominantly *gallery/phase* answers whose ids are not registry question ids
+(`invisibles.u200c`, `convenience.*`, marks lists) — they become decisions
+only in spec 090, so in 088 they have no decision record to derive from;
+(c) no phase↔decision mapping exists (modules declare flows, not phases).
+Deleting `phaseAnswersByStep` in 088 would therefore either drop gallery
+answers on re-record (the spec-079 D-4 bug, for steps 088 is not chartered
+to move) or require a replacement per-step storage under another name.
+T016/T017 are stopped pending an owner/plan ruling; the sound subset — the
+draft `surveyAnswers` slice (T015) and the decision records themselves —
+proceeds, and `phaseAnswersByStep`'s remaining contents after US1 are exactly
+the gallery answers the spec ledger assigns to 090.

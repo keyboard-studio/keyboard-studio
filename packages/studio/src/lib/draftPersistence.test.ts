@@ -69,6 +69,7 @@ import {
   reconcileProjectIndex,
   DRAFT_INDEX_KEY,
   recordProjectSubmission,
+  migrateDraftEnvelope,
   startCloudSync,
   CLOUD_SYNC_DEBOUNCE_MS,
   MAX_CLOUD_DRAFT_BYTES,
@@ -2430,6 +2431,41 @@ describe("draftPersistence", () => {
         "invisibles.u200c",
       ]);
       expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c", "convenience.x"]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Spec 088: v1 → v2 migration (T009; US3's end-to-end tests live in the
+  // US3 section added with T027–T029).
+  // -------------------------------------------------------------------------
+  describe("spec 088 v1 migration (migrateDraftEnvelope)", () => {
+    const fixtureRaw = readFileSync(
+      path.join(currentDir, "__fixtures__", "v1-draft-18e63aa4.json"),
+      "utf8",
+    );
+
+    it("maps the fixture's identity/track/project_name answers onto decision ids", () => {
+      const result = migrateDraftEnvelope(JSON.parse(fixtureRaw));
+      expect(result).not.toBeNull();
+      const decisions = result!.envelope.decisions ?? {};
+      expect(decisions["language-code"]).toMatchObject({ value: "fr", provenance: "asked", step: "identity" });
+      expect(decisions["copyright-holder"]).toMatchObject({ value: "Fixture Author", provenance: "asked", step: "identity" });
+      expect(decisions["authoring-track"]).toMatchObject({ value: "copy", provenance: "asked", step: "track" });
+      expect(decisions["project-display-name"]).toMatchObject({ value: "Fixture Keyboard", provenance: "asked", step: "project_name" });
+      expect(decisions["project-keyboard-id"]).toMatchObject({ value: "fixture_keyboard", provenance: "asked", step: "project_name" });
+      expect(result!.migrationOrphans).toEqual([]);
+      // The migrated surveyAnswers slice holds no survey-question answers.
+      const steps = result!.envelope.surveyAnswers?.steps ?? {};
+      for (const stepId of ["identity", "track", "project_name"]) {
+        expect(steps[stepId]?.answers ?? {}).toEqual({});
+      }
+    });
+
+    it("is an identity pass-through for a current-version envelope and null for non-objects", () => {
+      const v2 = { version: 2, savedAt: 1 };
+      expect(migrateDraftEnvelope(v2)?.envelope).toEqual(v2);
+      expect(migrateDraftEnvelope(null)).toBeNull();
+      expect(migrateDraftEnvelope("nope")).toBeNull();
     });
   });
 
