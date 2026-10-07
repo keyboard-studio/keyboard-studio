@@ -499,10 +499,11 @@ export async function driveInvisiblesStep(page: Page): Promise<void> {
  * only that the screen hasn't rendered YET, not that the gate skipped it —
  * treating the two as the same thing is what let the walk return early while
  * the app was still sitting on "Keep these letters for convenience?", timing
- * out downstream on the NEXT landmark it never reached. Races the step's own
- * control against the one landmark that ALWAYS follows it on the spine
- * (carve — see steps/manifest.ts), and only clicks Continue if the
- * convenience screen is the one that actually showed.
+ * out downstream on the NEXT landmark it never reached. Waits on the step's
+ * own control together with the one landmark that ALWAYS follows it on the
+ * spine (carve — see steps/manifest.ts) as a single union wait with one
+ * shared window, and only clicks Continue if the convenience screen is the
+ * one that actually showed.
  */
 export async function driveConvenienceStep(
   page: Page,
@@ -532,14 +533,20 @@ export async function driveConvenienceStep(
     await expect(continueBtn).toHaveCount(0);
     return;
   }
-  await Promise.race([
-    continueBtn.waitFor({ state: "visible", timeout: 20_000 }),
-    carveGallery.waitFor({ state: "visible", timeout: 20_000 }),
-  ]).catch(() => {
-    // Neither landmark showed within the combined window — fall through to
-    // the direct check below, which reports the real state; a genuinely
-    // stuck walk still fails loudly at the caller's own subsequent wait.
-  });
+  // ONE waiter over the candidate set with one shared window (a single
+  // union locator), then the direct check below reads which landmark is
+  // actually present. Arming a separate full-timeout waiter per landmark
+  // (the Promise.race form) leaves the losing waiter polling until its 20s
+  // expiry on every call — measured in the spec 089 CI traces as serial
+  // full-timeout waits against whichever landmark the branch did not take.
+  await continueBtn
+    .or(carveGallery)
+    .waitFor({ state: "visible", timeout: 20_000 })
+    .catch(() => {
+      // Neither landmark showed within the combined window — fall through to
+      // the direct check below, which reports the real state; a genuinely
+      // stuck walk still fails loudly at the caller's own subsequent wait.
+    });
   if (await continueBtn.isVisible().catch(() => false)) {
     await continueBtn.click();
   }
@@ -559,23 +566,28 @@ export async function driveConvenienceStep(
  * than assuming a fixed count.
  *
  * Race-proof by construction — the same hardening as driveConvenienceStep
- * above (see its doc comment): races the step's own control against the
- * landmarks that follow it on the spine (the convenience step's control, or —
- * if that is ALSO gated away — the carve gallery itself), rather than trusting
- * a fixed-timeout absence read to mean "the S0 gate skipped this".
+ * above (see its doc comment): waits on the step's own control together with
+ * the landmarks that follow it on the spine (the convenience step's control,
+ * or — if that is ALSO gated away — the carve gallery itself) as a single
+ * union wait, rather than trusting a fixed-timeout absence read to mean
+ * "the S0 gate skipped this".
  */
 export async function driveMarksSeries(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("marks-continue");
-  const nextLandmarks = [
-    page.getByTestId("convenience-continue"),
-    page.getByTestId("carve-gallery"),
-  ];
+  // ONE waiter over the whole candidate set (the step's own control plus the
+  // landmarks that follow it on the spine) with one shared window per pass,
+  // then the direct check below reads which landmark is actually present.
+  // Arming a separate full-timeout waiter per landmark (the Promise.race
+  // form) left two losing waiters polling until expiry on EVERY pass through
+  // this loop — measured in the spec 089 CI traces as ~5s expirations of the
+  // convenience-continue and carve-gallery waits per station, plus a 20s
+  // pair on the first pass.
+  const anyLandmark = continueBtn
+    .or(page.getByTestId("convenience-continue"))
+    .or(page.getByTestId("carve-gallery"));
   for (let i = 0; i < 6; i++) {
     const timeout = i === 0 ? 20_000 : 5_000;
-    await Promise.race([
-      continueBtn.waitFor({ state: "visible", timeout }),
-      ...nextLandmarks.map((l) => l.waitFor({ state: "visible", timeout })),
-    ]).catch(() => {
+    await anyLandmark.waitFor({ state: "visible", timeout }).catch(() => {
       // Nothing showed within the combined window — fall through to the
       // direct visibility check below.
     });
