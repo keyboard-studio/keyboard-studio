@@ -322,7 +322,7 @@ owner's OI-1 ruling** (plan.md). Under a global ruling, each site loses its
 `isMutateSeamEnabled()` condition and the flag-parity tests
 (`projectWorkingCopyVfs.flagParity.test.ts`, `serializeWorkingCopy.flagParity.test.ts`)
 are retired with the flag; under a runner-only ruling, those sites keep reading a
-gate and T027/T028 close as partially-unmet FR-003, recorded in the PR body —
+gate and T021/T022 close as partially-unmet FR-003, recorded in the PR body —
 the plan does not silently pick either.
 
 ### R8 — SC-001 baseline: script first, capture on the pre-089 stacked base, compare bytes
