@@ -3,17 +3,28 @@
 **Feature:** specs/093-derived-keyboard
 **Branch:** cut from `main` after 092 merges (`km/derived-keyboard`)
 **Created:** 2026-10-06
-**Status:** Implemented with held items (2026-10-07) — the replay engine,
-the StepHost/StudioShell rebuild wiring (T009), starting-point
-recalculation (T017, core), determinism (SC-002) and the replay-path
-perf re-measurement (T021) are landed; the touch/repropagate retirement
-(T010/T011) and the decisions-only draft (US2: T014–T016, T018) are
-HELD on spec 090's US3/US4 landing on this stack, with evidence in
-[followups.md](followups.md). Owner decisions stand as ruled 2026-10-06:
-(a) starting-point change = recalculation; (b) perf budgets
-measure-first — the <300 ms / <2 s numbers remain PROPOSED (T021
-evidence: warm edit median 7.20 ms, cold resume median 9.58 ms on
-sil_euro_latin), never converted to a gate here.
+**Status:** Implemented with held items — FINAL PASS 2026-10-07 (restacked
+on the completed 088–092 stack): the replay engine, the
+StepHost/StudioShell rebuild wiring (T009), determinism (SC-002) and the
+replay-path perf re-measurement (T021) are landed; the final pass landed
+the carve-overlay fold (090 D-090-24 owned delta), the T017 wire-in under
+OWNER ruling (b) 2026-10-07 (base switch = RETAIN + RECALCULATE, consent
+reworded in the same change), the base-contribution ordering fix, the
+depcruise wiring-half exemptions (lead ruling (a)), the A2
+snapshot-channel adoption in recalculate, and the cure for the
+non-terminating flow-driver family (live extraction is now store-level
+idempotent). SC-005 is confirmed at the store level (golden walk 2/2 on
+the final tree). Two items stand stopped with evidence in
+[followups.md](followups.md): the touch/repropagate retirement
+(T010/T011 — its unblock premise was falsified in substance by 090's
+landed completion-wiring shape) and the decisions-only draft (US2:
+T014–T016, T018 — a scope stop: one inseparable unit whose resume half
+restructures boot). FR-004 and FR-005 therefore remain open obligations.
+Owner decisions stand as ruled: (a) starting-point change =
+recalculation (2026-10-06); (b) base switch = retain + recalculate
+(2026-10-07); perf budgets measure-first — the <300 ms / <2 s numbers
+remain PROPOSED (T021 evidence: warm edit median 7.20 ms, cold resume
+median 9.58 ms on sil_euro_latin), never converted to a gate here.
 **Series:** 6 of 6. The plan is [088 HANDOFF.md](../088-modular-decisions/HANDOFF.md)
 (sections "Recalculation on change" and phase 6).
 **Depends on:** 090 (pure `apply`, overlays as decision values) and 092 (setup as a decision).
@@ -110,6 +121,21 @@ lib/persistWorkingCopy.ts + lib/draftPersistence.ts) stands while US2
 waits on the same landing — on this tree those slices still carry
 author work that is not yet decision-derived, and dropping them would
 lose it silently.
+
+**Ledger state at FINAL PASS (T024 re-measured 2026-10-07 on the
+completed stack, packages/studio/src, tests excluded):** row 3 is fully
+realised — the final pass's carve-overlay fold means replay now also
+produces the carve overlay slice, the last overlay held as working-copy
+state. Rows 1 and 2 stand, re-justified on the final tree (followups.md
+final-pass stops): `staleSteps` 29 references and `repropagate` 15
+references (non-test) remain because FR-019's step-level staleness
+closure and R1's touch re-derivation have no decision-replay
+replacement on the landed 090 shape (D-090-38 completion wiring); the
+saved `workingCopy` slice remains because the decisions-only draft
+(US2) is stopped as one inseparable unit. The other T024-era banned
+references measure zero: `dedup-with-provenance` 0,
+`phaseAnswersByStep` 0. T024 stays UNCHECKED — its gates are zero only
+when rows 1 and 2 retire.
 
 ## Success Criteria
 - **SC-001** The US1 walk passes in `pnpm dev`.

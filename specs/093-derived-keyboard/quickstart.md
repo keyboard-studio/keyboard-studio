@@ -100,3 +100,13 @@ grep -rn "staleSteps" packages/studio/src   # expect: no results after T011
   `decisions/replayDeterminism.test.ts` (T020); SC-004 re-measured on
   the replay path at T021 (perf-baseline.md — warm edit median
   7.20 ms, cold resume median 9.58 ms, sil_euro_latin).
+- **T023 golden walk — FINAL PASS (2026-10-07, this branch on the
+  completed stack):** the upstream `decisionMutations` fixture
+  regeneration has cascaded through 090/091/092's landings, and
+  `tests/steps/stepHost.goldenWalk.test.tsx` now PASSES 2/2 (copy +
+  adapt tracks, full deep equality against the committed fixture). The
+  earlier failure was purely the fixture delta characterised above; no
+  traversal step, answer, or emission differed. **SC-005 is therefore
+  CONFIRMED at the store level** (the harness the owner's live-capture
+  ruling accepts in-sandbox); the literal source-zip byte capture runs
+  in CI.
