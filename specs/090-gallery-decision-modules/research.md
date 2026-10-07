@@ -873,3 +873,149 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   fresh-walk classification byte-identical to T023/T024 (the 7 known
   post-merge-signature deltas per track) — T025 adds zero delta;
   fixtures restored (regeneration remains T029's action).
+
+- **D-090-19 — T026 persistence adjudication: the options, re-derived
+  and recorded for the lead's ruling (T026 STOPPED here — no option
+  is chosen by this entry).** Provenance note: the predecessor's
+  report referenced lettered options (a)/(b)/(c) that were not in the
+  delivered text; the option space below is re-derived from the
+  branch evidence (D-090-17, D-090-18, D-090-16, the spec-079
+  persistence table, `steps/types.ts`, `manifest.persistence.test.ts`)
+  and recorded in full so the ruling is made on text, not on a
+  summary of text.
+
+  **The facts the adjudication turns on.** (1) The five US2 steps'
+  decided values now live in `decisionStore`, persisted in the v2
+  draft's `decisions` slice (088 FR-007): character-inventory (T021),
+  punctuation- + invisibles-inventory (T022), marks-treatment (T023),
+  retained-convenience-chars (T024). (2) The manifest declarations
+  have not moved: characters / punctuation / invisibles still
+  declare `persistence: "phase-b-draft"` (manifest.ts:100/189/213) —
+  a store T025 deleted; marks and convenience declare
+  `"answer-store"` (manifest.ts:163/238 in the pre-merge numbering).
+  (3) The declarations are machine-pinned:
+  `manifest.persistence.test.ts` parses
+  `specs/079-survey-answer-persistence/contracts/step-classification.md`
+  and fails unless each row's FIRST backtick token equals the
+  manifest's declaration for that step (dual declarations are
+  expressible — the characters row already reads `` `phase-b-draft`
+  (alphabet) + `answer-store` (sub-screen position, …) `` and only
+  the first token is compared). The kind union itself is spec-079
+  vocabulary (`steps/types.ts`, R-02/R-12):
+  `"answer-store" | "phase-b-draft" | "working-copy" | { exempt }`.
+  There is no decision kind. (4) The answer store is NOT yet free of
+  gallery answers, so T026's premise ("zero gallery answer ids
+  remain") is not currently true: marks' per-toggle answers remain
+  in `surveyAnswerStore` BY DESIGN (D-090-16(2) — they carry spec
+  079's draft→confirmed evidence lifecycle; the value records the
+  derived composite at commit points, and per-toggle recording was
+  rejected in D-090-11 because re-guarding a partial series is not
+  proven idempotent; D-090-16 names T026 as the adjudicator of this
+  layer's fate); characters' per-grapheme addition answers remain
+  (CharactersStep.tsx:147, the manifest comment's "manual-path
+  answers"); punctuation still writes its one inventory answer
+  (PunctuationStep.tsx:481); convenience's booleans LEFT the store
+  (D-090-17) but its pre-T024 adoption shim reads legacy booleans
+  restored from older drafts' `surveyAnswers` slices — D-090-17:
+  "T026 must keep the convenience answers readable for this shim or
+  retire it with the slot"; marks and convenience also keep their
+  step-status slots (not-asked/finished + evidence key) in the store
+  (D-090-17's stated basis for convenience's unchanged declaration).
+  (5) `surveyAnswerStore`'s own header already frames the narrowed
+  role T026's text asks for ("what was GIVEN, including drafts" vs
+  the decision record's "what was DECIDED") — the narrowing is a
+  declaration problem more than a store problem.
+
+  **Option (a) — declare the decisions slice (extend the spec-079
+  vocabulary).** Add `"decision-store"` to `PersistenceDeclaration`
+  in `steps/types.ts`; re-declare the five steps with the decisions
+  slice as the first token — characters keeps its dual form
+  (`` `decision-store` (alphabet) + `answer-store` (sub-screen
+  position, manual-path answers) ``), marks/convenience declare
+  `decision-store` with the answer-store evidence/status residue
+  named in the manifest comment (the pin compares only the first
+  token, so the residue stays visible in the row text), punctuation
+  /invisibles declare `decision-store`. The five rows of the
+  spec-079 table are amended in lockstep, with an amendment note in
+  step-classification.md recording that spec 090 superseded the
+  "Declaration after 079" cells for these rows. The answer-store
+  evidence layer (marks per-toggle, characters additions,
+  punctuation inventory answer) and the convenience shim are KEPT:
+  they are the within-step draft/evidence surface, which is exactly
+  the narrowed role T026's store text describes.
+  *Consequence for the pinned table:* five rows amended plus a
+  written amendment note — the 079 contract's end-state column no
+  longer describes these steps without the note; the pin test stays
+  green because manifest and table move together, and the kind union
+  (079 vocabulary) gains a member by 090's hand, visible in both
+  files' history. *Consequence for 091:* the declarations become
+  truthful and machine-readable at the moment 091 starts deriving
+  step membership over the manifest/declaration surface: a
+  `decision-store` step is exactly a step whose settled state is a
+  decision record, so 091's derivation (and its FR-005 parity
+  rewrite) can key decision-backed membership off the declaration
+  instead of re-deriving it from the registry.
+
+  **Option (b) — residue reading, vocabulary untouched.** Keep the
+  kind union exactly as spec 079 left it; reinterpret the
+  declaration (documented in `steps/types.ts`) as naming where a
+  step's NON-decision residue persists. Characters / punctuation /
+  invisibles: `phase-b-draft` → `answer-store` (their residue —
+  position, evidence layer — is answer-store state); marks /
+  convenience stay `answer-store` (the D-090-17 status-slot reading,
+  generalized). Evidence layer and shim kept, as in (a). Only the
+  three `phase-b-draft` rows change in the table; the
+  `phase-b-draft` kind itself either stays in the union as
+  defined-but-unused vocabulary or is struck — striking it is the
+  same species of 079 amendment as (a)'s addition, so the clean
+  form of (b) keeps it, unused.
+  *Consequence for the pinned table:* three rows amended, no
+  amendment note strictly required (the tokens stay within 079's
+  vocabulary), but the table's declaration column stops answering
+  FR-007's question ("where a step's answers are kept so that
+  leaving and returning loses nothing") for the five steps — the
+  alphabet, the marks composite and the retained set are declared
+  NOWHERE; a reviewer reading the table learns where the residue
+  lives, not where the answers live. *Consequence for 091:*
+  declarations become actively ambiguous for derivation — identity,
+  track and help (pure question steps) share `answer-store` with
+  the five decision-backed steps, so 091 cannot distinguish
+  decision-settled steps from answer-store steps by declaration and
+  must hard-code or registry-derive the set its membership
+  derivation was supposed to read off the manifest.
+
+  **Option (c) — T026's letter, executed literally (eliminate the
+  evidence layer).** Remove the remaining gallery answer writes so
+  the task text's premise is made true: marks records per-toggle
+  into the value (reopening D-090-11's rejected design — the value
+  can carry per-toggle `answers` with `completion: null`, but spec
+  079's evidence lifecycle — savedAt/stage/evidence keys, read by
+  `steps/evidence.ts` key fns — has no home in the value and would
+  need a new carrier or be dropped); characters' addition answers
+  and punctuation's inventory answer likewise move into their
+  values or vanish; the convenience adoption shim is RETIRED with
+  its slot (pre-T024 drafts' restored convenience booleans become
+  unreadable — no orphan surface exists for answer-store residue,
+  so that state is dropped, contrary to the 087 Q5 / 088 T030
+  "surfaced, never dropped" precedent the rest of US2 followed).
+  Declarations then follow (b)'s tokens (`answer-store` residue =
+  position/status only) and the same three table rows are amended.
+  *Consequence for the pinned table:* as (b) for the tokens, plus
+  D-090-11 and D-090-16 require superseding entries (their recorded
+  rationale — evidence lifecycle, guard idempotence — is overridden
+  by the ruling, not by new evidence), and spec-079 evidence
+  suites re-point or lose coverage. *Consequence for 091:* the
+  cleanest store story (surveyAnswerStore = question steps +
+  position/status only, T026's checkpoint text verbatim), but the
+  marks/characters recording redesign lands under 090's tail task
+  rather than as its own adjudicated change, and 091's parity
+  surface (FR-005 rewrite) inherits whatever the redesign does to
+  the evidence lifecycle as a fait accompli.
+
+  **What is NOT in dispute across the options:** the store keeps
+  its name (research Q4); the header documents the narrowed role
+  under every option; `phase-b-draft` cannot survive as a
+  declaration for any step (its store is deleted) — the options
+  differ in what replaces it and in the fate of the evidence layer,
+  not in whether the status quo is declarable. **Stopped for the
+  lead's ruling.**
