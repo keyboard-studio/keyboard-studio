@@ -130,10 +130,11 @@ export const STEPS_WITH_APPLY_COMPLETION: ReadonlySet<string> = new Set([
   "characters",
   "marks",
   "carve",
-  "mechanisms",
   "touch",
   "help",
 ]);
+// ("mechanisms" left the set at spec 090 T041: its R1 effects re-homed to
+// lib/assignLoopCompletion.ts, fired by AddPhysicalAdapter — D-090-38.)
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf — moved from StudioShell.tsx (was private, now exported).

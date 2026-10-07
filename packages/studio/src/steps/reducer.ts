@@ -29,7 +29,6 @@ import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/t
 // dependency, not an internal studio/src/ layer) — the steps-layer boundary
 // forbids steps/ -> lib/stores/dashboard/components, not other packages.
 import type { DesktopModifications } from "@keyboard-studio/engine";
-import { repropagate } from "./repropagate.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionSet } from "../decisions/decisionTypes.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
@@ -122,8 +121,8 @@ export interface TouchCompleteResult {
 
 export interface ReducerDeps {
   // --- Store actions (from workingCopyStore) ---
-  /** Lock the desktop layout after Mechanisms completion (R1). */
-  lockDesktop: () => void;
+  // (lockDesktop retired at spec 090 T041: R1 re-homed to
+  // lib/assignLoopCompletion.ts — D-090-38.)
   /** Persist the serialized touch layout JSON at Phase E completion (R2). */
   setTouchLayoutJson: (json: string | null) => void;
   /**
@@ -218,13 +217,9 @@ export interface ReducerDeps {
   setWorkingIR?: (ir: KeyboardIR) => void;
 
   // --- touch re-propagation (spec-014 US2, T024) ---
-  /**
-   * Read the current staleness closure (the P4b `staleSteps` slice). Injected
-   * (steps/ may not import stores/). Drives touch re-propagation on a physical
-   * change; an empty closure short-circuits to a no-op (R5). Absent ⇒ no
-   * re-propagation is attempted (P4b behavior).
-   */
-  getStaleSteps?: () => ReadonlySet<string>;
+  // (getStaleSteps retired at spec 090 T041 with R1: re-propagation is
+  // driven from lib/assignLoopCompletion.ts, which reads the closure
+  // from the store directly — D-090-38.)
 
   // --- decision audit (spec 053 FR-001/FR-002, research D-02) ---
   /**
@@ -313,28 +308,10 @@ export function applyStepCompletion(
     // completion payload, and MarksStepHost mirrors the R10 migration
     // determination into the session.)
 
-    // R1 — lock gate: fire lockDesktop() after Mechanisms completes.
-    case MECHANISMS_STEP_ID: {
-      deps.lockDesktop();
-      // spec-014 US2 (T024): a physical step/lock completion triggers automatic
-      // touch re-propagation. Spec 089 T021 (OI-1 ruled global): the mutate
-      // flag that used to gate this is deleted — re-propagation runs
-      // unconditionally. repropagate() itself short-circuits to a no-op when
-      // the staleness closure is empty (R5). Deps are injected to respect the
-      // steps-layer boundary (no stores/ import here).
-      if (
-        deps.getStaleSteps !== undefined &&
-        deps.getWorkingIR !== undefined &&
-        deps.setWorkingIR !== undefined
-      ) {
-        repropagate({
-          staleSteps: deps.getStaleSteps(),
-          getWorkingIR: deps.getWorkingIR,
-          setWorkingIR: deps.setWorkingIR,
-        });
-      }
-      break;
-    }
+    // (No mechanisms case: spec 090 T041 retired R1. The physical-layout
+    // decision records step-side in AddPhysicalAdapter, and the lock +
+    // re-propagation effects re-homed to lib/assignLoopCompletion.ts,
+    // fired by the adapter and by journey-runner's replay — D-090-38.)
 
     // R2 — touch-layout build: mirrors StudioShell.tsx handlePhaseEComplete.
     // Spec 035 R11: the reducer no longer gates the build on "assignments is

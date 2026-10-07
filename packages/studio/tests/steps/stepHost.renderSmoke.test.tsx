@@ -155,7 +155,6 @@ import type { EditorStep } from "../../src/steps/types.ts";
 
 /** A no-op ReducerDeps suitable for smoke tests (chrome selection only). */
 const noopReducerDeps: ReducerDeps = {
-  lockDesktop: vi.fn(),
   clearStale: vi.fn(),
   setTouchLayoutJson: vi.fn(),
   instantiateFromBase: vi.fn(),

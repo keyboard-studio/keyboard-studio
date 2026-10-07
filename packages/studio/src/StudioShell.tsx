@@ -563,7 +563,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Working-copy store actions needed by SurveyView (not delegated to StepHost).
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
-  const lockDesktop = useWorkingCopyStore((s) => s.lockDesktop);
   const clearStale = useWorkingCopyStore((s) => s.clearStale);
   const setTouchLayoutJson = useWorkingCopyStore((s) => s.setTouchLayoutJson);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
@@ -826,7 +825,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   const reducerDeps: ReducerDeps = useMemo(
     () => ({
-      lockDesktop,
       clearStale,
       setTouchLayoutJson,
       instantiateFromBase,
@@ -870,9 +868,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // the carve-deletion overlay (setIR would). See workingCopyStore.setWorkingIR.
       getWorkingIR: () => useWorkingCopyStore.getState().ir,
       setWorkingIR: (next) => useWorkingCopyStore.getState().setWorkingIR(next),
-      // spec-014 US2 (T024): the staleness closure drives touch re-propagation
-      // on physical-step completion. Read via getState() (no re-render churn).
-      getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
       // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
       // everything else here; the reducer knows only that it has a callback.
       recordDecision,
@@ -906,7 +901,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     }),
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [
-      lockDesktop,
       clearStale,
       setTouchLayoutJson,
       instantiateFromBase,

@@ -193,7 +193,9 @@ export const deadkeysStep: EditorStep = step({
 
 /**
  * Mechanisms step: MechanismGallery (physical key assignment — Phase C).
- * The reducer fires lockDesktop() when this step completes.
+ * On completion AddPhysicalAdapter records the physical-layout decision
+ * and fires the lock + re-propagation effects (lib/assignLoopCompletion
+ * .ts; the reducer's R1 hook retired at spec 090 T041 — D-090-38).
  * Self-read: assigns onto groups[]/stores[] without upstream producer.
  * inputs stays [] to avoid C2 data cycle (FR-002).
  * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).

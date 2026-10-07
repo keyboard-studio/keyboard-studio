@@ -302,14 +302,22 @@ assignments/keys refresh as they do today, hand-set ones survive, and both value
   shape fixed under D-090-12/D-090-30/D-090-31 (no patch channel for the lock flag, the
   touch JSON string, or the phase-C entry — applies are no-ops, R1/R2 effects re-home to
   the completion wiring); T043 flagged for a lead ruling (D-090-38 Flag 1)
-- [ ] T041 [US4] `physical-layout` module: value = the assignment list (each assignment keeps
+- [x] T041 [US4] `physical-layout` module: value = the assignment list (each assignment keeps
   the provenance it already carries) in
   packages/studio/src/survey/questions/gallery/physicalLayout.ts; `MechanismGallery` reports
   through `onChange` instead of `recordAssignments` in
   packages/studio/src/editors/assignLoop/MechanismGallery.tsx; `apply` performs the R1
   `lockDesktop` effect and the reducer's R1 hook is retired in
   packages/studio/src/steps/reducer.ts; `repropagate` refresh behaviour (suggested refresh,
-  hand-set survive) is preserved against the value
+  hand-set survive) is preserved against the value — Landed under the D-090-38
+  execution shape (D-090-39): the task text's "`apply` performs R1" is not
+  implementable inside 089's patch contract (no channel serves the lock flag,
+  the phase-C entry, or repropagate), so the module's apply is a no-op and
+  R1 re-homed to completion wiring (`lib/assignLoopCompletion.ts`), fired by
+  AddPhysicalAdapter after recording step-side and by journey-runner's
+  replay; `recordAssignments` remains the gallery's edit-time write path
+  (the D-090-31 record-from-working-copy pattern). Golden-walk fixture
+  delta at mechanisms adjudicated intended (D-090-39).
 - [ ] T042 [US4] `touch-layout` module: value = key-edit ops + `deletedTouchKeyIds`, per-key
   provenance in spec 014's vocabulary unchanged, in
   packages/studio/src/survey/questions/gallery/touchLayout.ts; `TouchGallery` reports through

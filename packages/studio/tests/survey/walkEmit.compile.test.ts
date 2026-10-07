@@ -22,7 +22,7 @@
 //   3. One desktop assignment — an S-02 deadkey (Latin) / S-08 RAlt placement
 //      (Cyrillic) in the exact MechanismAssignment shape MechanismGallery
 //      records, via workingCopyStore.recordAssignments; then the mechanisms
-//      step completes through the real reducer (lockDesktop).
+//      step completes through the re-homed completion effects (lockDesktop).
 //   4. One touch assignment — a longpress in TouchGallery's
 //      buildTouchMechanismRef shape, completed through the real reducer's touch
 //      step with the same deps StudioShell injects (R11 emission matrix +
@@ -89,10 +89,10 @@ import { resolveTouchSeedSource, shouldEmitTouchLayout } from "../../src/lib/tou
 import { buildSourceZipForDownload } from "../../src/lib/buildOutputBundle.ts";
 import {
   applyStepCompletion,
-  MECHANISMS_STEP_ID,
   TOUCH_STEP_ID,
   type ReducerDeps,
 } from "../../src/steps/reducer.ts";
+import { applyPhysicalCompletionEffects } from "../../src/lib/assignLoopCompletion.ts";
 import { PATTERN_DEADKEY, PATTERN_RALT } from "../../src/editors/assignLoop/patternIds.ts";
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,6 @@ function carveCharacter(ch: string): string[] {
 function studioReducerDeps(): ReducerDeps {
   const wc = () => useWorkingCopyStore.getState();
   return {
-    lockDesktop: () => wc().lockDesktop(),
     clearStale: (id) => wc().clearStale(id),
     setTouchLayoutJson: (json) => wc().setTouchLayoutJson(json),
     instantiateFromBase: (b, o) => wc().instantiateFromBase(b, o),
@@ -203,7 +202,6 @@ function studioReducerDeps(): ReducerDeps {
     },
     getWorkingIR: () => wc().ir,
     setWorkingIR: (next) => wc().setWorkingIR(next),
-    getStaleSteps: () => wc().staleSteps,
   };
 }
 
@@ -381,7 +379,9 @@ describe("MVP walk compile oracle — the blocking-diagnostic filter is not vacu
 
         // --- 3. desktop assignment + mechanisms completion ------------------
         useWorkingCopyStore.getState().recordAssignments([c.desktopAssignment]);
-        applyStepCompletion(MECHANISMS_STEP_ID, undefined, studioReducerDeps());
+        // Spec 090 T041: R1 re-homed from the reducer — this is the exact
+        // effects call AddPhysicalAdapter fires on completion (D-090-38).
+        applyPhysicalCompletionEffects();
         expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
 
         // --- 4. touch assignment + touch completion -------------------------

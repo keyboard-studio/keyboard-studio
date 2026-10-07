@@ -1677,3 +1677,37 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   are the D-090-36 family (an intended migration signature), to be
   adjudicated at the gate, neither pre-regenerated nor treated as
   regression without a diff read.
+- **D-090-39 — T041 landed: physical-layout module migrated under
+  the D-090-38 shape; golden-walk fixture delta adjudicated
+  INTENDED (the Flag-2 signature, arriving one task early).**
+  Value home `survey/assignLoop/physicalLayoutValue.ts` (value =
+  `{ assignments }` from `selectDesktopAssignments(phaseResults)` —
+  the gallery's own selector, so the recorded value is the set the
+  author saw); renderer `PhysicalLayoutDecisionRenderer` mirrors
+  AddPhysicalAdapter's reads; the adapter records
+  `{physical-layout, provenance: "asked"}` and fires
+  `applyPhysicalCompletionEffects()` (new `lib/assignLoopCompletion
+  .ts`: `lockDesktop()` + staleness-gated `repropagate`, the retired
+  R1 verbatim) before `onComplete`. Reducer MECHANISMS case
+  deleted; `mechanisms` left `STEPS_WITH_APPLY_COMPLETION`;
+  journey-runner's mechanisms case re-pointed at the shared
+  effects; ReducerDeps `lockDesktop` + `getStaleSteps` retired
+  (type, StudioShell, journey-runner, and three test constructions;
+  `getWorkingIR`/`setWorkingIR` stay — `applyDecisionEffects`'
+  ctx uses them). Two completion simulations re-pointed at the
+  real effects (walkEmit.compile, MechanismGallery.progression
+  T008 — the latter now exercises the real repropagate too).
+  **Fixture adjudication (read, not assumed):** both tracks delta
+  ONLY at the mechanisms step — `applyStepCompletion
+  ["mechanisms"] → []`, `decisionMutations [] → ["record"]`,
+  interleaved `storeMutations` gains the same single `record`;
+  `workingCopyMutations ["lockDesktop"]` UNCHANGED in both, now
+  fired by the adapter's effects instead of the reducer. A
+  store-level probe verified exactly one `physical-layout` record
+  per walk, from the adapter. Fixtures regenerated through the
+  harness's own write path; walk green 2/2 against them, plus a
+  confirmation run. Gates: tsc 0; module/consistency/reducer/
+  registry 45/45; progression 37/37; walkEmit 4/4; StepHost +
+  applyDecisionEffects ×2 + deepLinkRevision + walk 30/30;
+  recorder suites 15/15; eslint 0 errors (4 pre-existing
+  StudioShell warnings, untouched lines).

@@ -88,6 +88,7 @@ import {
   type InstantiateResult,
   type TouchCompleteResult,
 } from "../steps/reducer.ts";
+import { applyPhysicalCompletionEffects } from "../lib/assignLoopCompletion.ts";
 import { useWorkingCopyStore, bindManifest } from "../stores/workingCopyStore.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { loadFlowSourceDef } from "../steps/flowSources.ts";
@@ -439,7 +440,6 @@ function collectEditorActionEvents(
 
 function buildReplayReducerDeps(): ReducerDeps {
   return {
-    lockDesktop: () => useWorkingCopyStore.getState().lockDesktop(),
     clearStale: (stepId) => useWorkingCopyStore.getState().clearStale(stepId),
     setTouchLayoutJson: (json) => useWorkingCopyStore.getState().setTouchLayoutJson(json),
     instantiateFromBase: (base, opts) => useWorkingCopyStore.getState().instantiateFromBase(base, opts),
@@ -468,7 +468,6 @@ function buildReplayReducerDeps(): ReducerDeps {
     },
     getWorkingIR: () => useWorkingCopyStore.getState().ir,
     setWorkingIR: (ir) => useWorkingCopyStore.getState().setWorkingIR(ir),
-    getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
   };
 }
 
@@ -767,7 +766,10 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           collectEditorActionEvents(group, "mechanism_edit");
           // FR-015: no per-key decomposition — record an empty assignment set.
           useWorkingCopyStore.getState().recordAssignments([]);
-          applyStepCompletion("mechanisms", undefined, deps); // fires lockDesktop (R1)
+          // Spec 090 T041: R1 (lock + repropagate) re-homed from the
+          // reducer to lib/assignLoopCompletion.ts — the same effects
+          // AddPhysicalAdapter fires on the live path (D-090-38).
+          applyPhysicalCompletionEffects();
           result = undefined;
           break;
         }

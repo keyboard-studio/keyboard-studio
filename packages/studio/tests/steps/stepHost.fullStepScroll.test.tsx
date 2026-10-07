@@ -43,7 +43,6 @@ import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 const noopReducerDeps: ReducerDeps = {
-  lockDesktop: vi.fn(),
   clearStale: vi.fn(),
   setTouchLayoutJson: vi.fn(),
   instantiateFromBase: vi.fn(),

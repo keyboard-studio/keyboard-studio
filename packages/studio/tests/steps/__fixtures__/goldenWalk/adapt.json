@@ -159,16 +159,17 @@
   },
   {
     "stepId": "mechanisms",
-    "applyStepCompletion": [
-      "mechanisms"
-    ],
+    "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [
       "lockDesktop"
     ],
-    "decisionMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
