@@ -1,8 +1,9 @@
 # Data Model: Gallery Decision Modules (specs/090-gallery-decision-modules)
 
 All types live in `packages/studio`. Nothing in `packages/contracts` changes.
-Shapes marked **PROPOSED — PENDING OWNER RULING** are not settled; see
-research.md R8 and the choice-point task T003 in tasks.md.
+The `CarvedLayoutValue` removal-item shape is **RULED** (owner ruling
+2026-10-06, km-lead proposals Q4 — Candidate A); see research.md R8 and
+task T003 in tasks.md.
 
 ## Gallery decision module (extends `QuestionModule`, per 089)
 
@@ -14,7 +15,7 @@ provider per decision — the registry's `decisionIndex` throws on a duplicate.
 |---|---|---|
 | `provides` | `[DecisionId]` (one) | the step's settled decision |
 | `requires` | `DecisionId[]` | copied verbatim from the step's declaration in `steps/stepDependencies.ts` (table below), so 091 can delete `settles` without moving anything |
-| `renderer` | `ComponentType<DecisionRendererProps<Value>>` | the existing step component, unchanged visually; `"question"` for none of these (FR-001's literal rename is research Q2) |
+| `renderer` | `ComponentType<DecisionRendererProps<Value>>` | the existing step component, unchanged visually; `"question"` for none of these (FR-001's literal rename `"default"` → `"question"` is RULED — owner ruling 2026-10-06, km-lead proposals Q5; research R3/Q2) |
 | `apply` | `(value, ctx) → WorkingCopyPatch` | pure: reads only `ctx` (IR, value, `requires` inputs); writes no store (FR-005, SC-005). Runs through 089's runner + declared-`writes` check |
 | `writes` | `IRPath[]` | declared per module; the in-place rewrites it owns (MARKS guards, R1, R2, deadkey ops, context tolerance) must fall inside it |
 | `extract` | optional | only where a starting-point seed exists today (e.g. the `pb_character_inventory` spike's `buildProducedSet` probe, folded into `character-inventory`); live extraction is 092's work |
@@ -42,7 +43,7 @@ provider per decision — the registry's `decisionIndex` throws on a duplicate.
 | `punctuation-inventory` | `PunctuationStep` | `character-inventory` | `InventoryDecisionValue` |
 | `invisibles-inventory` | `InvisiblesStep` | `character-inventory` | `InventoryDecisionValue` |
 | `retained-convenience-chars` | `ConvenienceCharsStep` | `character-inventory`, `base-keyboard` | `RetainedConvenienceCharsValue` |
-| `carved-layout` | `CarveGalleryV2` | `base-keyboard`, `windows-layout`, `marks-treatment`, `punctuation-inventory`, `invisibles-inventory`, `retained-convenience-chars` | `CarvedLayoutValue` (**PROPOSED — PENDING OWNER RULING** in part) |
+| `carved-layout` | `CarveGalleryV2` | `base-keyboard`, `windows-layout`, `marks-treatment`, `punctuation-inventory`, `invisibles-inventory`, `retained-convenience-chars` | `CarvedLayoutValue` (**RULED** — owner ruling 2026-10-06, km-lead proposals Q4) |
 | `deadkeys-defined` | deadkey editors via `DeadkeyAdapter` | `carved-layout` | `DeadkeysDefinedValue` |
 | `rule-set` | `RulesStep` | `deadkeys-defined`, `windows-layout` | `RuleSetValue` |
 | `physical-layout` | `MechanismGallery` | `carved-layout`, `deadkeys-defined`, `rule-set`, `marks-treatment`, `windows-layout` | `PhysicalLayoutValue` |
@@ -106,14 +107,14 @@ its mirror in `workingCopyStore.session.retainedConvenienceChars` — after
 US2 the mirror is an applied view or a selector over this value, not a second
 record).
 
-### `CarvedLayoutValue` — **PROPOSED — PENDING OWNER RULING**
+### `CarvedLayoutValue` — **RULED** (owner ruling 2026-10-06, km-lead proposals Q4)
 ```ts
 interface CarvedLayoutValue {
-  removals: CarveRemovalItem[];               // shape below: PROPOSED
+  removals: CarveRemovalItem[];               // shape below: RULED (Candidate A)
   dispositions: CarveDisposition[];           // contracts type, unchanged, own provenance (research R8)
   closedKeyboardCard: "accepted" | "declined" | null;
 }
-interface CarveRemovalItem {                  // PROPOSED — Candidate A
+interface CarveRemovalItem {                  // RULED — Candidate A (km-lead proposals Q4)
   kind: "node" | "item" | "family" | "char";  // deletedNodeIds | deletedItemIds | disabledFamilyIds | carveChars
   id: string;
   provenance: "asked" | "derived" | "extracted";  // asked = hand removal, derived = accepted proposal, extracted = from the starting point
@@ -123,10 +124,10 @@ The four removal collections are one item list discriminated by `kind` (the
 four id spaces stay distinct — `workingCopyStore.ts:568-607` documents that
 `deletedItemIds` and `deletedTouchKeyIds` are different spaces, and node/item
 ids likewise). The per-item `provenance` field above is **Candidate A** from
-research R8, written here as the working shape only. Candidate B (mirror
-spec 014's agency object per item) would replace the `provenance` field with
-`agency`/`source`. **US3 does not implement against this shape until the
-ruling is recorded (tasks.md T003).** Orphaned hand-set items stay in
+research R8, **RULED** (owner ruling 2026-10-06, km-lead proposals Q4).
+Candidate B (mirror spec 014's agency object per item) is rejected under the
+ruling. **US3 implements against this shape** (tasks.md T003 records the
+ruling; T030/T032 proceed when their turn comes). Orphaned hand-set items stay in
 `removals` and are shown, never dropped (spec edge case, spec 014 R6).
 
 ### `DeadkeysDefinedValue`

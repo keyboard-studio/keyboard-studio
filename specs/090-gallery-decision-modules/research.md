@@ -101,9 +101,9 @@ string literal (only `pb_character_inventory` sets a component). The plan:
 
 - Rename the literal `"default"` → `"question"` per FR-001's wording. Cost is
   contained (one type literal, the question-module snapshot) precisely because
-  the literal is unused at runtime. Recorded as Open Question Q2 — if the
-  owner prefers the code's word, the rename task is dropped, nothing else
-  changes.
+  the literal is unused at runtime. **RULED (owner ruling 2026-10-06, km-lead
+  proposals Q5): the rename proceeds per FR-001; Q2 is resolved.** T004 keeps
+  the rename — the keep-`"default"` alternative is rejected under the ruling.
 - `DecisionRendererProps` gains `provenance` and `source` (FR-001), so a
   renderer can show "from <keyboard>" — displayed from props, never read from
   a store.
@@ -228,9 +228,11 @@ per story phase in tasks.md, each PR's body recording its gate results.
 Dependency risk, stated plainly: if 089's walk has not landed when 090's US1
 starts, US1's first task is blocked — the walk is not re-invented inside 090.
 
-## R8 — Carve per-item provenance: OPEN OWNER DECISION (not resolved here)
+## R8 — Carve per-item provenance: RULED — Candidate A (owner ruling 2026-10-06, km-lead proposals Q4)
 
-**Status: awaiting Matthew's ruling. Nothing in this plan locks a shape.**
+**Status: RULED (owner ruling 2026-10-06, km-lead proposals Q4). Candidate A is the
+shape: flat per-item `{ provenance: asked | derived | extracted }` for the removal-set
+items; Candidate B is rejected.**
 
 The series has two provenance vocabularies in the code today:
 
@@ -245,7 +247,7 @@ The series has two provenance vocabularies in the code today:
    `{ agency: "hand-set" | "base-derived" | "physical-suggested" | "tool-proposed", source? }`.
 
 US4 keeps vocabulary 2 for touch (the spec says so verbatim). One carve
-sub-value is **out of this choice point's scope**: `carveDispositions` items
+sub-value is **out of this ruling's scope**: `carveDispositions` items
 are `CarveDisposition` from `packages/contracts`
 ([carveDisposition.ts](../../packages/contracts/src/carveDisposition.ts),
 spec 076) and already carry their own provenance vocabulary
@@ -269,22 +271,25 @@ is not recorded. For those items, the candidates are:
   shape for every collection in the studio, at the cost of a second
   vocabulary inside decision values.
 
-**How the plan handles the open decision:** the Foundational phase contains
-an explicit **choice-point task** (T003) that presents both candidates with
-the touch precedent and records Matthew's ruling into this file and
-data-model.md. US3's `carved-layout` value type is written in data-model.md
-against Candidate A and marked **PROPOSED — PENDING OWNER RULING**; US3 tasks
-that depend on the shape carry a stop condition naming T003. Every other
-story (US1, US2, US4, US5) is shape-independent and may proceed before the
-ruling lands.
+**How the plan handles the decision:** the Foundational phase contained an
+explicit **choice-point task** (T003) presenting both candidates with the
+touch precedent. The owner ruled (owner ruling 2026-10-06, km-lead proposals
+Q4): **Candidate A** — flat per-item `{ provenance: asked | derived | extracted }`
+for the removal-set items; Candidate B is rejected. `carveDispositions` items
+are out of this ruling's scope, as established above: their spec-076
+provenance rides unchanged. US3's `carved-layout` value type in data-model.md
+is marked **RULED**; T030/T032 proceed against Candidate A when their turn
+comes — the stop gate that waited for this ruling is removed. T003 is
+complete once the ruling is recorded here and in data-model.md.
 
 ## Open questions
 
-- **Q1 (owner, blocks US3's value shape only):** carve per-item provenance —
-  Candidate A or Candidate B (R8)?
-- **Q2 (owner, low stakes):** FR-001's renderer literal `"question"` vs the
-  code's existing `"default"` — the plan renames to the spec's word (R3);
-  confirm or drop the rename task.
+- **Q1 — RESOLVED (owner ruling 2026-10-06, km-lead proposals Q4):** carve
+  per-item provenance = Candidate A — flat per-item
+  `{ provenance: asked | derived | extracted }` for the removal-set items (R8).
+- **Q2 — RESOLVED (owner ruling 2026-10-06, km-lead proposals Q5):** FR-001's
+  renderer literal — rename `"default"` → `"question"` (R3); T004 proceeds
+  with the rename.
 - **Q3 (reconcile with 089's plan):** `help-docs` is settled by the `help`
   step, whose flow writes 089 moves into `apply`, while the step's component
   is the `PhaseFGate` gallery wrapper. The plan assigns 090 only the

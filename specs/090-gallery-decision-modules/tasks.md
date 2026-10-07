@@ -14,8 +14,10 @@ green, package suites + `tsc` + lint green. A story whose gate is not green does
 `[P]` marks tasks in a phase that touch different files with no incomplete dependencies
 between them.
 
-**The one hard stop in this list is T003** — the carve per-item provenance choice point. It
-blocks only the US3 tasks named there; every other phase may proceed before the ruling lands.
+**No hard stop remains in this list.** The carve per-item provenance choice point (T003) is
+**RULED** (owner ruling 2026-10-06, km-lead proposals Q4 — Candidate A), and the renderer
+literal in T004 is **RULED** (owner ruling 2026-10-06, km-lead proposals Q5 — rename to
+`"question"`). T030/T032 proceed against the ruled shape when their turn comes.
 
 ## Format
 
@@ -44,18 +46,20 @@ gallery group ready to receive modules.
 
 **Purpose**: the shared contract every story builds on — renderer props, the gallery host,
 the FR-003 enforcement layers, the FR-002 coverage test, the SC-005 determinism harness, and
-the owner's carve choice point.
+the recording of the owner's carve ruling (T003, resolved).
 
-- [ ] T003 **CHOICE POINT (owner — not an implementation task)**: present the carve removal-item
-  provenance candidates from research R8 (Candidate A: per-item
-  `{ provenance: asked | derived | extracted }`; Candidate B: mirror spec 014's per-item
-  agency object) with the touch precedent and the `CarveDisposition` distinction, and record
-  Matthew's ruling verbatim in specs/090-gallery-decision-modules/research.md (R8) and
-  specs/090-gallery-decision-modules/data-model.md (removing the PROPOSED — PENDING OWNER
-  RULING marking, or replacing the shape with the ruled one). **Blocks T030/T032 only**
+- [x] T003 **RULED (owner ruling 2026-10-06, km-lead proposals Q4)** — the carve removal-item
+  provenance choice point is resolved: **Candidate A**, flat per-item
+  `{ provenance: asked | derived | extracted }` for the removal-set items (Candidate B,
+  mirroring spec 014's per-item agency object, is rejected); `carveDispositions`' existing
+  spec-076 provenance rides unchanged. The ruling is recorded in
+  specs/090-gallery-decision-modules/research.md (R8) and
+  specs/090-gallery-decision-modules/data-model.md (removal-item shape marked RULED).
+  T030/T032 proceed against this shape when their turn comes — no stop gate remains
 - [ ] T004 FR-001 contract: `DecisionRendererProps` gains `provenance` and `source`; the
   `QuestionModule.renderer` literal `"default"` becomes `"question"` per the spec's wording
-  (research R3/Q2 — drop just the rename if the owner keeps the code's word) in
+  (research R3/Q2 — RULED: rename per FR-001, owner ruling 2026-10-06, km-lead proposals
+  Q5; the keep-`"default"` alternative is rejected under the ruling) in
   packages/studio/src/decisions/decisionTypes.ts and packages/studio/src/survey/types.ts,
   with the question-module snapshot updated in
   packages/studio/src/survey/questions/__snapshots__/questionModules.test.ts.snap
@@ -222,11 +226,11 @@ show only what `apply` wrote, and an orphaned hand removal is still shown.
 
 **PR slice**: this phase is one PR.
 
-- [ ] T030 [US3] **Stop gate**: confirm the T003 ruling is recorded in research R8 /
-  data-model.md and set the `CarveRemovalItem` shape in
-  packages/studio/src/survey/questions/gallery/carvedLayout.ts to the ruled shape before any
-  carve value code is written. If no ruling is recorded, this phase does not start (US4/US5
-  work is not blocked by it — reorder, don't improvise a shape)
+- [ ] T030 [US3] Set the `CarveRemovalItem` shape in
+  packages/studio/src/survey/questions/gallery/carvedLayout.ts to the ruled shape —
+  Candidate A, flat per-item `{ provenance: asked | derived | extracted }` (owner ruling
+  2026-10-06, km-lead proposals Q4; recorded in research R8 / data-model.md) — before any
+  carve value code is written
 - [ ] T031 [US3] Re-verify research R1's rows for `carve`, `deadkeys`, `rules` against the
   landed code; amend specs/090-gallery-decision-modules/research.md if any row drifted
 - [ ] T032 [US3] `carved-layout` module: value = removal items (ruled shape) + `dispositions`
@@ -315,6 +319,31 @@ gallery's IR rewrite.
 
 ---
 
+## Phase 6b: Tail — `phaseAnswersByStep` deletion (after US4)
+
+**Why here (owner ruling 2026-10-06, km-lead proposals Q8):** 090 owns this deletion.
+The field's residue after 088 is gallery answers, which become decision values in this
+spec. 088's T016/T017 were stopped on a falsified premise (`mergePhaseResults` never
+reads `.answers`; the slots hold predominantly gallery answers with no decision record
+until 090), and 088's duplication ledger is corrected to "retired by 090." Sequencing
+is the whole risk: this task runs **only after US4 completes** — deleting earlier breaks
+spec-079 D-4 per-step replacement for galleries not yet converted. (Waiting is not
+neutral either: 093's replay input is decisions only, so a fact held solely in this
+field would be invisible to replay and silently vanish when the derived-keyboard draft
+drops the working-copy slice.)
+
+- [ ] T063 Delete `phaseAnswersByStep` from packages/studio/src/stores/workingCopyStore.ts,
+  coupled to `recordPhase` ceasing to carry answers (its answer-carrying writes retire with
+  the US1–US4 migrations); strip-on-restore for the stale field in pre-090 snapshots: a
+  persisted working-copy snapshot that still carries `phaseAnswersByStep` has the field
+  dropped on restore in packages/studio/src/lib/persistWorkingCopy.ts and never re-saved;
+  closing grep recorded: zero references to `phaseAnswersByStep` in packages/studio/src
+
+**Checkpoint**: no answer state remains outside decision records — the working copy holds
+only the applied view the decisions produce (until 093 drops the saved slice entirely).
+
+---
+
 ## Phase 7: User Story 5 — Every decision leaves a log entry (Priority: P2)
 
 **Goal**: `layout`, `rules`, `touch_seed_source`, `deadkeys`, `punctuation` and `convenience`
@@ -382,8 +411,11 @@ story gate, SC-002 at T060, SC-003 at T053, SC-004 at T027/T060, SC-005 per stor
 
 - **Phase 1 → Phase 2** blocks everything: no story starts before the host, the registry
   group, the enforcement scaffolding, and the coverage test exist.
-- **T003 (owner ruling)** blocks only **T030 → T032** (the carve value shape). US1, US2, US4,
-  US5 and the rest of US3's preparation (T031) do not wait on it.
+- **T003's ruling is recorded** (owner ruling 2026-10-06, km-lead proposals Q4 —
+  Candidate A): nothing waits on it; T030/T032 use the ruled `CarveRemovalItem` shape.
+- **T063 (`phaseAnswersByStep` deletion)** runs only **after US4 completes** (the T045
+  gate green) — owner ruling 2026-10-06, km-lead proposals Q8. It blocks nothing else;
+  US5 and Polish proceed independently of it.
 - **US1 → US2 → US3 → US4 → US5** in spec order: US2's `surveyAnswerStore` narrowing (T026)
   joins US1's layout migration; US5's exactly-one-entry check (T053) is only meaningful after
   US1–US4 have moved recording to the decision path; US3's carve reads the inventory values
@@ -396,12 +428,11 @@ story gate, SC-002 at T060, SC-003 at T053, SC-004 at T027/T060, SC-005 per stor
 ## Parallel Opportunities
 
 - Phase 2: T006 (depcruise) and T007 (ESLint/audit) are different files — parallel-safe.
-  T003 is an owner conversation and runs alongside all of Phase 2.
+  T003 is already ruled and recorded; nothing in Phase 2 waits on an owner conversation.
 - US1: T011 (layout) and T012 (touch seed) are different components and module files —
   parallel-safe; T013 joins on the host patterns they prove.
 - US2: T022 (punctuation/invisibles) and T024 (convenience) are parallel-safe once T021 lands.
-- US3: T033 (deadkeys) and T034 (rules) are parallel-safe; both are independent of the T003
-  ruling.
+- US3: T033 (deadkeys) and T034 (rules) are parallel-safe.
 - US5: T051 (gap test) and T052 (help host) are parallel-safe.
 - Polish: T060 and T061 are parallel-safe; T062 joins on everything.
 

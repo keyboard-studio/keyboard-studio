@@ -62,13 +62,21 @@ its store writes fire today).
 (research R1's verified table), 1 store deleted (`phaseBDraftStore`), 1 store narrowed
 (`surveyAnswerStore`), 5 reducer-side rewrites moved into `apply`.
 
-## Owner decisions carried into this plan (verbatim, unresolved where marked)
+## Owner decisions carried into this plan (verbatim; rulings recorded 2026-10-06)
 
-- **Carve per-item provenance — OPEN, awaiting Matthew's ruling.** Candidate: per-item
-  `{ provenance: asked | derived | extracted }` mirroring spec 014 touch provenance. This plan
-  does **not** resolve it: tasks.md T003 is an explicit choice-point that presents both
-  candidates from research R8 and records the ruling; the `carved-layout` removal-item shape in
-  data-model.md is marked PROPOSED — PENDING OWNER RULING, and US3 stops at that gate.
+- **Carve per-item provenance — RULED (owner ruling 2026-10-06, km-lead proposals Q4):**
+  Candidate A — flat per-item enum `{ provenance: asked | derived | extracted }` for the
+  removal-set items; `carveDispositions`' existing spec-076 provenance rides unchanged.
+  tasks.md T003 records the ruling (resolved — no longer a choice point); the `carved-layout`
+  removal-item shape in data-model.md is marked RULED, and US3's T030/T032 proceed against it
+  when their turn comes.
+- **Renderer literal — RULED (owner ruling 2026-10-06, km-lead proposals Q5):** rename
+  `"default"` → `"question"` per FR-001 (research R3/Q2 resolved). T004 proceeds with the
+  rename; the keep-`"default"` alternative is rejected under the ruling.
+- **`phaseAnswersByStep` retirement — RULED (owner ruling 2026-10-06, km-lead proposals
+  Q8):** 090 deletes it, as the tail task T063 sequenced after US4. Its residue is gallery
+  answers that become decision values in this spec; 088's T016/T017 were stopped on a
+  falsified premise, and 088's duplication ledger is corrected to "retired by 090."
 - Series stacking (owner, 2026-10-06): each spec branch off the previous spec's branch,
   implemented in order without waiting for merges — hence this branch off `km/decision-apply`,
   and per-story PRs that target this spec's branch / retarget as the stack lands.
@@ -149,11 +157,14 @@ shrink to host wiring and are deleted per story as their step migrates.
 
 1. **Foundational first** (blocks all stories): the FR-001 renderer-props extension, the
    gallery host, depcruise layer 1, the registry group skeleton with the FR-002 coverage test
-   (all fourteen ids, exactly one provider each), and the carve provenance **choice point**
-   (T003 — an owner ruling, not an implementation task; only US3 waits on it).
+   (all fourteen ids, exactly one provider each), and the recording of the owner's carve
+   provenance ruling (T003 — RULED 2026-10-06, km-lead proposals Q4: Candidate A; no story
+   waits on it).
 2. **Stories in spec order, one PR each**: US1 small pickers → US2 alphabet & inventories
-   (deletes `phaseBDraftStore`) → US3 carve/deadkeys/rules (gated on T003 for the carve value
-   shape) → US4 mechanisms & touch → US5 log entries (last; its SC-003 check spans all steps).
+   (deletes `phaseBDraftStore`) → US3 carve/deadkeys/rules (carve value shape RULED —
+   T003 / km-lead proposals Q4) → US4 mechanisms & touch, followed by the
+   `phaseAnswersByStep` deletion tail task (T063; owner ruling 2026-10-06, km-lead
+   proposals Q8) → US5 log entries (last; its SC-003 check spans all steps).
    `help` is split by the 089/090 boundary (research Q3): 089 owns the flow applies; US5's host
    registration + log entry for `help-docs` lands with the log work.
 3. **Every story** re-verifies its research R1 rows against the landed 088/089 code as its
