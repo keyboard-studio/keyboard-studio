@@ -26,7 +26,7 @@ measured first and the proposed thresholds are never asserted as gates until Mat
 FIRST, before any replay code exists (owner decision (b): measure before committing).
 
 - [ ] T001 Verify stacked prerequisites on `km/derived-keyboard`: 088 `decisionStore` + drafts at `DRAFT_VERSION` 2 in packages/studio/src/lib/draftPersistence.ts, 089 pure `apply` + patch runner in packages/studio/src/steps/mutateApply.ts, 090 decision modules with per-item provenance in packages/studio/src/survey/questions/registry.ts, 092 setup-as-a-decision; record the audit in specs/093-derived-keyboard/research.md (appendix) and HALT if any prerequisite is missing — do not reinvent it inside 093
-- [ ] T002 Build the SC-004 measurement harness in packages/studio/src/decisions/rebuildPerf.measure.ts: median single-decision-edit rebuild time and resume (full-rebuild) time on `sil_euro_latin` over a fixed run count, runnable against the current (pre-093) working-copy path as the baseline; write the baseline numbers to specs/093-derived-keyboard/perf-baseline.md with the proposed thresholds (<300 ms edit / <2 s resume) recorded as PROPOSED, pending Matthew's ruling — not gates
+- [x] T002 Build the SC-004 measurement harness in packages/studio/src/decisions/rebuildPerf.measure.ts: median single-decision-edit rebuild time and resume (full-rebuild) time on `sil_euro_latin` over a fixed run count, runnable against the current (pre-093) working-copy path as the baseline; write the baseline numbers to specs/093-derived-keyboard/perf-baseline.md with the proposed thresholds (<300 ms edit / <2 s resume) recorded as PROPOSED, pending Matthew's ruling — not gates
 
 **Checkpoint**: Prerequisites verified; baseline perf evidence exists.
 
