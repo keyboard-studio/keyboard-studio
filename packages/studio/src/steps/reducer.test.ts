@@ -1,19 +1,22 @@
 // reducer.test.ts — T027 (P4b foundation).
 //
 // Asserts R1–R6 from the manifest-reducer contract:
-//   R1 — lock fires once at the mechanisms step.
+//   R1 — RETIRED at spec 090 T041: the mechanisms lock + re-propagation
+//        re-homed to lib/assignLoopCompletion.ts (D-090-38); the R1 block
+//        below pins the reducer's no-op at that step, and the behaviour
+//        coverage lives in lib/assignLoopCompletion.test.ts.
 //   R2 — touch-build runs with Case-A/Case-B + error→null→advance (graceful degradation).
 //   R3 — copy/adapt routes Track 2 → instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
 //   R4 — editor purity: no editor component calls the reducer (enforced by review; here we
 //         test that the reducer is standalone and not called from the adapter files).
 //   R5 — unknown step id is a no-op.
 //
-// R1 and R2 each run once: both write paths were always outside the flag
+// R2 runs once: its write path was always outside the flag
 // gate (spec 021 T007/T008), and since spec 089 T021 deleted the flag
 // (OI-1 ruled global) there is no second state to run. The
 // question-answer write path is the decision-apply runner now (spec 089:
 // steps/applyDecisionEffects.test.ts); touch re-propagation at mechanisms
-// is likewise unconditional (T024 block below).
+// is likewise unconditional (pinned in lib/assignLoopCompletion.test.ts).
 //
 // Source of truth: specs/012-step-model-manifest/contracts/manifest-reducer.contract.md
 
@@ -70,7 +73,6 @@ function makeTouchAssignments(): TouchCompleteResult["assignments"] {
 
 function makeDepsMock(): ReducerDeps {
   return {
-    lockDesktop: vi.fn(),
     clearStale: vi.fn(),
     setTouchLayoutJson: vi.fn(),
     instantiateFromBase: vi.fn(),
@@ -85,28 +87,21 @@ function makeDepsMock(): ReducerDeps {
 // R1 — lock fires at mechanisms step
 // ---------------------------------------------------------------------------
 
-describe("R1 — lockDesktop fires at the mechanisms step", () => {
+describe("R1 — retired at spec 090 T041: the reducer is a no-op at the mechanisms step", () => {
   let deps: ReducerDeps;
   beforeEach(() => {
     deps = makeDepsMock();
+    (mockRepropagate as ReturnType<typeof vi.fn>).mockClear();
   });
 
-  it("calls lockDesktop exactly once, with no arguments, when stepId is 'mechanisms'", () => {
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
-    expect(deps.lockDesktop).toHaveBeenCalledExactlyOnceWith();
-  });
-
-  it("calls no other store action at the mechanisms step", () => {
+  it("calls no dep at the mechanisms step (lock + repropagate live in lib/assignLoopCompletion.ts)", () => {
     applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
     expect(deps.setTouchLayoutJson).not.toHaveBeenCalled();
+    expect(deps.clearStale).not.toHaveBeenCalled();
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
     expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
     expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
-  });
-
-  it("does NOT fire lockDesktop for a different step id", () => {
-    applyStepCompletion("carve", undefined, deps);
-    expect(deps.lockDesktop).not.toHaveBeenCalled();
+    expect(mockRepropagate).not.toHaveBeenCalled();
   });
 });
 
@@ -414,7 +409,6 @@ describe("R5 — unknown step id is a harmless no-op", () => {
   for (const id of unknownIds) {
     it(`no-op for step id "${id}"`, () => {
       expect(() => applyStepCompletion(id, undefined, deps)).not.toThrow();
-      expect(deps.lockDesktop).not.toHaveBeenCalled();
       expect(deps.setTouchLayoutJson).not.toHaveBeenCalled();
       expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
       expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
@@ -434,57 +428,33 @@ describe("R4 — the reducer holds no store state of its own", () => {
   it("R4 — reducer is a pure function of its arguments (no captured store references)", () => {
     // Calling with completely independent mock objects that share no reference
     // with any real store confirms the reducer doesn't rely on module-level singletons.
+    // (Probe step re-pointed from mechanisms to choose_base at spec 090 T041:
+    // the mechanisms case retired, so it exercises no deps at all now.)
     const deps1 = makeDepsMock();
     const deps2 = makeDepsMock();
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps1);
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps2);
-    expect(deps1.lockDesktop).toHaveBeenCalledTimes(1);
-    expect(deps2.lockDesktop).toHaveBeenCalledTimes(1);
-    // deps1.lockDesktop was not called by the deps2 invocation (no cross-contamination)
-    expect(deps1.lockDesktop).not.toBe(deps2.lockDesktop);
+    const result: InstantiateResult = {
+      base: makeBaseKeyboard(),
+      ir: makeKeyboardIR(),
+      vfs: makeVirtualFS(),
+      track: "adapt",
+    };
+    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps1);
+    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps2);
+    expect(deps1.instantiateFromExisting).toHaveBeenCalledTimes(1);
+    expect(deps2.instantiateFromExisting).toHaveBeenCalledTimes(1);
+    // deps1's dep was not called by the deps2 invocation (no cross-contamination)
+    expect(deps1.instantiateFromExisting).not.toBe(deps2.instantiateFromExisting);
   });
 });
 
 // ---------------------------------------------------------------------------
-// T024 — single-writer rule: the mechanisms-completion repropagate() call no
-// longer injects setTouchLayoutJson (buildTouchLayoutJson is the sole writer
+// T024 — single-writer rule: the mechanisms-completion repropagate() call
+// injects no setTouchLayoutJson (buildTouchLayoutJson is the sole writer
 // of the .keyman-touch-layout artifact; repropagate() owns ir.touchLayout
-// provenance/merge only).
+// provenance/merge only). The call site moved with R1 to
+// lib/assignLoopCompletion.ts at spec 090 T041 — the pin lives in
+// lib/assignLoopCompletion.test.ts now.
 // ---------------------------------------------------------------------------
-
-describe("T024 — repropagate() call site no longer injects setTouchLayoutJson", () => {
-  let deps: ReducerDeps;
-
-  beforeEach(() => {
-    deps = makeDepsMock();
-    deps.getStaleSteps = vi.fn().mockReturnValue(new Set(["touch"]));
-    deps.getWorkingIR = vi.fn().mockReturnValue(makeKeyboardIR());
-    deps.setWorkingIR = vi.fn();
-    (mockRepropagate as ReturnType<typeof vi.fn>).mockClear();
-  });
-
-  it("calls repropagate() with a deps object that has no setTouchLayoutJson member", () => {
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
-    expect(mockRepropagate).toHaveBeenCalledTimes(1);
-    const passedDeps = (mockRepropagate as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
-    expect("setTouchLayoutJson" in passedDeps).toBe(false);
-  });
-
-  // Spec 089 T021/T022: re-propagation is unconditional now — the only
-  // remaining condition is that its deps are injected. With the default
-  // deps (no getStaleSteps/getWorkingIR/setWorkingIR), it does not run
-  // and lockDesktop() is the only effect at mechanisms.
-  it("deps absent: does not re-propagate; lockDesktop() is the only effect at mechanisms", () => {
-    const bare = makeDepsMock();
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, bare);
-    expect(mockRepropagate).not.toHaveBeenCalled();
-    expect(bare.lockDesktop).toHaveBeenCalledTimes(1);
-    expect(bare.setTouchLayoutJson).not.toHaveBeenCalled();
-    expect(bare.buildTouchLayoutJson).not.toHaveBeenCalled();
-    expect(bare.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(bare.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // spec 034 T006 (TI-1, TI-2) — integration against the REAL working-copy store
