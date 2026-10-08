@@ -462,6 +462,20 @@ export function useKeyboardArtifact(
   // True once the first full fetch+compile cycle has completed. Used by the
   // transform-change effect below to skip the initial render.
   const hasFetchedRef = useRef(false);
+  // Value key of the last full fetch→compile run started by the effect below
+  // (`<base id>|<scaffold keyboardId>|<scaffold displayName>`). The effect
+  // compares by VALUE, not object identity: callers re-derive scaffoldSpec
+  // on every render (see decisions/identitySelectors.ts, called bare in
+  // StudioShell), so an equal spec arrives as a fresh object each render.
+  // Restarting on identity alone is not benign — each restart increments
+  // runId, aborting the in-flight run at its next checkpoint AFTER it has
+  // already fetched the base source, so identity churn in the host can keep
+  // the pipeline fetching forever without ever settling (measured on the
+  // union tree's CI run 37754110396: ~5,800 full base-package fetches in a
+  // single 240 s walk, ~26/s sustained, starving every step of the walk).
+  // A genuinely different base or scaffold target changes the key and runs;
+  // retry() calls run() directly and is unaffected.
+  const lastFullRunKeyRef = useRef<string | null>(null);
   // Version counter bumped when vfsTransform changes after the first fetch.
   // Drives the re-apply+recompile effect without touching run()'s dep array.
   const [transformVersion, setTransformVersion] = useState(0);
@@ -1007,10 +1021,18 @@ export function useKeyboardArtifact(
       setStage({ kind: "idle" });
       vfsRef.current = null;
       baseVfsRef.current = null;
+      lastFullRunKeyRef.current = null;
       // IR ownership moved to the working-copy store; the hook no longer calls
       // clearIR() here. The store's instantiateFromBase / reset owns IR lifecycle.
       return;
     }
+
+    // Value-key guard (see lastFullRunKeyRef): a re-render whose base and
+    // scaffold target are unchanged must not restart the fetch→compile
+    // cycle — the in-flight (or settled) run for this key already owns it.
+    const runKey = `${baseKeyboard.id}|${scaffoldSpec?.keyboardId ?? ""}|${scaffoldSpec?.displayName ?? ""}`;
+    if (lastFullRunKeyRef.current === runKey) return;
+    lastFullRunKeyRef.current = runKey;
 
     // Reset transformVersion so no stale transform from the previous keyboard
     // can survive into this keyboard's VFS via the transform-change effect.
