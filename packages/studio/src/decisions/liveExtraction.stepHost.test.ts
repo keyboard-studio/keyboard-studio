@@ -135,6 +135,38 @@ describe("live extraction at setup (real stores, real registry)", () => {
     expect(record?.inputs).toEqual({ "authoring-track": "adapt" });
   });
 
+  // Design correction (owner ruling, 2026-10-08 — specs/092-live-extraction/
+  // followups.md; the T028 convenience-gate failure): the live pass never
+  // seeds or offers the language code. The base catalog carries "fr", but
+  // the code's only live source is the author's target-language choice
+  // (identity Q1–Q3, via IdentityLite's lookup-default evaluation). An
+  // unanswered slot stays unanswered; an answered one is untouched, with
+  // no `offered` from the base either.
+  it("(7) language-code unanswered → no record, though the base catalog carries a code (adapt)", () => {
+    driveSetup({ copyright: COPYRIGHT, track: "adapt" });
+    expect(useDecisionStore.getState().decisions["language-code"]).toBeUndefined();
+    // The pass itself was not disabled wholesale: the holder still seeds.
+    expect(useDecisionStore.getState().decisions["copyright-holder"]?.value).toBe(COPYRIGHT);
+  });
+
+  it("(7b) language-code unanswered → no record (copy)", () => {
+    driveSetup({ copyright: COPYRIGHT, track: "copy" });
+    expect(useDecisionStore.getState().decisions["language-code"]).toBeUndefined();
+  });
+
+  it("(8) language-code answered by the author → kept byte-unchanged, no offered from the base", () => {
+    useDecisionStore.getState().record({
+      id: "language-code",
+      value: "hau",
+      provenance: "asked",
+    });
+    driveSetup({ copyright: COPYRIGHT, track: "adapt" });
+    const record = useDecisionStore.getState().decisions["language-code"];
+    expect(record?.value).toBe("hau");
+    expect(record?.provenance).toBe("asked");
+    expect(record?.offered).toBeUndefined();
+  });
+
   it("(6) post-#1901 order, copy track → no seed (the copied notice is not proposed)", () => {
     const decisions = useDecisionStore.getState();
     useWorkingCopyStore.getState().instantiateFromBase(catalogEntry(), {
