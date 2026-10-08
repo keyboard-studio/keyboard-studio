@@ -92,6 +92,22 @@ const CAPTURE = process.env["GOLDEN_WALK_CAPTURE"] === "1";
 test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte", async ({
   page,
 }) => {
+  // Timeout sized to the walk, not the config default (240s). This is the
+  // one walk that still drives the FULL French fixture by design — its
+  // fixture is its purpose — and at observed CI pace the route cannot fit
+  // 240s: on run 37679303677 both the base-code capture and this verify
+  // consumed the entire cap and died at the same final-phase fill
+  // (driveHelpPhase, #pf_welcome_paragraph) with identity -> mechanisms
+  // (23 targets) -> touch (whole inventory) already complete behind them.
+  // The route's mechanisms+touch core alone measured ~524s of action time
+  // in copy-edit:455's trace at comparable pace, and the smaller
+  // de-fixtured 455 took 449s in that same job. 1200s is ~2x the
+  // pace-adjusted estimate for the full route. Tripwire: a death at
+  // 1200s with the walk incomplete is NOT pace — treat it as a genuine
+  // stall (the Phase F form failing to render is then the first suspect)
+  // and re-diagnose instead of raising again. The byte-for-byte
+  // comparison below is untouched by this sizing.
+  test.setTimeout(1_200_000);
   await seedReturningVisitor(page);
   await page.goto("/");
 
