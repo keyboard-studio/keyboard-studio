@@ -55,15 +55,18 @@
 // null, and the CLDR slice never joins — surplus = 25 letters, gate
 // applies (this harness's answered-empty variant, which keeps the seed
 // out, reproduces that state and passes).
-// The seeded record is value="fr", provenance="extracted",
+// The seeded record was value="fr", provenance="extracted",
 // source="basic_kbdfr" (dump-verified) — a machine-proposed fact the
 // author never saw, let alone confirmed; nothing in the walk ever
-// surfaces it for confirmation before it starts driving derivations.
-// Whether an extracted language code should drive the composed bcp47 —
-// and with it the exemplar auto-seed and the needed set's CLDR slice —
-// is the owner design question this reproduction hands back; the
-// assertions below encode the 089 behaviour and FAIL on the union until
-// that question is ruled and implemented.
+// surfaced it for confirmation before it started driving derivations.
+//
+// RULED + FIXED (owner ruling, 2026-10-08 — specs/092-live-extraction/
+// followups.md): the author's target-language choice is the code's only
+// live source; choosing a base contributes metadata for available keys,
+// never the identity's language value. il_language_code now declares
+// seedWhen: () => false, so the live pass never seeds or offers it.
+// The assertions below encode the 089 behaviour and now PASS — this
+// file is the regression test for the ruled contract.
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
