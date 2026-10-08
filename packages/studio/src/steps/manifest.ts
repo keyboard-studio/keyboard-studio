@@ -46,6 +46,7 @@ import {
   layoutStep,
   chooseBaseStep,
   trackStep,
+  attributionStep,
   projectNameStep,
   carveStep,
   deadkeysStep,
@@ -135,6 +136,12 @@ const stepPool: readonly Step[] = [
 
   // --- Track selection (copy vs adapt) ---
   trackStep,
+
+  // --- Attribution (author / copyright, #1901) ---
+  // Both tracks walk it, immediately after the track choice: the
+  // questions' proposals are track-shaped (profile confirmation on
+  // copy; the base's copyright holder seeded on update).
+  attributionStep,
 
   // --- Project name (copy-track only) ---
   // Gated side trail (declared screen gate, registry.ts): copy-track takes

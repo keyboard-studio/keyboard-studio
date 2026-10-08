@@ -130,7 +130,7 @@ import provenance_additional_notes from "./reserve/provenance_additional_notes.t
 /**
  * Each flow's membership (flow_id -> its question modules), in walk order.
  *
- * - identity_lite holds ONLY the live il_* modules; the demoted Phase A battery
+ * - identity_lite and attribution hold ONLY the live il_* modules; the demoted Phase A battery
  *   lives under phase_a_identity (a status:"proposed" flow, see flowSources).
  * - phase_a_identity: the 30 demoted Phase A modules; their decisions use
  *   `reserve-*` ids, distinct from the live il_* ones, so one decision index
@@ -144,16 +144,24 @@ export const flowModules = {
     il_language_code,
     il_target_script,
     il_script_not_supported,
-    // spec 064 US1 — attribution capture. Separate ids from the demoted
-    // author_display_name / author_contact_email / pa_copyright_holder, because
-    // routing lives in definition.next and those three belong to the phase_a chain.
-    il_author_name,
-    il_author_email,
-    il_copyright_holder,
   ],
 
   track: [
     trackChoiceMod,
+  ],
+
+  // Attribution capture (spec 064 US1's questions, re-homed by #1901): the
+  // author name / email / copyright holder are asked AFTER the track
+  // choice, in their own flow, because what they should propose depends
+  // on the track (confirm-from-profile on copy; the base's holder seeded
+  // on update — see il_copyright_holder's seedWhen). Separate ids from
+  // the demoted author_display_name / author_contact_email /
+  // pa_copyright_holder, because routing lives in definition.next and
+  // those three belong to the phase_a chain.
+  attribution: [
+    il_author_name,
+    il_author_email,
+    il_copyright_holder,
   ],
 
   project_name: [

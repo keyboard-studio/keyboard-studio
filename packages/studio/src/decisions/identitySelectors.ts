@@ -155,7 +155,15 @@ export function deriveSurveyContext(decisions: DecisionSet): SurveyContext {
   };
 }
 
-/** Identity question id → the decision that records its answer. */
+/**
+ * Identity question id → the decision that records its answer. The
+ * author/copyright trio is NOT here (#1901): those questions belong to the
+ * post-track attribution step now, whose own resume is record-driven
+ * (the runner renders recorded decisions directly — no phase-result
+ * rebuild). Their pre-#1901 records, stamped under the identity step,
+ * still compose attribution via deriveAttribution above — the selectors
+ * are keyed by decision id, not by step.
+ */
 const IDENTITY_QUESTIONS: ReadonlyArray<{
   questionId: string;
   decisionId: DecisionId;
@@ -166,9 +174,6 @@ const IDENTITY_QUESTIONS: ReadonlyArray<{
   { questionId: "il_language_autonym", decisionId: "language-autonym", answerType: "text" },
   { questionId: "il_language_code", decisionId: "language-code", answerType: "text" },
   { questionId: "il_target_script", decisionId: "target-script", answerType: "select" },
-  { questionId: "il_author_name", decisionId: "author-name", answerType: "text" },
-  { questionId: "il_author_email", decisionId: "author-email", answerType: "text" },
-  { questionId: "il_copyright_holder", decisionId: "copyright-holder", answerType: "text" },
 ];
 
 /**

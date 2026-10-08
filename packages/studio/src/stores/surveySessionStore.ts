@@ -95,6 +95,7 @@ export type ActiveStepId =
   | "layout"
   | "choose_base"
   | "track"
+  | "attribution"
   | "project_name"
   | "characters"
   | "carve"

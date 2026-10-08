@@ -26,6 +26,7 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   layout: "community keyboard layout",
   choose_base: "choosing a base keyboard",
   track: "authoring track",
+  attribution: "author & copyright",
   project_name: "project name",
   characters: "characters",
   marks: "combining marks",

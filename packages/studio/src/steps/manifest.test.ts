@@ -119,6 +119,8 @@ const EXPECTED_SPINE_ORDER = [
   "layout",
   "choose_base",
   "track",
+  // #1901: the author/copyright step walks right after the track choice.
+  "attribution",
   "characters",
   "marks",
   "punctuation",

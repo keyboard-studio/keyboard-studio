@@ -47,6 +47,7 @@ export type StepId =
   | "layout"
   | "choose_base"
   | "track"
+  | "attribution"
   | "project_name"
   | "characters"
   | "marks"
@@ -89,7 +90,10 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "B",
     label: msg({ id: "phaseStepper.phase.b", message: "Base keyboard" }),
-    stepIds: ["choose_base", "track", "project_name"],
+    // attribution (#1901): the author/copyright step walks between
+    // track and project_name — same "Base keyboard" phase as its
+    // neighbours (it settles who the base-derived keyboard belongs to).
+    stepIds: ["choose_base", "track", "attribution", "project_name"],
   },
   {
     letter: "C",

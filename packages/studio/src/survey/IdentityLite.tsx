@@ -58,44 +58,17 @@ export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResu
     bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw, region),
     supported: !UNSUPPORTED_SCRIPTS.has(targetScriptRaw),
     prefill: deriveScriptPrefill(targetScriptRaw),
-    attribution: extractAttribution(result),
-  };
-}
-
-/**
- * Derive attribution from the completed flow (spec 064 US1).
- *
- * Returns null when no author name was captured — a gated script terminates at
- * il_script_not_supported before the attribution questions. Callers must treat
- * null as "no notice to emit" rather than substituting anything.
- *
- * The copyright holder deliberately falls back to the author name (D1), so an
- * author who is also the rights holder confirms one field instead of two.
- */
-function extractAttribution(result: SurveyPhaseResult): Attribution | null {
-  const authorName = answerString(result, "il_author_name").trim();
-  if (authorName === "") return null;
-  const email = answerString(result, "il_author_email").trim();
-  const holder = answerString(result, "il_copyright_holder").trim();
-  return {
-    authorName,
-    ...(email !== "" ? { authorEmail: email } : {}),
-    copyrightHolder: holder !== "" ? holder : authorName,
+    // #1901: the author/copyright questions moved to the post-track
+    // attribution step, so this flow's answers no longer carry them. The
+    // result's attribution is composed from the DECISIONS by
+    // decisions/identitySelectors.ts (deriveIdentityResult), which
+    // StudioShell merges over this value — the sole live source since 089.
+    attribution: null,
   };
 }
 
 export interface IdentityLiteProps {
   context?: SurveyContext;
-  /**
-   * Authenticated profile used to PRE-FILL the attribution questions (spec 064
-   * D7/FR-001), so the author confirms rather than types.
-   *
-   * Passed in rather than read from the auth hook here, to keep this component a
-   * pure survey surface with no dependency on the GitHub session. The adapter
-   * supplies it. A null/absent `name` means ASK — never substitute the login
-   * handle, because a handle is not a copyright holder.
-   */
-  authorSeed?: { name?: string | null; email?: string | null };
   onComplete: (result: SurveyPhaseResult, identity: IdentityLiteResult) => void;
   onBack?: () => void;
   findingsByQuestionId?: Record<string, LintFinding[]>;
@@ -149,7 +122,6 @@ export function IdentityLite({
   onBack,
   findingsByQuestionId,
   resume,
-  authorSeed,
 }: IdentityLiteProps) {
   const { t } = useLingui();
 
@@ -181,13 +153,13 @@ export function IdentityLite({
 
   // Spec 092 (T033, plan.md G-12): the identity lookup inputs, accumulated
   // across this step's resolutions — the resolved langtags entry's seed
-  // values, the Q1 English answer, and the stored author profile, in the
-  // exact shapes the five il_* modules' declared `lookupDefault`s read
-  // (ExtractContext.identity). Kept in a ref because the resolutions fire
-  // from callbacks that must not re-subscribe on every keystroke.
+  // values and the Q1 English answer, in the exact shapes the langtags
+  // il_* modules' declared `lookupDefault`s read (ExtractContext.identity).
+  // Kept in a ref because the resolutions fire from callbacks that must not
+  // re-subscribe on every keystroke.
   const identityInputsRef = useRef<IdentityLookupInputs>({});
 
-  // Evaluate the five declared lookup defaults against the accumulated
+  // Evaluate the three declared lookup defaults against the accumulated
   // inputs and record each result as a `default` decision record.
   // SurveyRunner's record-first seeding then renders the record — value,
   // the langtags caption for "langtags"-sourced records, and the proposal
@@ -209,8 +181,6 @@ export function IdentityLite({
       "il_language_autonym",
       "il_language_code",
       "il_target_script",
-      "il_author_name",
-      "il_author_email",
     ] as const) {
       const mod = questionRegistry[questionId];
       if (mod?.lookupDefault === undefined || mod.provides === undefined) continue;
@@ -251,25 +221,6 @@ export function IdentityLite({
       }
     }
   }, []);
-
-  // The stored author profile is a resolution input known from the first
-  // render (spec 064 D7): evaluate against it as soon as it is known, so
-  // the attribution questions arrive pre-filled for confirmation. A
-  // profile with no name seeds nothing — ASK rather than substitute the
-  // login handle, which is not a copyright holder (the modules' declared
-  // defaults encode that exclusion).
-  const authorName = authorSeed?.name;
-  const authorEmail = authorSeed?.email;
-  useEffect(() => {
-    identityInputsRef.current = {
-      ...identityInputsRef.current,
-      authorProfile: {
-        ...(authorName !== undefined ? { name: authorName } : {}),
-        ...(authorEmail !== undefined ? { email: authorEmail } : {}),
-      },
-    };
-    evaluateIdentityDefaults();
-  }, [authorName, authorEmail, evaluateIdentityDefaults]);
 
   // The search summary the author selected at il_language_english (spec 030 US1).
   // Its `hasRegionVariants` flag is read synchronously by getNextOverride at
@@ -354,9 +305,7 @@ export function IdentityLite({
     resolvedEntryRef.current = null;
     selectedRegionRef.current = "";
     forgetIdentityDefaults(["il_language_autonym", "il_language_code", "il_target_script"]);
-    const { authorProfile } = identityInputsRef.current;
     identityInputsRef.current = {
-      ...(authorProfile !== undefined ? { authorProfile } : {}),
       ...(q1EnglishRef.current !== "" ? { q1English: q1EnglishRef.current } : {}),
     };
     evaluateIdentityDefaults();

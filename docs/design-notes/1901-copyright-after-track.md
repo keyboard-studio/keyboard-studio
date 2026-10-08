@@ -20,6 +20,24 @@ the base or the track existed — on a fresh walk the seed can never fire
 gate runs the extraction pass), and the holder defaults to the author even
 on the update track, where the base's holder should be preserved.
 
+## Premise verification — holder seed timing (checked, holds)
+
+The one premise that could have falsified D1/D3: the extraction pass fires
+at the setup commit (base instantiated + track recorded — StudioShell
+doCommit), when the author name does not exist yet, and
+`il_copyright_holder.requires` includes `author-name`. Verified in
+`decisions/liveExtraction.ts`: the pass does NOT gate on `requires`
+satisfaction — `requires` feeds ordering (`orderDecisions`) and the inputs
+snapshot only; seeding gates on `filterGated` (conditional-`next`
+reachability against recorded decisions) and the module's `seedWhen`. The
+holder's `extract` reads only `ctx.ir.header.copyright`, so at track
+completion on the update track the holder seeds from the base bundle
+exactly as the spec-092 acceptance test expects, and the attribution step
+renders that record pre-filled (record-first seeding, source caption
+`from <base id>`). SurveyRunner additionally re-runs the idempotent pass
+at question-push time (G-9), and spec 093 recalculation re-derives
+extracted records on a base switch. No change to 092 machinery is needed.
+
 ## D1 — Placement: a new post-track flow + step (CHOSEN)
 
 Move `il_author_name`, `il_author_email`, `il_copyright_holder` out of

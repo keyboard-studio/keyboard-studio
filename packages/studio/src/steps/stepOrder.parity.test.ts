@@ -17,6 +17,19 @@
 // survive as the baseline; its exactness survives for membership,
 // trails, locks and the Flow Map graph; order itself is asserted in
 // FR-005 form (equal, or every inversion edge-explained).
+//
+// AMENDMENT (#1901, a deliberate decision per the rule above — not a
+// regeneration): the author/copyright decisions moved out of the
+// identity screen into a new "attribution" screen after "track" (the
+// questions are asked after the track choice because their proposals
+// are track-shaped). BASELINE_ORDER gains "attribution" after "track";
+// BASELINE_MEMBERSHIP moves author-name / author-email /
+// copyright-holder from identity to attribution; the Flow Map edges
+// re-route through attribution (it is project_name's preceding spine
+// step, so the copy fork now leaves from attribution); the tie-break
+// pairs gain attribution's unordered pairs (its only ordering edges
+// are target-script and, via screenRequires, authoring-track; nothing
+// downstream requires its decisions).
 
 import { describe, expect, it } from "vitest";
 import { manifest, screenTrails } from "./manifest.ts";
@@ -31,6 +44,7 @@ const BASELINE_ORDER = [
   "layout",
   "choose_base",
   "track",
+  "attribution",
   "project_name",
   "characters",
   "marks",
@@ -62,8 +76,9 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["identity", "layout", "spine"],
   ["layout", "choose_base", "spine"],
   ["choose_base", "track", "spine"],
-  ["track", "characters", "spine"],
-  ["track", "project_name", "fork"],
+  ["track", "attribution", "spine"],
+  ["attribution", "characters", "spine"],
+  ["attribution", "project_name", "fork"],
   ["project_name", "characters", "join"],
   ["characters", "marks", "spine"],
   ["marks", "punctuation", "spine"],
@@ -82,10 +97,12 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
 
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
 const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
-  identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script", "author-name", "author-email", "copyright-holder"],
+  identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script"],
   layout: ["windows-layout"],
   choose_base: ["base-keyboard"],
   track: ["authoring-track"],
+  // #1901 amendment: the author trio's membership, moved from identity.
+  attribution: ["author-name", "author-email", "copyright-holder"],
   project_name: ["project-display-name", "project-keyboard-id"],
   characters: ["existing-keyboards", "co-installed-keyboards", "discovery-intro", "text-sample", "text-sample-review", "linguist-confirm", "picker-confirm", "standard-letters", "typing-approach", "special-letters-wanted", "special-letters", "special-letters-notes", "latin-digraphs-wanted", "latin-digraphs-list", "punctuation-wanted", "punctuation-list", "digit-set", "char-count", "latin-qwerty-branch", "spare-keys-qwerty", "latin-azerty-branch", "azerty-qz-swap", "spare-keys-azerty", "non-roman-branch", "indic-conjuncts-wanted", "indic-virama", "indic-vowels-separate", "indic-pre-base-vowels", "indic-nukta-wanted", "indic-nukta-detail", "indic-onset-vowels-wanted", "indic-onset-vowels-list", "sea-medials", "sea-stacked-consonants", "rtl-direction-confirm", "rtl-short-vowels", "rtl-special-letters", "syllabic-note", "syllabic-grid", "syllabic-finals-wanted", "syllabic-finals-list", "other-free-entry", "contact-language", "legacy-encoding", "use-case", "additional-methods", "character-inventory"],
   marks: ["marks-treatment"],
@@ -242,15 +259,34 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //   - layout is pinned only to "after identity, before carve".
     //   - marks/punctuation/invisibles/convenience each read the alphabet
     //     and feed carve, but none reads another.
+    //   - attribution (#1901 amendment) is ordered only against identity
+    //     (target-script) and track (authoring-track, via screenRequires);
+    //     nothing downstream requires its decisions, so it is a
+    //     tie-break against every other screen it neighbours.
     const BASELINE_TIE_BREAK_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["layout", "choose_base"],
       ["layout", "track"],
+      ["layout", "attribution"],
       ["layout", "project_name"],
       ["layout", "characters"],
       ["layout", "marks"],
       ["layout", "punctuation"],
       ["layout", "invisibles"],
       ["layout", "convenience"],
+      ["choose_base", "attribution"],
+      ["attribution", "project_name"],
+      ["attribution", "characters"],
+      ["attribution", "marks"],
+      ["attribution", "punctuation"],
+      ["attribution", "invisibles"],
+      ["attribution", "convenience"],
+      ["attribution", "carve"],
+      ["attribution", "deadkeys"],
+      ["attribution", "rules"],
+      ["attribution", "mechanisms"],
+      ["attribution", "touch_seed_source"],
+      ["attribution", "touch"],
+      ["attribution", "help"],
       ["marks", "punctuation"],
       ["marks", "invisibles"],
       ["marks", "convenience"],

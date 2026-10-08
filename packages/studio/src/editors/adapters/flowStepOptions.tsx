@@ -13,7 +13,7 @@
 // EditorStepProps-compatible components that register in registerEditorSteps.ts.
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { DecisionProposalSource, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
@@ -29,6 +29,11 @@ import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
+import type { ExtractContext } from "../../decisions/extractContext.ts";
+import type { QuestionModule } from "../../survey/types.ts";
+import ilAuthorNameModule from "../../survey/questions/a/il_author_name.ts";
+import ilAuthorEmailModule from "../../survey/questions/a/il_author_email.ts";
+import ilCopyrightHolderModule from "../../survey/questions/a/il_copyright_holder.ts";
 
 /** A recorded decision's string value, or undefined when absent/non-string. */
 function decisionString(decisions: DecisionSet, id: DecisionId): string | undefined {
@@ -234,6 +239,109 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 };
 
 // ---------------------------------------------------------------------------
+// attributionOptions — the author / copyright questions (#1901).
+//
+// These three questions were the identity step's tail (spec 064 US1);
+// they are asked AFTER the track choice now, because what they propose
+// depends on it:
+//   - Author name / email: confirm-style defaults from the authenticated
+//     profile (spec 064 D7). The RULE is the modules' declared
+//     `lookupDefault` (spec 092 T033); the seed callbacks below only
+//     supply the profile input (deps.authorProfile, read by the factory)
+//     and read the declared default back. A profile with no name seeds
+//     nothing — ASK rather than substitute the login handle, which is
+//     not a copyright holder.
+//   - Copyright holder: NO caller seed on either track. On the update
+//     track the live extraction pass has already seeded the decision
+//     from the base keyboard (il_copyright_holder's `seedWhen`), and
+//     SurveyRunner's record-first seeding renders it pre-filled with
+//     its source caption; on the copy track the module forbids that
+//     seed (the copied notice is retained by the attribution machinery)
+//     and the field stays blank — blank means "same as the author" (D1).
+// Re-entry (FR-031, the project_name pattern): a recorded asked answer
+// is the seed — the author's own value, never a re-proposal over it.
+// Extract: the author-name answer (the module's validate already
+// requires it non-blank; this guard keeps a completion without it from
+// advancing).
+// Effects: none here (spec 089) — il_copyright_holder's apply lands the
+// attribution at StepHost's boundary, pass 2 included: this completion
+// recording author-name is exactly pass 2's trigger, as the identity
+// completion was before the move.
+// ---------------------------------------------------------------------------
+
+export type AttributionPayload = { authorName: string };
+
+const attributionModules: Readonly<Record<string, QuestionModule>> = {
+  [ilAuthorNameModule.definition.id]: ilAuthorNameModule,
+  [ilAuthorEmailModule.definition.id]: ilAuthorEmailModule,
+  [ilCopyrightHolderModule.definition.id]: ilCopyrightHolderModule,
+};
+
+/** The recorded asked answer for a question's decision, or undefined. */
+function askedAnswer(deps: FlowStepDeps, questionId: string): string | undefined {
+  const decisionId = attributionModules[questionId]?.provides?.[0];
+  if (decisionId === undefined) return undefined;
+  const record = deps.decisions[decisionId];
+  if (record === undefined || record.provenance !== "asked") return undefined;
+  return typeof record.value === "string" ? record.value : undefined;
+}
+
+/**
+ * A module's declared profile lookup default, evaluated against the
+ * factory-supplied author profile. Undefined when the module declares
+ * no default (il_copyright_holder) or the profile carries no value.
+ */
+function profileDefault(
+  deps: FlowStepDeps,
+  questionId: string,
+): { value: string; source?: string } | undefined {
+  const mod = attributionModules[questionId];
+  if (mod?.lookupDefault === undefined) return undefined;
+  const ctx: ExtractContext = {
+    ir: null,
+    catalog: null,
+    identity: { authorProfile: deps.authorProfile },
+  };
+  const dflt = mod.lookupDefault(ctx);
+  if (dflt === undefined || typeof dflt.value !== "string" || dflt.value === "") {
+    return undefined;
+  }
+  return {
+    value: dflt.value,
+    ...(dflt.source !== undefined ? { source: dflt.source } : {}),
+  };
+}
+
+export const attributionOptions: FlowStepOptions<AttributionPayload> = {
+  flowRef: "attribution",
+  title: "Author & copyright",
+
+  buildContext(deps: FlowStepDeps) {
+    return deps.surveyContext;
+  },
+
+  seeds: {
+    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
+      return askedAnswer(deps, questionId) ?? profileDefault(deps, questionId)?.value;
+    },
+    getSeedSource(questionId: string, deps: FlowStepDeps): DecisionProposalSource | undefined {
+      // An asked answer is the author's own — it names no proposal
+      // source. Only a profile lookup default does ("identity").
+      if (askedAnswer(deps, questionId) !== undefined) return undefined;
+      const source = profileDefault(deps, questionId)?.source;
+      return source !== undefined ? (source as DecisionProposalSource) : undefined;
+    },
+  },
+
+  extract(result: SurveyPhaseResult): AttributionPayload | undefined {
+    const answer = result.answers.find((a) => a.questionId === "il_author_name");
+    if (!answer || answer.answerType !== "text") return undefined;
+    const authorName = String(answer.value).trim();
+    return authorName !== "" ? { authorName } : undefined;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // phaseFOptions — reproduces PhaseFAdapter + PhaseF behaviour exactly.
 //
 // Context: the decision-derived survey context (deriveSurveyContext, spec 089).
@@ -373,6 +481,7 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
 // ---------------------------------------------------------------------------
 
 export const TrackStepFactoryComponent = makeFlowStepComponent(trackOptions);
+export const AttributionStepFactoryComponent = makeFlowStepComponent(attributionOptions);
 export const ProjectNameStepFactoryComponent = makeFlowStepComponent(projectNameOptions);
 export const PhaseFStepFactoryComponent = makeFlowStepComponent(phaseFOptions);
 

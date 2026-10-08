@@ -1,4 +1,4 @@
-// Per-question module: il_author_name (identity-lite, spec 064 US1)
+// Per-question module: il_author_name (attribution flow — spec 064 US1, moved post-track by #1901)
 //
 // WHY A NEW ID RATHER THAN REVIVING author_display_name
 // -----------------------------------------------------
@@ -48,13 +48,25 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  // Decision spike (km/decisions-spike): attribution capture follows a
-  // supported script (spec 064 US1) — gated scripts terminate before it.
-  // No hand-written gatedBy: the gate is DERIVED from il_target_script's
-  // conditional `next` via gatedByFromNext (single source for conditional
-  // routing — never both by hand).
+  // Attribution capture follows a supported script (spec 064 US1) — gated
+  // scripts terminate before it. Until #1901 that was expressed by
+  // il_target_script's conditional `next` default-branching here, and the
+  // gate was DERIVED from that edge via gatedByFromNext. The attribution
+  // questions now form their own post-track flow (#1901), where no
+  // routing edge from il_target_script can reach; the gate's single home
+  // is the session terminal instead — advance("identity") routes a gated
+  // script to "unsupported", so this step is never reached for one.
   provides: ["author-name"],
   requires: ["target-script"],
+  // #1901: the attribution screen walks AFTER the track choice — what
+  // the trio proposes depends on the track (profile confirmation on
+  // copy; the base's copyright seeded on update). Declared as a
+  // SCREEN-order requirement, not a module `requires` — the same
+  // treatment track_choice gives its base-keyboard edge and
+  // project_display_name gives this very decision: deriveScreens folds
+  // it into the full-list sort only, so this flow's own per-flow sort
+  // (orderParity) never sees an edge it cannot resolve.
+  screenRequires: ["authoring-track"],
   // Spec 092 (T033): the stored author profile's name as a lookup default
   // (spec 064 FR-001: propose-then-confirm, never a blank form). Absent
   // when the profile has no name — ASK rather than substitute the login

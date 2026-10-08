@@ -158,6 +158,10 @@ export const decisionModules: readonly QuestionModule[] = [
   ...withGroup(flowModules.phase_b_characters, "characters"),
   ...withGroup(flowModules.phase_f_helpdocs, "help"),
   ...withGroup(flowModules.track, "track"),
+  // #1901: the attribution screen sits between track and project_name.
+  // Declaration order here is the sort's tie-break: both screens
+  // screen-require "authoring-track", and attribution walks first.
+  ...withGroup(flowModules.attribution, "attribution"),
   ...withGroup(flowModules.project_name, "project_name"),
   ...galleryModules,
 ];
@@ -203,6 +207,7 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = module
   ...flowModules.phase_b_characters,
   ...phaseFLibraryModules,
   ...flowModules.track,
+  ...flowModules.attribution,
   ...flowModules.project_name,
   ...reserveModules,
   ...galleryModules,

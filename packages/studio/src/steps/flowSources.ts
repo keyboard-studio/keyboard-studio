@@ -133,6 +133,17 @@ const declaredFlowSources = {
     registry: moduleRecord(flowModules.track),
   },
 
+  // #1901: author / copyright questions, asked after the track choice
+  // and seeded per track (profile defaults on copy, the base's holder
+  // extracted on update).
+  attribution: {
+    id: "attribution",
+    derivedModules: flowModules.attribution,
+    phase: "G",
+    title: "Author & copyright",
+    registry: moduleRecord(flowModules.attribution),
+  },
+
   project_name: {
     id: "project_name",
     derivedModules: flowModules.project_name,
