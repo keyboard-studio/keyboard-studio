@@ -237,3 +237,49 @@ completion-scoping, and the no-double-run rule.
   an omitted-vs-undefined distinction (or a seed-logic revisit), not a
   mechanical move. Revisit when the project_name seed logic next
   changes.
+
+## 9. Hand-off: the footer's overlap band can trap real clicks too (app-side, NOT fixed here)
+
+Surfaced by copy-edit:455's deterministic CI failure (2026-10-07). Spec
+081's studio footer overlaps the bottom 40px of content by design
+(`.ks-studio-footer { margin-top: -40px; z-index: 100 }`), and the
+Mechanism Gallery's sequence builder puts its Apply button where that
+band can cover it: Playwright's click was intercepted by the footer's
+progress-dot-row and retried until the test's 240s budget was gone.
+The harness side is fixed in the e2e helper (`driveMechanismsGallery`'s
+sequence fallback now centres `sequences-apply` in the viewport before
+clicking, with the click bounded so a genuine intercept fails fast).
+The app-side observation is handed off, not fixed: a real user on a
+short viewport can hit the same trap — the sequence builder's Apply
+sitting under the footer band, visible but not clickable. Whether the
+band should yield (footer pointer-events, content padding, builder
+placement) is a design call for the chrome's owning spec (081), not
+for 089.
+
+
+## 10. Golden-walk live gate (T003): walk oversized for its 240s cap — sized, not stalled
+
+Run 37679303677 was the first run whose golden-walk steps executed
+(decoupled lane): BOTH the base-code capture and the head verify failed
+— identically: the full 240s consumed, death at `driveHelpPhase`'s
+first fill (`#pf_welcome_paragraph`, surveyFlow.ts:918) with identity
+→ mechanisms (23 targets) → touch (whole inventory) already complete
+behind them, and no app error output in either WebServer log.
+Classification: budget/pace, not a Phase F stall — the route's
+mechanisms+touch core alone measured ~524s of action time in
+copy-edit:455's trace at comparable runner pace, and the smaller
+de-fixtured 455 took 449s in the same job; a 240s cap is arithmetically
+unreachable for this route at observed CI pace. The extraction-churn
+spin 093 fixed on its tree is NOT implicated: its mechanism
+(`runLiveExtractionFromStores`) does not exist in 088/089 code, and
+the capture died the same way on the pre-089 base app. Fix: the spec
+carries `test.setTimeout(1_200_000)` with the sizing evidence and a
+tripwire (death at 1200s = genuine stall, re-diagnose) in the comment;
+the byte-for-byte comparison is untouched. The union-waiter diet was
+already on this walk's path in both failing runs (the capture step
+copies the head's helpers into .golden-base) — no diet remained to
+apply. Observability note for the lane's owner: the golden-walk steps'
+Playwright artifacts are never uploaded (the Upload Playwright report
+step precedes the verify step, and the capture runs under .golden-base,
+outside the upload paths) — error-context/traces for these two steps
+exist only in the job log's error excerpt.
