@@ -192,3 +192,32 @@ export function instantiateFromBaseIfConfirmed(
   });
   return true;
 }
+
+/**
+ * Track 2 (adapt) instantiation with the author's identity seed applied —
+ * the adapt counterpart of {@link instantiateFromBaseIfConfirmed}'s seeding.
+ *
+ * The setup-decision gate (spec 092) made instantiation wait until the
+ * authoring-track decision is recorded, so an adapt walk now ALWAYS lands
+ * here with the author's identity answers already in the decision store —
+ * but the raw `instantiateFromExisting` action composes its identity from
+ * the BASE alone (its first language tag, no language name), and no later
+ * step repairs it: `project_keyboard_id`'s apply is the identity channel's
+ * only decision writer and it is copy-track only, and the derived-keyboard
+ * rebuild preserves the instantiation-seeded identity. The emitted package
+ * descriptor therefore declared the base's raw tag as the `<Language>`
+ * display text (`<Language ID="fr">fr</Language>`) instead of the author's
+ * language name. Composing the same seed the copy track gets — via the one
+ * composition rule, {@link identitySeedFromSession} — at the one moment the
+ * identity is first written fixes every downstream reader at once.
+ */
+export function instantiateFromExistingWithIdentitySeed(
+  base: BaseKeyboard,
+  opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
+): void {
+  const identitySeed = identitySeedFromSession(base);
+  useWorkingCopyStore.getState().instantiateFromExisting(base, {
+    ...opts,
+    ...(identitySeed !== undefined ? { identitySeed } : {}),
+  });
+}

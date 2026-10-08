@@ -23,6 +23,7 @@ import {
   needsRebaseConfirm,
   confirmRebaseTo,
   instantiateFromBaseIfConfirmed,
+  instantiateFromExistingWithIdentitySeed,
   REBASE_CONFIRM_MESSAGE,
 } from "./confirmRebase.ts";
 
@@ -258,5 +259,49 @@ describe("instantiateFromBaseIfConfirmed — identity seed", () => {
     useWorkingCopyStore.getState().reset();
     instantiateFromBaseIfConfirmed(basicKbdus, payload);
     expect(hasUnsavedEdits()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Identity seed — the adapt track (Track 2) gets the same seed
+//
+// Regression pin for the union-tree copy-edit failure (adapt track emitted
+// `<Language ID="fr">fr</Language>`): the setup-decision gate made adapt
+// instantiation wait for the recorded track, so it always lands in
+// instantiateFromExisting — which composed identity from the base alone
+// (first tag, no language name) and no later writer repaired it. The
+// seeded wrapper is the live composition for that dep.
+// ---------------------------------------------------------------------------
+
+describe("instantiateFromExistingWithIdentitySeed — identity seed", () => {
+  afterEach(() => {
+    clearIdentityDecisions();
+  });
+
+  it("overlays the author's composed tag and English name on the preserved identity", () => {
+    seedIdentityDecisions("bfd", "Bafut");
+    useWorkingCopyStore.getState().reset();
+    instantiateFromExistingWithIdentitySeed(basicKbdus, payload);
+    expect(useWorkingCopyStore.getState().identity).toEqual({
+      // Preserved from the base: the id is the base's own (the seed carries
+      // none — choosing a new id is the author's act).
+      keyboardId: basicKbdus.id,
+      displayName: basicKbdus.displayName,
+      // Overlaid from the seed: NOT the base's first language tag ("en").
+      bcp47: "bfd-Latn",
+      languageName: "Bafut",
+    });
+  });
+
+  it("keeps the base's preserved identity untouched when there is no seed", () => {
+    useWorkingCopyStore.getState().reset();
+    instantiateFromExistingWithIdentitySeed(basicKbdus, payload);
+    const identity = useWorkingCopyStore.getState().identity;
+    expect(identity).toEqual({
+      keyboardId: basicKbdus.id,
+      bcp47: basicKbdus.languages?.[0] ?? "",
+      displayName: basicKbdus.displayName,
+    });
+    expect(identity).not.toHaveProperty("languageName");
   });
 });

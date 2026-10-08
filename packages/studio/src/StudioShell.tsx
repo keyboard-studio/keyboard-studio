@@ -41,7 +41,10 @@ import {
   bindManifest,
 } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
-import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
+import {
+  instantiateFromBaseIfConfirmed,
+  instantiateFromExistingWithIdentitySeed,
+} from "./lib/confirmRebase.ts";
 import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
@@ -565,9 +568,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Working-copy store actions needed by SurveyView (not delegated to StepHost).
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
   const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
-  const instantiateFromExisting = useWorkingCopyStore(
-    (s) => s.instantiateFromExisting,
-  );
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const setValidatorFindings = useWorkingCopyStore(
     (s) => s.setValidatorFindings,
@@ -833,7 +833,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const reducerDeps: ReducerDeps = useMemo(
     () => ({
       instantiateFromBase,
-      instantiateFromExisting,
+      // Track 2 (adapt): the seeded wrapper, not the raw store action — the
+      // adapt instantiation must carry the author's identity-language seed
+      // (composed tag + English name) or the emitted descriptor falls back
+      // to the base's raw tag as the <Language> display text. Module-level
+      // import, like instantiateFromBaseIfConfirmed below.
+      instantiateFromExisting: (base, opts) =>
+        instantiateFromExistingWithIdentitySeed(base, opts),
       clearTouchSeedChoice,
       // Spec 035 R11: the emission-matrix wrapper that used to live here
       // (as the buildTouchLayoutJson dep) moved verbatim into
@@ -888,7 +894,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [
       instantiateFromBase,
-      instantiateFromExisting,
       clearTouchSeedChoice,
       recordDecision,
     ],

@@ -92,6 +92,7 @@ import {
   type TouchCompleteResult,
 } from "../lib/assignLoopCompletion.ts";
 import { useWorkingCopyStore, bindManifest } from "../stores/workingCopyStore.ts";
+import { instantiateFromExistingWithIdentitySeed } from "../lib/confirmRebase.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { evalCondition as _evalCondition, resolveNext, advanceThrough } from "./SurveyRunner.tsx";
@@ -445,7 +446,11 @@ function buildReplayReducerDeps(): ReducerDeps {
   return {
     instantiateFromBase: (base, opts) => useWorkingCopyStore.getState().instantiateFromBase(base, opts),
     instantiateFromExisting: (base, opts) =>
-      useWorkingCopyStore.getState().instantiateFromExisting(base, opts),
+      // The live dep is the identity-seeded wrapper (the adapt identity must
+      // carry the author's composed tag + language name from the moment of
+      // instantiation); the replay harness wires the same composition so a
+      // replayed adapt journey produces the identity the live walk would.
+      instantiateFromExistingWithIdentitySeed(base, opts),
     instantiateFromBaseIfConfirmed: (base, opts) => {
       // The real dep's declared signature allows a null vfs/ir (the pre-parse
       // state a real base resolution can transiently be in); this harness
