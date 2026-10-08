@@ -4,9 +4,9 @@
 // and the INDEPENDENT target script, deriving the routing/A2 prefill
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
 
-import { useMemo, useRef, useCallback, useEffect } from "react";
+import { useMemo, useRef, useCallback } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Attribution, SurveyPhaseResult, LintFinding, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import type { SurveyPhaseResult, LintFinding, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { questionRegistry } from "./questions/registry.ts";
 import type { ExtractContext, IdentityLookupInputs } from "../decisions/extractContext.ts";
