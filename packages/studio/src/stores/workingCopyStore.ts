@@ -1205,6 +1205,17 @@ export interface WorkingCopyState {
       vfs: VirtualFS;
       ir: KeyboardIR;
       removalCapabilities?: Map<string, RemovalCapability>;
+      /**
+       * The author's identity-language overlay (the identity step's composed
+       * tag + English name, from `identitySeedFromSession`), spread over the
+       * preserved identity. Without it the adapt copy keeps the BASE's first
+       * language tag and no language name, so the package descriptor falls
+       * back to the raw tag as the `<Language>` display text and every
+       * `identity.bcp47` reader works on the base's language instead of the
+       * author's. The seed never carries `keyboardId` — the preserved id
+       * always wins.
+       */
+      identitySeed?: IdentityPatch;
     },
   ) => void;
 
@@ -2294,7 +2305,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     });
   },
 
-  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities }) => {
+  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities, identitySeed }) => {
     // Three-case resolution (redundant re-fire / first instantiate / genuine
     // switch) is shared with instantiateFromBase — see
     // resolveInstantiationCase for the full explanation.
@@ -2334,6 +2345,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         keyboardId: keyboard.id,
         bcp47: keyboard.languages?.[0] ?? "",
         displayName: keyboard.displayName,
+        // The author's identity-language overlay (composed tag + English
+        // name) wins over the base's preserved fields — the adapt track's
+        // author has already told the identity step what language this
+        // keyboard is FOR; the base's own first tag is only the fallback
+        // when no seed was composed. The seed never carries `keyboardId`,
+        // so the preserved id above is never overridden.
+        ...(identitySeed ?? {}),
       },
       // Seed the carve working IR from the existing keyboard's IR.
       ir,
