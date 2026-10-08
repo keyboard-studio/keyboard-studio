@@ -32,6 +32,11 @@ import { buildExtractContext } from "./extractContext.ts";
 import { filterGated, orderDecisions } from "./orderDecisions.ts";
 import { deriveSurveyContext } from "./identitySelectors.ts";
 import { prefill as prefillWelcomeParagraph } from "../lib/adaptiveDescription.ts";
+import {
+  proposeProjectUrl,
+  proposeProvenanceBasis,
+} from "../lib/phaseFSeeds.ts";
+import type { PhaseFSeedContext } from "../lib/phaseFSeeds.ts";
 
 /** The slice of the decision store the pass writes through. */
 export interface LiveExtractionStore {
@@ -225,7 +230,10 @@ export function runLiveExtractionFromStores(): LiveExtractionResult {
   // Spec 092 (T036): Phase F's derivations read working-copy slices and
   // two identity-derived values that are not part of the bundle — supply
   // them from the same stores the old PHASE_F_SEEDS readers read, so the
-  // pf_* modules' extracts/lookup defaults resolve identically.
+  // pf_* modules' extracts/lookup defaults resolve identically. The
+  // derivations are computed HERE, in the wiring (G-17): the pf_*
+  // modules import nothing from lib/ (mutate-seam rule) and read the
+  // computed proposals off the context, the welcome-prefill pattern.
   const surveyContext = deriveSurveyContext(useDecisionStore.getState().decisions);
   const welcomePrefill = prefillWelcomeParagraph({
     instantiationMode: wc.instantiationMode,
@@ -233,13 +241,19 @@ export function runLiveExtractionFromStores(): LiveExtractionResult {
     baseWelcomeHtmText: wc.baseWelcomeHtmText,
     baseHelpPhpText: wc.baseHelpPhpText,
   });
+  const seedContext: PhaseFSeedContext = {
+    instantiationMode: wc.instantiationMode,
+    baseKeyboard: wc.baseKeyboard,
+    baseVfs: wc.baseVfs,
+  };
+  const projectUrlProposal = proposeProjectUrl(seedContext);
+  const provenanceBasisProposal = proposeProvenanceBasis(seedContext);
   ctx.phaseF = {
     ...(welcomePrefill !== undefined ? { welcomePrefill } : {}),
-    seeds: {
-      instantiationMode: wc.instantiationMode,
-      baseKeyboard: wc.baseKeyboard,
-      baseVfs: wc.baseVfs,
-    },
+    ...(projectUrlProposal !== undefined ? { projectUrlProposal } : {}),
+    ...(provenanceBasisProposal !== undefined
+      ? { provenanceBasisProposal }
+      : {}),
     ...(surveyContext["author_contact"] !== undefined
       ? { authorContact: surveyContext["author_contact"] }
       : {}),

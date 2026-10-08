@@ -16,17 +16,17 @@ import { getLoadedLangtags } from "../lib/langtagsDefaults.ts";
  * the author is asked. `catalog` is null for non-catalog imports.
  */
 /**
- * Spec 092 (T036): the live-only seed inputs Phase F's derivations read —
- * the working-copy slices `lib/adaptiveDescription.ts` and
- * `lib/phaseFSeeds.ts` consume, plus the two identity-derived survey
- * values (`author_contact`, `bcp47_tag`). Populated by the live wiring
- * (`runLiveExtractionFromStores`) from the working-copy store and the
- * recorded identity decisions; absent in the demo runner and in unit
- * tests, where Phase F extracts/defaults resolve to absent — the same
- * result the old seed table produced against an empty store.
+ * Spec 092 (T036): the live-only Phase F inputs — the RESULTS of the
+ * Phase F derivations (`lib/adaptiveDescription.ts`'s prefill,
+ * `lib/phaseFSeeds.ts`'s two proposals), computed by the live wiring
+ * (`runLiveExtractionFromStores`) from the working-copy store, plus the
+ * two identity-derived survey values (`author_contact`, `bcp47_tag`)
+ * read from the recorded identity decisions. Absent in the demo runner
+ * and in unit tests, where Phase F extracts/defaults resolve to
+ * absent — the same result the old seed table produced against an
+ * empty store.
  */
 export interface PhaseFSeedInputs {
-  seeds: import("../lib/phaseFSeeds.ts").PhaseFSeedContext;
   /**
    * The welcome-paragraph prefill, computed by the wiring from
    * `lib/adaptiveDescription.ts`'s `prefill` — that derivation is
@@ -36,6 +36,22 @@ export interface PhaseFSeedInputs {
    * The adapter's `requiredWhen` uses the same single derivation.
    */
   welcomePrefill?: string;
+  /**
+   * `pf_project_url`'s proposal, computed by the wiring from
+   * `lib/phaseFSeeds.ts`'s `proposeProjectUrl` over the working-copy
+   * slices (G-17). Same pattern as the welcome prefill: question
+   * modules import nothing from lib/ (the mutate-seam depcruise rule;
+   * the standalone content-i18n extractor loads them), so the module's
+   * `extract` reads the computed value here rather than calling the
+   * derivation itself.
+   */
+  projectUrlProposal?: string;
+  /**
+   * `pf_provenance_basis`'s proposal — `lib/phaseFSeeds.ts`'
+   * `proposeProvenanceBasis`, computed by the wiring (G-17), same
+   * pattern as `projectUrlProposal`.
+   */
+  provenanceBasisProposal?: string;
   authorContact?: string;
   bcp47Tag?: string;
 }
