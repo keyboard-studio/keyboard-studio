@@ -630,3 +630,251 @@ describe("mounting resolves no impact (FR-036)", () => {
     expect(resolveImpact).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Decisions-page enrichment: the meta line, the expanded detail, and the
+// supersede links (docs/decisions-page-audit.md).
+//
+// Through-line, as with the suites above: the record already carried the
+// value, the provenance, the time, and the supersede links — the page just
+// never showed them. These tests pin that each one now renders, per kind.
+// ---------------------------------------------------------------------------
+
+describe("enrichment — the meta line (provenance + recorded time, collapsed)", () => {
+  it("states the author's own choice and when it was recorded", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({ recordedAt: Date.UTC(2026, 9, 8, 14, 32) })}
+          superseded={false}
+          resolveImpact={() => null}
+        />
+      </ul>,
+    );
+    const meta = screen.getByTestId("decision-entry-meta");
+    expect(meta.textContent).toMatch(/Your own choice/);
+    expect(meta.textContent).toMatch(/Recorded/);
+    expect(meta.textContent).toMatch(/Oct 8, 2026/);
+  });
+
+  it("names the proposal and its source for a tool-proposed answer", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({ provenance: { agency: "tool-proposed", source: "langtags" } })}
+          superseded={false}
+          resolveImpact={() => null}
+        />
+      </ul>,
+    );
+    expect(screen.getByTestId("decision-entry-meta").textContent).toMatch(
+      /Suggested by the tool, from langtags/,
+    );
+  });
+
+  it("gives a decision entry a provenance too — its headline is only a summary", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            stepId: "layout",
+            payload: {
+              kind: "decision",
+              decisionId: "windows-layout",
+              value: { layoutId: "basic_french" },
+              summary: "Base keyboard",
+            },
+            provenance: { agency: "base-derived", source: "base" },
+          })}
+          superseded={false}
+          resolveImpact={() => null}
+        />
+      </ul>,
+    );
+    expect(screen.getByTestId("decision-entry-meta").textContent).toMatch(
+      /Carried from the base keyboard/,
+    );
+  });
+});
+
+describe("enrichment — the expanded detail (what was recorded)", () => {
+  it("decision: the module label and the stored value's outline render on expand", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            stepId: "punctuation",
+            payload: {
+              kind: "decision",
+              decisionId: "punctuation-inventory",
+              value: {
+                accepted: [{ char: "«", provenance: "asked" }],
+                declined: [{ char: "»", provenance: "asked" }],
+              },
+              summary: "Punctuation inventory: 2 items",
+            },
+            provenance: { agency: "hand-set" },
+          })}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    expect(screen.queryByTestId("decision-entry-detail")).toBeNull();
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    const detail = screen.getByTestId("decision-entry-detail");
+    // The label comes from the providing module, resolved live — and the
+    // VALUE, not just the summary's digest of it: the characters themselves.
+    expect(detail.textContent).toContain("Punctuation inventory");
+    expect(detail.textContent).toContain("accepted: «");
+    expect(detail.textContent).toContain("declined: »");
+  });
+
+  it("decision: an unresolvable decision id degrades to prose, never the raw id", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            payload: {
+              kind: "decision",
+              decisionId: "no-such-decision",
+              value: "x",
+              summary: "no-such-decision: x",
+            },
+          })}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    const detail = screen.getByTestId("decision-entry-detail");
+    expect(detail.textContent).toMatch(/a decision this build no longer has/);
+    expect(detail.textContent).not.toContain("no-such-decision");
+  });
+
+  it("survey-answer: the offer the author overrode is stated, with its site count", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            provenance: {
+              agency: "hand-set",
+              proposed: { value: "accept", siteIds: ["site-a", "site-b"] },
+            },
+          })}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    const detail = screen.getByTestId("decision-entry-detail");
+    expect(detail.textContent).toMatch(/The tool suggested accept/);
+    expect(detail.textContent).toMatch(/named 2 sites/);
+  });
+
+  it("survey-answer: no detail block when there was no offer to override", () => {
+    renderExpandedRow({ state: "none" });
+    expect(screen.queryByTestId("decision-entry-detail")).toBeNull();
+  });
+
+  it("editor-action: the affected-item sample renders, with truncation stated", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            stepId: "carve",
+            payload: {
+              kind: "editor-action",
+              actionType: "gallery_edit",
+              summary: {
+                keysRemoved: 3,
+                sample: ["é", "à", "ù"],
+                sampleTruncated: true,
+              },
+            },
+          })}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    const detail = screen.getByTestId("decision-entry-detail");
+    expect(detail.textContent).toContain("é");
+    expect(detail.textContent).toMatch(/Only the first few are shown/);
+  });
+
+  it("base-contribution: states whether the base was copied or updated", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({
+            stepId: "choose_base",
+            payload: {
+              kind: "base-contribution",
+              baseId: "basic_kbdus",
+              baseDisplayName: "US English",
+              derivedAxes: [],
+              inheritedMetadata: [],
+              instantiationMode: "adapt-existing",
+            },
+          })}
+          superseded={false}
+          resolveImpact={() => ({ state: "none" })}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    expect(screen.getByTestId("decision-entry-impact").textContent).toMatch(
+      /Updated the existing keyboard built on this base/,
+    );
+  });
+});
+
+describe("enrichment — supersede links", () => {
+  it("a superseded row offers to reveal its replacement", () => {
+    const onRevealEntry = vi.fn();
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry()}
+          superseded
+          replacementEntryId="d2"
+          onRevealEntry={onRevealEntry}
+          resolveImpact={() => null}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-show-replacement"));
+    expect(onRevealEntry).toHaveBeenCalledWith("d2");
+  });
+
+  it("a replacing row offers to reveal the entry it replaced", () => {
+    const onRevealEntry = vi.fn();
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={entry({ supersedes: "d0" })}
+          superseded={false}
+          onRevealEntry={onRevealEntry}
+          resolveImpact={() => null}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-show-replaced"));
+    expect(onRevealEntry).toHaveBeenCalledWith("d0");
+  });
+
+  it("no supersede links render without a reveal callback — the marker still does", () => {
+    render(
+      <ul>
+        <DecisionEntryRow entry={entry()} superseded resolveImpact={() => null} />
+      </ul>,
+    );
+    expect(screen.getByTestId("decision-entry-superseded")).toBeTruthy();
+    expect(screen.queryByTestId("decision-entry-show-replacement")).toBeNull();
+    expect(screen.queryByTestId("decision-entry-show-replaced")).toBeNull();
+  });
+});
