@@ -133,10 +133,7 @@ import {
 import { decideGalleryValue } from "./steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "./lib/galleryHostDeps.ts";
 import baseKeyboardModule from "./survey/questions/gallery/baseKeyboard.ts";
-import {
-  getCharacterInventoryValue,
-  resetInventoryDecisions,
-} from "./survey/useInventoryDraft.ts";
+import { resetInventoryDecisions } from "./survey/useInventoryDraft.ts";
 import type { CharacterInventoryValue } from "./survey/phaseBDraftOps.ts";
 import { computeConvenienceGate } from "./survey/convenience/convenienceGate.ts";
 
