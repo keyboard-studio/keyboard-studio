@@ -25,6 +25,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseTrackCopy,
+  driveAttributionStep,
   acceptProjectName,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
@@ -52,9 +53,10 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
   await seedReturningVisitor(page);
   await page.goto("/");
 
-  await driveIdentityLite(page, { languageCode: "fr", authorName: "Test Author" });
+  await driveIdentityLite(page, { languageCode: "fr" });
   await pickBaseKeyboard(page, "basic_kbdfr");
   await chooseTrackCopy(page);
+  await driveAttributionStep(page);
   await acceptProjectName(page);
 
   // The walk now sits on the characters step's prefill confirmation — the

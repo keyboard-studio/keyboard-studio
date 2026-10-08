@@ -18,7 +18,7 @@
 // Run: cd packages/studio && npx playwright test e2e/switch-base-rebase.spec.ts
 
 import { test, expect, type Page, type Dialog } from "playwright/test";
-import { driveIdentityLite, chooseAdaptTrack, seedReturningVisitor } from "./helpers/surveyFlow";
+import { driveIdentityLite, chooseAdaptTrack, driveAttributionStep, seedReturningVisitor } from "./helpers/surveyFlow";
 
 const BASE_A = "bj_cree_woods";
 const BASE_B = "basic_kbdfr";
@@ -232,6 +232,7 @@ test.describe("F1 — switch-base rebase confirm", () => {
     const dialogs = attachDialogHarness(page);
     await buildToBaseAConfirmed(page);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 30_000 });
 
     const before = await hookState(page);
