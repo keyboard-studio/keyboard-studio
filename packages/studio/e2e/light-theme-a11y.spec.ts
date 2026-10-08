@@ -23,6 +23,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   drivePunctuationStep,
@@ -116,6 +117,7 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
 
   await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
 
   // "Confirm the basics" — the densest read-only surface in the flow, and the
   // one whose label/value colour pairs were most at risk from the token swap.

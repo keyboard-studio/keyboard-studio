@@ -154,7 +154,9 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
     // Now advance into "characters" — the same discoveryMethod value gates
     // the pane swap on ONLY once activeRightPane flips to "character-map".
+    // (#1901: the attribution step sits between track and characters.)
     fireEvent.click(screen.getByTestId("track-adapt"));
+    fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByLabelText("Character map")).toBeTruthy();
   });
 

@@ -43,10 +43,14 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'Ethi' or value == 'Hani' or value == 'Hang'", goto: "il_script_not_supported" },
-    // spec 064 US1: a supported script continues into attribution capture.
-    // Gated scripts take the branch above and terminate — an author who cannot
-    // make a keyboard is never asked who holds its copyright.
-    { default: true as const, goto: "il_author_name" },
+    // #1901: NO default branch — a supported script ENDS the identity
+    // flow here. Attribution capture (il_author_name → …) used to be this
+    // edge's target (spec 064 US1); the author/copyright questions now
+    // live in the post-track `attribution` flow, because what they
+    // propose depends on the track. A gated script still terminates on
+    // the notice above — an author who cannot make a keyboard is never
+    // asked who holds its copyright (the session's "unsupported"
+    // terminal enforces the same fact one layer up).
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 

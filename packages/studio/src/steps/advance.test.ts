@@ -1,7 +1,9 @@
 // advance.test.ts — unit tests for the pure advance policy (spec 028 T007).
 //
 // Covers every case in advance-and-stephost.contract.md §1:
-//   - copy/adapt fork at "track"
+//   - copy/adapt fork at "attribution" (the track case forwards there
+//     since #1901 — the fork is evaluated after the post-track
+//     author/copyright questions are answered)
 //   - project_name → characters (side-trail rejoin hop)
 //   - identity supported/unsupported (terminal branch)
 //   - help → done + navigate:"output"
@@ -27,7 +29,7 @@ import {
 // ---------------------------------------------------------------------------
 
 type WalkStep =
-  | "identity" | "layout" | "choose_base" | "track" | "project_name" | "characters"
+  | "identity" | "layout" | "choose_base" | "track" | "attribution" | "project_name" | "characters"
   | "carve" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
@@ -116,9 +118,13 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("choose_base")).toBe("track");
   });
 
-  it("track → characters (skips project_name which is a derived side trail)", () => {
-    // project_name is a derived side trail so nextMainLineStepAfter("track") skips it.
-    expect(nextMainLineStepAfter("track")).toBe("characters");
+  it("track → attribution (#1901: the post-track author/copyright step)", () => {
+    expect(nextMainLineStepAfter("track")).toBe("attribution");
+  });
+
+  it("attribution → characters (skips project_name which is a derived side trail)", () => {
+    // project_name is a derived side trail so nextMainLineStepAfter("attribution") skips it.
+    expect(nextMainLineStepAfter("attribution")).toBe("characters");
   });
 
   it("characters → marks (spec 071)", () => {
@@ -176,22 +182,22 @@ describe("nextMainLineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> marks -> carve -> deadkeys -> rules -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> attribution -> project_name -> characters -> marks -> carve -> deadkeys -> rules -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     // Spec 035 R4/R12: with no recorded fork choice (copyCtx.touchSeedSource === null),
     // mechanisms routes through the off-spine touch_seed_source fork before touch.
     expect(sequence).toEqual([
-      "identity", "layout", "choose_base", "track", "project_name", "characters",
+      "identity", "layout", "choose_base", "track", "attribution", "project_name", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
   });
 
-  it("SR-2 adapt track: same spine but project_name is skipped", () => {
+  it("SR-2 adapt track: same spine but project_name is skipped (attribution is walked)", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "layout", "choose_base", "track", "characters",
+      "identity", "layout", "choose_base", "track", "attribution", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     expect(sequence).not.toContain("project_name");
@@ -249,7 +255,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   it("spine ids (spine !== false) are in the locked order", () => {
     const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
-      "identity", "layout", "choose_base", "track", "characters",
+      "identity", "layout", "choose_base", "track", "attribution", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch", "help", "package",
     ]);
   });
@@ -296,29 +302,43 @@ describe("advance: choose_base", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — track step (copy/adapt fork)
+// advance — track step → attribution; the copy/adapt fork lives at
+// "attribution" since #1901 (the fork is evaluated once the post-track
+// author/copyright questions are answered).
 // ---------------------------------------------------------------------------
 
-describe("advance: track — copy fork", () => {
-  it("copy track → project_name (side-trail)", () => {
+describe("advance: track → attribution (#1901)", () => {
+  it("copy track → attribution", () => {
     const { next } = advance("track", undefined, copyCtx);
+    expect(next).toBe("attribution");
+  });
+
+  it("adapt track → attribution", () => {
+    const { next } = advance("track", undefined, adaptCtx);
+    expect(next).toBe("attribution");
+  });
+});
+
+describe("advance: attribution — copy fork", () => {
+  it("copy track → project_name (side-trail)", () => {
+    const { next } = advance("attribution", undefined, copyCtx);
     expect(next).toBe("project_name");
   });
 
   it("copy track does NOT carry setCharactersSubStage", () => {
-    const outcome = advance("track", undefined, copyCtx);
+    const outcome = advance("attribution", undefined, copyCtx);
     expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
 
-describe("advance: track — adapt fork (US2)", () => {
+describe("advance: attribution — adapt fork (US2)", () => {
   it("adapt track → characters (skips project_name)", () => {
-    const { next } = advance("track", undefined, adaptCtx);
+    const { next } = advance("attribution", undefined, adaptCtx);
     expect(next).toBe("characters");
   });
 
   it("adapt track carries setCharactersSubStage:'prefill'", () => {
-    const outcome = advance("track", undefined, adaptCtx);
+    const outcome = advance("attribution", undefined, adaptCtx);
     expect(outcome.setCharactersSubStage).toBe("prefill");
   });
 });
@@ -475,23 +495,31 @@ describe("advance: terminals (idempotent, not called in practice)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — track step: null selectedTrack recovery (P1-B invariant guard)
+// advance — attribution step: null selectedTrack recovery (P1-B invariant
+// guard; the guard moved with the fork at #1901 — it used to sit on the
+// track case, which now forwards unconditionally)
 // ---------------------------------------------------------------------------
 
-describe("advance: track — null selectedTrack recovery", () => {
+describe("advance: attribution — null selectedTrack recovery", () => {
+  it("the track case forwards to attribution even with a null track (no fork there)", () => {
+    const outcome = advance("track", undefined, { selectedTrack: null, identitySupported: true });
+    expect(outcome.next).toBe("attribution");
+  });
+
   it("null selectedTrack defaults to copy path (project_name), not adapt", () => {
-    // TrackStepAdapter must always set selectedTrack before onComplete; null here
-    // is an invariant violation. The guard defaults to copy (project_name) — the
-    // safer fork, as it does not skip a step.
+    // The track step's completion must always record the authoring-track
+    // decision before attribution is reached; null here is an invariant
+    // violation. The guard defaults to copy (project_name) — the safer
+    // fork, as it does not skip a step.
     // Note: we do not assert console.error in this suite because vitest's spy
     // setup would require importing vi and mocking before the module loads;
     // the console.error call is documented in advance.ts and visible in test output.
-    const outcome = advance("track", undefined, { selectedTrack: null, identitySupported: true });
+    const outcome = advance("attribution", undefined, { selectedTrack: null, identitySupported: true });
     expect(outcome.next).toBe("project_name");
   });
 
   it("null selectedTrack recovery does NOT carry setCharactersSubStage", () => {
-    const outcome = advance("track", undefined, { selectedTrack: null, identitySupported: true });
+    const outcome = advance("attribution", undefined, { selectedTrack: null, identitySupported: true });
     expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
@@ -531,7 +559,9 @@ describe("advance: pure — result is ignored", () => {
 
 describe("advance: gates read the DecisionSet (spec 088 T020)", () => {
   it("adapt in the DecisionSet skips project_name even when the field says copy", () => {
-    const outcome = advance("track", undefined, {
+    // The fork is evaluated at the attribution step's completion (#1901):
+    // the project_name gate reads the DecisionSet, not the field.
+    const outcome = advance("attribution", undefined, {
       selectedTrack: "copy",
       identitySupported: true,
       touchSeedSource: null,
@@ -540,7 +570,7 @@ describe("advance: gates read the DecisionSet (spec 088 T020)", () => {
         "authoring-track": { id: "authoring-track", value: "adapt", provenance: "asked" },
       },
     });
-    expect(outcome.next).not.toBe("project_name");
+    expect(outcome.next).toBe("characters");
   });
 
   it("a recorded touch-seed-source in the DecisionSet routes mechanisms straight to touch", () => {
@@ -621,12 +651,15 @@ describe("spec 091 T021 — derived screens in the walk", () => {
   });
 
   it("a screen whose decisions are all gated off is skipped by advance (adapt skips project_name)", () => {
-    const outcome = advance("track", undefined, adaptCtx);
+    // The fork is evaluated at the attribution step (#1901): track
+    // forwards there on both tracks first.
+    expect(advance("track", undefined, adaptCtx).next).toBe("attribution");
+    const outcome = advance("attribution", undefined, adaptCtx);
     expect(outcome.next).toBe("characters");
   });
 
   it("the same screen is walked when its gate passes (copy walks project_name)", () => {
-    const outcome = advance("track", undefined, copyCtx);
+    const outcome = advance("attribution", undefined, copyCtx);
     expect(outcome.next).toBe("project_name");
     // And the walked side trail rejoins the spine at characters.
     expect(advance("project_name", undefined, copyCtx).next).toBe("characters");
@@ -636,7 +669,7 @@ describe("spec 091 T021 — derived screens in the walk", () => {
     // The characters screen has no entry in the derived screen gates (its
     // members' gates are per-question routing), so advance lands on it and
     // walks through it on BOTH tracks.
-    expect(advance("track", undefined, adaptCtx).next).toBe("characters");
+    expect(advance("attribution", undefined, adaptCtx).next).toBe("characters");
     expect(advance("characters", undefined, adaptCtx).next).toBe("marks");
     expect(advance("characters", undefined, copyCtx).next).toBe("marks");
   });

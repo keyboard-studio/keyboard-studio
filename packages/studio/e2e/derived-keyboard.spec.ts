@@ -38,6 +38,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
   buildOneCharacterList,
@@ -150,18 +151,15 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
     english: "Test",
     autonym: "Nehiyawewin",
     script: "other",
-    // Spec 092: the copyright question arrives after the track choice.
-    deferCopyright: true,
   });
   await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
   await chooseAdaptTrack(page);
 
-  // The post-track copyright question (spec 092 US1): leave blank (D1
-  // defaults it to the author) and advance.
-  const copyrightField = page.locator("#il_copyright_holder");
-  await copyrightField.waitFor({ state: "visible", timeout: 15_000 });
-  await surveyAdvance(page).click();
-  await expect(copyrightField).toBeHidden({ timeout: 15_000 });
+  // The post-track attribution step (#1901): author name (blank for a
+  // guest — type it), email blank, and the copyright holder pre-filled
+  // from the base keyboard (update track: the existing holder is
+  // preserved by default) — confirm all three as-is.
+  await driveAttributionStep(page, { authorName: "Test Author" });
 
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -221,10 +219,10 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
   // ---- Forward again through the re-completions. ----
   await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
   await chooseAdaptTrack(page);
-  const copyrightAgain = page.locator("#il_copyright_holder");
-  await copyrightAgain.waitFor({ state: "visible", timeout: 15_000 });
-  await surveyAdvance(page).click();
-  await expect(copyrightAgain).toBeHidden({ timeout: 15_000 });
+  // Re-walk through attribution: the asked records render pre-filled
+  // (author name from the first pass, holder preserved from the base) —
+  // confirm as-is.
+  await driveAttributionStep(page);
   await acceptProjectName(page);
   await forwardToCarve(page);
 

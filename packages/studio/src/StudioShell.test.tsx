@@ -129,14 +129,18 @@ function advanceToTrack() {
 
 /**
  * Drive from "identity" to "prefill" via the default Track 1 (Copy) path:
- * identity → base → track → project-name → prefill.
+ * identity → base → track → attribution (#1901) → project-name → prefill.
  *
  * Track 2 (Adapt) skips project-name; tests that need that path should
- * click "track-adapt" instead.
+ * click "track-adapt" instead (attribution still applies — it sits
+ * before the fork).
  */
 function advanceToPrefill() {
   advanceToTrack();
   fireEvent.click(screen.getByTestId("track-copy"));
+  // The attribution step's stub completes on survey-advance, like
+  // project_name's — two advances now stand between track and prefill.
+  fireEvent.click(screen.getByTestId("survey-advance"));
   fireEvent.click(screen.getByTestId("survey-advance"));
 }
 
@@ -1287,14 +1291,16 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 // require a real VFS/IR compile cycle — that belongs in a separate integration test.
 //
 // What this test covers:
-//   - Clicking "track-adapt" advances to "prefill" (skips project-name).
+//   - Clicking "track-adapt" advances to "attribution" (#1901: author/
+//     copyright are asked after the track choice, on both tracks), and
+//     from there to "prefill" (skips project-name).
 //   - The project-name stage is NOT rendered on the adapt path.
 //   - After clicking track-adapt, instantiationMode remains null (onInstantiate
 //     never fires in this mock — the routing test confirms stage progression, not
 //     store instantiation, which is covered exhaustively in workingCopyStore.test.ts).
 
 describe("SurveyView — Track 2 (adapt) routing", () => {
-  it("clicking track-adapt advances to prefill, skipping project-name", async () => {
+  it("clicking track-adapt advances through attribution to prefill, skipping project-name", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1306,13 +1312,18 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     // Click adapt (Track 2).
     fireEvent.click(screen.getByTestId("track-adapt"));
 
-    // Should be at prefill, not project-name.
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    // Should be at attribution (#1901), not project-name.
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
     expect(screen.queryByTestId("stage-track")).toBeNull();
+
+    // Advance through attribution to prefill.
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 
-  it("track-copy still advances through project-name to prefill (regression guard)", async () => {
+  it("track-copy still advances through attribution and project-name to prefill (regression guard)", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1320,9 +1331,13 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     advanceToTrack();
     fireEvent.click(screen.getByTestId("track-copy"));
 
-    // Should be at project-name, not prefill yet.
-    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    // Should be at attribution first (#1901), not project-name yet.
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
+
+    // Advance through attribution to project-name.
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
 
     // Advance through project-name.
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -1349,7 +1364,10 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
     advanceToTrack();
     fireEvent.click(screen.getByTestId("track-adapt"));
 
-    // Adapt-track lands directly on prefill (no project-name).
+    // Adapt-track lands on attribution (#1901), then prefill (no
+    // project-name).
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
 
@@ -1570,8 +1588,9 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → layout → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → help → package (M2, spec 071/075, spec 082, spec 083)", () => {
+  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → help → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
     // track is now a real manifest step (P0 fix); project_name is a derived side trail.
+    // attribution (#1901) is spine: every author walks it after the track choice.
     const spineIds = manifest
       .filter((s) => STEP_TRAILS.get(s.id)?.spine !== false)
       .map((s) => s.id);
@@ -1580,6 +1599,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "layout",
       "choose_base",
       "track",
+      "attribution",
       "characters",
       "marks",
       "punctuation",
@@ -1629,7 +1649,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1654,10 +1674,16 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-track")).toBeTruthy();
     expect(screen.queryByTestId("stage-base")).toBeNull();
 
-    // → project_name (manifest step: gated side trail, copy-track CYOA fork)
+    // → attribution (manifest step, #1901: author/copyright after the
+    // track choice)
     fireEvent.click(screen.getByTestId("track-copy"));
-    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-track")).toBeNull();
+
+    // → project_name (manifest step: gated side trail, copy-track CYOA fork)
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    expect(screen.queryByTestId("stage-attribution")).toBeNull();
 
     // → characters / prefill sub-stage (project_name rejoins at "characters")
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -1708,7 +1734,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-F")).toBeTruthy();
   });
 
-  it("adapt-track skips project_name (side trail) and lands directly on characters (P0 fix)", async () => {
+  it("adapt-track skips project_name (side trail) and lands on characters via attribution (P0 fix, #1901)", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1716,10 +1742,13 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     advanceToTrack();
     expect(screen.getByTestId("stage-track")).toBeTruthy();
 
-    // adapt-track: nextMainLineStepAfter("track") skips project_name (side trail).
+    // adapt-track: the fork now leaves from attribution (#1901) —
+    // nextMainLineStepAfter("attribution") skips project_name (side trail).
     fireEvent.click(screen.getByTestId("track-adapt"));
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
 
     // Must land on prefill (characters step), not project-name.
+    fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });

@@ -74,7 +74,7 @@ describe("runSpikeDecisionFlow", () => {
     expect(decisions["target-script"]).toMatchObject({ value: "Latn", provenance: "asked" });
   });
 
-  it("gates the not-supported branch in for Ethiopic and skips attribution", () => {
+  it("gates the not-supported branch in for Ethiopic; attribution is ungated in the runner (#1901)", () => {
     const decisions = runSpikeDecisionFlow({
       modules: spikeModules,
       baseIR: fixtureIR(["am-Ethi"]),
@@ -82,11 +82,19 @@ describe("runSpikeDecisionFlow", () => {
     });
 
     expect(decisions["target-script"]).toMatchObject({ value: "Ethi", provenance: "extracted" });
-    // il_author_name is gated out for unsupported scripts: no decision recorded.
-    expect(decisions["author-name"]).toBeUndefined();
+    // #1901: il_author_name no longer carries a derived gate (it heads the
+    // post-track attribution flow), so this runner — which has no session
+    // terminal — treats it as an ordinary unanswered question (the
+    // default-provenance record below). The live app's "a gated script is
+    // never asked attribution" protection is the session terminal in
+    // steps/advance.ts, not a module gate.
+    expect(decisions["author-name"]).toMatchObject({
+      value: undefined,
+      provenance: "default",
+    });
   });
 
-  it("gates attribution in for Latin and skips the not-supported branch", () => {
+  it("records the asked author name for Latin and skips the not-supported branch", () => {
     const decisions = runSpikeDecisionFlow({
       modules: spikeModules,
       baseIR: fixtureIR(["bam-Latn"]),

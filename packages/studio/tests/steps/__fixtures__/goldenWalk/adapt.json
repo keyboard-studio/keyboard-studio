@@ -7,8 +7,7 @@
       "advance"
     ],
     "workingCopyMutations": [
-      "recordPhase",
-      "setAttribution"
+      "recordPhase"
     ],
     "decisionMutations": [
       "recordAll"
@@ -47,11 +46,27 @@
     "applyStepCompletion": [],
     "storeMutations": [
       "recordAll",
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
+    "decisionMutations": [
+      "recordAll"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "attribution",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "recordAll",
       "advance",
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [
-      "recordPhase"
+      "recordPhase",
+      "setAttribution"
     ],
     "decisionMutations": [
       "recordAll"

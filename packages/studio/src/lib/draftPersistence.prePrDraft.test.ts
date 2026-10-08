@@ -59,8 +59,13 @@ describe("pre-reordering draft loads on the current build", () => {
     useSurveyAnswerStore.getState().reset();
   });
 
-  it("the reordering changed the order of steps, not the set of step ids", () => {
-    expect([...STEP_ORDER].sort()).toEqual([...PRE_REORDER_STEP_IDS].sort());
+  it("the reordering changed the order of steps, not the set of step ids (one deliberate addition since: attribution, #1901)", () => {
+    // The 091 reordering itself changed no ids. #1901 deliberately ADDED
+    // one step (attribution) — every pre-reordering id still exists, so a
+    // draft persisted before either change names only known steps.
+    expect([...STEP_ORDER].sort()).toEqual(
+      [...PRE_REORDER_STEP_IDS, "attribution"].sort(),
+    );
   });
 
   it("every step id the draft persists is still a known step", () => {

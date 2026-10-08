@@ -34,6 +34,7 @@ type ActiveStepId =
   | "layout"
   | "choose_base"
   | "track"
+  | "attribution"
   | "project_name"
   | "characters"
   | "carve"
@@ -217,27 +218,35 @@ export function advance(
       return { next: nextMainLineStepAfter("choose_base") }; // track
 
     case "track":
+      // #1901: both tracks continue to the attribution step — the
+      // author/copyright questions are asked after the track choice
+      // because their proposals are track-shaped. The copy/update fork
+      // is evaluated at the attribution step's completion, below.
+      return { next: "attribution" };
+
+    case "attribution":
       if (ctx.selectedTrack !== null) {
         if (stepApplies(stepById("project_name"), ctx)) {
           // Copy-track: project_name side-trail (gated on the copy track).
           return { next: "project_name" };
         }
-        // Adapt-track: skip the project_name side trail → characters.
+        // Update-track: skip the project_name side trail → characters.
         // Also signals host to call setCharactersSubStage("prefill") post-advance.
         return {
-          next: nextMainLineStepAfter("track"),  // characters
+          next: nextMainLineStepAfter("attribution"),  // characters
           setCharactersSubStage: "prefill",
         };
       } else {
-        // Invariant violation: selectedTrack is null here, but
-        // makeFlowStepComponent(trackOptions).onCommit always calls setSelectedTrack
-        // before invoking onComplete. A null at this point means something went wrong
-        // upstream. Log the violation and default to the copy path (project_name) —
-        // copy is the safer default because it does NOT skip a step. Do NOT silently
-        // route as adapt (which skips project_name and could confuse the user).
+        // Invariant violation: selectedTrack is null here, but the track
+        // step's completion recorded the authoring-track decision before
+        // this step could be reached. A null at this point means something
+        // went wrong upstream. Log the violation and default to the copy
+        // path (project_name) — copy is the safer default because it does
+        // NOT skip a step. Do NOT silently route as update (which skips
+        // project_name and could confuse the user).
         devLog.error(
-          "[advance] invariant violation: selectedTrack is null at track step. " +
-          "trackOptions.onCommit must set selectedTrack before calling onComplete. " +
+          "[advance] invariant violation: selectedTrack is null at attribution step. " +
+          "The track step must record the authoring-track decision before attribution is reached. " +
           "Defaulting to copy path (project_name) to avoid silent wrong-fork routing."
         );
         return { next: "project_name" };

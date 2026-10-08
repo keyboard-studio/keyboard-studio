@@ -2,16 +2,16 @@
  * E2E: spec 092 US1 — the series acceptance test (FR-005), run in the LIVE
  * wizard (never the demo, per the owner's words carried in the spec).
  *
- * One declaration changes: `il_copyright_holder` requires the
- * authoring-track decision. Nothing else about the question changes. On
- * the completed stack (091's derived order places the question after the
- * track choice; 092's extraction pass has run at setup) the two tracks
- * diverge at that one question:
+ * The placement is #1901's: the author/copyright questions form their own
+ * attribution step AFTER the track choice (the identity step no longer
+ * asks them), and 092's extraction pass has run at setup. The two tracks
+ * diverge at the attribution step's last question:
  *
- *   - ADAPT from basic_kbdfr: the question arrives AFTER the track choice,
+ *   - UPDATE (adapt) from basic_kbdfr: the copyright question arrives
  *     pre-filled with the base keyboard's own copyright notice —
  *     "(c) 2009-2019 SIL International" — and labelled "from basic_kbdfr".
- *     The author may still change it.
+ *     The existing holder is preserved by default; the author may still
+ *     change it, but is not prompted to re-enter it.
  *   - COPY from basic_kbdfr: the holder defaults to the author (D1); the
  *     copied notice is NOT offered for re-entry — the field is not
  *     pre-filled with it and no "from basic_kbdfr" label appears (an
@@ -20,8 +20,9 @@
  *
  * CI-GATED: per the owner's ruling, live captures run in CI; the sandbox
  * cannot navigate Playwright to localhost. Store-level evidence for the
- * same behaviours lives in src/decisions/liveExtraction.test.ts and
- * tests/steps/stepHost.liveExtraction.test.tsx.
+ * same behaviours lives in src/decisions/liveExtraction.test.ts,
+ * src/decisions/liveExtraction.stepHost.test.ts (incl. the post-#1901
+ * setup order), and steps/applyDecisionEffects.attributionCompletion.test.tsx.
  */
 import { test, expect } from "playwright/test";
 import {
@@ -40,14 +41,25 @@ const BASE_COPYRIGHT = "(c) 2009-2019 SIL International";
 async function driveToTrackChoice(page: Parameters<typeof driveIdentityLite>[0]) {
   await seedReturningVisitor(page);
   await page.goto("/");
-  // Identity minus the copyright question: with FR-005's requires edge it
-  // no longer renders in the identity sequence.
-  await driveIdentityLite(page, {
-    languageCode: "fr",
-    authorName: "Test Author",
-    deferCopyright: true,
-  });
+  // Identity carries no author/copyright questions anymore (#1901) — they
+  // are the attribution step's, after the track choice.
+  await driveIdentityLite(page, { languageCode: "fr" });
   await pickBaseKeyboard(page, "basic_kbdfr");
+}
+
+/**
+ * Answer the attribution step's first two questions (author name, then
+ * the optional email left blank) so the walk stands on the copyright
+ * question — the subject of both tests below.
+ */
+async function driveToCopyrightQuestion(page: Parameters<typeof driveIdentityLite>[0]) {
+  const nameField = page.locator("#il_author_name");
+  await nameField.waitFor({ state: "visible", timeout: 15_000 });
+  await nameField.fill("Test Author");
+  await surveyAdvance(page).click();
+  const emailField = page.locator("#il_author_email");
+  await emailField.waitFor({ state: "visible", timeout: 15_000 });
+  await surveyAdvance(page).click();
 }
 
 test("spec 092 US1 (adapt): copyright question arrives after the track choice, pre-filled from the base keyboard", async ({
@@ -55,8 +67,10 @@ test("spec 092 US1 (adapt): copyright question arrives after the track choice, p
 }) => {
   await driveToTrackChoice(page);
   await chooseAdaptTrack(page);
+  await driveToCopyrightQuestion(page);
 
-  // The question arrives now — after the track choice, not in identity.
+  // The question arrives now — in the post-track attribution step, not in
+  // identity.
   const field = page.locator("#il_copyright_holder");
   await field.waitFor({ state: "visible", timeout: 15_000 });
 
@@ -88,6 +102,7 @@ test("spec 092 US1 (copy): holder defaults to the author; the copied notice is n
 }) => {
   await driveToTrackChoice(page);
   await chooseTrackCopy(page);
+  await driveToCopyrightQuestion(page);
 
   const field = page.locator("#il_copyright_holder");
   await field.waitFor({ state: "visible", timeout: 15_000 });

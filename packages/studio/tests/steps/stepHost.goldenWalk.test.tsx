@@ -463,7 +463,8 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 
 /**
  * Drive the full copy-track walk.
- * identity -> layout -> choose_base -> track(copy) -> project_name ->
+ * identity -> layout -> choose_base -> track(copy) -> attribution ->
+ * project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
@@ -490,6 +491,9 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-copy" },
+    // #1901: author/copyright are asked here now (FlowStepHost stub emits
+    // the same answers the identity stub used to).
+    { stepId: "attribution", testId: "survey-advance" },
     { stepId: "project_name", testId: "survey-advance" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     // marks skips transparently inside this window, landing on punctuation.
@@ -515,7 +519,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 
 /**
  * Drive the full adapt-track walk.
- * identity -> layout -> choose_base -> track(adapt) ->
+ * identity -> layout -> choose_base -> track(adapt) -> attribution ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
@@ -529,6 +533,7 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
+    { stepId: "attribution", testId: "survey-advance" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     // marks skips transparently inside this window, landing on punctuation.
     { stepId: "characters/B", testId: "phase-b-done", settleFor: "punctuation-done" },

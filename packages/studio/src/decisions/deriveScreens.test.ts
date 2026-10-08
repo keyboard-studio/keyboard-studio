@@ -290,6 +290,8 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "layout",
       "choose_base",
       "track",
+      // #1901: the author/copyright screen walks after the track choice.
+      "attribution",
       "project_name",
       "characters",
       "marks",
@@ -304,6 +306,23 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "touch",
       "help",
     ]);
+  });
+
+  it("attribution screen: ungated spine screen holding the author trio (#1901)", () => {
+    const attribution = screens.find((s) => s.id === "attribution")!;
+    expect(attribution.kind).toBe("question");
+    expect(attribution.spine).toBe(true);
+    expect(attribution.gatedBy).toBeUndefined();
+    expect(attribution.decisionIds).toEqual([
+      "author-name",
+      "author-email",
+      "copyright-holder",
+    ]);
+    // And the identity screen no longer holds them.
+    const identity = screens.find((s) => s.id === "identity")!;
+    expect(identity.decisionIds).not.toContain("author-name");
+    expect(identity.decisionIds).not.toContain("author-email");
+    expect(identity.decisionIds).not.toContain("copyright-holder");
   });
 
   it("frozen trail: project_name is a gated side trail joining characters", () => {

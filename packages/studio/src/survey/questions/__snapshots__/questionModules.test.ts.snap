@@ -16,7 +16,7 @@ exports[`live question modules > a/il_language_region.ts > definition contract 1
 
 exports[`live question modules > a/il_script_not_supported.ts > definition contract 1`] = `"notice | optional | next null | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > a/il_target_script.ts > definition contract 1`] = `"select | required | next [value == 'Ethi' or value == 'Hani' or value == 'Hang' -> il_script_not_supported; (default) -> il_author_name] | options [Latn, romanization-Latn, fonipa, Arab, Hebr, Deva, Cyrl, Grek, Geor, Armn, Ethi, Hani, Hang, other] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+exports[`live question modules > a/il_target_script.ts > definition contract 1`] = `"select | required | next [value == 'Ethi' or value == 'Hani' or value == 'Hang' -> il_script_not_supported] | options [Latn, romanization-Latn, fonipa, Arab, Hebr, Deva, Cyrl, Grek, Geor, Armn, Ethi, Hani, Hang, other] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > b/pb_additional_methods.ts > definition contract 1`] = `"radio | optional | next [value == 'text-sample' -> pb_text_sample; value == 'linguist' -> pb_linguist_confirm; value == 'picker' -> pb_picker_confirm; (default) -> null] | options [text-sample, linguist, picker, done] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 

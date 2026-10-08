@@ -16,10 +16,12 @@ export const fakeIdentity = {
 export const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
 
 /**
- * The identity phase result the IdentityLite stub completes with — the seven
+ * The identity phase result the IdentityLite stub completes with — the four
  * identity answers matching fakeIdentity, so the decisions recorded at
  * completion derive the same identity result (spec 089: nothing stores the
  * identity object itself anymore; it is derived from these answers' records).
+ * #1901: the author/copyright answers are NOT here anymore — they are the
+ * attribution step's completion (fakeAttributionPhaseResult below).
  */
 export const fakeIdentityPhaseResult = {
   phase: "A" as const,
@@ -28,6 +30,19 @@ export const fakeIdentityPhaseResult = {
     { questionId: "il_language_english", answerType: "text" as const, value: "English" },
     { questionId: "il_language_code", answerType: "text" as const, value: "en" },
     { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
+  ],
+  confirmedInventory: [],
+};
+
+/**
+ * The attribution phase result the FlowStepHost stub completes with (#1901)
+ * — the same author/copyright answers the identity stub used to emit, now
+ * from the post-track attribution step, so the golden walks record the
+ * same decisions and land the same attribution, one step later.
+ */
+export const fakeAttributionPhaseResult = {
+  phase: "G" as const,
+  answers: [
     { questionId: "il_author_name", answerType: "text" as const, value: "Test Author" },
     { questionId: "il_author_email", answerType: "text" as const, value: "author@example.org" },
     { questionId: "il_copyright_holder", answerType: "text" as const, value: "Test Author" },

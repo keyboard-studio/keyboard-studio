@@ -87,6 +87,7 @@ import {
   driveIdentityLite as driveIdentityLiteBase,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   driveMechanismsGallery,
@@ -415,6 +416,7 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await driveIdentityLite(page, { autonym: "Piaroa", code: "pid", script: "Latn" });
     await pickBaseKeyboard(page, PIAROA_BASE_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
 
     // Spec 057 FR-072: a mid-walk tab round trip, folded into an existing long
@@ -549,6 +551,7 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
     await driveIdentityLite(page, { autonym: "Bamanankan", code: "bm", script: "Latn" });
     await pickBaseKeyboard(page, BAMBARA_BASE_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 

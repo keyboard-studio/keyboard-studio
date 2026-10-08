@@ -216,7 +216,21 @@ describe("section marks — one per non-active manifest step", () => {
   });
 
   it("every manifest step up to and including 'help' earns exactly one mark on this author's path", () => {
-    const dots = buildProgressDots({ record: recordOf([]), ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    // #1901: the author's history runs through the attribution step
+    // (track -> attribution -> characters on this adapt path) — a
+    // traversal that reached characters without it can no longer occur,
+    // and a behind-active step absent from history reads as not-on-path.
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({
+        traversal: traversal({
+          activeStepId: "characters",
+          history: ["identity", "layout", "choose_base", "track", "attribution"],
+          selectedTrack: "adapt",
+        }),
+      }),
+      lookupQuestionLabel: stubLabel,
+    });
     // "adapt" skips project_name (FR-049a) — every OTHER on-path step has a mark.
     const onPathIds = manifest
       .filter((s) => s.id !== "project_name" && s.id !== "package")

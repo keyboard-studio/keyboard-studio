@@ -32,6 +32,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseTrackCopy,
+  driveAttributionStep,
   chooseAdaptTrack,
   acceptProjectName,
   confirmPrefill,
@@ -353,6 +354,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await fillIdentityLite(page);
     await pickBaseKeyboardCopyEdit(page);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -406,6 +408,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await fillIdentityLite(page);
     await pickBaseKeyboardCopyEdit(page);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
 
@@ -423,6 +426,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await fillIdentityLite(page);
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -467,6 +471,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     });
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -561,6 +566,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     });
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await completePhaseB(page);
     await finishGalleryWork(page);
@@ -599,6 +605,7 @@ async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
   await fillIdentityLite(page, fx);
   await pickBaseKeyboardCopyEdit(page, fx);
   await chooseTrackCopy(page);
+  await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
 
@@ -750,6 +757,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     await fillIdentityLite(page);
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page); // "Done" advances the traversal to "carve".

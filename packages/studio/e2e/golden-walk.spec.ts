@@ -6,10 +6,12 @@
  *
  * THE WALK (fixed answers — changing any of them re-baselines the fixture):
  *   identity-lite: english "Test", autonym "Test Autonym", language code
- *     "fr", target script "other", author "Test Author" (the driveIdentityLite
- *     defaults + languageCode "fr" — the same fixture spec 088's SC-001 walk
- *     uses)
+ *     "fr", target script "other" (the driveIdentityLite defaults +
+ *     languageCode "fr" — the same fixture spec 088's SC-001 walk uses)
  *     -> layout confirm -> base picker (basic_kbdfr) -> track (copy)
+ *       -> attribution (#1901): author "Test Author", email + holder blank
+ *         (the driveAttributionStep defaults — the same ANSWERS the walk
+ *         always gave, at their post-track position)
  *       -> project name (accept the pre-fill) -> prefill confirm
  *         -> characters: build-list method, add "é" (marks / punctuation /
  *            invisibles / convenience accepted as proposed). NOTE:
@@ -68,6 +70,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseTrackCopy,
+  driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
   buildOneCharacterList,
@@ -95,9 +98,10 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
   await seedReturningVisitor(page);
   await page.goto("/");
 
-  await driveIdentityLite(page, { languageCode: "fr", authorName: "Test Author" });
+  await driveIdentityLite(page, { languageCode: "fr" });
   await pickBaseKeyboard(page, "basic_kbdfr");
   await chooseTrackCopy(page);
+  await driveAttributionStep(page, { authorName: "Test Author" });
   await acceptProjectName(page);
   await confirmPrefill(page);
 

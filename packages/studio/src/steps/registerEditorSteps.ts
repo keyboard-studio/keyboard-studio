@@ -34,6 +34,7 @@ import {
 } from "../editors/adapters/panelAdapters.tsx";
 import {
   TrackStepFactoryComponent,
+  AttributionStepFactoryComponent,
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
 } from "../editors/adapters/flowStepOptions.tsx";
@@ -122,6 +123,25 @@ export const trackStep: EditorStep = step({
   component: TrackStepFactoryComponent,
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
   specRef: ["§8", "specs/018-qu-wire-track"],
+  persistence: "answer-store",
+});
+
+/**
+ * Attribution step: author name / email / copyright holder (#1901).
+ * Asked AFTER the track choice, on both tracks — what the questions
+ * propose is track-shaped (profile confirmation on copy; the base's
+ * copyright holder seeded by the extraction pass on update). The
+ * questions were the identity step's tail until #1901; their decisions
+ * (author-name / author-email / copyright-holder) and the attribution
+ * apply are unchanged — only the placement moved. No IR leaf is written
+ * by the step itself: the attribution lands via the recorded decisions
+ * (il_copyright_holder's apply, StepHost's applyDecisionEffects).
+ */
+export const attributionStep: EditorStep = step({
+  id: "attribution",
+  title: "Author & Copyright",
+  component: AttributionStepFactoryComponent,
+  specRef: ["§8", "specs/064-keyboard-attribution"],
   persistence: "answer-store",
 });
 
@@ -313,6 +333,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   identityStep,
   chooseBaseStep,
   trackStep,
+  attributionStep,
   projectNameStep,
   carveStep,
   deadkeysStep,

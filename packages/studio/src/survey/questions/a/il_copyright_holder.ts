@@ -1,9 +1,9 @@
-// Per-question module: il_copyright_holder (identity-lite, spec 064 US1)
+// Per-question module: il_copyright_holder (attribution flow — spec 064 US1, moved post-track by #1901)
 //
 // See il_author_name.ts for why identity-lite uses its own ids rather than
 // reviving the demoted phase_a modules directly.
 //
-// TERMINAL for identity-lite (`next: null`), whereas the demoted
+// TERMINAL for the attribution flow (`next: null`), whereas the demoted
 // pa_copyright_holder continues to provenance_opt_in. That divergence is exactly
 // why a separate id is needed.
 //

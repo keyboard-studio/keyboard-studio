@@ -270,9 +270,10 @@ function useRoute(): RouteId {
 //   project_name  — copy-track CYOA fork; rejoins at "characters"
 //   touch_seed_source — touch-seed fork; rejoins at "touch"
 //
-// Track/project_name routing:
-//   copy-track:  choose_base → track → project_name → characters
-//   adapt-track: choose_base → track → (skip project_name) → characters
+// Track/project_name routing (#1901: the attribution step sits between
+// track and the fork — author/copyright are asked after the track choice):
+//   copy-track:  choose_base → track → attribution → project_name → characters
+//   adapt-track: choose_base → track → attribution → (skip project_name) → characters
 //
 // Characters internal flow (intra-phase — not manifest steps):
 //   prefill → B-questions

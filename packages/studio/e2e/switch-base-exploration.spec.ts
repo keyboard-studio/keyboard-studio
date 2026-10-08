@@ -20,6 +20,7 @@ import { join } from "node:path";
 import {
   driveIdentityLite,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   seedReturningVisitor,
@@ -303,6 +304,7 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   if (level === "L3-base-confirmed") return;
 
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
   await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 30_000 });
   h.note("track chosen (adapt); at prefill confirmation");
   if (level === "L4-track-chosen") return;

@@ -46,6 +46,7 @@ import { loadFlowSourceDef, screenIdForFlow } from "../../steps/flowSources.ts";
 import { flowSources } from "../../steps/flowSources.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { selectTrack, useDecisionStore } from "../../stores/decisionStore.ts";
+import { useGitHubAuth } from "../../hooks/useGitHubAuth.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { DecisionSet } from "../../decisions/decisionTypes.ts";
 import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
@@ -109,6 +110,15 @@ export interface FlowStepDeps {
    * group on arrival (flowStepOptions.tsx).
    */
   selectedTrack: "copy" | "adapt" | null;
+  /**
+   * The authenticated author's profile (spec 064 D7), or nulls for a
+   * guest / a profile that does not publish them. Read once here (the
+   * factory owns all hook access, C2.5) for the options records whose
+   * seeders evaluate profile lookup defaults — the attribution flow's
+   * author name / email (#1901): the modules declare the rule
+   * (`lookupDefault`); the seed callback only supplies this input.
+   */
+  authorProfile: { name: string | null; email: string | null };
   /**
    * The working copy's currently-derived HISTORY-entry proposal state
    * (spec 079 US5), or `null` before it has ever been derived.
@@ -242,6 +252,10 @@ export function makeFlowStepComponent<Extracted>(
     const surveyContext = deriveSurveyContext(decisions);
     const selectedTrack = selectTrack(decisions);
     const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
+    // The profile seed source for the attribution flow's lookup defaults
+    // (#1901) — the same hook IdentityLiteAdapter reads; nulls for a
+    // guest mean ASK, never a substituted handle (spec 064 D7).
+    const { authorName, authorEmail } = useGitHubAuth();
 
     // Unconditional hook call (hooks must not be conditional). When the flow
     // does not use findings, the derived record is computed but ignored below.
@@ -264,6 +278,7 @@ export function makeFlowStepComponent<Extracted>(
       displayNameRef,
       selectedTrack,
       historyEntryState,
+      authorProfile: { name: authorName, email: authorEmail },
     };
 
     // Fires once per mount (C2.5 — store access confined to this factory).

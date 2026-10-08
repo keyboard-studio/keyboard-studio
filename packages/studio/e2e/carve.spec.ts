@@ -65,6 +65,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   confirmMechanismsEmpty,
@@ -162,6 +163,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     });
     await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 
@@ -334,6 +336,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     });
     await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 

@@ -241,12 +241,9 @@ const IDENTITY_PHASE_RESULT = {
     { questionId: "il_language_english", answerType: "text" as const, value: "Hausa" },
     { questionId: "il_language_code", answerType: "text" as const, value: "ha" },
     { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
-    // spec 064 US1: identity-lite continues into attribution, so a genuinely
-    // COMPLETED result includes these. Without them, resume correctly lands on
-    // the first unanswered attribution question rather than the flow's end.
-    { questionId: "il_author_name", answerType: "text" as const, value: "Alice Example" },
-    { questionId: "il_author_email", answerType: "text" as const, value: "alice@example.org" },
-    { questionId: "il_copyright_holder", answerType: "text" as const, value: "Hausa Language Committee" },
+    // #1901: a genuinely COMPLETED identity result ends here — the
+    // author/copyright answers (spec 064 US1) are the attribution step's
+    // completion now, recorded under that step, not this one.
   ],
 };
 
@@ -273,8 +270,8 @@ describe("IdentityLiteAdapter — resume from recorded decisions (spec 089)", ()
 
     render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
 
-    // spec 064 US1: the flow's last question is now the copyright holder.
-    expect(screen.getByText("Who holds the copyright, if not you?")).toBeDefined();
+    // #1901: the flow's last question is the target script again.
+    expect(screen.getByText("Which script will THIS keyboard type?")).toBeDefined();
     expect(
       screen.queryByText("What is your language called in your own language?"),
     ).toBeNull();
@@ -285,9 +282,11 @@ describe("IdentityLiteAdapter — resume from recorded decisions (spec 089)", ()
 
     render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
 
-    // The resumed flow shows the last question with its recorded answer.
-    expect(screen.getByText("Who holds the copyright, if not you?")).toBeDefined();
-    expect(screen.getByDisplayValue("Hausa Language Committee")).toBeDefined();
+    // The resumed flow shows the last question (target script) with its
+    // recorded answer restored — Finish is available directly.
+    expect(screen.getByText("Which script will THIS keyboard type?")).toBeDefined();
+    const advance = screen.getByTestId("survey-advance") as HTMLButtonElement;
+    expect(advance.disabled).toBe(false);
   });
 
   it("completion writes NOTHING to any store — it forwards the result untouched (spec 089)", () => {
@@ -303,8 +302,9 @@ describe("IdentityLiteAdapter — resume from recorded decisions (spec 089)", ()
     // recordAnswersAsDecisions + applyDecisionEffects run there).
     const forwarded = onComplete.mock.calls[0]![0] as { phase: string; answers: unknown[] };
     expect(forwarded.phase).toBe("A");
-    // 4 -> 7: spec 064 US1 appends the three attribution answers.
-    expect(forwarded.answers.length).toBe(7);
+    // The four identity answers — the attribution trio is the attribution
+    // step's own completion (#1901), not appended here.
+    expect(forwarded.answers.length).toBe(4);
     // And the session store carries no identity residue from the adapter:
     // the fields it used to write no longer exist at all (T017).
     const session = useSurveySessionStore.getState();

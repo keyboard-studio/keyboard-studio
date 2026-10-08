@@ -33,7 +33,6 @@
 
 import { useMemo } from "react";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { useGitHubAuth } from "../../hooks/useGitHubAuth.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { GalleryHost } from "../../steps/galleryHost.tsx";
@@ -65,8 +64,9 @@ import {
 // used to write (identityResult, surveyContext, identityPhaseResult) and
 // the working-copy attribution write are all derived or applied at the
 // host boundary now. What the adapter still owns is presentation wiring:
-// the decision-derived context, the authenticated-profile seed, and the
-// decision-derived resume payload.
+// the decision-derived context and the decision-derived resume payload.
+// (#1901: the authenticated-profile seed moved to the attribution step's
+// flow factory — attribution is asked after the track choice now.)
 // ---------------------------------------------------------------------------
 
 export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
@@ -76,10 +76,6 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
   const surveyContext = deriveSurveyContext(decisions);
   // Derive per-question findings from the V3 store bridge (spec-014).
   const findingsByQuestionId = useValidatorFindings();
-  // Only the profile fields are read here; the auth STATUS is irrelevant to
-  // identity capture, and a guest simply gets no seed (D6 then requires a typed
-  // name before emission).
-  const { authorName, authorEmail } = useGitHubAuth();
   // Prior completed run, rebuilt from the decisions — lets a history pop back
   // onto this step resume the flow at its last question instead of replaying
   // from question 1.
@@ -94,9 +90,6 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
 
   return (
     <IdentityLite
-      // spec 064 D7: pre-fill attribution from the authenticated profile so the
-      // author confirms rather than types. Absent fields fall through to asking.
-      authorSeed={{ name: authorName, email: authorEmail }}
       context={surveyContext}
       onComplete={handleComplete}
       findingsByQuestionId={findingsByQuestionId}

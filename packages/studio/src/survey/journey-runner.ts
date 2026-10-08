@@ -122,6 +122,7 @@ export type { ReplayResult } from "./journeyFixture.ts";
 const STEP_FLOW_IDS: Readonly<Record<string, string>> = {
   identity: "identity_lite",
   track: "track",
+  attribution: "attribution",
   project_name: "project_name",
   characters: "phase_b_characters",
   help: "phase_f_helpdocs",
@@ -582,6 +583,18 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
             track: trackValue,
           };
           applyStepCompletion(CHOOSE_BASE_STEP_ID, instantiateResult, deps);
+          result = phaseResult;
+          break;
+        }
+
+        case "attribution": {
+          // #1901: the author/copyright flow, replayed exactly like the
+          // other survey flows (identity / project_name) — walk the flow
+          // from the fixture's answers and record the phase result.
+          const answers = answerMapFromGroup(group, "attribution");
+          const walked = walkFlowFromAnswers(STEP_FLOW_IDS["attribution"]!, surveyContext, answers);
+          const phaseResult: SurveyPhaseResult = { phase: walked.phase, answers: walked.answers };
+          useWorkingCopyStore.getState().recordPhase(phaseResult);
           result = phaseResult;
           break;
         }

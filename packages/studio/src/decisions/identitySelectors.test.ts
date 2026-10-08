@@ -55,8 +55,25 @@ const FULL_RESULT: SurveyPhaseResult = {
 };
 
 describe("deriveIdentityResult", () => {
-  it("matches extractIdentityLite field-for-field on the full identity set", () => {
-    expect(deriveIdentityResult(decisions(FULL))).toEqual(extractIdentityLite(FULL_RESULT));
+  it("matches extractIdentityLite on the identity fields, plus the decision-composed attribution", () => {
+    // #1901: extractIdentityLite no longer carries attribution (the
+    // questions left its flow; its `attribution` is null by construction).
+    // The derived result is the extracted identity PLUS the attribution
+    // composed from the attribution decisions — including records a
+    // pre-#1901 draft stamped under the identity step, since the
+    // selectors are keyed by decision id, not by step.
+    const derived = deriveIdentityResult(decisions(FULL));
+    const extracted = extractIdentityLite(FULL_RESULT);
+    expect(extracted.attribution).toBeNull();
+    expect(derived).toEqual({
+      ...extracted,
+      attribution: {
+        authorName: "Test Author",
+        authorEmail: "author@example.org",
+        // FULL's copyright-holder is "" — D1 defaults it to the author.
+        copyrightHolder: "Test Author",
+      },
+    });
   });
 
   it("is null before the target script is recorded (identity not completed)", () => {
@@ -165,7 +182,11 @@ describe("deriveIdentityResume", () => {
       answerType: "text",
       value: "fr",
     });
-    expect(resume?.answers).toHaveLength(8);
+    // #1901: only the five identity questions — FULL's author/copyright
+    // records belong to the attribution step now and are NOT replayed
+    // into the identity flow (they still compose attribution above).
+    expect(resume?.answers).toHaveLength(5);
+    expect(resume?.answers.map((a) => a.questionId)).not.toContain("il_author_name");
   });
 
   it("is null when no identity answer is recorded", () => {

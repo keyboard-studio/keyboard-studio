@@ -1,4 +1,4 @@
-// Per-question module: il_author_email (identity-lite, spec 064 US1)
+// Per-question module: il_author_email (attribution flow — spec 064 US1, moved post-track by #1901)
 //
 // See il_author_name.ts for why identity-lite uses its own ids rather than
 // reviving the demoted phase_a modules directly.

@@ -2,8 +2,9 @@
 //   - toResumeAnswers(): exhaustive per-answerType flattening of a completed
 //     SurveyPhaseResult into SurveyRunner's resumeAnswers shape.
 //   - DOM: rendering IdentityLite with a `resume` payload mounts the flow on
-//     its LAST question (il_copyright_holder since spec 064) with the recorded
-//     answer restored,
+//     its LAST question (il_target_script since #1901 moved the author/
+//     copyright questions to the post-track attribution step) with the
+//     recorded answer restored,
 //     Back walks to the prior question with its value, and Finish re-completes
 //     with the same extracted identity.
 
@@ -32,12 +33,6 @@ const COMPLETED: SurveyPhaseResult = {
     { questionId: "il_language_english", answerType: "text", value: "Hausa" },
     { questionId: "il_language_code", answerType: "text", value: "ha" },
     { questionId: "il_target_script", answerType: "select", value: "Latn" },
-    // spec 064 US1: the identity flow now continues into attribution, so a
-    // genuinely COMPLETED run includes these. Without them, resume correctly
-    // lands on the first unanswered attribution question instead of the end.
-    { questionId: "il_author_name", answerType: "text", value: "Alice Example" },
-    { questionId: "il_author_email", answerType: "text", value: "alice@example.org" },
-    { questionId: "il_copyright_holder", answerType: "text", value: "Hausa Language Committee" },
   ],
 };
 
@@ -54,12 +49,6 @@ const COMPLETED_AMBIGUOUS: SurveyPhaseResult = {
     { questionId: "il_language_english", answerType: "text", value: "Afar" },
     { questionId: "il_language_autonym", answerType: "text", value: "Qafar" },
     { questionId: "il_target_script", answerType: "select", value: "Latn" },
-    // spec 064 US1: the identity flow now continues into attribution, so a
-    // genuinely COMPLETED run includes these. Without them, resume correctly
-    // lands on the first unanswered attribution question instead of the end.
-    { questionId: "il_author_name", answerType: "text", value: "Alice Example" },
-    { questionId: "il_author_email", answerType: "text", value: "alice@example.org" },
-    { questionId: "il_copyright_holder", answerType: "text", value: "Hausa Language Committee" },
   ],
 };
 
@@ -74,10 +63,6 @@ describe("toResumeAnswers", () => {
       il_language_english: "Hausa",
       il_language_code: "ha",
       il_target_script: "Latn",
-      // spec 064 US1 — attribution is part of a completed identity run.
-      il_author_name: "Alice Example",
-      il_author_email: "alice@example.org",
-      il_copyright_holder: "Hausa Language Committee",
     });
   });
 
@@ -123,10 +108,11 @@ describe("toResumeAnswers", () => {
 // ---------------------------------------------------------------------------
 
 describe("IdentityLite — resume", () => {
-  // spec 064 US1: the last question is now the copyright holder, not the script.
-  it("mounts on the LAST question (copyright holder) with the answer restored", () => {
+  // #1901: the last question is the target script again — the author/
+  // copyright questions moved to the post-track attribution step.
+  it("mounts on the LAST question (target script) with the answer restored", () => {
     render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />, { withStepNav: true });
-    expect(screen.getByText("Who holds the copyright, if not you?")).toBeTruthy();
+    expect(screen.getByText("Which script will THIS keyboard type?")).toBeTruthy();
     expect(
       screen.queryByText("What is your language called in your own language?"),
     ).toBeNull();
@@ -139,11 +125,11 @@ describe("IdentityLite — resume", () => {
   it("Back from the resumed last question restores the prior answer", () => {
     render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("survey-back"));
-    // Flow order: english → autonym → code → target_script → author name →
-    // author email → copyright holder (spec 064 US1). Back from the last
-    // question (copyright holder) lands on il_author_email with its restored
-    // value; assert on the display value rather than the input role.
-    expect(screen.getByDisplayValue("alice@example.org")).toBeTruthy();
+    // Flow order: english → region? → autonym → code → target_script. Back
+    // from the last question (target script) lands on il_language_code with
+    // its restored value; assert on the display value rather than the
+    // input role.
+    expect(screen.getByDisplayValue("ha")).toBeTruthy();
   });
 
   it("Finish on a resumed flow re-completes with the same extracted identity", () => {
@@ -153,21 +139,20 @@ describe("IdentityLite — resume", () => {
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(onComplete).toHaveBeenCalledTimes(1);
     const [result, identity] = onComplete.mock.calls[0]!;
-    expect(identity.bcp47).toBe("ha-Latn");
+    // Through the composer, not a spelled-out tag (the region test below
+    // documents why): whether the canonical form elides the script subtag
+    // depends on the langtags chunk having loaded this session, and the
+    // post-#1901 walk reaches Finish before it reliably has.
+    expect(identity.bcp47).toBe(buildTargetBcp47("ha", "Latn", ""));
     expect(identity.autonym).toBe("Hausa");
     expect(identity.supported).toBe(true);
-    // spec 064 US1: attribution survives the resume round-trip.
-    expect(identity.attribution).toEqual({
-      authorName: "Alice Example",
-      authorEmail: "alice@example.org",
-      copyrightHolder: "Hausa Language Committee",
-    });
+    // #1901: the identity result no longer carries attribution — it is
+    // composed from the attribution decisions at the store level
+    // (decisions/identitySelectors.ts, covered by its own suite).
+    expect(identity.attribution).toBeNull();
     // The replayed result carries every original answer exactly once.
     const ids = result.answers.map((a) => a.questionId);
     expect(ids.sort()).toEqual([
-      "il_author_email",
-      "il_author_name",
-      "il_copyright_holder",
       "il_language_autonym",
       "il_language_code",
       "il_language_english",
