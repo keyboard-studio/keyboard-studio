@@ -15,11 +15,13 @@
 //     "Test Keyboard" + project_keyboard_id "test_keyboard"; the host
 //     records the project decisions and project_keyboard_id's apply lands
 //     setIdentity on the working copy.
+//   attribution (#1901): survey-advance completes with the author/copyright
+//     answers the identity stub used to emit before the move.
 //   phase_f_helpdocs: survey-advance completes with an empty phase result.
 //
 // Any other flow renders an inert `flow-stub-<id>` marker.
 
-import { fakePhaseResult } from "./fakes.ts";
+import { fakeAttributionPhaseResult, fakePhaseResult } from "./fakes.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 const PROJECT_NAME_RESULT = {
@@ -40,8 +42,9 @@ export function FlowStepHost({
   onComplete: (result: unknown) => void;
   onBack?: () => void;
 }) {
-  const stubbed = ["track", "project_name", "phase_f_helpdocs"].includes(flow.flow_id);
+  const stubbed = ["track", "attribution", "project_name", "phase_f_helpdocs"].includes(flow.flow_id);
   const advance: Record<string, () => void> = {
+    attribution: () => onComplete(fakeAttributionPhaseResult),
     project_name: () => onComplete(PROJECT_NAME_RESULT),
     phase_f_helpdocs: () => onComplete(fakePhaseResult),
   };
@@ -88,6 +91,7 @@ export function FlowStepHost({
       </div>
     );
   }
+  if (flow.flow_id === "attribution") return <div data-testid="stage-attribution" />;
   if (flow.flow_id === "project_name") return <div data-testid="stage-project-name" />;
   if (flow.flow_id === "phase_f_helpdocs") return <div data-testid="stage-F" />;
   return <div data-testid={`flow-stub-${flow.flow_id}`} />;

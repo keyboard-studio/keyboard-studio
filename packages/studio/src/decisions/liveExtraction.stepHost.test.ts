@@ -110,4 +110,44 @@ describe("live extraction at setup (real stores, real registry)", () => {
     const record = useDecisionStore.getState().decisions["copyright-holder"];
     expect(record).toBeUndefined();
   });
+
+  // #1901: the author name is now recorded at the attribution step, AFTER
+  // setup — driveSetup above keeps the legacy order (a restored pre-#1901
+  // draft's asked record). The seed must not depend on that order: the
+  // pass gates on seedWhen + reachability, not on `requires` satisfaction.
+  it("(5) post-#1901 order (no author-name at setup) → the holder still seeds on the update track", () => {
+    const decisions = useDecisionStore.getState();
+    useWorkingCopyStore.getState().instantiateFromBase(catalogEntry(), {
+      vfs: createVirtualFS([]),
+      ir: bundleIR(COPYRIGHT),
+    });
+    decisions.record({
+      id: "base-keyboard",
+      value: { id: "basic_kbdfr" },
+      provenance: "asked",
+    });
+    decisions.record({ id: "authoring-track", value: "adapt", provenance: "asked" });
+    runLiveExtractionFromStores();
+    const record = useDecisionStore.getState().decisions["copyright-holder"];
+    expect(record?.value).toBe(COPYRIGHT);
+    expect(record?.provenance).toBe("extracted");
+    // The inputs snapshot carries only the facts recorded at pass time.
+    expect(record?.inputs).toEqual({ "authoring-track": "adapt" });
+  });
+
+  it("(6) post-#1901 order, copy track → no seed (the copied notice is not proposed)", () => {
+    const decisions = useDecisionStore.getState();
+    useWorkingCopyStore.getState().instantiateFromBase(catalogEntry(), {
+      vfs: createVirtualFS([]),
+      ir: bundleIR(COPYRIGHT),
+    });
+    decisions.record({
+      id: "base-keyboard",
+      value: { id: "basic_kbdfr" },
+      provenance: "asked",
+    });
+    decisions.record({ id: "authoring-track", value: "copy", provenance: "asked" });
+    runLiveExtractionFromStores();
+    expect(useDecisionStore.getState().decisions["copyright-holder"]).toBeUndefined();
+  });
 });

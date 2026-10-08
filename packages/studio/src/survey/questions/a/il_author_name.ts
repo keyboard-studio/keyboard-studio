@@ -57,16 +57,18 @@ const mod: QuestionModule = {
   // is the session terminal instead — advance("identity") routes a gated
   // script to "unsupported", so this step is never reached for one.
   provides: ["author-name"],
-  requires: ["target-script"],
-  // #1901: the attribution screen walks AFTER the track choice — what
-  // the trio proposes depends on the track (profile confirmation on
-  // copy; the base's copyright seeded on update). Declared as a
-  // SCREEN-order requirement, not a module `requires` — the same
-  // treatment track_choice gives its base-keyboard edge and
-  // project_display_name gives this very decision: deriveScreens folds
-  // it into the full-list sort only, so this flow's own per-flow sort
-  // (orderParity) never sees an edge it cannot resolve.
-  screenRequires: ["authoring-track"],
+  // #1901: BOTH of this question's order facts are cross-screen now —
+  // the supported-script decision (settled by the identity screen) and
+  // the track choice the attribution screen walks after (what the trio
+  // proposes depends on it: profile confirmation on copy; the base's
+  // copyright seeded on update). Declared as SCREEN-order requirements,
+  // not module `requires` — the same treatment track_choice gives its
+  // base-keyboard edge and project_display_name gives the track edge:
+  // deriveScreens folds them into the full-list sort only, so this
+  // flow's own per-flow sort (orderParity) never sees an edge it cannot
+  // resolve in-flow. (In identity_lite, target-script was an in-flow
+  // `requires`; the move is what reclassifies it.)
+  screenRequires: ["target-script", "authoring-track"],
   // Spec 092 (T033): the stored author profile's name as a lookup default
   // (spec 064 FR-001: propose-then-confirm, never a blank form). Absent
   // when the profile has no name — ASK rather than substitute the login

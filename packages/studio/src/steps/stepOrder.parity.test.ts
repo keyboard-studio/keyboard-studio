@@ -262,7 +262,11 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //   - attribution (#1901 amendment) is ordered only against identity
     //     (target-script) and track (authoring-track, via screenRequires);
     //     nothing downstream requires its decisions, so it is a
-    //     tie-break against every other screen it neighbours.
+    //     tie-break against every other screen it neighbours. NOT against
+    //     choose_base: that pair is chain-fixed (choose_base -> track via
+    //     base-keyboard, track -> attribution via authoring-track) once
+    //     il_author_name's target-script edge is a screenRequires like
+    //     the others (#1901 reclassification).
     const BASELINE_TIE_BREAK_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["layout", "choose_base"],
       ["layout", "track"],
@@ -273,7 +277,6 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
       ["layout", "punctuation"],
       ["layout", "invisibles"],
       ["layout", "convenience"],
-      ["choose_base", "attribution"],
       ["attribution", "project_name"],
       ["attribution", "characters"],
       ["attribution", "marks"],
