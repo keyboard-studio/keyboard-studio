@@ -20,12 +20,19 @@
 // Simulator-free and compiler-free: the studio's projection imports this from
 // the root engine entry.
 
-import type { ContextVariant, IRComment, IRRule, KeyboardIR } from '@keyboard-studio/contracts';
+import type { ContextVariant, IRComment, IRRule, IRStore, KeyboardIR, NormalizationStep } from '@keyboard-studio/contracts';
 
 import { emitRule } from '../codec/emit.js';
+import { applyNormalizationStep, removeNormalizationStep } from './normalization-step/insert.js';
+import { NORMALIZATION_GROUP } from './normalization-step/constants.js';
+
+/** The one site a normalization step offers (spec 086): all-or-nothing. */
+export const NORMALIZATION_STEP_SITE_ID = 'normalization-step';
 
 /** One source rule's generated rules, inserted together. JSON-safe. */
-export interface ContextToleranceOverlayBatch {
+export interface ContextToleranceRulesBatch {
+  /** Absent on batches persisted before the step batch existed. */
+  kind?: 'rules';
   /** The source rule's text digest (`toleranceSiteKeys`): the site this batch fixes. */
   siteKey: string;
   /** The group the rules go in, by `IRGroup.name`. */
@@ -35,6 +42,59 @@ export interface ContextToleranceOverlayBatch {
   /** The leading comment on the batch (FR-015). */
   comment: string;
   rules: IRRule[];
+}
+
+/**
+ * The generated normalization step (spec 086) as replayable data: its group,
+ * stores and rules, plus the entry point it displaced. Replay appends the
+ * group and points `entryPoints.main` at it; removal restores the entry.
+ */
+export interface NormalizationStepBatch {
+  kind: 'normalization-step';
+  /** Always `NORMALIZATION_STEP_SITE_ID`: the site a decision names. */
+  siteKey: string;
+  groupName: string;
+  originalEntry: string;
+  stores: IRStore[];
+  rules: IRRule[];
+}
+
+export type ContextToleranceOverlayBatch = ContextToleranceRulesBatch | NormalizationStepBatch;
+
+export function isNormalizationStepBatch(b: ContextToleranceOverlayBatch): b is NormalizationStepBatch {
+  return b.kind === 'normalization-step';
+}
+
+/** True when `overlay` holds a normalization step batch. */
+export function overlayHasNormalizationStep(overlay: ContextToleranceOverlay | null): boolean {
+  return overlay !== null && overlay.batches.some(isNormalizationStepBatch);
+}
+
+/** The overlay that records an accepted normalization step. Clones, so the cached step is never aliased. */
+export function buildNormalizationStepOverlay(step: NormalizationStep): ContextToleranceOverlay {
+  return {
+    batches: [
+      {
+        kind: 'normalization-step',
+        siteKey: NORMALIZATION_STEP_SITE_ID,
+        groupName: step.groupName,
+        originalEntry: step.originalEntry,
+        stores: structuredClone(step.stores),
+        rules: structuredClone(step.rules),
+      },
+    ],
+  };
+}
+
+function stepOf(batch: NormalizationStepBatch): NormalizationStep {
+  return {
+    groupName: NORMALIZATION_GROUP,
+    originalEntry: batch.originalEntry,
+    stores: structuredClone(batch.stores),
+    rules: structuredClone(batch.rules),
+    ruleCount: Math.max(0, batch.rules.length - 2),
+    examples: [],
+  };
 }
 
 export interface ContextToleranceOverlay {
@@ -117,6 +177,7 @@ export function applyContextToleranceOverlay(
   const comments: IRComment[] = [...ir.comments];
 
   for (const batch of overlay.batches) {
+    if (isNormalizationStepBatch(batch)) continue; // replayed below, after the rule batches
     const group = groups.find((g) => g.name === batch.groupName);
     if (group === undefined || batch.rules.length === 0) {
       warnings.push(`context-tolerance rules for group "${batch.groupName}" skipped: the group no longer exists`);
@@ -146,7 +207,22 @@ export function applyContextToleranceOverlay(
       });
     }
   }
-  return { ir: { ...ir, groups, comments }, warnings };
+  let result: KeyboardIR = { ...ir, groups, comments };
+  for (const batch of overlay.batches) {
+    if (!isNormalizationStepBatch(batch)) continue;
+    // The step hands on to the entry group it displaced. If that group is gone
+    // (the keyboard changed since the step was built) the replay would point
+    // `main` at a group that does not exist, so leave the keyboard unchanged.
+    if (!result.groups.some((g) => g.name === batch.originalEntry && g.name !== NORMALIZATION_GROUP)) {
+      warnings.push(
+        `context normalization step skipped: the entry group "${batch.originalEntry}" it was built for no longer exists`,
+      );
+      continue;
+    }
+    // Replaces a step already present rather than stacking a second one.
+    result = applyNormalizationStep(result, stepOf(batch));
+  }
+  return { ir: result, warnings };
 }
 
 /**
@@ -155,11 +231,14 @@ export function applyContextToleranceOverlay(
  * analyse a projected keyboard as it would be without the accepted fix, so the
  * decision's fingerprint and sites stay stable once the fix is in place.
  */
-export function removeContextToleranceOverlay(ir: KeyboardIR, overlay: ContextToleranceOverlay): KeyboardIR {
-  if (overlay.batches.length === 0) return ir;
+export function removeContextToleranceOverlay(source: KeyboardIR, overlay: ContextToleranceOverlay): KeyboardIR {
+  if (overlay.batches.length === 0) return source;
+  const stepBatch = overlay.batches.find(isNormalizationStepBatch);
+  const ir = stepBatch !== undefined ? removeNormalizationStep(source, stepBatch.originalEntry) : source;
   const textsByGroup = new Map<string, Set<string>>();
   const commentTexts = new Set<string>();
   for (const batch of overlay.batches) {
+    if (isNormalizationStepBatch(batch)) continue;
     const group = ir.groups.find((g) => g.name === batch.groupName);
     if (group === undefined) continue;
     const texts = textsByGroup.get(batch.groupName) ?? new Set<string>();
@@ -201,6 +280,10 @@ export function presentContextToleranceSites(ir: KeyboardIR, overlay: ContextTol
   for (const batch of overlay.batches) {
     const group = ir.groups.find((g) => g.name === batch.groupName);
     if (group === undefined) continue;
+    if (isNormalizationStepBatch(batch)) {
+      present.push(batch.siteKey);
+      continue;
+    }
     const texts = new Set(group.rules.map((r) => emitRule(r, group.usingKeys)));
     if (batch.rules.length > 0 && batch.rules.every((r) => texts.has(emitRule(r, group.usingKeys)))) {
       present.push(batch.siteKey);

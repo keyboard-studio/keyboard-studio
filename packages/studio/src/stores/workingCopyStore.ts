@@ -32,6 +32,9 @@ import type {
   KeyboardIR,
   LintFinding,
   RemovalCapability,
+  NormalizationRefusalReason,
+  NormalizationStep,
+  StoredNormalizationStep,
   ToleranceReport,
   VirtualFS,
   WelcomeConvention,
@@ -245,6 +248,14 @@ export type ContextToleranceState =
       fixableRuleIds: string[];
       siteKeys: Record<string, string>;
       fingerprint: string;
+      /**
+       * The proposed normalization step (spec 086). When present it is the
+       * proposal: `fixableRuleIds` is the single site `normalization-step`
+       * and `proposal` carries no variants.
+       */
+      normalizationStep?: NormalizationStep;
+      /** Why the step was not offered and the 062 variants were proposed instead (FR-019). */
+      fallbackReason?: NormalizationRefusalReason | "verification-regressed";
     }
   | { status: "failed"; runId: number; reason: string };
 
@@ -803,6 +814,12 @@ export interface WorkingCopyState {
   contextTolerance: ContextToleranceState;
   /** See {@link AppliedContextTolerance}. `null` when no fix is applied. */
   contextToleranceOverlay: AppliedContextTolerance | null;
+  /**
+   * Authoring cache of the generated normalization step (spec 086 FR-016),
+   * keyed by source content + generator version. Persisted with the working
+   * copy; only reused when its `cacheKey` equals the current source's key.
+   */
+  contextNormalizationStep: StoredNormalizationStep | null;
 
   // -- Default-fill provenance slice (#890) --------------------------------------
   /**
@@ -1326,6 +1343,9 @@ export interface WorkingCopyState {
   /** Record (or clear, with `null`) the applied context-tolerance fix (spec 078). */
   setContextToleranceOverlay: (next: AppliedContextTolerance | null) => void;
 
+  /** Store (or clear, with `null`) the cached normalization step (spec 086). */
+  setContextNormalizationStep: (next: StoredNormalizationStep | null) => void;
+
   // -- Default-fill provenance actions (#890) ----------------------------------
 
   /**
@@ -1589,6 +1609,7 @@ export type WorkingCopyData = Omit<
   | "setValidatorFindings"
   | "setContextTolerance"
   | "setContextToleranceOverlay"
+  | "setContextNormalizationStep"
   | "setAxisFills"
   | "commitKeyEdit"
   | "undoKeyEdit"
@@ -1655,6 +1676,7 @@ const INITIAL_STATE: WorkingCopyData = {
   // context tolerance slice (spec 078) — no analysis yet
   contextTolerance: { status: "idle" },
   contextToleranceOverlay: null,
+  contextNormalizationStep: null,
   // default-fill provenance slice (#890) — default empty (no pre-fill run yet)
   axisFills: [],
 };
@@ -2531,6 +2553,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         ? s
         : { contextToleranceOverlay: next },
     ),
+
+  setContextNormalizationStep: (next) =>
+    set((s) => (s.contextNormalizationStep === next ? s : { contextNormalizationStep: next })),
 
   // -- Default-fill provenance actions (#890) ----------------------------------
 

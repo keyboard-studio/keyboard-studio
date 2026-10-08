@@ -104,7 +104,7 @@ import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
-import { buildContextToleranceProposal } from "./contextToleranceProposal.ts";
+import { buildContextToleranceProposal, buildNormalizationStepProposal } from "./contextToleranceProposal.ts";
 import { isContextToleranceEnabled } from "../../flags/contextToleranceFlag.ts";
 import {
   CONTEXT_TOLERANCE_QUESTION_ID,
@@ -645,6 +645,12 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // rule; could-not-check items stay in the notice, not here).
   const toleranceProposal = useMemo(() => {
     if (!toleranceEnabled || tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
+    if (tolerance.normalizationStep !== undefined) {
+      const ruleCount = tolerance.normalizationStep.ruleCount;
+      // The station's own intro, examples and disclosure carry the wording; the
+      // panel's description and the (hidden) site framing stay empty.
+      return buildNormalizationStepProposal({ ruleCount, framing: "", description: "" });
+    }
     const fixable = new Set(tolerance.fixableRuleIds);
     const addedRuleCount = tolerance.proposal.variants.filter((v) => fixable.has(v.sourceRuleId)).length;
     return buildContextToleranceProposal({
@@ -1169,6 +1175,17 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
           ruleLines={toleranceRuleLines}
           fingerprint={toleranceFingerprint}
           {...(priorTolerance !== undefined ? { prior: priorTolerance } : {})}
+          {...(tolerance.status === "ready" && tolerance.normalizationStep !== undefined
+            ? {
+                step: {
+                  ruleCount: tolerance.normalizationStep.ruleCount,
+                  examples: tolerance.normalizationStep.examples,
+                },
+              }
+            : {})}
+          {...(tolerance.status === "ready" && tolerance.fallbackReason !== undefined
+            ? { fallbackReason: tolerance.fallbackReason }
+            : {})}
           onDecide={(decision) => {
             setToleranceDecision(decision);
             // Confirm (or decline) is the station's last interaction: move on.

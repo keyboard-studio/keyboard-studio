@@ -52,6 +52,15 @@ other by relative path, so no alias is needed to resolve them. The depcruise rul
 `context-tolerance-browser-safe` keeps the Node loader out of the browser entry. The
 context-tolerance overlay (`pattern-apply/context-tolerance-overlay.ts`) is exported from the
 root entry, because the studio replays it inside its synchronous VFS projection.
+The spec 086 normalization step lives in `pattern-apply/normalization-step/`
+(`proposeNormalizationStep`, `applyNormalizationStep`, `removeNormalizationStep`,
+`normalizationStepCacheKey`) and ships through the `./context-tolerance` subpath. The overlay
+applies it as its own batch kind; the working IR is never touched. The `./context-tolerance`
+barrel also exports `buildNormalizationStepOverlay`, `isNormalizationStepBatch`,
+`overlayHasNormalizationStep`, `NORMALIZATION_STEP_SITE_ID` and
+`createNormalizationStepMigrationRule`. The spec 062 per-rule generator
+(`proposeContextVariants`) it also exports is a fallback with retirement criteria in the
+[086 engine contract](../specs/086-context-normalization-group/contracts/engine-normalization-step.md#062-per-rule-path-retirement-criteria).
 
 ### `@keymanapp/keyboard-lint`
 

@@ -22,7 +22,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 const server = await createServer({
   configFile: resolve(HERE, "vite.config.ts"),
-  server: { middlewareMode: true },
+  // No HMR socket: parallel --jobs workers would otherwise all fight for its port.
+  server: { middlewareMode: true, hmr: false, ws: false },
   appType: "custom",
   logLevel: "warn",
 });

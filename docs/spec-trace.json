@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-30",
+  "lastUpdated": "2026-10-06",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -918,6 +918,14 @@
     "specs/083-deadkey-lifecycle": {
       "title": "Feature Specification: Deadkey lifecycle — defining, managing, renaming, and deleting deadkeys",
       "hash": "sha256:9b07f85501551e19",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/086-context-normalization-group": {
+      "title": "Feature Specification: Context normalization group",
+      "hash": "sha256:e941c0d01dbc2742",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

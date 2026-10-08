@@ -152,6 +152,12 @@ build artifacts you should regenerate rather than hand-edit:
   pins is byte-identical, and it validates every stored set through the engine's own
   `parseUnicodeSet`, imported from source under Node type stripping (importing the compiled
   module would be circular).
+- `codegen-normalization-regressed` — derives the studio's slim list of keyboard ids the corpus
+  harness found `regressed` under the spec 086 normalization step from the committed
+  [docs/context-normalization-verification.json](context-normalization-verification.json) into
+  `packages/studio/src/lib/generated/normalizationRegressed.generated.json`. Tiny and **committed**
+  (so studio tests need no prebuild); `normalizationVerification.test.ts` fails when it drifts from
+  the record. Needs no corpus checkout.
 
 Not in the prebuild chain: `pnpm run codegen-host-layouts` derives the studio's reference
 host-layout tables (spec 076 FR-023) from the Keyman basic keyboards in `../keyboards/release/basic`
@@ -381,6 +387,14 @@ vendored pre-fix/post-fix fixtures for the two keyboards a human hand-fixed for 
 `haroi` and `sil_kcho`, plus pure classification unit tests. The full sweep is the CLI, never a
 test. Detail: [utilities/nfd-tolerance-corpus/README.md](../utilities/nfd-tolerance-corpus/README.md).
 
+`--mode normalization-step` verifies the spec 086 normalization step instead: typed output
+unchanged, every pasted NFC/NFD probe passing, compile diagnostics unchanged. It writes the
+committed record [docs/context-normalization-verification.json](context-normalization-verification.json),
+keyed by source hash. `--jobs <n>` parallelises, `--incremental` re-simulates only keyboards
+whose source or generator version changed, `--budget-minutes <n>` caps each keyboard, and
+`--check` (run in CI after the corpus gate) fails on any stale or missing record without
+simulating.
+
 ### facet-index
 
 [spec 070](../specs/070-keyboard-facet-index/) scans the sibling `../keyboards` corpus (the
@@ -469,3 +483,30 @@ pnpm run spec-search "layer A validity" --json
 - `specs/_archive/**` (retired feature docs) is skipped unless `--scope` starts with
   `specs/_archive`, so shipped specs' working docs don't crowd out live ones. The root `.ignore`
   does the same for ripgrep-based search.
+
+## Unattended spec-kit rounds
+
+After specify and clarify, `scripts/speckit_rounds.py` drives the rest of a feature (plan, tasks,
+then one `tasks.md` phase at a time) with **one fresh `claude -p` session per round**. Each
+round runs the `speckit-round` skill
+([.claude/skills/speckit-round/SKILL.md](../.claude/skills/speckit-round/SKILL.md)). The
+driver keeps no chat context. Between rounds it reads state from `.spec-context.json` and the
+`tasks.md` checkboxes.
+
+```
+python3 scripts/speckit_rounds.py specs/086-context-normalization-group --dry-run
+python3 scripts/speckit_rounds.py specs/086-context-normalization-group --max-budget-usd 20
+```
+
+- **Where rounds run.** Each round runs in the worktree whose branch is named for the feature
+  (`NNN-slug`, or `*/NNN-slug`). That branch must contain the skill: merge `main` into it
+  first, or the driver refuses to start.
+- **Commits per phase.** Each implement round runs the phase's gates, then commits and pushes
+  that phase on the feature branch with an explicit `HEAD:refs/heads/<branch>` refspec. A red
+  phase ends the round `BLOCKED` with nothing pushed.
+- **Spec-folder sync.** After every round the driver commits and pushes `specs/<feature>/`
+  alone (`scripts/speckit_git.py`). Round logs in `specs/<feature>/rounds/` stay local.
+- **When it stops.** The driver stops when the pipeline is complete, when a round ends
+  `BLOCKED`, after two rounds with no recorded progress, or at `--max-rounds` (default 25).
+- **The last round** runs implement's wrap-up, which fires the `after_implement` hooks (km-lead
+  review, km-archivist PR). Nothing ever merges.
