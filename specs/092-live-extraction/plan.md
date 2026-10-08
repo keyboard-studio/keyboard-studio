@@ -530,6 +530,24 @@ gallery).
   per-extract; absent `phaseF` still yields absent. Pinned by
   lib/phaseFSeeds.test.ts (functions untouched) and the StepHost
   acceptance suite (seeding through the real wiring).
+  **Verified (fix lane, 2026-10-08):** the refactor landed as
+  `d5b0dccd` (rebased over Matthew's ci.yml decoupling commit
+  5ad0e14a, which had advanced the branch past the briefed head).
+  Depcruise in CI form (all packages, 1445 modules): 4 → **2**
+  violations; the pf pair is gone and the remainder is exactly the
+  pre-existing decisions-layer pair on liveExtraction's wiring
+  halves (→ workingCopyStore, → decisionStore) — the lead-ruled
+  exemption set already applied on 093's branch, untouched here.
+  Dependency count reconciles (4204 → 4203 studio-local: two edges
+  removed, one legal decisions→lib edge added). Studio tsc clean.
+  Suites: phaseFSeeds 8/8, liveExtraction 13/13, StepHost acceptance
+  4/4, orderParity 12/12, phaseFDemotion 5/5, questionModules +
+  registry 814/814. The two Phase F integration files were run
+  solo under a 150 s hard cap: both killed at the cap with zero
+  completions — the spin persists on THIS branch, as expected:
+  its cure is 093's extraction-idempotence fix (040d8592), which
+  is not on this branch and arrives with the same merge that
+  carries this fix up.
 
 ## Implementation outcome (Phase 7, T060–T063)
 
