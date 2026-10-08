@@ -2079,3 +2079,41 @@ and `ApplyChannelError` in `steps/reducer.ts`; the golden-walk script
   worktree on the D-090-46 install artifact (`babel-plugin-macros`
   module-not-found at load, before any content is read); CI installs
   fresh. Spec 090 is 49/49; the PR bases on `km/decision-apply`.
+- **D-090-50 — the four spec-079 failures were T063's, and are fixed
+  (2026-10-08, branch `km/fix-d4-phase-slot` off the union).**
+  D-090-49's accounting carried InvisiblesStep ×3 + PunctuationStep ×1
+  as "pre-existing branch state" on an A/B against `625c3f43` — but
+  that base already contained T063, so the comparison could not see
+  it. Bisect: at `c5164ffc^` (pre-T063) both files pass 57/57; at the
+  union head the same 4 fail. The introducer is exactly `c5164ffc`.
+  T063's premise — "no production code reads stored phase-slot
+  answers (cross-spec R-2)" — was falsified in one place: R-2 scoped
+  to `mergePhaseResults`, but `writingDirectionFrom` in
+  InvisiblesStep reads `phase.answers` from the working copy's phase
+  results, so on a fresh walk the Phase A/B direction signal
+  (`writing_direction`, `pb_non_roman_branch`,
+  `pb_rtl_direction_confirm`) stopped reaching the invisibles step
+  when `recordPhase` began storing `answers: []`: the bidi group no
+  longer auto-expands for an RTL author and a direction shape change
+  no longer proposes the bidi candidates. That is lost app behaviour,
+  not test rot — but restoring slot answers was NOT the fix: the
+  deletion itself was ruled (proposal 8) and a slot copy is exactly
+  the second answer store 093's replay cannot see. The equivalent
+  source of truth already exists and the live completion path already
+  populates it: `recordAnswersAsDecisions` writes those three
+  answers into the decision set under the modules' provided ids
+  (`reserve-writing-direction`, `non-roman-branch`,
+  `rtl-direction-confirm`). Fix: InvisiblesStep derives its direction
+  answers from the decision set (`directionAnswersFromDecisions`,
+  precedence order preserved) instead of the phase results;
+  `writingDirectionFrom` now takes the flat answer list. The two
+  D-4/R-08 tests are re-expressed, not weakened: their scenario
+  (invisibles records into phase C; convenience records into the same
+  phase with an empty answer set) and their intent (no recorded
+  answer is erased by a same-phase recording) are unchanged — the
+  assertions now read the surviving homes: the phase entry's
+  non-answer fields (the slot's post-T063 contract, shallow-merged)
+  and the decision state that holds the answers (invisibles'
+  inventory decision). The two bidi tests keep their behavioural
+  assertions verbatim; only `markRtl()`'s lever changed, from the
+  retired slot write to the decision record the live flow writes.

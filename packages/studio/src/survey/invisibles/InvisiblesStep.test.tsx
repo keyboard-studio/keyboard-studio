@@ -13,12 +13,13 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { writingDirectionFrom } from "./InvisiblesStep.tsx";
+import { directionAnswersFromDecisions, writingDirectionFrom } from "./InvisiblesStep.tsx";
 import { InvisiblesStepHost } from "./InvisiblesStepHost.tsx";
 import { invisibleCandidatesFor } from "./invisibleCandidates.ts";
 import { getCharacterInventoryValue, getInvisiblesInventoryValue, inventoryOps, resetInventoryDecisions } from "../../survey/useInventoryDraft.ts";
 import { invisibleDecisionsOf } from "../../survey/phaseBDraftOps.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
 function lastResult(onComplete: ReturnType<typeof vi.fn>): SurveyPhaseResult {
@@ -28,9 +29,17 @@ function lastResult(onComplete: ReturnType<typeof vi.fn>): SurveyPhaseResult {
 }
 
 function markRtl(): void {
-  useWorkingCopyStore.getState().recordPhase({
-    phase: "B",
-    answers: [{ questionId: "pb_rtl_direction_confirm", answerType: "select", value: "true" }],
+  // The author answered the Phase B rtl-confirm question on the characters
+  // step; its completion records the answer as the module's provided
+  // decision (recordAnswersAsDecisions), which is where the invisibles
+  // step now reads the direction signal from. (Until spec 090 T063 this
+  // wrote the answer into the phase-B result slot; the slot carries no
+  // answers now.)
+  useDecisionStore.getState().record({
+    id: "rtl-direction-confirm",
+    value: "true",
+    provenance: "asked",
+    step: "characters",
   });
 }
 
@@ -182,7 +191,7 @@ describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
   });
 
-  it("the phase-C answer slot still holds invisibles' own answers after convenience records into the same phase (D-4/R-08)", () => {
+  it("invisibles' recorded answers still hold after convenience records into the same phase (D-4/R-08)", () => {
     const recordPhase = useWorkingCopyStore.getState().recordPhase;
     const onComplete = vi.fn();
     render(<InvisiblesStepHost onComplete={onComplete} />, { withStepNav: true });
@@ -196,12 +205,24 @@ describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
     // never-asked-yet) answer set — this must not erase invisibles' entries.
     recordPhase({ phase: "C", answers: [] }, { stepId: "convenience" });
 
+    // The phase slot no longer carries answers (spec 090 T063): what
+    // recordPhase still owes D-4 is the phase's non-answer fields — the
+    // confirmed inventory invisibles recorded survives the same-phase
+    // recording (the slot's shallow merge keeps it).
     const phaseC = useWorkingCopyStore
       .getState()
       .phaseResults.find((p) => p.phase === "C");
     expect(phaseC).toBeDefined();
+    expect(phaseC!.confirmedInventory).toEqual(invisiblesResult.confirmedInventory);
+
+    // The answers themselves are decision state now: every answer
+    // invisibles recorded is still held in its inventory decision,
+    // exactly as recorded — convenience's same-phase recording erased
+    // none of them (spec 079 D-4/R-08).
+    const held = invisibleDecisionsOf(getInvisiblesInventoryValue());
     for (const a of invisiblesResult.answers) {
-      expect(phaseC!.answers).toContainEqual(a);
+      const notation = "U+" + a.questionId.slice("invisibles.u".length).toUpperCase();
+      expect(held[notation] === "accepted").toBe(a.value);
     }
   });
 });
@@ -221,9 +242,10 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
 
     // Shape change: the author is now known to be RTL — new bidi candidates
     // become relevant. (Spec 089: the signal is the Phase B rtl-confirm
-    // answer in the phase results — markRtl() — not a seeded survey context,
-    // which is decision-derived now and cannot carry a synthetic "rtl"
-    // script_family.)
+    // answer — markRtl() — not a seeded survey context, which is
+    // decision-derived now and cannot carry a synthetic "rtl"
+    // script_family. Since spec 090 T063 the answer reaches this step as
+    // the recorded `rtl-direction-confirm` decision, not a phase result.)
     markRtl();
     render(<InvisiblesStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
@@ -273,23 +295,45 @@ describe("InvisiblesStep — the bidi group and writing direction", () => {
     expect(writingDirectionFrom([], ctx)).toBe("unknown");
     expect(
       writingDirectionFrom(
-        [{ phase: "A", answers: [{ questionId: "writing_direction", answerType: "select", value: "ltr" }] }],
+        [{ questionId: "writing_direction", answerType: "select", value: "ltr" }],
         ctx,
       ),
     ).toBe("ltr");
     expect(
       writingDirectionFrom(
-        [{ phase: "B", answers: [{ questionId: "pb_rtl_direction_confirm", answerType: "select", value: "false" }] }],
+        [{ questionId: "pb_rtl_direction_confirm", answerType: "select", value: "false" }],
         ctx,
       ),
     ).toBe("rtl");
     expect(
       writingDirectionFrom(
-        [{ phase: "B", answers: [{ questionId: "pb_non_roman_branch", answerType: "select", value: "rtl" }] }],
+        [{ questionId: "pb_non_roman_branch", answerType: "select", value: "rtl" }],
         ctx,
       ),
     ).toBe("rtl");
     expect(writingDirectionFrom([], { script_family: "rtl" })).toBe("rtl");
     expect(writingDirectionFrom([], { script_family: "indic" })).toBe("ltr");
+  });
+
+  it("directionAnswersFromDecisions reads the three direction answers from their decision records, Phase A first", () => {
+    expect(directionAnswersFromDecisions({})).toEqual([]);
+    expect(
+      directionAnswersFromDecisions({
+        "rtl-direction-confirm": { id: "rtl-direction-confirm", value: "true", provenance: "asked" },
+        "reserve-writing-direction": { id: "reserve-writing-direction", value: "ltr", provenance: "asked" },
+        "non-roman-branch": { id: "non-roman-branch", value: "rtl", provenance: "asked" },
+      }),
+    ).toEqual([
+      { questionId: "writing_direction", answerType: "select", value: "ltr" },
+      { questionId: "pb_non_roman_branch", answerType: "select", value: "rtl" },
+      { questionId: "pb_rtl_direction_confirm", answerType: "select", value: "true" },
+    ]);
+    // A record carrying no value (a seed that never became an answer)
+    // is not an answer and must not signal a direction.
+    expect(
+      directionAnswersFromDecisions({
+        "rtl-direction-confirm": { id: "rtl-direction-confirm", value: undefined, provenance: "default" },
+      }),
+    ).toEqual([]);
   });
 });

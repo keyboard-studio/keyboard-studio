@@ -681,9 +681,12 @@ describe("PunctuationStep — a removed proposal is never re-proposed (US4)", ()
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 T027 — leave-and-return, and the phase-C answer slot's per-step
-// ownership (D-4/R-08): convenience recording into the same phase must not
+// spec 079 T027 — leave-and-return, and per-step ownership of recorded
+// answers (D-4/R-08): convenience recording into the same phase must not
 // erase invisibles' (or any other phase-C step's) already-recorded answers.
+// Since spec 090 T063 the answers' home is the decision store and the
+// phase slot carries only non-answer fields; the D-4 assertion below
+// reads both homes.
 // ---------------------------------------------------------------------------
 
 describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
@@ -698,8 +701,12 @@ describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
     expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
   });
 
-  it("the phase-C answer slot still holds invisibles' answers after convenience records into the same phase (D-4/R-08)", () => {
+  it("invisibles' recorded answers still hold after convenience records into the same phase (D-4/R-08)", () => {
     const recordPhase = useWorkingCopyStore.getState().recordPhase;
+    // Invisibles' U+200C answer, recorded the way the step itself records
+    // it — into its inventory decision (the answers' home since spec 090
+    // T063 retired phase-slot answers).
+    inventoryOps("invisibles").acceptInvisible("U+200C");
     const invisiblesResult: SurveyPhaseResult = {
       phase: "C",
       answers: [{ questionId: "invisibles.u200c", answerType: "boolean", value: true }],
@@ -711,9 +718,15 @@ describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
     // this must not clobber invisibles' entries.
     recordPhase({ phase: "C", answers: [] }, { stepId: "convenience" });
 
+    // The slot's surviving half of the D-4 contract: the phase entry keeps
+    // the non-answer fields invisibles recorded.
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
     expect(phaseC).toBeDefined();
-    expect(phaseC!.answers).toContainEqual(invisiblesResult.answers[0]);
+    expect(phaseC!.confirmedInventory).toEqual(["‌"]);
+
+    // The answer itself: still held in invisibles' inventory decision,
+    // exactly as recorded.
+    expect(invisibleDecisionsOf(getInvisiblesInventoryValue())["U+200C"]).toBe("accepted");
   });
 });
 
