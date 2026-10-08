@@ -25,19 +25,22 @@ persona:
   routing_group: qwerty-qwertz
 
 events:
-  # --- identity: only the 4 required identity_lite questions ---
-  # (il_language_code, il_author_email, il_copyright_holder are all
-  # required: false — omitted.)
+  # --- identity: only the required identity_lite questions ---
+  # (il_language_code is required: false — omitted. il_author_email and
+  # il_copyright_holder, also optional, are attribution questions since
+  # #1901 — likewise omitted there.)
   - { stepId: identity, questionId: il_language_english, value: "English" }
   - { stepId: identity, questionId: il_language_autonym, value: "English" }
   - { stepId: identity, questionId: il_target_script, value: "Latn" }
-  - { stepId: identity, questionId: il_author_name, value: "Studio Author" }
 
   # --- choose_base (Track 2: adapt basic_kbdus — skips project_name) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
 
   # --- track (adapt) ---
   - { stepId: track, questionId: track_choice, value: "adapt" }
+
+  # --- attribution (attribution flow, #1901: asked after the track choice) ---
+  - { stepId: attribution, questionId: il_author_name, value: "Studio Author" }
 
   # --- characters: only the 6 required phase_b_characters questions on this
   #     branch (pb_existing_keyboards/pb_co_installed_keyboards are

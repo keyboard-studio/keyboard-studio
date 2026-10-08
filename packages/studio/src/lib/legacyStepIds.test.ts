@@ -83,7 +83,11 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
     // the baseline is main@18e63aa4's step membership, frozen — the same
     // baseline steps/stepOrder.parity.test.ts asserts equality against).
     const BASELINE_PROVIDES: Readonly<Record<string, readonly string[]>> = {
-      identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script", "author-name", "author-email", "copyright-holder"],
+      // #1901 amendment: the pre-091 identity step also provided the
+      // author/copyright trio; those decisions live on the attribution
+      // screen now (asserted separately below) — the identity screen
+      // holds only the language decisions.
+      identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script"],
       layout: ["windows-layout"],
       choose_base: ["base-keyboard"],
       track: ["authoring-track"],
@@ -110,6 +114,13 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
       for (const decisionId of BASELINE_PROVIDES[id] ?? []) {
         expect(screen.decisionIds, `${id} -> ${screen.id}`).toContain(decisionId);
       }
+    }
+    // #1901: the author/copyright decisions the pre-091 identity step
+    // provided are held by the attribution screen (post-track) now.
+    const attribution = screenById.get("attribution")!;
+    expect(attribution).toBeDefined();
+    for (const decisionId of ["author-name", "author-email", "copyright-holder"]) {
+      expect(attribution.decisionIds, `identity (pre-091) -> attribution`).toContain(decisionId);
     }
   });
 

@@ -159,3 +159,31 @@ the record channels work exactly as they do for Phase F:
 - `orderParity.test.ts`: identity_lite's frozen order loses the trio;
   the new attribution flow's order is frozen as
   `[il_author_name, il_author_email, il_copyright_holder]`.
+
+## As landed (implementation notes)
+
+- One reclassification the plan did not foresee: `il_author_name`'s
+  `requires: ["target-script"]` was an IN-FLOW edge inside identity_lite.
+  In the attribution flow it is cross-screen, and the raw per-flow sort
+  (orderParity calls `orderDecisions` unscoped) throws on it. It is now
+  `screenRequires: ["target-script", "authoring-track"]` — the
+  track_choice / project_display_name treatment. Consequence recorded in
+  stepOrder.parity: the (choose_base, attribution) pair became
+  chain-fixed and left the frozen tie-break set.
+- The golden-walk store fixtures (tests/steps/__fixtures__/goldenWalk)
+  changed by exactly the move: `setAttribution` leaves the identity
+  window for the attribution window on both tracks, and the adapt
+  track's `setCharactersSubStage` (prefill signal) moves from the track
+  window to the attribution window (the fork relocation, D3). Every
+  other entry is byte-identical, and the e2e golden walk keeps the same
+  answers at their new position, so the emitted-bytes baseline stands.
+- Terminology (#1810): new prose says "update" for Track 2; the track
+  decision VALUE remains `"adapt"` (a stored value, not prose).
+- Test-corpus re-homing (full-suite tail): the journey fixtures
+  (content/journeys/*.yaml) answer the trio at the attribution step and
+  the journey runner gained an `attribution` replay handler (walk the
+  flow + recordPhase, like identity/project_name); the spec-079
+  step-classification table gained the attribution row (`answer-store`);
+  step-set enumerations (STEP_ORDER, drill-downs, live-flow list, legacy
+  provides oracle) were amended with the new step recorded as a
+  deliberate #1901 addition, never a silent baseline drift.

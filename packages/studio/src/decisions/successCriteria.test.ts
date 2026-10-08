@@ -226,7 +226,8 @@ describe("SC-003: zero ordering artifacts + parity", () => {
   it("derived order matches the legacy order (parity)", () => {
     const flow = loadFlowSourceDef(flowSources["identity_lite"]!);
     const ids = flow.questions.map((q) => q.id);
-    // The frozen legacy order (from the deleted YAML).
+    // The frozen legacy order (from the deleted YAML), as amended by
+    // #1901: the author/copyright tail moved to the attribution flow.
     expect(ids).toEqual([
       "il_language_english",
       "il_language_region",
@@ -234,6 +235,11 @@ describe("SC-003: zero ordering artifacts + parity", () => {
       "il_language_code",
       "il_target_script",
       "il_script_not_supported",
+    ]);
+    // The moved questions keep their legacy relative order in their new
+    // flow (#1901).
+    const attribution = loadFlowSourceDef(flowSources["attribution"]!);
+    expect(attribution.questions.map((q) => q.id)).toEqual([
       "il_author_name",
       "il_author_email",
       "il_copyright_holder",

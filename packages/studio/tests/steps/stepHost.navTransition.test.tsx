@@ -156,6 +156,8 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["base-preview", "base-confirm"] },
   { testIds: ["track-copy"] },
   { testIds: ["survey-advance"] },
+  // #1901: the attribution step sits between track and project_name.
+  { testIds: ["survey-advance"] },
   { testIds: ["prefill-confirm"] },
   { testIds: ["phase-b-done"], settleFor: "punctuation-done" },
   { testIds: ["punctuation-done"], settleFor: "invisibles-continue" },
