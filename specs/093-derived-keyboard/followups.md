@@ -404,3 +404,52 @@ On the final tree (HEAD 0c7b6a07 + this record):
 - depcruise: 2 errors, both the pre-existing 092 pf items recorded
   above; decisions-layer is 0 after the ruling-(a) exemptions.
 - Golden walk (SC-005): 2/2, confirmed (see quickstart.md).
+
+## WALK-PACE (2026-10-08) — union e2e timeouts root-caused: full-run refire storm in useKeyboardArtifact
+
+Union CI run 37754110396: nine copy-edit/spec-034 walks died at the 240s
+cap (349, 419, 455, 630, 661 ×4, 677) that had all passed on spec 089's
+run 37679303677. Measured from the runs' own Playwright artifacts:
+
+- NOT runner pace: on the union run the boot smokes were FASTER than on
+  089's run (4.0–14.1s vs 5.3–16.8s) and the short tests matched, while
+  every long walk inflated ~2x or died (089 durations: 349 132s, 419
+  126s, 630 180s, 661s 96–180s, 677 120s; union: Armn 90→174s, the rest
+  >240s). The union e2e job took 55m16s vs 089's 44m12s despite nine
+  walks being truncated at the cap.
+- The dying walks' traces show the app issuing ~80,000 requests per
+  walk: test 349 made 81,731 requests, of which the base package
+  (basic_kbdfr, 14 files via /local-kbd-proxy) was fetched ~5,850 times
+  at a steady ~26 episodes/s from the first preview fetch to the cap
+  (419: 80,356 requests / ~5,765 episodes). The one adapt walk that
+  completed (548) fetched the same package exactly 4 times.
+- Mechanism: useKeyboardArtifact's full fetch→compile effect keyed on
+  OBJECT identity of baseKeyboard/scaffoldSpec. Callers re-derive
+  scaffoldSpec per render (identitySelectors, called bare in
+  StudioShell) and hosts re-render on the hook's own stage transitions;
+  each restart increments runId, so the in-flight run aborts at its next
+  checkpoint AFTER fetching the base source — the pipeline fetched
+  forever and rarely settled, and every driver action fought the storm
+  (advance clicks ~30s apart, gaps growing 26→36s). Derivation math is
+  NOT implicated (compile-hunt store harness: low-ms per completion).
+- FIX (branch km/fix-walk-pace): the effect now compares its run target
+  by VALUE (`<base id>|<scaffold keyboardId>|<scaffold displayName>`,
+  lastFullRunKeyRef) and skips restarts for an unchanged target; the key
+  resets when the base goes null; retry() calls run() directly and
+  bypasses the guard. Pinned by useKeyboardArtifact.refireGuard.test.ts
+  (identity churn does not re-fetch/re-scaffold; a value change runs;
+  retry re-runs). Suites: hooks 36/38 with the fix — the 2 failures are
+  useKeyboardArtifact.contextTolerance.test.ts hook-timeouts, A/B
+  identical on the unmodified base in this sandbox (pre-existing
+  environment sensitivity, not this change).
+- Test 455 separately lost its sized budget in a later rewrite: 089's
+  tree carried test.setTimeout(480_000) (measured 450s end-to-end on
+  37679303677, progress linear in budget per run 37632354160's traces);
+  the union rewrite dropped it, so the walk died at the 240s default.
+  Restored at 480_000 with the evidence and the tripwire recorded in
+  the test.
+- Observed in the same union run, NOT pace and outside this lane: 548
+  fails an emit assertion (`.kps` language name "fr" vs the fixture's
+  English name) and T028 fails after reload+Back (the convenience-step
+  heading never appears) — both complete their walks quickly; both are
+  functional regressions for the lead to route.
