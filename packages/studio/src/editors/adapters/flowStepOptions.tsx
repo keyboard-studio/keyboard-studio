@@ -272,9 +272,11 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
 /**
  * Spec 092 (T036): the PHASE_F_SEEDS table that used to live here is
  * deleted. Each entry became an `extract` or a `lookupDefault` declared
- * on its pf_* module (derivations still in lib/phaseFSeeds.ts and
- * lib/adaptiveDescription.ts), seeded as decision records by the live
- * extraction pass and read back by SurveyRunner from the records.
+ * on its pf_* module (derivations in lib/phaseFSeeds.ts and
+ * lib/adaptiveDescription.ts, computed by the live extraction wiring
+ * and read off the extract context — G-17), seeded as decision records
+ * by the live extraction pass and read back by SurveyRunner from the
+ * records.
  * pf_credits was deliberately never seeded — thanking ≠ owning — and
  * stays unseeded.
  */

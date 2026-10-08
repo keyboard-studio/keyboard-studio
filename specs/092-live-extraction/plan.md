@@ -485,6 +485,70 @@ gallery).
   covered by the lead's exemption ruling for 093's final pass —
   and 2× upstream Phase-F bypass).
 
+- **G-17 (post-restack fix lane, 2026-10-08 — the Phase-F bypass pair
+  dispositioned: REFACTOR onto the wiring-computed pattern, no
+  exemption).** CI's build job fails on this branch (and on 093's
+  above it, where the wiring halves are already exempted) at Lint →
+  depcruise with the pair G-16 counted as pre-existing:
+  `question-modules-no-bypass-mutate-seam` on
+  `survey/questions/f/pf_provenance_basis.ts → lib/phaseFSeeds.ts`
+  and the same for `pf_project_url.ts`. Precision on origin: the
+  edges are 092's own — introduced by the T036 conversion
+  (bf08959a), absent at 091's head; "upstream" in G-16 meant
+  "before the restack pass", not another spec's work. 093's final
+  pass flagged the pair and deliberately did not self-exempt
+  (outside its ruling's named set); disposition was assigned to
+  this lane WITH a decision. Evidence: (1) `lib/phaseFSeeds.ts` is
+  pure — string/VFS reads over a plain-data context, imports only
+  contracts types + `lib/vfsText.ts` (itself a 15-line pure
+  reader); it writes nothing and touches no store, so the rule's
+  stated fear (a second IR write path re-opening the
+  answer-store-vs-IR fork) is not engaged. (2) But purity is not
+  the whole architecture: `PhaseFSeedInputs`' own record states
+  the Phase F pattern — derivations are computed by the WIRING and
+  read off the context, because question modules stay import-light
+  (the standalone content-i18n extractor loads them). The welcome
+  prefill and the pf_contact_info / pf_doc_language values
+  (`welcomePrefill`, `authorContact`, `bcp47Tag`) all follow it;
+  the two seed proposals were the family's only self-computing
+  members, calling lib derivations from inside `extract`. (3) The
+  sanctioned channel therefore already exists in the same
+  interface: the wiring (`runLiveExtractionFromStores`) builds the
+  seed context from the working-copy store — the store-adjacent
+  layer by design — and already imports lib derivations
+  (adaptiveDescription's prefill). Decision: the wiring computes
+  `proposeProjectUrl` / `proposeProvenanceBasis` and hands the
+  strings in as `ctx.phaseF.projectUrlProposal` /
+  `provenanceBasisProposal`; the modules' extracts return them
+  verbatim; `PhaseFSeedInputs.seeds` is retired (its only
+  consumers were the two modules). No config change, no exemption:
+  the violation is removed by construction, and the exemption
+  route remains available for a future derivation that genuinely
+  cannot be wiring-computed. Behavioural equivalence: the same
+  pure functions over the same three store slices, computed once
+  at the same single wiring site per instantiation instead of
+  per-extract; absent `phaseF` still yields absent. Pinned by
+  lib/phaseFSeeds.test.ts (functions untouched) and the StepHost
+  acceptance suite (seeding through the real wiring).
+  **Verified (fix lane, 2026-10-08):** the refactor landed as
+  `d5b0dccd` (rebased over Matthew's ci.yml decoupling commit
+  5ad0e14a, which had advanced the branch past the briefed head).
+  Depcruise in CI form (all packages, 1445 modules): 4 → **2**
+  violations; the pf pair is gone and the remainder is exactly the
+  pre-existing decisions-layer pair on liveExtraction's wiring
+  halves (→ workingCopyStore, → decisionStore) — the lead-ruled
+  exemption set already applied on 093's branch, untouched here.
+  Dependency count reconciles (4204 → 4203 studio-local: two edges
+  removed, one legal decisions→lib edge added). Studio tsc clean.
+  Suites: phaseFSeeds 8/8, liveExtraction 13/13, StepHost acceptance
+  4/4, orderParity 12/12, phaseFDemotion 5/5, questionModules +
+  registry 814/814. The two Phase F integration files were run
+  solo under a 150 s hard cap: both killed at the cap with zero
+  completions — the spin persists on THIS branch, as expected:
+  its cure is 093's extraction-idempotence fix (040d8592), which
+  is not on this branch and arrives with the same merge that
+  carries this fix up.
+
 ## Implementation outcome (Phase 7, T060–T063)
 
 - **SC-001 (FR-005):** the one-line `requires` edit + both-tracks

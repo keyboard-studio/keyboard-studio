@@ -54,3 +54,35 @@ the fix belongs with whoever owns the recorder/instantiation ordering
 gallery modules. The store-level pin lives in galleryLogEntries.test.ts
 ("HANDOFF G7 starting-point verification"); the live-walk spec
 deliberately asserts nothing about base-contribution presence.
+
+## CORRECTION — content-i18n-freshness crash was NOT an install artifact (fixed 2026-10-08)
+
+The T054-era classification ("crashes in this worktree on the D-090-46
+install artifact; CI installs fresh") was wrong: the crash reproduces in
+CI (run 37679325422's build log) on this branch and on 091's above it,
+while 088/089 pass the same chain. Root cause, three layers, all from
+090's delta making the question registry's import graph reach studio
+component modules (gallery modules import their renderers, D-090-8):
+
+1. `babel-plugin-macros` — an optional peer of @lingui/react/@lingui/core
+   that nothing provided — is now declared in packages/studio's
+   devDependencies (the consuming package), lockfile updated.
+2. Two module-top-level Vite-only reads on the newly-reached path made
+   load-safe without behaviour change: browserPatternLibrary's
+   import.meta.glob load is deferred to first use (memoized, same
+   one-shot semantics), and services.ts's USE_REAL env read goes through
+   the try/catch idiom lib/envFlag.ts already documents.
+3. Uncompiled Lingui macro EXECUTION (top-level msg() descriptor
+   constants — an endorsed pattern across the component layer) cannot be
+   deferred per-site; the extractor tool now resolves the two macro
+   specifiers to a runtime shim in its own runtimes only
+   (utilities/i18n-content-extract/linguiMacroShim.ts, wired via a
+   --import preload for the CLI and resolve.alias for its vitest run).
+   msg() in the shim is the identity — exactly what the compiled macro
+   emits — and the freshness check passing byte-identical is the
+   fidelity proof.
+
+Verified on the branch: full root lint chain exit 0; the utility's own
+vitest suite 30/30 (it was failing at collection on the same cause);
+studio tsc clean; browserPatternLibrary tests 5/5. The fix propagates
+to 091+ by merge.

@@ -38,20 +38,32 @@ import type {
 // module file (packages/studio/src/lib/), so reaching the repo-root content/
 // tree is four levels up: lib -> src -> studio -> packages -> <repo root>.
 //   packages/studio/src/lib/../../../../content/patterns = <repo root>/content/patterns
+//
+// The glob (and the load it feeds) runs on FIRST USE, not at module import:
+// import.meta.glob only exists under Vite, and Node-side tooling that loads
+// this module's import graph without calling the service (e.g. the
+// i18n-content-extract CLI walking the question registry under tsx) must not
+// crash at import time. In the browser the patterns are still loaded exactly
+// once, memoized below — the same one-shot semantics the eager top-level
+// load had, deferred to the first getPatternLibraryService()/getPatternByIdSync()
+// call, which is where every consumer already enters.
 // ---------------------------------------------------------------------------
 
-const YAML_MODULES = import.meta.glob(
-  "../../../../content/patterns/**/*.yaml",
-  { eager: true, query: "?raw", import: "default" },
-) as Record<string, string>;
+function globPatternModules(): Record<string, string> {
+  return import.meta.glob("../../../../content/patterns/**/*.yaml", {
+    eager: true,
+    query: "?raw",
+    import: "default",
+  }) as Record<string, string>;
+}
 
 // ---------------------------------------------------------------------------
-// Load + validate all YAML modules at import time (eager glob runs once)
+// Load + validate all YAML modules (runs once, on first use)
 // ---------------------------------------------------------------------------
 
 function loadAll(): Pattern[] {
   const patterns: Pattern[] = [];
-  for (const [path, raw] of Object.entries(YAML_MODULES)) {
+  for (const [path, raw] of Object.entries(globPatternModules())) {
     if (typeof raw !== "string") {
       devLog.warn(`[browserPatternLibrary] skipping ${path}: not a string`);
       continue;
@@ -78,12 +90,21 @@ function loadAll(): Pattern[] {
   return patterns;
 }
 
-const _allPatterns: Pattern[] = loadAll();
+interface PatternIndex {
+  all: Pattern[];
+  // O(1) id lookup — built once alongside `all`.
+  byId: Map<string, Pattern>;
+}
 
-// O(1) id lookup — built once alongside _allPatterns.
-const _patternById: Map<string, Pattern> = new Map(
-  _allPatterns.map((p) => [p.id, p]),
-);
+let _patternIndex: PatternIndex | null = null;
+
+function patternIndex(): PatternIndex {
+  if (_patternIndex === null) {
+    const all = loadAll();
+    _patternIndex = { all, byId: new Map(all.map((p) => [p.id, p])) };
+  }
+  return _patternIndex;
+}
 
 // ---------------------------------------------------------------------------
 // Service implementation
@@ -91,15 +112,15 @@ const _patternById: Map<string, Pattern> = new Map(
 
 class BrowserPatternLibraryService implements PatternLibraryService {
   listAll(): Promise<Pattern[]> {
-    return Promise.resolve([..._allPatterns]);
+    return Promise.resolve([...patternIndex().all]);
   }
 
   getById(id: string): Promise<Pattern | undefined> {
-    return Promise.resolve(_patternById.get(id));
+    return Promise.resolve(patternIndex().byId.get(id));
   }
 
   filterFor(base: BaseKeyboard, axes?: DiscoveryAxisVector): Promise<PatternMatch[]> {
-    return Promise.resolve(rankPatterns(_allPatterns, base, axes));
+    return Promise.resolve(rankPatterns(patternIndex().all, base, axes));
   }
 }
 
@@ -107,7 +128,7 @@ let _instance: BrowserPatternLibraryService | null = null;
 
 /**
  * Return the singleton browser pattern library service.
- * Patterns are loaded once via import.meta.glob at module-init time.
+ * Patterns are loaded once via import.meta.glob, on first use.
  */
 export function getPatternLibraryService(): PatternLibraryService {
   if (_instance === null) {
@@ -117,8 +138,8 @@ export function getPatternLibraryService(): PatternLibraryService {
 }
 
 /**
- * Synchronous pattern-by-id lookup over the same eagerly-loaded
- * `_patternById` index `getById()` wraps in a resolved Promise. Needed by
+ * Synchronous pattern-by-id lookup over the same memoized
+ * pattern index `getById()` wraps in a resolved Promise. Needed by
  * pure/non-async call sites (e.g. `buildSessionProducedSet` callers in
  * `useInventoryDiff`/galleries) that must resolve a `MechanismRef.patternId`
  * to its `Pattern.kmnFragment` inside a `useMemo`, not an effect — see
@@ -126,5 +147,5 @@ export function getPatternLibraryService(): PatternLibraryService {
  * mock fixture index the same way `getPatternLibraryService` does.
  */
 export function getPatternByIdSync(id: string): Pattern | undefined {
-  return _patternById.get(id);
+  return patternIndex().byId.get(id);
 }
