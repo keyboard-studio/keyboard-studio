@@ -428,7 +428,10 @@ export function useKeyboardArtifact(
   const prevKeyboardCssBlobUrls = useRef<string[]>([]);
   const runId = useRef(0);
   const engineRef = useRef<EngineModule | null>(null);
-  // Shared engine load+init promise. Assigned once by the first run() call.
+  // Shared engine load+init promise. Assigned by the first run() call that
+  // finds it empty; cleared again if the load rejects, so a later run()
+  // re-attempts the load instead of re-awaiting a cached failure (see the
+  // catch inside the Step 0 block in run()).
   // Subsequent concurrent run() calls await the same promise so they don't
   // skip the load block while engineRef.current is still null — which caused
   // runCompile to abort with engine=null on every mount of GalleryPreviewWithPatterns
@@ -669,7 +672,23 @@ export function useKeyboardArtifact(
     // Fire onInstantiate on full runs only (not recompile). The working-copy
     // store takes ownership of the IR here; the hook no longer calls setIR.
     if (isFullRun && onInstantiate !== null && onInstantiate !== undefined) {
-      onInstantiate(kb, { vfs, ir: parsedIr, removalCapabilities: parsedRemovalCapabilities });
+      try {
+        onInstantiate(kb, { vfs, ir: parsedIr, removalCapabilities: parsedRemovalCapabilities });
+      } catch (err: unknown) {
+        // The callback runs on the far side of setStage("compiling") and
+        // before setStage("ready") below, so an uncontained throw would
+        // escape through the caller's `void run(...)` as an unhandled
+        // rejection and leave the stage wedged on "compiling" forever — the
+        // preview silently appears to stop compiling. Land it on the same
+        // error surface compile failures use, with the failure visible.
+        if (runId.current !== thisRunId) return;
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Working-copy instantiation failed";
+        setStage({ kind: "error", step: "compile", message });
+        return;
+      }
     }
 
     // Carry font face info (added by the .kps font-loading path) onto the ready stage.
@@ -706,19 +725,35 @@ export function useKeyboardArtifact(
     // engineRef.current is still null (the original one-shot flag race).
     if (engineReadyPromise.current === null) {
       engineReadyPromise.current = (async () => {
-        const mod = await loadEngine();
-        if (mod === null) {
-          // The author sees the friendly string; the classifier must see the
-          // original text (FR-005a). Attaching it as `cause` carries it through
-          // without changing what the Stage: "error" UI renders.
-          const original = takeEngineLoadFailure();
-          throw new Error(
-            "Engine failed to load — check browser console for WASM errors.",
-            ...(original !== null ? [{ cause: original }] : []),
-          );
+        try {
+          const mod = await loadEngine();
+          if (mod === null) {
+            // The author sees the friendly string; the classifier must see the
+            // original text (FR-005a). Attaching it as `cause` carries it through
+            // without changing what the Stage: "error" UI renders.
+            const original = takeEngineLoadFailure();
+            throw new Error(
+              "Engine failed to load — check browser console for WASM errors.",
+              ...(original !== null ? [{ cause: original }] : []),
+            );
+          }
+          engineRef.current = mod;
+          await mod.init();
+        } catch (err: unknown) {
+          // A rejected load must not stay cached. This promise is the
+          // session's only engine-load attempt, so leaving the rejection in
+          // the ref would make every later run() — Retry included — re-await
+          // the same failure without ever re-attempting the load, stranding
+          // the preview on the error stage even when the failure was
+          // transient (a chunk fetch or WASM init that would succeed on a
+          // second attempt). Clearing the ref lets the next run() load
+          // afresh; the rejection still propagates unchanged to this run's
+          // catch below, which owns the error stage and the stale-chunk
+          // reload decision, so a failed attempt surfaces exactly once and
+          // nothing here can spin a reload loop.
+          engineReadyPromise.current = null;
+          throw err;
         }
-        engineRef.current = mod;
-        await mod.init();
       })();
     }
     try {
