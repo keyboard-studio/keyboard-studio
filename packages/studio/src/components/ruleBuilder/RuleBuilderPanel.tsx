@@ -46,6 +46,7 @@ import {
   CSS_TEXT_ON_ACCENT,
   ERROR_BG,
   ERROR_TEXT,
+  FONT,
   FONT_MONO,
   TEXT_DIM,
   TEXT_MAIN,
@@ -288,7 +289,8 @@ const fieldStyle: CSSProperties = {
   fontSize: 13,
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
-  borderRadius: 4,
+  borderRadius: "var(--app-radius-sm)",
+  fontFamily: FONT,
   color: TEXT_MAIN,
 };
 
@@ -303,21 +305,25 @@ const buttonStyle: CSSProperties = {
   fontSize: 13,
   background: "transparent",
   border: `1px solid ${BORDER}`,
-  borderRadius: 4,
+  borderRadius: "var(--app-radius-sm)",
+  fontFamily: FONT,
   color: TEXT_MAIN,
   cursor: "pointer",
   padding: "6px 12px",
 };
 
+// Sized like ui/Button's primary variant so the builder's actions match the
+// rest of the Rules step.
 const primaryButtonStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 600,
   background: ACCENT,
   border: "none",
-  borderRadius: 4,
+  borderRadius: "var(--app-radius-sm)",
   color: CSS_TEXT_ON_ACCENT,
   cursor: "pointer",
-  padding: "10px 16px",
+  padding: "8px 18px",
+  fontFamily: FONT,
 };
 
 // ---------------------------------------------------------------------------
@@ -598,7 +604,7 @@ export function RuleBuilderPanel({
           padding: 16,
           background: BG_CARD,
           border: `1px solid ${BORDER}`,
-          borderRadius: 8,
+          borderRadius: "var(--app-radius)",
         }}
       >
         <p style={{ margin: 0, fontSize: 14, color: TEXT_MAIN }}>
@@ -717,7 +723,7 @@ export function RuleBuilderPanel({
         padding: 16,
         background: BG_CARD,
         border: `1px solid ${BORDER}`,
-        borderRadius: 8,
+        borderRadius: "var(--app-radius)",
       }}
     >
       <h2 style={{ margin: 0, fontSize: 16, color: TEXT_MAIN }}>
@@ -765,7 +771,7 @@ export function RuleBuilderPanel({
               return (
                 <div
                   key={group.family.id}
-                  style={{ border: `1px solid ${BORDER}`, borderRadius: 4, padding: 8 }}
+                  style={{ border: `1px solid ${BORDER}`, borderRadius: "var(--app-radius-sm)", padding: 8 }}
                 >
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                     <input
@@ -842,7 +848,7 @@ export function RuleBuilderPanel({
                   fontSize: 13,
                   color: TEXT_MAIN,
                   border: `1px dashed ${BORDER}`,
-                  borderRadius: 4,
+                  borderRadius: "var(--app-radius-sm)",
                   padding: 8,
                 }}
               >
@@ -920,6 +926,7 @@ export function RuleBuilderPanel({
               color: ACCENT,
               cursor: "pointer",
               fontSize: 13,
+              fontFamily: FONT,
               padding: 0,
               textDecoration: "underline",
             }}
@@ -985,7 +992,7 @@ export function RuleBuilderPanel({
               padding: 8,
               marginBottom: 8,
               border: `1px solid ${BORDER}`,
-              borderRadius: 4,
+              borderRadius: "var(--app-radius-sm)",
               fontSize: 13,
             }}
           >
@@ -1130,7 +1137,7 @@ export function RuleBuilderPanel({
             style={{
               background: ERROR_BG,
               border: `1px solid ${ERROR_TEXT}`,
-              borderRadius: 4,
+              borderRadius: "var(--app-radius-sm)",
               padding: 8,
               marginTop: 8,
               fontSize: 13,
