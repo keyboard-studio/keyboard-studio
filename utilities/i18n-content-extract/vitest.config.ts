@@ -25,6 +25,12 @@ export default defineConfig({
       { find: /^@keyboard-studio\/contracts\/fixtures$/, replacement: resolve(contractsSrc, "fixtures/index.ts") },
       { find: /^@keyboard-studio\/contracts\/criteria$/, replacement: resolve(contractsSrc, "criteriaData.ts") },
       { find: /^@keyboard-studio\/contracts\/dev-log$/, replacement: resolve(contractsSrc, "utils/devLog.ts") },
+      // The test graph loads the studio question registry, whose component
+      // modules import Lingui macros; with no Vite lingui plugin in this
+      // config, the macro entries resolve to this tool's runtime shim
+      // (same shim the CLI preloads — see linguiMacroShim.ts).
+      { find: /^@lingui\/core\/macro$/, replacement: resolve(__dirname, "linguiMacroShim.ts") },
+      { find: /^@lingui\/react\/macro$/, replacement: resolve(__dirname, "linguiMacroShim.ts") },
     ],
   },
   test: {

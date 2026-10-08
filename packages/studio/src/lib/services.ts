@@ -38,7 +38,21 @@ import {
 } from "./browserPatternLibrary.ts";
 import { importOrReload } from "../crash/staleChunk.ts";
 
-export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
+// The env read goes through a try/catch, the same Node-safety idiom as
+// lib/envFlag.ts: outside a Vite context (a bare Node import of this
+// module's graph by tooling that never calls the services) `import.meta.env`
+// is undefined and the bare property access throws at module load. The
+// flag's default is "real unless explicitly 'false'", so an unreadable env
+// keeps the default.
+function readUseRealEngine(): boolean {
+  try {
+    return import.meta.env.VITE_USE_REAL_ENGINE !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export const USE_REAL = readUseRealEngine();
 
 // Single lazy-import seam for the engine barrel. Every accessor below routes
 // through it so (a) there is one `import()` expression for Vite to key the
