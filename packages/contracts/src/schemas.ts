@@ -802,6 +802,7 @@ export const HelpDocsAnswersSchema = z.object({
   projectHomeUrl: z.string().optional(),
   projectHelpUrl: z.string().optional(),
   docLanguage: z.enum(["english", "target", "bilingual"]).optional(),
+  docLanguageTags: z.array(z.string().min(1)).min(1).max(2).optional(),
   designRationale: z.string().optional(),
   fontGuidance: z.string().optional(),
   canonicalOrder: z.string().optional(),

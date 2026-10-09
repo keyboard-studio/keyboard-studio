@@ -64,6 +64,9 @@ export type DecisionId =
   | "help-usage-tip-2"
   | "help-history-bullets"
   | "help-doc-language"
+  | "help-doc-language-other"
+  | "help-doc-language-second"
+  | "help-doc-language-second-other"
   | "help-font-guidance"
   | "help-scope-variety"
   | "help-provenance-basis"
@@ -260,6 +263,9 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "help-usage-tip-2": [],
   "help-history-bullets": [],
   "help-doc-language": [],
+  "help-doc-language-other": [],
+  "help-doc-language-second": [],
+  "help-doc-language-second-other": [],
   "help-font-guidance": [],
   "help-scope-variety": [],
   "help-provenance-basis": [],

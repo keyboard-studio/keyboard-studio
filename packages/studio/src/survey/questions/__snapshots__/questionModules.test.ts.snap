@@ -140,7 +140,13 @@ exports[`live question modules > f/pf_credits.ts > definition contract 1`] = `"t
 
 exports[`live question modules > f/pf_design_rationale.ts > definition contract 1`] = `"text | optional | next [ctx.routing_group == 'non-roman' -> pf_canonical_order; (default) -> pf_example_words] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > f/pf_doc_language.ts > definition contract 1`] = `"radio | optional | next pf_font_guidance | options [english, target, bilingual] | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+exports[`live question modules > f/pf_doc_language.ts > definition contract 1`] = `"radio | optional | next [value == 'other' -> pf_doc_language_other; (default) -> pf_doc_language_second] | options [english, target, other] | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_doc_language_other.ts > definition contract 1`] = `"autocomplete | optional | next pf_doc_language_second | options_source @langtags_iso639 | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_doc_language_second.ts > definition contract 1`] = `"radio | optional | next [value == 'other' -> pf_doc_language_second_other; (default) -> pf_font_guidance] | options [none, english, target, other] | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_doc_language_second_other.ts > definition contract 1`] = `"autocomplete | optional | next pf_font_guidance | options_source @langtags_iso639 | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > f/pf_example_words.ts > definition contract 1`] = `"text | optional | next pf_troubleshooting | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 

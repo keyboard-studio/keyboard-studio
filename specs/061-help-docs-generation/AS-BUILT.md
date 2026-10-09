@@ -14,7 +14,7 @@
 
 ## Public contracts
 
-- `packages/contracts/src/help-docs.ts`: `HelpDocsAnswers { description; usageTips: string[]; credits?; contactInfo?; projectHomeUrl?; projectHelpUrl?; docLanguage?: "english" | "target" | "bilingual"; designRationale?; fontGuidance?; canonicalOrder?; scriptGlossary?; exampleWords?; scopeVariety?; provenanceBasis?; troubleshooting?; knownLimitations?; relatedKeyboards?; furtherReading? }`, with `HelpDocsAnswersSchema` mirror in `schemas.ts` (drift-guarded). Only `description` is required.
+- `packages/contracts/src/help-docs.ts`: `HelpDocsAnswers { description; usageTips: string[]; credits?; contactInfo?; projectHomeUrl?; projectHelpUrl?; docLanguage?: "english" | "target" | "bilingual" (legacy, no longer written); docLanguageTags?: string[] (1-2 BCP 47 tags, main language first); designRationale?; fontGuidance?; canonicalOrder?; scriptGlossary?; exampleWords?; scopeVariety?; provenanceBasis?; troubleshooting?; knownLimitations?; relatedKeyboards?; furtherReading? }`, with `HelpDocsAnswersSchema` mirror in `schemas.ts` (drift-guarded). Only `description` is required.
 - `packages/studio/src/stores/workingCopyStore.ts`: `helpDocs`, `baseWelcomeHtmText`, `baseHelpPhpText` (all default `null`); `setHelpDocs(helpDocs | null)` is whole-value replace, like `setAttribution`.
 - `packages/engine/src/shared/helpDocsRender.ts`: `buildDocSections`, `renderReadmeMd`, `renderReadmeHtm`, `renderWelcomeHtm`, `renderHelpPhp`, `DocSection`, `HelpDocsRenderInput`; also `renderWelcomeLayoutSection`, `extractWelcomeImageRefs`.
 - `packages/engine/src/loader/fetchKeyboardSourceToVfs.ts`: result gains optional `baseWelcomeHtmText`, `baseHelpPhpText`.
@@ -41,7 +41,14 @@
 
 ## Divergences from the spec
 
-None found. Data-model interface and contract identifiers match the code.
+None at retirement. Data-model interface and contract identifiers matched the code.
+
+## Amendments after retirement
+
+- **FR-006, help-page language (2026-10-08).** FR-006 originally tagged the shipped welcome and help pages with the keyboard's own primary language. It now reads: the page's declared language is the language the author says the help prose is written in, falling back to the keyboard's primary language when the author hasn't said. In code:
+  - `pf_doc_language` asks for the main language: English, the keyboard's language, or another language through `pf_doc_language_other`, a langtags picker. `pf_doc_language_second` (with `pf_doc_language_second_other`) adds an optional second language, so any two of English, the keyboard's language and another language can be paired (sil_yi EN+ZH, sil_cameroon_azerty EN+FR, winchus ES alone).
+  - `extractHelpDocs` resolves the answers to `HelpDocsAnswers.docLanguageTags`, main language first. `helpDocsRender.ts` `proseLang` sets `<html lang>` from the first tag. A bilingual page gets one root `lang`, not per-section spans, because each answer holds both languages in one text.
+  - Compatibility: additive. `docLanguageTags` is a new optional field. `docLanguage` stays in the type and schema so saved drafts still load, and a saved `pf_doc_language` answer of `bilingual` reads as English plus the keyboard's language. No contracts version bump.
 
 ## Follow-ups and open issues
 
