@@ -42,6 +42,7 @@ import { useIsNarrow } from "../hooks/useViewport.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
+import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -109,6 +110,9 @@ export function OutputScreen() {
   const reducedMotion = usePrefersReducedMotion();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
+  // SurveyView owns the draft autosave and is unmounted on this route; keep
+  // saving while Output is open (test builds, reports, source edits).
+  useOutputAutosave();
   const narrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
