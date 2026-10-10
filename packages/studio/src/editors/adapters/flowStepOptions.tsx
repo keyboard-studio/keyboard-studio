@@ -29,6 +29,7 @@ import {
 import { deriveHistoryEntryState, applyHistoryEntryAction } from "../../lib/historyEntryState.ts";
 import { identityLanguagePatch } from "../../lib/identityLanguagePatch.ts";
 import { proposeProjectUrl, proposeProvenanceBasis, type PhaseFSeedContext } from "../../lib/phaseFSeeds.ts";
+import { primarySubtag } from "../../lib/suggestBase.ts";
 import { isHistoryEntryAction } from "../../survey/questions/f/pf_history_entry.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 
@@ -362,12 +363,12 @@ const PHASE_F_SEEDS: Readonly<Record<string, PhaseFSeedSpec>> = {
   // pf_more_detail_gate's "No" is a plain default, not something any data
   // suggested — so it carries no source.
   pf_more_detail_gate: { getValue: () => "false" },
-  pf_doc_language: {
-    getValue: (deps) => {
-      const tag = deps.surveyContext["bcp47_tag"];
-      const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
-      return primary === "" || primary === "en" ? "english" : "bilingual";
-    },
+  // English main language (a plain default, so no source); for a non-English
+  // keyboard, its own language as the proposed second — the pair the old
+  // single "bilingual" answer proposed.
+  pf_doc_language: { getValue: () => "english" },
+  pf_doc_language_second: {
+    getValue: (deps) => (isEnglishTag(deps.surveyContext["bcp47_tag"]) ? "none" : "target"),
     source: "identity",
   },
   pf_history_entry: { getValue: () => "confirm", source: "analysis" },
@@ -422,6 +423,47 @@ const OPT_IN_QUESTION_IDS: ReadonlyArray<[OptInField, string]> = [
   ["furtherReading", "pf_further_reading"],
 ];
 
+function isEnglishTag(tag: string | undefined): boolean {
+  if (tag === undefined) return true;
+  return ["", "en"].includes(primarySubtag(tag));
+}
+
+/**
+ * The help prose's language tags, main language first (HelpDocsAnswers
+ * .docLanguageTags). Each choice resolves to a tag: "english" → "en",
+ * "target" → the keyboard's tag, "other" → that question's picker answer. A
+ * second choice that can't resolve (no keyboard tag yet, blank picker) is
+ * dropped, and a second language equal to the first is ignored. But an
+ * unresolved MAIN language yields no tags at all: promoting the second
+ * language into `tags[0]` would make it the page's `<html lang>` and
+ * mislabel prose written in the main language, so the renderer instead
+ * falls back to the keyboard's `primaryBcp47`. The legacy
+ * single-question "bilingual" answer reads as English + the keyboard's
+ * language.
+ */
+function resolveDocLanguageTags(result: SurveyPhaseResult, targetBcp47: string | undefined): string[] {
+  const resolve = (choice: string | undefined, otherQuestionId: string): string | undefined => {
+    if (choice === "english") return "en";
+    if (choice === "target") return targetBcp47?.trim() || undefined;
+    if (choice === "other") return getTextAnswer(result, otherQuestionId)?.trim() || undefined;
+    return undefined;
+  };
+  const main = getTextAnswer(result, "pf_doc_language");
+  const candidates =
+    main === "bilingual"
+      ? [resolve("english", ""), resolve("target", "")]
+      : [
+          resolve(main, "pf_doc_language_other"),
+          resolve(getTextAnswer(result, "pf_doc_language_second"), "pf_doc_language_second_other"),
+        ];
+  if (candidates[0] === undefined) return [];
+  const tags: string[] = [];
+  for (const tag of candidates) {
+    if (tag !== undefined && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) tags.push(tag);
+  }
+  return tags;
+}
+
 function getTextAnswer(result: SurveyPhaseResult, questionId: string): string | undefined {
   const answer = result.answers.find((a) => a.questionId === questionId);
   return answer !== undefined && typeof answer.value === "string" ? answer.value : undefined;
@@ -437,8 +479,14 @@ function getTextAnswer(result: SurveyPhaseResult, questionId: string): string | 
  * reachable in the live flow (research D-11). `pf_project_url` splits on a
  * newline into `projectHomeUrl`/`projectHelpUrl` — the question's own
  * documented "one or two lines" format (FR-004).
+ *
+ * `targetBcp47` is the keyboard's own tag, which a "the language of the
+ * keyboard" doc-language answer resolves to.
  */
-export function extractHelpDocs(result: SurveyPhaseResult): HelpDocsAnswers | undefined {
+export function extractHelpDocs(
+  result: SurveyPhaseResult,
+  targetBcp47?: string,
+): HelpDocsAnswers | undefined {
   const description = getTextAnswer(result, "pf_welcome_paragraph")?.trim() ?? "";
   if (description === "") return undefined;
 
@@ -464,10 +512,8 @@ export function extractHelpDocs(result: SurveyPhaseResult): HelpDocsAnswers | un
     if (lines[1] !== undefined) helpDocs.projectHelpUrl = lines[1];
   }
 
-  const docLanguage = getTextAnswer(result, "pf_doc_language");
-  if (docLanguage === "english" || docLanguage === "target" || docLanguage === "bilingual") {
-    helpDocs.docLanguage = docLanguage;
-  }
+  const docLanguageTags = resolveDocLanguageTags(result, targetBcp47);
+  if (docLanguageTags.length > 0) helpDocs.docLanguageTags = docLanguageTags;
 
   for (const [field, questionId] of OPT_IN_QUESTION_IDS) {
     const value = getTextAnswer(result, questionId)?.trim();
@@ -555,7 +601,10 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
     // spec 061: wire the previously-inert Phase F answers into the working
     // copy. Skipped entirely (not setHelpDocs(null)) when the required
     // description is blank — see extractHelpDocs's doc comment.
-    const extracted = extractHelpDocs(result);
+    const extracted = extractHelpDocs(
+      result,
+      deps.identityResult?.bcp47 || deps.surveyContext["bcp47_tag"],
+    );
     if (extracted !== undefined) {
       deps.setHelpDocs(extracted);
     }

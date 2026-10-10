@@ -100,6 +100,15 @@
   "pf_doc_language": [
     "specs/061-help-docs-generation"
   ],
+  "pf_doc_language_other": [
+    "specs/061-help-docs-generation"
+  ],
+  "pf_doc_language_second": [
+    "specs/061-help-docs-generation"
+  ],
+  "pf_doc_language_second_other": [
+    "specs/061-help-docs-generation"
+  ],
   "pf_contact_info": [
     "specs/064-keyboard-attribution"
   ]

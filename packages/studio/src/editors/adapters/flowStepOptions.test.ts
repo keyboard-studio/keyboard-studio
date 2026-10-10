@@ -672,6 +672,103 @@ describe("extractHelpDocs — US3 optional default-path answers", () => {
   });
 });
 
+describe("extractHelpDocs — help-page languages (docLanguageTags)", () => {
+  const tagsFor = (answers: SurveyAnswer[], targetBcp47?: string) =>
+    extractHelpDocs(
+      buildResultG([textAnswer("pf_welcome_paragraph", "A keyboard."), ...answers]),
+      targetBcp47,
+    )?.docLanguageTags;
+
+  it("leaves the tags out when the language question was never answered", () => {
+    expect(tagsFor([], "bum")).toBeUndefined();
+  });
+
+  it("resolves English and the keyboard's own language to tags", () => {
+    expect(tagsFor([textAnswer("pf_doc_language", "english")], "bum")).toEqual(["en"]);
+    expect(tagsFor([textAnswer("pf_doc_language", "target")], "bum-Latn")).toEqual(["bum-Latn"]);
+  });
+
+  it("takes another language from its picker (winchus: Spanish only)", () => {
+    expect(
+      tagsFor([textAnswer("pf_doc_language", "other"), textAnswer("pf_doc_language_other", "es")], "cbi"),
+    ).toEqual(["es"]);
+  });
+
+  it("pairs any two languages, main language first", () => {
+    // sil_cameroon_azerty-style: English + French, neither the keyboard's language.
+    expect(
+      tagsFor(
+        [
+          textAnswer("pf_doc_language", "english"),
+          textAnswer("pf_doc_language_second", "other"),
+          textAnswer("pf_doc_language_second_other", "fr"),
+        ],
+        "bum",
+      ),
+    ).toEqual(["en", "fr"]);
+    // khmer_angkor-style: English + the keyboard's language.
+    expect(
+      tagsFor(
+        [textAnswer("pf_doc_language", "english"), textAnswer("pf_doc_language_second", "target")],
+        "km",
+      ),
+    ).toEqual(["en", "km"]);
+  });
+
+  it("ignores a picker answer left over from a branch the author backed out of", () => {
+    expect(
+      tagsFor(
+        [
+          textAnswer("pf_doc_language", "english"),
+          textAnswer("pf_doc_language_other", "es"),
+          textAnswer("pf_doc_language_second", "none"),
+        ],
+        "cbi",
+      ),
+    ).toEqual(["en"]);
+  });
+
+  it("drops a language it can't resolve, and a second language that repeats the first", () => {
+    expect(tagsFor([textAnswer("pf_doc_language", "target")])).toBeUndefined();
+    expect(
+      tagsFor([textAnswer("pf_doc_language", "other"), textAnswer("pf_doc_language_other", "  ")], "bum"),
+    ).toBeUndefined();
+    expect(
+      tagsFor(
+        [textAnswer("pf_doc_language", "target"), textAnswer("pf_doc_language_second", "target")],
+        "bum",
+      ),
+    ).toEqual(["bum"]);
+  });
+
+  it("never promotes the second language when the main language can't resolve", () => {
+    // Blank "other" picker as main + English as second: no tags, so the
+    // renderer's <html lang> falls back to the keyboard's primaryBcp47
+    // instead of mislabelling main-language prose as English.
+    expect(
+      tagsFor(
+        [
+          textAnswer("pf_doc_language", "other"),
+          textAnswer("pf_doc_language_other", "  "),
+          textAnswer("pf_doc_language_second", "english"),
+        ],
+        "bum",
+      ),
+    ).toBeUndefined();
+    // Same for "target" with no keyboard tag yet.
+    expect(
+      tagsFor(
+        [textAnswer("pf_doc_language", "target"), textAnswer("pf_doc_language_second", "english")],
+        undefined,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("reads the legacy single-question 'bilingual' answer as English + the keyboard's language", () => {
+    expect(tagsFor([textAnswer("pf_doc_language", "bilingual")], "km")).toEqual(["en", "km"]);
+  });
+});
+
 describe("extractHelpDocs — US4 opt-in additional-detail battery", () => {
   it("captures all eleven opt-in fields when answered (FR-011/FR-014)", () => {
     const result = buildResultG([
@@ -886,10 +983,12 @@ describe("phaseFOptions.seeds.getSeedValue (choice defaults)", () => {
     expect(seedFor("pf_more_detail_gate")).toBe("false");
   });
 
-  it("defaults the help language to English, or bilingual for a non-English keyboard", () => {
+  it("defaults the help language to English, plus the keyboard's own language for a non-English keyboard", () => {
     expect(seedFor("pf_doc_language")).toBe("english");
-    expect(seedFor("pf_doc_language", { bcp47_tag: "en-Latn" })).toBe("english");
-    expect(seedFor("pf_doc_language", { bcp47_tag: "ha-Latn" })).toBe("bilingual");
+    expect(seedFor("pf_doc_language", { bcp47_tag: "ha-Latn" })).toBe("english");
+    expect(seedFor("pf_doc_language_second")).toBe("none");
+    expect(seedFor("pf_doc_language_second", { bcp47_tag: "en-Latn" })).toBe("none");
+    expect(seedFor("pf_doc_language_second", { bcp47_tag: "ha-Latn" })).toBe("target");
   });
 
   it("preselects adding the drafted HISTORY entry", () => {
@@ -957,7 +1056,8 @@ describe("phaseFOptions.seeds — derived text proposals", () => {
     const sourceFor = (id: string) => phaseFOptions.seeds!.getSeedSource!(id, buildDeps().deps);
     expect(sourceFor("pf_welcome_paragraph")).toBe("base");
     expect(sourceFor("pf_contact_info")).toBe("identity");
-    expect(sourceFor("pf_doc_language")).toBe("identity");
+    expect(sourceFor("pf_doc_language")).toBeUndefined();
+    expect(sourceFor("pf_doc_language_second")).toBe("identity");
     expect(sourceFor("pf_history_entry")).toBe("analysis");
     expect(sourceFor("pf_project_url")).toBe("base");
     expect(sourceFor("pf_provenance_basis")).toBe("base");

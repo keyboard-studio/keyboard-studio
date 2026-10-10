@@ -18,14 +18,16 @@ import {
 } from "./registry.ts";
 
 describe("questionRegistry", () => {
-  // 9 Phase A + 47 Phase B + 24 Phase F + 3 Phase G + 31 Reserve = 114 total
+  // 9 Phase A + 47 Phase B + 27 Phase F + 3 Phase G + 31 Reserve = 117 total
   // (re-verified 2026-09-21; spec 069 FR-002 — update this count in the same
   // change that adds or removes a questionRegistry entry. Spec 079 US5 adds
   // pf_history_entry + pf_history_entry_bullets to Phase F; spec 075 FR-019
   // retired pb_rtl_direction_marks + pb_rtl_direction_marks_detail from Phase B:
-  // the invisible-characters spine step subsumes them.)
-  it("has exactly the verified inventory of 114 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(114);
+  // the invisible-characters spine step subsumes them. pf_doc_language_other,
+  // pf_doc_language_second and pf_doc_language_second_other add a chosen
+  // help-page language and a second one.)
+  it("has exactly the verified inventory of 117 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(117);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {
