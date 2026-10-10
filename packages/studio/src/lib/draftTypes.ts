@@ -140,4 +140,53 @@ export interface DurableDraft {
    * store, so every step shows its proposal and nothing is invented (FR-032).
    */
   surveyAnswers?: SurveyAnswerSnapshot;
+  /**
+   * The project's test builds and the author's notes on tester reports (spec
+   * 094, stores/testingStore.ts). Optional and additive with no
+   * `DRAFT_VERSION` bump, following the `phaseBDraft` / `decisionRecord` /
+   * `surveyAnswers` precedent: a draft without it simply has no testing yet.
+   * The cloud draft stores the envelope as an opaque blob, so it syncs with no
+   * server change.
+   */
+  testing?: TestingRecord;
+}
+
+/** One installable package made for testing (spec 094 data-model.md). */
+export interface TestBuild {
+  /** Random 16-hex id; the two-device merge key. */
+  buildId: string;
+  /** The N in "Test build N". Shared by two builds only after a two-device collision. */
+  number: number;
+  /** The test version it was built at (research R1). */
+  version: string;
+  /** ISO-8601, client clock; display only. */
+  createdAt: string;
+  /** SHA-256 of the stable publish projection (research R7). */
+  fingerprint: string;
+  /** Decision-record entry count when the build was made. */
+  decisionCursor: number;
+  /** Stage ids changed since the previous build; may contain "source". */
+  changedSections: string[];
+  /** The previous build's number when the fingerprints match. */
+  identicalTo?: number;
+}
+
+/** The author's own note of one problem a tester reported (spec 094 FR-012). */
+export interface TesterReport {
+  reportId: string;
+  text: string;
+  foundInBuild: number;
+  sectionId?: string;
+  status: "open" | "fixed";
+  /** Decision cursor when it was marked fixed. */
+  markedFixedAt?: number;
+  /** The first build made after it was marked fixed (FR-014). */
+  fixedInBuild?: number;
+}
+
+export interface TestingRecord {
+  /** Advanced only after a build succeeds (FR-011); the maximum of both sides on a merge. */
+  nextBuildNumber: number;
+  builds: TestBuild[];
+  reports: TesterReport[];
 }

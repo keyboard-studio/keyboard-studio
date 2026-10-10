@@ -29,7 +29,7 @@ import { plural } from "@lingui/core/macro";
 import { DecisionEntryRow } from "./DecisionEntryRow.tsx";
 import type { ResolveContext } from "../lib/resolveLocation.ts";
 import { buildStageGroups, type StageGroup } from "./stageGroups.ts";
-import { formatClauseList, stageActionLabel } from "./stageText.ts";
+import { formatClauseList, stageActionLabel, dimensionLabel as dimensionLabelText } from "./stageText.ts";
 import type { HeadlineDimension } from "./headline.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 import { useScrollRestoration } from "../hooks/useScrollRestoration.ts";
@@ -265,45 +265,8 @@ export function DecisionTrailView({
   // cannot disagree on what a stage is called (SC-007).
   const stageLabel = (actionType: EditorActionType): string => stageActionLabel(actionType, i18n);
 
-  // One dimension's ICU-pluralized text (FR-011/FR-012) — mirrors
-  // DecisionEntryRow's dimensionLabel so a stage's composed roll-up reads the
-  // same way its entries do (SC-007). `count` is destructured to a plain local
-  // so the Lingui macro derives the named placeholder `count`.
-  const dimensionLabel = (dimension: HeadlineDimension): string => {
-    const { count } = dimension;
-    switch (dimension.kind) {
-      case "keysRemoved":
-        return t({
-          id: "trail.entry.headline.dimension.keysRemoved",
-          message: plural(count, { one: "# key removed", other: "# keys removed" }),
-        });
-      case "keysAdded":
-        return t({
-          id: "trail.entry.headline.dimension.keysAdded",
-          message: plural(count, { one: "# key added", other: "# keys added" }),
-        });
-      case "mechanismsAssigned":
-        return t({
-          id: "trail.entry.headline.dimension.mechanismsAssigned",
-          message: plural(count, {
-            one: "# mechanism assigned",
-            other: "# mechanisms assigned",
-          }),
-        });
-      case "touchKeysAffected":
-        return t({
-          id: "trail.entry.headline.dimension.touchKeysAffected",
-          message: plural(count, {
-            one: "# touch key affected",
-            other: "# touch keys affected",
-          }),
-        });
-      default: {
-        const _exhaustive: never = dimension.kind;
-        return _exhaustive;
-      }
-    }
-  };
+  // Shared with the stage roll-ups and Output's section list (stageText.ts).
+  const dimensionLabel = (dimension: HeadlineDimension): string => dimensionLabelText(dimension, i18n);
 
   // A non-editor stage's author-facing name, keyed on the manifest stepId
   // rather than any actionType (base-contribution and survey-summary roll-ups

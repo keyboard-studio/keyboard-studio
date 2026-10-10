@@ -28,7 +28,7 @@ import { deriveRuleAdditions } from "./ruleAdditions.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import {
-  bumpKeyboardVersion,
+  resolvePublishVersion,
   generateStubs,
   resolveInheritedHolders,
   parseTargetTokens,
@@ -55,6 +55,7 @@ import {
 } from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
+import { hasTestBuilds } from "../stores/testingStore.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -312,7 +313,8 @@ export async function projectWorkingCopyForOutput(
   let historyVersion = rawVersion;
   const isAdaptation = instantiationMode === "adapt-existing";
   if (isAdaptation) {
-    const bumpedVersion = bumpKeyboardVersion(rawVersion);
+    // spec 094: the one publish-version decision (research R1).
+    const bumpedVersion = resolvePublishVersion({ mode: "adapt-existing", rawVersion, hasTestBuilds: hasTestBuilds() });
     version = bumpedVersion.replace(/[^\w.\-]/g, "_");
     historyVersion = bumpedVersion;
 

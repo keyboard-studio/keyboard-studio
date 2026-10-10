@@ -97,6 +97,9 @@ export type { ImportAttributionInput } from "./output/index.js";
 
 // Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
 export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
+// The one place the output release version is decided (spec 094).
+export { resolvePublishVersion, resolveTestBuildVersion } from "./output/index.js";
+export type { OutputVersionMode, TestBuildVersionResult } from "./output/index.js";
 // Installable package (.kmp) — the primary download (spec §12). `buildKmp`
 // lazily imports @keymanapp/kmc-package on first call, so naming it here does
 // not pull jszip/marked into a consumer's entry chunk.

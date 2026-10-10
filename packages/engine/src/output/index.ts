@@ -21,6 +21,8 @@ export { addSidecar, isSidecarPath, STUDIO_METADATA_PREFIX } from "./sidecar.js"
 export { buildImportAttributionBlock } from "./import-attribution.js";
 export type { ImportAttributionInput } from "./import-attribution.js";
 export { bumpKeyboardVersion, stageAdaptHistory } from "./adapt-staging.js";
+export { resolvePublishVersion, resolveTestBuildVersion } from "./output-version.js";
+export type { OutputVersionMode, TestBuildVersionResult } from "./output-version.js";
 // Installable package (.kmp) — the primary download. Values are exported as
 // async functions and types via `export type` only, so nothing here forces
 // eager evaluation of kmp.js and its lazy jszip/marked chunk stays out of the

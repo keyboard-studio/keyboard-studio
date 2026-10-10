@@ -24,9 +24,10 @@
 
 import { useMemo } from "react";
 import type { DocMemberId, LintFinding } from "@keyboard-studio/contracts";
-import { bumpKeyboardVersion, renderHistoryMd } from "@keyboard-studio/engine";
+import { renderHistoryMd, resolvePublishVersion } from "@keyboard-studio/engine";
 import { runDocChecks } from "@keymanapp/keyboard-lint";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useHasTestBuilds } from "../stores/testingStore.ts";
 import { useDocsPreview } from "./useDocsPreview.ts";
 import { useDocMemberStates } from "./useDocMemberStates.ts";
 import { collectDocLintInput, docMemberForPath } from "../lib/collectDocLintInput.ts";
@@ -50,13 +51,19 @@ export function useDocumentationFindings(): LintFinding[] {
   const baselineDocFindings = useWorkingCopyStore((s) => s.baselineDocFindings);
   const docs = useDocsPreview();
   const memberStates = useDocMemberStates();
+  // spec 094: a tested three-part adapt base publishes at a.(b+1).0.
+  const testBuildsExist = useHasTestBuilds();
 
   return useMemo(() => {
     if (baseVfs === null || baseIr === null || baseKeyboard === null) return EMPTY;
     const isAdaptation = instantiationMode === "adapt-existing";
     const keyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
     const rawVersion = baseIr.header.version?.trim() || "1.0";
-    const keyboardVersion = isAdaptation ? bumpKeyboardVersion(rawVersion) : rawVersion;
+    const keyboardVersion = resolvePublishVersion({
+      mode: isAdaptation ? "adapt-existing" : "new-from-base",
+      rawVersion,
+      hasTestBuilds: testBuildsExist,
+    });
 
     const kmnPath = findKmnPath(baseVfs);
     const kmnText = kmnPath ? (readVfsText(baseVfs, kmnPath) ?? null) : null;
@@ -120,5 +127,6 @@ export function useDocumentationFindings(): LintFinding[] {
     baselineDocFindings,
     docs,
     memberStates,
+    testBuildsExist,
   ]);
 }

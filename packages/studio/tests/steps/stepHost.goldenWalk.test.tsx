@@ -582,3 +582,107 @@ describe("golden-walk: adapt-track (T004)", () => {
     expect(walk).toEqual(fixture);
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 094 T014 — revise-from-Output loop (SC-002)
+//
+// After a full walk the author is on Output. Each revision opens ONE step with
+// `jumpToLocation(..., { returnTo: { route: "output" } })` and comes straight
+// back. `navigateTo` is mocked here, so the hash round trip that remounts
+// SurveyView in the app is simulated: unmount (leave for Output), jump, mount.
+// "Zero unchanged steps revisited" is asserted on what ran: every decision
+// entry and every reducer completion between leaving Output and returning
+// belongs to the targeted step.
+// ---------------------------------------------------------------------------
+
+import { jumpToLocation } from "../../src/lib/jumpToLocation.ts";
+import { useDecisionLogStore } from "../../src/decisions/decisionLogStore.ts";
+import { seedInstantiatedWorkingCopy } from "../../src/test/workingCopy.ts";
+
+function routeOf(arg: unknown): string {
+  return typeof arg === "string" ? arg : (arg as { route: string }).route;
+}
+
+async function reviseFromOutput(stepId: string, controlTestId: string) {
+  cleanup();
+  const navigateToMock = navigateTo as ReturnType<typeof vi.fn>;
+  navigateToMock.mockClear();
+  const completions = vi.spyOn(ReducerModule, "applyStepCompletion");
+  completions.mockClear();
+  const entriesBefore = useDecisionLogStore.getState().record.entries.length;
+
+  const outcome = jumpToLocation(
+    { route: "survey", step: stepId as never },
+    { returnTo: { route: "output" } },
+  );
+  expect(outcome.kind).toBe("arrived");
+  await act(async () => {
+    renderSurveyWithNav();
+  });
+  expect(useSurveySessionStore.getState().activeStepId).toBe(stepId);
+
+  // Every step the walk moves onto after the revised step's control is used.
+  const movedTo: string[] = [];
+  const unsubscribe = useSurveySessionStore.subscribe((state, prev) => {
+    if (state.activeStepId !== prev.activeStepId) movedTo.push(state.activeStepId);
+  });
+  await act(async () => {
+    fireEvent.click(await screen.findByTestId(controlTestId));
+  });
+  unsubscribe();
+
+  const newEntries = useDecisionLogStore.getState().record.entries.slice(entriesBefore);
+  const completedSteps = completions.mock.calls.map((c) => String(c[0]));
+  const routes = navigateToMock.mock.calls.map((c) => routeOf(c[0]));
+  completions.mockRestore();
+  return { newEntries, completedSteps, routes, entriesBefore, movedTo };
+}
+
+describe.each([
+  ["copy", driveCopyTrack],
+  ["adapt", driveAdaptTrack],
+] as const)("revise-from-Output loop (spec 094) — %s track", (_name, drive) => {
+  beforeEach(async () => {
+    const recorder = createRecorder();
+    await act(async () => {
+      renderSurveyWithNav();
+    });
+    await drive(recorder);
+    recorder.restore();
+    // The harness mocks base resolution, so the walk leaves no real working
+    // copy; a revision needs one (jumpToLocation refuses with "no-project").
+    // Seeding touches only the working-copy store — the walk's traversal and
+    // decision record stand.
+    if (useWorkingCopyStore.getState().baseKeyboard === null) seedInstantiatedWorkingCopy([]);
+  });
+
+  it("a pane step: confirm returns to Output, touching no other step", async () => {
+    const { newEntries, completedSteps, routes, movedTo } = await reviseFromOutput("punctuation", "punctuation-done");
+    // The step completed (one advance past it) and nothing else ran before
+    // the return. A no-change completion records no entry (spec 079 T028),
+    // so entries may be empty; any that exist belong to this step.
+    expect(movedTo).toHaveLength(1);
+    expect(newEntries.every((e) => e.stepId === "punctuation")).toBe(true);
+    expect(completedSteps.every((s) => s === "punctuation")).toBe(true);
+    expect(routes[routes.length - 1]).toBe("output");
+  });
+
+  it("a full-layout step: Back to testing completes it and returns to Output", async () => {
+    const { newEntries, completedSteps, routes, movedTo } = await reviseFromOutput("rules", "step-revision-back-to-testing");
+    // The step completed (one advance past it) and nothing else ran before
+    // the return. A no-change completion records no entry (spec 079 T028),
+    // so entries may be empty; any that exist belong to this step.
+    expect(movedTo).toHaveLength(1);
+    expect(newEntries.every((e) => e.stepId === "rules")).toBe(true);
+    expect(completedSteps.every((s) => s === "rules")).toBe(true);
+    expect(routes[routes.length - 1]).toBe("output");
+  });
+
+  it("Discard returns to Output and records nothing", async () => {
+    const { newEntries, completedSteps, routes, movedTo } = await reviseFromOutput("punctuation", "step-revision-discard");
+    expect(movedTo).toEqual([]);
+    expect(newEntries).toEqual([]);
+    expect(completedSteps).toEqual([]);
+    expect(routes[routes.length - 1]).toBe("output");
+  });
+});

@@ -44,6 +44,7 @@ import {
   useWorkingCopyStore,
   bindManifest,
 } from "./stores/workingCopyStore.ts";
+import { useTestingStore } from "./stores/testingStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
 import {
@@ -1272,6 +1273,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // Saved answers and within-step positions belong to the abandoned project
     // (spec 080 FR-033: one of the only two reset sites).
     useSurveyAnswerStore.getState().reset();
+    // spec 094 FR-015: start-over discards the draft's test builds and reports.
+    useTestingStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT

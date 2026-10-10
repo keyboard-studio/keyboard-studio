@@ -21,7 +21,8 @@ const SLOT_VARIANTS = [
 export function StepNavCluster({ stepId }: { stepId: string }) {
   const { t } = useLingui();
   const spec = useStepNavStore((s) => s.entries[stepId]?.spec);
-  if (spec === undefined || !hasSlots(spec)) return null;
+  const revision = useStepNavStore((s) => (s.revision?.stepId === stepId ? s.revision : null));
+  if (revision === null && (spec === undefined || !hasSlots(spec))) return null;
 
   return (
     <div
@@ -50,9 +51,30 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
         overflowY: "hidden",
       }}
     >
+      {revision !== null && (
+        <Button
+          variant="secondary"
+          size="compact"
+          data-testid="step-revision-discard"
+          onClick={revision.onDiscard}
+        >
+          {t({ id: "step.revision.discard", message: "Discard changes and go back" })}
+        </Button>
+      )}
       {SLOT_VARIANTS.map(([slot, variant]) => {
-        const action: NavAction | undefined = spec[slot];
-        if (action === undefined) return null;
+        const stepAction: NavAction | undefined = spec?.[slot];
+        if (stepAction === undefined) return null;
+        // spec 094: while revising from Output, the editor's own forward
+        // completes the step and StepHost returns to Output, so it is named
+        // for where it goes.
+        const action: NavAction =
+          revision !== null && slot === "forward"
+            ? {
+                ...stepAction,
+                label: t({ id: "step.revision.backToTesting", message: "Back to testing" }),
+                testId: "step-revision-back-to-testing",
+              }
+            : stepAction;
         return (
           <Button
             key={slot}

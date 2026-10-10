@@ -78,6 +78,7 @@ import {
 } from "./draftPersistence.ts";
 import { saveServerDraft, saveServerDraftBeacon } from "./serverDraftStore.ts";
 import { irGroup } from "@keyboard-studio/contracts/fixtures";
+import { useTestingStore } from "../stores/testingStore.ts";
 
 const mockedSaveServerDraft = vi.mocked(saveServerDraft);
 const mockedSaveServerDraftBeacon = vi.mocked(saveServerDraftBeacon);
@@ -2433,4 +2434,110 @@ describe("draftPersistence", () => {
     });
   });
 
+});
+
+describe("spec 094: the testing record rides the draft", () => {
+  const testing = () => useTestingStore.getState();
+  const recordOneBuild = (fingerprint = "a".repeat(64)) =>
+    testing().recordBuild({ version: "0.1", fingerprint, decisionCursor: 0, changedSections: [] });
+
+  beforeEach(() => {
+    testing().reset();
+  });
+
+  it("round-trips builds and reports through save, reset and load (SC-005)", () => {
+    instantiateMinimal("testing_rt");
+    recordOneBuild();
+    testing().addReport({ text: "wrong vowel", foundInBuild: 1, sectionId: "rules" });
+    const before = testing().snapshot();
+    saveDraft("testing_rt");
+
+    testing().reset();
+    useWorkingCopyStore.getState().reset();
+    expect(loadDraft("testing_rt")).toBe(true);
+    expect(testing().snapshot()).toEqual(before);
+  });
+
+  it("a draft without a testing field loads with an empty record, never another project's", () => {
+    instantiateMinimal("testing_none");
+    saveDraft("testing_none");
+    const stored = JSON.parse(localStorage.getItem(draftKey("testing_none"))!) as DurableDraft;
+    expect(stored).not.toHaveProperty("testing");
+
+    recordOneBuild(); // live state from some other project
+    expect(loadDraft("testing_none")).toBe(true);
+    expect(testing().snapshot()).toBeUndefined();
+  });
+
+  it("applyRemoteDraft merges with the local record stored under the same key", () => {
+    instantiateMinimal("testing_merge");
+    recordOneBuild("1".repeat(64));
+    saveDraft("testing_merge");
+    const localBuild = testing().builds[0]!;
+
+    const remote = JSON.parse(localStorage.getItem(draftKey("testing_merge"))!) as DurableDraft;
+    remote.testing = {
+      nextBuildNumber: 2,
+      builds: [{ ...localBuild, buildId: "feedfacefeedface", fingerprint: "2".repeat(64) }],
+      reports: [],
+    };
+
+    testing().reset();
+    expect(applyRemoteDraft(remote)).toBe(true);
+    expect(testing().builds.map((b) => b.buildId).sort()).toEqual([localBuild.buildId, "feedfacefeedface"].sort());
+    expect(testing().nextBuildNumber).toBe(2);
+  });
+
+  it("applyRemoteDraft for project B never merges in project A's live builds", () => {
+    instantiateMinimal("testing_b");
+    saveDraft("testing_b");
+    const remoteB = JSON.parse(localStorage.getItem(draftKey("testing_b"))!) as DurableDraft;
+    remoteB.testing = {
+      nextBuildNumber: 2,
+      builds: [
+        {
+          buildId: "bbbbbbbbbbbbbbbb",
+          number: 1,
+          version: "0.1",
+          createdAt: "2026-10-09T00:00:00.000Z",
+          fingerprint: "b".repeat(64),
+          decisionCursor: 0,
+          changedSections: [],
+        },
+      ],
+      reports: [],
+    };
+
+    recordOneBuild("a".repeat(64)); // project A, live
+    expect(applyRemoteDraft(remoteB)).toBe(true);
+    expect(testing().builds.map((b) => b.buildId)).toEqual(["bbbbbbbbbbbbbbbb"]);
+  });
+
+  it("a submitted project freezes the record and writes nothing more", async () => {
+    instantiateMinimal("testing_frozen");
+    recordOneBuild();
+    saveDraft("testing_frozen");
+    await recordProjectSubmission("https://github.com/x/y/pull/1", null);
+
+    expect(testing().frozen).toBe(true);
+    expect(recordOneBuild("c".repeat(64))).toBeNull();
+
+    const before = localStorage.getItem(draftKey("testing_frozen"));
+    setActiveProjectKey("testing_frozen");
+    saveDraft("testing_frozen");
+    expect(localStorage.getItem(draftKey("testing_frozen"))).toBe(before);
+  });
+
+  it("autosave fires on a testing-store change, on the same debounce", () => {
+    vi.useFakeTimers();
+    instantiateMinimal("testing_autosave");
+    const teardown = installDraftAutosave("testing_autosave");
+
+    recordOneBuild();
+    vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+    const stored = JSON.parse(localStorage.getItem(draftKey("testing_autosave"))!) as DurableDraft;
+    expect(stored.testing?.builds).toHaveLength(1);
+
+    teardown();
+  });
 });

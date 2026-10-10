@@ -14,7 +14,7 @@
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import type { DecisionProposalSource, SurveyPhaseResult, HelpDocsAnswers } from "@keyboard-studio/contracts";
-import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engine";
+import { historyEntryHeading, resolvePublishVersion } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -31,6 +31,7 @@ import { identityLanguagePatch } from "../../lib/identityLanguagePatch.ts";
 import { proposeProjectUrl, proposeProvenanceBasis, type PhaseFSeedContext } from "../../lib/phaseFSeeds.ts";
 import { isHistoryEntryAction } from "../../survey/questions/f/pf_history_entry.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
+import { hasTestBuilds } from "../../stores/testingStore.ts";
 
 // ---------------------------------------------------------------------------
 // track options — reproduces TrackStepAdapter + PhaseTrack behaviour exactly.
@@ -391,7 +392,7 @@ const PHASE_F_SEEDS: Readonly<Record<string, PhaseFSeedSpec>> = {
 
 /**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
- * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`bumpKeyboardVersion`
+ * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`resolvePublishVersion`
  * derivation exactly (`baseIr.header.version?.trim() || "1.0"`, bumped only
  * on an adaptation) so the survey-time proposal and the final output-time
  * heading never disagree about which version they're for.
@@ -399,7 +400,11 @@ const PHASE_F_SEEDS: Readonly<Record<string, PhaseFSeedSpec>> = {
 function deriveHistoryVersion(): string {
   const state = useWorkingCopyStore.getState();
   const rawVersion = state.baseIr?.header.version?.trim() || "1.0";
-  return state.instantiationMode === "adapt-existing" ? bumpKeyboardVersion(rawVersion) : rawVersion;
+  return resolvePublishVersion({
+    mode: state.instantiationMode === "adapt-existing" ? "adapt-existing" : "new-from-base",
+    rawVersion,
+    hasTestBuilds: hasTestBuilds(),
+  });
 }
 
 type OptInField =

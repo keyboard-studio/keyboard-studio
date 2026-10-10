@@ -17,9 +17,10 @@
 // ids are unchanged from when these lived inline, so the catalog is untouched.
 
 import type { I18n } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import type { EditorActionType } from "@keyboard-studio/contracts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
+import type { HeadlineDimension } from "./headline.ts";
 
 const STAGE_ACTION_MESSAGE: Record<EditorActionType, ReturnType<typeof msg>> = {
   gallery_edit: msg({
@@ -66,4 +67,58 @@ export function stageActionLabel(actionType: EditorActionType, i18n?: I18n): str
 export function formatClauseList(items: readonly string[], i18n?: I18n): string {
   if (i18n === undefined) return items.join(", ");
   return new Intl.ListFormat(i18n.locale, { style: "long", type: "conjunction" }).format(items);
+}
+
+/**
+ * One headline dimension's ICU-pluralized text (FR-011/FR-012), e.g. "3 keys
+ * removed". Shared by the entry rows, the stage roll-ups and Output's section
+ * list (spec 094), so a count reads the same everywhere it appears. `count`
+ * is a plain local so the macro derives the named placeholder `count`.
+ */
+export function dimensionLabel(dimension: HeadlineDimension, i18n?: I18n): string {
+  const { count } = dimension;
+  switch (dimension.kind) {
+    case "keysRemoved":
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "trail.entry.headline.dimension.keysRemoved",
+          message: plural(count, { one: "# key removed", other: "# keys removed" }),
+        }),
+      );
+    case "keysAdded":
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "trail.entry.headline.dimension.keysAdded",
+          message: plural(count, { one: "# key added", other: "# keys added" }),
+        }),
+      );
+    case "mechanismsAssigned":
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "trail.entry.headline.dimension.mechanismsAssigned",
+          message: plural(count, {
+            one: "# mechanism assigned",
+            other: "# mechanisms assigned",
+          }),
+        }),
+      );
+    case "touchKeysAffected":
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "trail.entry.headline.dimension.touchKeysAffected",
+          message: plural(count, {
+            one: "# touch key affected",
+            other: "# touch keys affected",
+          }),
+        }),
+      );
+    default: {
+      const _exhaustive: never = dimension.kind;
+      return _exhaustive;
+    }
+  }
 }

@@ -34,7 +34,7 @@ and push to `094-test-and-revise` when its gates are green.
 
 **Purpose**: Confirm the baseline so later byte-identity checks are meaningful.
 
-- [ ] T001 Run `pnpm --filter @keyboard-studio/engine test` and `pnpm --filter @keyboard-studio/studio test` on the branch before any edit. Record pre-existing failures, if any, in the US1 phase commit message (Setup and Foundational ride with it) so they aren't attributed to this feature.
+- [X] T001 Run `pnpm --filter @keyboard-studio/engine test` and `pnpm --filter @keyboard-studio/studio test` on the branch before any edit. Record pre-existing failures, if any, in the US1 phase commit message (Setup and Foundational ride with it) so they aren't attributed to this feature.
 
 ---
 
@@ -47,7 +47,7 @@ persistence. Every user story depends on these.
 
 ### Version resolver (C1, research R1)
 
-- [ ] T002 [P] Write the table test `engine/output/output-version.test.ts` covering every row of the R1 table:
+- [X] T002 [P] Write the table test `engine/output/output-version.test.ts` covering every row of the R1 table:
   - Track 2 with V of 1/2/3 parts, with and without test builds;
   - Track 1 with P major ≥ 1, P = 0.b, and P = 0.0[.x] (`versionUnsupported`);
   - a non-integer V (`1.0a`, unsupported);
@@ -56,8 +56,8 @@ persistence. Every user story depends on these.
     comparison, all matching `^(0|[1-9]\d*)(\.(0|[1-9]\d*)){0,2}$`, each > V and < the publish
     version with `hasTestBuilds: true`;
   - `resolvePublishVersion({ hasTestBuilds: false })` equals today's behaviour (`bumpKeyboardVersion` for adapt, pass-through for copy) for a sample of corpus-shaped versions.
-- [ ] T003 Implement `resolvePublishVersion` and `resolveTestBuildVersion` in the new `engine/output/output-version.ts`, per contracts C1. Delegate the existing bump to `bumpKeyboardVersion` in `engine/output/adapt-staging.ts`. Export both from `engine/index.ts`. T002 must pass.
-- [ ] T004 Migrate the three "bump only on adapt" sites to `resolvePublishVersion`, passing `hasTestBuilds: false` for now (T009 wires the real value):
+- [X] T003 Implement `resolvePublishVersion` and `resolveTestBuildVersion` in the new `engine/output/output-version.ts`, per contracts C1. Delegate the existing bump to `bumpKeyboardVersion` in `engine/output/adapt-staging.ts`. Export both from `engine/index.ts`. T002 must pass.
+- [X] T004 Migrate the three "bump only on adapt" sites to `resolvePublishVersion`, passing `hasTestBuilds: false` for now (T009 wires the real value):
   - `studio/lib/serializeWorkingCopy.ts` (~:313-317)
   - `studio/hooks/useDocumentationFindings.ts` (~:58-59)
   - `deriveHistoryVersion` in `studio/editors/adapters/flowStepOptions.tsx` (~:400-403)
@@ -66,17 +66,17 @@ persistence. Every user story depends on these.
 
 ### Output blockers (C6, research R5)
 
-- [ ] T005 [P] Write `studio/lib/outputBlockers.test.ts`. It asserts:
+- [X] T005 [P] Write `studio/lib/outputBlockers.test.ts`. It asserts:
   - the priority order touchStale > coverage > license > attribution > notReady;
   - the `stepId` each blocker names (touch → `touch`, attribution → the language/identity step, coverage → none, because it keeps `backToUnfinishedGallery`);
   - `blocked === false` only when all inputs are clear;
   - the optional `versionUnsupported` blocker, which has no `stepId` and blocks only the test build.
-- [ ] T006 Implement the pure `outputBlockers()` in the new `studio/lib/outputBlockers.ts`, per contracts C6. Message ids reuse the existing `output.status.*` and download aria-label ids.
-- [ ] T007 Refactor `studio/components/OutputScreen.tsx` so the `downloadAriaLabel` ternary (~:233-279), the `kmpActionable`/`zipActionable` flags (~:283-284) and the `outputBlocked`/`outputBlockedReason` passed to `ManagedPRSubmitPanel` (~:762-776) all derive from `outputBlockers()`. Today, when attribution or license is the blocker, the PR panel reason falls through to "compile not complete". Fix that in `studio/components/ManagedPRSubmitPanel.tsx` (~:511-531) by passing the first blocker's reason. Extend `studio/components/ManagedPRSubmitPanel.test.tsx` with the attribution-blocked case. All existing `OutputScreen*.test.tsx` must stay green.
+- [X] T006 Implement the pure `outputBlockers()` in the new `studio/lib/outputBlockers.ts`, per contracts C6. Message ids reuse the existing `output.status.*` and download aria-label ids.
+- [X] T007 Refactor `studio/components/OutputScreen.tsx` so the `downloadAriaLabel` ternary (~:233-279), the `kmpActionable`/`zipActionable` flags (~:283-284) and the `outputBlocked`/`outputBlockedReason` passed to `ManagedPRSubmitPanel` (~:762-776) all derive from `outputBlockers()`. Today, when attribution or license is the blocker, the PR panel reason falls through to "compile not complete". Fix that in `studio/components/ManagedPRSubmitPanel.tsx` (~:511-531) by passing the first blocker's reason. Extend `studio/components/ManagedPRSubmitPanel.test.tsx` with the attribution-blocked case. All existing `OutputScreen*.test.tsx` must stay green.
 
 ### Testing store and persistence (C4, research R6, data-model)
 
-- [ ] T008 [P] Write `studio/stores/testingStore.test.ts`, covering:
+- [X] T008 [P] Write `studio/stores/testingStore.test.ts`, covering:
   - `recordBuild` advances `nextBuildNumber` only on call (a failed build never calls it, FR-011);
   - `identicalTo` is set when the fingerprint matches the previous build;
   - `addReport` rejects an unknown `foundInBuild`;
@@ -85,24 +85,24 @@ persistence. Every user story depends on these.
   - `mergeRemote` unions by `buildId`/`reportId`, takes the maximum `nextBuildNumber`, and flags two builds that share a number with different ids;
   - `reset`;
   - every mutator is a no-op while frozen.
-- [ ] T009 Implement the new `studio/stores/testingStore.ts` per contracts C4 and data-model.md. Use random ids from `crypto.getRandomValues`, 16 hex. Add a selector `useHasTestBuilds()`. Replace T004's hard-coded `hasTestBuilds: false` at all three sites with the store value:
+- [X] T009 Implement the new `studio/stores/testingStore.ts` per contracts C4 and data-model.md. Use random ids from `crypto.getRandomValues`, 16 hex. Add a selector `useHasTestBuilds()`. Replace T004's hard-coded `hasTestBuilds: false` at all three sites with the store value:
   - `serializeWorkingCopy.ts` and `deriveHistoryVersion` (a plain `getState()` function, not a hook) read it non-reactively with `useTestingStore.getState()`;
   - `useDocumentationFindings` reads it through `useHasTestBuilds()` and adds it to its `useMemo` deps.
 
   A Phase F HISTORY proposal stamped before the first build keeps its old version in `historyEntryState`. That is harmless for output, because `renderHistoryMd` re-derives the heading from `opts.version` (`engine/shared/renderHistoryMd.ts:121`). T024(c) asserts it: a confirmed entry stamped at 1.2.4 renders a `1.3.0` heading once a build exists.
-- [ ] T010 Add `TestingRecord`, `TestBuild` and `TesterReport` types and the optional `testing?: TestingRecord` field to `DurableDraft` in `studio/lib/draftTypes.ts`. It is additive, so do **not** bump `DRAFT_VERSION`. Add a comment following the existing additive-field notes (~:126-141).
-- [ ] T011 Wire persistence in `studio/lib/draftPersistence.ts`:
+- [X] T010 Add `TestingRecord`, `TestBuild` and `TesterReport` types and the optional `testing?: TestingRecord` field to `DurableDraft` in `studio/lib/draftTypes.ts`. It is additive, so do **not** bump `DRAFT_VERSION`. Add a comment following the existing additive-field notes (~:126-141).
+- [X] T011 Wire persistence in `studio/lib/draftPersistence.ts`:
   - `saveDraft` writes `testingStore.snapshot()`;
   - the local paths (`loadDraft`, `resumeProject` → `loadDraft`, and the pending slot) call `hydrate` with the envelope's record;
   - `applyRemoteDraft` (the cloud-restore banner's only path, `StudioShell.tsx:1348`) merges instead of replacing (R6). Merge the remote record with the **local record stored under `envelope.projectKey`** (read from `localStorage`), never with the live store. When the banner fires, the live store may hold a different project, and merging with it would leak that project's builds into this one. Then `hydrate` the merged result;
   - `installDraftAutosave` subscribes to `testingStore` on the existing 500 ms timer, with no new timer (D3 does not apply, but don't add one anyway).
-- [ ] T012 Extend `studio/lib/draftPersistence.test.ts`:
+- [X] T012 Extend `studio/lib/draftPersistence.test.ts`:
   - a testing record round-trips through save, load and reload (SC-005);
   - a draft without `testing` loads unchanged;
   - `applyRemoteDraft` merges with the local stored record for the same project key rather than replacing it;
   - `applyRemoteDraft` for project B while the live store holds project A's builds yields only B's local and remote builds;
   - a frozen project writes nothing.
-- [ ] T013 Reset `testingStore` in `handleStartOver` in `studio/StudioShell.tsx` (~:1237-1299), alongside the other store resets.
+- [X] T013 Reset `testingStore` in `handleStartOver` in `studio/StudioShell.tsx` (~:1237-1299), alongside the other store resets.
 
 **Checkpoint**:
 
@@ -123,16 +123,16 @@ the next download, without passing through any other step.
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Add the describe "revise-from-Output loop (spec 094)" to `studio-tests/steps/stepHost.goldenWalk.test.tsx`. For both the copy and adapt fixtures, after reaching Output:
+- [X] T014 [P] [US1] Add the describe "revise-from-Output loop (spec 094)" to `studio-tests/steps/stepHost.goldenWalk.test.tsx`. For both the copy and adapt fixtures, after reaching Output:
   - revise one pane step (e.g. `punctuation`) and one full-layout step (`rules`) via `jumpToLocation(..., { returnTo: { route: "output" } })`;
   - assert `surveySessionStore.activeStepId` only ever equals the targeted step between leaving and returning, so zero unchanged steps are visited (SC-002);
   - assert the edit persists in the working copy;
   - assert Discard restores the arrival snapshot and appends no decision-record entry. For the pane step, also assert that the survey answer edited before Discard is back to its arrival value. For `rules` and `touch`, assert that the working copy's IR and `touchLayoutJson` equal their arrival values.
-- [ ] T015 [P] [US1] Extend `studio/components/StepHost.test.tsx`:
+- [X] T015 [P] [US1] Extend `studio/components/StepHost.test.tsx`:
   - for an output-origin arrival on a full-layout step, the footer nav publishes "Back to testing" and "Discard changes and go back" through `stepNavStore`;
   - for a trail-origin arrival on a full-layout step, it does not (unchanged behaviour);
   - the pane-step banner copy depends on the origin.
-- [ ] T016 [P] [US1] Write the new `studio/components/OutputSectionList.test.tsx`:
+- [X] T016 [P] [US1] Write the new `studio/components/OutputSectionList.test.tsx`:
   - it lists only the steps whose `buildProgressDots` kind is `completed`, in registry order;
   - it shows a one-line summary per step (editor dimensions for carve/mechanisms/touch, answer count for survey steps, the generic line for deadkeys/rules);
   - activating a row calls `jumpToLocation` with `returnTo: { route: "output" }`;
@@ -140,27 +140,27 @@ the next download, without passing through any other step.
 
 ### Implementation for User Story 1
 
-- [ ] T017 [P] [US1] Add `deadkeys` and `rules` entries to `STAGE_LABEL_MESSAGE` in `studio/decisions/progressDots.ts` (~:169-185), with the matching en/fr catalog entries.
-- [ ] T018 [US1] Implement the new `studio/components/OutputSectionList.tsx` (FR-001):
+- [X] T017 [P] [US1] Add `deadkeys` and `rules` entries to `STAGE_LABEL_MESSAGE` in `studio/decisions/progressDots.ts` (~:169-185), with the matching en/fr catalog entries.
+- [X] T018 [US1] Implement the new `studio/components/OutputSectionList.tsx` (FR-001):
   - sections from `buildProgressDots`, filtered to completed;
   - summaries from `buildStageGroups` roll-ups (`studio/decisions/stageGroups.ts`) and `stageActionLabel` (`studio/decisions/stageText.ts`);
   - rendered as a disclosure plus a list of buttons, following the ARIA APG disclosure pattern (docs/accessibility.md);
   - new ids under `output.sections.*`.
-- [ ] T019 [US1] In `studio/components/StepHost.tsx`:
+- [X] T019 [US1] In `studio/components/StepHost.tsx`:
   1. When `deepLinkArrival.returnTo` is present, take a **revision snapshot** into component state at arrival. A pane step writes survey answers and the decision record as well as the working copy, so a working-copy-only snapshot would leave those behind. The snapshot covers every store `applyEnvelopeToStores` (`studio/lib/draftPersistence.ts:1060`) restores, **except traversal**: the working copy (`snapshotWorkingCopyData`, which already carries the guard-intent store), `snapshotPhaseBDraft()`, `getSurveyAnswerSnapshot()` and `snapshotDecisionRecord()`. Add an exported `captureRevisionSnapshot()` / `restoreRevisionSnapshot(s)` pair to `draftPersistence.ts` that reuses the same prepare-then-commit appliers, so the restore is atomic in the same way. Full-layout editors' component-local state unmounts on the jump back, so it needs nothing extra.
   2. Make the 5b banner copy depend on the origin: `step.revision.backToTesting` for `route === "output"`; the trail copy stays as is.
   3. Add "Discard changes and go back" to the pane banner: call `restoreRevisionSnapshot`, skip the decision recorder, and call `jumpToLocation(returnTo)`.
   4. Lift the `layout !== "full"` exclusion (~:412) **only for the output origin**: publish "Back to testing" (run the step's normal completion, then `jumpToLocation(returnTo)`) and "Discard changes and go back" through `usePublishStepNav`, so `StepNavCluster` renders them outside the full-screen chrome div.
   5. Keep the one-shot arrival semantics.
-- [ ] T020 [US1] If T019 needs extra action slots, extend `studio/stores/stepNavStore.ts` and `studio/components/StepNavCluster.tsx` to render them. They must be keyboard-operable and labelled, and announced through the footer's existing `role="status"` span rather than a new live region (FR-019). Extend `studio/stores/stepNavStore.test.ts`.
-- [ ] T021 [US1] Mount `OutputSectionList` in `studio/components/OutputScreen.tsx`, in the right pane above the download buttons, under the existing `baseKeyboard !== null` guard.
-- [ ] T022 [US1] FR-004: give each `outputBlockers()` blocker that has a `stepId` an "Open <section>" button in `studio/components/OutputScreen.tsx`, calling `jumpToLocation(stepLocation, { returnTo: { route: "output" } })`. In particular:
+- [X] T020 [US1] If T019 needs extra action slots, extend `studio/stores/stepNavStore.ts` and `studio/components/StepNavCluster.tsx` to render them. They must be keyboard-operable and labelled, and announced through the footer's existing `role="status"` span rather than a new live region (FR-019). Extend `studio/stores/stepNavStore.test.ts`.
+- [X] T021 [US1] Mount `OutputSectionList` in `studio/components/OutputScreen.tsx`, in the right pane above the download buttons, under the existing `baseKeyboard !== null` guard.
+- [X] T022 [US1] FR-004: give each `outputBlockers()` blocker that has a `stepId` an "Open <section>" button in `studio/components/OutputScreen.tsx`, calling `jumpToLocation(stepLocation, { returnTo: { route: "output" } })`. In particular:
   - the touch-stale banner (~:512-526) gets an "Open Touch layout" button;
   - the attribution banner (~:655-668) gets an "Open language step" button;
   - the coverage banner keeps its `backToUnfinishedGallery` behaviour.
 
   Extend `studio/components/OutputScreen.test.tsx` for both new buttons.
-- [ ] T023 [US1] Add the en and fr catalog entries for every new `output.sections.*` and `step.revision.*` id in `studio/locales/en/messages.json` and `studio/locales/fr/messages.json`. Run `pnpm --filter @keyboard-studio/studio messages:extract` and `messages:compile`. Never hand-edit the compiled `messages.js`.
+- [X] T023 [US1] Add the en and fr catalog entries for every new `output.sections.*` and `step.revision.*` id in `studio/locales/en/messages.json` and `studio/locales/fr/messages.json`. Run `pnpm --filter @keyboard-studio/studio messages:extract` and `messages:compile`. Never hand-edit the compiled `messages.js`.
 
 **Checkpoint**: T014–T016 pass, the full studio suite is green, and `pnpm lint` is green.
 Commit `feat(studio): revise a section from Output and return (spec 094 T001-T023)` and push.

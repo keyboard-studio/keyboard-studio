@@ -178,6 +178,8 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   invisibles: msg({ id: "footer.stage.invisibles", message: "Invisible characters" }),
   convenience: msg({ id: "footer.stage.convenience", message: "Convenience letters" }),
   carve: msg({ id: "footer.stage.carve", message: "Carve" }),
+  deadkeys: msg({ id: "footer.stage.deadkeys", message: "Deadkeys" }),
+  rules: msg({ id: "footer.stage.rules", message: "Rules" }),
   mechanisms: msg({ id: "footer.stage.mechanisms", message: "Mechanisms" }),
   touch_seed_source: msg({ id: "footer.stage.touchSeedSource", message: "Touch seed" }),
   touch: msg({ id: "footer.stage.touch", message: "Touch layout" }),
