@@ -30,6 +30,15 @@
 // pairs gain attribution's unordered pairs (its only ordering edges
 // are target-script and, via screenRequires, authoring-track; nothing
 // downstream requires its decisions).
+//
+// AMENDMENT (#2002, same rule — a deliberate decision, not a
+// regeneration): the help-page language questions landed on main
+// (3ae6559c) after this baseline was frozen, and this branch's
+// integration of main adds them: BASELINE_MEMBERSHIP's help screen
+// gains help-doc-language-other / help-doc-language-second /
+// help-doc-language-second-other, in walk order after
+// help-doc-language. No order, trail, lock or edge changes: the new
+// modules chain inside the help screen via their own requires.
 
 import { describe, expect, it } from "vitest";
 import { manifest, screenTrails } from "./manifest.ts";
@@ -115,7 +124,7 @@ const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   mechanisms: ["physical-layout"],
   touch_seed_source: ["touch-seed-source"],
   touch: ["touch-layout"],
-  help: ["help-welcome-paragraph", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
+  help: ["help-welcome-paragraph", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-doc-language-other", "help-doc-language-second", "help-doc-language-second-other", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
   package: [],
 };
 
