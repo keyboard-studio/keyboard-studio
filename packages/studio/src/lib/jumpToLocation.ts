@@ -16,7 +16,12 @@ import { navigateTo } from "./navigate.ts";
 import { resolveLocation, type ResolveContext, type UnreachableReason } from "./resolveLocation.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import { snapshotTraversal, useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import {
+  applyTraversalSnapshot,
+  snapshotTraversal,
+  useSurveySessionStore,
+  type ActiveStepId,
+} from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
@@ -48,6 +53,32 @@ export interface PendingJump {
   readonly question?: string;
   /** Where to send them back to after a revision (FR-034). */
   readonly returnTo?: Location;
+  /**
+   * Where the author's walk stood before this jump moved it (spec 094). A
+   * revision that returns to `returnTo` puts it back, so revising one section
+   * from Output does not move the Studio tab's place.
+   */
+  readonly returnPosition?: TraversalPosition;
+}
+
+/** The walk's position: the current step and the Back stack that leads to it. */
+export interface TraversalPosition {
+  readonly activeStepId: ActiveStepId;
+  readonly history: readonly ActiveStepId[];
+}
+
+/**
+ * Put the walk back at `position`, keeping everything else the traversal
+ * holds as it is now. Completing the revised step advanced the walk past it
+ * and the jump truncated the Back stack; neither belongs to the place the
+ * author left.
+ */
+export function restoreTraversalPosition(position: TraversalPosition): void {
+  applyTraversalSnapshot({
+    ...snapshotTraversal(),
+    activeStepId: position.activeStepId,
+    history: [...position.history],
+  });
 }
 
 let pendingJump: PendingJump | null = null;
@@ -170,6 +201,10 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
   // Traversal first, then the hash. The hash change is what unmounts and
   // remounts the wizard, so the target has to be in the store before the
   // remount reads it — the ordering is load-bearing, not stylistic.
+  // Read before the jump below truncates it (spec 094).
+  const before = useSurveySessionStore.getState();
+  const returnPosition: TraversalPosition = { activeStepId: before.activeStepId, history: before.history };
+
   if (target.step !== undefined) {
     useSurveySessionStore.getState().jumpToStep(target.step);
     // The WITHIN-STEP half of the same "target before remount" ordering. The
@@ -187,7 +222,7 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
     target.question !== undefined || opts?.returnTo !== undefined
       ? {
           ...(target.question !== undefined ? { question: target.question } : {}),
-          ...(opts?.returnTo !== undefined ? { returnTo: opts.returnTo } : {}),
+          ...(opts?.returnTo !== undefined ? { returnTo: opts.returnTo, returnPosition } : {}),
         }
       : null;
 

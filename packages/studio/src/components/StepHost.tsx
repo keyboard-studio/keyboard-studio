@@ -59,7 +59,13 @@ import { navigateTo } from "../lib/navigate.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
 import { JumpContext, type JumpToScreen } from "../lib/jumpContext.ts";
 import { StepNavContext } from "../hooks/usePublishStepNav.ts";
-import { peekPendingJump, clearPendingJump, jumpToLocation } from "../lib/jumpToLocation.ts";
+import {
+  peekPendingJump,
+  clearPendingJump,
+  jumpToLocation,
+  restoreTraversalPosition,
+  type TraversalPosition,
+} from "../lib/jumpToLocation.ts";
 import type { Location } from "../lib/location.ts";
 import {
   captureRevisionSnapshot,
@@ -117,6 +123,18 @@ export interface StepHostProps {
 interface DeepLinkArrival {
   readonly targetStepId: ActiveStepId;
   readonly returnTo: Location;
+  /** Where the walk stood before the jump (spec 094; restored on an Output return). */
+  readonly returnPosition?: TraversalPosition;
+}
+
+/**
+ * Back to Output after a revision (spec 094). The walk goes back to where it
+ * stood before the jump: completing the revised step advanced it, and a
+ * revision is not a reason to move the Studio tab's place.
+ */
+function returnToOutput(arrival: DeepLinkArrival): void {
+  if (arrival.returnPosition !== undefined) restoreTraversalPosition(arrival.returnPosition);
+  jumpToLocation(arrival.returnTo);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +310,11 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const [deepLinkArrival] = useState<DeepLinkArrival | null>(() => {
     const pending = peekPendingJump();
     return pending?.returnTo !== undefined
-      ? { targetStepId: activeStepId, returnTo: pending.returnTo }
+      ? {
+          targetStepId: activeStepId,
+          returnTo: pending.returnTo,
+          ...(pending.returnPosition !== undefined ? { returnPosition: pending.returnPosition } : {}),
+        }
       : null;
   });
 
@@ -332,7 +354,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // Restores the working copy, answers and decision record as they stood on
     // arrival, so nothing from this visit is recorded (Story 1 scenario 3).
     restoreRevisionSnapshot(revisionSnapshot);
-    jumpToLocation(deepLinkArrival.returnTo);
+    returnToOutput(deepLinkArrival);
   }, [revisionSnapshot, deepLinkArrival]);
 
   // A full-page editor owns its footer nav slots, so its revision actions ride
@@ -536,7 +558,11 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // NOTHING about the record or about staleness — only where the author
     // lands next, which is the one thing FR-034 asks this component to add.
     if (revisableViaDeepLink && deepLinkArrival !== null && !continueFromHere) {
-      jumpToLocation(deepLinkArrival.returnTo);
+      if (deepLinkArrival.returnTo.route === "output") {
+        returnToOutput(deepLinkArrival);
+      } else {
+        jumpToLocation(deepLinkArrival.returnTo);
+      }
       return;
     }
 

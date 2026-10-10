@@ -17,6 +17,7 @@ import {
   consumePendingJump,
   jumpToLocation,
   peekPendingJump,
+  restoreTraversalPosition,
 } from "./jumpToLocation.ts";
 
 vi.mock("./navigate.ts", async (importOriginal) => {
@@ -88,6 +89,8 @@ describe("arrival", () => {
   it("retains returnTo for the caller's return affordance (FR-034)", () => {
     seedProject();
     walkToCharacters();
+    const before = useSurveySessionStore.getState();
+    const position = { activeStepId: before.activeStepId, history: before.history };
 
     jumpToLocation(
       { route: "survey", step: "identity", question: "il_language_english" },
@@ -97,7 +100,27 @@ describe("arrival", () => {
     expect(peekPendingJump()).toEqual({
       question: "il_language_english",
       returnTo: { route: "trail" },
+      // spec 094: where the walk stood before the jump truncated it.
+      returnPosition: position,
     });
+  });
+
+  it("restoreTraversalPosition puts the walk back without touching the rest of the traversal (spec 094)", () => {
+    seedProject();
+    walkToCharacters();
+    const before = useSurveySessionStore.getState();
+    const position = { activeStepId: before.activeStepId, history: before.history };
+    const visited = before.visited;
+
+    jumpToLocation({ route: "survey", step: "identity" }, { returnTo: { route: "output" } });
+    expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
+
+    restoreTraversalPosition(peekPendingJump()!.returnPosition!);
+
+    const after = useSurveySessionStore.getState();
+    expect(after.activeStepId).toBe(position.activeStepId);
+    expect(after.history).toEqual(position.history);
+    expect(after.visited).toEqual(visited);
   });
 
   it("skips the navigate when already on the target tab — a same-value hash fires no hashchange", () => {

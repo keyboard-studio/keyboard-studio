@@ -610,6 +610,7 @@ async function reviseFromOutput(stepId: string, controlTestId: string) {
   const completions = vi.spyOn(ReducerModule, "applyStepCompletion");
   completions.mockClear();
   const entriesBefore = useDecisionLogStore.getState().record.entries.length;
+  const positionBefore = useSurveySessionStore.getState().activeStepId;
 
   const outcome = jumpToLocation(
     { route: "survey", step: stepId as never },
@@ -635,7 +636,8 @@ async function reviseFromOutput(stepId: string, controlTestId: string) {
   const completedSteps = completions.mock.calls.map((c) => String(c[0]));
   const routes = navigateToMock.mock.calls.map((c) => routeOf(c[0]));
   completions.mockRestore();
-  return { newEntries, completedSteps, routes, entriesBefore, movedTo };
+  const positionAfter = useSurveySessionStore.getState().activeStepId;
+  return { newEntries, completedSteps, routes, entriesBefore, movedTo, positionBefore, positionAfter };
 }
 
 describe.each([
@@ -657,30 +659,44 @@ describe.each([
   });
 
   it("a pane step: confirm returns to Output, touching no other step", async () => {
-    const { newEntries, completedSteps, routes, movedTo } = await reviseFromOutput("punctuation", "punctuation-done");
-    // The step completed (one advance past it) and nothing else ran before
-    // the return. A no-change completion records no entry (spec 079 T028),
-    // so entries may be empty; any that exist belong to this step.
-    expect(movedTo).toHaveLength(1);
+    const { newEntries, completedSteps, routes, movedTo, positionBefore, positionAfter } = await reviseFromOutput(
+      "punctuation",
+      "punctuation-done",
+    );
+    // The step completed (one advance past it), then the walk went back to
+    // where it stood before the revision; nothing else ran before the return.
+    // A no-change completion records no entry (spec 079 T028), so entries may
+    // be empty; any that exist belong to this step.
+    expect(movedTo).toHaveLength(2);
+    expect(positionAfter).toBe(positionBefore);
     expect(newEntries.every((e) => e.stepId === "punctuation")).toBe(true);
     expect(completedSteps.every((s) => s === "punctuation")).toBe(true);
     expect(routes[routes.length - 1]).toBe("output");
   });
 
   it("a full-layout step: Back to testing completes it and returns to Output", async () => {
-    const { newEntries, completedSteps, routes, movedTo } = await reviseFromOutput("rules", "step-revision-back-to-testing");
-    // The step completed (one advance past it) and nothing else ran before
-    // the return. A no-change completion records no entry (spec 079 T028),
-    // so entries may be empty; any that exist belong to this step.
-    expect(movedTo).toHaveLength(1);
+    const { newEntries, completedSteps, routes, movedTo, positionBefore, positionAfter } = await reviseFromOutput(
+      "rules",
+      "step-revision-back-to-testing",
+    );
+    // The step completed (one advance past it), then the walk went back to
+    // where it stood before the revision; nothing else ran before the return.
+    // A no-change completion records no entry (spec 079 T028), so entries may
+    // be empty; any that exist belong to this step.
+    expect(movedTo).toHaveLength(2);
+    expect(positionAfter).toBe(positionBefore);
     expect(newEntries.every((e) => e.stepId === "rules")).toBe(true);
     expect(completedSteps.every((s) => s === "rules")).toBe(true);
     expect(routes[routes.length - 1]).toBe("output");
   });
 
   it("Discard returns to Output and records nothing", async () => {
-    const { newEntries, completedSteps, routes, movedTo } = await reviseFromOutput("punctuation", "step-revision-discard");
-    expect(movedTo).toEqual([]);
+    const { newEntries, completedSteps, routes, movedTo, positionBefore } = await reviseFromOutput(
+      "punctuation",
+      "step-revision-discard",
+    );
+    // The only move is back to where the walk stood before the revision.
+    expect(movedTo).toEqual([positionBefore]);
     expect(newEntries).toEqual([]);
     expect(completedSteps).toEqual([]);
     expect(routes[routes.length - 1]).toBe("output");

@@ -23,7 +23,9 @@ import type { ReducerDeps } from "../steps/reducer.ts";
 import type { Location } from "../lib/location.ts";
 
 const { pending, jumpToLocation } = vi.hoisted(() => ({
-  pending: { current: null as { returnTo?: Location } | null },
+  pending: {
+    current: null as { returnTo?: Location; returnPosition?: { activeStepId: string; history: string[] } } | null,
+  },
   jumpToLocation: vi.fn(),
 }));
 
@@ -114,6 +116,29 @@ describe("full-layout step opened from Output", () => {
 
     fireEvent.click(screen.getByTestId("step-revision-back-to-testing"));
     expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+  });
+
+  it("puts the walk back where it stood before the jump, on Back to testing and on Discard", () => {
+    for (const action of ["step-revision-back-to-testing", "step-revision-discard"]) {
+      seedInstantiatedWorkingCopy([]);
+      arriveAt("rules", { route: "output" });
+      pending.current = {
+        returnTo: { route: "output" },
+        returnPosition: { activeStepId: "punctuation", history: ["identity"] },
+      };
+      renderHostWithFooter("rules");
+
+      fireEvent.click(screen.getByTestId(action));
+
+      const s = useSurveySessionStore.getState();
+      expect(s.activeStepId, action).toBe("punctuation");
+      expect(s.history, action).toEqual(["identity"]);
+      expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+      cleanup();
+      jumpToLocation.mockClear();
+      useStepNavStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+    }
   });
 
   it("Discard restores the arrival state, records nothing, and returns", () => {
