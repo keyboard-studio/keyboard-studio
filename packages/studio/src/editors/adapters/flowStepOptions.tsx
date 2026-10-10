@@ -29,6 +29,7 @@ import {
 import { deriveHistoryEntryState, applyHistoryEntryAction } from "../../lib/historyEntryState.ts";
 import { identityLanguagePatch } from "../../lib/identityLanguagePatch.ts";
 import { proposeProjectUrl, proposeProvenanceBasis, type PhaseFSeedContext } from "../../lib/phaseFSeeds.ts";
+import { primarySubtag } from "../../lib/suggestBase.ts";
 import { isHistoryEntryAction } from "../../survey/questions/f/pf_history_entry.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 
@@ -423,16 +424,20 @@ const OPT_IN_QUESTION_IDS: ReadonlyArray<[OptInField, string]> = [
 ];
 
 function isEnglishTag(tag: string | undefined): boolean {
-  const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
-  return primary === "" || primary === "en";
+  if (tag === undefined) return true;
+  return ["", "en"].includes(primarySubtag(tag));
 }
 
 /**
  * The help prose's language tags, main language first (HelpDocsAnswers
  * .docLanguageTags). Each choice resolves to a tag: "english" → "en",
  * "target" → the keyboard's tag, "other" → that question's picker answer. A
- * choice that can't resolve (no keyboard tag yet, blank picker) is dropped,
- * and a second language equal to the first is ignored. The legacy
+ * second choice that can't resolve (no keyboard tag yet, blank picker) is
+ * dropped, and a second language equal to the first is ignored. But an
+ * unresolved MAIN language yields no tags at all: promoting the second
+ * language into `tags[0]` would make it the page's `<html lang>` and
+ * mislabel prose written in the main language, so the renderer instead
+ * falls back to the keyboard's `primaryBcp47`. The legacy
  * single-question "bilingual" answer reads as English + the keyboard's
  * language.
  */
@@ -451,6 +456,7 @@ function resolveDocLanguageTags(result: SurveyPhaseResult, targetBcp47: string |
           resolve(main, "pf_doc_language_other"),
           resolve(getTextAnswer(result, "pf_doc_language_second"), "pf_doc_language_second_other"),
         ];
+  if (candidates[0] === undefined) return [];
   const tags: string[] = [];
   for (const tag of candidates) {
     if (tag !== undefined && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) tags.push(tag);

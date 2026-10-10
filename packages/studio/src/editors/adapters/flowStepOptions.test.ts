@@ -741,6 +741,29 @@ describe("extractHelpDocs — help-page languages (docLanguageTags)", () => {
     ).toEqual(["bum"]);
   });
 
+  it("never promotes the second language when the main language can't resolve", () => {
+    // Blank "other" picker as main + English as second: no tags, so the
+    // renderer's <html lang> falls back to the keyboard's primaryBcp47
+    // instead of mislabelling main-language prose as English.
+    expect(
+      tagsFor(
+        [
+          textAnswer("pf_doc_language", "other"),
+          textAnswer("pf_doc_language_other", "  "),
+          textAnswer("pf_doc_language_second", "english"),
+        ],
+        "bum",
+      ),
+    ).toBeUndefined();
+    // Same for "target" with no keyboard tag yet.
+    expect(
+      tagsFor(
+        [textAnswer("pf_doc_language", "target"), textAnswer("pf_doc_language_second", "english")],
+        undefined,
+      ),
+    ).toBeUndefined();
+  });
+
   it("reads the legacy single-question 'bilingual' answer as English + the keyboard's language", () => {
     expect(tagsFor([textAnswer("pf_doc_language", "bilingual")], "km")).toEqual(["en", "km"]);
   });
