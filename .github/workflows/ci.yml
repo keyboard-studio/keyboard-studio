@@ -18,6 +18,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main, dev]
+  # Nightly full-gate run: the corpus gate is path-gated on pull requests
+  # (see the `changes` job), so a scheduled run remains the unconditional
+  # backstop. Interim measure until the full CI lightening follow-up lands.
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
 
 # Cancel a superseded run when a newer commit lands on the same ref, so a
 # rapid second push doesn't leave the first full run burning runner minutes.
@@ -31,7 +37,62 @@ env:
   KEYBOARDS_CORPUS_SHA: 435f82d69bfc926eb03c2d8632571b41b6da3266
 
 jobs:
+  # Interim path gate for the corpus gate. A full build takes ~58 minutes,
+  # of which the corpus gate is ~51, yet a change touching no engine,
+  # contracts, harness, or scripts path cannot regress context tolerance.
+  # Changes to this workflow or the dependency manifest/lockfile turn the
+  # gate on, as do the `run-corpus` / `run-all-gates` PR labels and every
+  # non-PR run (push to main, nightly schedule, manual dispatch). Anything
+  # that prevents diffing fails open and runs the gate. Keep the gate inside
+  # the required `build` job so relevant PRs remain blocked by it.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      corpus: ${{ steps.gates.outputs.corpus }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether this change needs the corpus gate
+        id: gates
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          corpus=false
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            corpus=true
+          else
+            files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" 2>/dev/null || true)"
+            if [ -z "$files" ]; then
+              # Diff unavailable — fail open and run the gate.
+              corpus=true
+            else
+              while IFS= read -r f; do
+                case "$f" in
+                  .github/workflows/ci.yml|package.json|pnpm-lock.yaml)
+                    corpus=true ;;
+                  packages/engine/*|packages/contracts/*)
+                    corpus=true ;;
+                  utilities/nfd-tolerance-corpus/*|scripts/*)
+                    corpus=true ;;
+                esac
+              done <<< "$files"
+            fi
+            case "$PR_LABELS" in
+              *'"run-corpus"'*|*'"run-all-gates"'*) corpus=true ;;
+            esac
+          fi
+          echo "corpus=$corpus" >> "$GITHUB_OUTPUT"
+          echo "Corpus gate for this run: corpus=$corpus (event: $GITHUB_EVENT_NAME)"
+
   build:
+    needs: changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -208,7 +269,15 @@ jobs:
       - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
         run: pnpm run test:nfd-tolerance-corpus
 
+      # This sweep is ~51 of the build job's ~58 minutes. It still runs inside
+      # the required `build` check on every PR that can affect it, on pushes to
+      # main, and nightly; the hermetic unit suite above runs unconditionally.
+      - name: Corpus gate (skipped — change cannot reach the transform)
+        if: needs.changes.outputs.corpus != 'true'
+        run: echo "Corpus gate skipped — this change touches no engine/contracts/corpus path. Add the run-corpus label to force it."
+
       - name: Corpus gate (context tolerance — zero regressed keyboards)
+        if: needs.changes.outputs.corpus == 'true'
         run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed
 
       # kbgen is a prototype outside the workspace too, and since the
@@ -218,13 +287,7 @@ jobs:
       - name: Test (kbgen — outside the pnpm workspace)
         run: pnpm run test:kbgen
 
-      # nfd-tolerance-corpus is likewise outside the workspace. Its suite is
-      # hermetic — the ground-truth fixtures are vendored .kmn, so it needs no
-      # corpus checkout — and it is the regression guard for a harness whose
-      # whole job is catching a transform that silently emits the wrong
-      # character. Unrun here, it rots.
-      - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
-        run: pnpm run test:nfd-tolerance-corpus
+      # The nfd-tolerance-corpus suite ran once, above, before the corpus gate.
 
       # km-triage-app (the km-triage GitHub App's audit/cache/manifest/sweep
       # helpers) tests with node:test, not vitest, and nothing ran them.
