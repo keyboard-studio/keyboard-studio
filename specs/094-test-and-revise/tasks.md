@@ -177,7 +177,7 @@ labelled build 1 and build 2, and installing each shows its label to the person 
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Write the new `studio/lib/serializeWorkingCopy.testBuild.test.ts`.
+- [X] T024 [P] [US2] Write the new `studio/lib/serializeWorkingCopy.testBuild.test.ts`.
   - **(a) Default projection unchanged.** With no `testBuild` and no test builds, the projection is byte-identical to a snapshot taken from the current code. Cover a copy fixture and an adapt fixture (FR-010, SC-004).
   - **(b) Test-build overrides.** With `testBuild: { number: 2, version: "2.3.2" }` on an adapt fixture at 2.3:
     - `.kmn` `&KEYBOARDVERSION` is `2.3.2`;
@@ -189,7 +189,7 @@ labelled build 1 and build 2, and installing each shows its label to the person 
   - **(b2) Stable mode.** `stableForFingerprint: true` differs from the default projection only
     in the publish version (forced `hasTestBuilds: true`) and the HISTORY fallback date.
   - **(c) Three-part publish rule.** For a three-part adapt base 1.2.3 with `hasTestBuilds: true`, the default projection (the publish path) uses `1.3.0` in the `.kmn`, `.kps` and HISTORY. With `hasTestBuilds: false` it uses `1.2.4` (SC-004a). A confirmed HISTORY entry stamped at `1.2.4` before the first build renders a `1.3.0` heading once a build exists.
-- [ ] T025 [P] [US2] Write the new `studio/lib/workingCopyFingerprint.test.ts`:
+- [X] T025 [P] [US2] Write the new `studio/lib/workingCopyFingerprint.test.ts`:
   - identical working copies give identical fingerprints;
   - a one-character `.kmn` edit changes the fingerprint;
   - path ordering does not matter;
@@ -197,7 +197,7 @@ labelled build 1 and build 2, and installing each shows its label to the person 
     after `recordBuild` (the publish version moves 1.2.4 → 1.3.0, stable mode hides it, R7);
   - **date:** with no confirmed HISTORY entry, fingerprints taken on two different (faked)
     dates are equal.
-- [ ] T026 [P] [US2] Write the new `studio/components/TestBuildPanel.test.tsx`:
+- [X] T026 [P] [US2] Write the new `studio/components/TestBuildPanel.test.tsx`:
   - the button is enabled exactly when the normal `.kmp` download is, except that a `versionUnsupported` resolution disables only the test-build button (FR-006);
   - when disabled, its accessible name gives the first blocker;
   - a failed build records nothing (FR-011);
@@ -209,31 +209,31 @@ labelled build 1 and build 2, and installing each shows its label to the person 
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Add the `testBuild?: { number; version }` option to `ProjectForOutputOptions` in `studio/lib/serializeWorkingCopy.ts` (contracts C2). When it is set, `testBuild.version` replaces the resolved publish version in all four places:
+- [X] T027 [US2] Add the `testBuild?: { number; version }` option to `ProjectForOutputOptions` in `studio/lib/serializeWorkingCopy.ts` (contracts C2). When it is set, `testBuild.version` replaces the resolved publish version in all four places:
   - the identity overlay passed to `projectWorkingCopyVfs` (`.kmn`);
   - the adapt `.kps` `<Version>` regex patch (~:343-361);
   - the `version` passed to a generated descriptor;
   - `historyVersion` (~:550-561).
 
   Then post-patch the `.kps` `<Info><Name>` and `<Description>`, and insert a localized notice block at the top of the rendered `welcome.htm` body (~:526-531). Resolve the label strings through the Lingui `i18n` instance, not hard-coded. T024 must pass.
-- [ ] T028 [US2] Implement the new `studio/lib/workingCopyFingerprint.ts`. It runs `computeSha256Hex` (from `@keyboard-studio/engine`; codec hash) over the `path\0content` lines of `projectWorkingCopyForOutput({ stableForFingerprint: true })`, sorted by path. Add the `stableForFingerprint` option to `ProjectForOutputOptions` in `studio/lib/serializeWorkingCopy.ts` (contracts C2): it forces `hasTestBuilds: true` into `resolvePublishVersion` and pins the HISTORY fallback `dateIso` to a constant (research R7). Encode binary entries as Base64 the same way as `persistWorkingCopy.serializeEntry`. T025 must pass.
-- [ ] T029 [US2] Add `buildTestBuildKmp(testBuild)` to `studio/lib/buildOutputBundle.ts` (contracts C3). Give `buildOutputBundle(opts?)` an optional options parameter that is forwarded to `projectWorkingCopyForOutput`. The filename is `${keyboardId}-test-build-${N}.kmp`. Leave `buildKmpForDownload` and `buildSourceZipForDownload` calling without options.
-- [ ] T030 [US2] Add a `handleMakeTestBuild` action to `studio/hooks/usePreviewArtifact.ts`, mirroring `handleDownloadKmp` (~:419-459). In order:
+- [X] T028 [US2] Implement the new `studio/lib/workingCopyFingerprint.ts`. It runs `computeSha256Hex` (from `@keyboard-studio/engine`; codec hash) over the `path\0content` lines of `projectWorkingCopyForOutput({ stableForFingerprint: true })`, sorted by path. Add the `stableForFingerprint` option to `ProjectForOutputOptions` in `studio/lib/serializeWorkingCopy.ts` (contracts C2): it forces `hasTestBuilds: true` into `resolvePublishVersion` and pins the HISTORY fallback `dateIso` to a constant (research R7). Encode binary entries as Base64 the same way as `persistWorkingCopy.serializeEntry`. T025 must pass.
+- [X] T029 [US2] Add `buildTestBuildKmp(testBuild)` to `studio/lib/buildOutputBundle.ts` (contracts C3). Give `buildOutputBundle(opts?)` an optional options parameter that is forwarded to `projectWorkingCopyForOutput`. The filename is `${keyboardId}-test-build-${N}.kmp`. Leave `buildKmpForDownload` and `buildSourceZipForDownload` calling without options.
+- [X] T030 [US2] Add a `handleMakeTestBuild` action to `studio/hooks/usePreviewArtifact.ts`, mirroring `handleDownloadKmp` (~:419-459). In order:
   1. Compute N = `nextBuildNumber`.
   2. Call `resolveTestBuildVersion`; on `versionUnsupported`, surface the blocker.
   3. Call `buildTestBuildKmp`.
   4. **Only on success**: compute the fingerprint, derive `changedSections` from decision-record entries after the previous build's `decisionCursor`, add `"source"` when the fingerprint changed but no entries were recorded (R7), call `testingStore.recordBuild`, then trigger the browser download.
   5. On failure, show the existing download error path and record nothing.
-- [ ] T031 [US2] Pass `testVersion` resolution into `outputBlockers()` so `versionUnsupported` (Track 1 P = 0.0.x, non-integer or 4+ part versions) disables only the test-build button and says why. It carries **no** `stepId` and gets no "Open" button: the version comes from the starting point, and no step edits it. Extend `studio/lib/outputBlockers.test.ts`.
-- [ ] T032 [US2] Implement the new `studio/components/TestBuildPanel.tsx` (FR-006 to FR-009):
+- [X] T031 [US2] Pass `testVersion` resolution into `outputBlockers()` so `versionUnsupported` (Track 1 P = 0.0.x, non-integer or 4+ part versions) disables only the test-build button and says why. It carries **no** `stepId` and gets no "Open" button: the version comes from the starting point, and no step edits it. Extend `studio/lib/outputBlockers.test.ts`.
+- [X] T032 [US2] Implement the new `studio/components/TestBuildPanel.tsx` (FR-006 to FR-009):
   - the "Make a test build" button, using `canDownload`, `touchStale` and the blockers exactly as the `.kmp` button does;
   - a build list showing number, version, local date and time, changed-section labels via `stageLabel`, "Same as build N", and a two-device collision flag;
   - announcements through the existing Output `role="status"` region;
   - read-only when the project is frozen (`isProjectFrozen`).
 
   T026 must pass.
-- [ ] T033 [US2] Mount `TestBuildPanel` in `studio/components/OutputScreen.tsx`, between the `.kmp`/`.zip` buttons and the banners. Add the en and fr catalog entries for all `output.testing.*` ids used in T027 and T032. Run extract and compile.
-- [ ] T034 [US2] Check that the source zip and managed-PR paths never pass `testBuild`. Add an assertion to `studio/components/ManagedPRSubmitPanel.test.tsx` that the submitted VFS contains no "Test build" string and no test version, after two test builds exist (FR-010, SC-004).
+- [X] T033 [US2] Mount `TestBuildPanel` in `studio/components/OutputScreen.tsx`, between the `.kmp`/`.zip` buttons and the banners. Add the en and fr catalog entries for all `output.testing.*` ids used in T027 and T032. Run extract and compile.
+- [X] T034 [US2] Check that the source zip and managed-PR paths never pass `testBuild`. Add an assertion to `studio/components/ManagedPRSubmitPanel.test.tsx` that the submitted VFS contains no "Test build" string and no test version, after two test builds exist (FR-010, SC-004).
 
 **Checkpoint**: T024–T026 pass, the full studio and engine suites are green, and `pnpm lint` is
 green. Run the quickstart manual steps 1, 3, 8 and 9 against `pnpm --filter

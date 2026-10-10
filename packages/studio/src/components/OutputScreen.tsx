@@ -53,6 +53,7 @@ import { outputBlockers } from "../lib/outputBlockers.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { OutputSectionList } from "./OutputSectionList.tsx";
+import { TestBuildPanel } from "./TestBuildPanel.tsx";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
@@ -247,13 +248,14 @@ export function OutputScreen() {
   const downloadKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
   // spec 094 C6: one ordered blocker list feeds the download aria-labels, the
   // action flags and the PR panel's reason, so they cannot disagree.
-  const outputGate = outputBlockers({
+  const gateInput = {
     touchStale,
     coverageBlocked,
     licenseUnparseable: licenseUnparseable !== null,
     attributionMissing,
     stageReady: artifact.stage.kind === "ready" && baseKeyboard !== null,
-  });
+  };
+  const outputGate = outputBlockers(gateInput);
   const firstBlocker = outputGate.blockers[0];
   const downloadAriaLabel = firstBlocker !== undefined
     ? i18n.t(firstBlocker.downloadAria)
@@ -519,6 +521,14 @@ export function OutputScreen() {
                 contributing upstream.
               </Trans>
             </p>
+            {/* spec 094 FR-006: a labelled, numbered build for testers, from the
+                same working copy and behind the same gates as the package. */}
+            <TestBuildPanel
+              gate={gateInput}
+              nextTestVersion={artifact.nextTestVersion}
+              busy={buildingKmp || downloading}
+              onMakeTestBuild={artifact.handleMakeTestBuild}
+            />
             {touchStale && (
               <div
                 role="alert"

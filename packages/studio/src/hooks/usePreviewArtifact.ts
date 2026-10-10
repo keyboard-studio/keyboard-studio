@@ -41,8 +41,14 @@ import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import {
   buildKmpForDownload,
   buildSourceZipForDownload,
+  buildTestBuildKmp,
   OutputBundleError,
 } from "../lib/buildOutputBundle.ts";
+import { resolveTestBuildVersion } from "@keyboard-studio/engine";
+import { changedSectionsSince, useTestingStore } from "../stores/testingStore.ts";
+import type { TestBuild } from "../lib/draftTypes.ts";
+import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import { computeWorkingCopyFingerprint } from "../lib/workingCopyFingerprint.ts";
 import { useInventoryCoverageGate } from "./useInventoryCoverageGate.ts";
 import type { InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 
@@ -106,6 +112,17 @@ export interface PreviewArtifact {
    */
   kmpDiagnostics: CompilerDiagnostic[];
   handleDownloadKmp: () => Promise<void>;
+  /**
+   * The version the next test build would ship at, or null when none fits
+   * below the publish version (spec 094 research R1 — `versionUnsupported`).
+   */
+  nextTestVersion: string | null;
+  /**
+   * Make, download and record the next test build (spec 094 FR-006..FR-009,
+   * FR-011). Shares the .kmp download's gates, in-flight flag and error path;
+   * resolves to the recorded build, or null when nothing was recorded.
+   */
+  handleMakeTestBuild: () => Promise<TestBuild | null>;
 
   // Inventory coverage gate — the same desktop-always/touch-only-if-authored
   // truth StepHost and PhaseFGate compute (lib/unimplementedInventory.ts).
@@ -458,6 +475,64 @@ export function usePreviewArtifact(): PreviewArtifact {
     }
   }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason]);
 
+  // spec 094: the next test build's version, from the same resolver the
+  // publish version comes from. Recomputed as builds are recorded.
+  const baseIrVersion = useWorkingCopyStore((s) => s.baseIr?.header.version);
+  const nextBuildNumber = useTestingStore((s) => s.nextBuildNumber);
+  const nextTestVersionResult = resolveTestBuildVersion({
+    mode: instantiationMode === "adapt-existing" ? "adapt-existing" : "new-from-base",
+    rawVersion: baseIrVersion?.trim() || "1.0",
+    buildNumber: nextBuildNumber,
+  });
+  const nextTestVersion = nextTestVersionResult.ok ? nextTestVersionResult.version : null;
+
+  const handleMakeTestBuild = useCallback(async (): Promise<TestBuild | null> => {
+    if (stage.kind !== "ready" || coverageGate.blocked || emissionBlockReason !== null) return null;
+    if (nextTestVersion === null) return null;
+    const number = useTestingStore.getState().nextBuildNumber;
+    setBuildingKmp(true);
+    setKmpError(null);
+    setKmpDiagnostics([]);
+    setDownloadWarnings([]);
+    try {
+      const result = await buildTestBuildKmp({ number, version: nextTestVersion });
+      if (result === null) {
+        setKmpError("Nothing to download — select a keyboard first.");
+        return null;
+      }
+      // Only a build that succeeded uses up a number (FR-011).
+      const fingerprint = (await computeWorkingCopyFingerprint()) ?? "";
+      const testing = useTestingStore.getState();
+      const previous = testing.builds[testing.builds.length - 1];
+      const entries = useDecisionLogStore.getState().record.entries;
+      const build = testing.recordBuild({
+        version: nextTestVersion,
+        fingerprint,
+        decisionCursor: entries.length,
+        changedSections:
+          previous === undefined
+            ? []
+            : changedSectionsSince(entries, previous.decisionCursor, previous.fingerprint !== fingerprint),
+      });
+      if (result.warnings.length > 0) {
+        devLog.warn("[studio] test build projection warnings:", result.warnings);
+        setDownloadWarnings(result.warnings);
+      }
+      triggerDownload(result.bytes, result.filename, "application/octet-stream");
+      return build;
+    } catch (err: unknown) {
+      if (err instanceof OutputBundleError) {
+        setKmpError(err.message);
+        setKmpDiagnostics(err.diagnostics);
+      } else {
+        setKmpError(err instanceof Error ? err.message : "Package build failed");
+      }
+      return null;
+    } finally {
+      setBuildingKmp(false);
+    }
+  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason, nextTestVersion]);
+
   return {
     baseKeyboard,
     pickerMode,
@@ -481,6 +556,8 @@ export function usePreviewArtifact(): PreviewArtifact {
     kmpError,
     kmpDiagnostics,
     handleDownloadKmp,
+    nextTestVersion,
+    handleMakeTestBuild,
     coverageGate,
     showIdentityWarn,
   };

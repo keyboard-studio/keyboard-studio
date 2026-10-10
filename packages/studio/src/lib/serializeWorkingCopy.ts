@@ -56,6 +56,7 @@ import {
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 import { hasTestBuilds } from "../stores/testingStore.ts";
+import { testBuildDescriptionPrefix, testBuildNameSuffix, testBuildWelcomeNotice } from "./testBuildLabels.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,70 @@ export interface ProjectForOutputOptions {
    * overlay, which is how "what if the author had left this blank?" is expressed.
    */
   identityOverride?: Partial<IdentityOverlay>;
+  /**
+   * spec 094 (contracts C2): produce test build `number` at `version` — the
+   * version replaces the publish version everywhere it ships, and the package
+   * name, description and welcome page are labelled. Only the test-build
+   * download passes this; the source zip and the pull request never do.
+   */
+  testBuild?: { number: number; version: string };
+  /**
+   * spec 094 (research R7): the projection a test-build fingerprint is taken
+   * over. Resolves the publish version as if test builds exist and pins the
+   * clock-derived HISTORY date and LICENSE year, so "nothing changed" hashes
+   * the same across the first build and across days. Never downloaded.
+   */
+  stableForFingerprint?: true;
+}
+
+/** The HISTORY fallback date and LICENSE year stable mode pins (research R7). */
+const STABLE_FINGERPRINT_DATE = "2000-01-01";
+const STABLE_FINGERPRINT_YEAR = 2000;
+
+function escapeXml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * Label test build `number` in the package descriptor's `<Info>` name and
+ * description and at the top of the welcome page (spec 094 FR-008). A missing
+ * descriptor or `<Info>` element is named in the warnings, never silent.
+ */
+function labelTestBuild(
+  vfs: VirtualFS,
+  keyboardId: string,
+  testBuild: { number: number; version: string },
+  warnings: string[],
+): void {
+  const kpsPath = `source/${keyboardId}.kps`;
+  const kps = readVfsText(vfs, kpsPath);
+  const info = kps?.match(/<Info>[\s\S]*?<\/Info>/);
+  if (kps === undefined || info === null || info === undefined) {
+    warnings.push(`[test-build] could not label ${kpsPath}: no <Info> element`);
+  } else {
+    const suffix = escapeXml(testBuildNameSuffix(testBuild.number));
+    const prefix = escapeXml(testBuildDescriptionPrefix(testBuild.number));
+    const labelled = info[0]
+      .replace(/(<Name\b[^>]*>)([^<]*)(<\/Name>)/, (_m, open: string, name: string, close: string) => `${open}${name} ${suffix}${close}`)
+      .replace(
+        /(<Description\b[^>]*>)([^<]*)(<\/Description>)/,
+        (_m, open: string, text: string, close: string) => `${open}${prefix} ${text}${close}`,
+      );
+    vfs.set(kpsPath, kps.replace(info[0], labelled), false);
+  }
+
+  const welcome = readVfsText(vfs, WELCOME_PAGE_PATH);
+  if (welcome !== undefined) {
+    const notice =
+      `<p data-ks-test-build="${testBuild.number}" style="border:2px solid;padding:8px;font-weight:bold">` +
+      `${escapeXml(testBuildWelcomeNotice(testBuild.number, testBuild.version))}</p>`;
+    const body = welcome.match(/<body\b[^>]*>/);
+    vfs.set(
+      WELCOME_PAGE_PATH,
+      body !== null ? welcome.replace(body[0], `${body[0]}${notice}`) : `${notice}${welcome}`,
+      false,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -312,9 +377,19 @@ export async function projectWorkingCopyForOutput(
   // composer both tracks share.
   let historyVersion = rawVersion;
   const isAdaptation = instantiationMode === "adapt-existing";
+  // spec 094 (research R1/R2): the one publish-version decision, and the
+  // version this production actually ships at. A test build ships at its own
+  // version everywhere the publish version would go. Stable (fingerprint) mode
+  // resolves as if test builds exist, so recording the first build never makes
+  // an unedited working copy look changed (R7).
+  const testBuild = opts?.testBuild;
+  const stable = opts?.stableForFingerprint === true;
+  const publishVersion = isAdaptation
+    ? resolvePublishVersion({ mode: "adapt-existing", rawVersion, hasTestBuilds: stable || hasTestBuilds() })
+    : rawVersion;
+  const shippedVersion = testBuild?.version ?? publishVersion;
   if (isAdaptation) {
-    // spec 094: the one publish-version decision (research R1).
-    const bumpedVersion = resolvePublishVersion({ mode: "adapt-existing", rawVersion, hasTestBuilds: hasTestBuilds() });
+    const bumpedVersion = shippedVersion;
     version = bumpedVersion.replace(/[^\w.\-]/g, "_");
     historyVersion = bumpedVersion;
 
@@ -370,6 +445,13 @@ export async function projectWorkingCopyForOutput(
       ...(identityForProjection ?? {}),
       version: bumpedVersion,
     };
+  } else if (testBuild !== undefined) {
+    // Track 1 normally ships the copied keyboard's own version untouched, so
+    // the overlay carries none. A test build sets it: the overlay is what
+    // reaches the .kmn &KEYBOARDVERSION and the descriptor's <Version>.
+    version = shippedVersion.replace(/[^\w.\-]/g, "_");
+    historyVersion = shippedVersion;
+    identityForProjection = { ...identityForProjection, version: shippedVersion };
   }
 
   // 4b. spec 059 FR-010: merge the caller's identity override, for this call only.
@@ -496,7 +578,8 @@ export async function projectWorkingCopyForOutput(
       attribution ?? undefined,
       // emitYear: defaulted to the current year. D2 records when the work is
       // PUBLISHED, and this path runs at the moment the author downloads it.
-      undefined,
+      // Pinned in stable (fingerprint) mode so a new year is not an edit.
+      stable ? STABLE_FINGERPRINT_YEAR : undefined,
       inherited,
     );
   }
@@ -549,7 +632,7 @@ export async function projectWorkingCopyForOutput(
   // back to whatever HISTORY.md the fetched tree itself carried. The date is
   // the one nondeterministic input (research R12); a stored proposal's own date
   // wins inside renderHistoryMd.
-  const dateIso = new Date().toISOString().slice(0, 10);
+  const dateIso = stable ? STABLE_FINGERPRINT_DATE : new Date().toISOString().slice(0, 10);
   const existingHistoryMd = readVfsText(clonedVfs, "HISTORY.md") ?? null;
   clonedVfs.set(
     "HISTORY.md",
@@ -605,6 +688,13 @@ export async function projectWorkingCopyForOutput(
     if (text === undefined) continue;
     const { json, removed } = conformTouchLayoutToKeymanSchema(text);
     if (removed.length > 0) clonedVfs.set(path, json, false);
+  }
+
+  // 5f. spec 094 FR-008: label a test build where a tester sees it — the
+  //     package name and description, and the welcome page. The .kmn &NAME is
+  //     deliberately untouched so the release upgrades the same keyboard.
+  if (testBuild !== undefined) {
+    labelTestBuild(clonedVfs, resolvedKeyboardId, testBuild, adaptWarnings);
   }
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection

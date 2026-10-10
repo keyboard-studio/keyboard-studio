@@ -1,7 +1,7 @@
 // Tests for testingStore (spec 094 contracts C4, data-model.md).
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { useTestingStore, mergeTestingRecords, collidingBuildNumbers } from "./testingStore.ts";
+import { useTestingStore, mergeTestingRecords, collidingBuildNumbers, changedSectionsSince } from "./testingStore.ts";
 import type { TestBuild, TestingRecord } from "../lib/draftTypes.ts";
 
 const store = () => useTestingStore.getState();
@@ -144,5 +144,18 @@ describe("snapshot / hydrate / reset / frozen", () => {
     expect(store().frozen).toBe(true);
     store().reset();
     expect(store().frozen).toBe(false);
+  });
+});
+
+describe("changedSectionsSince", () => {
+  const entries = [{ stepId: "rules" }, { stepId: "touch" }, { stepId: "rules" }, { stepId: "help" }];
+
+  it("lists distinct steps after the cursor, first-touched order", () => {
+    expect(changedSectionsSince(entries, 1, true)).toEqual(["touch", "rules", "help"]);
+  });
+
+  it("reports a direct source edit when files changed but nothing was recorded", () => {
+    expect(changedSectionsSince(entries, 4, true)).toEqual(["source"]);
+    expect(changedSectionsSince(entries, 4, false)).toEqual([]);
   });
 });

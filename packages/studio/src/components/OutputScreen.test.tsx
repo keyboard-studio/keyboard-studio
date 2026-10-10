@@ -277,11 +277,13 @@ describe("OutputScreen — output-time touch-layout staleness gate", () => {
     });
 
     // BOTH downloads carry the explanation while touch is stale — the .kmp is
-    // the primary artifact, not a laxer path around the gate.
+    // the primary artifact, not a laxer path around the gate — and so does
+    // "Make a test build", which shares the .kmp's gates (spec 094 FR-006).
     const blocked = screen.getAllByRole("button", {
       name: /download unavailable.*touch layout is out of date/i,
     });
-    expect(blocked.length).toBe(2);
+    expect(blocked.length).toBe(3);
+    expect(blocked.map((b) => b.getAttribute("data-testid"))).toContain("make-test-build");
     expect((screen.getByTestId("emit-download-kmp") as HTMLButtonElement).disabled).toBe(true);
   });
 

@@ -180,3 +180,22 @@ export function useHasTestBuilds(): boolean {
 export function hasTestBuilds(): boolean {
   return useTestingStore.getState().builds.length > 0;
 }
+
+/**
+ * The stage ids changed since a build (research R7): the distinct steps of the
+ * decision-record entries appended after `fromCursor`, in the order first
+ * touched. When the files changed but no decision was recorded, the change can
+ * only have come from Output's direct source editor, reported as "source".
+ */
+export function changedSectionsSince(
+  entries: readonly { stepId: string }[],
+  fromCursor: number,
+  filesChanged: boolean,
+): string[] {
+  const sections: string[] = [];
+  for (const entry of entries.slice(fromCursor)) {
+    if (!sections.includes(entry.stepId)) sections.push(entry.stepId);
+  }
+  if (sections.length === 0 && filesChanged) sections.push("source");
+  return sections;
+}
