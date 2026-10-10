@@ -114,3 +114,21 @@ describe("TestBuildPanel", () => {
     expect(screen.getByTestId("test-build-list")).toBeTruthy();
   });
 });
+
+describe("TestBuildPanel — tester reports (spec 094 T037)", () => {
+  it("shows the reports section only once a build exists", async () => {
+    renderPanel();
+    expect(screen.queryByTestId("tester-reports")).toBeNull();
+    await act(async () => {
+      fireEvent.click(button());
+    });
+    expect(screen.getByTestId("tester-reports")).toBeTruthy();
+  });
+});
+
+describe("TestBuildPanel — accessible name when enabled", () => {
+  it("names the next build and its version", () => {
+    renderPanel();
+    expect(button().getAttribute("aria-label")).toBe("Make test build 1, version 2.3.1, and download it");
+  });
+});

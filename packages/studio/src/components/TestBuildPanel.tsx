@@ -15,6 +15,7 @@ import type { TestBuild } from "../lib/draftTypes.ts";
 import { stageLabel } from "../decisions/progressDots.ts";
 import { formatClauseList } from "../decisions/stageText.ts";
 import { ACCENT, BORDER, TEXT_DIM } from "../ui/theme.ts";
+import { TesterReports } from "./TesterReports.tsx";
 
 export interface TestBuildPanelProps {
   /** The download gates, exactly as the installable download sees them. */
@@ -146,6 +147,8 @@ export function TestBuildPanel({ gate, nextTestVersion, busy, onMakeTestBuild }:
       <span role="status" aria-live="polite" style={{ fontSize: 12, color: TEXT_DIM }}>
         {status}
       </span>
+      {/* spec 094 FR-012: reports attach to a build, so they appear once one exists. */}
+      {builds.length > 0 && <TesterReports />}
     </section>
   );
 }

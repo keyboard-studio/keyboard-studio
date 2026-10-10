@@ -252,7 +252,7 @@ open report is still listed, and the fixed one shows which build fixed it.
 
 ### Tests for User Story 3
 
-- [ ] T035 [P] [US3] Write the new `studio/components/TesterReports.test.tsx`:
+- [X] T035 [P] [US3] Write the new `studio/components/TesterReports.test.tsx`:
   - adding a report requires text and a build, and the section is optional;
   - the section link calls `jumpToLocation` with `returnTo: { route: "output" }` (FR-013);
   - marking fixed and then making a build shows "Fixed in build N" (FR-014);
@@ -262,13 +262,13 @@ open report is still listed, and the fixed one shows which build fixed it.
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Implement the new `studio/components/TesterReports.tsx` (FR-012 to FR-014):
+- [X] T036 [US3] Implement the new `studio/components/TesterReports.tsx` (FR-012 to FR-014):
   - an add-report form with a text area (1-2000 characters), a build select (existing build numbers) and an optional section select (completed sections from `buildProgressDots`);
   - a report list with status toggle, a section link and the "Found in build N / Fixed in build M" text;
   - store calls go through `testingStore`.
 
   T035 must pass.
-- [ ] T037 [US3] Mount `TesterReports` inside `TestBuildPanel` in `studio/components/TestBuildPanel.tsx`, shown once at least one build exists. Add the en and fr catalog entries for `output.testing.reports.*`. Run extract and compile.
+- [X] T037 [US3] Mount `TesterReports` inside `TestBuildPanel` in `studio/components/TestBuildPanel.tsx`, shown once at least one build exists. Add the en and fr catalog entries for `output.testing.reports.*`. Run extract and compile.
 
 **Checkpoint**: T035 passes, the full studio suite is green, `pnpm lint` is green, and quickstart
 step 5 passes. Commit `feat(studio): record tester reports against test builds (spec 094
