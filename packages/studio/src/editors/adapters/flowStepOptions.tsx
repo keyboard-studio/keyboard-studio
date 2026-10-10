@@ -46,7 +46,8 @@ import { hasTestBuilds } from "../../stores/testingStore.ts";
 //   the user owns it" contract leaves the field genuinely unset in that case,
 //   same as project_name below.
 // Extract: track_choice answer → "copy" | "adapt" only; else undefined (stay).
-// onCommit: setSelectedTrack(track); if track!=="copy" also setScaffoldSpec(null).
+// onCommit: setSelectedTrack(track); adoptTrack(track) on the working copy;
+//   if track!=="copy" also setScaffoldSpec(null).
 // Payload: { track }.
 // ---------------------------------------------------------------------------
 
@@ -80,6 +81,9 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
   onCommit(extracted: TrackPayload, deps: FlowStepDeps): void {
     // R7 ordering: setSelectedTrack BEFORE onComplete → StepHost advance.
     deps.setSelectedTrack(extracted.track);
+    // The working copy was instantiated at choose_base, before this answer
+    // existed; record the track on it so adapt really is adapt-existing.
+    useWorkingCopyStore.getState().adoptTrack(extracted.track);
     if (extracted.track !== "copy") {
       // Adapt-track: null scaffold spec (advanceOutcome carries setCharactersSubStage
       // which fires AFTER advance — matches pre-Stage-6 ordering).

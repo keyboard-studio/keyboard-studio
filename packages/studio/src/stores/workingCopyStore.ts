@@ -1212,6 +1212,26 @@ export interface WorkingCopyState {
   ) => void;
 
   /**
+   * Record the author's copy/adapt answer on the working copy that already
+   * exists (spec 094 quickstart finding).
+   *
+   * The base is confirmed — and the working copy instantiated — at
+   * `choose_base`, before the track step asks copy or adapt, so it is always
+   * instantiated `new-from-base`. Re-instantiating at the track step is not
+   * an option: same id with a different mode is a genuine switch to
+   * `resolveInstantiationCase` and clears the survey results already recorded.
+   * Nothing has been edited yet at that point (the track step comes straight
+   * after `choose_base`), so the working copy's content is the same for both
+   * tracks; only the mode and the identity differ. This sets them in place:
+   *   - "adapt": `adapt-existing`, keeping the keyboard's own id and name (as
+   *     instantiateFromExisting does) and the language the author chose;
+   *   - "copy": `new-from-base`, dropping an id and name an earlier adapt
+   *     answer took from the keyboard, so project_name sets the new ones.
+   * A no-op before instantiation or when the mode already matches.
+   */
+  adoptTrack: (track: "copy" | "adapt") => void;
+
+  /**
    * Apply an identity patch (language name, BCP47 tag, display name) over
    * the base keyboard identity. Replaces any prior patch (last-wins).
    */
@@ -1567,6 +1587,7 @@ export type WorkingCopyData = Omit<
   | "unflagCharForSequence"
   | "instantiateFromBase"
   | "instantiateFromExisting"
+  | "adoptTrack"
   | "setIdentity"
   | "isInstantiated"
   | "setAttribution"
@@ -2357,6 +2378,30 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       closedKeyboardCard: null,
       carveDispositions: [],
       carveTouchKeepInert: [],
+    });
+  },
+
+  adoptTrack: (track) => {
+    const { instantiationMode, baseKeyboard, identity } = get();
+    if (instantiationMode === null || baseKeyboard === null) return;
+    if (track === "adapt") {
+      if (instantiationMode === "adapt-existing") return;
+      set({
+        instantiationMode: "adapt-existing",
+        identity: {
+          ...identity,
+          keyboardId: baseKeyboard.id,
+          displayName: baseKeyboard.displayName,
+          bcp47: identity?.bcp47 || (baseKeyboard.languages?.[0] ?? ""),
+        },
+      });
+      return;
+    }
+    if (instantiationMode === "new-from-base") return;
+    const { keyboardId: _id, displayName: _name, ...rest } = identity ?? {};
+    set({
+      instantiationMode: "new-from-base",
+      identity: Object.keys(rest).length > 0 ? rest : null,
     });
   },
 
