@@ -55,6 +55,7 @@ import { jumpToLocation } from "../lib/jumpToLocation.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { OutputSectionList } from "./OutputSectionList.tsx";
 import { TestBuildPanel } from "./TestBuildPanel.tsx";
+import { PublishHandover } from "./PublishHandover.tsx";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
@@ -808,12 +809,17 @@ export function OutputScreen() {
                 explanatory aria-label (canSubmit already forbids the
                 emission either way). Attribution prefill from whichever
                 identity provider is active. */}
-            <ManagedPRSubmitPanel
-              canSubmit={canDownload}
-              outputBlocked={submitBlocker !== undefined}
-              {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
-              prefill={submitPrefill}
-            />
+            {/* spec 094 FR-016: after test builds, one "Testing done, publish"
+                step says what changed since the last build and lists open
+                reports before the unchanged submit panel appears. */}
+            <PublishHandover>
+              <ManagedPRSubmitPanel
+                canSubmit={canDownload}
+                outputBlocked={submitBlocker !== undefined}
+                {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
+                prefill={submitPrefill}
+              />
+            </PublishHandover>
 
             {/* Decoupled "Sign up with GitHub / Google" identity step (docs/github-integration.md
                 §1a). Establishes who the user is — NOT a submit/PR action, and not

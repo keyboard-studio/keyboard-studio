@@ -1,7 +1,9 @@
 // SurveyResetButton — the "Reset" control in the NavBar's top-right corner,
-// rendered while a survey is mounted. Clicking it opens an "Are you sure?" + Yes
-// confirmation (inline warning tied to the button, not a browser dialog — no
-// window.confirm in this repo). Yes fires onReset, which the caller wires to
+// rendered while a survey is mounted. Clicking it opens a "Start over?" + Yes
+// confirmation, which names what goes — the draft, its test builds and tester
+// reports, and the cloud copy (spec 094 edge case "Start over"). It is an
+// inline warning tied to the button, not a browser dialog (no window.confirm
+// in this repo). Yes fires onReset, which the caller wires to
 // the full start-over path (store resets + draft discard). Because that path
 // clears working-copy edits directly instead of re-instantiating over them,
 // it never routes through the "Switching base keyboards…" rebase confirm.
@@ -19,6 +21,7 @@
 // stray click can't leave a live "Yes" button around.
 
 import { useRef, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { CSSProperties } from "react";
 import { BORDER, ERROR_RED, FONT, TEXT_DIM } from "../ui/theme.ts";
 import {
@@ -64,7 +67,9 @@ const CONFIRM_PANEL_STYLE: CSSProperties = {
 const CONFIRM_TEXT_STYLE: CSSProperties = {
   color: TEXT_DIM,
   fontSize: 13,
-  whiteSpace: "nowrap",
+  // The prompt is a sentence, so it wraps inside a bounded popover.
+  width: "28ch",
+  lineHeight: 1.4,
 };
 
 const YES_BTN_STYLE: CSSProperties = {
@@ -79,6 +84,7 @@ const YES_BTN_STYLE: CSSProperties = {
 };
 
 export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
+  const { t } = useLingui();
   const [confirming, setConfirming] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -97,7 +103,7 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
       <button
         type="button"
         data-testid="survey-reset-arm"
-        aria-label="Reset survey"
+        aria-label={t({ id: "nav.reset.ariaLabel", message: "Start this keyboard over" })}
         aria-expanded={confirming}
         // "true", not "dialog": the confirm popover carries role="alert" and no
         // dialog semantics (see the panel below), so advertising a dialog would
@@ -108,14 +114,17 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
         style={RESET_BTN_STYLE}
         onClick={() => setConfirming((armed) => !armed)}
       >
-        Reset
+        <Trans id="nav.reset.arm">Reset</Trans>
       </button>
       {confirming && (
         <div style={CONFIRM_PANEL_STYLE}>
           {/* role="alert" announces the question on arm — the popover carries no
               dialog semantics, so focus is left where the author put it. */}
           <span role="alert" style={CONFIRM_TEXT_STYLE}>
-            Are you sure?
+            <Trans id="nav.reset.confirm">
+              Start over? This deletes the draft, its test builds and tester reports, and its cloud
+              copy.
+            </Trans>
           </span>
           <button
             type="button"
@@ -127,7 +136,7 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
               onReset();
             }}
           >
-            Yes
+            <Trans id="nav.reset.yes">Yes, start over</Trans>
           </button>
         </div>
       )}

@@ -1,13 +1,16 @@
 // Tests for SurveyResetButton — the Reset control in the NavBar's top-right
-// corner. Verifies the two-step arm/confirm flow: Reset arms an "Are you sure?"
+// corner. Verifies the two-step arm/confirm flow: Reset arms a "Start over?"
 // + Yes popover (no browser dialog), Yes fires onReset exactly once, and a
 // second trigger click / Escape / outside pointer-down disarm without firing.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { SurveyResetButton } from "./SurveyResetButton.tsx";
 
 afterEach(cleanup);
+
+const CONFIRM = /^Start over\?/;
 
 describe("SurveyResetButton", () => {
   it("does not fire onReset on the first click — it arms the confirmation", () => {
@@ -16,7 +19,9 @@ describe("SurveyResetButton", () => {
 
     fireEvent.click(screen.getByTestId("survey-reset-arm"));
     expect(onReset).not.toHaveBeenCalled();
-    expect(screen.getByText("Are you sure?")).toBeTruthy();
+    expect(screen.getByText(CONFIRM)).toBeTruthy();
+    // spec 094: the prompt names everything start-over deletes.
+    expect(screen.getByRole("alert").textContent).toMatch(/draft.*test builds.*tester reports.*cloud/s);
     expect(screen.getByTestId("survey-reset-yes")).toBeTruthy();
   });
 
@@ -27,7 +32,7 @@ describe("SurveyResetButton", () => {
     fireEvent.click(screen.getByTestId("survey-reset-arm"));
     fireEvent.click(screen.getByTestId("survey-reset-yes"));
     expect(onReset).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("Are you sure?")).toBeNull();
+    expect(screen.queryByText(CONFIRM)).toBeNull();
     expect(screen.getByTestId("survey-reset-arm")).toBeTruthy();
   });
 
@@ -44,7 +49,7 @@ describe("SurveyResetButton", () => {
 
     fireEvent.click(trigger);
     expect(onReset).not.toHaveBeenCalled();
-    expect(screen.queryByText("Are you sure?")).toBeNull();
+    expect(screen.queryByText(CONFIRM)).toBeNull();
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -55,7 +60,7 @@ describe("SurveyResetButton", () => {
     fireEvent.click(screen.getByTestId("survey-reset-arm"));
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onReset).not.toHaveBeenCalled();
-    expect(screen.queryByText("Are you sure?")).toBeNull();
+    expect(screen.queryByText(CONFIRM)).toBeNull();
   });
 
   it("pointer-down outside the control disarms without firing onReset", () => {
@@ -65,7 +70,7 @@ describe("SurveyResetButton", () => {
     fireEvent.click(screen.getByTestId("survey-reset-arm"));
     fireEvent.pointerDown(document.body);
     expect(onReset).not.toHaveBeenCalled();
-    expect(screen.queryByText("Are you sure?")).toBeNull();
+    expect(screen.queryByText(CONFIRM)).toBeNull();
   });
 
   it("pointer-down inside the control keeps the confirmation armed", () => {

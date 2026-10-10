@@ -27,8 +27,18 @@ export interface TestBuildPanelProps {
   onMakeTestBuild: () => Promise<TestBuild | null>;
 }
 
+/** A changed section's display name; `"source"` is a direct `.kmn` edit (research R7). */
+export function useChangedSectionName(): (id: string) => string {
+  const { t, i18n } = useLingui();
+  return (id) =>
+    id === "source"
+      ? t({ id: "output.testing.changed.source", message: "Source edited directly" })
+      : stageLabel(id, i18n);
+}
+
 export function TestBuildPanel({ gate, nextTestVersion, busy, onMakeTestBuild }: TestBuildPanelProps) {
   const { t, i18n } = useLingui();
+  const sectionName = useChangedSectionName();
   const builds = useTestingStore((s) => s.builds);
   const nextNumber = useTestingStore((s) => s.nextBuildNumber);
   const frozen = useTestingStore((s) => s.frozen);
@@ -47,11 +57,6 @@ export function TestBuildPanel({ gate, nextTestVersion, busy, onMakeTestBuild }:
           id: "output.testing.make.ariaLabel",
           message: `Make test build ${nextNumber}, version ${version}, and download it`,
         });
-
-  const sectionName = (id: string): string =>
-    id === "source"
-      ? t({ id: "output.testing.changed.source", message: "Source edited directly" })
-      : stageLabel(id, i18n);
 
   const changedText = (build: TestBuild): string => {
     if (build.identicalTo !== undefined) {

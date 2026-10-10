@@ -287,7 +287,7 @@ report before submission is offered.
 
 ### Tests for User Story 4
 
-- [ ] T038 [P] [US4] Write the new `studio/components/PublishHandover.test.tsx`:
+- [X] T038 [P] [US4] Write the new `studio/components/PublishHandover.test.tsx`:
   - with no test builds, the existing submit panel renders exactly as today;
   - with builds, a "Testing done, publish" step appears first;
   - it shows "No changes since test build N" when the fingerprint matches, and otherwise lists the changed sections;
@@ -296,14 +296,14 @@ report before submission is offered.
 
 ### Implementation for User Story 4
 
-- [ ] T039 [US4] Implement the new `studio/components/PublishHandover.tsx` (FR-016, FR-017):
+- [X] T039 [US4] Implement the new `studio/components/PublishHandover.tsx` (FR-016, FR-017):
   - on open, compute the fingerprint (T028) and compare it with the last build;
   - derive the changed sections as in T030;
   - list reports with `status === "open"`;
   - require one confirm before rendering its `children` (the existing submit panel).
 
   T038 must pass.
-- [ ] T040 [US4] Wrap `ManagedPRSubmitPanel` in `PublishHandover` in `studio/components/OutputScreen.tsx` (~:761-778). Leave the panel's props and behaviour unchanged. Add the en and fr catalog entries for `output.publishHandover.*`. Run extract and compile.
+- [X] T040 [US4] Wrap `ManagedPRSubmitPanel` in `PublishHandover` in `studio/components/OutputScreen.tsx` (~:761-778). Leave the panel's props and behaviour unchanged. Add the en and fr catalog entries for `output.publishHandover.*`. Run extract and compile.
 
 **Checkpoint**: T038 passes, the full studio suite is green, and `pnpm lint` is green.
 Polish rides with this phase (constitution phase cadence).
@@ -312,16 +312,16 @@ Polish rides with this phase (constitution phase cadence).
 
 ## Phase 7: Polish & cross-cutting concerns
 
-- [ ] T041 [P] Move the start-over confirmation copy in `studio/components/SurveyResetButton.tsx` (~:97-133) into the catalog (`nav.reset.*`, en and fr). The prompt must state that the draft, its test builds and tester reports, and the cloud copy are deleted (spec edge case "Start over"). Update `studio/components/SurveyResetButton.test.tsx`.
-- [ ] T042 [P] Extend `e2e/copy-edit.spec.ts`:
+- [X] T041 [P] Move the start-over confirmation copy in `studio/components/SurveyResetButton.tsx` (~:97-133) into the catalog (`nav.reset.*`, en and fr). The prompt must state that the draft, its test builds and tester reports, and the cloud copy are deleted (spec edge case "Start over"). Update `studio/components/SurveyResetButton.test.tsx`.
+- [X] T042 [P] Extend `e2e/copy-edit.spec.ts`:
   1. make test build 1 and assert the download name `<id>-test-build-1.kmp`;
   2. open Rules from the section list, edit, choose Back to testing, and assert the URL hash returns to `#output`;
   3. make test build 2 and assert its name;
   4. reload and assert two builds are listed.
 
   This job is non-blocking in CI.
-- [ ] T043 [P] Add or update rows in `specs/056-ada-accessibility/wcag-2.2-aa-tracker.md` for the section list, the footer revision actions, the test-build panel, the reports form and the publish hand-over. Only flip a row to `pass` with named test evidence (T015, T016, T026, T035, T038).
-- [ ] T044 [P] Update [docs/workflow-model.md](../../docs/workflow-model.md) and [docs/architecture.md](../../docs/architecture.md) to describe the Output-origin revision loop and that test builds are a `.kmp`-only projection. Update `docs/github-integration.md` only where it says Output is terminal.
+- [X] T043 [P] Add or update rows in `specs/056-ada-accessibility/wcag-2.2-aa-tracker.md` for the section list, the footer revision actions, the test-build panel, the reports form and the publish hand-over. Only flip a row to `pass` with named test evidence (T015, T016, T026, T035, T038).
+- [X] T044 [P] Update [docs/workflow-model.md](../../docs/workflow-model.md) and [docs/architecture.md](../../docs/architecture.md) to describe the Output-origin revision loop and that test builds are a `.kmp`-only projection. Update `docs/github-integration.md` only where it says Output is terminal.
 - [ ] T045 Run the full quickstart ([quickstart.md](quickstart.md) steps 1-10), `pnpm lint`, and both package suites. Record results in the phase commit. Commit `feat(studio): publish hand-over after testing, plus polish (spec 094 T038-T045)` and push.
 
 ---

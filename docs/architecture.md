@@ -89,6 +89,22 @@ one persistent working copy.
   modelled as component lifetime; content was not.
   → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/AS-BUILT.md)
 
+- **The Output-origin revision loop (spec 094).** Output reuses the jump
+  primitive's `returnTo` seam: the section list, blocker banners and tester
+  reports open a step with `returnTo: { route: "output" }`, and the step returns
+  there when it completes. There is no second router. On arrival `StepHost`
+  takes a revision snapshot (`captureRevisionSnapshot` in
+  [`lib/draftPersistence.ts`](../packages/studio/src/lib/draftPersistence.ts)).
+  It covers every store a draft restore covers except traversal, and Discard
+  puts it back with the same prepare-then-commit appliers. **Test builds are a
+  `.kmp`-only projection.** `buildTestBuildKmp` passes a `testBuild` option
+  through `projectWorkingCopyForOutput`, which overrides the version and adds
+  the label. The download, source-zip and PR paths call without options, so
+  their bytes are unchanged. Version arithmetic is the engine's
+  `resolvePublishVersion` / `resolveTestBuildVersion`. Builds and reports live
+  in `testingStore` and persist as the draft's additive `testing` field.
+  → [`specs/094-test-and-revise/`](../specs/094-test-and-revise/spec.md)
+
 - **Phase-B steps between `characters` and `carve`.** Four survey steps
   run (by derived step order) after the alphabet is confirmed and before the carve
   gallery, in this order: `marks` (spec 071, computed S0 gate), `punctuation`,
@@ -129,6 +145,9 @@ pick keyboard ──▶ instantiate working copy (Track 1 copy/adapt | Track 2 i
    ├─ validate  (Layer A + B continuous; Layer C hygiene)  ◀── 300 ms debounce, TS + WASM oracle
    │
    └─▶ output  (VirtualFS → .kmp installable  |  → source .zip  |  GitHub OAuth fork + PR)
+         │   ▲
+         │   └── revise one section, Back to testing  (spec 094)
+         └─▶ numbered test build  (.kmp only; never the .zip or PR)
 ```
 
 Authoritative detail: [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)

@@ -885,3 +885,62 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     await expect(page.getByTestId("carve-gallery")).toHaveCount(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 094 (T042) — test-and-revise loop.
+//
+// Build 1 → open Carve (a full-layout step) from Output's section list → Back
+// to testing (the hash returns to #output without passing any other step) →
+// build 2 → reload, and both builds are still listed. Build 2 is made with no
+// survey step visited after it, so the reload proves Output itself autosaves.
+// The section list shows
+// only steps that recorded a decision, and this walk accepts Rules as-is, so
+// Carve stands in for it. The visit is a round trip, not an edit; the
+// edit-and-keep and Discard paths are covered by the golden walks
+// (stepHost.goldenWalk.test.tsx).
+// Non-blocking in CI, like the rest of this file.
+// ---------------------------------------------------------------------------
+
+async function makeTestBuild(page: Page): Promise<Download> {
+  const button = page.getByTestId("make-test-build");
+  await expect(button).not.toBeDisabled({ timeout: 60_000 });
+  const [download] = await Promise.all([page.waitForEvent("download"), button.click()]);
+  return download;
+}
+
+test.describe("spec 094: test builds and the revise-from-Output loop", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedReturningVisitor(page);
+    await page.goto("/");
+  });
+
+  test("T042: build 1, revise Carve and come back, build 2, both survive a reload", async ({ page }) => {
+    await walkToOutput(page, FIXTURE);
+
+    const first = await makeTestBuild(page);
+    expect(first.suggestedFilename()).toMatch(/-test-build-1\.kmp$/);
+    await expect(page.getByTestId("test-build-list").locator("li")).toHaveCount(1);
+
+    // Open Carve from the section list (a disclosure; expand it if collapsed).
+    const toggle = page.getByTestId("output-section-list-toggle");
+    if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+    await page.getByTestId("output-section-carve").click();
+    await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
+    expect(new URL(page.url()).hash).not.toBe("#output");
+
+    // Full-layout step, Output origin: the footer offers "Back to testing".
+    await page.getByTestId("step-revision-back-to-testing").click();
+    await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 15_000 });
+    expect(new URL(page.url()).hash).toBe("#output");
+
+    const second = await makeTestBuild(page);
+    expect(second.suggestedFilename()).toMatch(/-test-build-2\.kmp$/);
+    await expect(page.getByTestId("test-build-list").locator("li")).toHaveCount(2);
+
+    // Let the 500 ms autosave commit the testing record, then reload.
+    await page.waitForTimeout(1_500);
+    await page.reload();
+    await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 30_000 });
+    await expect(page.getByTestId("test-build-list").locator("li")).toHaveCount(2, { timeout: 30_000 });
+  });
+});
