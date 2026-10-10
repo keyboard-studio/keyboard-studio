@@ -7,23 +7,31 @@
 // Spanish, release/sil/sil_cameroon_azerty ships both azerty-en.php and
 // azerty-fr.php, and release/k/khmer_angkor ships EN and KH PDF manuals.
 // Nothing in the keyboard data reveals the audience's reading language.
+//
+// The help's MAIN language. winchus (Spanish) and sil_cameroon_azerty (French)
+// are written in a national language that is neither English nor the
+// keyboard's own, so "another language" opens a langtags picker
+// (pf_doc_language_other). A second language for a bilingual page is
+// pf_doc_language_second. The main language becomes the page's `<html lang>`.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
-const OPTION_VALUES = new Set(["english", "target", "bilingual"]);
+// "bilingual" is the pre-pf_doc_language_second answer (English + the
+// keyboard's language). It is no longer offered, but a draft saved with it
+// must still validate; helpDocsFromDecisions reads it as ["en", target].
+const OPTION_VALUES = new Set(["english", "target", "other", "bilingual"]);
 
 export const definition = {
   id: "pf_doc_language",
   prompt: "What language should the help page be written in?",
   help_text:
     "This decides how you write every answer that follows. Choose the language " +
-    "your users actually read. Many published keyboards are not English-only: " +
-    "some ship help in the language community's own language, and some publish " +
-    "both. If you pick \"both\", write each answer in both languages and the " +
-    "help page will present them together.",
+    "your users actually read: English, the keyboard's own language, or another " +
+    "language such as the national language of the region. You can add a second " +
+    "language on the next screen.",
   type: "radio" as const,
-  // Optional (minimum-questions revision): blank means English, so an author who
-  // opts into the battery is never blocked by a question they have no view on.
+  // Optional (minimum-questions revision): an author who opts into the battery
+  // is never blocked by a question they have no view on.
   required: false,
   options: [
     { value: "english", label: "English" },
@@ -32,17 +40,24 @@ export const definition = {
       label: "The language of the keyboard ({{language_name}})",
       note: "Best when the users do not read English",
     },
-    { value: "bilingual", label: "Both — English and {{language_name}}" },
+    {
+      value: "other",
+      label: "Another language…",
+      note: "For example the national language of the region",
+    },
   ],
-  next: "pf_font_guidance",
+  next: [
+    { condition: "value == 'other'", goto: "pf_doc_language_other" },
+    { default: true, goto: "pf_doc_language_second" },
+  ],
 } satisfies import("../../types.ts").FlowQuestion;
 
 export function validate(
   value: string | string[] | undefined,
 ): ValidationResult {
   const v = typeof value === "string" ? value : "";
-  // Blank is allowed and means English — the question is optional. The check
-  // below still guards against a value outside the offered options.
+  // Blank is allowed — the question is optional. The check below still guards
+  // against a value outside the offered options.
   if (v.length === 0) {
     return { ok: true };
   }
@@ -60,12 +75,13 @@ export const fixtures: QuestionModule["fixtures"] = {
   valid: [
     { value: "english", note: "English-only help (the common case)" },
     { value: "target", note: "help written in the keyboard's own language" },
-    { value: "bilingual", note: "both, as sil_yi and sil_cameroon_azerty ship" },
-    { value: "", note: "blank is fine — means English" },
+    { value: "other", note: "a national language, as winchus (Spanish) ships" },
+    { value: "bilingual", note: "legacy answer from a saved draft — still accepted" },
+    { value: "", note: "blank is fine (optional)" },
     { value: undefined, note: "undefined is fine (optional)" },
   ],
   invalid: [
-    { value: "french", expectedCode: "invalid_option", note: "not an offered option" },
+    { value: "french", expectedCode: "invalid_option", note: "a language goes through 'other', not a bare name" },
   ],
 };
 
@@ -79,18 +95,13 @@ const mod: QuestionModule = {
   provides: ["help-doc-language"], requires: ["help-more-detail"],
   specRef: "specs/061-help-docs-generation",
   // Spec 092 (T036): the documentation-language default is this module's
-  // lookup default, replacing the PHASE_F_SEEDS table entry — derived
-  // from the identity phase's composed BCP47 tag (supplied by the live
-  // wiring as ctx.phaseF.bcp47Tag): an English or tag-less project
-  // documents in English only; anything else documents bilingually. The
-  // author can overturn it.
-  lookupDefault: (ctx) => {
-    const tag = ctx.phaseF?.bcp47Tag;
-    const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
-    return {
-      value: primary === "" || primary === "en" ? "english" : "bilingual",
-      source: "identity",
-    };
-  },
+  // lookup default, replacing the PHASE_F_SEEDS table entry. #2002 split
+  // the old single "bilingual" proposal across two questions: the main
+  // language defaults to English (a plain default, no source — the old
+  // seed table's entry carried none), and pf_doc_language_second's
+  // lookup default proposes the keyboard's own language as the second
+  // for a non-English project, which is what "bilingual" used to mean.
+  // The author can overturn either.
+  lookupDefault: () => ({ value: "english" }),
 };
 export default mod;

@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-30",
+  "lastUpdated": "2026-10-09",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -270,7 +270,7 @@
     },
     "specs/002-defaults-engine": {
       "title": "Feature Specification: Defaults engine (propose-then-confirm proposers)",
-      "hash": "sha256:f89242b98574e472",
+      "hash": "sha256:d7a9076892fb900b",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:72d56c2fead04937",
+      "hash": "sha256:362d5502ef0862b8",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -445,7 +445,7 @@
     },
     "specs/025-qu-proposed-flows-library": {
       "title": "Feature Specification: Proposed-flow Library section on the Flow Map",
-      "hash": "sha256:caa5f5b8b899ec7c",
+      "hash": "sha256:4f71c0042c9e2cf9",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -597,7 +597,7 @@
     },
     "docs/lens-model.md": {
       "title": "How the four analytic lenses compose",
-      "hash": "sha256:16df2c92ff925507",
+      "hash": "sha256:8a07fd7c8294abe8",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -661,7 +661,7 @@
     },
     "specs/050-text-sample-prefill": {
       "title": "Feature Specification: Text-sample prefill (paste or upload)",
-      "hash": "sha256:bc0ef88027c448ba",
+      "hash": "sha256:359d7da57a0ce514",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -861,7 +861,7 @@
     },
     "specs/078-context-tolerance-wiring": {
       "title": "Feature Specification: Context tolerance reaches the author",
-      "hash": "sha256:1c37c260290b420a",
+      "hash": "sha256:ee889edfc83e3712",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -885,7 +885,7 @@
     },
     "specs/081-footer-step-nav": {
       "title": "Feature Specification: Survey progress buttons live in the footer",
-      "hash": "sha256:63147ac7ca822373",
+      "hash": "sha256:e386c7bf1b5064d1",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -893,7 +893,7 @@
     },
     "specs/076-rule-behaviours": {
       "title": "Feature Specification: Rule behaviours — managing reorder, blocking, and context rules as intents",
-      "hash": "sha256:0fe3879e0ea7c171",
+      "hash": "sha256:cb9a9268145ef7bc",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -901,7 +901,7 @@
     },
     "specs/077-base-decisions": {
       "title": "Feature Specification: Base-keyboard decisions with knowledgeable consent",
-      "hash": "sha256:8914139fb196508c",
+      "hash": "sha256:79308c3c1b103d36",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -922,6 +922,37 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "specs/084-criteria-compliance-page": {
+      "title": "Feature Specification: Criteria compliance page — per-keyboard approval-criteria status in the decisions-tab pattern",
+      "hash": "sha256:3b6c9f55b6d40e07",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Proposed — planning spec only (PR #1937); no implementation yet. Acknowledged to register the section; implementation is future work."
+    },
+    "specs/085-adaptive-placement-basis": {
+      "title": "Feature Specification: Adaptive placement basis — base-derived default, author-observed override, expressed driver",
+      "hash": "sha256:c6c915415e91f460",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Proposed — planning spec only (PR #1936); no implementation yet. Acknowledged to register the section; implementation is future work."
+    },
+    "specs/087-decision-backend": {
+      "title": "Backend Streamlining: Decisions as the Only Unit",
+      "hash": "sha256:54ac0790f34155e4",
+      "status": "implemented",
+      "implements": [
+        "packages/studio/src/decisions/decisionFlow.ts",
+        "packages/studio/src/decisions/orderDecisions.ts",
+        "packages/studio/src/decisions/extractContext.ts",
+        "packages/studio/src/steps/stepDependencies.ts",
+        "packages/studio/src/steps/mutateApply.ts",
+        "packages/studio/src/survey/questions/registry.ts"
+      ],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #1938 (decisions as the only unit — derived order, full retirement); all 30 tasks complete. Spec was never seeded, so it flagged as new-section post-merge. Deferred follow-ups live in specs/087-decision-backend/followups.md."
     }
   }
 }

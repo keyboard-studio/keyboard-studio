@@ -14,6 +14,9 @@
 //     flow, research D-11), trimmed, blanks dropped;
 //   - `help-project-url` splits on newlines into home/help URLs — the
 //     question's documented "one or two lines" format (FR-004);
+//   - the help-page languages compose into `docLanguageTags` (#2002,
+//     integrated 2026-10-10): pf_doc_language + pf_doc_language_second and
+//     their "another language" pickers resolve to BCP 47 tags, main first;
 //   - the opt-in battery fields land only when non-blank.
 //
 // The HISTORY-entry half lives here too (not in the question module)
@@ -22,6 +25,7 @@
 
 import type { HelpDocsAnswers, HistoryEntryState } from "@keyboard-studio/contracts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
+import { deriveIdentityResult } from "./identitySelectors.ts";
 import { applyHistoryEntryAction } from "../lib/historyEntryState.ts";
 import { isHistoryEntryAction } from "../survey/questions/f/pf_history_entry.ts";
 
@@ -50,6 +54,53 @@ const OPT_IN_DECISION_IDS: ReadonlyArray<[OptInField, DecisionId]> = [
   ["relatedKeyboards", "help-related-keyboards"],
   ["furtherReading", "help-further-reading"],
 ];
+
+/**
+ * The help prose's language tags, main language first
+ * (`HelpDocsAnswers.docLanguageTags`, #2002). Each recorded choice
+ * resolves to a tag: "english" → "en", "target" → the keyboard's own
+ * tag (the identity derivation's composed `bcp47`), "other" → that
+ * question's picker answer. A second choice that can't resolve (no
+ * keyboard tag yet, blank picker) is dropped, and a second language
+ * equal to the first is ignored. But an unresolved MAIN language
+ * yields no tags at all: promoting the second language into `tags[0]`
+ * would make it the page's `<html lang>` and mislabel prose written
+ * in the main language, so the renderer instead falls back to the
+ * keyboard's `primaryBcp47` (km-triage fix on #2002). The legacy
+ * single-question "bilingual" answer reads as English + the
+ * keyboard's language. The legacy `docLanguage` field is no longer
+ * written — contracts marks it accepted-for-loading only.
+ */
+function resolveDocLanguageTags(
+  decisions: DecisionSet,
+  targetBcp47: string | undefined,
+): string[] {
+  const resolve = (choice: string, otherDecisionId: DecisionId): string | undefined => {
+    if (choice === "english") return "en";
+    if (choice === "target") return targetBcp47?.trim() || undefined;
+    if (choice === "other") return decisionString(decisions, otherDecisionId).trim() || undefined;
+    return undefined;
+  };
+  const main = decisionString(decisions, "help-doc-language");
+  const candidates =
+    main === "bilingual"
+      ? [resolve("english", "help-doc-language-other"), resolve("target", "help-doc-language-other")]
+      : [
+          resolve(main, "help-doc-language-other"),
+          resolve(
+            decisionString(decisions, "help-doc-language-second"),
+            "help-doc-language-second-other",
+          ),
+        ];
+  if (candidates[0] === undefined) return [];
+  const tags: string[] = [];
+  for (const tag of candidates) {
+    if (tag !== undefined && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
+      tags.push(tag);
+    }
+  }
+  return tags;
+}
 
 /**
  * Build `HelpDocsAnswers` from the recorded `help-*` decisions, or
@@ -82,10 +133,11 @@ export function helpDocsFromDecisions(decisions: DecisionSet): HelpDocsAnswers |
     if (lines[1] !== undefined) helpDocs.projectHelpUrl = lines[1];
   }
 
-  const docLanguage = decisionString(decisions, "help-doc-language");
-  if (docLanguage === "english" || docLanguage === "target" || docLanguage === "bilingual") {
-    helpDocs.docLanguage = docLanguage;
-  }
+  const docLanguageTags = resolveDocLanguageTags(
+    decisions,
+    deriveIdentityResult(decisions)?.bcp47 || undefined,
+  );
+  if (docLanguageTags.length > 0) helpDocs.docLanguageTags = docLanguageTags;
 
   for (const [field, decisionId] of OPT_IN_DECISION_IDS) {
     const value = decisionString(decisions, decisionId).trim();

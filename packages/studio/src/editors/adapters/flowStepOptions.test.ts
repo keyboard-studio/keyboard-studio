@@ -662,10 +662,13 @@ describe("extraction pass — Phase F choice defaults", () => {
     expect(passSeedFor("pf_more_detail_gate")).toBe("false");
   });
 
-  it("defaults the help language to English, or bilingual for a non-English keyboard", () => {
+  it("defaults the help languages: main English; second is the keyboard's language for a non-English keyboard (#2002)", () => {
     // pf_doc_language sits behind the more-detail gate (G-9): each case
     // opens the gate first, as the live walk does before the question is
-    // reached.
+    // reached. #2002 split the old single "bilingual" default across the
+    // two questions: the main language is a plain English default, and
+    // pf_doc_language_second proposes "target" for a non-English
+    // keyboard, "none" for an English one.
     expect(passSeedWithGateOpen("pf_doc_language")).toBe("english");
     useDecisionStore.getState().reset();
     recordIdentity("en");
@@ -676,6 +679,7 @@ describe("extraction pass — Phase F choice defaults", () => {
     });
     runLiveExtractionFromStores();
     expect(recordFor("pf_doc_language")?.value).toBe("english");
+    expect(recordFor("pf_doc_language_second")?.value).toBe("none");
     useDecisionStore.getState().reset();
     recordIdentity("ha");
     useDecisionStore.getState().record({
@@ -684,7 +688,8 @@ describe("extraction pass — Phase F choice defaults", () => {
       provenance: "asked",
     });
     runLiveExtractionFromStores();
-    expect(recordFor("pf_doc_language")?.value).toBe("bilingual");
+    expect(recordFor("pf_doc_language")?.value).toBe("english");
+    expect(recordFor("pf_doc_language_second")?.value).toBe("target");
   });
 
   it("preselects adding the drafted HISTORY entry", () => {
@@ -785,9 +790,18 @@ describe("extraction pass — Phase F derived text proposals", () => {
       provenance: "default",
       source: "identity",
     });
+    // #2002: the main language's English default is a plain default (no
+    // source); the identity-sourced proposal moved to the second-language
+    // question (this arrangement's identity is "bfd", so it proposes
+    // the keyboard's own language).
     expect(recordFor("pf_doc_language")).toMatchObject({
       provenance: "default",
+    });
+    expect(recordFor("pf_doc_language")?.source).toBeUndefined();
+    expect(recordFor("pf_doc_language_second")).toMatchObject({
+      provenance: "default",
       source: "identity",
+      value: "target",
     });
     expect(recordFor("pf_history_entry")).toMatchObject({
       provenance: "default",

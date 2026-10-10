@@ -70,6 +70,9 @@ import pbLegacyEncodingMod from "./b/pb_legacy_encoding.ts";
 import pbUseCaseMod from "./b/pb_use_case.ts";
 import pbAdditionalMethodsMod from "./b/pb_additional_methods.ts";
 import pfDocLanguageMod from "./f/pf_doc_language.ts";
+import pfDocLanguageOtherMod from "./f/pf_doc_language_other.ts";
+import pfDocLanguageSecondMod from "./f/pf_doc_language_second.ts";
+import pfDocLanguageSecondOtherMod from "./f/pf_doc_language_second_other.ts";
 import pfWelcomeParagraphMod from "./f/pf_welcome_paragraph.ts";
 import pfFontGuidanceMod from "./f/pf_font_guidance.ts";
 import pfHistoryEntryMod from "./f/pf_history_entry.ts";
@@ -240,6 +243,9 @@ export const flowModules = {
 
     // --- Optional battery (reached only when the gate is Yes) ---
     pfDocLanguageMod,
+    pfDocLanguageOtherMod,
+    pfDocLanguageSecondMod,
+    pfDocLanguageSecondOtherMod,
     pfFontGuidanceMod,
     pfUsageTip2Mod,
     pfScopeVarietyMod,

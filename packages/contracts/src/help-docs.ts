@@ -28,18 +28,21 @@ export interface HelpDocsAnswers {
   projectHelpUrl?: string;
 
   /**
-   * pf_doc_language. Absent/blank means English (existing question default).
-   *
-   * Write-time author guidance only — it instructs which language(s) to
-   * write the OTHER free-text answers in (the question's own prompt: "This
-   * decides how you write every answer that follows"). No render path reads
-   * this field: the renderer displays whatever prose the author wrote
-   * verbatim, in any of the three cases. The shipped `<html lang>` attribute
-   * is a separate concern already covered by FR-006, driven by the
-   * keyboard's `primaryBcp47`, not by this field. Recorded here for
-   * provenance/audit only.
+   * Legacy pf_doc_language answer, superseded by `docLanguageTags`. No longer
+   * written; still accepted so drafts saved before the change keep loading.
+   * No render path reads it.
    */
   docLanguage?: "english" | "target" | "bilingual";
+
+  /**
+   * The language(s) the author writes the help prose in, as BCP 47 tags in
+   * presentation order: one tag, or two for a bilingual page
+   * (pf_doc_language, pf_doc_language_second and their "another language"
+   * pickers). The first tag is the shipped page's `<html lang>`. Absent means
+   * the author didn't say, and `lang` falls back to the keyboard's
+   * `primaryBcp47`.
+   */
+  docLanguageTags?: string[];
 
   // Opt-in "additional detail" battery (FR-011/FR-014) — order in research D-10.
   designRationale?: string; // pf_design_rationale

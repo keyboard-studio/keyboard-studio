@@ -98,6 +98,106 @@ describe("helpDocsFromDecisions — optional default-path answers (spec 061 US3)
   });
 });
 
+describe("helpDocsFromDecisions — help-page languages (docLanguageTags, #2002)", () => {
+  // The keyboard's own tag comes from the identity decisions
+  // (deriveIdentityResult's composed bcp47): fr/Latn → "fr-Latn",
+  // km/Khmr → "km-Khmr" (langtags is not loaded in unit tests, so no
+  // default-script suppression — the same composed shapes
+  // identitySelectors.test.ts pins).
+  const FR = { "language-code": "fr", "target-script": "Latn" } as const;
+  const KM = { "language-code": "km", "target-script": "Khmr" } as const;
+  const tagsFor = (values: Partial<Record<DecisionId, unknown>>) =>
+    helpDocsFromDecisions(
+      decisions({ "help-welcome-paragraph": "A keyboard.", ...values }),
+    )?.docLanguageTags;
+
+  it("leaves the tags out when the language question was never answered", () => {
+    expect(tagsFor({ ...FR })).toBeUndefined();
+  });
+
+  it("resolves English and the keyboard's own language to tags", () => {
+    expect(tagsFor({ "help-doc-language": "english", ...FR })).toEqual(["en"]);
+    expect(tagsFor({ "help-doc-language": "target", ...FR })).toEqual(["fr-Latn"]);
+  });
+
+  it("takes another language from its picker (winchus: Spanish only)", () => {
+    expect(
+      tagsFor({ "help-doc-language": "other", "help-doc-language-other": "es", ...FR }),
+    ).toEqual(["es"]);
+  });
+
+  it("pairs any two languages, main language first", () => {
+    // sil_cameroon_azerty-style: English + French, neither the keyboard's language.
+    expect(
+      tagsFor({
+        "help-doc-language": "english",
+        "help-doc-language-second": "other",
+        "help-doc-language-second-other": "fr",
+        "language-code": "bum",
+        "target-script": "Latn",
+      }),
+    ).toEqual(["en", "fr"]);
+    // khmer_angkor-style: English + the keyboard's language.
+    expect(
+      tagsFor({
+        "help-doc-language": "english",
+        "help-doc-language-second": "target",
+        ...KM,
+      }),
+    ).toEqual(["en", "km-Khmr"]);
+  });
+
+  it("ignores a picker answer left over from a branch the author backed out of", () => {
+    expect(
+      tagsFor({
+        "help-doc-language": "english",
+        "help-doc-language-other": "es",
+        "help-doc-language-second": "none",
+        ...FR,
+      }),
+    ).toEqual(["en"]);
+  });
+
+  it("drops a language it can't resolve, and a second language that repeats the first", () => {
+    expect(tagsFor({ "help-doc-language": "target" })).toBeUndefined();
+    expect(
+      tagsFor({ "help-doc-language": "other", "help-doc-language-other": "  ", ...FR }),
+    ).toBeUndefined();
+    expect(
+      tagsFor({
+        "help-doc-language": "target",
+        "help-doc-language-second": "target",
+        ...FR,
+      }),
+    ).toEqual(["fr-Latn"]);
+  });
+
+  it("never promotes the second language when the main language can't resolve", () => {
+    // Blank "other" picker as main + English as second: no tags, so the
+    // renderer's <html lang> falls back to the keyboard's primaryBcp47
+    // instead of mislabelling main-language prose as English.
+    expect(
+      tagsFor({
+        "help-doc-language": "other",
+        "help-doc-language-other": "  ",
+        "help-doc-language-second": "english",
+        ...FR,
+      }),
+    ).toBeUndefined();
+    // Same for "target" with no keyboard tag yet.
+    expect(
+      tagsFor({
+        "help-doc-language": "target",
+        "help-doc-language-second": "english",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("reads the legacy single-question 'bilingual' answer as English + the keyboard's language", () => {
+    expect(tagsFor({ "help-doc-language": "bilingual", ...KM })).toEqual(["en", "km-Khmr"]);
+  });
+});
+
 describe("helpDocsFromDecisions — opt-in additional-detail battery (spec 061 US4)", () => {
   it("captures all eleven opt-in fields when recorded", () => {
     expect(
