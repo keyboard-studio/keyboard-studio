@@ -1,0 +1,44 @@
+{
+  "workflow": "speckit",
+  "specName": "Steps derived from decisions",
+  "branch": "km/derived-steps",
+  "history": [
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:52:07.607Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:52:07.712Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:52:07.811Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:52:07.944Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:52:08.052Z"
+    }
+  ],
+  "currentStep": "tasks",
+  "status": "ready-to-implement"
+}

@@ -16,15 +16,13 @@ exports[`live question modules > a/il_language_region.ts > definition contract 1
 
 exports[`live question modules > a/il_script_not_supported.ts > definition contract 1`] = `"notice | optional | next null | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > a/il_target_script.ts > definition contract 1`] = `"select | required | next [value == 'Ethi' or value == 'Hani' or value == 'Hang' -> il_script_not_supported; (default) -> il_author_name] | options [Latn, romanization-Latn, fonipa, Arab, Hebr, Deva, Cyrl, Grek, Geor, Armn, Ethi, Hani, Hang, other] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+exports[`live question modules > a/il_target_script.ts > definition contract 1`] = `"select | required | next [value == 'Ethi' or value == 'Hani' or value == 'Hang' -> il_script_not_supported] | options [Latn, romanization-Latn, fonipa, Arab, Hebr, Deva, Cyrl, Grek, Geor, Armn, Ethi, Hani, Hang, other] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > b/pb_additional_methods.ts > definition contract 1`] = `"radio | optional | next [value == 'text-sample' -> pb_text_sample; value == 'linguist' -> pb_linguist_confirm; value == 'picker' -> pb_picker_confirm; (default) -> null] | options [text-sample, linguist, picker, done] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > b/pb_azerty_qz_swap.ts > definition contract 1`] = `"radio | optional | next pb_spare_keys_azerty | options [follow-azerty, follow-qwerty, no-preference] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > b/pb_char_count.ts > definition contract 1`] = `"radio | required | next [ctx.routing_group == 'qwerty-qwertz' -> pb_latin_qwerty_branch; ctx.routing_group == 'azerty' -> pb_latin_azerty_branch; (default) -> pb_contact_language] | options [tiny, small, medium, large] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
-
-exports[`live question modules > b/pb_character_inventory.ts > definition contract 1`] = `"multi_select | required | next (absent) | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes []"`;
 
 exports[`live question modules > b/pb_co_installed_keyboards.ts > definition contract 1`] = `"text | optional | next pb_discovery_intro | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
@@ -191,3 +189,31 @@ exports[`live question modules > g/project_display_name.ts > definition contract
 exports[`live question modules > g/project_keyboard_id.ts > definition contract 1`] = `"short_text | required | next null | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes [header.keyboardId]"`;
 
 exports[`live question modules > g/track_choice.ts > definition contract 1`] = `"radio | required | next null | options [copy, adapt] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/baseKeyboard.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/carvedLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/characterInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/deadkeysDefined.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores, raw]"`;
+
+exports[`live question modules > gallery/helpDocs.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/invisiblesInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores]"`;
+
+exports[`live question modules > gallery/physicalLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/punctuationInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/retainedConvenienceChars.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/ruleSet.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores]"`;
+
+exports[`live question modules > gallery/touchLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/touchSeedSource.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/windowsLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;

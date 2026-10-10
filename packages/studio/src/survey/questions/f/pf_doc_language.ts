@@ -18,7 +18,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 // "bilingual" is the pre-pf_doc_language_second answer (English + the
 // keyboard's language). It is no longer offered, but a draft saved with it
-// must still validate; extractHelpDocs reads it as ["en", target].
+// must still validate; helpDocsFromDecisions reads it as ["en", target].
 const OPTION_VALUES = new Set(["english", "target", "other", "bilingual"]);
 
 export const definition = {
@@ -94,5 +94,14 @@ const mod: QuestionModule = {
   writes: [],
   provides: ["help-doc-language"], requires: ["help-more-detail"],
   specRef: "specs/061-help-docs-generation",
+  // Spec 092 (T036): the documentation-language default is this module's
+  // lookup default, replacing the PHASE_F_SEEDS table entry. #2002 split
+  // the old single "bilingual" proposal across two questions: the main
+  // language defaults to English (a plain default, no source — the old
+  // seed table's entry carried none), and pf_doc_language_second's
+  // lookup default proposes the keyboard's own language as the second
+  // for a non-English project, which is what "bilingual" used to mean.
+  // The author can overturn either.
+  lookupDefault: () => ({ value: "english" }),
 };
 export default mod;

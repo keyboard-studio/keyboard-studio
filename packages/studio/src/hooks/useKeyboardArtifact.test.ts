@@ -772,3 +772,93 @@ describe("isOskStylesheetPath", () => {
     expect(isOskStylesheetPath(path)).toBe(expected);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression guard: a rejected engine load must not be cached for the session.
+//
+// engineReadyPromise memoizes the engine load+init so concurrent run() calls
+// share one attempt. It originally kept the promise even after it rejected,
+// so every later run() — the Retry button included — re-awaited the SAME
+// rejected promise and landed on error/vfs without ever re-attempting the
+// load. A transient failure (a chunk fetch or WASM init that would succeed
+// seconds later) therefore stranded the preview for the whole session.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — engine load failure is not cached (regression)", () => {
+  it("a rejected engine load surfaces error/vfs, and Retry re-attempts the load and recovers", async () => {
+    // First load attempt fails at init() — the cached load+init promise
+    // rejects, as it also does when the dynamic import itself fails
+    // (loadEngine() collapses that to the same rejection path).
+    mockEngine.init.mockRejectedValueOnce(
+      new Error("wasm init transient failure"),
+    );
+
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The failed attempt still surfaces on the error stage, with the
+    // original failure visible (not masked, not a spinner).
+    expect(result.current.stage.kind).toBe("error");
+    if (result.current.stage.kind === "error") {
+      expect(result.current.stage.step).toBe("vfs");
+      expect(result.current.stage.message).toContain(
+        "wasm init transient failure",
+      );
+    }
+    expect(mockEngine.init).toHaveBeenCalledTimes(1);
+
+    // Retry must start a FRESH load attempt — init runs a second time — and
+    // with the load now succeeding the run proceeds to "ready" in the same
+    // session, no page reload involved.
+    await act(async () => {
+      result.current.retry();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockEngine.init).toHaveBeenCalledTimes(2);
+    expect(result.current.stage.kind).toBe("ready");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression guard: an onInstantiate throw must not wedge the artifact stage.
+//
+// runCompile() invoked onInstantiate with no containment, on the far side of
+// setStage("compiling") and before setStage("ready"). A throw escaped through
+// run()'s awaited call into the effect's `void run(...)`, surfacing only as an
+// unhandled rejection while the stage stayed "compiling" forever — the
+// preview appeared to stop compiling, silently. The throw must instead land
+// on the same error surface compile failures use.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — onInstantiate throw settles on the error stage (regression)", () => {
+  it("an onInstantiate throw lands on error/compile instead of wedging at compiling", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>(() => {
+      throw new Error("instantiate boom: working-copy store rejected the IR");
+    });
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, onInstantiate),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onInstantiate).toHaveBeenCalledTimes(1);
+    expect(result.current.stage.kind).toBe("error");
+    if (result.current.stage.kind === "error") {
+      expect(result.current.stage.step).toBe("compile");
+      expect(result.current.stage.message).toContain("instantiate boom");
+    }
+  });
+});

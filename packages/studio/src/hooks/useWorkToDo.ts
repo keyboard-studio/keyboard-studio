@@ -32,14 +32,18 @@ import { deriveCharacterFlags } from "../survey/characterFlags.ts";
 import { derivePunctuationFlags } from "../survey/punctuation/punctuationFlags.ts";
 import { useSourcedExemplars } from "../survey/useSourcedExemplars.ts";
 import { punctuationKey } from "../steps/evidence.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import {
+  getCharacterInventoryValue,
+} from "../survey/useInventoryDraft.ts";
+import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
 import { selectWorkToDo, type WorkItem, type NotAskedGateInput, type FlaggedAnswerInput } from "../steps/workToDo.ts";
 import type { StepId } from "../steps/answerTypes.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { lowercaseBaseView } from "../survey/charNormUtils.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore, getDecisionSnapshot } from "../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { useAccountedForGate } from "./useAccountedForGate.ts";
 import { useCarveNeededSet } from "./useCarveNeededSet.ts";
 import { deriveCarveNeededSet } from "@keyboard-studio/engine";
@@ -53,10 +57,14 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const ir = useWorkingCopyStore((s) => s.ir);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
-  const bcp47 = useSurveySessionStore((s) => s.surveyContext.bcp47_tag);
+  const bcp47 = useDecisionStore((s) => deriveSurveyContext(s.decisions).bcp47_tag);
   const marksStepAnswers = useSurveyAnswerStore((s) => s.steps.marks);
   const charactersStepAnswers = useSurveyAnswerStore((s) => s.steps.characters);
-  const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
+  const alphabetEvidenceKey = useDecisionStore(
+    (s) =>
+      (s.decisions["character-inventory"]?.value as CharacterInventoryValue | undefined)
+        ?.alphabetEvidenceKey,
+  );
   const punctuationInventoryAnswer = useSurveyAnswerStore(
     (s) => s.steps.punctuation?.answers["punctuation.inventory"],
   );
@@ -202,12 +210,11 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
  */
 export function readWorkToDo(): Record<StepId, WorkItem[]> {
   const workingCopy = useWorkingCopyStore.getState();
-  const surveySession = useSurveySessionStore.getState();
   const surveyAnswers = useSurveyAnswerStore.getState();
 
   const alphabet = workingCopy.session.alphabet;
   const baseIr = workingCopy.baseIr;
-  const bcp47 = surveySession.surveyContext.bcp47_tag;
+  const bcp47 = deriveSurveyContext(getDecisionSnapshot()).bcp47_tag;
   const marksStepAnswers = surveyAnswers.steps.marks;
 
   let marksFlagged: readonly FlaggedAnswerInput[] = [];
@@ -248,7 +255,7 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
 
   const charactersFlagged = deriveCharacterFlags(
     surveyAnswers.steps.characters?.answers ?? EMPTY_ANSWERS,
-    usePhaseBDraftStore.getState().alphabetEvidenceKey ?? "",
+    getCharacterInventoryValue().alphabetEvidenceKey ?? "",
   );
 
   const notAsked: Record<StepId, NotAskedGateInput> = {};

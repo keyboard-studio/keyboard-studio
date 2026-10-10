@@ -71,9 +71,27 @@ export const fixtures: QuestionModule["fixtures"] = {
 const mod: QuestionModule = {
   definition,
   validate,
+  // Decision apply (spec 089 T012): deliberately EMPTY. The track decision
+  // itself is the whole effect — routing reads it through the decision
+  // selectors (088's selectTrack), and nothing is written to the working
+  // copy at this completion. The working-copy setup an adapt selection
+  // implies is spec 092's instantiation concern, and the adapt track's
+  // scaffold consequence (no scaffold spec) is deriveScaffoldSpec's rule
+  // (null unless the track is "copy"), not a write performed here. The
+  // empty apply exists so the module's place in the apply contract is
+  // explicit rather than an omission.
+  apply: () => ({}),
   fixtures,
   inputs: [],
   writes: [],
   provides: ["authoring-track"],
+  // Spec 091 FR-003 re-homing (Delta P1, revised in phase 4): the track
+  // step's ordering edge lived only in the pre-091 step table (`requires:
+  // ["base-keyboard"]`). It is declared here as a SCREEN-order requirement —
+  // not a module `requires`, which the frozen per-flow ordering contracts
+  // (orderParity.test.ts, unmodifiable; SC-002) would see as unresolvable
+  // when sorting this flow alone. `deriveScreens` folds it into the
+  // full-list sort only (see survey/types.ts `screenRequires`).
+  screenRequires: ["base-keyboard"],
 };
 export default mod;

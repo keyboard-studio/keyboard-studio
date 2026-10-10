@@ -184,7 +184,7 @@ describe("spec 025 — live composition is unchanged; Library is additive (FR-00
     expect(proposed).toEqual(["phase_a_identity"]);
     const live = Object.values(flowSources).filter((s) => s.status === "live").map((s) => s.id).sort();
     expect(live).toEqual(
-      ["identity_lite", "phase_b_characters", "phase_f_helpdocs", "project_name", "track"],
+      ["attribution", "identity_lite", "phase_b_characters", "phase_f_helpdocs", "project_name", "track"],
     );
   });
 

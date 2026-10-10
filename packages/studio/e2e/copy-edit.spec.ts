@@ -32,6 +32,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseTrackCopy,
+  driveAttributionStep,
   chooseAdaptTrack,
   acceptProjectName,
   confirmPrefill,
@@ -353,6 +354,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await fillIdentityLite(page);
     await pickBaseKeyboardCopyEdit(page);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -406,6 +408,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await fillIdentityLite(page);
     await pickBaseKeyboardCopyEdit(page);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
 
@@ -423,6 +426,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await fillIdentityLite(page);
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -455,6 +459,17 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   test("emitted .kps declares the author's language and name; .kvks and welcome.htm are non-empty", async ({
     page,
   }) => {
+    // Timeout sized to the walk, not the 240s config default. This is the
+    // ~250-action full walk; on the contended CI runner every action costs
+    // 2–8s in actionability waits, and trace analysis (run 37632354160)
+    // showed progress linear in budget — ≈6 sequences recorded at a 240s
+    // cap, 14 at 480s, in healthy advancing state, never stuck. Measured
+    // end-to-end at 450s on spec 089's run (37679303677). The budget line
+    // was lost when this test was rewritten on a later branch and the walk
+    // died at the 240s default on the union run (37754110396); restored
+    // with its evidence. Tripwire: death AT 480s with the walk still
+    // advancing means the route grew — re-measure, don't re-raise.
+    test.setTimeout(480_000);
     // Walk the wizard and download. Unlike the other walks here this one supplies
     // the language code, so the identity-lite series composes a real BCP47 tag for
     // the package descriptor to declare (spec 059 FR-001) instead of leaving the
@@ -467,6 +482,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     });
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -561,6 +577,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     });
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await completePhaseB(page);
     await finishGalleryWork(page);
@@ -599,6 +616,7 @@ async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
   await fillIdentityLite(page, fx);
   await pickBaseKeyboardCopyEdit(page, fx);
   await chooseTrackCopy(page);
+  await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
 
@@ -750,6 +768,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     await fillIdentityLite(page);
     await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page); // "Done" advances the traversal to "carve".

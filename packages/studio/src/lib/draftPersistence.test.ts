@@ -25,15 +25,18 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore, getSurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
-import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
 import {
-  usePhaseBDraftStore,
-  snapshotPhaseBDraft,
-  resetPhaseBDraftDecisions,
-} from "../stores/phaseBDraftStore.ts";
+  getDecisionSnapshot,
+  selectTouchSeedSource,
+  useDecisionStore,
+} from "../stores/decisionStore.ts";
+import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
+import { getCharacterInventoryValue, getInvisiblesInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
+import { snapshotFromValues } from "../survey/phaseBDraftOps.ts";
 import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
-import type { IdentityLiteResult } from "../survey/index.ts";
 
 // serverDraftStore's fetch-based transport is mocked at the module boundary
 // (P1-2) so startCloudSync/recordProjectSubmission tests below never touch
@@ -69,6 +72,7 @@ import {
   reconcileProjectIndex,
   DRAFT_INDEX_KEY,
   recordProjectSubmission,
+  migrateDraftEnvelope,
   startCloudSync,
   CLOUD_SYNC_DEBOUNCE_MS,
   MAX_CLOUD_DRAFT_BYTES,
@@ -142,11 +146,11 @@ describe("draftPersistence", () => {
   describe("constants + draftKey", () => {
     it("DRAFT_KEY_PREFIX and DRAFT_VERSION match the documented contract", () => {
       expect(DRAFT_KEY_PREFIX).toBe("ks.draft.");
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2); // spec 088 FR-007: bumped 1 → 2
     });
 
     it("draftKey namespaces and versions the per-project key", () => {
-      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v1");
+      expect(draftKey("my_kbd")).toBe("ks.draft.my_kbd.v2");
     });
   });
 
@@ -642,7 +646,7 @@ describe("draftPersistence", () => {
   });
 
   describe("G-1/G-5: round-trip save + load restores BOTH stores from a single draft", () => {
-    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touchSeedSource, never re-instantiating a second working copy", () => {
+    it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touch-seed decision, never re-instantiating a second working copy", () => {
       const base: BaseKeyboard = {
         id: "test_keyboard",
         displayName: "Test Keyboard",
@@ -666,10 +670,16 @@ describe("draftPersistence", () => {
       } as unknown as SurveyPhaseResult);
 
       // Traversal position: two forward hops (history becomes non-trivial) plus
-      // the spec-035 touchSeedSource fork choice (km-frontend-flagged risk (a)).
+      // the spec-035 touch-seed fork choice — since spec 088 that choice is
+      // the `touch-seed-source` decision, not a session field.
       useSurveySessionStore.getState().advance("choose_base");
       useSurveySessionStore.getState().advance("track");
-      useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
+      useDecisionStore.getState().record({
+        id: "touch-seed-source",
+        value: "import-adapt",
+        provenance: "asked",
+        step: "touch_seed_source",
+      });
 
       const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
       expect(projectKey).toBe("test_keyboard");
@@ -677,10 +687,11 @@ describe("draftPersistence", () => {
       saveDraft(projectKey!);
       expect(localStorage.getItem(draftKey(projectKey!))).not.toBeNull();
 
-      // Cold reset BOTH stores — nothing left to inherit from; a partial reset
+      // Cold reset the stores — nothing left to inherit from; a partial reset
       // would mask a restore that only APPEARED to work.
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
       expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
 
@@ -705,8 +716,9 @@ describe("draftPersistence", () => {
       const session = useSurveySessionStore.getState();
       expect(session.activeStepId).toBe("track");
       expect(session.history).toEqual(["identity", "choose_base"]);
-      // (a) touchSeedSource round-trips through the traversal snapshot.
-      expect(session.touchSeedSource).toBe("import-adapt");
+      // (a) the touch-seed choice round-trips through the draft's decisions
+      // slice (spec 088 — it no longer rides the traversal snapshot).
+      expect(selectTouchSeedSource(getDecisionSnapshot())).toBe("import-adapt");
 
       expect(wasDraftRestoredThisBoot()).toBe(true);
     });
@@ -904,21 +916,21 @@ describe("draftPersistence", () => {
     });
   });
 
-  describe("P0 fix: phaseBDraftStore.chars folds into the durable draft round-trip", () => {
+  describe("P0 fix: the build-list alphabet folds into the durable draft round-trip (decisions-carried since spec 090; legacy slice migrates at T025)", () => {
     it("restores the in-progress build-list alphabet on load, not an empty array (km-review P0 — no silent discard of the author's typed/toggled chars)", () => {
       const pk = "phaseb-draft-project";
       instantiateMinimal(pk);
       useSurveySessionStore.getState().setDiscoveryMethod("build-list");
       useSurveySessionStore.getState().setCharactersSubStage("B");
-      usePhaseBDraftStore.getState().setAll(["a", "b", "ɛ"]);
+      inventoryOps("characters").setAll(["a", "b", "ɛ"]);
 
       saveDraft(pk);
 
       // Cold reset ALL THREE stores — nothing left to inherit from.
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+      resetInventoryDraft();
+      expect(getCharacterInventoryValue().chars).toEqual([]);
 
       expect(loadDraft(pk)).toBe(true);
 
@@ -927,13 +939,13 @@ describe("draftPersistence", () => {
       expect(session.discoveryMethod).toBe("build-list");
       expect(session.charactersSubStage).toBe("B");
       // ...AND the alphabet the author had already built is intact, not blanked.
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "b", "ɛ"]);
+      expect(getCharacterInventoryValue().chars).toEqual(["a", "b", "ɛ"]);
     });
 
     it("restores exemplar-attested digraphs alongside the alphabet, never into it", () => {
       const pk = "phaseb-draft-digraphs";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().seedFromProposal({
+      inventoryOps("characters").seedFromProposal({
         resolvedTag: "ewo",
         source: "cldr",
         confidence: "approved",
@@ -947,33 +959,38 @@ describe("draftPersistence", () => {
       saveDraft(pk);
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual([]);
+      resetInventoryDraft();
+      expect(getCharacterInventoryValue().exemplarDigraphs).toEqual([]);
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual(["dz", "kp"]);
+      expect(getCharacterInventoryValue().exemplarDigraphs).toEqual(["dz", "kp"]);
       // The clusters are a fact about the orthography, not characters to type —
       // the alphabet still holds only their constituent letters.
-      expect(usePhaseBDraftStore.getState().chars).not.toContain("dz");
-      expect(usePhaseBDraftStore.getState().chars).toContain("d");
+      expect(getCharacterInventoryValue().chars).not.toContain("dz");
+      expect(getCharacterInventoryValue().chars).toContain("d");
     });
 
-    it("a phaseBDraft record written before digraphs were recorded restores to an empty list, not undefined", () => {
+    it("a legacy slice written before digraphs were recorded migrates to an empty list, not undefined (spec 090 T025 slice migration)", () => {
       const pk = "phaseb-draft-legacy-digraphs";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().setAll(["a"]);
       saveDraft(pk);
 
+      // Simulate a pre-T025 record: the inventory rides the legacy
+      // phaseBDraft slice (here: no exemplarDigraphs field), and the
+      // decisions slice carries no inventory records.
       const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
-      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
-      delete phaseBDraft.exemplarDigraphs;
+      const decisions = envelope.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      envelope.phaseBDraft = { chars: ["a"] };
       localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().exemplarDigraphs).toEqual([]);
+      expect(getCharacterInventoryValue().exemplarDigraphs).toEqual([]);
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
     });
 
     it("a pre-fix record with no phaseBDraft field restores to an empty alphabet (backward compat — additive optional field, not a version bump)", () => {
@@ -988,77 +1005,84 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().setAll(["stale"]); // must be cleared by restore, not left dangling
+      inventoryOps("characters").setAll(["stale"]); // must be cleared by restore, not left dangling
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+      expect(getCharacterInventoryValue().chars).toEqual([]);
     });
 
-    it("a pre-font-change record whose phaseBDraft has no selectedFont field restores to DEFAULT_PHASE_B_FONT (backward compat — additive optional field, not a version bump)", () => {
+    it("a legacy slice with no selectedFont field migrates to DEFAULT_PHASE_B_FONT (backward compat — additive optional field, not a version bump)", () => {
       const pk = "phaseb-draft-legacy-font";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().setAll(["a"]);
       saveDraft(pk);
 
-      // Simulate a record written before selectedFont was added to phaseBDraft.
+      // Simulate a pre-T025 record whose slice predates selectedFont.
       const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
-      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
-      delete phaseBDraft.selectedFont;
+      const decisions = envelope.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      envelope.phaseBDraft = { chars: ["a"] };
       localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().setSelectedFont("charis-sil"); // must be overwritten by restore, not left dangling
+      inventoryOps("characters").setSelectedFont("charis-sil"); // must be overwritten by restore, not left dangling
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+      expect(getCharacterInventoryValue().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
     });
 
-    it("a malformed selectedFont value (not one of the known FONT_OPTIONS) restores to DEFAULT_PHASE_B_FONT rather than propagating garbage", () => {
+    it("a malformed selectedFont in a legacy slice migrates to DEFAULT_PHASE_B_FONT and surfaces as a decision-trail orphan, never dropped (spec 090 T025)", () => {
       const pk = "phaseb-draft-malformed-font";
       instantiateMinimal(pk);
       saveDraft(pk);
 
       const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
-      const phaseBDraft = envelope.phaseBDraft as Record<string, unknown>;
-      phaseBDraft.selectedFont = "comic-sans";
+      const decisions = envelope.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      envelope.phaseBDraft = { chars: [], selectedFont: "comic-sans" };
       localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+      inventoryOps("characters").setSelectedFont("charis-sil");
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+      expect(getCharacterInventoryValue().selectedFont).toBe(DEFAULT_PHASE_B_FONT);
+      const orphanIds = useDecisionLogStore
+        .getState()
+        .record.entries.map((e) => (e.payload.kind === "survey-answer" ? e.payload.questionId : null));
+      expect(orphanIds).toContain("phaseBDraft.selectedFont");
     });
 
     it("a valid persisted selectedFont ('charis-sil') round-trips intact through save + load", () => {
       const pk = "phaseb-draft-valid-font";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+      inventoryOps("characters").setSelectedFont("charis-sil");
       saveDraft(pk);
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      usePhaseBDraftStore.getState().setSelectedFont(DEFAULT_PHASE_B_FONT);
+      resetInventoryDraft();
+      inventoryOps("characters").setSelectedFont(DEFAULT_PHASE_B_FONT);
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().selectedFont).toBe("charis-sil");
+      expect(getCharacterInventoryValue().selectedFont).toBe("charis-sil");
     });
 
-    it("installDraftAutosave also debounce-saves a phaseBDraftStore mutation (same 500ms window, no new timer)", () => {
+    it("installDraftAutosave also debounce-saves an inventory decision mutation (same 500ms window, no new timer)", () => {
       vi.useFakeTimers();
       const pk = "phaseb-draft-autosave";
       instantiateMinimal(pk);
 
       const teardown = installDraftAutosave(pk);
-      usePhaseBDraftStore.getState().add("q");
+      inventoryOps("characters").add("q");
 
       vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
       const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
-      expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+      expect((saved.decisions?.["character-inventory"]?.value as { chars: string[] }).chars).toEqual(["q"]);
 
       teardown();
     });
@@ -1216,7 +1240,7 @@ describe("draftPersistence", () => {
       expect(localStorage.getItem(draftKey(pk))).toBeNull();
     });
 
-    it("AUTOSAVE_DEBOUNCE_MS is 500 and a burst across working copy, survey session, phaseBDraft and surveyAnswer schedules exactly one save (single-cycle invariant)", () => {
+    it("AUTOSAVE_DEBOUNCE_MS is 500 and a burst across working copy, survey session, decisions and surveyAnswer schedules exactly one save (single-cycle invariant)", () => {
       expect(AUTOSAVE_DEBOUNCE_MS).toBe(500);
 
       vi.useFakeTimers();
@@ -1229,7 +1253,7 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().lockDesktop();
       useSurveySessionStore.getState().advance("choose_base");
-      usePhaseBDraftStore.getState().add("q");
+      inventoryOps("characters").add("q");
       useSurveyAnswerStore.getState().setPosition("identity", "q1");
 
       vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
@@ -1240,7 +1264,7 @@ describe("draftPersistence", () => {
       const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
       expect(saved.workingCopy.desktopLocked).toBe(true);
       expect(saved.traversal.activeStepId).toBe("choose_base");
-      expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+      expect((saved.decisions?.["character-inventory"]?.value as { chars: string[] }).chars).toEqual(["q"]);
       expect(saved.surveyAnswers?.steps["identity"]?.position).toBe("q1");
 
       teardown();
@@ -1292,7 +1316,7 @@ describe("draftPersistence", () => {
     // proposed chip to "author". Pinned as a full save -> cold reset -> load
     // round trip: every sticky field equals what was saved.
     function seedStickyDraft(): void {
-      const store = usePhaseBDraftStore.getState();
+      const store = inventoryOps("characters");
       store.seedFromProposal({
         resolvedTag: "ewo",
         source: "cldr",
@@ -1316,15 +1340,15 @@ describe("draftPersistence", () => {
     function coldReset(): void {
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
+      resetInventoryDraft();
+      resetInventoryDecisions();
     }
 
     it("restores rejected, provenance, proposalConfidence, exemplarMethodDeclined and declaredRoles exactly as saved", () => {
       const pk = "phaseb-draft-sticky-fields";
       instantiateMinimal(pk);
       seedStickyDraft();
-      const before = snapshotPhaseBDraft();
+      const before = snapshotFromValues(getCharacterInventoryValue(), getInvisiblesInventoryValue());
       // Sanity: the fixture really exercises every sticky field.
       expect(before.rejected).toEqual(["z"]);
       expect(before.provenance).toMatchObject({ d: "cldr", q: "author" });
@@ -1336,11 +1360,11 @@ describe("draftPersistence", () => {
 
       saveDraft(pk);
       coldReset();
-      expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-      expect(usePhaseBDraftStore.getState().provenance).toEqual({});
+      expect(getCharacterInventoryValue().rejected).toEqual([]);
+      expect(getCharacterInventoryValue().provenance).toEqual({});
 
       expect(loadDraft(pk)).toBe(true);
-      const after = snapshotPhaseBDraft();
+      const after = snapshotFromValues(getCharacterInventoryValue(), getInvisiblesInventoryValue());
       expect(after.chars).toEqual(before.chars);
       expect(after.rejected).toEqual(before.rejected);
       expect(after.provenance).toEqual(before.provenance);
@@ -1359,8 +1383,8 @@ describe("draftPersistence", () => {
       coldReset();
       expect(loadDraft(pk)).toBe(true);
 
-      usePhaseBDraftStore.getState().addProposed("z", "cldr");
-      expect(usePhaseBDraftStore.getState().chars).not.toContain("z");
+      inventoryOps("characters").addProposed("z", "cldr");
+      expect(getCharacterInventoryValue().chars).not.toContain("z");
     });
   });
 
@@ -1368,59 +1392,65 @@ describe("draftPersistence", () => {
     it("restores a string alphabetEvidenceKey", () => {
       const pk = "phaseb-alphabet-key";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().add("a");
-      usePhaseBDraftStore.getState().setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
+      inventoryOps("characters").add("a");
+      inventoryOps("characters").setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
       saveDraft(pk);
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      resetInventoryDraft();
+      resetInventoryDecisions();
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
     });
 
     it("a pre-079 draft (built alphabet, no key) is stamped on load from its restored identity and base (FR-032)", () => {
       const pk = "phaseb-alphabet-key-pre079";
       instantiateMinimal(pk);
+      // Spec 089: the stamp derives the identity from the recorded
+      // decisions (saved into the draft envelope, restored on load).
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "language-name", value: "Test", provenance: "asked" });
+        record({ id: "language-autonym", value: "Test", provenance: "asked" });
+        record({ id: "language-code", value: "tl", provenance: "asked" });
+        record({ id: "target-script", value: "Latn", provenance: "asked" });
+      }
       useSurveySessionStore.setState({
-        identityResult: {
-          autonym: "Test",
-          english: "Test",
-          languageSubtag: "tl",
-          region: "",
-          targetScriptRaw: "Latn",
-          bcp47: "tl-Latn",
-          supported: true,
-          attribution: null,
-          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-        } as never,
         localBase: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
       });
-      usePhaseBDraftStore.getState().add("a");
+      inventoryOps("characters").add("a");
       saveDraft(pk);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
-      usePhaseBDraftStore.getState().reset();
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
+      resetInventoryDraft();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
     });
 
-    it("drops a non-string alphabetEvidenceKey rather than coercing it", () => {
+    it("drops a non-string alphabetEvidenceKey in a legacy slice rather than coercing it (and surfaces it as an orphan, spec 090 T025)", () => {
       const pk = "phaseb-alphabet-key-bad";
       instantiateMinimal(pk);
-      usePhaseBDraftStore.getState().add("a");
       saveDraft(pk);
-      const raw = JSON.parse(localStorage.getItem(draftKey(pk))!) as { phaseBDraft: Record<string, unknown> };
-      raw.phaseBDraft.alphabetEvidenceKey = 42;
+      // Pre-T025 record shape: the key rides the legacy slice, malformed.
+      const raw = JSON.parse(localStorage.getItem(draftKey(pk))!) as Record<string, unknown>;
+      const decisions = raw.decisions as Record<string, unknown>;
+      delete decisions["character-inventory"];
+      delete decisions["invisibles-inventory"];
+      raw.phaseBDraft = { chars: ["a"], alphabetEvidenceKey: 42 };
       localStorage.setItem(draftKey(pk), JSON.stringify(raw));
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
+      resetInventoryDraft();
+      resetInventoryDecisions();
 
       expect(loadDraft(pk)).toBe(true);
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      expect(getCharacterInventoryValue().chars).toEqual(["a"]);
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
+      const orphanIds = useDecisionLogStore
+        .getState()
+        .record.entries.map((e) => (e.payload.kind === "survey-answer" ? e.payload.questionId : null));
+      expect(orphanIds).toContain("phaseBDraft.alphabetEvidenceKey");
     });
   });
 
@@ -1430,33 +1460,32 @@ describe("draftPersistence", () => {
     it("seed, remove N, save, cold-reset, load, re-seed: the chosen list is tier minus N and the ledger still lists the N", () => {
       const pk = "phaseb-punctuation-rejections";
       instantiateMinimal(pk);
-      const store = usePhaseBDraftStore.getState();
+      const store = inventoryOps("characters");
       store.seedProposals(TIER, "cldr", "punctuation:hi");
       store.remove("!");
       store.remove("?");
-      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
 
       saveDraft(pk);
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
-      resetPhaseBDraftDecisions();
-      expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-      expect(usePhaseBDraftStore.getState().seededProposals).toEqual([]);
+      resetInventoryDraft();
+      resetInventoryDecisions();
+      expect(getCharacterInventoryValue().rejected).toEqual([]);
+      expect(getCharacterInventoryValue().seededProposals).toEqual([]);
 
       expect(loadDraft(pk)).toBe(true);
-      const after = usePhaseBDraftStore.getState();
-      expect(after.punctuation).toEqual(["\u0964", "\u0965"]);
-      expect(after.rejected).toEqual(["!", "?"]);
-      expect(after.seededProposals).toEqual(["punctuation:hi"]);
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(getCharacterInventoryValue().rejected).toEqual(["!", "?"]);
+      expect(getCharacterInventoryValue().seededProposals).toEqual(["punctuation:hi"]);
 
       // The same key is a no-op after reload; a NEW key (re-resolution) seeds
       // again and the restored ledger still vetoes the removed marks.
-      after.seedProposals(TIER, "cldr", "punctuation:hi");
-      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
-      after.seedProposals(TIER, "cldr", "punctuation:hi-IN");
-      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
-      expect(usePhaseBDraftStore.getState().rejected).toEqual(["!", "?"]);
+      inventoryOps("characters").seedProposals(TIER, "cldr", "punctuation:hi");
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
+      inventoryOps("characters").seedProposals(TIER, "cldr", "punctuation:hi-IN");
+      expect(getCharacterInventoryValue().punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(getCharacterInventoryValue().rejected).toEqual(["!", "?"]);
     });
   });
 
@@ -1529,7 +1558,7 @@ describe("draftPersistence", () => {
       saveDraft(resumed); // create resumed's own real record to resume into
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
-      usePhaseBDraftStore.getState().reset();
+      resetInventoryDraft();
       expect(resumeProject(resumed)).toBe(true);
       expect(resolveActiveProjectKey()).toBe(resumed);
 
@@ -1654,20 +1683,18 @@ describe("draftPersistence", () => {
         ir: makeScaffoldedIR(),
       });
 
-      useSurveySessionStore.getState().setScaffoldSpec({
-        keyboardId: "proj_x",
-        displayName: "My Custom Keyboard",
-      });
-      useSurveySessionStore.getState().setIdentityResult({
-        autonym: "Test",
-        english: "Test",
-        languageSubtag: "yo",
-        region: "",
-        targetScriptRaw: "Latn",
-        bcp47: "yo-Latn",
-        supported: true,
-        prefill: {} as unknown as IdentityLiteResult["prefill"],
-      });
+      // Spec 089: the envelope's displayName/languageTag derive from the
+      // recorded decisions (project + identity), not session fields.
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "authoring-track", value: "copy", provenance: "asked" });
+        record({ id: "project-display-name", value: "My Custom Keyboard", provenance: "asked" });
+        record({ id: "project-keyboard-id", value: "proj_x", provenance: "asked" });
+        record({ id: "language-name", value: "Test", provenance: "asked" });
+        record({ id: "language-autonym", value: "Test", provenance: "asked" });
+        record({ id: "language-code", value: "yo", provenance: "asked" });
+        record({ id: "target-script", value: "Latn", provenance: "asked" });
+      }
 
       saveDraft("proj_x");
 
@@ -1679,21 +1706,22 @@ describe("draftPersistence", () => {
     });
 
     // #1578: a same-session switch (no intervening reload) between a
-    // Track-1 scaffolded project (A, whose label comes from
-    // surveySessionStore.scaffoldSpec — deriveProjectLabel's tier 1) and a
-    // plain adapted project (B, whose label falls back to the base's own
-    // displayName) must not let A's scaffoldSpec leak into B's derived
-    // label. `envelope.traversal` (snapshotTraversal/applyTraversalSnapshot)
-    // already carries `scaffoldSpec` as part of its broader
-    // SurveySessionData snapshot and fully overwrites it on every
-    // `loadDraft` call — this pins that behavior so it can't silently
-    // regress.
+    // Track-1 scaffolded project (A, whose label comes from the derived
+    // scaffoldSpec — deriveProjectLabel's tier 1) and a plain adapted
+    // project (B, whose label falls back to the base's own displayName)
+    // must not let A's scaffoldSpec leak into B's derived label.
+    // Spec 089: the scaffoldSpec is derived from the decision set, and the
+    // envelope's per-project decision snapshot (088) is applied wholesale
+    // on every `loadDraft` call — this pins that behavior so it can't
+    // silently regress.
     it("switching FROM a Track-1 scaffolded project TO a plain one, in one session, does not leak the former's scaffoldSpec into the latter's label", () => {
       instantiateMinimal("proj_a");
-      useSurveySessionStore.getState().setScaffoldSpec({
-        keyboardId: "proj_a",
-        displayName: "Testish Keyboard",
-      });
+      {
+        const record = useDecisionStore.getState().record;
+        record({ id: "authoring-track", value: "copy", provenance: "asked" });
+        record({ id: "project-display-name", value: "Testish Keyboard", provenance: "asked" });
+        record({ id: "project-keyboard-id", value: "proj_a", provenance: "asked" });
+      }
       saveDraft("proj_a");
       expect(
         (JSON.parse(localStorage.getItem(draftKey("proj_a"))!) as DurableDraft).displayName,
@@ -1701,6 +1729,7 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().reset();
       useSurveySessionStore.getState().reset();
+      useDecisionStore.getState().reset();
       const baseB = {
         id: "proj_b",
         displayName: "French Basic",
@@ -1718,12 +1747,12 @@ describe("draftPersistence", () => {
       // The same-session switch: resume A, then resume B — as "My
       // keyboards"'s Resume action does, with no reload in between.
       expect(loadDraft("proj_a")).toBe(true);
-      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+      expect(deriveScaffoldSpec(getDecisionSnapshot())?.displayName).toBe("Testish Keyboard");
 
       expect(loadDraft("proj_b")).toBe(true);
-      // B never scaffolded — its own record has no scaffoldSpec, so resuming
-      // it must clear A's leftover, not leave it standing.
-      expect(useSurveySessionStore.getState().scaffoldSpec).toBeNull();
+      // B never scaffolded — its own decision snapshot has no project
+      // records, so resuming it must clear A's leftover, not leave it standing.
+      expect(deriveScaffoldSpec(getDecisionSnapshot())).toBeNull();
 
       saveDraft("proj_b");
       expect(
@@ -1732,7 +1761,7 @@ describe("draftPersistence", () => {
 
       // Switching back confirms A's own record was never touched either.
       expect(loadDraft("proj_a")).toBe(true);
-      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+      expect(deriveScaffoldSpec(getDecisionSnapshot())?.displayName).toBe("Testish Keyboard");
     });
   });
 
@@ -2397,7 +2426,7 @@ describe("draftPersistence", () => {
       expect(after.recordedScreenOf).toEqual({ "entry-1": "attachments" });
     });
 
-    it("T069 (FR-032, US4 scenario 3): a checked-in pre-079 draft restores cleanly — empty answer store, phase answers adopted under \"legacy\", no stamp invented", () => {
+    it("T069 (FR-032, US4 scenario 3): a checked-in pre-079 draft restores cleanly — empty answer store, no stamp invented; its stored phase answers are inert and clear at the next record (spec 090 T063)", () => {
       const fixture = readFileSync(path.join(currentDir, "__fixtures__", "pre079-draft.json"), "utf8");
       const envelope = JSON.parse(fixture) as Record<string, unknown> & { workingCopy: Record<string, unknown>; phaseBDraft: Record<string, unknown> };
       // The fixture really is pre-079: none of the three additive fields.
@@ -2412,24 +2441,187 @@ describe("draftPersistence", () => {
       expect(() => loadDraft("pre079")).not.toThrow();
       expect(useSurveyAnswerStore.getState().steps).toEqual({});
       expect(useSurveyAnswerStore.getState().recordedScreenOf).toEqual({});
-      expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "ŋ"]);
+      expect(getCharacterInventoryValue().chars).toEqual(["a", "ŋ"]);
       // No base in the fixture's traversal, so nothing to derive a stamp from.
-      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
 
-      // The phase-C answers recorded before 079 have no owner step; the next
-      // step to record into phase C must not overwrite them (D-4).
+      // Spec 090 T063: the restored phase-C answers sit in the slot as inert
+      // legacy data (no production reader remains), the retired sidecar
+      // never reappears, and the next recordPhase clears the slot's answers
+      // — decision records are the only answer state now.
       const phaseC = () => useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
       expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c"]);
+      expect("phaseAnswersByStep" in useWorkingCopyStore.getState()).toBe(false);
       useWorkingCopyStore
         .getState()
         .recordPhase(
           { phase: "C", answers: [{ questionId: "convenience.x", answerType: "boolean", value: false }] },
           { stepId: "convenience" },
         );
-      expect(useWorkingCopyStore.getState().phaseAnswersByStep["C"]?.["legacy"]?.map((a) => a.questionId)).toEqual([
-        "invisibles.u200c",
+      expect(phaseC()?.answers).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Spec 088: v1 → v2 migration (T009; US3's end-to-end tests live in the
+  // US3 section added with T027–T029).
+  // -------------------------------------------------------------------------
+  describe("spec 088 v1 migration (migrateDraftEnvelope)", () => {
+    const fixtureRaw = readFileSync(
+      path.join(currentDir, "__fixtures__", "v1-draft-18e63aa4.json"),
+      "utf8",
+    );
+
+    it("maps the fixture's identity/track/project_name answers onto decision ids", () => {
+      const result = migrateDraftEnvelope(JSON.parse(fixtureRaw));
+      expect(result).not.toBeNull();
+      const decisions = result!.envelope.decisions ?? {};
+      expect(decisions["language-code"]).toMatchObject({ value: "fr", provenance: "asked", step: "identity" });
+      expect(decisions["copyright-holder"]).toMatchObject({ value: "Fixture Author", provenance: "asked", step: "identity" });
+      expect(decisions["authoring-track"]).toMatchObject({ value: "copy", provenance: "asked", step: "track" });
+      expect(decisions["project-display-name"]).toMatchObject({ value: "Fixture Keyboard", provenance: "asked", step: "project_name" });
+      expect(decisions["project-keyboard-id"]).toMatchObject({ value: "fixture_keyboard", provenance: "asked", step: "project_name" });
+      expect(result!.migrationOrphans).toEqual([]);
+      // The migrated surveyAnswers slice holds no survey-question answers.
+      const steps = result!.envelope.surveyAnswers?.steps ?? {};
+      for (const stepId of ["identity", "track", "project_name"]) {
+        expect(steps[stepId]?.answers ?? {}).toEqual({});
+      }
+    });
+
+    it("is an identity pass-through for a current-version envelope and null for non-objects", () => {
+      const v2 = { version: 2, savedAt: 1 };
+      expect(migrateDraftEnvelope(v2)?.envelope).toEqual(v2);
+      expect(migrateDraftEnvelope(null)).toBeNull();
+      expect(migrateDraftEnvelope("nope")).toBeNull();
+    });
+  });
+
+  describe("spec 088 US3 — v1 draft end-to-end (SC-003) + orphan surfacing (T030)", () => {
+    const fixtureRaw = readFileSync(
+      path.join(currentDir, "__fixtures__", "v1-draft-18e63aa4.json"),
+      "utf8",
+    );
+    const V1_KEY = "ks.draft.fixture_keyboard.v1";
+
+    interface V1FixtureStep {
+      answers?: Record<string, { value?: unknown; [k: string]: unknown }>;
+    }
+    interface V1FixtureDraft {
+      surveyAnswers?: { steps?: Record<string, V1FixtureStep> };
+      traversal?: { selectedTrack?: string };
+      [k: string]: unknown;
+    }
+
+    function fixtureVariant(mutate: (draft: V1FixtureDraft) => void): string {
+      const draft = JSON.parse(fixtureRaw) as V1FixtureDraft;
+      mutate(draft);
+      return JSON.stringify(draft);
+    }
+
+    it("T027: loadDraft finds the .v1 key, migrates it, and opens the project with the answers as decisions", () => {
+      localStorage.setItem(V1_KEY, fixtureRaw);
+
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+
+      const decisions = getDecisionSnapshot();
+      expect(decisions["language-code"]).toMatchObject({ value: "fr", step: "identity" });
+      expect(decisions["copyright-holder"]).toMatchObject({ value: "Fixture Author" });
+      expect(decisions["authoring-track"]).toMatchObject({ value: "copy" });
+      expect(decisions["project-display-name"]).toMatchObject({ value: "Fixture Keyboard" });
+      expect(decisions["project-keyboard-id"]).toMatchObject({ value: "fixture_keyboard" });
+      // The project actually opened: the working copy was restored.
+      expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
+    });
+
+    it("T028: an answer whose question id is absent from the registry becomes exactly one orphan — full accounting", () => {
+      const variant = fixtureVariant((draft) => {
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
+      });
+
+      const result = migrateDraftEnvelope(JSON.parse(variant));
+      expect(result).not.toBeNull();
+      expect(result!.migrationOrphans).toEqual([
+        { questionId: "zz_removed_question", stepId: "identity", value: "orphan-value" },
       ]);
-      expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c", "convenience.x"]);
+
+      // 100% accounting: 6 v1 answers = 5 decision records + 0 retained
+      // gallery answers (the fixture has no settles-step answers) + 1 orphan.
+      const totalAnswers = Object.values(
+        (JSON.parse(variant) as V1FixtureDraft).surveyAnswers?.steps ?? {},
+      ).reduce(
+        (n: number, step: V1FixtureStep) => n + Object.keys(step.answers ?? {}).length,
+        0,
+      );
+      const recordCount = Object.keys(result!.envelope.decisions ?? {}).length;
+      const retainedCount = Object.values(result!.envelope.surveyAnswers?.steps ?? {}).reduce(
+        (n: number, step) => n + Object.keys(step.answers ?? {}).length,
+        0,
+      );
+      expect(totalAnswers).toBe(6);
+      expect(recordCount + retainedCount + result!.migrationOrphans.length).toBe(totalAnswers);
+    });
+
+    it("T029: a session-field/answer disagreement migrates with the session value winning, and logs it", () => {
+      const variant = fixtureVariant((draft) => {
+        if (draft.traversal) draft.traversal.selectedTrack = "adapt"; // track_choice answer stays "copy"
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        const result = migrateDraftEnvelope(JSON.parse(variant));
+        expect(result!.envelope.decisions?.["authoring-track"]).toMatchObject({ value: "adapt" });
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining("session field for authoring-track disagrees"),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("T030: loading a v1 draft with an orphan writes it to the decision trail, carrying its value, exactly once", () => {
+      const variant = fixtureVariant((draft) => {
+        const answers = draft.surveyAnswers?.steps?.["identity"]?.answers;
+        if (answers) {
+          answers["zz_removed_question"] = {
+            value: "orphan-value",
+            answerType: "text",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: null,
+            screenId: "capture",
+            savedAt: 1791334913771,
+          };
+        }
+      });
+      localStorage.setItem(V1_KEY, variant);
+
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+
+      const orphanEntries = () =>
+        useDecisionLogStore.getState().record.entries.filter(
+          (e) => e.payload.kind === "survey-answer" && e.payload.questionId === "zz_removed_question",
+        );
+      expect(orphanEntries()).toHaveLength(1);
+      expect(orphanEntries()[0]).toMatchObject({
+        stepId: "identity",
+        provenance: { agency: "hand-set" },
+        payload: { kind: "survey-answer", questionId: "zz_removed_question", value: "orphan-value" },
+      });
+
+      // Re-applying the same v1 draft does not duplicate the trail entry.
+      expect(loadDraft("fixture_keyboard")).toBe(true);
+      expect(orphanEntries()).toHaveLength(1);
     });
   });
 

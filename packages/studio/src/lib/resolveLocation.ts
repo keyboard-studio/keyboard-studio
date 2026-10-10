@@ -10,7 +10,8 @@
 // arrives in `ResolveContext`, which is what makes the resolution table a unit
 // test matrix rather than a DOM test (contract §4).
 
-import { decisionsFromTraversal } from "../steps/decisionsFromTraversal.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import { resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
 import type { Step } from "../steps/types.ts";
 import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
@@ -57,6 +58,23 @@ export interface ResolveContext {
   readonly manifest: readonly Step[];
   readonly questionRegistry: QuestionRegistryView;
   readonly traversal: TraversalSnapshot;
+  /**
+   * Spec 088 FR-004 (contract C-3.2): the decision set `gatedBy` is
+   * evaluated over — a VIEW of the decision store's snapshot with the
+   * `touch-seed-source` record omitted, constructed by the caller by
+   * omission from the store snapshot (never stored, never rebuilt from
+   * session fields). The seed is omitted deliberately: a remembered seed
+   * must not strand the jump back to the chooser (see walkedByTrack).
+   */
+  readonly decisions: DecisionSet;
+  /**
+   * Spec 091 T015: the derived screen gates (steps/manifest.ts
+   * `screenGates`), keyed by screen id. `walkedByTrack` reads the gate
+   * from here — steps no longer carry `gatedBy` (T014). Optional so pure
+   * fixtures can omit it (absent = ungated); production always supplies
+   * it via lib/jumpToLocation.ts's liveResolveContext.
+   */
+  readonly screenGates?: ReadonlyMap<string, (decisions: DecisionSet) => boolean>;
   /** Whether a working copy exists at all. */
   readonly hasProject: boolean;
   /**
@@ -84,21 +102,26 @@ const WIZARD_ROUTE = "survey";
  * Steps the active track walks. `project_name` is the one off-spine step whose
  * membership depends on the track: the copy track walks it, the adapt track
  * skips it (steps/manifest.ts's track-routing docstring). The condition is the
- * step's own `gatedBy` (steps/stepDependencies.ts) — never re-stated here.
+ * screen's DERIVED gate (spec 091 T015: decisions/deriveScreens.ts, published
+ * as steps/manifest.ts's `screenGates` and threaded through the context) —
+ * never re-stated here.
  *
- * Only the track is fed to the gate, deliberately. `touch_seed_source`'s gate
+ * The gate is fed the decision set WITHOUT the touch-seed record,
+ * deliberately (spec 088 C-3.2: the caller constructs that view by omission
+ * from the decision-store snapshot). `touch_seed_source`'s gate
  * ("no seed choice recorded") governs whether advance() ROUTES through the
  * chooser, not whether the chooser is a place the author may be: spec 035
  * R12/US2-AS4 keeps a remembered choice changeable, and
  * `backToTouchSeedSource` lands on the chooser with the choice still set.
- * Feeding `touchSeedSource` here would refuse that very location, grey out its
+ * Feeding the seed record here would refuse that very location, grey out its
  * progress dot, and break the decision row's jump to change the seed. A
  * chooser the author never visited is still refused as `beyond-gate`.
  */
-function walkedByTrack(step: Step, traversal: TraversalSnapshot): boolean {
-  if (step.gatedBy === undefined) return true;
-  // No touch-seed argument, deliberately (see above).
-  return step.gatedBy(decisionsFromTraversal(traversal.selectedTrack));
+function walkedByTrack(stepId: string, decisions: DecisionSet, ctx: ResolveContext): boolean {
+  const gate = ctx.screenGates?.get(stepId);
+  if (gate === undefined) return true;
+  // The caller's set omits the touch-seed record, deliberately (see above).
+  return gate(decisions);
 }
 
 /**
@@ -200,20 +223,30 @@ export function resolveLocation(loc: Location, ctx: ResolveContext): LocationRes
     return refuse(loc, "no-project", ctx);
   }
 
-  const step = ctx.manifest.find((s) => s.id === loc.step);
+  // Spec 091 T015: a step id written before the derived screens (a pre-091
+  // deep link, a restored draft) resolves through the frozen legacy map to
+  // the screen that now holds that step's decisions. Current ids map to
+  // themselves; the `done`/`unsupported` terminals pass through unmapped
+  // and are refused below as step-not-in-build, exactly as before.
+  const stepId = resolveLegacyStepId(loc.step) as ActiveStepId;
+
+  const step = ctx.manifest.find((s) => s.id === stepId);
   if (step === undefined) {
     return refuse(loc, "step-not-in-build", ctx);
   }
-  if (!walkedByTrack(step, ctx.traversal)) {
+  if (!walkedByTrack(stepId, ctx.decisions, ctx)) {
     return refuse(loc, "skipped-by-track", ctx);
   }
-  if (!isReached(loc.step, ctx.traversal)) {
+  if (!isReached(stepId, ctx.traversal)) {
     return refuse(loc, "beyond-gate", ctx);
   }
 
-  if (loc.question !== undefined && !isAddressablePosition(loc.question, loc.step, ctx)) {
+  if (loc.question !== undefined && !isAddressablePosition(loc.question, stepId, ctx)) {
     return refuse(loc, "question-not-in-build", ctx);
   }
 
-  return { kind: "reachable", location: loc };
+  return {
+    kind: "reachable",
+    location: stepId === loc.step ? loc : { ...loc, step: stepId },
+  };
 }

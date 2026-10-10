@@ -12,7 +12,7 @@ import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB, parseSpacedChars } from "./PhaseB.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps } from "../survey/useInventoryDraft.ts";
 import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { SurveyPhaseResult, IRGroup, IRRule } from "@keyboard-studio/contracts";
 
@@ -332,7 +332,7 @@ describe("AlphabetBreakdown — visible decomposition (spec 071)", () => {
   it("does not render while the alphabet has no marks and no accented letters", async () => {
     await renderBuildListView();
     act(() => {
-      usePhaseBDraftStore.getState().add("a");
+      inventoryOps("characters").add("a");
     });
     expect(screen.queryByTestId("alphabet-marks")).toBeNull();
     expect(screen.queryByTestId("alphabet-accented")).toBeNull();
@@ -341,7 +341,7 @@ describe("AlphabetBreakdown — visible decomposition (spec 071)", () => {
   it("a precomposed pick populates Letters, Marks, and Accented letters visibly", async () => {
     await renderBuildListView();
     act(() => {
-      usePhaseBDraftStore.getState().add("é");
+      inventoryOps("characters").add("é");
     });
     const letters = screen.getByTestId("alphabet-letters");
     const marks = screen.getByTestId("alphabet-marks");
@@ -354,7 +354,7 @@ describe("AlphabetBreakdown — visible decomposition (spec 071)", () => {
   it("marks the just-added base and mark as new (US5 AC2)", async () => {
     await renderBuildListView();
     act(() => {
-      usePhaseBDraftStore.getState().add("é");
+      inventoryOps("characters").add("é");
     });
     const justAdded = screen.getAllByLabelText(/just added/);
     const labels = justAdded.map((el) => el.getAttribute("aria-label") ?? "");
@@ -365,7 +365,7 @@ describe("AlphabetBreakdown — visible decomposition (spec 071)", () => {
   it("a lone combining-mark pick renders in Marks on a dotted-circle carrier", async () => {
     await renderBuildListView();
     act(() => {
-      usePhaseBDraftStore.getState().add(ACUTE);
+      inventoryOps("characters").add(ACUTE);
     });
     const marks = screen.getByTestId("alphabet-marks");
     expect(marks.textContent).toContain("◌");
@@ -377,7 +377,7 @@ describe("AlphabetBreakdown — visible decomposition (spec 071)", () => {
     const CIRCUMFLEX = "̂"; // U+0302
     // Entered breve-first; code-point order must still list U+0302 before U+0306.
     act(() => {
-      usePhaseBDraftStore.getState().setAll([BREVE, CIRCUMFLEX]);
+      inventoryOps("characters").setAll([BREVE, CIRCUMFLEX]);
     });
     const marks = screen.getByTestId("alphabet-marks").textContent ?? "";
     expect(marks.indexOf("U+0302")).toBeLessThan(marks.indexOf("U+0306"));
@@ -398,7 +398,7 @@ describe("US1 — whole-text capture (spec 047)", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
-    const { chars } = usePhaseBDraftStore.getState();
+    const { chars } = getCharacterInventoryValue();
     // Entered uppercase (N, Y) is folded to lowercase in the alphabet — we never
     // store a capital without its lowercase (both cases reach the IR on Done).
     for (const ch of ["n", "a", "ï", "v", "e", "?", "y", "s", "—", "3", "t", "i", "m", "."]) {
@@ -420,7 +420,7 @@ describe("US1 — whole-text capture (spec 047)", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual(
+    expect(getCharacterInventoryValue().chars).toEqual(
       expect.arrayContaining(["a", "b", "4", "."]),
     );
   });
@@ -433,7 +433,7 @@ describe("US1 — whole-text capture (spec 047)", () => {
     });
     // The Add button is disabled for whitespace-only input; nothing is captured.
     expect((screen.getByRole("button", { name: /\+ Add/i }) as HTMLButtonElement).disabled).toBe(true);
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 });
 
@@ -445,7 +445,7 @@ describe("US2 — category breakdown (spec 047)", () => {
   it("routes a/1/./€ to Letters/Numbers/Punctuation/Symbols, each once; empty sections hidden (AS2.1/2.2)", async () => {
     await renderBuildListView({});
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a", "1", ".", "€"]);
+      inventoryOps("characters").setAll(["a", "1", ".", "€"]);
     });
     expect(screen.getByTestId("alphabet-letters").textContent).toContain("U+0061"); // a
     expect(screen.getByTestId("alphabet-numbers").textContent).toContain("U+0031"); // 1
@@ -464,7 +464,7 @@ describe("US2 — category breakdown (spec 047)", () => {
   it("the new sections render beneath Accented letters (FR-004)", async () => {
     await renderBuildListView({});
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["é", "1"]);
+      inventoryOps("characters").setAll(["é", "1"]);
     });
     const accented = screen.getByTestId("alphabet-accented");
     const numbers = screen.getByTestId("alphabet-numbers");
@@ -479,7 +479,7 @@ describe("US2 — category breakdown (spec 047)", () => {
     // ɛ (U+025B) has a LOWER code point than a (U+0061); raw code-point order
     // would place ɛ first, but ICU root collation places a before ɛ.
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["ɛ", "a"]);
+      inventoryOps("characters").setAll(["ɛ", "a"]);
     });
     const letters = screen.getByTestId("alphabet-letters").textContent ?? "";
     expect(letters.indexOf("U+0061")).toBeLessThan(letters.indexOf("U+025B"));
@@ -494,7 +494,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
   it("Letters collapse to lowercase with the toggle off (AS3.1)", async () => {
     await renderBuildListView({});
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a", "b", "c"]);
+      inventoryOps("characters").setAll(["a", "b", "c"]);
     });
     const letters = screen.getByTestId("alphabet-letters").textContent ?? "";
     expect(letters).toContain("U+0061"); // a shown
@@ -504,7 +504,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
   it("toggling on reveals derived uppercases (AS3.2/FR-008)", async () => {
     await renderBuildListView({});
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a", "b", "c"]);
+      inventoryOps("characters").setAll(["a", "b", "c"]);
     });
     const toggle = screen.getByTestId("letters-uppercase-toggle");
     await act(async () => {
@@ -520,7 +520,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
     await renderBuildListView({});
     // Devanagari letter क (U+0915) is caseless — caseCounterpart returns null.
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["क", "1"]);
+      inventoryOps("characters").setAll(["क", "1"]);
     });
     expect(screen.getByTestId("alphabet-letters").textContent).toContain("U+0915");
   });
@@ -530,7 +530,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
     // Only "A" entered, never "a": it must be shown as-is (U+0041), and no
     // lowercase "a" (U+0061) is synthesized into the Letters view.
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["A", "1"]);
+      inventoryOps("characters").setAll(["A", "1"]);
     });
     const letters = screen.getByTestId("alphabet-letters").textContent ?? "";
     expect(letters).toContain("U+0041"); // A shown as entered
@@ -541,7 +541,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "en" }, onComplete);
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a", "b", "c"]);
+      inventoryOps("characters").setAll(["a", "b", "c"]);
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Done/i }));
@@ -559,7 +559,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "tr" }, onComplete);
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["i"]);
+      inventoryOps("characters").setAll(["i"]);
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Done/i }));
@@ -580,7 +580,7 @@ describe("US4 — focused Your-alphabet list (spec 047)", () => {
     await renderBuildListView({});
     const ACUTE = "́";
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a", "é", ACUTE, "5", "?"]);
+      inventoryOps("characters").setAll(["a", "é", ACUTE, "5", "?"]);
     });
     // "Your alphabet (n)" reflects only linguistic content: a, é, and the mark = 3.
     expect(screen.getByText(/Your alphabet \(3\)/i)).toBeTruthy();
@@ -600,7 +600,7 @@ describe("US4 — focused Your-alphabet list (spec 047)", () => {
     const ACUTE = "́"; // U+0301
     // Entered out of order: ɛ (U+025B), a, é (U+00E9 combo), acute, grave.
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["ɛ", "a", "é", ACUTE, GRAVE]);
+      inventoryOps("characters").setAll(["ɛ", "a", "é", ACUTE, GRAVE]);
     });
     const group = screen.getByRole("group", { name: /Accumulated characters/i }).textContent ?? "";
     const at = (u: string) => group.indexOf(u);
@@ -623,7 +623,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     // Ə + combining acute (U+018F U+0301): no single composed form.
     const graph = "Ə́";
     act(() => {
-      usePhaseBDraftStore.getState().setAll([graph]);
+      inventoryOps("characters").setAll([graph]);
     });
     // The "Your alphabet" chip shows the base code point, then the extra mark in
     // a bracketed "[+́]" badge; the full stack is on the chip's hover title.
@@ -648,7 +648,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     const groupText = screen.getByRole("group", { name: /Accumulated characters/i }).textContent ?? "";
     expect(groupText).toContain("U+0071"); // q
     expect(groupText).not.toContain("U+0051"); // Q not shown
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["q"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["q"]);
     // Both cases still reach the recorded IR on Done.
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Done/i }));
@@ -663,14 +663,14 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     // Both cases present (e.g. added via the character map); only the lowercase
     // chip is shown (toggle off).
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["q", "Q"]);
+      inventoryOps("characters").setAll(["q", "Q"]);
     });
     const removeBtn = screen.getByRole("button", { name: /Remove q \(U\+0071\)/ });
     await act(async () => {
       fireEvent.click(removeBtn);
     });
     // One click clears the pair — the uppercase does not linger as an orphan.
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 
   it("keeps an entered uppercase that has no single-character lowercase, as chosen", async () => {
@@ -685,7 +685,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["İ"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["İ"]);
   });
 
   it("keeps a lowercase letter that has no uppercase counterpart, forcing no uppercase (IPA)", async () => {
@@ -701,7 +701,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
       fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
     // Kept as entered (not folded away, no synthesized uppercase in the UI).
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["ĸ"]);
+    expect(getCharacterInventoryValue().chars).toEqual(["ĸ"]);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Done/i }));
     });
@@ -712,7 +712,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
   it("'Your alphabet' collapses letters to lowercase with the toggle off, reveals uppercases when on", async () => {
     await renderBuildListView({});
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a", "b", "c"]);
+      inventoryOps("characters").setAll(["a", "b", "c"]);
     });
     const groupText = () =>
       screen.getByRole("group", { name: /Accumulated characters/i }).textContent ?? "";
@@ -729,7 +729,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
   it("'Your alphabet' count is the collapsed lowercase-unit count (both cases present not double-counted)", async () => {
     await renderBuildListView({});
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a", "A", "b", "B"]);
+      inventoryOps("characters").setAll(["a", "A", "b", "B"]);
     });
     expect(screen.getByText(/Your alphabet \(2\)/i)).toBeTruthy();
   });
@@ -737,7 +737,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
   it("FR-012 — a single-code-point grapheme still renders a plain U+XXXX label with no badge", async () => {
     await renderBuildListView({});
     act(() => {
-      usePhaseBDraftStore.getState().setAll(["a"]);
+      inventoryOps("characters").setAll(["a"]);
     });
     const group = screen.getByRole("group", { name: /Accumulated characters/i });
     expect(group.textContent).toContain("U+0061");

@@ -1,0 +1,614 @@
+# Implementation Plan: Live extraction from the starting point (specs/092-live-extraction)
+
+**Branch**: `km/live-extraction` (stacked off `km/derived-steps`) | **Date**: 2026-10-06 | **Spec**: [spec.md](spec.md)
+
+**Input**: Feature specification from `/specs/092-live-extraction/spec.md`; series plan in
+[088 HANDOFF.md](../088-modular-decisions/HANDOFF.md) (G2, G7 and "Extraction runs live");
+predecessor plans 088 (decision store), 089 (`apply`), 090 (gallery modules), 091 (derived steps).
+
+## Summary
+
+`extract()` exists on five modules but never runs in the live app; every live pre-fill is
+step-specific seeding code, and the working copy is set up before the track is known. This spec
+runs extraction **once, after setup**, in the live wizard: a thin live runner over the existing
+primitives (`orderByDependencies`, per-module `extract` + `validate`, `buildExtractContext`)
+merges extracted values and lookup defaults into the 088 `decisionStore` — seeding unanswered
+decisions with their source named, and placing the extracted value beside (`offered`) an answer
+the author already gave, never over it. The five step-specific seeders named in FR-002 become
+`extract`s or lookup defaults of the same record shape and are deleted as write paths. Setup
+itself becomes the `apply` of a decision that `requires: ["base-keyboard", "authoring-track"]`,
+so the track is known when the working copy is instantiated (fixing the HANDOFF G7 hazard), and
+the starting-point decision-log entry is recorded at the same post-setup point, where its
+inputs exist by construction. The spec contains the series' acceptance test (US1): add
+`requires: ["authoring-track"]` to `il_copyright_holder` and change nothing else — on the adapt
+track the question then appears after the track choice, pre-filled from the keyboard's own
+copyright and labelled "from <keyboard>"; on the copy track it defaults to the author. That
+test is verified by a Playwright walk of **both** tracks in `pnpm dev`, never in the demo.
+
+**Owner's words, carried verbatim (HANDOFF.md):**
+
+> "Values from the starting point become defaults the author knowingly confirms, changes or
+> overturns. They are never applied silently."
+
+> "Run this test in the **live wizard**, not the demo."
+
+**Settled principles this plan does not reopen:** extracted values are never applied silently;
+every answer is saved the moment it is given; old drafts migrate automatically with unmapped
+answers shown, never dropped (087 Q5 precedent, owned by 088 for this series). No owner ruling
+specific to 092 was outstanding at plan time; the series' open owner questions sit in 090
+(carve per-item provenance shape) and 093 (starting-point change semantics, perf budgets) and
+neither blocks this spec.
+
+## Technical Context
+
+**Language/Version**: TypeScript (repo stack), Node ≥ 22.19.0, pnpm 9
+
+**Primary Dependencies**: React + Zustand stores (existing); the 087 decision machinery
+(`decisions/orderDecisions.ts`, `decisions/extractContext.ts`, `decisions/decisionFlow.ts`
+semantics); Playwright `^1.61.1` for the live walks. No new dependency.
+
+**Storage**: `decisionStore` (088) is the only store seeded. Drafts keep 088's v2 `decisions`
+slice; this spec changes no draft shape and no `DRAFT_VERSION`.
+
+**Testing**: Vitest via the studio package's own config (never bare `vitest` at the root);
+Playwright e2e in `packages/studio/e2e/` against `pnpm dev`; store-level tests through the
+real `StepHost`. The 089 golden walk is the byte-identical regression gate.
+
+**Target Platform**: the studio SPA (browser), live wizard only — `DecisionsDemo` is not a
+verification surface for this spec.
+
+**Performance Goals**: none set by the spec. The extraction pass is one synchronous pass over
+the registry inside the setup commit; it adds no timer and no per-step cost. (093 owns perf
+budgets for replay; not this spec.)
+
+**Constraints**: no `packages/contracts` change; no new timer (D3 untouched — the pass runs
+inside the setup commit, not in the validation cycle); no i18n message id changes (a genuinely
+new source-label string takes a new id under the existing survey provenance pattern; moving or
+re-sourcing a question never renames its id); Pattern schema untouched; the acceptance test
+permits exactly one declaration edit (FR-005) — any second edit it seems to need is a series
+failure to report, not to quietly make.
+
+**Scale/Scope**: one live runner; five converted seeders (FR-002 inventory, verified in
+research.md R3); one setup decision; one module declaration change; both renderer kinds gain
+record-driven source labels. Engine package: no changes expected — extraction reads the IR
+through the existing codec-built bundle.
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+| Article | Assessment |
+|---|---|
+| I — Pattern schema locked | PASS — no Pattern field, type, or `{{slotId}}` syntax is touched; nothing in `packages/contracts` changes (the `DecisionProposalSource` vocabulary the seeds already use is consumed as-is). |
+| II — KeyboardIR is the engine spine | PASS — extraction reads the parsed `KeyboardIR` + catalog bundle (`buildExtractContext`); no raw `.kmn` handling; opaque `RawKmnFragment` content is never survey-edited or silently dropped — an extractor that cannot read a value returns absent and the question is asked. |
+| III — Single persistent working copy | PASS — setup still instantiates exactly one working copy (`instantiateFromBase` / `instantiateFromExisting`); it becomes an `apply` so it runs once with the track known, instead of twice (new-from-base, then adapt). No second copy, no intermediate serialization. |
+| IV — Validator layering fixed | PASS — no new debounce timer, no parallel validation path. The extraction pass is synchronous inside the setup commit, outside the 300 ms D3 cycle; extracted values pass each module's own `validate()` (a question-level check, not a new validation layer). |
+| V — VirtualFS only during authoring | PASS — no host-disk writes; the pass reads the in-memory bundle and writes decision records. |
+| VI — Team boundaries | PASS — Engine team owns the runner, the setup decision, and the module `extract` conversions. Content boundary respected: question wording and help copy are unchanged; seed *values* that Content owns (Phase F proposals in `lib/phaseFSeeds.ts`) keep their derivation logic and only change their delivery path. |
+| VII — Out of scope for v1 | PASS — none of the excluded items is implemented; no CJK/Ethiopic, LDML, multi-source merge, or opaque-fragment editing. |
+| VIII — House conventions | PASS — commit titles use the locked `<prefix>(<area>)` vocabulary; no issue numbers in shipped code/comments; no emoji in console output; file references in user-facing text use markdown links. |
+| IX — No survey surface outside the decision registry | PASS, and this spec is an Article IX completion step: the last step-specific seeders (survey surfaces whose values were computed outside the registry's modules) are folded into module `extract`s / lookup defaults, and placement of the acceptance question follows from its declared `requires` under 091's derived steps. The registry declaration for the one changed module (FR-005) and for the setup decision (FR-004) is a functional requirement of the spec itself. |
+
+No violations; no Complexity Tracking table needed.
+
+**Post-design re-check**: Phase 1 design (research.md, data-model.md, contracts/) introduces
+no new store, no new timer, no contracts change, and no surface outside the registry — the
+check above stands unchanged.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/092-live-extraction/
+├── spec.md                  # Feature specification (already written)
+├── plan.md                  # This file (/speckit-plan)
+├── research.md              # Phase 0 output — verified seeder inventory, hazard localisation
+├── data-model.md            # Phase 1 output — records the pass writes, merge rules
+├── quickstart.md            # Phase 1 output — live-walk validation scenarios
+├── contracts/
+│   └── live-extraction.md   # The extraction pass + setup decision + label contracts
+└── tasks.md                 # Phase 2 output (/speckit-tasks — not part of plan)
+```
+
+### Source Code (repository root)
+
+```text
+packages/studio/src/decisions/
+├── liveExtraction.ts        # NEW: the live extraction pass (merge into decisionStore)
+├── liveExtraction.test.ts   # NEW: merge-rule unit tests (seed / offered / validate-reject)
+├── extractContext.ts        # unchanged — buildExtractContext supplies the bundle
+├── decisionFlow.ts          # unchanged semantics; the demo runner stays demo-facing
+└── recordBaseContribution.ts# unchanged function; its call site moves post-setup
+
+packages/studio/src/survey/questions/a/
+└── il_copyright_holder.ts   # FR-005: requires gains "authoring-track" (the one-line edit)
+
+packages/studio/src/survey/
+├── IdentityLite.tsx         # seed refs (langtags/profile) become lookup defaults; seed write path deleted
+├── Prefill.tsx              # renders rows from decision records; computed prefill values move to module extracts
+├── CharactersStep.tsx       # confirmPrefill write path deleted; alphabet proposal = pb_character_inventory extract
+└── SurveyRunner.tsx         # seed props fed from decision records (default renderer labels, FR-003)
+
+packages/studio/src/survey/questions/b/
+└── pb_character_inventory.ts# its existing extract becomes live via the pass
+
+packages/studio/src/editors/adapters/
+└── flowStepOptions.tsx      # PHASE_F_SEEDS table deleted; entries become pf_* module extracts/defaults
+
+packages/studio/src/editors/carve/
+└── CarveGalleryV2.tsx       # prefillCarveDispositions effect deleted; dispositions arrive as decision value (090)
+
+packages/studio/src/stores/
+└── workingCopyStore.ts      # prefillCarveDispositions action deleted; instantiation invoked by setup apply
+
+packages/studio/src/
+├── StudioShell.tsx          # doCommit mode re-derivation deleted; setup runs via the decision runner
+└── components/StepHost.tsx  # completion path: setup apply → extraction pass → recordBaseContribution
+
+packages/studio/e2e/
+├── live-extraction-acceptance.spec.ts  # NEW: US1 both-tracks walk + US3/US4 assertions + SC-002 count
+└── golden-walk.spec.ts                 # 089's walk, reused unchanged as the regression gate
+```
+
+**Structure Decision:** the live runner lives in `decisions/` beside the machinery it reuses —
+the same home 087 chose for the decision unit — as a new file, not an extension of
+`decisionFlow.ts`: that runner's whole-flow pure-pass semantics (extract → answer → default in
+one return value) are demo-shaped, and bending them into a store merge would blur both. The
+per-module semantics (order, validate-rejects-are-absent, source naming) are shared by
+construction and pinned by tests on both sides (research R1/OQ-3). Everything else is a
+conversion at an existing site: seeders become module declarations where their modules already
+live, and the two deletions in `StudioShell.tsx` / `StepHost.tsx` rewire setup and recording
+into the runner's post-setup point. No new directories; no engine changes.
+
+## Complexity Tracking
+
+No Constitution Check violations — table not required.
+
+## Implementation audit (T001, 092 agent — against cascaded base `81e79756`)
+
+Base verified: merge of `km/derived-steps` @ `54fe4883` (088 close + 089 through
+T024 + its depcruise fix pending restack, see G-6; 090 US1+US2) into
+`km/live-extraction`. Present exactly as planned: 088 `stores/decisionStore.ts`
+(`record/recordAll/forget/set/snapshot/peek`, `selectTrack`/`selectTouchSeedSource`);
+the `Decision` record with `inputs`/`offered`/`source`; 089's `applyDecisionEffects`
+runner + `galleryHost` record-then-apply; `runDecisionFlow` semantics (order,
+gating, extract→validate, source = catalog id → IR-header fallback, throwing
+extract names its module) with **no live caller** (non-test callers are
+`DecisionsDemo` ×2 and `spikeRunner` only — T002 grep snapshot);
+`buildExtractContext(baseIr, baseKeyboard)` against `workingCopyStore`'s
+`baseIr`/`baseKeyboard` slots; `il_copyright_holder` exactly as research R5
+(`requires: ["author-name"]`, `extractCopyrightHolder`, no `validate`);
+`questionRegistry`/`decisionIndex` composition (flow + Phase F + reserve +
+gallery).
+
+**Predecessor gaps and plan deltas (recorded, not silently adapted):**
+
+- **G-1 (091 in flight):** `steps/stepDependencies.ts` is still present and
+  steps are not yet derived. Does not block the pass (it orders by module
+  `requires` via `orderDecisions`); T001's "091 landed" item is unmet and the
+  acceptance walk's placement assertions ride on 091 + CI.
+- **G-2 (090 US3/US4 in flight):** gallery modules for `carved-layout`,
+  `touch-layout`, `physical-layout`, `help-docs`, `deadkeys-defined`,
+  `rule-set` are registered but placeholder (`UnmigratedGalleryRenderer`,
+  no-op `apply`). T037 is **PENDING-PREDECESSOR**: `prefillCarveDispositions`
+  (store action + `CarveGalleryV2` effect) still exists; its conversion waits
+  for 090's carve migration to land via restack.
+- **G-3:** `DecisionRendererProps` (090) carries `provenance`/`source` but no
+  `offered`. T032 extends the type additively with `offered?: unknown`.
+- **G-4:** no module-level lookup-default declaration exists in the landed
+  contract (`runDecisionFlow`'s `default` is value-less). 092 defines it:
+  optional `lookupDefault(ctx)` on `QuestionModule`, returning
+  `{ value, source? }` — introduced in T010, populated by the US2 conversions.
+- **G-5:** T035 names `pb_character_inventory.ts`; 090 deleted it. Its
+  `extract` lives on as `survey/questions/gallery/characterInventory.ts`'s
+  extract. T035 retargets there.
+- **G-6:** the base carries the known depcruise cycle
+  (`survey/types` ↔ `workingCopyStore`); the fix (`030bf59c`) sits on
+  `km/decision-apply` and arrives via a later restack. Not fixed here; local
+  `pnpm lint` depcruise verdicts are read with that caveat (eslint on touched
+  files + focused suites are the local gates; CI is authoritative).
+- **G-7 / OQ-2 RESOLVED:** setup is the `base-keyboard` completion's deferred
+  instantiation (no new `DecisionId` — a record for it would pollute the set
+  093 replays and SC-002 counts). T013's wiring lands in `StudioShell.tsx` +
+  `decisions/liveExtraction.ts`, not `StepHost.tsx` as the task's file list
+  suggested: the instantiation artifact and `doCommit` live in `StudioShell`,
+  which `StepHost` cannot reach. Shape: the single-instantiation effect gates
+  on BOTH `base-keyboard` and `authoring-track` records; `doCommit` then runs
+  the existing `applyStepCompletion("choose_base", …)` apply path with the
+  track known, exactly once (per-base guard unchanged); the extraction pass
+  is invoked at the post-apply point inside `doCommit` (the same point T050
+  later adds `recordBaseContribution` to). FR-004's observable behaviour
+  holds: instantiation only through the apply path, requires both decisions,
+  runs once, track known.
+
+- **G-8 (FR-005 is NOT self-sufficient on the intermediate base — lead
+  ruling requested, US1 thread stopped at T023):** T021's one-line edit
+  landed exactly as specified, and T022's `seedWhen` is independently
+  sound at pass level. But on today's base the edit has a consequence the
+  plan did not record: `orderDecisions(flowModules.identity_lite)` — and
+  with it `loadFlowSourceDef(identity_lite)` — THROWS `unresolved
+  decision: "authoring-track" required by "il_copyright_holder"`,
+  because per-flow ordering rejects cross-flow `requires` by design.
+  The loader's live callers include `IdentityLite.tsx:171` (the wizard's
+  identity step itself, in a useMemo), the Dashboard routing view, and
+  the Flow Map's renderedNodeSet — so on the intermediate stack the live
+  identity step cannot render. (The store-level golden walk does not
+  catch this: its harness substitutes the identity step.) The frozen
+  parity test (`orderParity.test.ts`, identity_lite) is red for the same
+  reason. On the COMPLETED stack this resolves itself: 091's design
+  unifies identity/track/project_name into one SurveyRunner flow (its
+  research.md: "screens are one SurveyRunner over one flow"), making the
+  requires intra-flow, and 091's plan already owns the parity rewrite.
+  Options for the lead: (a) accept the intermediate red — it heals at the
+  091 restack, which precedes 092 in merge order; (b) hold T021 (revert
+  the one line; T020/T022 stand) until 091 lands; (c) authorise a
+  cross-flow tolerance change in `orderDecisions`/`loadDerivedFlow` on
+  this branch — out of 092's declared scope and on the exact surface 091
+  is rewriting, so a restack collision is likely. 092's recommendation:
+  (a), with (b) if any consumer needs a runnable identity flow from this
+  branch before 091 lands (093's re-audit is the candidate consumer).
+
+- **G-9 (gate-open-after-setup, resolved in T031/T036):** the setup pass
+  evaluates gates once against the pre-pass decision set (the demo
+  runner's `filterGated` semantics), so a question gated behind an
+  as-yet-unanswered choice (Phase F's more-detail branch:
+  `pf_doc_language`, `pf_project_url`, `pf_provenance_basis`, …) is
+  correctly NOT seeded at setup — seeding it would leak an unreached
+  value into decision-derived output. When the author opens the gate
+  mid-step, `SurveyRunner`'s record-proposal path re-runs the idempotent
+  pass at question-push time (only for a question whose module declares
+  an extract/lookup default and has no record yet), materialising the
+  record so the seed and its "from <source>" caption arrive exactly as
+  if the gate had been open at setup. The pass remains the single
+  evaluation engine; only its invocation gains a second, lazy trigger.
+
+- **G-10 (T034 premise gap — stopped and reported):** the script-alignment
+  firing path the task converts is DORMANT on this base.
+  `evaluateFiringConditions` (adaptation/firing.ts) and
+  `buildScriptAlignmentRows` (survey/Prefill.tsx) have no live caller
+  (tests only), and the `AdaptationEvidenceProvider` seam's live
+  implementation does not exist ("The live implementation (follow-up
+  feature) reads the committed facet index; tests and the current studio
+  inject a mock" — adaptation/evidence.ts). There is no live prefill
+  write path for sa1/sa2/sa3 to convert, and no evidence source an
+  extract could read at setup. Building the evidence pipeline is the
+  follow-up feature the seam names, not a 092 conversion. T034 is left
+  unlanded; `Prefill.tsx`'s live rows (buildPrefillRows) are untouched.
+- **G-11 (T035 disposition):** on the landed base, 090 already converted
+  the characters step to the decision shape: `phaseBDraftStore` is gone,
+  `CharactersStep.confirmPrefill` is no longer a seeding write path — it
+  is spec 079 US3's carry-over over the decision record
+  (`getCharacterInventoryValue` reads the record), and the pass runs
+  `characterInventory`'s extract at setup, seeding that record. The
+  task's carry-over clause ("kept, with `offered` beside") is the pass's
+  merge rule, implemented and tested (T011/T030). T035 is therefore
+  satisfied by the predecessor's conversion plus the pass; no code
+  change, and `confirmPrefill` is NOT deleted (deleting it would break
+  spec 079's carry-over behaviour and its tests).
+
+- **G-12 (T033 partial — declarations landed, IdentityLite write path
+  remains):** the five il_* lookup defaults are declared on their modules
+  (values/sources mirror `IdentityLite`'s seeders exactly, including the
+  deliberate exclusions — no profile name → absent, never the login
+  handle; `il_copyright_holder` not seeded there), `ExtractContext`
+  carries the `identity` lookup inputs, and `SurveyRunner` renders the
+  shared langtags caption from a `default`/`langtags` record. What is
+  NOT done: deleting `IdentityLite.tsx`'s seed refs and its
+  `getSeedValue`/`getSeedProvenance`/`getSeedSource` props, and the
+  ask-time evaluation that would feed the declarations (evaluate in the
+  resolution effect, seed-if-absent via `peekDecision`, so restored
+  asked records are never offered a lookup default). That surgery
+  touches the identity surface's timing (resolution effects, restore
+  interplay, the PhaseA/IdentityLite test suites) and was not landed
+  sight-unseen in this pass; the declarations are unit-pinned so the
+  remaining wiring is mechanical. The lead may schedule it as a
+  follow-up on this branch or fold it into the 091 restack work.
+  **LANDED (restack pass, 2026-10-07, commit 82f23aba):** the ask-time
+  evaluation is wired in IdentityLite — every resolution (profile
+  known, entry resolved, Q1 committed, region variant chosen, entry
+  cleared) re-evaluates the five declarations against the accumulated
+  `IdentityLookupInputs` and records each result as a `default`
+  decision record (seed-if-absent / replace-own-seed / never touch an
+  author-shaped record, so a restored asked record is neither
+  overwritten nor offered a lookup default); a re-resolution forgets
+  the superseded entry's `default` records first. SurveyRunner's
+  record-first seeding (T031) renders the records identically to the
+  host props, so IdentityLite's `getSeedValue` / `getSeedProvenance` /
+  `getSeedSource` props and the seed refs behind them are DELETED.
+  All ten IdentityLite / runner / StepHost identity suites green.
+
+- **G-13 (T050 satisfied by position + T013, no move needed):**
+  `recordBaseContribution` is invoked from `createDecisionRecorder`'s
+  completion callback, which `StepHost` calls AFTER `applyStepCompletion`
+  by construction — its inputs are read from the instantiated store at
+  that point, and with the T013 setup gate the first instantiation
+  happens only once the track decision exists, so the live path writes
+  the entry with non-null inputs and the correct mode (pinned for both
+  tracks by T051's tests). The function's no-entry-when-uninstantiated
+  behaviour (spec 055 FR-030 / research D-11: no entry, never a
+  fabricated zero) is deliberate and stays. T040/T041 likewise reduced
+  to verification + retiring the stale hazard comment: `doCommit`'s
+  track read is the recorded decision (never the session's mutable
+  state), the gated effect is its only live caller, and the restore
+  pre-seed guard stays as written.
+
+- **G-14 (restack pass, 2026-10-07 — the G-8 boundary ruling's premise
+  is FALSIFIED for group-member modules by 091's landing; STOPPED for a
+  lead ruling):** the restack merge itself landed clean
+  (`46e1dffe`, origin/km/derived-steps @ ed8f12fd, zero conflicts). The
+  ruled conversion (il_copyright_holder's `authoring-track` edge:
+  module `requires` → `screenRequires`) was then tested by ablation
+  before being committed, and it does NOT heal the full-list consumer
+  on the completed stack. Evidence (scratch ablations, all reverted):
+  (1) with the edge in `requires` (current tree), the raw per-flow sort
+  throws `unresolved decision: "authoring-track" required by
+  "il_copyright_holder"` (G-8's named item), AND `deriveScreens` over
+  the live registry returns 18 screens with the `identity` group SPLIT
+  (il_copyright_holder dragged after `track` by the edge), so
+  `steps/manifest.ts` throws at module load ("18 steps declared but 19
+  screens derived") — stepOrder.parity and sc002 fail at COLLECTION and
+  the live manifest is unloadable. (2) With the edge as
+  `screenRequires`, the per-flow sort heals (copyright last in flow),
+  but deriveScreens STILL returns the split 18: 091's Phase-4 final
+  design folds `screenRequires` back into deriveScreens' module-level
+  sort, which is exactly right for singleton-screen modules
+  (track_choice, project_display_name — 091's cases) and exactly wrong
+  for a group member: the folded edge reorders the one module out of
+  its group. (3) With the edge dropped entirely, deriveScreens returns
+  17 screens = 091's frozen baseline (identity whole, 9 members),
+  the manifest loads, and orderParity + sc002 pass 17/17. A further
+  wrinkle either way: the pass's `snapshotInputs` reads `m.requires`,
+  so moving or dropping the edge removes `authoring-track` from the
+  seeded copyright record's `inputs` snapshot (T012's recorded
+  behaviour) unless the snapshot's declaration channel is extended.
+  Semantic note: `screenRequires: ["authoring-track"]` on this module
+  would assert "the identity screen is placed after the track screen",
+  which the frozen baseline itself contradicts (identity sorts first);
+  the track dependency is a run-time data dependency, already consumed
+  by `seedWhen`, the T013 setup gate (track recorded before the pass
+  runs), and the pass's inputs snapshot — it was never a screen-order
+  fact. Options put to the lead: (A) drop the edge (ablation-proven;
+  snapshot loses authoring-track); (A2) drop the edge + snapshotInputs
+  reads `requires` ∪ the module's `inputs` declaration (set
+  `inputs: ["authoring-track"]` on the module) — keeps T012's snapshot
+  byte-identical, small mechanism change inside liveExtraction.ts,
+  RECOMMENDED by this pass; (B) keep the conversion and re-engineer
+  deriveScreens to apply screenRequires at screen granularity —
+  rewrites 091's landed core sort inside 092's pass, not recommended;
+  (C) convert + move the whole identity screen — contradicts the
+  frozen baseline and the protected parity test, rejected. The rest
+  of the restack pass (T023, acceptance re-run, G-12 remainder, T037,
+  gates, PR) is NOT executed on a tree whose manifest throws at load;
+  it resumes on the ruling.
+- **G-14 RULING (lead, 2026-10-07): option (A2) — drop the ordering
+  edge, keep the dependency's information.** The authoring-track
+  dependency is a run-time DATA dependency — already consumed by
+  `seedWhen`, the T013 setup gate, and the inputs snapshot. It was
+  never a screen-order fact (091's frozen baseline sorts identity
+  first, contradicting the screen-order reading), and 091's landed
+  deriveScreens folds screenRequires into the module-level sort, so
+  the previously ruled conversion splits the identity screen and
+  leaves steps/manifest.ts unloadable. The original ruling's intent —
+  the dependency must not be silently lost — is satisfied by A2: the
+  information lives in the three channels that mean what it means;
+  only the ordering channel, where it is false, loses it.
+  **Landed:** `il_copyright_holder.requires` is back to
+  `["author-name"]`; the track dependency is declared on the new
+  `QuestionModule.snapshotInputs` channel (`["authoring-track"]`) —
+  a dedicated DecisionId-space field, because the module's existing
+  `inputs` field is `IRPath[]` over the KeyboardIR address space and
+  cannot carry a DecisionId (the ruling's "inputs declaration" is
+  this channel; the name records what it feeds). The pass's
+  `snapshotInputs` now reads `requires` ∪ `snapshotInputs`
+  (requires first), so the seeded copyright record's `inputs`
+  snapshot is byte-identical to T012's recorded behaviour
+  (`{author-name, authoring-track}`), re-pinned in
+  liveExtraction.test.ts. Verified on the restacked tree:
+  orderParity + sc002 + deriveScreens + manifest + stepOrder.parity
+  + StepHost.derivedScreens + gateWalkParity all green (full-list
+  deriveScreens yields the frozen 17 screens, identity whole,
+  manifest loads). **Precedent flagged for 093:** decision records'
+  `inputs` snapshots may name decisions sourced from a module's
+  `snapshotInputs` declaration, not only `requires`.
+
+- **G-15 (restack pass, 2026-10-07 — T037's premise is falsified by
+  090's LANDED carve shape; closed as satisfied-by-landed-shape, the
+  G-11/T035 pattern, NO code change):** T037 imagined the bulk-default
+  pre-fill as a starting-point seed the pass could own: write per-item
+  `derived` entries into the `carved-layout` value and delete the
+  `workingCopyStore` action + the `CarveGalleryV2` effect that call
+  it. On the landed shape every element of that picture is otherwise:
+  (1) The per-item entries already exist in the decision value —
+  `CarvedLayoutValue.dispositions` rides the overlay's
+  `CarveDisposition[]` verbatim (comboId + disposition + the
+  contracts type's own spec-076 per-item provenance, incl.
+  `bulk-default`), snapshotted by `currentCarvedLayoutValue()` and
+  recorded decisionId-keyed by the CarveAdapter at completion
+  (`carved-layout` ← the landed recording shape). The one vocabulary
+  difference from T037's text: the per-item provenance is spec-076's
+  (`bulk-default` / `author-override` / `deadkey-requirement`), not
+  the decision-provenance `derived` — deliberate per carveValue.ts
+  (research R8), since dispositions predate the decision record.
+  (2) The action + effect are not a seed write path; they are spec
+  076 FR-022's overlay lifecycle. Their inputs are SESSION-derived —
+  `recommendedComboIds` from the gallery's carve analysis of the
+  current IR, deadkey combos scanned from the current IR, the
+  closed-keyboard card answer — none of which exist at setup, so the
+  extraction pass (setup-time, starting-point bundle) cannot compute
+  them; and the lifecycle continues all session (new combos take the
+  current bulk default; prune on un-carve; read on every recompile).
+  The never-over-a-combo-with-a-disposition rule T037 demands is
+  implemented inside the action itself. (3) Deleting them would
+  delete FR-022's bulk-default behaviour, not convert a seeder — and
+  would contradict the lead-ratified record-from-working-copy design
+  for editor-backed steps (D-090-31): the overlay stays canonical,
+  the decision value snapshots it at completion, and 093's carve
+  fold reconstructs the overlay from that value. T037 is therefore
+  closed with its intent met by the landed architecture: the
+  bulk-default pre-fill IS per-item entries in the carved-layout
+  decision value, recorded with its value, never over an existing
+  disposition.
+
+- **G-16 (restack pass gate accounting, 2026-10-07):** full studio
+  suite, run in bounded batches on a contended 2-vCPU box (a VM
+  reboot mid-pass cleared the other crews; batches that appeared to
+  stall were batch-mates of one spinning file, identified by
+  bisection). **508 of 511 test files verdicted; 8 failed tests,
+  exactly the named budget:** the 4 local-corpus SC-004 failures
+  (`basic_kbdru` + `arabic_izza` in successCriteria.sc004.test.ts
+  and successCriteria.sc004.kmp.test.ts — the absent-local-corpus
+  set) and 4 in the spec-079 carry-over step files
+  (InvisiblesStep.test.tsx ×3 — two writing-direction/bidi tests +
+  the phase-C answer-slot D-4/R-08 test; PunctuationStep.test.tsx
+  ×1 — the same D-4/R-08 slot test). Everything else green,
+  including the StepHost golden walk (byte-identical, both tracks —
+  the T002 fixture delta is fully reconciled by the cascade) and
+  all 13 liveExtraction + StepHost acceptance tests. **Three files
+  do not terminate on this stack** and are excluded above:
+  PhaseFAdaptiveDescription.integration.test.tsx,
+  PhaseFContactSeed.integration.test.tsx (both re-checked
+  immediately after the G-14/A2 fix, repeatedly, solo, 200–420 s —
+  zero tests complete; 093's expected cure did NOT arrive with the
+  edge drop), and **panelAdapters.test.tsx** (bisected as the file
+  poisoning every batch that contained it; solo kills at 150 s /
+  240 s / 300 s, the last on a quiet box; A/B-verified NOT a
+  restack-pass regression — it spins identically with the pre-pass
+  IdentityLite at 96d046d0, and 093 verdicted it on the pre-restack
+  tree, so it arrived with the completed stack, upstream of 092).
+  The three files' mechanism is one named family for the lead /
+  093's final pass: drivers that walk a live flow through the real
+  runner on the completed stack spin instead of completing.
+  tsc clean; eslint 0 errors on touched files; depcruise 0 new
+  violations (the cruised closure's 4 are pre-existing: 2×
+  decisions-layer on liveExtraction's landed wiring halves —
+  covered by the lead's exemption ruling for 093's final pass —
+  and 2× upstream Phase-F bypass).
+
+- **G-17 (post-restack fix lane, 2026-10-08 — the Phase-F bypass pair
+  dispositioned: REFACTOR onto the wiring-computed pattern, no
+  exemption).** CI's build job fails on this branch (and on 093's
+  above it, where the wiring halves are already exempted) at Lint →
+  depcruise with the pair G-16 counted as pre-existing:
+  `question-modules-no-bypass-mutate-seam` on
+  `survey/questions/f/pf_provenance_basis.ts → lib/phaseFSeeds.ts`
+  and the same for `pf_project_url.ts`. Precision on origin: the
+  edges are 092's own — introduced by the T036 conversion
+  (bf08959a), absent at 091's head; "upstream" in G-16 meant
+  "before the restack pass", not another spec's work. 093's final
+  pass flagged the pair and deliberately did not self-exempt
+  (outside its ruling's named set); disposition was assigned to
+  this lane WITH a decision. Evidence: (1) `lib/phaseFSeeds.ts` is
+  pure — string/VFS reads over a plain-data context, imports only
+  contracts types + `lib/vfsText.ts` (itself a 15-line pure
+  reader); it writes nothing and touches no store, so the rule's
+  stated fear (a second IR write path re-opening the
+  answer-store-vs-IR fork) is not engaged. (2) But purity is not
+  the whole architecture: `PhaseFSeedInputs`' own record states
+  the Phase F pattern — derivations are computed by the WIRING and
+  read off the context, because question modules stay import-light
+  (the standalone content-i18n extractor loads them). The welcome
+  prefill and the pf_contact_info / pf_doc_language values
+  (`welcomePrefill`, `authorContact`, `bcp47Tag`) all follow it;
+  the two seed proposals were the family's only self-computing
+  members, calling lib derivations from inside `extract`. (3) The
+  sanctioned channel therefore already exists in the same
+  interface: the wiring (`runLiveExtractionFromStores`) builds the
+  seed context from the working-copy store — the store-adjacent
+  layer by design — and already imports lib derivations
+  (adaptiveDescription's prefill). Decision: the wiring computes
+  `proposeProjectUrl` / `proposeProvenanceBasis` and hands the
+  strings in as `ctx.phaseF.projectUrlProposal` /
+  `provenanceBasisProposal`; the modules' extracts return them
+  verbatim; `PhaseFSeedInputs.seeds` is retired (its only
+  consumers were the two modules). No config change, no exemption:
+  the violation is removed by construction, and the exemption
+  route remains available for a future derivation that genuinely
+  cannot be wiring-computed. Behavioural equivalence: the same
+  pure functions over the same three store slices, computed once
+  at the same single wiring site per instantiation instead of
+  per-extract; absent `phaseF` still yields absent. Pinned by
+  lib/phaseFSeeds.test.ts (functions untouched) and the StepHost
+  acceptance suite (seeding through the real wiring).
+  **Verified (fix lane, 2026-10-08):** the refactor landed as
+  `d5b0dccd` (rebased over Matthew's ci.yml decoupling commit
+  5ad0e14a, which had advanced the branch past the briefed head).
+  Depcruise in CI form (all packages, 1445 modules): 4 → **2**
+  violations; the pf pair is gone and the remainder is exactly the
+  pre-existing decisions-layer pair on liveExtraction's wiring
+  halves (→ workingCopyStore, → decisionStore) — the lead-ruled
+  exemption set already applied on 093's branch, untouched here.
+  Dependency count reconciles (4204 → 4203 studio-local: two edges
+  removed, one legal decisions→lib edge added). Studio tsc clean.
+  Suites: phaseFSeeds 8/8, liveExtraction 13/13, StepHost acceptance
+  4/4, orderParity 12/12, phaseFDemotion 5/5, questionModules +
+  registry 814/814. The two Phase F integration files were run
+  solo under a 150 s hard cap: both killed at the cap with zero
+  completions — the spin persists on THIS branch, as expected:
+  its cure is 093's extraction-idempotence fix (040d8592), which
+  is not on this branch and arrives with the same merge that
+  carries this fix up.
+
+## Implementation outcome (Phase 7, T060–T063)
+
+- **SC-001 (FR-005):** the one-line `requires` edit + both-tracks
+  acceptance walk are landed; the walk is CI-gated (sandbox Chromium
+  cannot navigate localhost). Store-level: T030 proves the seeding,
+  offered, copy-track, and no-source behaviours against the real stores.
+  Caveat G-8 (CLOSED by the restack pass): the interim cross-flow
+  ordering throw is resolved by the G-14/A2 ruling — the edge left
+  the ordering graph for the `snapshotInputs` channel; the manifest
+  loads, the frozen 17 screens derive with identity whole, and the
+  both-tracks StepHost acceptance re-run is green (T023). The walk's
+  live verdict rides this spec's PR CI.
+- **SC-002 (seed mechanisms):** after this spec, live seed VALUES are
+  computed by exactly one engine — the extraction pass — for: the
+  copyright holder (extract), all seven Phase F entries (extracts +
+  lookup defaults), and every module declaring extract/lookupDefault.
+  Remaining non-pass seed surfaces, honestly counted: (1) the
+  SurveyRunner host-proposal channel remains as the fallback for
+  flows this spec did not convert (gallery/mechanism steps are 090's
+  decision modules with their own proposal path). The former second
+  remainder — `IdentityLite`'s render-time langtags/profile seeders —
+  is CLOSED by the restack pass (G-12 landed): the ask-time
+  evaluation records the declared lookup defaults as decision
+  records and IdentityLite's seed write path is deleted, so every
+  seed value on every surface this spec owns is computed by exactly
+  one mechanism — a module declaration, evaluated by the pass at
+  setup or by the identity resolution at ask time.
+- **SC-003 (write paths deleted):** the PHASE_F_SEEDS table is deleted
+  (remaining mentions are comments recording its removal);
+  `prefillCarveDispositions` still exists BY DESIGN — G-15: on 090's
+  landed shape it is spec-076 FR-022's overlay lifecycle, not a seed
+  write path, and its output already lands per-item in the
+  carved-layout decision value (T037 closed satisfied-by-landed-
+  shape); the Phase B seeding write (`seedPhaseBFromPrefill`) was
+  already deleted by 090 and the character-inventory decision is
+  pass-seeded (T035/G-11); IdentityLite's seed write path is DELETED
+  (restack pass, G-12 landed).
+- **SC-004:** the walk's adapt leg runs from track choice to prefill
+  confirmation with no reload (T042); the mode is asserted at store
+  level (T051).
+- **SC-005:** `recordBaseContribution` writes with non-null inputs and
+  the track-correct mode on the live path (G-13, T051 both tracks).
+- **Golden walk:** unchanged from the characterised baseline delta
+  (decisionMutations-only fixture staleness owned by 089/090; no
+  store/navigation/content deltas introduced by this branch).
+
+**T002 baseline (pre-change, this base):** the Playwright golden walk is
+CI-gated per the owner's ruling (sandbox Chromium cannot navigate localhost).
+The store-level StepHost golden walk (`tests/steps/stepHost.goldenWalk.test.tsx`,
+2 tests) is **red on this base with a characterised, decisionMutations-only
+delta**: in both tracks, ~4 entries whose committed fixtures say
+`decisionMutations: []` actually record 1–2 `"record"` mutations (plus added
+`"record"` entries in existing lists); zero store-mutation, navigation, or
+content deltas. This is predecessor-cascade fixture staleness (the unified
+spy harness from 089's restack vs fixtures regenerated on parallel branches),
+not a 092 effect — no 092 code existed when measured. The fixtures are NOT
+regenerated on this branch (the oracle belongs to 089/090 and its
+reconciliation rides their restack); per-phase, this suite is re-run and any
+delta beyond the characterised shape is a stop-and-report. Also pre-existing
+on this base (verified by stash-and-rerun at Phase 2):
+`tests/steps/stepHost.renderSmoke.test.tsx` fails 2 `touch_seed_source`
+render assertions (24 passed) — a 090-era stub/manifest drift, untouched by
+092's changes and left for the predecessors' reconciliation.

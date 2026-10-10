@@ -1,17 +1,18 @@
-// Per-question module: il_copyright_holder (identity-lite, spec 064 US1)
+// Per-question module: il_copyright_holder (attribution flow — spec 064 US1, moved post-track by #1901)
 //
 // See il_author_name.ts for why identity-lite uses its own ids rather than
 // reviving the demoted phase_a modules directly.
 //
-// TERMINAL for identity-lite (`next: null`), whereas the demoted
+// TERMINAL for the attribution flow (`next: null`), whereas the demoted
 // pa_copyright_holder continues to provenance_opt_in. That divergence is exactly
 // why a separate id is needed.
 //
 // NOT required: per D1 the holder defaults to the author name when left blank,
 // so an author who is also the rights holder confirms one field instead of two.
 
-import type { QuestionModule } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
 import type { ExtractContext } from "../../../decisions/extractContext.ts";
+import { deriveAttribution } from "../../../decisions/identitySelectors.ts";
 import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 
 // help_text extends the demoted module's rather than replacing it (HANDOFF-CONTENT
@@ -96,14 +97,47 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
+/**
+ * Decision apply (spec 089 T011): the identity step's attribution lands on
+ * the working copy from the recorded decisions — `extractAttribution`'s
+ * rule composed over `ctx.decisions` by `deriveAttribution` (holder
+ * defaults to the author name, D1). No author name recorded ⇒ no channel:
+ * the working copy's attribution stays exactly as it was. This replaces
+ * IdentityLiteAdapter's completion-time `setAttribution` write.
+ */
+export function apply(_value: string | string[] | undefined, ctx: ApplyContext): WorkingCopyPatch {
+  const attribution = deriveAttribution(ctx.decisions);
+  return attribution === null ? {} : { attribution };
+}
+
 const mod: QuestionModule = {
   definition,
   fixtures,
+  apply,
   inputs: [],
   writes: [],
   // Decision spike (km/decisions-spike).
   provides: ["copyright-holder"],
+  // Spec 092 FR-005 (the series acceptance test): the holder defaults to
+  // the author, so the author-name decision is a true ordering
+  // requirement. The authoring-track dependency is NOT one (G-14, lead
+  // ruling A2): it is a run-time DATA dependency — the track decides what
+  // the starting point's copyright may do here (seed on adapt, never
+  // offered on copy) — consumed by `seedWhen` below, by the setup gate
+  // (the track is recorded before the pass runs), and by the seeded
+  // record's `inputs` snapshot via `snapshotInputs`. As a `requires`
+  // edge it was false: 091's frozen baseline sorts identity first, and
+  // the edge dragged this module out of its screen group.
   requires: ["author-name"],
+  snapshotInputs: ["authoring-track"],
   extract: extractCopyrightHolder,
+  // Spec 092 T022: the track-dependent seeding disposition, declared here
+  // rather than special-cased in the pass. Adapt: the extracted notice
+  // seeds the question (pre-filled, labelled with its source). Copy: NO
+  // seed and NO `offered` — the copied keyboard's notice is retained by
+  // the attribution machinery (D1 leaves the holder defaulting to the
+  // author), and offering it for re-entry is the D4 duplicate-holder
+  // hazard this module's help text exists to prevent.
+  seedWhen: (decisions) => decisions["authoring-track"]?.value === "adapt",
 };
 export default mod;

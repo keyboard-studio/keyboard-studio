@@ -30,13 +30,15 @@ events:
   - { stepId: identity, questionId: il_language_english, value: "Hausa" }
   - { stepId: identity, questionId: il_language_autonym, value: "Hausa" }
   - { stepId: identity, questionId: il_target_script, value: "Latn" }
-  - { stepId: identity, questionId: il_author_name, value: "Studio Author" }
 
   # --- choose_base (Track 1: copy from basic_kbdus) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
 
   # --- track (copy) ---
   - { stepId: track, questionId: track_choice, value: "copy" }
+
+  # --- attribution (attribution flow, #1901: asked after the track choice) ---
+  - { stepId: attribution, questionId: il_author_name, value: "Studio Author" }
 
   # --- project_name (copy-track only) ---
   - { stepId: project_name, questionId: project_display_name, value: "Hausa (QWERTY)" }

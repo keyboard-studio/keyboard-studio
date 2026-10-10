@@ -8,7 +8,9 @@ import { loadLangtags } from "../lib/langtagsDefaults.ts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
 import { questionRegistry } from "../survey/questions/registry.ts";
-import pbCharacterInventory from "../survey/questions/b/pb_character_inventory.ts";
+import characterInventoryModule from "../survey/questions/gallery/characterInventory.ts";
+import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
+import type { QuestionModule } from "../survey/types.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
 import { buildExtractContext } from "./extractContext.ts";
 import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
@@ -100,9 +102,27 @@ const IDENTITY_MODULES = [
 });
 
 // SC-001 covers identity/script/character questions. The character inventory
-// (pb_character_inventory) extracts from the IR's produced set — including it
-// reflects the real pre-fill surface.
-const SC001_MODULES = [...IDENTITY_MODULES, pbCharacterInventory];
+// (the gallery characterInventory module — the retired pb_character_inventory
+// spike's extract, folded in by spec 090 T021) extracts from the IR's produced
+// set — including it reflects the real pre-fill surface.
+const SC001_MODULES = [...IDENTITY_MODULES, characterInventoryModule as unknown as QuestionModule];
+
+// The character-inventory module declares requires (its step's declared
+// requires — the spec 090 FR-002 parity): authoring-track,
+// project-keyboard-id (which itself requires project-display-name).
+// runDecisionFlow orders by requires and throws when one is unprovided,
+// so the flow includes the providers — but they are NOT part of SC-001's
+// measured set and must not enter the rate's denominator.
+const REQUIRES_CLOSURE = ["track_choice", "project_keyboard_id", "project_display_name"].map(
+  (id) => {
+    const mod = questionRegistry[id];
+    if (!mod) throw new Error(`question "${id}" not in registry`);
+    return mod;
+  },
+);
+const SC001_FLOW_MODULES = [...SC001_MODULES, ...REQUIRES_CLOSURE];
+/** The decision ids SC-001 measures (the measured modules' provides). */
+const SC001_MEASURED_IDS = SC001_MODULES.flatMap((m) => [...(m.provides ?? [])]);
 
 describe("SC-001: pre-fill on 5 real keyboards", () => {
   // language-name resolves through the lazily-loaded langtags dataset, which
@@ -122,7 +142,7 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
     for (const kb of KEYBOARDS) {
       const { ir, catalog } = loadKeyboard(kb);
       const decisions = runDecisionFlow({
-        modules: SC001_MODULES,
+        modules: SC001_FLOW_MODULES,
         context: buildExtractContext(ir, catalog),
       });
 
@@ -142,8 +162,11 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
 
       const inventory = decisions["character-inventory"];
       expect(inventory?.provenance).toBe("extracted");
-      expect(Array.isArray(inventory?.value)).toBe(true);
-      expect((inventory?.value as unknown[]).length).toBeGreaterThan(0);
+      // The gallery module's extract yields a whole inventory value
+      // (spec 090 T021); its chars are the produced set.
+      const inventoryChars = (inventory?.value as CharacterInventoryValue | undefined)?.chars;
+      expect(Array.isArray(inventoryChars)).toBe(true);
+      expect((inventoryChars ?? []).length).toBeGreaterThan(0);
       expect(inventory?.source).toContain(kb.id);
 
       // Hand-checked English name of the primary tag (en/ru/de/ar).
@@ -164,11 +187,12 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
     for (const kb of KEYBOARDS) {
       const { ir, catalog } = loadKeyboard(kb);
       const decisions = runDecisionFlow({
-        modules: SC001_MODULES,
+        modules: SC001_FLOW_MODULES,
         context: buildExtractContext(ir, catalog),
       });
 
-      for (const decision of Object.values(decisions)) {
+      for (const id of SC001_MEASURED_IDS) {
+        const decision = decisions[id as keyof typeof decisions];
         totalDecisions++;
         if (decision?.provenance === "extracted") {
           prefilledDecisions++;
@@ -202,7 +226,8 @@ describe("SC-003: zero ordering artifacts + parity", () => {
   it("derived order matches the legacy order (parity)", () => {
     const flow = loadFlowSourceDef(flowSources["identity_lite"]!);
     const ids = flow.questions.map((q) => q.id);
-    // The frozen legacy order (from the deleted YAML).
+    // The frozen legacy order (from the deleted YAML), as amended by
+    // #1901: the author/copyright tail moved to the attribution flow.
     expect(ids).toEqual([
       "il_language_english",
       "il_language_region",
@@ -210,6 +235,11 @@ describe("SC-003: zero ordering artifacts + parity", () => {
       "il_language_code",
       "il_target_script",
       "il_script_not_supported",
+    ]);
+    // The moved questions keep their legacy relative order in their new
+    // flow (#1901).
+    const attribution = loadFlowSourceDef(flowSources["attribution"]!);
+    expect(attribution.questions.map((q) => q.id)).toEqual([
       "il_author_name",
       "il_author_email",
       "il_copyright_holder",

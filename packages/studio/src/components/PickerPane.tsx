@@ -28,12 +28,13 @@
 //       working copy was actually created (it showed "Open base" even for a
 //       Track 1 scaffold) — a mode INPUT sitting where an author reads a state
 //       DISPLAY.
-//     - selecting a different base re-instantiates and discards carve
-//       deletions plus recorded survey phases, behind nothing but a native
-//       window.confirm. That is a start-over action; it does not belong on the
-//       screen whose job is to emit. `changeBaseSlot` relocates it to the
-//       survey's choose_base step, where the preview-before-commit gate and
-//       confirmRebaseTo already live.
+//     - selecting a different base re-instantiates the working copy under
+//       the new base, behind nothing but a native window.confirm. That is a
+//       consequential action (spec 093 T017: the decision set is retained
+//       and recalculated against the new base — but the copy is rebuilt);
+//       it does not belong on the screen whose job is to emit.
+//       `changeBaseSlot` relocates it to the survey's choose_base step,
+//       where the preview-before-commit gate and confirmRebaseTo already live.
 //   The base is shown instead as read-only provenance.
 //
 // Both variants render `identityPanelSlot` and `kmnEditorSlot` at the SAME

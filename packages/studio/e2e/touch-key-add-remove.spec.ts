@@ -79,6 +79,7 @@ import {
   driveIdentityLite as driveIdentityLiteBase,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   seedReturningVisitor,
@@ -382,6 +383,7 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 063 SC-006)"
     await driveIdentityLite(page);
     await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, PLACED_CHAR);
     await skipCarve(page);

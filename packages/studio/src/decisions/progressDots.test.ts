@@ -24,7 +24,7 @@ import { I18n } from "@lingui/core";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import type { DecisionEntry, DecisionRecord } from "@keyboard-studio/contracts";
 import { PRE_IDENTITY_STEP_ID } from "@keyboard-studio/contracts";
-import { manifest } from "../steps/manifest.ts";
+import { manifest, screenGates } from "../steps/manifest.ts";
 import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { ResolveContext } from "../lib/resolveLocation.ts";
 import type { WorkItem } from "../steps/workToDo.ts";
@@ -54,18 +54,36 @@ const REGISTRY = {
   some_optional_question: {},
 };
 
+function decisionsForTrack(track: "copy" | "adapt" | null | undefined): ResolveContext["decisions"] {
+  // Spec 088: gates read the decision set; the fixture's track lives there.
+  return track === null || track === undefined
+    ? {}
+    : { "authoring-track": { id: "authoring-track" as const, value: track, provenance: "asked" as const } };
+}
+
 function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
-  return {
+  const base: ResolveContext = {
     manifest,
+    // Spec 091 T015: the derived screen gates, as liveResolveContext passes.
+    screenGates,
     questionRegistry: REGISTRY,
     traversal: traversal({
       activeStepId: "characters",
       history: ["identity", "layout", "choose_base", "track"],
       selectedTrack: "adapt",
     }),
+    decisions: decisionsForTrack("adapt"),
     hasProject: true,
-    ...overrides,
   };
+  const merged = { ...base, ...overrides };
+  // A test overriding only the traversal still means its track: re-derive
+  // the gate set from the merged traversal unless decisions were overridden.
+  if (overrides.decisions === undefined && overrides.traversal !== undefined) {
+    merged.decisions = decisionsForTrack(
+      (overrides.traversal as { selectedTrack?: "copy" | "adapt" | null }).selectedTrack,
+    );
+  }
+  return merged;
 }
 
 function answerEntry(
@@ -198,7 +216,21 @@ describe("section marks — one per non-active manifest step", () => {
   });
 
   it("every manifest step up to and including 'help' earns exactly one mark on this author's path", () => {
-    const dots = buildProgressDots({ record: recordOf([]), ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    // #1901: the author's history runs through the attribution step
+    // (track -> attribution -> characters on this adapt path) — a
+    // traversal that reached characters without it can no longer occur,
+    // and a behind-active step absent from history reads as not-on-path.
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({
+        traversal: traversal({
+          activeStepId: "characters",
+          history: ["identity", "layout", "choose_base", "track", "attribution"],
+          selectedTrack: "adapt",
+        }),
+      }),
+      lookupQuestionLabel: stubLabel,
+    });
     // "adapt" skips project_name (FR-049a) — every OTHER on-path step has a mark.
     const onPathIds = manifest
       .filter((s) => s.id !== "project_name" && s.id !== "package")

@@ -34,7 +34,7 @@
 // The gates are skipped locally (visibly) when ../keyboards is absent; in CI an
 // absent corpus fails the presence test below.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { renderHook } from "@testing-library/react";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { parseKmn, runAllChecks } from "@keyboard-studio/engine";
@@ -61,12 +61,8 @@ describe.skipIf(!sc004GatesEnabled)("SC-004: a completed adapt flow passes the s
   });
 
   beforeEach(() => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
     useWorkingCopyStore.getState().reset();
     useSurveySessionStore.getState().reset();
-  });
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it.each(KEYBOARDS.map((k) => [k.id, k] as const))(

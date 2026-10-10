@@ -1,6 +1,8 @@
-// recordMigration — pure read-time normalization of a pre-feature (v1)
-// decision record (specs/055-legible-decision-trail research D-01, contract
-// §5, SC-011).
+// recordMigration — pure read-time normalization of a decision record
+// written by an older build (specs/055-legible-decision-trail research D-01,
+// contract §5, SC-011; the v2 -> v3 stage is spec 090 US5, D-090-48).
+// Normalization is staged by the record's own version — see
+// `normalizeDecisionRecord` for the stage table.
 //
 // FR-005 makes absence mean "not measured". A record written by the shipped
 // v1 build stores a PRESENT `0` (or any other number) for editor-action
@@ -66,9 +68,11 @@ export interface PreMigrationEntry extends Omit<DecisionEntry, "impact"> {
 }
 
 /**
- * A record as it may be found on disk or in a restored draft: a `version >= 2`
- * record is exactly {@link DecisionRecord}; a `version < 2` record may still
- * carry the pre-055 flat impact shape this module lifts on read.
+ * A record as it may be found on disk or in a restored draft: a
+ * current-version record is exactly {@link DecisionRecord}; a `version === 2`
+ * record's entries are too (the v3 delta is additive — see
+ * {@link normalizeDecisionRecord}); a `version < 2` record may still carry
+ * the pre-055 flat impact shape this module lifts on read.
  */
 export interface PreMigrationDecisionRecord extends Omit<DecisionRecord, "entries"> {
   entries: readonly PreMigrationEntry[];
@@ -131,22 +135,34 @@ function normalizeEntry(entry: PreMigrationEntry): DecisionEntry {
 /**
  * Normalize a record on read.
  *
- * A `version >= 2` record is returned as-is (the same reference — there is
- * nothing to normalize). A `version < 2` record — including one with no
- * `version` at all, which a pre-055 build may not have written — is
- * normalized entry by entry per {@link normalizeEntry}. Never mutates
- * `record` and never writes anything back; the caller decides what to do
- * with the returned value.
+ * Normalization is STAGED by the record's own version, and each stage runs
+ * only over the records it describes:
+ *
+ *   - `version < 2` — including one with no `version` at all, which a pre-055
+ *     build may not have written — is normalized entry by entry per
+ *     {@link normalizeEntry} (the v1 -> v2 transforms: unmeasured editor
+ *     counts to absent, flat impacts lifted into `files`).
+ *   - `version === 2` needs NO entry transform at all: the v3 delta (spec
+ *     090 US5) is a purely additive payload kind a v2 record cannot contain,
+ *     so its entries are already current-shaped. Running the v1 transforms
+ *     over them anyway would strip editor-action counts v2 genuinely
+ *     measured — the FR-005a failure below, one stage up.
+ *   - `version >= DECISION_RECORD_VERSION` is returned as-is (the same
+ *     reference — there is nothing to normalize).
+ *
+ * Never mutates `record` and never writes anything back; the caller decides
+ * what to do with the returned value.
  *
  * THE RETURNED RECORD IS TAGGED `version: DECISION_RECORD_VERSION`, because it
- * is a v2-shaped record: every entry has been through {@link normalizeEntry}.
- * Carrying the input's stale `1` forward would be a lie about the value handed
- * back, and a load-bearing one — a caller that stores the returned record
- * (decisionLogStore's `hydrate`, whose state `draftPersistence` snapshots)
- * would keep the v1 tag for the rest of the session, so the NEXT read would
- * re-run this migration over every entry appended in between and strip the
- * counts those entries genuinely measured. That is FR-005a's "absence must
- * never be fabricated" failure, relocated to the version boundary.
+ * is a current-shaped record: every entry has been through the stages its
+ * version required. Carrying the input's stale tag forward would be a lie
+ * about the value handed back, and a load-bearing one — a caller that stores
+ * the returned record (decisionLogStore's `hydrate`, whose state
+ * `draftPersistence` snapshots) would keep the v1 tag for the rest of the
+ * session, so the NEXT read would re-run this migration over every entry
+ * appended in between and strip the counts those entries genuinely measured.
+ * That is FR-005a's "absence must never be fabricated" failure, relocated to
+ * the version boundary.
  */
 export function normalizeDecisionRecord(record: PreMigrationDecisionRecord): DecisionRecord {
   const version = typeof record.version === "number" ? record.version : 1;
@@ -155,7 +171,10 @@ export function normalizeDecisionRecord(record: PreMigrationDecisionRecord): Dec
     format: record.format,
     version: DECISION_RECORD_VERSION,
     keyboardId: record.keyboardId,
-    entries: record.entries.map(normalizeEntry),
+    entries:
+      version < 2
+        ? record.entries.map(normalizeEntry)
+        : (record.entries as unknown as DecisionEntry[]),
     truncated: record.truncated,
   };
 }

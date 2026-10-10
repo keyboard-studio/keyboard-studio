@@ -5,9 +5,8 @@
 // pipeline's full run() fires onInstantiate on mount for the base the survey
 // already instantiated. onInstantiate used to unconditionally call
 // instantiateFromBaseIfConfirmed, which:
-//   - popped window.confirm("Switching base keyboards will discard your current
-//     edits (carve deletions and survey answers). Continue?") over work already
-//     in the store, and
+//   - popped the rebase-confirm dialog (REBASE_CONFIRM_MESSAGE) over work
+//     already in the store, and
 //   - on confirm, re-ran Track 1 instantiateFromBase against a store that (for a
 //     Track 2 / adapt-existing survey) was in a different mode — a same-id
 //     "genuine switch" that reset phaseResults + irAxes, discarding the survey

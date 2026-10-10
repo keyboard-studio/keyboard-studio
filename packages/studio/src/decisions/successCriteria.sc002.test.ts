@@ -3,8 +3,9 @@
 // named errors (measured by fault injection across the registry)."
 //
 // Registry-wide fault-injection sweep over EVERY derived flow
-// (steps/flowSources.ts) and the wizard step layer (steps/stepDependencies.ts ->
-// steps/stepOrder.ts). Faults per item/edge:
+// (steps/flowSources.ts) and the wizard screen layer (the derived screens
+// of decisions/deriveScreens.ts, ordered via steps/stepOrder.ts). Faults
+// per item/edge:
 //   - removal       : drop a provider another item requires  -> unresolved decision
 //   - duplicate     : a second provider of a provided decision -> duplicate provider
 //   - requires-cycle: close a loop over an existing requires edge -> dependency cycle
@@ -18,7 +19,8 @@ import type { DecisionId } from "./decisionTypes.ts";
 import { orderDecisions } from "./orderDecisions.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { orderSteps } from "../steps/stepOrder.ts";
-import { DECLARED_STEP_IDS, stepDependencies } from "../steps/stepDependencies.ts";
+import { decisionModules, declaredScreenGates } from "../survey/questions/registry.ts";
+import { deriveScreens } from "./deriveScreens.ts";
 
 interface Patch {
   id?: string;
@@ -257,10 +259,29 @@ describe("SC-002: registry-wide fault injection", () => {
   });
 
   it("step layer: every injected fault is a named error", () => {
-    const steps: StepItem[] = DECLARED_STEP_IDS.map((id) => {
-      const d = stepDependencies(id);
-      return { id, provides: d.provides, requires: d.requires };
-    });
+    // The step layer is the derived screens (spec 091): an item per
+    // screen, provides = the screen's member decisions, requires = the
+    // member modules' requires + screenRequires contracted to decisions
+    // outside the screen (a screen requiring its own decision is a
+    // self-edge, not an ordering fact). The terminal package screen is
+    // the pre-091 table's entry carried as a literal: it settles nothing
+    // and requires the help docs.
+    const byModuleId = new Map(decisionModules.map((m) => [m.definition.id, m] as const));
+    const steps: StepItem[] = deriveScreens(decisionModules, declaredScreenGates).map(
+      (screen) => {
+        const own = new Set<DecisionId>(screen.decisionIds);
+        const requires = new Set<DecisionId>();
+        for (const moduleId of screen.moduleIds) {
+          const mod = byModuleId.get(moduleId);
+          if (mod === undefined) continue;
+          for (const r of [...(mod.requires ?? []), ...(mod.screenRequires ?? [])]) {
+            if (!own.has(r)) requires.add(r);
+          }
+        }
+        return { id: screen.id, provides: screen.decisionIds, requires: [...requires] };
+      },
+    );
+    steps.push({ id: "package", provides: [], requires: ["help-docs"] });
     const r = sweep("steps", steps, stepAdapter);
     results.push(r);
     for (const t of Object.values(r)) expect(t.failures, t.failures.join("\n")).toEqual([]);

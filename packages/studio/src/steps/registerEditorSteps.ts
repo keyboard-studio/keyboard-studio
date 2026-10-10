@@ -27,20 +27,20 @@ import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { DeadkeyAdapter } from "../editors/adapters/deadkeyAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
-import { TouchSeedSourcePanel } from "../editors/touchSeedSource/TouchSeedSourcePanel.tsx";
+import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import {
   BaseResolutionAdapter,
   IdentityLiteAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
 import {
   TrackStepFactoryComponent,
+  AttributionStepFactoryComponent,
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
 } from "../editors/adapters/flowStepOptions.tsx";
-import { LayoutStep } from "../survey/layout/LayoutStep.tsx";
+import { LayoutStepHost } from "../survey/layout/LayoutStepHost.tsx";
 import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
 import { rulesStep } from "./rulesStep.ts";
-import { stepDependencies } from "./stepDependencies.ts";
 
 /** Re-exported for the manifest (spec 082 Track A). */
 export { rulesStep };
@@ -74,7 +74,6 @@ function step(
  */
 export const identityStep: EditorStep = step({
   id: "identity",
-  ...stepDependencies("identity"),
   title: "Keyboard Identity",
   component: IdentityLiteAdapter,
   specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
@@ -84,14 +83,14 @@ export const identityStep: EditorStep = step({
 /**
  * Layout step (spec 076 A4): the community-layout question, right after
  * Identity. Proposes a Windows layout from the identity language tag; the
- * author confirms or searches all layouts. Answers persist per question in the
- * answer store; no IR writes.
+ * author confirms or searches all layouts. The pick is the `windows-layout`
+ * decision (spec 090 T011): LayoutStepHost renders the gallery module's
+ * renderer through the gallery host; no IR writes.
  */
 export const layoutStep: EditorStep = step({
   id: "layout",
-  ...stepDependencies("layout"),
   title: "Keyboard Layout",
-  component: LayoutStep,
+  component: LayoutStepHost,
   specRef: ["specs/076-rule-behaviours"],
   persistence: "answer-store",
 });
@@ -106,7 +105,6 @@ export const layoutStep: EditorStep = step({
  */
 export const chooseBaseStep: EditorStep = step({
   id: "choose_base",
-  ...stepDependencies("choose_base"),
   title: "Choose Base Keyboard",
   component: BaseResolutionAdapter,
   specRef: ["§8", "specs/080-documentation-completeness"],
@@ -121,7 +119,6 @@ export const chooseBaseStep: EditorStep = step({
  */
 export const trackStep: EditorStep = step({
   id: "track",
-  ...stepDependencies("track"),
   title: "Authoring Track",
   component: TrackStepFactoryComponent,
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
@@ -130,15 +127,33 @@ export const trackStep: EditorStep = step({
 });
 
 /**
+ * Attribution step: author name / email / copyright holder (#1901).
+ * Asked AFTER the track choice, on both tracks — what the questions
+ * propose is track-shaped (profile confirmation on copy; the base's
+ * copyright holder seeded by the extraction pass on update). The
+ * questions were the identity step's tail until #1901; their decisions
+ * (author-name / author-email / copyright-holder) and the attribution
+ * apply are unchanged — only the placement moved. No IR leaf is written
+ * by the step itself: the attribution lands via the recorded decisions
+ * (il_copyright_holder's apply, StepHost's applyDecisionEffects).
+ */
+export const attributionStep: EditorStep = step({
+  id: "attribution",
+  title: "Author & Copyright",
+  component: AttributionStepFactoryComponent,
+  specRef: ["§8", "specs/064-keyboard-attribution"],
+  persistence: "answer-store",
+});
+
+/**
  * Project name step: ProjectNameStep (copy-track only).
- * Its gatedBy (stepDependencies.ts) makes it a side trail: copy takes it,
- * adapt bypasses it, and both rejoin at the next ungated step.
+ * Its declared screen gate (registry.ts) makes it a side trail: copy
+ * takes it, adapt bypasses it, and both rejoin at the next ungated step.
  * Collects scaffold params displayName + keyboardId — no separate scaffold step.
  * FR-004: header.script is intentionally NOT declared (does not exist in KeyboardIR).
  */
 export const projectNameStep: EditorStep = step({
   id: "project_name",
-  ...stepDependencies("project_name"),
   title: "Project Name",
   component: ProjectNameStepFactoryComponent,
   inputs: [irPath("header", "bcp47")],
@@ -159,7 +174,6 @@ export const projectNameStep: EditorStep = step({
  */
 export const carveStep: EditorStep = step({
   id: "carve",
-  ...stepDependencies("carve"),
   title: "Carve Keys",
   layout: "full",
   component: CarveAdapter,
@@ -181,7 +195,6 @@ export const carveStep: EditorStep = step({
  */
 export const deadkeysStep: EditorStep = step({
   id: "deadkeys",
-  ...stepDependencies("deadkeys"),
   title: "Deadkeys",
   layout: "full",
   component: DeadkeyAdapter,
@@ -192,7 +205,9 @@ export const deadkeysStep: EditorStep = step({
 
 /**
  * Mechanisms step: MechanismGallery (physical key assignment — Phase C).
- * The reducer fires lockDesktop() when this step completes.
+ * On completion AddPhysicalAdapter records the physical-layout decision
+ * and fires the lock + re-propagation effects (lib/assignLoopCompletion
+ * .ts; the reducer's R1 hook retired at spec 090 T041 — D-090-38).
  * Self-read: assigns onto groups[]/stores[] without upstream producer.
  * inputs stays [] to avoid C2 data cycle (FR-002).
  * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).
@@ -203,7 +218,6 @@ export const deadkeysStep: EditorStep = step({
  */
 export const mechanismsStep: EditorStep = step({
   id: "mechanisms",
-  ...stepDependencies("mechanisms"),
   title: "Assign Mechanisms",
   layout: "full",
   component: AddPhysicalAdapter,
@@ -215,9 +229,10 @@ export const mechanismsStep: EditorStep = step({
 
 /**
  * Touch seed source step: side-trail fork for choosing touch surface seed.
- * Gated side trail (stepDependencies.ts); rejoins at the touch carve+add step (FR-013).
- * Renders TouchSeedSourcePanel (T014, spec 035 contracts/seed-source-fork.md) —
- * a bespoke chooser panel, NOT the surface-parameterized carve/add shell, so
+ * Gated side trail (declared screen gate, registry.ts); rejoins at the touch carve+add step (FR-013).
+ * Renders TouchSeedSourceHost (T014, spec 035 contracts/seed-source-fork.md;
+ * the gallery host wrapper since spec 090 T012) — a bespoke chooser panel,
+ * NOT the surface-parameterized carve/add shell, so
  * `surface` is omitted (that field only describes the AddPhysicalAdapter /
  * AddTouchAdapter shell pattern the touch step below still uses).
  *
@@ -233,23 +248,23 @@ export const mechanismsStep: EditorStep = step({
  */
 export const touchSeedSourceStep: EditorStep = step({
   id: "touch_seed_source",
-  ...stepDependencies("touch_seed_source"),
   title: "Touch Seed Source",
   layout: "full",
-  component: TouchSeedSourcePanel,
+  component: TouchSeedSourceHost,
   specRef: "specs/035-mobile-touch-derivation",
   persistence: "working-copy",
 });
 
 /**
  * Touch step: TouchGallery (touch key assignment — Phase E).
- * The reducer fires buildTouchLayoutJson when this step completes.
+ * On completion AddTouchAdapter records the touch-layout decision and
+ * fires the build effects (lib/assignLoopCompletion.ts; the reducer's
+ * R2 hook retired at spec 090 T042 — D-090-38).
  * Seeds from locked physical layout; inputs stays [] to avoid C2 cycle (FR-002).
  * TOUCH_WRITES: touchLayout...keys[] + touchLayout.nodeIds[] (editorMutate.ts).
  */
 export const touchStep: EditorStep = step({
   id: "touch",
-  ...stepDependencies("touch"),
   title: "Touch Layout",
   layout: "full",
   component: AddTouchAdapter,
@@ -280,7 +295,6 @@ export const touchStep: EditorStep = step({
  */
 export const helpStep: EditorStep = step({
   id: "help",
-  ...stepDependencies("help"),
   title: "Help & Tips",
   component: PhaseFGate,
   specRef: ["§8", "specs/061-help-docs-generation", "specs/080-documentation-completeness"],
@@ -293,7 +307,6 @@ export const helpStep: EditorStep = step({
  */
 export const packageStep: EditorStep = step({
   id: "package",
-  ...stepDependencies("package"),
   title: "Package (reserved)",
   component: PhaseFStepFactoryComponent,
   specRef: "§16",
@@ -320,6 +333,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   identityStep,
   chooseBaseStep,
   trackStep,
+  attributionStep,
   projectNameStep,
   carveStep,
   deadkeysStep,

@@ -83,12 +83,16 @@ import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import {
   applyStepCompletion,
   CHOOSE_BASE_STEP_ID,
-  TOUCH_STEP_ID,
   type ReducerDeps,
   type InstantiateResult,
-  type TouchCompleteResult,
 } from "../steps/reducer.ts";
+import {
+  applyPhysicalCompletionEffects,
+  applyTouchCompletionEffects,
+  type TouchCompleteResult,
+} from "../lib/assignLoopCompletion.ts";
 import { useWorkingCopyStore, bindManifest } from "../stores/workingCopyStore.ts";
+import { instantiateFromExistingWithIdentitySeed } from "../lib/confirmRebase.ts";
 import { flowSources } from "../steps/flowSources.ts";
 import { loadFlowSourceDef } from "../steps/flowSources.ts";
 import { evalCondition as _evalCondition, resolveNext, advanceThrough } from "./SurveyRunner.tsx";
@@ -119,6 +123,7 @@ export type { ReplayResult } from "./journeyFixture.ts";
 const STEP_FLOW_IDS: Readonly<Record<string, string>> = {
   identity: "identity_lite",
   track: "track",
+  attribution: "attribution",
   project_name: "project_name",
   characters: "phase_b_characters",
   help: "phase_f_helpdocs",
@@ -439,17 +444,13 @@ function collectEditorActionEvents(
 
 function buildReplayReducerDeps(): ReducerDeps {
   return {
-    lockDesktop: () => useWorkingCopyStore.getState().lockDesktop(),
-    clearStale: (stepId) => useWorkingCopyStore.getState().clearStale(stepId),
-    setTouchLayoutJson: (json) => useWorkingCopyStore.getState().setTouchLayoutJson(json),
     instantiateFromBase: (base, opts) => useWorkingCopyStore.getState().instantiateFromBase(base, opts),
     instantiateFromExisting: (base, opts) =>
-      useWorkingCopyStore.getState().instantiateFromExisting(base, opts),
-    // FR-015: no per-key decomposition — the harness never builds a real
-    // touch layout; this mirrors the R11 emission matrix's own "don't emit"
-    // outcome rather than a build failure.
-    buildTouchLayoutJson: () => ({ json: null, warnings: [] }),
-    resolveBaseTouchJson: () => undefined,
+      // The live dep is the identity-seeded wrapper (the adapt identity must
+      // carry the author's composed tag + language name from the moment of
+      // instantiation); the replay harness wires the same composition so a
+      // replayed adapt journey produces the identity the live walk would.
+      instantiateFromExistingWithIdentitySeed(base, opts),
     instantiateFromBaseIfConfirmed: (base, opts) => {
       // The real dep's declared signature allows a null vfs/ir (the pre-parse
       // state a real base resolution can transiently be in); this harness
@@ -468,7 +469,6 @@ function buildReplayReducerDeps(): ReducerDeps {
     },
     getWorkingIR: () => useWorkingCopyStore.getState().ir,
     setWorkingIR: (ir) => useWorkingCopyStore.getState().setWorkingIR(ir),
-    getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
   };
 }
 
@@ -592,6 +592,18 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "attribution": {
+          // #1901: the author/copyright flow, replayed exactly like the
+          // other survey flows (identity / project_name) — walk the flow
+          // from the fixture's answers and record the phase result.
+          const answers = answerMapFromGroup(group, "attribution");
+          const walked = walkFlowFromAnswers(STEP_FLOW_IDS["attribution"]!, surveyContext, answers);
+          const phaseResult: SurveyPhaseResult = { phase: walked.phase, answers: walked.answers };
+          useWorkingCopyStore.getState().recordPhase(phaseResult);
+          result = phaseResult;
+          break;
+        }
+
         case "project_name": {
           const answers = answerMapFromGroup(group, "project_name");
           const walked = walkFlowFromAnswers(STEP_FLOW_IDS["project_name"]!, surveyContext, answers);
@@ -627,8 +639,8 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
         case "invisibles": {
           // No modular flow and no gallery-action-summary shape for these —
           // see module header. applyStepCompletion("marks", {}, deps) is a
-          // genuine no-op here (an empty payload has no marksWorklist, so
-          // reducer.ts's MARKS_STEP_ID case breaks early), mirroring a
+          // genuine no-op here (spec 090 T023 retired the reducer's marks
+          // case — the guards ride the decision value's apply), mirroring a
           // marks-free alphabet's real auto-skip.
           if (currentStepId === "marks") applyStepCompletion("marks", {}, deps);
           result = undefined;
@@ -767,7 +779,10 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           collectEditorActionEvents(group, "mechanism_edit");
           // FR-015: no per-key decomposition — record an empty assignment set.
           useWorkingCopyStore.getState().recordAssignments([]);
-          applyStepCompletion("mechanisms", undefined, deps); // fires lockDesktop (R1)
+          // Spec 090 T041: R1 (lock + repropagate) re-homed from the
+          // reducer to lib/assignLoopCompletion.ts — the same effects
+          // AddPhysicalAdapter fires on the live path (D-090-38).
+          applyPhysicalCompletionEffects();
           result = undefined;
           break;
         }
@@ -798,7 +813,17 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
             baseVfs: pendingBase?.vfs ?? null,
             seedSource: touchSeedSource,
           };
-          applyStepCompletion(TOUCH_STEP_ID, touchResult, deps); // fires setTouchLayoutJson (R2)
+          // Spec 090 T042: R2 re-homed from the reducer to
+          // lib/assignLoopCompletion.ts — the same effects
+          // AddTouchAdapter fires on the live path (D-090-38),
+          // replacing this harness's former buildTouchLayoutJson
+          // stub (which always returned null json). Replay now
+          // builds what the live path builds for the same inputs:
+          // with assignments [] and the journey's seed choice, the
+          // R11 matrix still emits on the reseed path — the
+          // desktop-derived layout the author would get completing
+          // touch with no edits after choosing reseed.
+          applyTouchCompletionEffects(touchResult);
           result = undefined;
           break;
         }
@@ -818,6 +843,18 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
       }
 
       const outcome = advance(currentStepId as Parameters<typeof advance>[0], result, {
+        // Spec 088 FR-004: gates read a DecisionSet. This harness tracks the
+        // two routing facts as locals (see the header), so it assembles the
+        // equivalent set from them — it replays fixtures, it does not read
+        // the live decision store.
+        decisions: {
+          ...(selectedTrack !== null
+            ? { "authoring-track": { id: "authoring-track" as const, value: selectedTrack, provenance: "asked" as const } }
+            : {}),
+          ...(touchSeedSource !== null
+            ? { "touch-seed-source": { id: "touch-seed-source" as const, value: touchSeedSource, provenance: "asked" as const } }
+            : {}),
+        },
         selectedTrack,
         identitySupported: true,
         touchSeedSource,

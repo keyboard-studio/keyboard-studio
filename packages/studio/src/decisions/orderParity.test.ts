@@ -12,7 +12,12 @@ import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { orderDecisions } from "./orderDecisions.ts";
 
-/** Frozen from the deleted content/flows/identity_lite.modular.yaml. */
+/**
+ * Frozen from the deleted content/flows/identity_lite.modular.yaml, minus
+ * the attribution tail: #1901 moved il_author_name / il_author_email /
+ * il_copyright_holder into the post-track attribution flow (below). The
+ * language/script six keep their legacy relative order.
+ */
 const LEGACY_IDENTITY_LITE_ORDER: readonly string[] = [
   "il_language_english",
   "il_language_region",
@@ -20,9 +25,6 @@ const LEGACY_IDENTITY_LITE_ORDER: readonly string[] = [
   "il_language_code",
   "il_target_script",
   "il_script_not_supported",
-  "il_author_name",
-  "il_author_email",
-  "il_copyright_holder",
 ];
 
 describe("orderDecisions — identity_lite derived order (post-YAML)", () => {
@@ -31,6 +33,25 @@ describe("orderDecisions — identity_lite derived order (post-YAML)", () => {
       (m) => m.definition.id,
     );
     expect(derived).toEqual([...LEGACY_IDENTITY_LITE_ORDER]);
+  });
+});
+
+/**
+ * The attribution flow's frozen order (#1901): the identity_lite legacy
+ * tail, in its original relative order — author, email, holder.
+ */
+const LEGACY_ATTRIBUTION_ORDER: readonly string[] = [
+  "il_author_name",
+  "il_author_email",
+  "il_copyright_holder",
+];
+
+describe("orderDecisions — attribution derived order (#1901)", () => {
+  it("derived order equals the frozen order", () => {
+    const derived = orderDecisions(flowModules.attribution).map(
+      (m) => m.definition.id,
+    );
+    expect(derived).toEqual([...LEGACY_ATTRIBUTION_ORDER]);
   });
 });
 
@@ -47,6 +68,14 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
 }> = [
   // Frozen from the deleted content/flows/track.modular.yaml.
   { flowId: "track", phase: "G", registry: moduleRecord(flowModules.track), order: ["track_choice"] },
+  // #1901: the attribution flow (author/copyright, post-track). Never a
+  // YAML flow — the frozen order is the identity_lite legacy tail's.
+  {
+    flowId: "attribution",
+    phase: "G",
+    registry: moduleRecord(flowModules.attribution),
+    order: ["il_author_name", "il_author_email", "il_copyright_holder"],
+  },
   // Frozen from the deleted content/flows/project_name.modular.yaml.
   {
     flowId: "project_name",

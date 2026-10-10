@@ -17,13 +17,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, dev]
-  # Nightly full-gate run: the corpus gate is path-gated on pull requests
-  # (see the `changes` job), so a scheduled run remains the unconditional
-  # backstop. Interim measure until the full CI lightening follow-up lands.
-  schedule:
-    - cron: '17 7 * * *'
-  workflow_dispatch:
+    # `km/*` added 2026-10-07 for the modular-decisions stack: stacked PRs
+    # base on the previous spec's km/* branch, and without this they report
+    # no CI at all (the spec 089 golden-walk capture/verify lives in the
+    # e2e lane and keys off the PR base ref).
+    branches: [main, dev, 'km/*']
 
 # Cancel a superseded run when a newer commit lands on the same ref, so a
 # rapid second push doesn't leave the first full run burning runner minutes.
@@ -37,62 +35,7 @@ env:
   KEYBOARDS_CORPUS_SHA: 435f82d69bfc926eb03c2d8632571b41b6da3266
 
 jobs:
-  # Interim path gate for the corpus gate. A full build takes ~58 minutes,
-  # of which the corpus gate is ~51, yet a change touching no engine,
-  # contracts, harness, or scripts path cannot regress context tolerance.
-  # Changes to this workflow or the dependency manifest/lockfile turn the
-  # gate on, as do the `run-corpus` / `run-all-gates` PR labels and every
-  # non-PR run (push to main, nightly schedule, manual dispatch). Anything
-  # that prevents diffing fails open and runs the gate. Keep the gate inside
-  # the required `build` job so relevant PRs remain blocked by it.
-  changes:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      corpus: ${{ steps.gates.outputs.corpus }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Decide whether this change needs the corpus gate
-        id: gates
-        env:
-          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          corpus=false
-          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-            corpus=true
-          else
-            files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" 2>/dev/null || true)"
-            if [ -z "$files" ]; then
-              # Diff unavailable — fail open and run the gate.
-              corpus=true
-            else
-              while IFS= read -r f; do
-                case "$f" in
-                  .github/workflows/ci.yml|package.json|pnpm-lock.yaml)
-                    corpus=true ;;
-                  packages/engine/*|packages/contracts/*)
-                    corpus=true ;;
-                  utilities/nfd-tolerance-corpus/*|scripts/*)
-                    corpus=true ;;
-                esac
-              done <<< "$files"
-            fi
-            case "$PR_LABELS" in
-              *'"run-corpus"'*|*'"run-all-gates"'*) corpus=true ;;
-            esac
-          fi
-          echo "corpus=$corpus" >> "$GITHUB_OUTPUT"
-          echo "Corpus gate for this run: corpus=$corpus (event: $GITHUB_EVENT_NAME)"
-
   build:
-    needs: changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -269,15 +212,7 @@ jobs:
       - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
         run: pnpm run test:nfd-tolerance-corpus
 
-      # This sweep is ~51 of the build job's ~58 minutes. It still runs inside
-      # the required `build` check on every PR that can affect it, on pushes to
-      # main, and nightly; the hermetic unit suite above runs unconditionally.
-      - name: Corpus gate (skipped — change cannot reach the transform)
-        if: needs.changes.outputs.corpus != 'true'
-        run: echo "Corpus gate skipped — this change touches no engine/contracts/corpus path. Add the run-corpus label to force it."
-
       - name: Corpus gate (context tolerance — zero regressed keyboards)
-        if: needs.changes.outputs.corpus == 'true'
         run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed
 
       # kbgen is a prototype outside the workspace too, and since the
@@ -287,7 +222,13 @@ jobs:
       - name: Test (kbgen — outside the pnpm workspace)
         run: pnpm run test:kbgen
 
-      # The nfd-tolerance-corpus suite ran once, above, before the corpus gate.
+      # nfd-tolerance-corpus is likewise outside the workspace. Its suite is
+      # hermetic — the ground-truth fixtures are vendored .kmn, so it needs no
+      # corpus checkout — and it is the regression guard for a harness whose
+      # whole job is catching a transform that silently emits the wrong
+      # character. Unrun here, it rots.
+      - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
+        run: pnpm run test:nfd-tolerance-corpus
 
       # km-triage-app (the km-triage GitHub App's audit/cache/manifest/sweep
       # helpers) tests with node:test, not vitest, and nothing ran them.
@@ -374,8 +315,52 @@ jobs:
         working-directory: packages/studio
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright (boot-smoke + copy-edit)
-        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit
+      - name: Playwright (boot-smoke + copy-edit + spec 088 live gate)
+        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit decision-store-reload
+
+      # Spec 089 SC-001 golden walk (owner ruling 2026-10-06: store-level
+      # gates in the sandbox; live captures run in CI). The baseline zip is
+      # captured from the PR's BASE ref — the pre-change code — because the
+      # implementation sandbox's Chromium cannot navigate localhost. The
+      # walk spec + helpers are additive files, copied onto the base
+      # checkout; capture runs only while no baseline is committed. Once
+      # the captured zip is committed to the branch (from the
+      # golden-walk-baseline artifact below), this step skips and the
+      # verify step compares against the committed baseline.
+      - name: Golden-walk baseline capture (from PR base, if uncommitted)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .golden-base
+          persist-credentials: false
+
+      - name: Capture golden-walk baseline on base code
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
+        run: |
+          cp packages/studio/e2e/golden-walk.spec.ts .golden-base/packages/studio/e2e/
+          cp -r packages/studio/e2e/helpers .golden-base/packages/studio/e2e/
+          mkdir -p .golden-base/packages/studio/e2e/fixtures/golden-walk
+          cp packages/studio/e2e/fixtures/golden-walk/README.md .golden-base/packages/studio/e2e/fixtures/golden-walk/
+          cd .golden-base
+          pnpm install --frozen-lockfile
+          pnpm run codegen-charnames
+          pnpm --filter "@keyboard-studio/studio^..." build
+          cd packages/studio
+          npx playwright install --with-deps chromium
+          GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desktop
+          cp e2e/fixtures/golden-walk/basic-kbdfr-copy.zip "$GITHUB_WORKSPACE/packages/studio/e2e/fixtures/golden-walk/"
+
+      - name: Upload captured golden-walk baseline
+        if: always() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-walk-baseline
+          path: packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip
+          if-no-files-found: ignore
+
+      # (The golden-walk verify step sits at the very end of this job, so
+      # its results.json does not displace the main lane's summary below.)
 
       # One-screen result table on the run page: counts plus each failing
       # test's first line per error, from the json reporter (CI-only, see
@@ -424,3 +409,10 @@ jobs:
             packages/studio/test-results/
           retention-days: 14
           if-no-files-found: ignore
+
+      # Spec 089 SC-001, verify mode: fails loudly when the baseline is
+      # missing (never a vacuous pass). Last in the job so its
+      # results.json does not displace the main lane's summary above.
+      - name: Playwright (spec 089 golden walk, verify)
+        if: ${{ !cancelled() && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
+        run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk

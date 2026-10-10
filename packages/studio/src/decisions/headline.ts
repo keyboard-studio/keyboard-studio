@@ -67,6 +67,16 @@ export type HeadlineSpec =
   | { id: "editorStepNoChange"; stage: EditorActionType }
   | { id: "editorStepUnmeasured"; stage: EditorActionType }
   | {
+      id: "galleryDecision";
+      /**
+       * The recording host's own account of the decision (spec 090 US5),
+       * carried on the payload — rendered verbatim, because no headline
+       * rule here could compose a truer one without per-module knowledge
+       * of what the value means.
+       */
+      summary: string;
+    }
+  | {
       id: "baseContribution";
       /** Author-facing base name (contract §2) — never `baseId`, the internal identifier. */
       baseName: string;
@@ -163,6 +173,14 @@ export function headlineOf(
       return { id: "editorStepNoChange", stage: payload.actionType };
     }
     return { id: "editorStepUnmeasured", stage: payload.actionType };
+  }
+
+  if (payload.kind === "decision") {
+    // spec 090 US5 (D-090-48): the summary the recording host composed is
+    // the headline. It is author-facing content produced inside the studio
+    // at record time (the same standing `payload.value` has), never a code
+    // this module would have to resolve through the catalogue.
+    return { id: "galleryDecision", summary: payload.summary };
   }
 
   if (payload.kind === "base-contribution") {

@@ -1,14 +1,22 @@
 // A draft saved BEFORE the decision-backend reordering (spec 087) must still
-// load unchanged on the current build.
+// load on the current build.
 //
-// Why no migration is needed (evidence this test pins):
-//   - The persisted envelope is DRAFT_VERSION 1 and the modules that define and
-//     restore its shape (draftPersistence, draftTypes, surveyAnswerStore,
-//     surveySessionStore, decisionLogStore) are untouched by the reordering.
-//   - Everything persisted is keyed by STEP ID and ANSWER ID, never by position
-//     or by an order list. The reordering only changes how STEP_ORDER is
-//     derived; the set of step ids is identical, and STEP_ORDER is used only to
-//     rank owners when concatenating phase answers, never written to a draft.
+// What spec 087 needed (and this test originally pinned): no migration —
+// everything persisted is keyed by STEP ID and ANSWER ID, never by position
+// or by an order list, and the reordering only changed how STEP_ORDER is
+// derived.
+//
+// What spec 088 changed (the premise update recorded here): a DRAFT_VERSION 1
+// envelope is now MIGRATED on load (v1→v2). Traversal, position, and status
+// still restore verbatim, and every answer VALUE survives — but survey
+// answers now arrive via decision records: an answer whose question id
+// resolves through the registry is projected back from its record (value
+// preserved; the SavedAnswer's screenId/savedAt are the projection's, not
+// the v1 original's). An unresolvable id on a step WITH settles is retained
+// as an answer (here: `pb_alphabet` on characters); an unresolvable id
+// elsewhere (`language_name` — the old identity_lite flow's internal id) is
+// NOT dropped either: it surfaces as an orphan entry in the decision trail
+// (spec 088 T030, OPEN-088-1 ruling).
 //
 // The fixture was written by the real `saveDraft` with the stores seeded the way
 // the pre-reordering flow left them (persistence code is byte-identical on both
@@ -21,6 +29,8 @@ import path from "node:path";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { getDecisionSnapshot } from "../stores/decisionStore.ts";
+import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { STEP_ORDER } from "../steps/stepOrder.ts";
 import { draftKey, loadDraft, type DurableDraft } from "./draftPersistence.ts";
 
@@ -49,8 +59,13 @@ describe("pre-reordering draft loads on the current build", () => {
     useSurveyAnswerStore.getState().reset();
   });
 
-  it("the reordering changed the order of steps, not the set of step ids", () => {
-    expect([...STEP_ORDER].sort()).toEqual([...PRE_REORDER_STEP_IDS].sort());
+  it("the reordering changed the order of steps, not the set of step ids (one deliberate addition since: attribution, #1901)", () => {
+    // The 091 reordering itself changed no ids. #1901 deliberately ADDED
+    // one step (attribution) — every pre-reordering id still exists, so a
+    // draft persisted before either change names only known steps.
+    expect([...STEP_ORDER].sort()).toEqual(
+      [...PRE_REORDER_STEP_IDS, "attribution"].sort(),
+    );
   });
 
   it("every step id the draft persists is still a known step", () => {
@@ -64,7 +79,7 @@ describe("pre-reordering draft loads on the current build", () => {
     for (const id of persisted) expect(STEP_ORDER).toContain(id);
   });
 
-  it("loadDraft restores traversal and every saved answer verbatim", () => {
+  it("loadDraft restores traversal verbatim; answers restore per the spec 088 migration contract", () => {
     localStorage.setItem(draftKey(fixture.projectKey), fixtureText);
 
     expect(loadDraft(fixture.projectKey)).toBe(true);
@@ -79,9 +94,39 @@ describe("pre-reordering draft loads on the current build", () => {
     const saved = fixture.surveyAnswers?.steps ?? {};
     expect(Object.keys(restored).sort()).toEqual(Object.keys(saved).sort());
     for (const [stepId, step] of Object.entries(saved)) {
-      expect(restored[stepId]?.answers).toEqual(step.answers);
+      // Position and status are slice state the migration never touches.
       expect(restored[stepId]?.position).toBe(step.position);
       expect(restored[stepId]?.status).toEqual(step.status);
+      // Every answer VALUE survives migration (via its decision record, or
+      // retained in place) — except the orphan asserted below.
+      for (const [questionId, answer] of Object.entries(step.answers)) {
+        if (stepId === "identity" && questionId === "language_name") continue;
+        expect(restored[stepId]?.answers[questionId]?.value).toEqual(answer.value);
+      }
     }
+    // pb_alphabet does not resolve through the registry and its step has
+    // settles, so the answer itself is retained verbatim.
+    expect(restored["characters"]?.answers["pb_alphabet"]).toEqual(
+      saved["characters"]?.answers["pb_alphabet"],
+    );
+
+    // The four resolvable questions are decision records now.
+    expect(getDecisionSnapshot()).toMatchObject({
+      "reserve-script-family": { value: "latin", step: "identity" },
+      "char-count": { value: "42", step: "characters" },
+      "mark-input-order": { value: "mark_first", step: "marks" },
+      "help-canonical-order": { value: true, step: "punctuation" },
+    });
+    const identityAnswers = restored["identity"]?.answers ?? {};
+    // language_name does not resolve — it is not in the answer store, and
+    // it is NOT dropped: it surfaces in the decision trail as an orphan
+    // entry carrying its value (spec 088 T030).
+    expect(identityAnswers["language_name"]).toBeUndefined();
+    const orphanEntries = useDecisionLogStore.getState().record.entries.filter(
+      (e) => e.payload.kind === "survey-answer" && e.payload.questionId === "language_name",
+    );
+    expect(orphanEntries).toHaveLength(1);
+    expect(orphanEntries[0]?.payload).toMatchObject({ value: "French" });
+    expect(orphanEntries[0]?.stepId).toBe("identity");
   });
 });

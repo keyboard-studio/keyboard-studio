@@ -11,13 +11,19 @@
 //
 //   1. `applyStepCompletion` from `steps/reducer.ts` — spy via vi.spyOn after
 //      import.  Records which step IDs flow through the reducer.
-//   2. `surveySessionStore` mutators (advance, popHistory, setIdentityResult,
-//      setSurveyContext, setSelectedTrack, setScaffoldSpec, setLocalBase,
-//      setCharactersSubStage) — injected via useSurveySessionStore.setState so
+//   2. `surveySessionStore` mutators (advance, popHistory, setLocalBase,
+//      setBaseConfirmed, setCharactersSubStage) AND `decisionStore` mutators
+//      (record, recordAll, forget) — injected via the stores' setState so
+
 //      the spy still executes the real logic.  Records call order.
-//   3. `workingCopyStore` mutators (recordPhase, setIdentity, lockDesktop,
-//      setTouchLayoutJson) — injected via useWorkingCopyStore.setState in the
-//      same way.  Captures the host-level working-copy writes that the Stage 5
+//      Spec 089: the identity/track/project effects that used to be session
+//      setters (setIdentityResult, setSurveyContext, setSelectedTrack,
+//      setScaffoldSpec — deleted in T017) now appear here as decision
+//      records, and their working-copy landings as overlay setters (seam 3).
+//   3. `workingCopyStore` mutators (recordPhase, setIdentity, setAttribution,
+//      setHelpDocs, setHistoryEntryState, lockDesktop, setTouchLayoutJson)
+//      — injected via useWorkingCopyStore.setState in the same way.
+//      Captures the host-level working-copy writes that the Stage 5
 //      refactor centralises into StepHost (research R7, contract §2).
 //   4. `navigateTo` from `lib/navigate.ts` — a vi.mock fn; captures top-level
 //      route transitions.
@@ -35,13 +41,14 @@
 //     the same reducerDeps-injected closures via useWorkingCopyStore.setState),
 //     but their presence here is redundant with the reducer entry — it is belt-
 //     and-suspenders coverage.
-//   - `routeAnswersThroughMutate` is a private (non-exported) function in
-//     StudioShell.tsx.  A direct spy is impractical without production-code
-//     changes.  Its effect (routing in-scope question answers through question-
-//     module `mutate()` helpers) is delegated to reducerDeps closures and is
-//     therefore INDIRECTLY covered by the `applyStepCompletion` entries for the
-//     steps that call it (identity, characters/B, help).  The refactor must
-//     preserve its call site by code inspection, not by this oracle.
+//   - Spec 089 replaced `routeAnswersThroughMutate` with the exported
+//     `applyDecisionEffects` (steps/reducer.ts), run by StepHost after
+//     recordAnswersAsDecisions.  Its observable effects are exactly seams 2
+//     and 3: the decision records written at completion and the working-copy
+//     overlay setters the runner's sink calls (setIdentity / setAttribution /
+//     setHelpDocs / setHistoryEntryState + the checked IR merge).  Both are
+//     captured DIRECTLY, so the apply path is covered by this oracle, not
+//     merely by code inspection as its predecessor was.
 //
 // WHY THIS SEAM IS REFACTOR-STABLE:
 //   - No SurveyView internal function names appear in the fixture shape.
@@ -76,6 +83,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 
 // ---------------------------------------------------------------------------
 // Mock child survey components — the shared StudioShell harness
@@ -86,6 +94,10 @@ import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 
 vi.mock("../../src/survey/FlowStepHost.tsx", () => import("../../src/test/studioShellMocks/FlowStepHost.tsx"));
 vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
+// CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
+// the barrel), so the shallow stubs must be registered for the files too.
+vi.mock("../../src/survey/Prefill.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("../../src/survey/PhaseB.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
   import("../../src/test/studioShellMocks/BaseResolution.tsx"),
 );
@@ -210,6 +222,13 @@ interface WalkEntry {
    * centralised StepHost completion path per research R7).
    */
   workingCopyMutations: string[];
+  /**
+   * Decision-store mutator names in call order (spec 088). The completion
+   * writer (recordAll via StudioShell's injected deps) and the flow
+   * onCommit record for the track step land here — this is where the track
+   * choice is visible now that the session store no longer carries it.
+   */
+  decisionMutations: string[];
   navigateTo: string[];
 }
 
@@ -220,14 +239,22 @@ interface WalkEntry {
 const SESSION_MUTATOR_NAMES = [
   "advance",
   "popHistory",
-  "setIdentityResult",
-  "setSurveyContext",
-  "setSelectedTrack",
-  "setScaffoldSpec",
+
   "setLocalBase",
   "setBaseConfirmed",
   "setCharactersSubStage",
 ] as const;
+
+// Spec 089: decision-store mutators, captured into the same storeMutations
+// list (interleaved by invocation order) — a completion's decision records
+// are the successor of the deleted session setters.
+const DECISION_MUTATOR_NAMES = [
+  "record",
+  "recordAll",
+  "forget",
+] as const;
+
+const STORE_MUTATOR_NAMES = [...SESSION_MUTATOR_NAMES, ...DECISION_MUTATOR_NAMES] as const;
 
 // ---------------------------------------------------------------------------
 // Working-copy store mutator names to spy on
@@ -242,6 +269,9 @@ const SESSION_MUTATOR_NAMES = [
 const WC_MUTATOR_NAMES = [
   "recordPhase",
   "setIdentity",
+  "setAttribution",
+  "setHelpDocs",
+  "setHistoryEntryState",
   "lockDesktop",
   "setTouchLayoutJson",
 ] as const;
@@ -277,6 +307,22 @@ function createRecorder() {
     }
   }
 
+  // 3b. Decision-store mutator spies — same pattern (specs 088+089). One
+  // installation feeds BOTH collections: storeMutations (interleaved with
+  // the session/working-copy calls, via storeSpies below — the A6 order
+  // evidence) and decisionMutations (the decision-only view, spec 088).
+  const decisionSpies: Record<string, ReturnType<typeof vi.fn>> = {};
+  {
+    const store = useDecisionStore.getState();
+    for (const name of DECISION_MUTATOR_NAMES) {
+      const original = store[name] as (...args: unknown[]) => void;
+      const spy = vi.fn((...args: unknown[]) => original(...args));
+      useDecisionStore.setState({ [name]: spy } as Partial<typeof store>);
+      decisionSpies[name] = spy;
+    }
+  }
+  const storeSpies = { ...sessionSpies, ...decisionSpies };
+
   // 4. Working-copy store mutator spies — same pattern.
   const wcSpies: Record<string, ReturnType<typeof vi.fn>> = {};
   {
@@ -293,8 +339,9 @@ function createRecorder() {
   function clearAll() {
     applyStepCompletionSpy.mockClear();
     navigateToMock.mockClear();
-    for (const spy of Object.values(sessionSpies)) spy.mockClear();
+    for (const spy of Object.values(storeSpies)) spy.mockClear();
     for (const spy of Object.values(wcSpies)) spy.mockClear();
+    for (const spy of Object.values(decisionSpies)) spy.mockClear();
   }
 
   function beginStep(stepId: string) {
@@ -304,6 +351,7 @@ function createRecorder() {
       applyStepCompletion: [],
       storeMutations: [],
       workingCopyMutations: [],
+      decisionMutations: [],
       navigateTo: [],
     };
   }
@@ -335,8 +383,9 @@ function createRecorder() {
       current.applyStepCompletion.push(String(call[0]));
     }
 
-    current.storeMutations = collectOrdered(sessionSpies, SESSION_MUTATOR_NAMES);
+    current.storeMutations = collectOrdered(storeSpies, STORE_MUTATOR_NAMES);
     current.workingCopyMutations = collectOrdered(wcSpies, WC_MUTATOR_NAMES);
+    current.decisionMutations = collectOrdered(decisionSpies, DECISION_MUTATOR_NAMES);
 
     for (const call of navigateToMock.mock.calls) {
       current.navigateTo.push(String(call[0]));
@@ -391,12 +440,18 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
     const testIds = "testIds" in step ? step.testIds : [step.testId];
     recorder.beginStep(step.stepId);
     for (const testId of testIds) {
+      // findBy (not getBy): the characters step's Phase B mounts behind a
+      // lazy boundary since spec 090 T021, so phase-b-done can land a tick
+      // after the prefill-confirm click that summons it. Awaiting the
+      // element does not change the recorded walk — the recorder window
+      // boundaries are the same beginStep/endStep around the same clicks.
+      const el = await screen.findByTestId(testId);
       if (step.async) {
         await act(async () => {
-          fireEvent.click(screen.getByTestId(testId));
+          fireEvent.click(el);
         });
       } else {
-        fireEvent.click(screen.getByTestId(testId));
+        fireEvent.click(el);
       }
     }
     if (step.settleFor !== undefined) {
@@ -408,7 +463,8 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 
 /**
  * Drive the full copy-track walk.
- * identity -> layout -> choose_base -> track(copy) -> project_name ->
+ * identity -> layout -> choose_base -> track(copy) -> attribution ->
+ * project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
@@ -435,6 +491,9 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-copy" },
+    // #1901: author/copyright are asked here now (FlowStepHost stub emits
+    // the same answers the identity stub used to).
+    { stepId: "attribution", testId: "survey-advance" },
     { stepId: "project_name", testId: "survey-advance" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     // marks skips transparently inside this window, landing on punctuation.
@@ -460,7 +519,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 
 /**
  * Drive the full adapt-track walk.
- * identity -> layout -> choose_base -> track(adapt) ->
+ * identity -> layout -> choose_base -> track(adapt) -> attribution ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
  * mechanisms -> touch_seed_source -> touch -> help -> done
@@ -474,6 +533,7 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
+    { stepId: "attribution", testId: "survey-advance" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     // marks skips transparently inside this window, landing on punctuation.
     { stepId: "characters/B", testId: "phase-b-done", settleFor: "punctuation-done" },

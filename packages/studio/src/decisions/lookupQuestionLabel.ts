@@ -15,8 +15,9 @@
 import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { resolveContentString } from "../lib/contentI18n.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import { decisionIndex, questionRegistry } from "../survey/questions/registry.ts";
 import type { FlowQuestion } from "../survey/types.ts";
+import type { DecisionId } from "./decisionTypes.ts";
 
 /**
  * The two prose fields this module ever reads off a flow-question definition
@@ -118,5 +119,33 @@ export function createLookupQuestionLabel(
     }
 
     return undefined;
+  };
+}
+
+/**
+ * Build the decision-id counterpart of {@link createLookupQuestionLabel}
+ * (decisions-page enrichment).
+ *
+ * A `decision` payload's `decisionId` lives in the DECISION id space — a
+ * module's `provides` — not in the question id space `questionRegistry`
+ * is keyed by, so the lookup bridges through the registry's canonical
+ * `decisionIndex` (decisionId -> providing module) and then resolves that
+ * module's label through the same source seam as a question's: audit
+ * label, then prompt, localized identically. Returns `undefined` when no
+ * module provides the decision or the module names neither field — the
+ * caller renders the FR-014 prose fallback, never the raw decisionId
+ * (`recordGalleryDecisions.summarizeGalleryDecision`'s record-time
+ * fallback to the raw id is exactly what this lookup exists to avoid at
+ * render time).
+ */
+export function createLookupDecisionLabel(
+  i18n?: I18n,
+  getQuestionLabelSource: GetQuestionLabelSource = defaultGetQuestionLabelSource,
+): (decisionId: string) => string | undefined {
+  const lookupQuestionLabel = createLookupQuestionLabel(i18n, getQuestionLabelSource);
+  return (decisionId: string): string | undefined => {
+    const mod = decisionIndex[decisionId as DecisionId];
+    if (mod === undefined) return undefined;
+    return lookupQuestionLabel(mod.definition.id);
   };
 }

@@ -15,7 +15,7 @@
 //     loaded keyboard's identity and sets instantiationMode = "adapt-existing".
 //   - Both instantiate entry points also clear the per-working-copy Phase B
 //     proposal decisions (resetPhaseBDraftDecisions, spec 044 FR-016a), which
-//     deliberately survive phaseBDraftStore's own per-visit reset().
+//     deliberately survive the inventory draft's own per-visit reset.
 //   - `setIdentity()` overlays a post-instantiation identity patch.
 //   - No host-disk writes. VirtualFS lives as a React-state reference.
 //   - Worker boundary upheld: WASM is not imported here.
@@ -60,18 +60,55 @@ import {
   type DiscoveryAxisVector,
   type MarkInputOrder,
   type MechanismAssignment,
-  type SurveyAnswer,
   type SurveyPhaseResult,
   type SurveySession,
   type TouchAssignment,
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
-import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
+import { useDecisionStore } from "./decisionStore.ts";
+import {
+  emptyCharacterInventoryValue,
+  emptyInventoryDecisionValue,
+  resetDraftDecisions,
+  type CharacterInventoryValue,
+} from "../survey/phaseBDraftOps.ts";
 import { useGuardIntentStore } from "./guardIntentStore.ts";
+
+/**
+ * Clear the Phase B proposal decisions (spec 044 FR-016a) at
+ * instantiation. Was `resetPhaseBDraftDecisions` on the retired facade
+ * (spec 090 T025); implemented here over leaf modules only — the
+ * decision store and the pure ops — because workingCopyStore sits
+ * UNDER the gallery host deps in the import graph (an import of the
+ * inventory hook would close the old facade cycle in a new shape).
+ * Behaviour parity with the decide-path version: both inventory
+ * modules' applies are no-ops, and the character transform touches
+ * only sticky fields (never `chars`), so no punctuation-projection
+ * maintenance is owed; records keep their existing provenance, and a
+ * character record is materialized from the empty value when none
+ * exists yet, exactly as the decide path materialized it.
+ */
+function resetPhaseBDraftDecisions(): void {
+  const store = useDecisionStore.getState();
+  const char = store.decisions["character-inventory"];
+  if (char !== undefined) {
+    store.record({ ...char, value: resetDraftDecisions(char.value as CharacterInventoryValue) });
+  } else {
+    store.record({
+      id: "character-inventory",
+      value: resetDraftDecisions(emptyCharacterInventoryValue()),
+      provenance: "asked",
+    });
+  }
+  const inv = store.decisions["invisibles-inventory"];
+  if (inv !== undefined) {
+    store.record({ ...inv, value: emptyInventoryDecisionValue() });
+  }
+}
 import type { Step } from "../steps/types.ts";
-import { STEP_ORDER } from "../steps/stepOrder.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 import { promoteKeyAtAddressToHandSet } from "../editors/assignLoop/touchBehavior.ts";
+import type { IdentityPatch } from "./identityPatch.ts";
 
 /**
  * One sibling-accent bulk group: the batch of accented siblings the longpress
@@ -330,40 +367,9 @@ export function bulkDispositionDefault(
     : { disposition: "block", provenance: "bulk-default" };
 }
 
-// ---------------------------------------------------------------------------
-// Identity patch — lightweight overlay for the "identity" phase result.
-// Typed as a partial record so Phase 2 can add fields without a schema bump.
-// ---------------------------------------------------------------------------
-
-export type IdentityPatch = Partial<{
-  /** BCP47 tag for the new keyboard (e.g. "ha-Latn"). */
-  bcp47: string;
-  /** Human-readable display name for the new keyboard. */
-  displayName: string;
-  /**
-   * The language's name in English, as the author confirmed it (spec 059 FR-002).
-   *
-   * Display text for the package descriptor's `<Language>` element and nothing
-   * else — the codec does not serialize a language name, so this never reaches
-   * the `.kmn`. Blank or absent lets the BCP47 tag stand in as its own display
-   * text, which is what the descriptor writer did for every tag before 057.
-   */
-  languageName: string;
-  /**
-   * New keyboard identifier chosen by the author (Track 1 only).
-   *
-   * Must satisfy validateKeyboardId (§10 Layer A check #1: 1-255 chars,
-   * no spaces / parens / brackets / commas). When set, the projection's id
-   * rename pass (projectWorkingCopyVfs step 4) renames every
-   * source/<baseId>.{kmn,kps,kvks,keyman-touch-layout,ico,css,htm,js} sibling
-   * to source/<keyboardId>.*, rewrites the .kmn's path-bearing stores
-   * (&KMW_EMBEDCSS, &KMW_HELPFILE, &VISUALKEYBOARD, &LAYOUTFILE, &BITMAP),
-   * and rewrites `.kmw-keyboard-<baseId>` selectors in *.css and the
-   * <ID> / <kbdname> references in *.kps and *.kvks. The downloaded zip
-   * filename uses this id.
-   */
-  keyboardId: string;
-}>;
+// Identity patch lives in a leaf module (see identityPatch.ts); re-exported
+// here so existing importers keep resolving.
+export type { IdentityPatch } from "./identityPatch.ts";
 
 // ---------------------------------------------------------------------------
 // State interface
@@ -666,15 +672,6 @@ export interface WorkingCopyState {
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
   phaseResults: SurveyPhaseResult[];
-  /**
-   * Who owns which answers inside each phase slot (spec 079 D-4, R-08). Several
-   * steps record into phase C; each step's list lives under its own id, and
-   * `phaseResults[p].answers` is DERIVED as their concatenation in manifest
-   * order (`"legacy"` first). A step re-recording replaces only its own list,
-   * so Convenience letters can no longer erase what Invisible characters
-   * recorded. Studio-only: the contracts `SurveyPhaseResult` is untouched.
-   */
-  phaseAnswersByStep: PhaseAnswersByStep;
   /**
    * IR-derived axis baseline, set before Phase A from the recognized patterns.
    * Updating this re-derives the session.
@@ -1208,6 +1205,17 @@ export interface WorkingCopyState {
       vfs: VirtualFS;
       ir: KeyboardIR;
       removalCapabilities?: Map<string, RemovalCapability>;
+      /**
+       * The author's identity-language overlay (the identity step's composed
+       * tag + English name, from `identitySeedFromSession`), spread over the
+       * preserved identity. Without it the adapt copy keeps the BASE's first
+       * language tag and no language name, so the package descriptor falls
+       * back to the raw tag as the `<Language>` display text and every
+       * `identity.bcp47` reader works on the base's language instead of the
+       * author's. The seed never carries `keyboardId` — the preserved id
+       * always wins.
+       */
+      identitySeed?: IdentityPatch;
     },
   ) => void;
 
@@ -1463,62 +1471,6 @@ function resolveInstantiationCase(
 
 const INITIAL_SURVEY = remerge({}, []);
 
-// ---------------------------------------------------------------------------
-// Per-step phase answers (spec 079 D-4, R-08)
-// ---------------------------------------------------------------------------
-
-/** Answers recorded into each phase, keyed by the step that recorded them. */
-export type PhaseAnswersByStep = Record<string, Record<string, SurveyAnswer[]>>;
-
-/** Owner id for answers whose recording step is unknown (pre-079 data, no stepId). */
-export const LEGACY_ANSWER_OWNER = "legacy";
-
-/** Owner order: `"legacy"` first, then manifest order, then anything unknown. */
-function ownerRank(owner: string): number {
-  if (owner === LEGACY_ANSWER_OWNER) return -1;
-  const i = STEP_ORDER.indexOf(owner);
-  return i === -1 ? STEP_ORDER.length : i;
-}
-
-/** The phase entry's `answers`: every owner's list concatenated in owner order. */
-export function concatPhaseAnswers(
-  owners: Record<string, SurveyAnswer[]>,
-): SurveyAnswer[] {
-  return Object.keys(owners)
-    .sort((a, b) => ownerRank(a) - ownerRank(b))
-    .flatMap((owner) => owners[owner] ?? []);
-}
-
-function sameAnswerList(
-  a: readonly SurveyAnswer[],
-  b: readonly SurveyAnswer[],
-): boolean {
-  return a === b || JSON.stringify(a) === JSON.stringify(b);
-}
-
-/**
- * The owner map for `phase`, trusted only while it still describes the stored
- * answers. Anything that replaced `phaseResults` wholesale (a reset, a genuine
- * re-instantiation, a restored pre-079 snapshot) leaves the sidecar out of step;
- * the stored answers are then adopted under `"legacy"` rather than invented.
- */
-function ownersOf(
-  sidecar: PhaseAnswersByStep,
-  stored: SurveyPhaseResult | undefined,
-  phase: string,
-): Record<string, SurveyAnswer[]> {
-  const storedAnswers = stored?.answers ?? [];
-  const owners = sidecar[phase];
-  if (
-    owners !== undefined &&
-    sameAnswerList(concatPhaseAnswers(owners), storedAnswers)
-  )
-    return owners;
-  return storedAnswers.length > 0
-    ? { [LEGACY_ANSWER_OWNER]: storedAnswers }
-    : {};
-}
-
 /**
  * The store's data fields only — actions excluded. This is the single source of
  * truth for "what is the serializable shape of a working copy": `INITIAL_STATE`
@@ -1637,7 +1589,6 @@ const INITIAL_STATE: WorkingCopyData = {
   carveTouchKeepInert: [],
   // survey slots
   ...INITIAL_SURVEY,
-  phaseAnswersByStep: {},
   desktopLocked: false,
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
@@ -2054,31 +2005,25 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // -- surveyResultsStore actions --------------------------------------------
 
   recordPhase: (result, opts) => {
+    // spec 090 T063: the phase slot no longer carries answers. The per-step
+    // answer-ownership sidecar (spec 079 D-4) retired with the gallery
+    // migrations — every settled answer now lives in the decision store
+    // (088) and nowhere else, so the slot keeps only the result's non-answer
+    // fields, shallow-merged over the phase's previous entry. `opts.stepId`
+    // is accepted for caller compatibility and no longer used.
+    void opts;
     const prev = get().phaseResults;
     const idx = prev.findIndex((p) => p.phase === result.phase);
-    // spec 079 D-4: the recording step replaces only ITS answers in the slot;
-    // every other field keeps the shallow-merge semantics documented above.
-    const owner = opts?.stepId ?? LEGACY_ANSWER_OWNER;
-    const owners = {
-      ...ownersOf(get().phaseAnswersByStep, prev[idx], result.phase),
-      [owner]: result.answers,
-    };
     const merged: SurveyPhaseResult = {
       ...(idx === -1 ? {} : prev[idx]),
       ...result,
-      answers: concatPhaseAnswers(owners),
+      answers: [],
     };
     const next =
       idx === -1
         ? [...prev, merged]
         : prev.map((p, i) => (i === idx ? merged : p));
-    set({
-      ...remerge(get().irAxes, next),
-      phaseAnswersByStep: {
-        ...get().phaseAnswersByStep,
-        [result.phase]: owners,
-      },
-    });
+    set({ ...remerge(get().irAxes, next) });
   },
 
   recordAssignments: (assignments) => {
@@ -2297,8 +2242,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Phase B proposal decisions are per-working-copy (spec 044 FR-016a), not
-    // per-session: they survive phaseBDraftStore.reset() (which runs on every
-    // entry to the build-list screen) and are cleared HERE instead. Without
+    // per-session: they survive the inventory draft's reset() (which runs on
+    // every entry to the build-list screen) and are cleared HERE instead. Without
     // this, declining the exemplar offer — or removing a proposed character —
     // on one keyboard would silently carry into the next one started in the
     // same browser session. Placed after the shouldNoop guard so a redundant
@@ -2360,7 +2305,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     });
   },
 
-  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities }) => {
+  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities, identitySeed }) => {
     // Three-case resolution (redundant re-fire / first instantiate / genuine
     // switch) is shared with instantiateFromBase — see
     // resolveInstantiationCase for the full explanation.
@@ -2378,8 +2323,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Per-working-copy Phase B proposal decisions — see the identical call in
-    // instantiateFromBase above for why this cannot live in
-    // phaseBDraftStore.reset().
+    // instantiateFromBase above for why this cannot live in the inventory
+    // draft's reset().
     resetPhaseBDraftDecisions();
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({
@@ -2400,6 +2345,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         keyboardId: keyboard.id,
         bcp47: keyboard.languages?.[0] ?? "",
         displayName: keyboard.displayName,
+        // The author's identity-language overlay (composed tag + English
+        // name) wins over the base's preserved fields — the adapt track's
+        // author has already told the identity step what language this
+        // keyboard is FOR; the base's own first tag is only the fallback
+        // when no seed was composed. The seed never carries `keyboardId`,
+        // so the preserved id above is never overridden.
+        ...(identitySeed ?? {}),
       },
       // Seed the carve working IR from the existing keyboard's IR.
       ir,

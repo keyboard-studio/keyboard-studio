@@ -27,6 +27,9 @@ import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
 import { CONTEXT_TOLERANCE_WRITES } from "../steps/contextToleranceWrites.ts";
 import { applyMutatePatch, MutatePatchContainmentError } from "../steps/mutateApply.ts";
 import { useWorkingCopyStore, type ContextToleranceState } from "../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { recordMarksTreatmentValue } from "../survey/marks/marksValue.ts";
+import type { MarksContextToleranceDecision } from "@keyboard-studio/contracts";
 import { useContextToleranceApply } from "./useContextToleranceApply.ts";
 
 afterEach(cleanup);
@@ -195,15 +198,17 @@ describe("the working-IR write goes through the mutate seam", () => {
   });
 });
 
+/** Seed the tolerance decision the hook reads (spec 090 T023: the marks-treatment decision value). */
+function seedToleranceDecision(decision: MarksContextToleranceDecision): void {
+  useDecisionStore.getState().reset();
+  recordMarksTreatmentValue({ answers: {}, completion: null, contextTolerance: decision });
+}
+
 describe("useContextToleranceApply — idempotence (FR-008)", () => {
   it("does nothing when the applied overlay already matches the decision", () => {
     const store = useWorkingCopyStore.getState();
     store.reset();
-    store.recordPhase({
-      phase: "C",
-      answers: [],
-      marksContextTolerance: { decision: "accept", acceptedSiteIds: ["k1"], proposedSiteIds: ["k1"], fingerprint: "f1" },
-    });
+    seedToleranceDecision({ decision: "accept", acceptedSiteIds: ["k1"], proposedSiteIds: ["k1"], fingerprint: "f1" });
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
     const before = useWorkingCopyStore.getState().contextToleranceOverlay;
 
@@ -215,11 +220,7 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
   it("a decline removes an applied fix", () => {
     const store = useWorkingCopyStore.getState();
     store.reset();
-    store.recordPhase({
-      phase: "C",
-      answers: [],
-      marksContextTolerance: { decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" },
-    });
+    seedToleranceDecision({ decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" });
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
     renderHook(() => useContextToleranceApply(true));
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBeNull();
@@ -228,11 +229,7 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
   it("with the flag off it touches nothing", () => {
     const store = useWorkingCopyStore.getState();
     store.reset();
-    store.recordPhase({
-      phase: "C",
-      answers: [],
-      marksContextTolerance: { decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" },
-    });
+    seedToleranceDecision({ decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" });
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
     renderHook(() => useContextToleranceApply(false));
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).not.toBeNull();

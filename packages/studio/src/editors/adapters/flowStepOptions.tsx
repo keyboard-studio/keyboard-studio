@@ -13,7 +13,7 @@
 // EditorStepProps-compatible components that register in registerEditorSteps.ts.
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
-import type { DecisionProposalSource, SurveyPhaseResult, HelpDocsAnswers } from "@keyboard-studio/contracts";
+import type { DecisionProposalSource, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
@@ -22,16 +22,24 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 // modules — those stay pure descriptors the standalone content-i18n
 // extractor can load without the engine.
 import {
-  prefill as prefillWelcomeParagraph,
   requiredWhen as requiredWhenWelcomeParagraph,
   type AdaptiveDescriptionContext,
 } from "../../lib/adaptiveDescription.ts";
-import { deriveHistoryEntryState, applyHistoryEntryAction } from "../../lib/historyEntryState.ts";
-import { identityLanguagePatch } from "../../lib/identityLanguagePatch.ts";
-import { proposeProjectUrl, proposeProvenanceBasis, type PhaseFSeedContext } from "../../lib/phaseFSeeds.ts";
-import { primarySubtag } from "../../lib/suggestBase.ts";
-import { isHistoryEntryAction } from "../../survey/questions/f/pf_history_entry.ts";
+import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
+import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
+import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
+import type { ExtractContext } from "../../decisions/extractContext.ts";
+import type { QuestionModule } from "../../survey/types.ts";
+import ilAuthorNameModule from "../../survey/questions/a/il_author_name.ts";
+import ilAuthorEmailModule from "../../survey/questions/a/il_author_email.ts";
+import ilCopyrightHolderModule from "../../survey/questions/a/il_copyright_holder.ts";
+
+/** A recorded decision's string value, or undefined when absent/non-string. */
+function decisionString(decisions: DecisionSet, id: DecisionId): string | undefined {
+  const value = decisions[id]?.value;
+  return typeof value === "string" ? value : undefined;
+}
 
 // ---------------------------------------------------------------------------
 // track options — reproduces TrackStepAdapter + PhaseTrack behaviour exactly.
@@ -46,7 +54,10 @@ import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts
 //   the user owns it" contract leaves the field genuinely unset in that case,
 //   same as project_name below.
 // Extract: track_choice answer → "copy" | "adapt" only; else undefined (stay).
-// onCommit: setSelectedTrack(track); if track!=="copy" also setScaffoldSpec(null).
+// Effects: none here (spec 089) — the recorded authoring-track decision IS
+//   the effect; routing reads it via selectTrack and the scaffold
+//   consequence via deriveScaffoldSpec. track_choice's own apply is
+//   deliberately empty (see the module).
 // Payload: { track }.
 // ---------------------------------------------------------------------------
 
@@ -76,18 +87,6 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
     const v = String(answer.value);
     return v === "copy" || v === "adapt" ? { track: v } : undefined;
   },
-
-  onCommit(extracted: TrackPayload, deps: FlowStepDeps): void {
-    // R7 ordering: setSelectedTrack BEFORE onComplete → StepHost advance.
-    deps.setSelectedTrack(extracted.track);
-    if (extracted.track !== "copy") {
-      // Adapt-track: null scaffold spec (advanceOutcome carries setCharactersSubStage
-      // which fires AFTER advance — matches pre-Stage-6 ordering).
-      deps.setScaffoldSpec(null);
-    }
-    // Copy-track intentionally does NOT clear scaffoldSpec here;
-    // scaffoldSpec is set downstream by projectNameStep.onCommit.
-  },
 };
 
 // ---------------------------------------------------------------------------
@@ -101,7 +100,8 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
 //   Back→forward re-derivation: the ref-based pattern from PhaseProjectName
 //   is preserved via a closure ref inside getSeedValue/onAnswerCommit.
 // Extract: display + id (both trimmed); undefined unless both non-empty.
-// onCommit: setScaffoldSpec({keyboardId,displayName}) → setIdentity({keyboardId,displayName}).
+// Effects: none here (spec 089) — project_keyboard_id's apply composes the
+//   working-copy identity from the recorded decisions (deriveProjectIdentity).
 // Payload: { displayName, keyboardId }.
 // ---------------------------------------------------------------------------
 
@@ -136,20 +136,23 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 
   seeds: {
     getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
-      const english = deps.identityResult?.english ?? "";
+      // Spec 089 FR-005: the identity result is derived from the recorded
+      // decisions, not read from a stored session field.
+      const identity = deriveIdentityResult(deps.decisions);
+      const english = identity?.english ?? "";
       const defaultDisplayName =
-        deps.identityResult !== null
-          ? deps.identityResult.autonym || deps.identityResult.english
+        identity !== null
+          ? identity.autonym || identity.english
           : "";
-      // FR-031 (spec 057): `scaffoldSpec` is the durable record this step's OWN
-      // onCommit writes (deps.setScaffoldSpec below) — the same role
-      // `selectedTrack` plays for the track step. Once it is non-null the
+      // FR-031 (spec 057): the recorded project-display-name decision is the
+      // durable record of this step's own completion — the same role
+      // `selectedTrack` plays for the track step. Once it exists the
       // author has committed a name/id at least once, so a fresh arrival at
       // this step (deep link, or Back after an earlier visit unmounted it)
       // must show THAT, not re-propose the identity-derived default it
-      // started from. `null` (never committed yet) falls through to the
+      // started from. Absent (never committed yet) falls through to the
       // original default-proposal behavior unchanged.
-      const recordedDisplayName = deps.scaffoldSpec?.displayName;
+      const recordedDisplayName = decisionString(deps.decisions, "project-display-name");
 
       if (questionId === "project_display_name") {
         const seed = recordedDisplayName ?? defaultDisplayName;
@@ -167,8 +170,9 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
         // edited it away from the auto-slug of the display name, and FR-031
         // must show what they actually recorded, not re-derive a slug that
         // happens to look plausible.
-        if (deps.scaffoldSpec?.keyboardId !== undefined && deps.scaffoldSpec.keyboardId !== "") {
-          return deps.scaffoldSpec.keyboardId;
+        const recordedKeyboardId = decisionString(deps.decisions, "project-keyboard-id");
+        if (recordedKeyboardId !== undefined && recordedKeyboardId !== "") {
+          return recordedKeyboardId;
         }
 
         const committedName =
@@ -232,55 +236,127 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
     }
     return undefined;
   },
+};
 
-  onCommit(extracted: ProjectNamePayload, deps: FlowStepDeps): void {
-    // R7 ordering: setScaffoldSpec BEFORE setIdentity BEFORE onComplete → advance.
-    deps.setScaffoldSpec({ keyboardId: extracted.keyboardId, displayName: extracted.displayName });
-    // spec 059 FR-001/FR-002: carry the identity-lite answers into the working
-    // copy so the package descriptor can declare the AUTHOR's language. Before
-    // this, Track 1 set only keyboardId and displayName — the composed tag lived
-    // in surveySessionStore.identityResult and never crossed over, so the
-    // descriptor had no author tag to write even in principle.
-    //
-    // Language overlay via the shared composition rule (identityLanguagePatch):
-    // `bcp47` is consumed WHOLE (research D-03) and empties are omitted, in
-    // exactly one place — shared with confirmRebase's identitySeedFromSession.
-    deps.setIdentity({
-      keyboardId: extracted.keyboardId,
-      displayName: extracted.displayName,
-      ...identityLanguagePatch(deps.identityResult),
-    });
+// ---------------------------------------------------------------------------
+// attributionOptions — the author / copyright questions (#1901).
+//
+// These three questions were the identity step's tail (spec 064 US1);
+// they are asked AFTER the track choice now, because what they propose
+// depends on it:
+//   - Author name / email: confirm-style defaults from the authenticated
+//     profile (spec 064 D7). The RULE is the modules' declared
+//     `lookupDefault` (spec 092 T033); the seed callbacks below only
+//     supply the profile input (deps.authorProfile, read by the factory)
+//     and read the declared default back. A profile with no name seeds
+//     nothing — ASK rather than substitute the login handle, which is
+//     not a copyright holder.
+//   - Copyright holder: NO caller seed on either track. On the update
+//     track the live extraction pass has already seeded the decision
+//     from the base keyboard (il_copyright_holder's `seedWhen`), and
+//     SurveyRunner's record-first seeding renders it pre-filled with
+//     its source caption; on the copy track the module forbids that
+//     seed (the copied notice is retained by the attribution machinery)
+//     and the field stays blank — blank means "same as the author" (D1).
+// Re-entry (FR-031, the project_name pattern): a recorded asked answer
+// is the seed — the author's own value, never a re-proposal over it.
+// Extract: the author-name answer (the module's validate already
+// requires it non-blank; this guard keeps a completion without it from
+// advancing).
+// Effects: none here (spec 089) — il_copyright_holder's apply lands the
+// attribution at StepHost's boundary, pass 2 included: this completion
+// recording author-name is exactly pass 2's trigger, as the identity
+// completion was before the move.
+// ---------------------------------------------------------------------------
+
+export type AttributionPayload = { authorName: string };
+
+const attributionModules: Readonly<Record<string, QuestionModule>> = {
+  [ilAuthorNameModule.definition.id]: ilAuthorNameModule,
+  [ilAuthorEmailModule.definition.id]: ilAuthorEmailModule,
+  [ilCopyrightHolderModule.definition.id]: ilCopyrightHolderModule,
+};
+
+/** The recorded asked answer for a question's decision, or undefined. */
+function askedAnswer(deps: FlowStepDeps, questionId: string): string | undefined {
+  const decisionId = attributionModules[questionId]?.provides?.[0];
+  if (decisionId === undefined) return undefined;
+  const record = deps.decisions[decisionId];
+  if (record === undefined || record.provenance !== "asked") return undefined;
+  return typeof record.value === "string" ? record.value : undefined;
+}
+
+/**
+ * A module's declared profile lookup default, evaluated against the
+ * factory-supplied author profile. Undefined when the module declares
+ * no default (il_copyright_holder) or the profile carries no value.
+ */
+function profileDefault(
+  deps: FlowStepDeps,
+  questionId: string,
+): { value: string; source?: string } | undefined {
+  const mod = attributionModules[questionId];
+  if (mod?.lookupDefault === undefined) return undefined;
+  const ctx: ExtractContext = {
+    ir: null,
+    catalog: null,
+    identity: { authorProfile: deps.authorProfile },
+  };
+  const dflt = mod.lookupDefault(ctx);
+  if (dflt === undefined || typeof dflt.value !== "string" || dflt.value === "") {
+    return undefined;
+  }
+  return {
+    value: dflt.value,
+    ...(dflt.source !== undefined ? { source: dflt.source } : {}),
+  };
+}
+
+export const attributionOptions: FlowStepOptions<AttributionPayload> = {
+  flowRef: "attribution",
+  title: "Author & copyright",
+
+  buildContext(deps: FlowStepDeps) {
+    return deps.surveyContext;
+  },
+
+  seeds: {
+    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
+      return askedAnswer(deps, questionId) ?? profileDefault(deps, questionId)?.value;
+    },
+    getSeedSource(questionId: string, deps: FlowStepDeps): DecisionProposalSource | undefined {
+      // An asked answer is the author's own — it names no proposal
+      // source. Only a profile lookup default does ("identity").
+      if (askedAnswer(deps, questionId) !== undefined) return undefined;
+      const source = profileDefault(deps, questionId)?.source;
+      return source !== undefined ? (source as DecisionProposalSource) : undefined;
+    },
+  },
+
+  extract(result: SurveyPhaseResult): AttributionPayload | undefined {
+    const answer = result.answers.find((a) => a.questionId === "il_author_name");
+    if (!answer || answer.answerType !== "text") return undefined;
+    const authorName = String(answer.value).trim();
+    return authorName !== "" ? { authorName } : undefined;
   },
 };
 
 // ---------------------------------------------------------------------------
 // phaseFOptions — reproduces PhaseFAdapter + PhaseF behaviour exactly.
 //
-// Context: surveySessionStore.surveyContext (matches PhaseFAdapter today).
+// Context: the decision-derived survey context (deriveSurveyContext, spec 089).
 // usesFindings: true — derives findingsByQuestionId via buildFindingsByQuestionId.
-// Seeds: pf_contact_info from surveyContext.author_contact — see CTX_AUTHOR_CONTACT.
+// Seeds: NONE here since spec 092 (T036) — the pf_* seeds are extracts /
+//   lookup defaults declared on their modules and seeded as decision
+//   records by the live extraction pass; SurveyRunner reads the records.
 // Extract: identity (raw SurveyPhaseResult — the host's applyStepCompletion / advance
 //   already handles the result shape downstream).
-// onCommit: none (PhaseFAdapter had no pre-onComplete store writes).
+// Effects: none here (spec 089) — pf_welcome_paragraph's apply composes the
+//   working copy's help-docs + HISTORY-entry state from the recorded
+//   decisions (decisions/helpDocsFromDecisions.ts).
 // ---------------------------------------------------------------------------
 
 export type PhaseFPayload = SurveyPhaseResult;
-
-/**
- * SurveyContext key carrying the author's public contact, used to PRE-FILL
- * pf_contact_info rather than asking for the same fact a second time.
- *
- * Producer: keyboard attribution ([specs/064-keyboard-attribution](../../../../../specs/064-keyboard-attribution/spec.md))
- * captures an author contact once, in the identity phase, itself pre-filled from
- * the authenticated GitHub profile. Until that lands nothing writes this key, so
- * the seed below resolves to undefined and Phase F behaves exactly as it does
- * today — the seam is inert rather than speculative, and lights up with no
- * further change here.
- *
- * SurveyContext is an open `Record<string, string | undefined>`, so this needs
- * neither a new type nor a change to FlowStepDeps.
- */
-const CTX_AUTHOR_CONTACT = "author_contact";
 
 /**
  * Reads the four working-copy slices `pf_welcome_paragraph`'s `prefill`/
@@ -301,94 +377,17 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
   };
 }
 
-/** The working-copy slices the Phase F text proposals read (lib/phaseFSeeds.ts). */
-function readPhaseFSeedContext(): PhaseFSeedContext {
-  const state = useWorkingCopyStore.getState();
-  return {
-    instantiationMode: state.instantiationMode,
-    baseKeyboard: state.baseKeyboard,
-    baseVfs: state.baseVfs,
-  };
-}
-
 /**
- * One seeded Phase F question: its value resolver plus where the proposal
- * comes from, for the decision trail. The two travel together so a new
- * seeded question can never land in the value list without its source (or
- * an explicit sourceless `source`), and vice versa.
+ * Spec 092 (T036): the PHASE_F_SEEDS table that used to live here is
+ * deleted. Each entry became an `extract` or a `lookupDefault` declared
+ * on its pf_* module (derivations in lib/phaseFSeeds.ts and
+ * lib/adaptiveDescription.ts, computed by the live extraction wiring
+ * and read off the extract context — G-17), seeded as decision records
+ * by the live extraction pass and read back by SurveyRunner from the
+ * records.
+ * pf_credits was deliberately never seeded — thanking ≠ owning — and
+ * stays unseeded.
  */
-interface PhaseFSeedSpec {
-  /** Resolve the proposed value. Receives the flow deps — seeds are contextual. */
-  getValue: (deps: FlowStepDeps) => string | string[] | undefined;
-  /**
-   * Where the proposal comes from, for the decision trail. Absent means a
-   * plain default no data stands behind — still recorded as `tool-proposed`,
-   * just without naming a source (see `AnswerProposal.source`).
-   */
-  source?: DecisionProposalSource;
-}
-
-/**
- * The single registry of Phase F seeded questions. `getSeedValue` and
- * `getSeedSource` below both read this table, so the two lists cannot drift
- * as Phase F grows (km-triage, PR #1927): presence in the table means
- * "seeded", and `source` names the data behind the proposal.
- */
-const PHASE_F_SEEDS: Readonly<Record<string, PhaseFSeedSpec>> = {
-  // spec 079 FR-009: on an adaptation whose base has a usable description,
-  // propose it for confirmation (accept/edit/replace in one action, §3c).
-  // Net-new, copy (Track 1), and a base classified none/minimal all
-  // resolve to undefined here — pf_welcome_paragraph behaves exactly as
-  // before (required, unfilled). See `getRequiredOverride` below, which
-  // waives `required` in exactly this same case.
-  pf_welcome_paragraph: {
-    getValue: () => prefillWelcomeParagraph(readAdaptiveDescriptionContext()),
-    source: "base",
-  },
-
-  // pf_contact_info stays OPTIONAL. Seeding pre-fills the field; it does not
-  // require an answer. The author can clear it, or replace it with a community
-  // channel that is not their own address — several shipped keyboards publish a
-  // language-community contact rather than the author's personal one.
-  pf_contact_info: {
-    getValue: (deps) => {
-      const contact = deps.surveyContext[CTX_AUTHOR_CONTACT];
-      return contact !== undefined && contact !== "" ? contact : undefined;
-    },
-    source: "identity",
-  },
-
-  // Choice questions open with a defensible default so none is left blank.
-  // The author can overturn any of them; blank already meant these values.
-  // pf_more_detail_gate's "No" is a plain default, not something any data
-  // suggested — so it carries no source.
-  pf_more_detail_gate: { getValue: () => "false" },
-  // English main language (a plain default, so no source); for a non-English
-  // keyboard, its own language as the proposed second — the pair the old
-  // single "bilingual" answer proposed.
-  pf_doc_language: { getValue: () => "english" },
-  pf_doc_language_second: {
-    getValue: (deps) => (isEnglishTag(deps.surveyContext["bcp47_tag"]) ? "none" : "target"),
-    source: "identity",
-  },
-  pf_history_entry: { getValue: () => "confirm", source: "analysis" },
-
-  // Text proposals derived from the starting point (lib/phaseFSeeds.ts).
-  pf_project_url: {
-    getValue: () => proposeProjectUrl(readPhaseFSeedContext()),
-    source: "base",
-  },
-  pf_provenance_basis: {
-    getValue: () => proposeProvenanceBasis(readPhaseFSeedContext()),
-    source: "base",
-  },
-
-  // pf_credits is deliberately NOT in this table. Thanking and owning are
-  // different things: shipped credits sections routinely acknowledge advisors
-  // and contributors who hold no copyright. Pre-filling the holder here would
-  // produce exactly the duplicated boilerplate the question exists to collect
-  // something better than.
-};
 
 /**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
@@ -401,128 +400,6 @@ function deriveHistoryVersion(): string {
   const state = useWorkingCopyStore.getState();
   const rawVersion = state.baseIr?.header.version?.trim() || "1.0";
   return state.instantiationMode === "adapt-existing" ? bumpKeyboardVersion(rawVersion) : rawVersion;
-}
-
-type OptInField =
-  | "designRationale" | "fontGuidance" | "canonicalOrder" | "scriptGlossary"
-  | "exampleWords" | "scopeVariety" | "provenanceBasis" | "troubleshooting"
-  | "knownLimitations" | "relatedKeyboards" | "furtherReading";
-
-/** The opt-in "additional detail" battery — HelpDocsAnswers field ↔ Phase F question id. */
-const OPT_IN_QUESTION_IDS: ReadonlyArray<[OptInField, string]> = [
-  ["designRationale", "pf_design_rationale"],
-  ["fontGuidance", "pf_font_guidance"],
-  ["canonicalOrder", "pf_canonical_order"],
-  ["scriptGlossary", "pf_script_glossary"],
-  ["exampleWords", "pf_example_words"],
-  ["scopeVariety", "pf_scope_variety"],
-  ["provenanceBasis", "pf_provenance_basis"],
-  ["troubleshooting", "pf_troubleshooting"],
-  ["knownLimitations", "pf_known_limitations"],
-  ["relatedKeyboards", "pf_related_keyboards"],
-  ["furtherReading", "pf_further_reading"],
-];
-
-function isEnglishTag(tag: string | undefined): boolean {
-  if (tag === undefined) return true;
-  return ["", "en"].includes(primarySubtag(tag));
-}
-
-/**
- * The help prose's language tags, main language first (HelpDocsAnswers
- * .docLanguageTags). Each choice resolves to a tag: "english" → "en",
- * "target" → the keyboard's tag, "other" → that question's picker answer. A
- * second choice that can't resolve (no keyboard tag yet, blank picker) is
- * dropped, and a second language equal to the first is ignored. But an
- * unresolved MAIN language yields no tags at all: promoting the second
- * language into `tags[0]` would make it the page's `<html lang>` and
- * mislabel prose written in the main language, so the renderer instead
- * falls back to the keyboard's `primaryBcp47`. The legacy
- * single-question "bilingual" answer reads as English + the keyboard's
- * language.
- */
-function resolveDocLanguageTags(result: SurveyPhaseResult, targetBcp47: string | undefined): string[] {
-  const resolve = (choice: string | undefined, otherQuestionId: string): string | undefined => {
-    if (choice === "english") return "en";
-    if (choice === "target") return targetBcp47?.trim() || undefined;
-    if (choice === "other") return getTextAnswer(result, otherQuestionId)?.trim() || undefined;
-    return undefined;
-  };
-  const main = getTextAnswer(result, "pf_doc_language");
-  const candidates =
-    main === "bilingual"
-      ? [resolve("english", ""), resolve("target", "")]
-      : [
-          resolve(main, "pf_doc_language_other"),
-          resolve(getTextAnswer(result, "pf_doc_language_second"), "pf_doc_language_second_other"),
-        ];
-  if (candidates[0] === undefined) return [];
-  const tags: string[] = [];
-  for (const tag of candidates) {
-    if (tag !== undefined && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) tags.push(tag);
-  }
-  return tags;
-}
-
-function getTextAnswer(result: SurveyPhaseResult, questionId: string): string | undefined {
-  const answer = result.answers.find((a) => a.questionId === questionId);
-  return answer !== undefined && typeof answer.value === "string" ? answer.value : undefined;
-}
-
-/**
- * Build `HelpDocsAnswers` from a Phase F `SurveyPhaseResult`, or `undefined`
- * when the one required question (`pf_welcome_paragraph`) is blank — the
- * caller (phaseFOptions.onCommit) then skips `setHelpDocs` entirely, leaving
- * the store field exactly as it was (spec 061 research D-01).
- *
- * `pf_usage_tip_3`/`_4`/`_5` are deliberately not read — only `_1`/`_2` are
- * reachable in the live flow (research D-11). `pf_project_url` splits on a
- * newline into `projectHomeUrl`/`projectHelpUrl` — the question's own
- * documented "one or two lines" format (FR-004).
- *
- * `targetBcp47` is the keyboard's own tag, which a "the language of the
- * keyboard" doc-language answer resolves to.
- */
-export function extractHelpDocs(
-  result: SurveyPhaseResult,
-  targetBcp47?: string,
-): HelpDocsAnswers | undefined {
-  const description = getTextAnswer(result, "pf_welcome_paragraph")?.trim() ?? "";
-  if (description === "") return undefined;
-
-  const usageTips = [
-    getTextAnswer(result, "pf_usage_tip_1"),
-    getTextAnswer(result, "pf_usage_tip_2"),
-  ]
-    .map((t) => t?.trim() ?? "")
-    .filter((t) => t !== "");
-
-  const helpDocs: HelpDocsAnswers = { description, usageTips };
-
-  const credits = getTextAnswer(result, "pf_credits")?.trim();
-  if (credits !== undefined && credits !== "") helpDocs.credits = credits;
-
-  const contactInfo = getTextAnswer(result, "pf_contact_info")?.trim();
-  if (contactInfo !== undefined && contactInfo !== "") helpDocs.contactInfo = contactInfo;
-
-  const projectUrl = getTextAnswer(result, "pf_project_url");
-  if (projectUrl !== undefined) {
-    const lines = projectUrl.split("\n").map((l) => l.trim()).filter((l) => l !== "");
-    if (lines[0] !== undefined) helpDocs.projectHomeUrl = lines[0];
-    if (lines[1] !== undefined) helpDocs.projectHelpUrl = lines[1];
-  }
-
-  const docLanguageTags = resolveDocLanguageTags(result, targetBcp47);
-  if (docLanguageTags.length > 0) helpDocs.docLanguageTags = docLanguageTags;
-
-  for (const [field, questionId] of OPT_IN_QUESTION_IDS) {
-    const value = getTextAnswer(result, questionId)?.trim();
-    if (value !== undefined && value !== "") {
-      helpDocs[field] = value;
-    }
-  }
-
-  return helpDocs;
 }
 
 export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
@@ -566,24 +443,23 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
       previous: deps.historyEntryState,
     });
     if (next !== deps.historyEntryState) {
-      deps.setHistoryEntryState(next);
+      // Spec 089: no setter is plumbed through FlowStepDeps any more — this
+      // file already reads the working-copy slices via getState() for its
+      // seed functions (readAdaptiveDescriptionContext above), so the one
+      // remaining mount-time write goes through the same channel.
+      useWorkingCopyStore.getState().setHistoryEntryState(next);
     }
   },
 
   seeds: {
-    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
-      // Single registry above — one entry per seeded question, so the value
-      // and its trail source can never drift apart.
-      return PHASE_F_SEEDS[questionId]?.getValue(deps);
-    },
-
-    getSeedSource(questionId: string): DecisionProposalSource | undefined {
-      return PHASE_F_SEEDS[questionId]?.source;
-    },
-
+    // Spec 092 (T036): no getSeedValue/getSeedSource any more — the pf_*
+    // seeds are decision records now (see the T036 note above), and
+    // SurveyRunner reads them from the store. Only the required override
+    // remains a host concern.
+    //
     // spec 079 FR-009: waives pf_welcome_paragraph's static `required: true`
-    // in exactly the case getSeedValue above proposed a value — every other
-    // question (undefined here) keeps its own static `required`.
+    // in exactly the case the extraction pass seeded a prefill for it —
+    // every other question (undefined here) keeps its own static `required`.
     getRequiredOverride(questionId: string): boolean | undefined {
       if (questionId === "pf_welcome_paragraph") {
         return requiredWhenWelcomeParagraph(readAdaptiveDescriptionContext());
@@ -596,32 +472,6 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
     // Identity extraction — raw result forwarded to StepHost's generic path.
     return result;
   },
-
-  onCommit(result: PhaseFPayload, deps: FlowStepDeps): void {
-    // spec 061: wire the previously-inert Phase F answers into the working
-    // copy. Skipped entirely (not setHelpDocs(null)) when the required
-    // description is blank — see extractHelpDocs's doc comment.
-    const extracted = extractHelpDocs(
-      result,
-      deps.identityResult?.bcp47 || deps.surveyContext["bcp47_tag"],
-    );
-    if (extracted !== undefined) {
-      deps.setHelpDocs(extracted);
-    }
-
-    // spec 079 US5: apply the author's confirm / edit / dismiss decision onto
-    // the proposal onMount derived. A blank/absent pf_history_entry answer
-    // means "not decided yet" (validate() allows this) — status stays
-    // "proposed" and FR-011's placeholder marker is untouched. `current` can
-    // only be null if onMount somehow never ran (defensive; not reachable via
-    // the real factory, which always fires onMount before any answer commits).
-    const historyAction = getTextAnswer(result, "pf_history_entry");
-    const current = deps.historyEntryState;
-    if (historyAction !== undefined && isHistoryEntryAction(historyAction) && current !== null) {
-      const bulletsText = getTextAnswer(result, "pf_history_entry_bullets");
-      deps.setHistoryEntryState(applyHistoryEntryAction(historyAction, bulletsText, current));
-    }
-  },
 };
 
 // ---------------------------------------------------------------------------
@@ -633,6 +483,7 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
 // ---------------------------------------------------------------------------
 
 export const TrackStepFactoryComponent = makeFlowStepComponent(trackOptions);
+export const AttributionStepFactoryComponent = makeFlowStepComponent(attributionOptions);
 export const ProjectNameStepFactoryComponent = makeFlowStepComponent(projectNameOptions);
 export const PhaseFStepFactoryComponent = makeFlowStepComponent(phaseFOptions);
 

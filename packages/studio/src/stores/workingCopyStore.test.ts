@@ -19,7 +19,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
@@ -32,7 +32,6 @@ import type {
   IRStore,
   KeyboardIR,
   RemovalCapability,
-  SurveyAnswer,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
 import type { SourcedInventory } from "@keyboard-studio/engine";
@@ -692,124 +691,56 @@ describe("workingCopyStore — survey state consistency", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 D-4/R-08: per-step phase answers (phaseAnswersByStep sidecar).
-// recordPhase(result, { stepId }) replaces only ITS OWN step's slice of a
-// phase's answers, never the whole phase — and the phase's derived `answers`
-// is the concatenation of every step's slice in manifest order, "legacy"
-// first.
+// spec 090 T063: the per-step answer sidecar (spec 079 D-4) is deleted and
+// recordPhase no longer carries answers — settled answers live only in the
+// decision store (088). The phase slot keeps the results' non-answer fields,
+// shallow-merged per phase.
 // ---------------------------------------------------------------------------
 
-describe("workingCopyStore — recordPhase per-step answers (phaseAnswersByStep)", () => {
-  it("recording invisibles then convenience into phase C keeps invisibles' answers — a later step's record does not clobber an earlier one's", () => {
-    const invisiblesAnswers: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "zwj" },
-    ];
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: invisiblesAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "invisibles" },
-    );
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    expect(phaseC?.answers).toEqual([...invisiblesAnswers, ...convenienceAnswers]);
-  });
-
-  it("a step re-recording replaces only its OWN list — fewer answers on the re-record leaves no stale ones behind", () => {
+describe("workingCopyStore — recordPhase after the answer sidecar's deletion (T063)", () => {
+  it("stores no answers: a recorded result's answers never reach the phase slot", () => {
     useWorkingCopyStore.getState().recordPhase(
       {
         phase: "C",
-        answers: [
-          { questionId: "invisiblesQ1", answerType: "text", value: "a" },
-          { questionId: "invisiblesQ2", answerType: "text", value: "b" },
-        ],
+        answers: [{ questionId: "invisiblesQ1", answerType: "text", value: "zwj" }],
       } as unknown as SurveyPhaseResult,
       { stepId: "invisibles" },
     );
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    // invisibles re-records with FEWER answers than before (the walk changed).
-    const shrunkInvisibles: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "a-changed" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: shrunkInvisibles } as unknown as SurveyPhaseResult,
-      { stepId: "invisibles" },
-    );
-
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    // No stale "invisiblesQ2" left over from the first record — invisibles'
-    // slice was REPLACED, not merged, and convenience's slice is untouched.
-    expect(phaseC?.answers).toEqual([...shrunkInvisibles, ...convenienceAnswers]);
+    expect(phaseC?.answers).toEqual([]);
+    expect(
+      "phaseAnswersByStep" in useWorkingCopyStore.getState(),
+    ).toBe(false);
   });
 
-  it("derived phaseResults[C].answers is the concatenation in manifest order with 'legacy' first, when a step records without a stepId", () => {
-    const legacyAnswers: SurveyAnswer[] = [
-      { questionId: "legacyQ", answerType: "text", value: "pre-079" },
-    ];
-    // No stepId at all -> owner "legacy".
+  it("two steps recording into one phase keep both steps' non-answer fields (shallow merge)", () => {
     useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: legacyAnswers } as unknown as SurveyPhaseResult,
-    );
-
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    const invisiblesAnswers: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "zwj" },
-    ];
-    // invisibles comes BEFORE convenience in STEP_ORDER — recorded last here to
-    // prove the derived order is manifest order, not recording order.
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: invisiblesAnswers } as unknown as SurveyPhaseResult,
+      { phase: "C", answers: [], selectedPatternIds: ["p1"] } as unknown as SurveyPhaseResult,
       { stepId: "invisibles" },
     );
-
-    const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    expect(phaseC?.answers).toEqual([...legacyAnswers, ...invisiblesAnswers, ...convenienceAnswers]);
-  });
-
-  it("a snapshot without phaseAnswersByStep (e.g. restored pre-079) is adopted as 'legacy', and a subsequent stepId-recording appends alongside it rather than discarding it", () => {
-    const priorAnswers: SurveyAnswer[] = [
-      { questionId: "priorQ", answerType: "text", value: "from-before-079" },
-    ];
-    // Mirrors a restored snapshot: phaseResults holds real prior answers, but
-    // the sidecar is empty (as prepareWorkingCopySnapshot/applyWorkingCopySnapshot
-    // leaves it for a pre-079 draft with no phaseAnswersByStep field).
-    useWorkingCopyStore.setState({
-      phaseResults: [{ phase: "C", answers: priorAnswers } as unknown as SurveyPhaseResult],
-      phaseAnswersByStep: {},
-    });
-
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
     useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
+      { phase: "C", answers: [], computedAxes: { scriptClass: "alphabetic" } } as unknown as SurveyPhaseResult,
       { stepId: "convenience" },
     );
-
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    // The pre-existing answers survive (adopted as "legacy", which sorts
-    // first) and the new step's answers are appended, not lost.
-    expect(phaseC?.answers).toEqual([...priorAnswers, ...convenienceAnswers]);
+    expect(phaseC?.selectedPatternIds).toEqual(["p1"]);
+    expect(phaseC?.computedAxes).toEqual({ scriptClass: "alphabetic" });
+  });
+
+  it("a re-recorded phase replaces its own fields and still carries no answers", () => {
+    useWorkingCopyStore.getState().recordPhase(
+      { phase: "A", answers: [], identity: { keyboardId: "first" } } as unknown as SurveyPhaseResult,
+    );
+    useWorkingCopyStore.getState().recordPhase(
+      {
+        phase: "A",
+        answers: [{ questionId: "q", answerType: "text", value: "v" }],
+        identity: { keyboardId: "second" },
+      } as unknown as SurveyPhaseResult,
+    );
+    const phaseA = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "A");
+    expect(phaseA?.identity?.keyboardId).toBe("second");
+    expect(phaseA?.answers).toEqual([]);
   });
 });
 
@@ -1560,8 +1491,8 @@ describe("workingCopyStore — T078 mode-toggle regression suite (SC-011, FR-036
 // Regression for the Phase-5 MAJOR bug: the mutate-seam write path routed
 // incremental IR patches (US1 mutate-apply, US2 touch re-propagation, US2
 // touch promotion) through setIR, which RESETS deletedNodeIds/deletedItemIds/
-// undoStack. Those writes fire AFTER the carve step, so enabling
-// VITE_KM_MUTATE_SEAM=1 silently WIPED the live carve-deletion overlay that the
+// undoStack. Those writes fire AFTER the carve step, so enabling the
+// mutate seam (then flag-gated) silently WIPED the live carve-deletion overlay that the
 // OSK preview and shipped output project from baseIr + the overlay. The fix
 // routes those writes through setWorkingIR, which updates `ir` ONLY.
 // ---------------------------------------------------------------------------
@@ -2082,7 +2013,7 @@ describe("workingCopyStore — sequenceFlaggedChars", () => {
 // Per-working-copy Phase B proposal decisions (spec 044 FR-016a)
 //
 // `rejected` and `exemplarMethodDeclined` deliberately survive
-// phaseBDraftStore's own reset() — that runs on every entry to the build-list
+// the inventory draft's own reset() — that runs on every entry to the build-list
 // screen, and clearing them there would re-propose characters the author just
 // removed. They are per-WORKING-COPY, so the two instantiate entry points
 // clear them instead. Without that wiring the decisions were effectively
@@ -2100,16 +2031,16 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
   };
 
   afterEach(() => {
-    resetPhaseBDraftDecisions();
+    resetInventoryDecisions();
   });
 
   /** Seed a proposal, reject one of its characters, and decline the offer. */
   function declineAndReject(): void {
-    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
-    usePhaseBDraftStore.getState().remove("ɔ");
-    usePhaseBDraftStore.getState().declineExemplarMethod();
-    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    inventoryOps("characters").seedFromProposal(BM_INVENTORY, "bm");
+    inventoryOps("characters").remove("ɔ");
+    inventoryOps("characters").declineExemplarMethod();
+    expect(getCharacterInventoryValue().rejected).toContain("ɔ");
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
   }
 
   it("instantiateFromBase clears them for a new working copy", () => {
@@ -2121,8 +2052,8 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
     useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
 
-    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    expect(getCharacterInventoryValue().rejected).toEqual([]);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 
   it("instantiateFromExisting clears them for a new working copy", () => {
@@ -2133,8 +2064,8 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
     useWorkingCopyStore.getState().instantiateFromExisting(keyboardB, { vfs, ir: makeTestIR([]) });
 
-    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    expect(getCharacterInventoryValue().rejected).toEqual([]);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 
   it("a character rejected on keyboard A is proposed normally on keyboard B", () => {
@@ -2145,11 +2076,11 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
     useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
     // Entering B's build-list screen: the per-visit reset, then a fresh seed.
-    usePhaseBDraftStore.getState().reset();
-    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
+    resetInventoryDraft();
+    inventoryOps("characters").seedFromProposal(BM_INVENTORY, "bm");
 
-    expect(usePhaseBDraftStore.getState().chars).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().provenance["ɔ"]).toBe("cldr");
+    expect(getCharacterInventoryValue().chars).toContain("ɔ");
+    expect(getCharacterInventoryValue().provenance["ɔ"]).toBe("cldr");
   });
 
   it("a redundant re-fire of the SAME instantiate does not discard a live decision", () => {
@@ -2161,8 +2092,8 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     // Case 1 of resolveInstantiationCase: same id AND same mode -> full no-op.
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
 
-    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    expect(getCharacterInventoryValue().rejected).toContain("ɔ");
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
   });
 });
 

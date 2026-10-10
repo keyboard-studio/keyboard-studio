@@ -2,9 +2,17 @@
 // These describe the static question-module definition shape (survey/questions/**) —
 // distinct from the runtime SurveyAnswer/SurveyPhaseResult types in @keyboard-studio/contracts.
 
-import type { DecisionProposalSource, IRPath, KeyboardIR } from "@keyboard-studio/contracts";
-import type { DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
+import type {
+  Attribution,
+  DecisionProposalSource,
+  HelpDocsAnswers,
+  HistoryEntryState,
+  IRPath,
+  KeyboardIR,
+} from "@keyboard-studio/contracts";
+import type { DecisionId, DecisionRendererProps, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../decisions/extractContext.ts";
+import type { IdentityPatch } from "../stores/identityPatch.ts";
 
 /**
  * The two authoring tracks (spec §8 v1.3.0).
@@ -173,21 +181,49 @@ export interface OutputWrite {
 }
 
 /**
- * Context passed to a module's `mutate()` (spec-014, mutate-seam.contract.md).
+ * Context passed to a module's `apply()` (spec 089, contracts/apply-contract.md).
  *
- * The contract leaves the exact field set to the reducer apply site (gated task
- * T014); kept deliberately minimal here — the read-only current `KeyboardIR`
- * snapshot plus the module's own declared `writes` containment set, which the
- * reducer asserts the returned patch stays within.
- *
- * TODO(P5): extend with whatever the reducer apply path (steps/mutateApply.ts)
- * needs once T014 lands — do NOT over-build the shape ahead of that gate.
+ * Everything an apply may read, and nothing it may write directly: the
+ * working copy's current IR (null before instantiation), the module's own
+ * declared `writes` containment set, the FULL decision set as recorded
+ * before this completion's applies run (the completion's own records
+ * included — recording precedes applying, contract A6), and the working
+ * copy's current HISTORY-entry state (the one channel whose next value is
+ * a function of its previous value).
  */
-export interface MutateContext {
-  /** Read-only snapshot of the working-copy IR at apply time. `mutate()` MUST NOT mutate it. */
-  readonly ir: KeyboardIR;
-  /** The module's declared `writes` paths — the only IR locations the returned patch may touch. */
+export interface ApplyContext {
+  /** Current working-copy IR, or null before instantiation. `apply()` MUST NOT mutate it. */
+  readonly ir: KeyboardIR | null;
+  /** The module's declared `writes` paths — the only IR locations the patch's `ir` channel may touch. */
   readonly writes: readonly IRPath[];
+  /** The recorded decisions, including this completion's (A6: record, then apply). */
+  readonly decisions: DecisionSet;
+  /** The working copy's current HISTORY-entry state, or null before it is first derived. */
+  readonly currentHistoryEntryState: HistoryEntryState | null;
+}
+
+/**
+ * The multi-channel result of a module's `apply()` (spec 089 FR-001).
+ *
+ * Every channel is optional; absence means "no write on this channel".
+ * Channels are whole-value replaces — the apply builds the complete next
+ * slice value from `ctx.decisions` (plus `ctx.currentHistoryEntryState`
+ * for the history channel), never a diff. Which channels a module may
+ * return is fixed by the authorization table in contracts/apply-contract.md
+ * (A3): the runner rejects an unauthorized channel with `ApplyChannelError`
+ * and applies nothing.
+ */
+export interface WorkingCopyPatch {
+  /** IR patch, merged under the module's declared `writes` via the checked merge (A4). */
+  ir?: Partial<KeyboardIR>;
+  /** The working copy's identity slice (whole-value replace). */
+  identity?: IdentityPatch;
+  /** The working copy's attribution slice (whole-value replace). */
+  attribution?: Attribution;
+  /** The working copy's help-docs slice (whole-value replace). */
+  helpDocs?: HelpDocsAnswers;
+  /** The working copy's HISTORY-entry state slice (whole-value replace). */
+  historyEntryState?: HistoryEntryState;
 }
 
 /**
@@ -230,7 +266,7 @@ export interface QuestionModule {
    * IR locations this question READS — declared as static data.
    * Both `inputs` and `writes` address the same `IRPath` space over `KeyboardIR`
    * (one path algebra; no separate answer-key space). Consumed by the P0 dashboard
-   * and the orphan-input lint without invoking `mutate()`.
+   * and the orphan-input lint without invoking `apply()`.
    * Explicit `[]` is required for questions that read nothing (G7 / FR-006).
    */
   inputs?: readonly IRPath[];
@@ -246,7 +282,7 @@ export interface QuestionModule {
    * Output artifacts this question's answer reaches, if any (spec 059 FR-016).
    *
    * DIFFERENT ADDRESS SPACE from `writes`. `writes` is `IRPath[]` over
-   * `KeyboardIR` and governs `mutate()` containment; `outputs` names emitted
+   * `KeyboardIR` and governs `apply()` containment; `outputs` names emitted
    * ARTIFACTS. A question may legitimately declare `writes: []` and a non-empty
    * `outputs` — an identity answer writes no IR and still ships in the `.kps`.
    * That combination was previously inexpressible, which is why a question could
@@ -260,29 +296,22 @@ export interface QuestionModule {
   outputs?: readonly OutputWrite[];
 
   /**
-   * Optional IR mutation hook — the question-module IR write seam (spec-014,
-   * mutate-seam.contract.md). RATIFIED SIGNATURE; the implementation in any
-   * module and the reducer apply path remain GATED (task T014) — modules keep
-   * their stubs and nothing calls this yet.
-   *
-   * Contract:
-   *  - PURE: returns a `Partial<KeyboardIR>` patch; MUST NOT mutate `ctx.ir`
-   *    in place or perform side effects (M1/FR-002).
-   *  - The reducer applies the patch as a path-scoped DEEP merge restricted to
-   *    the module's declared `writes` `IRPath`s; nested siblings under a shared
-   *    parent are preserved, not branch-replaced (M2/Q9).
-   *  - Writing outside the declared `writes` is a FAIL-FAST whole-patch
-   *    rejection in all builds — never a partial apply, never swallowed, IR
-   *    left unchanged (M3/Q11/FR-003).
-   *  - IDEMPOTENT: applying the same `value` against the same IR twice is
-   *    byte-identical to applying it once (M4/FR-004).
-   *  - An empty patch `{}` is valid and merges to a no-op (M5); display-only
-   *    (empty `writes`) modules leave `mutate` absent (FR-007).
-   *
-   * Reducer apply path: steps/reducer.ts `applyStepCompletion` →
-   * steps/mutateApply.ts — OUT of scope for the contract surface (gated T014).
+   * The question module's decision-effect hook (spec 089 FR-001,
+   * contracts/apply-contract.md). PURE: computes the completion's effect on
+   * the working copy from the recorded decisions and returns it as a
+   * {@link WorkingCopyPatch}; MUST NOT mutate `ctx` or perform side effects.
+   * The runner (`applyDecisionEffects` in steps/reducer.ts) executes it
+   * unconditionally for every answered module that declares it — and for
+   * a composed module whose own question went unanswered, when the
+   * completion recorded one of its `requires` inputs — after the
+   * completion's decisions are recorded (A6). Channel authorization is
+   * fixed by the contract's table (A3) — returning an unauthorized channel
+   * throws `ApplyChannelError` and applies nothing. An empty patch `{}` is
+   * valid and writes nothing. Modules whose decisions have no working-copy
+   * effect omit `apply` entirely.
    */
-  mutate?: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
+  apply?: (value: string | string[] | undefined, ctx: ApplyContext) => WorkingCopyPatch;
+
 
   /**
    * Which spec unit(s) govern this question module (spec 031 FR-002). Same
@@ -311,6 +340,54 @@ export interface QuestionModule {
   requires?: readonly DecisionId[];
 
   /**
+   * Screen-grouping hint (spec 091 FR-002 / US3). Question-renderer modules
+   * sharing a `group` merge into one wizard screen keyed by it; a `group`
+   * naming a custom (singleton) screen instead marks the module intra-step
+   * to that screen (the two-level treatment in spec 091 research.md).
+   * Seeded per live flow at registry composition. Display/partition only:
+   * it NEVER affects order — placement is provides/requires plus the
+   * stable declaration-order tie-break (FR-001).
+   */
+  group?: string;
+
+  /**
+   * Declared screen key (spec 091, FR-002/FR-004): for a custom
+   * (component-renderer) module, the id of the singleton screen it forms.
+   * Seeded with today's step ids on the gallery modules, so derived screen
+   * ids keep the author's vocabulary (deep links, draft history). Absent on
+   * question modules (their screen id is their `group`). Never affects
+   * order.
+   */
+  screen?: string;
+
+  /**
+   * Screen-order requirements (spec 091 FR-003, phase-4 revision): decisions
+   * that must be provided by an EARLIER screen for this module's screen to be
+   * placed correctly — the former STEP-layer `requires` from the pre-091
+   * step table, re-homed. Distinct from `requires` (a
+   * question-order fact inside the flow graph): `screenRequires` is honoured
+   * ONLY by `deriveScreens`, which folds it into the full-list sort. It is
+   * deliberately invisible to per-flow ordering (orderParity / SC-002 sort a
+   * flow's modules alone, where a cross-screen decision is unresolvable and
+   * must not throw) and to the runner.
+   */
+  screenRequires?: readonly DecisionId[];
+
+  /**
+   * Snapshot-only decision dependencies (spec 092 G-14, lead ruling A2):
+   * decisions whose values join the `inputs` snapshot of records this
+   * module seeds — alongside `requires` — WITHOUT becoming ordering
+   * requirements. For a run-time DATA dependency that is not an order
+   * fact: the dependency's information stays auditable on the record
+   * (088 FR-001) while `orderDecisions` / `deriveScreens` never see the
+   * edge. Read by the live extraction pass's snapshot; invisible to
+   * ordering, gating, and the runner. NOT the `inputs` field above —
+   * that is `IRPath[]` over the KeyboardIR address space; this channel
+   * names DecisionIds.
+   */
+  snapshotInputs?: readonly DecisionId[];
+
+  /**
    * Base-keyboard probe: read this module's decisions from the import bundle
    * (spec 087 Q1) instead of asking the author. Return `undefined` when the
    * bundle carries no evidence for the decision. The result runs through
@@ -320,10 +397,40 @@ export interface QuestionModule {
   extract?: (ctx: ExtractContext) => unknown;
 
   /**
+   * Lookup default (spec 092): a value this module's decisions take when the
+   * starting point carries no evidence — resolved from a lookup (langtags,
+   * the stored author profile, an analysis) rather than from the bundle's
+   * keyboard. Runs in the live extraction pass only when `extract` produced
+   * nothing; the result runs through `validate()` and becomes
+   * `{ provenance: "default", source: <the lookup's name> }` under the same
+   * merge rules as an extraction (seed unanswered, `offered` beside an
+   * answer). Return `undefined` when the lookup has no value — a missing
+   * value is never silently defaulted. `source` names the lookup using the
+   * vocabulary the step seeders already used ("langtags", "identity",
+   * "base", "analysis"); omit it for a plain default with no named source.
+   */
+  lookupDefault?: (ctx: ExtractContext) => { value: unknown; source?: string } | undefined;
+
+  /**
+   * Seeding disposition (spec 092): whether this module's extracted/defaulted
+   * value may seed (or be offered beside) a decision at all, given the
+   * decisions resolved when the extraction pass reaches this module. Absent
+   * = always seed. Returning false skips the module entirely in the pass —
+   * no seed, no `offered` (e.g. `il_copyright_holder` on the copy track: the
+   * copied notice is retained by the attribution machinery and must not be
+   * offered for re-entry). The mechanism is generic; the track rule lives in
+   * the module's declaration, never in the pass.
+   */
+  seedWhen?: (decisions: DecisionSet) => boolean;
+
+  /**
    * Custom renderer for bulk decisions (e.g. a character-inventory picker).
-   * Absent (or "default") = the standard question field; a component dissolves
+   * Absent (or "question") = the standard question field; a component dissolves
    * a large editor panel into the same module registry. Size lives in the
-   * renderer, not the module system.
+   * renderer, not the module system. (Spec 090 FR-001: the literal was renamed
+   * from "default" to "question" — owner ruling 2026-10-06, km-lead proposals
+   * Q5 — because gallery modules always carry a component, and "question"
+   * names what the literal actually selects.)
    *
    * Typed as DecisionRendererProps<any>: modules in one registry carry
    * different answer types T, so the field is heterogeneous by design — the
@@ -331,7 +438,7 @@ export interface QuestionModule {
    * declares its own T (e.g. DecisionRendererProps<string[]>).
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  renderer?: "default" | React.ComponentType<DecisionRendererProps<any>>;
+  renderer?: "question" | React.ComponentType<DecisionRendererProps<any>>;
 
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {
@@ -343,4 +450,25 @@ export interface QuestionModule {
       expectedCode?: string;
     }>;
   };
+}
+
+/**
+ * A gallery decision module (spec 090): a QuestionModule whose decision value
+ * is a rich object rather than a question answer. `apply` and `renderer` are
+ * typed against the decision's real value type `V`; everything else (definition,
+ * provides/requires, inputs/writes, fixtures) is the plain module contract.
+ *
+ * 089's runner (`applyDecisionEffects`) is answer-shaped — it iterates
+ * step-completion answers typed `string | string[] | undefined` — so gallery
+ * modules are NOT run through it. The gallery host (steps/galleryHost.tsx)
+ * records the decision and invokes `apply` directly with an ApplyContext,
+ * reusing the runner's channel authorization and patch sink (research
+ * addendum D-090-1). The single cast back to the heterogeneous
+ * `QuestionModule` happens where the registry composes `galleryModules`.
+ */
+export interface GalleryModule<V> extends Omit<QuestionModule, "apply" | "renderer"> {
+  /** The decision this module settles — exactly one, by construction. */
+  provides: [DecisionId];
+  apply?: (value: V | undefined, ctx: ApplyContext) => WorkingCopyPatch;
+  renderer: React.ComponentType<DecisionRendererProps<V>>;
 }

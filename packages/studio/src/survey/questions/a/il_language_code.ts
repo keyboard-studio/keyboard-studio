@@ -76,5 +76,30 @@ const mod: QuestionModule = {
   provides: ["language-code"],
   requires: ["language-name"],
   extract: extractLanguageCode,
+  // Spec 092 (T033): the resolved langtags entry's code as a lookup
+  // default (the entry resolution — ISO 639-3 preferred — happens where
+  // the entry is resolved; this declaration names the value + source).
+  lookupDefault: (ctx) => {
+    const code = ctx.identity?.languageCode;
+    return code !== undefined && code !== "" ? { value: code, source: "langtags" } : undefined;
+  },
+  // Design correction (owner ruling, 2026-10-08 — recorded in
+  // specs/092-live-extraction/followups.md): the live extraction pass
+  // must never seed or offer this decision. The author selects a target
+  // language (this step's Q1–Q3); that choice is the code's ONLY live
+  // source — IdentityLite evaluates the lookupDefault above from the
+  // author's own resolution during the identity step and records it as
+  // a visible, overridable `default`. Choosing a base afterwards
+  // contributes metadata for available keys (the produced set, hence
+  // the convenience step's surplus candidates); it never writes the
+  // identity's language value. The base's code in an unanswered slot is
+  // a wrong fact about the author's language, and downstream
+  // derivations consume the slot as author-declared: the composed
+  // bcp47, Phase B's exemplar auto-seed, and the carve needed set's
+  // CLDR slice (the T028 convenience-gate failure). The `extract` probe
+  // above stays for the decision-flow probe (runDecisionFlow /
+  // DecisionsDemo), which has no prior target-language selection to
+  // override; `seedWhen` is read only by the live pass.
+  seedWhen: () => false,
 };
 export default mod;

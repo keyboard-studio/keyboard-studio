@@ -24,8 +24,7 @@ import type { FlowDef, FlowQuestion, QuestionModule } from "../survey/types.ts";
 import { computeDataEdges } from "./model.ts";
 import type { FlowGraph, GraphEdge, GraphNode, NodeKind, NodeRegion, StepGraph, StepGraphEdge, StepGraphNode } from "./model.ts";
 import { ruleTarget } from "./flowUtils.ts";
-import { manifest } from "../steps/manifest.ts";
-import { deriveStepStructure } from "../steps/stepOrder.ts";
+import { manifest, screenTrails } from "../steps/manifest.ts";
 import { formatIRPath } from "@keyboard-studio/contracts";
 
 /**
@@ -334,7 +333,7 @@ export function buildLeftoverNodes(
  *             next ungated step).
  */
 export function buildManifestStepGraph(): StepGraph {
-  const trails = deriveStepStructure(manifest);
+  const trails = screenTrails; // derived screen trails (spec 091 T014)
   const nodes: StepGraphNode[] = manifest.map((step, idx) => {
     const writePaths = step.writes.map(formatIRPath);
     const inputPaths = step.inputs.map(formatIRPath);

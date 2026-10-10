@@ -27,9 +27,11 @@ import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
+import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/decisionStore.ts";
+import { deriveIdentityResult } from "./decisions/identitySelectors.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
-import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
+import { resetInventoryDecisions } from "./survey/useInventoryDraft.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import type { Stage } from "./hooks/useKeyboardArtifact.ts";
 
@@ -42,13 +44,17 @@ import type { Stage } from "./hooks/useKeyboardArtifact.ts";
 
 vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
 vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+// CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
+// the barrel), so the shallow stubs must be registered for the files too.
+vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
-vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
-  import("./test/studioShellMocks/TouchSeedSourcePanel.tsx"),
+vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
+  import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
 vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
@@ -123,14 +129,18 @@ function advanceToTrack() {
 
 /**
  * Drive from "identity" to "prefill" via the default Track 1 (Copy) path:
- * identity → base → track → project-name → prefill.
+ * identity → base → track → attribution (#1901) → project-name → prefill.
  *
  * Track 2 (Adapt) skips project-name; tests that need that path should
- * click "track-adapt" instead.
+ * click "track-adapt" instead (attribution still applies — it sits
+ * before the fork).
  */
 function advanceToPrefill() {
   advanceToTrack();
   fireEvent.click(screen.getByTestId("track-copy"));
+  // The attribution step's stub completes on survey-advance, like
+  // project_name's — two advances now stand between track and prefill.
+  fireEvent.click(screen.getByTestId("survey-advance"));
   fireEvent.click(screen.getByTestId("survey-advance"));
 }
 
@@ -227,7 +237,7 @@ afterEach(() => {
   cleanup();
   // Spec 079 R-07: alphabetEvidenceKey / sticky decisions survive store.reset();
   // global test-setup only calls reset(), so clear them here.
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.
@@ -249,7 +259,8 @@ describe("SurveyView — prefill → B transition", () => {
 
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    // PhaseB mounts behind a lazy boundary since spec 090 T021 — await it.
+    expect(await screen.findByTestId("stage-B")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
   });
 });
@@ -908,17 +919,16 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
       vfs: createVirtualFS([]),
       ir: makeTestIR([]),
     });
-    // identityResult must be non-null in the snapshot: the restored
-    // CharactersStep renders null (its prefill guard) without it.
-    useSurveySessionStore.getState().setIdentityResult({
-      autonym: "English",
-      english: "English",
-      languageSubtag: "en",
-      targetScriptRaw: "Latn",
-      bcp47: "en-Latn",
-      supported: true,
-      prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-    });
+    // The derived identity result must be non-null in the snapshot: the
+    // restored CharactersStep renders null (its prefill guard) without it.
+    // Spec 089: that means the identity decisions are recorded.
+    {
+      const record = useDecisionStore.getState().record;
+      record({ id: "language-name", value: "English", provenance: "asked" });
+      record({ id: "language-autonym", value: "English", provenance: "asked" });
+      record({ id: "language-code", value: "en", provenance: "asked" });
+      record({ id: "target-script", value: "Latn", provenance: "asked" });
+    }
     useSurveySessionStore.getState().setLocalBase(basicKbdus);
     useSurveySessionStore.getState().setBaseConfirmed(true);
     useSurveySessionStore.getState().advance("choose_base");
@@ -1046,6 +1056,17 @@ describe("F6 wiring: promotePendingAutosave", () => {
           keyboardId: basicKbdus.id,
         } as unknown as Stage);
       }
+    });
+
+    // Spec 092 FR-004: doCommit now also waits for the authoring-track
+    // decision (the setup decision's second input, recorded by the track
+    // step's completion in production) — record it before confirming.
+    act(() => {
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: "copy",
+        provenance: "asked",
+      });
     });
 
     // Commit — fires doCommit → promotePendingAutosave.
@@ -1270,14 +1291,16 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 // require a real VFS/IR compile cycle — that belongs in a separate integration test.
 //
 // What this test covers:
-//   - Clicking "track-adapt" advances to "prefill" (skips project-name).
+//   - Clicking "track-adapt" advances to "attribution" (#1901: author/
+//     copyright are asked after the track choice, on both tracks), and
+//     from there to "prefill" (skips project-name).
 //   - The project-name stage is NOT rendered on the adapt path.
 //   - After clicking track-adapt, instantiationMode remains null (onInstantiate
 //     never fires in this mock — the routing test confirms stage progression, not
 //     store instantiation, which is covered exhaustively in workingCopyStore.test.ts).
 
 describe("SurveyView — Track 2 (adapt) routing", () => {
-  it("clicking track-adapt advances to prefill, skipping project-name", async () => {
+  it("clicking track-adapt advances through attribution to prefill, skipping project-name", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1289,13 +1312,18 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     // Click adapt (Track 2).
     fireEvent.click(screen.getByTestId("track-adapt"));
 
-    // Should be at prefill, not project-name.
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    // Should be at attribution (#1901), not project-name.
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
     expect(screen.queryByTestId("stage-track")).toBeNull();
+
+    // Advance through attribution to prefill.
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 
-  it("track-copy still advances through project-name to prefill (regression guard)", async () => {
+  it("track-copy still advances through attribution and project-name to prefill (regression guard)", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1303,9 +1331,13 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
     advanceToTrack();
     fireEvent.click(screen.getByTestId("track-copy"));
 
-    // Should be at project-name, not prefill yet.
-    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    // Should be at attribution first (#1901), not project-name yet.
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
+
+    // Advance through attribution to project-name.
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
 
     // Advance through project-name.
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -1332,7 +1364,10 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
     advanceToTrack();
     fireEvent.click(screen.getByTestId("track-adapt"));
 
-    // Adapt-track lands directly on prefill (no project-name).
+    // Adapt-track lands on attribution (#1901), then prefill (no
+    // project-name).
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
 
@@ -1541,7 +1576,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 //   2. The survey advances through steps in manifest order.
 //   3. applyStepCompletion is called (side effects fire) for mechanisms/touch.
 
-import { manifest } from "./steps/manifest.ts";
+import { manifest, screenGates } from "./steps/manifest.ts";
 import { STEP_TRAILS } from "./steps/stepOrder.ts";
 import * as StudioShellModule from "./StudioShell.tsx";
 
@@ -1553,8 +1588,9 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → layout → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → help → package (M2, spec 071/075, spec 082, spec 083)", () => {
+  it("manifest spine order is: identity → layout → choose_base → track → attribution → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → rules → mechanisms → touch → help → package (M2, spec 071/075, spec 082, spec 083, #1901)", () => {
     // track is now a real manifest step (P0 fix); project_name is a derived side trail.
+    // attribution (#1901) is spine: every author walks it after the track choice.
     const spineIds = manifest
       .filter((s) => STEP_TRAILS.get(s.id)?.spine !== false)
       .map((s) => s.id);
@@ -1563,6 +1599,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "layout",
       "choose_base",
       "track",
+      "attribution",
       "characters",
       "marks",
       "punctuation",
@@ -1581,7 +1618,9 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
   it("project_name is a derived side trail (gated) rejoining at 'characters' (M4b, P0 fix)", () => {
     const projName = manifest.find((s) => s.id === "project_name");
     expect(projName).toBeDefined();
-    expect(projName?.gatedBy).toBeDefined();
+    // Spec 091 T014/T015: steps no longer carry gatedBy — the gate is the
+    // derived screen gate published as screenGates by steps/manifest.ts.
+    expect(screenGates.get("project_name")).toBeDefined();
     expect(STEP_TRAILS.get("project_name")).toEqual({ spine: false, joinTarget: "characters" });
   });
 
@@ -1597,7 +1636,8 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
   it("touch_seed_source is a derived side trail (gated) rejoining at 'touch' (M4)", () => {
     const seedSource = manifest.find((s) => s.id === "touch_seed_source");
     expect(seedSource).toBeDefined();
-    expect(seedSource?.gatedBy).toBeDefined();
+    // Spec 091 T014/T015: the gate is the derived screen gate (screenGates).
+    expect(screenGates.get("touch_seed_source")).toBeDefined();
     expect(STEP_TRAILS.get("touch_seed_source")).toEqual({ spine: false, joinTarget: "touch" });
   });
 
@@ -1609,7 +1649,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1634,10 +1674,16 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-track")).toBeTruthy();
     expect(screen.queryByTestId("stage-base")).toBeNull();
 
-    // → project_name (manifest step: gated side trail, copy-track CYOA fork)
+    // → attribution (manifest step, #1901: author/copyright after the
+    // track choice)
     fireEvent.click(screen.getByTestId("track-copy"));
-    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-track")).toBeNull();
+
+    // → project_name (manifest step: gated side trail, copy-track CYOA fork)
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(screen.getByTestId("stage-project-name")).toBeTruthy();
+    expect(screen.queryByTestId("stage-attribution")).toBeNull();
 
     // → characters / prefill sub-stage (project_name rejoins at "characters")
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -1688,7 +1734,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-F")).toBeTruthy();
   });
 
-  it("adapt-track skips project_name (side trail) and lands directly on characters (P0 fix)", async () => {
+  it("adapt-track skips project_name (side trail) and lands on characters via attribution (P0 fix, #1901)", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1696,10 +1742,13 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     advanceToTrack();
     expect(screen.getByTestId("stage-track")).toBeTruthy();
 
-    // adapt-track: nextMainLineStepAfter("track") skips project_name (side trail).
+    // adapt-track: the fork now leaves from attribution (#1901) —
+    // nextMainLineStepAfter("attribution") skips project_name (side trail).
     fireEvent.click(screen.getByTestId("track-adapt"));
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
 
     // Must land on prefill (characters step), not project-name.
+    fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
@@ -1950,20 +1999,23 @@ describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)
     expect(screen.getByTestId("stage-B")).toBeTruthy();
   });
 
-  it("keeps the answers the walk recorded — identityResult and selectedTrack", async () => {
+  it("keeps the answers the walk recorded — the identity and track decisions (spec 089)", async () => {
     useSurveySessionStore.getState().reset();
     await mountSurvey();
     advanceToTrack();
     fireEvent.click(screen.getByTestId("track-copy"));
 
-    const identityBefore = useSurveySessionStore.getState().identityResult;
-    const trackBefore = useSurveySessionStore.getState().selectedTrack;
+    // Spec 089: identity and track live in the decision store now; the
+    // session fields this test used to read are deleted.
+    const identityBefore = deriveIdentityResult(getDecisionSnapshot());
+    const trackBefore = selectTrack(getDecisionSnapshot());
     expect(identityBefore).not.toBeNull();
+    expect(trackBefore).toBe("copy");
 
     await routeRoundTrip();
 
-    expect(useSurveySessionStore.getState().identityResult).toEqual(identityBefore);
-    expect(useSurveySessionStore.getState().selectedTrack).toBe(trackBefore);
+    expect(deriveIdentityResult(getDecisionSnapshot())).toEqual(identityBefore);
+    expect(selectTrack(getDecisionSnapshot())).toBe(trackBefore);
   });
 
   it("survives repeated round trips — the loss is not merely deferred by one", async () => {
@@ -2003,7 +2055,9 @@ describe("SurveyView — a reset happens only on an explicit start-over (spec 05
 
     expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
     expect(useSurveySessionStore.getState().history).toEqual([]);
-    expect(useSurveySessionStore.getState().identityResult).toBeNull();
+    // Spec 089: start-over resets the decision store too (088 FR-007), so
+    // the derived identity result is null again.
+    expect(deriveIdentityResult(getDecisionSnapshot())).toBeNull();
   });
 });
 

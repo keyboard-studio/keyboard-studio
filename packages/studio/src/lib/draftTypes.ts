@@ -27,9 +27,9 @@
 
 import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { WorkingCopySnapshot } from "./persistWorkingCopy.ts";
-import type { PhaseBDraftSnapshot } from "../stores/phaseBDraftStore.ts";
 import type { DecisionRecordSnapshot } from "../decisions/decisionLogStore.ts";
 import type { SurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 
 /** Lightweight peek at a stored draft, for a future resume-affordance. */
 export interface DraftMeta {
@@ -89,20 +89,16 @@ export interface ProjectIndexEntry {
  * data-model.md, reused verbatim from persistWorkingCopy.ts (working copy) and
  * surveySessionStore.ts (traversal) — see T017/T018.
  *
- * `phaseBDraft` (P0 fix, post-data-model.md addition) folds in the Phase B
- * build-list screen's in-progress typed/toggled alphabet
- * (../stores/phaseBDraftStore.ts) — NOT part of the original data-model.md
- * envelope because that store didn't exist yet. Without it, a reload/OAuth
- * return mid-build-list restored `traversal.discoveryMethod` /
- * `traversal.charactersSubStage` (already covered by TraversalSnapshot) but
- * landed the author back on the build-list screen with an EMPTY alphabet,
- * silently discarding everything they'd added — this studio-internal
- * persistence type is not the locked Pattern/Criterion contract, so extending
- * it is fine. Optional (`?`) rather than a DRAFT_VERSION bump: a
- * pre-this-change record simply has no `phaseBDraft` field, and `loadDraft`
- * treats that as "no draft alphabet yet" (`chars: []`) rather than discarding
- * an otherwise-good record — see the `envelope.phaseBDraft ??` fallback in
- * draftPersistence.ts's `loadDraft`.
+ * The Phase B build-list alphabet used to ride a `phaseBDraft` slice (P0
+ * fix, post-data-model.md addition). Since spec 090 T021 the draft IS the
+ * `character-inventory` / `invisibles-inventory` decision records, carried
+ * by the `decisions` slice below; T025 removed the `phaseBDraft` field
+ * from the written envelope. Records written between the P0 fix and T025
+ * still carry the slice: `loadDraft` reads it tolerantly off the raw
+ * record and migrates it into the decision values when the envelope's
+ * decisions don't already carry the inventory (see draftPersistence.ts's
+ * slice migration, spec 090 T025) — no DRAFT_VERSION bump, for the same
+ * reason the field never had one: it was always optional/additive.
  */
 export interface DurableDraft {
   version: number;
@@ -116,8 +112,6 @@ export interface DurableDraft {
   languageTag: string | null;
   workingCopy: WorkingCopySnapshot;
   traversal: TraversalSnapshot;
-  /** The Phase B build-list draft alphabet — see the doc comment above. */
-  phaseBDraft?: PhaseBDraftSnapshot;
   /**
    * The append-only per-keyboard decision record (specs/053-decision-audit,
    * FR-005), so the trail survives a reload rather than starting empty every
@@ -140,4 +134,25 @@ export interface DurableDraft {
    * store, so every step shows its proposal and nothing is invented (FR-032).
    */
   surveyAnswers?: SurveyAnswerSnapshot;
+  /**
+   * Spec 088 FR-007: the decision store's snapshot — the ONLY saved record
+   * of survey-question answers from draft version 2 on. Optional in the type
+   * so the v1→v2 migration output and partial envelopes type-check; every
+   * native v2 draft the writer produces carries it.
+   */
+  decisions?: DecisionSet;
+  /**
+   * Spec 088 US3 / contract C-4.3: v1 answers the migration could not map to
+   * a decision (their question no longer exists). Carried on the migrated
+   * envelope for the load path to surface to the author — never dropped, and
+   * never persisted past the load (the v2 writer does not write this field).
+   */
+  migrationOrphans?: MigrationOrphan[];
+}
+
+/** One unmappable v1 answer, kept by the migration for surfacing (C-4.3). */
+export interface MigrationOrphan {
+  questionId: string;
+  stepId: string;
+  value: unknown;
 }

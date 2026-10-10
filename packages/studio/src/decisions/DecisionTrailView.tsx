@@ -16,7 +16,7 @@
 //   - partial    -> part of the record could not be read; this is what was readable
 // None of them hides the list, because a partial trail is still worth reading.
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   supersededEntryIds,
   type DecisionEntry,
@@ -208,11 +208,52 @@ export function DecisionTrailView({
 
   const hasSuperseded = record.entries.some((e) => supersededIds.has(e.entryId));
 
+  // The reverse supersede map — entryId -> the entryId that replaced it —
+  // handed to each row as data (a row holds one entry at a time, FR-021, so
+  // it cannot know its own replacement). Powers the rows' supersede links
+  // (decisions-page enrichment): "Replaced by a later decision" becomes a
+  // way to GET to that decision, in both directions.
+  const replacedBy = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of record.entries) {
+      if (entry.supersedes !== null) map.set(entry.supersedes, entry.entryId);
+    }
+    return map;
+  }, [record.entries]);
+
   // FR-022: grouped in the order stageGroups.ts already walked — never re-sorted
   // here. FR-021: this is a pure derivation over the record; it resolves no
   // entry's impact (that only ever happens inside DecisionEntryRow, on its own
   // expand click).
   const stageGroups = useMemo(() => buildStageGroups(record), [record]);
+
+  // Reveal state for the rows' supersede links: the entry most recently
+  // asked for. Revealing un-hides a superseded target and expands its
+  // stage (both states live here, which is why the row asks rather than
+  // acts), then the effect below scrolls the now-rendered row into view
+  // and the highlight fades.
+  const [highlightedEntryId, setHighlightedEntryId] = useState<string | null>(null);
+  const revealEntry = (entryId: string) => {
+    const group = stageGroups.find((g) => g.entries.some((e) => e.entryId === entryId));
+    if (group !== undefined && collapsedSteps.has(group.stepId)) {
+      setCollapsedSteps((prev) => {
+        const next = new Set(prev);
+        next.delete(group.stepId);
+        return next;
+      });
+      onToggleStage?.(group.stepId);
+    }
+    if (supersededIds.has(entryId) && !showSuperseded) setShowSuperseded(true);
+    setHighlightedEntryId(entryId);
+  };
+
+  useEffect(() => {
+    if (highlightedEntryId === null) return;
+    const el = document.getElementById(`decision-entry-${highlightedEntryId}`);
+    el?.scrollIntoView?.({ block: "center" });
+    const timer = setTimeout(() => setHighlightedEntryId(null), 2400);
+    return () => clearTimeout(timer);
+  }, [highlightedEntryId]);
   // FR-025: a stage nothing was ever recorded for is OMITTED, never rendered as
   // though it made changes. A stage whose entries are all superseded still has
   // entries.length > 0 (FR-026 keeps that history reachable), so it is NOT
@@ -311,6 +352,17 @@ export function DecisionTrailView({
   // requires a readable degrade — never blank, never the identifier — for a
   // stepId this switch does not name (an unknown-to-the-manifest id, per
   // stageGroups.ts's FR-024 handling).
+  // A settled gallery decision count as a roll-up clause (spec 090 US5).
+  // `count` is a plain local so the Lingui macro derives the named
+  // placeholder, as with the dimension counts above.
+  const decisionCountDetail = (decisionCount: number): string => {
+    const count = decisionCount;
+    return t({
+      id: "trail.stage.rollUp.decisionSummary.decisionCount",
+      message: plural(count, { one: "# decision recorded", other: "# decisions recorded" }),
+    });
+  };
+
   const stepStageLabel = (stepId: string): string => {
     switch (stepId) {
       case "identity":
@@ -360,6 +412,7 @@ export function DecisionTrailView({
       case "not-recorded":
       case "base-contribution":
       case "survey-summary":
+      case "decision-summary":
         return stepStageLabel(group.stepId);
       case "editor-summary":
       case "editor-no-change":
@@ -459,10 +512,27 @@ export function DecisionTrailView({
       case "survey-summary": {
         const stage = stepStageLabel(group.stepId);
         const count = rollUp.answerCount;
-        const detail = t({
+        const answerDetail = t({
           id: "trail.stage.rollUp.surveySummary.answerCount",
           message: plural(count, { one: "# answer recorded", other: "# answers recorded" }),
         });
+        // spec 090 US5: a stage that also settled gallery decisions names
+        // both counts — the details are pre-localized clauses, joined by
+        // formatClauseList for the same reason as the editor dimensions.
+        // The composed message's placeholder is named `detail` (the
+        // catalogue's contract), so the joined string takes that name.
+        const detail =
+          rollUp.decisionCount !== undefined
+            ? formatClauseList([answerDetail, decisionCountDetail(rollUp.decisionCount)], i18n)
+            : answerDetail;
+        return t({
+          id: "trail.stage.rollUp.composed",
+          message: `${stage} (${detail})`,
+        });
+      }
+      case "decision-summary": {
+        const stage = stepStageLabel(group.stepId);
+        const detail = decisionCountDetail(rollUp.decisionCount);
         return t({
           id: "trail.stage.rollUp.composed",
           message: `${stage} (${detail})`,
@@ -594,6 +664,7 @@ export function DecisionTrailView({
                     <ul style={stageEntriesStyle} id={entriesRegionId}>
                       {group.entries.map((entry) => {
                         const superseded = supersededIds.has(entry.entryId);
+                        const replacementEntryId = replacedBy.get(entry.entryId);
                         return (
                           <DecisionEntryRow
                             key={entry.entryId}
@@ -601,6 +672,11 @@ export function DecisionTrailView({
                             superseded={superseded}
                             hidden={superseded && !showSuperseded}
                             resolveImpact={resolveImpact}
+                            onRevealEntry={revealEntry}
+                            highlighted={highlightedEntryId === entry.entryId}
+                            {...(replacementEntryId !== undefined
+                              ? { replacementEntryId }
+                              : {})}
                             {...(resolveImpactAsync !== undefined ? { resolveImpactAsync } : {})}
                             {...(resolveCtx !== undefined ? { resolveCtx } : {})}
                           />
