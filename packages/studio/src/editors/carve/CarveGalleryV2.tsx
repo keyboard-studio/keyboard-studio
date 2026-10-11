@@ -1135,7 +1135,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             Everything this keyboard can type
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-muted)', maxWidth: 620, lineHeight: 1.5 }}>
-            Every printable character your base keyboard can produce, in one panel. Click any character to discard it — nothing is deleted until you continue.
+            Every printable character your starting keyboard can produce, in one panel. Click any character to discard it — nothing is deleted until you continue.
           </p>
         </div>
       </div>
@@ -1348,7 +1348,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 chipBackground="color-mix(in srgb, var(--sil-red) 14%, var(--app-surface-2))"
                 chipColor="var(--app-danger-text-on-surface-2)"
                 heading={<Trans id="carve.suggested.heading">Suggested to discard</Trans>}
-                body={<Trans id="carve.suggested.body">Your base keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.</Trans>}
+                body={<Trans id="carve.suggested.startingBody">Your starting keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.</Trans>}
                 rows={primaryRows}
                 cellsByCh={cellsByCh}
                 isItemDeleted={isItemDeleted}

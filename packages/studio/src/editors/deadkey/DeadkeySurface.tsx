@@ -133,7 +133,7 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
       <FullStepPage testId="deadkey-step">
         {heading}
         <div style={emptyStyle}>
-          Choose a base keyboard first — deadkeys are defined against the working copy.
+          Choose a starting keyboard first — deadkeys are defined against the working copy.
         </div>
       </FullStepPage>
     );

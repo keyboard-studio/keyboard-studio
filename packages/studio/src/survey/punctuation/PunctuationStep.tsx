@@ -200,8 +200,8 @@ function ChosenChip({ char, isProposed, alsoBase = false, onRemove }: ChosenChip
       aria-label={
         alsoBase
           ? t({
-              id: "survey.punctuation.removeAlsoBaseAriaLabel",
-              message: `Remove ${{ char }} (${{ cp: title }}) — also produced by the base keyboard`,
+              id: "survey.punctuation.removeAlsoStartingAriaLabel",
+              message: `Remove ${{ char }} (${{ cp: title }}) — also produced by the starting keyboard`,
             })
           : t({
               id: "survey.punctuation.removeAriaLabel",
@@ -218,7 +218,7 @@ function ChosenChip({ char, isProposed, alsoBase = false, onRemove }: ChosenChip
       <span style={chipCodepoint()}>{base}</span>
       {alsoBase && (
         <span style={{ fontSize: 9, color: TEXT_DIM }} aria-hidden="true">
-          <Trans id="survey.punctuation.alsoBaseBadge">base</Trans>
+          <Trans id="survey.punctuation.alsoStartingBadge">starting</Trans>
         </span>
       )}
       <span style={chipIndicator(ERROR_RED)}>x</span>
@@ -733,11 +733,11 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
         {missingCount !== null && (
           <p data-testid="punctuation-missing-count" style={groupCaption}>
             {t({
-              id: "survey.punctuation.missingCount",
+              id: "survey.punctuation.startingMissingCount",
               message: plural(missingCount, {
-                0: "Every chosen mark is already on the base keyboard.",
-                one: "# of these is not on the base keyboard yet and will need a key.",
-                other: "# of these are not on the base keyboard yet and will need a key.",
+                0: "Every chosen mark is already on the starting keyboard.",
+                one: "# of these is not on the starting keyboard yet and will need a key.",
+                other: "# of these are not on the starting keyboard yet and will need a key.",
               }),
             })}
           </p>
@@ -784,30 +784,30 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
                 data-testid="base-punctuation-group"
                 role="group"
                 aria-label={t({
-                  id: "survey.punctuation.baseGroup.ariaLabel",
-                  message: "Proposed punctuation from the base keyboard — click to remove",
+                  id: "survey.punctuation.startingGroup.ariaLabel",
+                  message: "Proposed punctuation from the starting keyboard — click to remove",
                 })}
               >
                 <p style={groupCaption}>
                   {baseCoverageIncomplete ? (
-                    <Trans id="survey.punctuation.baseGroup.incompleteCaption">
-                      The full set of punctuation your base keyboard types is not fully
-                      known (part of the base is opaque to the studio), so only basic
+                    <Trans id="survey.punctuation.startingGroup.incompleteCaption">
+                      The full set of punctuation your starting keyboard types is not fully
+                      known (part of it is opaque to the studio), so only basic
                       ASCII punctuation is proposed here — click a mark to remove it.
                     </Trans>
                   ) : baseName !== null ? (
-                    <Trans id="survey.punctuation.baseGroup.caption">
-                      Already typed by your base keyboard ({baseName}) — proposed for
+                    <Trans id="survey.punctuation.startingGroup.caption">
+                      Already typed by your starting keyboard ({baseName}) — proposed for
                       you to keep; click a mark to remove it.
                     </Trans>
                   ) : (
-                    <Trans id="survey.punctuation.baseGroup.captionNoName">
-                      Already typed by your base keyboard — proposed for you to keep;
+                    <Trans id="survey.punctuation.startingGroup.captionNoName">
+                      Already typed by your starting keyboard — proposed for you to keep;
                       click a mark to remove it.
                     </Trans>
                   )}{" "}
-                  <Trans id="survey.punctuation.baseGroup.carveNote">
-                    Removing a mark here declares it unsupported, but the base layout
+                  <Trans id="survey.punctuation.startingGroup.carveNote">
+                    Removing a mark here declares it unsupported, but the starting keyboard
                     still types it until the discard step's punctuation rule changes.
                   </Trans>
                 </p>

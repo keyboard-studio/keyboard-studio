@@ -98,8 +98,8 @@ export function SurveyPreviewPane({
             [kb]
           </span>
           <span>
-            <Trans id="preview.empty.hint">
-              Choose a base keyboard in the wizard to see a live preview here.
+            <Trans id="preview.empty.chooseStartingHint">
+              Choose a starting keyboard in the wizard to see a live preview here.
             </Trans>
           </span>
         </div>

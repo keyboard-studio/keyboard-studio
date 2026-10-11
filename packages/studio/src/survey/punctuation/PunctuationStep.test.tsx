@@ -482,7 +482,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
 
     const base = await screen.findByTestId("base-punctuation-group");
     expect(chipsIn(base).sort()).toEqual([".", "?"].sort());
-    expect(base.textContent).toMatch(/base keyboard/i);
+    expect(base.textContent).toMatch(/starting keyboard/i);
     expect(base.textContent).not.toMatch(/not fully known/i);
     expect(getCharacterInventoryValue().provenance["."]).toBe("base");
     expect(getCharacterInventoryValue().seededProposals).toContain("punctuation-base:basic_kbdus");
@@ -522,7 +522,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
     expect(screen.getByText(`Your punctuation (${cldrChips.length + baseChips.length})`)).toBeTruthy();
 
     // "!" is in both sources: once, under CLDR, with the annotation.
-    expect(within(cldr).getByRole("button", { name: /Remove !.*also produced by the base/ })).toBeTruthy();
+    expect(within(cldr).getByRole("button", { name: /Remove !.*also produced by the starting keyboard/ })).toBeTruthy();
     expect(within(cldr).getByRole("button", { name: /Remove \u0964/ }).getAttribute("aria-label")).not.toMatch(
       /also produced/,
     );
@@ -543,7 +543,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Remove \u0964/ }));
     expect(screen.getByTestId("punctuation-missing-count").textContent).toMatch(/^1 of these/);
     fireEvent.click(screen.getByRole("button", { name: /Remove \u0965/ }));
-    expect(screen.getByTestId("punctuation-missing-count").textContent).toMatch(/already on the base keyboard/);
+    expect(screen.getByTestId("punctuation-missing-count").textContent).toMatch(/already on the starting keyboard/);
   });
 
   it("the base caption carries the always-keep note: removing here declares unsupported, but the base layout still types it", async () => {

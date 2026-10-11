@@ -17,8 +17,8 @@ import { buildDocLevelLabel, DOC_LEVEL_TONE } from "../lib/docLevelBadge.ts";
 const TRY_HINTS: Record<string, { intro: MessageDescriptor; examples: string[] }> = {
   basic_kbdus: {
     intro: msg({
-      id: "metadata.tryHint.basicKbdus.intro",
-      message: "US-English layout — types the same as your physical keyboard.",
+      id: "metadata.tryHint.basicKbdus.baseKeyboardIntro",
+      message: "US-English layout — types the same as your base keyboard.",
     }),
     examples: ["a -> a", "Shift+a -> A", "1 -> 1"],
   },

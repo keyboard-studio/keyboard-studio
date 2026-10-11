@@ -334,8 +334,8 @@ export function DecisionEntryRow({
         return t({ id: "trail.entry.meta.provenance.handSet", message: "Your own choice" });
       case "base-derived":
         return t({
-          id: "trail.entry.meta.provenance.fromBase",
-          message: "Carried from the base keyboard",
+          id: "trail.entry.meta.provenance.fromStarting",
+          message: "Carried from the starting keyboard",
         });
       case "tool-proposed": {
         if (provenance.source !== undefined) {
@@ -624,8 +624,8 @@ export function DecisionEntryRow({
     const value = spec.value;
     const question = questionText(spec.question);
     headline = t({
-      id: "trail.entry.headline.fromBase",
-      message: `Carried ${value} for ${question} from the base keyboard`,
+      id: "trail.entry.headline.fromStarting",
+      message: `Carried ${value} for ${question} from the starting keyboard`,
     });
   } else if (spec.id === "galleryDecision") {
     // spec 090 US5: the recording host's summary, verbatim — author-facing
@@ -705,8 +705,8 @@ export function DecisionEntryRow({
       const derivedAxisCount = spec.derivedAxisCount;
       const inheritedFieldCount = spec.inheritedFieldCount;
       headline = t({
-        id: "trail.entry.headline.baseContribution",
-        message: `Chose ${baseName} as the base keyboard — started with ${plural(startingKeyCount, { one: "# key", other: "# keys" })}, deriving ${plural(derivedAxisCount, { one: "# property", other: "# properties" })} and inheriting ${plural(inheritedFieldCount, { one: "# detail", other: "# details" })} from it`,
+        id: "trail.entry.headline.startingContribution",
+        message: `Chose ${baseName} as the starting keyboard — started with ${plural(startingKeyCount, { one: "# key", other: "# keys" })}, deriving ${plural(derivedAxisCount, { one: "# property", other: "# properties" })} and inheriting ${plural(inheritedFieldCount, { one: "# detail", other: "# details" })} from it`,
       });
     } else if (
       startingClause === undefined &&
@@ -716,8 +716,8 @@ export function DecisionEntryRow({
       // No count was present at all — the base itself is still named; never
       // a blank line and never a sentence with nothing in it.
       headline = t({
-        id: "trail.entry.headline.baseContribution.base",
-        message: `Chose ${baseName} as the base keyboard`,
+        id: "trail.entry.headline.startingContribution.simple",
+        message: `Chose ${baseName} as the starting keyboard`,
       });
     } else {
       // One or two of the three present. Named rather than indexed so the
@@ -735,8 +735,8 @@ export function DecisionEntryRow({
         detail = startingClause ?? derivedClause ?? inheritedClause ?? "";
       }
       headline = t({
-        id: "trail.entry.headline.baseContribution.withDetail",
-        message: `Chose ${baseName} as the base keyboard — ${detail}`,
+        id: "trail.entry.headline.startingContribution.withDetail",
+        message: `Chose ${baseName} as the starting keyboard — ${detail}`,
       });
     }
   } else {
@@ -864,13 +864,13 @@ export function DecisionEntryRow({
     const modeText =
       payload.instantiationMode === "new-from-base"
         ? t({
-            id: "trail.entry.detail.baseMode.newFromBase",
-            message: "Started as a new keyboard copied from this base.",
+            id: "trail.entry.detail.startingMode.newFromBase",
+            message: "Started as a new keyboard copied from this starting point.",
           })
         : payload.instantiationMode === "adapt-existing"
           ? t({
-              id: "trail.entry.detail.baseMode.adaptExisting",
-              message: "Updated the existing keyboard built on this base.",
+              id: "trail.entry.detail.startingMode.adaptExisting",
+              message: "Updated the existing keyboard from this starting point.",
             })
           : null;
     const modeLine = modeText !== null ? <p style={noticeStyle}>{modeText}</p> : null;
@@ -881,8 +881,8 @@ export function DecisionEntryRow({
         {!hasDerived && !hasInherited ? (
           <p style={noticeStyle}>
             {t({
-              id: "trail.entry.impact.baseContribution.empty",
-              message: "Nothing else was derived or inherited from this base.",
+              id: "trail.entry.impact.startingContribution.empty",
+              message: "Nothing else was derived or inherited from this starting keyboard.",
             })}
           </p>
         ) : (
@@ -890,16 +890,16 @@ export function DecisionEntryRow({
             {hasDerived && (
               <p style={noticeStyle}>
                 {t({
-                  id: "trail.entry.impact.baseContribution.derived",
-                  message: `Properties derived from the base: ${derivedList}`,
+                  id: "trail.entry.impact.startingContribution.derived",
+                  message: `Properties derived from the starting keyboard: ${derivedList}`,
                 })}
               </p>
             )}
             {hasInherited && (
               <p style={noticeStyle}>
                 {t({
-                  id: "trail.entry.impact.baseContribution.inherited",
-                  message: `Details inherited from the base: ${inheritedList}`,
+                  id: "trail.entry.impact.startingContribution.inherited",
+                  message: `Details inherited from the starting keyboard: ${inheritedList}`,
                 })}
               </p>
             )}
@@ -1113,9 +1113,9 @@ export function DecisionEntryRow({
             // the trailing branch below would tell them the opposite.
             <p style={noticeStyle}>
               {t({
-                id: "trail.entry.impact.unavailable.noWorkingCopyYet",
+                id: "trail.entry.impact.unavailable.chooseStarting",
                 message:
-                  "This decision was made before a keyboard existed to change, so its effect cannot be shown yet. Choose a base keyboard and it will appear here.",
+                  "This decision was made before a keyboard existed to change, so its effect cannot be shown yet. Choose a starting keyboard and it will appear here.",
               })}
             </p>
           ) : (

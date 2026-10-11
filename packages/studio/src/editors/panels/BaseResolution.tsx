@@ -138,7 +138,7 @@ export function BaseResolution({
         (err) => {
           if (!live) return;
           devLog.error("[BaseResolution] listAll() failed:", err);
-          setError(t({ id: "editor.baseResolution.loadError", message: "Could not load base keyboards." }));
+          setError(t({ id: "editor.baseResolution.startingLoadError", message: "Could not load starting keyboards." }));
           setLoading(false);
         },
       );
@@ -256,12 +256,12 @@ export function BaseResolution({
         }),
   });
 
-  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="base.picker.loading">Loading base keyboards...</Trans></div>;
+  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="starting.picker.loading">Loading starting keyboards...</Trans></div>;
   if (error !== null) return <div style={{ color: "var(--danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
   if (bases.length === 0)
     return (
       <div role="status" style={{ color: "var(--app-text-muted)", fontSize: 13, fontFamily: "var(--app-font)" }}>
-        <Trans id="base.picker.emptyCatalog">No base keyboards found. Check your connection and try again.</Trans>
+        <Trans id="starting.picker.emptyCatalog">No starting keyboards found. Check your connection and try again.</Trans>
       </div>
     );
 

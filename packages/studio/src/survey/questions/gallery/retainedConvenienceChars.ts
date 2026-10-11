@@ -1,6 +1,6 @@
 // retainedConvenienceChars — gallery decision module for `retained-convenience-chars` (spec 090).
 //
-// The convenience characters retained from the base keyboard. The
+// The convenience characters retained from the starting keyboard. The
 // toggles record the value live through onChange (design record
 // D-090-12); the step's completion result — whose
 // `retainedConvenienceChars` field `recordPhase` derives

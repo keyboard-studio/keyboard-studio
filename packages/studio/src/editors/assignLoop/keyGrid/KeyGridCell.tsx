@@ -302,18 +302,18 @@ export function KeyGridCell({
     );
   }
 
-  /** ", auto-placed from base keyboard" / ", auto-suggested from physical layout" / "" for hand-set (the unmarked default). */
+  /** ", auto-placed from starting keyboard" / ", auto-suggested from desktop layout" / "" for hand-set (the unmarked default). */
   function describeProvenance(): string {
     if (cell.provenance === undefined || cell.provenance === "hand-set") return "";
     const label =
       cell.provenance === "base-derived"
         ? t({
-            id: "editor.assignLoop.keyGrid.cell.provenanceBaseDerived",
-            message: "auto-placed from base keyboard",
+            id: "editor.assignLoop.keyGrid.cell.provenanceStartingDerived",
+            message: "auto-placed from starting keyboard",
           })
         : t({
-            id: "editor.assignLoop.keyGrid.cell.provenancePhysicalSuggested",
-            message: "auto-suggested from physical layout",
+            id: "editor.assignLoop.keyGrid.cell.provenanceDesktopSuggested",
+            message: "auto-suggested from desktop layout",
           });
     return ", " + label;
   }

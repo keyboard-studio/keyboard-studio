@@ -62,7 +62,7 @@ describe("SurveyPreviewPane", () => {
     renderPane({ localBase: null });
     expect(screen.queryByTitle("On-screen keyboard preview")).toBeNull();
     expect(
-      screen.getByText(/Choose a base keyboard/, { exact: false }),
+      screen.getByText(/Choose a starting keyboard/, { exact: false }),
     ).not.toBeNull();
   });
 });

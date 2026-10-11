@@ -388,15 +388,15 @@ describe("CharacterMapPane — data path", () => {
     });
     // "a" is a base-output glyph → accessible name carries the base hint.
     expect(
-      screen.getByRole("button", { name: /Add a \(U\+0061\) — from your base keyboard/ }),
+      screen.getByRole("button", { name: /Add a \(U\+0061\) — from your starting keyboard/ }),
     ).toBeTruthy();
     // "b" is not produced by the base → no hint.
     expect(
-      screen.queryByRole("button", { name: /Add b \(U\+0062\) — from your base keyboard/ }),
+      screen.queryByRole("button", { name: /Add b \(U\+0062\) — from your starting keyboard/ }),
     ).toBeNull();
     // Selecting "a" clears the base tint/hint (it is now a chosen alphabet char).
-    fireEvent.click(screen.getByRole("button", { name: /Add a \(U\+0061\) — from your base keyboard/ }));
-    expect(screen.queryByRole("button", { name: /from your base keyboard/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Add a \(U\+0061\) — from your starting keyboard/ }));
+    expect(screen.queryByRole("button", { name: /from your starting keyboard/ })).toBeNull();
   });
 
   it("shows a loanword letter as selected, and clicking it removes it from the loanword list only", async () => {
@@ -462,7 +462,7 @@ describe("CharacterMapPane — data path", () => {
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(
-        screen.getByText(/Characters with a dashed outline are on your base keyboard/i),
+        screen.getByText(/Characters with a dashed outline are on your starting keyboard/i),
       ).toBeTruthy();
     });
   });
@@ -477,7 +477,7 @@ describe("CharacterMapPane — data path", () => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     });
     expect(
-      screen.queryByText(/Characters with a dashed outline are on your base keyboard/i),
+      screen.queryByText(/Characters with a dashed outline are on your starting keyboard/i),
     ).toBeNull();
   });
 

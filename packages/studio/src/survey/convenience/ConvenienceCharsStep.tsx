@@ -358,8 +358,8 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
         // kept — but it is never auto-completed the way `not-applicable` is,
         // and the author sees why.
         <p style={mutedParaFlush} data-testid="convenience-unknown-notice">
-          <Trans id="survey.convenience.unknownEvidence.body">
-            We can't yet tell whether your base keyboard has extra letters your alphabet
+          <Trans id="survey.convenience.unknownEvidence.startingBody">
+            We can't yet tell whether your starting keyboard has extra letters your alphabet
             doesn't use — that depends on your alphabet being confirmed first. Continue for
             now; if it turns out there is something to keep, you'll be asked again later.
           </Trans>
@@ -368,10 +368,10 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
         <>
           <p style={mutedParaFlush}>
             {t({
-              id: "survey.convenience.intro",
+              id: "survey.convenience.startingIntro",
               message: plural(candidates.length, {
-                one: "Your alphabet doesn't use # letter from the base keyboard. Keeping it lets you type borrowed words, email addresses, and web addresses without switching keyboards.",
-                other: "Your alphabet doesn't use these # letters from the base keyboard. Keeping them lets you type borrowed words, email addresses, and web addresses without switching keyboards.",
+                one: "Your alphabet doesn't use # letter from the starting keyboard. Keeping it lets you type borrowed words, email addresses, and web addresses without switching keyboards.",
+                other: "Your alphabet doesn't use these # letters from the starting keyboard. Keeping them lets you type borrowed words, email addresses, and web addresses without switching keyboards.",
               }),
             })}
           </p>

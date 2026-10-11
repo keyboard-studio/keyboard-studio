@@ -231,8 +231,8 @@ export function TrackOneIdentityPanel() {
             aria-live="polite"
             style={{ fontSize: 12, color: WARNING, lineHeight: 1.4 }}
           >
-            <Trans id="editor.trackOneIdentity.baseIdWarning">
-              [WARN] This is still the base keyboard&rsquo;s id. Set a unique id
+            <Trans id="editor.trackOneIdentity.copiedIdWarning">
+              [WARN] This is still the copied keyboard&rsquo;s id. Set a unique id
               before submitting to the community repository.
             </Trans>
           </div>

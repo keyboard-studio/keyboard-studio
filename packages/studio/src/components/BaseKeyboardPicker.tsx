@@ -150,7 +150,7 @@ export interface BaseKeyboardPickerProps {
   value: BaseKeyboard | null;
   onChange: (kb: BaseKeyboard | null) => void;
   target?: SuggestTarget;
-  /** Visible label above the input. Defaults to "Base keyboard". */
+  /** Visible label above the input. Defaults to "Starting keyboard". */
   label?: string;
   /**
    * When provided, search is restricted to keyboards whose id is in this set
@@ -195,7 +195,7 @@ export function BaseKeyboardPicker({
   onSearchAll,
 }: BaseKeyboardPickerProps) {
   const { t } = useLingui();
-  const resolvedLabel = label ?? t({ id: "base.picker.defaultLabel", message: "Base keyboard" });
+  const resolvedLabel = label ?? t({ id: "starting.picker.defaultLabel", message: "Starting keyboard" });
   const [keyboards, setKeyboards] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -468,7 +468,7 @@ export function BaseKeyboardPicker({
             borderRadius: 6,
           }}
         >
-          <Trans id="base.picker.loading">Loading base keyboards...</Trans>
+          <Trans id="starting.picker.loading">Loading starting keyboards...</Trans>
         </div>
       )}
 
@@ -509,8 +509,8 @@ export function BaseKeyboardPicker({
           role="status"
           style={{ fontSize: 12, color: "var(--app-text-muted)", paddingTop: 4 }}
         >
-          <Trans id="base.picker.emptyCatalog">
-            No base keyboards found. Check your connection and try again.
+          <Trans id="starting.picker.emptyCatalog">
+            No starting keyboards found. Check your connection and try again.
           </Trans>
         </div>
       )}
@@ -607,7 +607,7 @@ export function BaseKeyboardPicker({
             <ul
               id={listboxId}
               role="listbox"
-              aria-label={t({ id: "base.picker.listboxLabel", message: "Base keyboard options" })}
+              aria-label={t({ id: "starting.picker.listboxLabel", message: "Starting keyboard options" })}
               style={{
                 ...POPUP_STYLE,
                 padding: 0,

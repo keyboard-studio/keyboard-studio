@@ -14,7 +14,7 @@ export const definition = {
   id: "q_sa3_latin_flavor",
   prompt: "Which Latin sub-profile should this keyboard follow?",
   help_text:
-    "The base keyboard uses a richer Latin sub-profile than a plain-Latin " +
+    "The starting keyboard uses a richer Latin sub-profile than a plain-Latin " +
     "start would assume. Plain covers the basic Latin letters; extended adds " +
     "accented/African-Latin letters; IPA covers phonetic symbols. Confirm the " +
     "profile that matches your orthography.",

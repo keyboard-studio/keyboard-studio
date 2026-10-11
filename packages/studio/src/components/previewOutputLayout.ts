@@ -13,7 +13,7 @@ export const LEFT_INIT_PCT = 40;
 /**
  * The left pane's small secondary-button treatment, shared by PickerPane's own
  * mode toggle and by whatever a caller renders into its `changeBaseSlot` (today
- * OutputScreen's "Change base keyboard"). Spread it and override only what
+ * OutputScreen's "Change starting keyboard"). Spread it and override only what
  * differs; three hand-copied style objects that had to stay in visual agreement
  * was the alternative.
  *

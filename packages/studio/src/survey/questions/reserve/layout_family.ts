@@ -10,7 +10,7 @@ import { irPath } from "@keyboard-studio/contracts";
 
 export const definition = {
   id: "layout_family",
-  prompt: "Which physical keyboard layout does your community use?",
+  prompt: "Which base keyboard layout does your community use?",
   help_text:
     "This tells the studio which keyboard patterns to offer you in the next " +
     "step. Most of the world uses QWERTY; choose QWERTZ or AZERTY only if " +

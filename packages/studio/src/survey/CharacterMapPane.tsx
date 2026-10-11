@@ -539,8 +539,8 @@ export function CharacterMapPane({
       </p>
       {baseProduced.size > 0 && (
         <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-          <Trans id="survey.characterMapPane.baseOutputLegend">
-            Characters with a dashed outline are on your base keyboard. They are not in
+          <Trans id="survey.characterMapPane.startingOutputLegend">
+            Characters with a dashed outline are on your starting keyboard. They are not in
             your alphabet until you add them.
           </Trans>
         </p>

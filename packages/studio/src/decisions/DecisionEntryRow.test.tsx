@@ -371,7 +371,7 @@ describe("spec 059 — identity entries resolved on expand", () => {
     }
     expect(new Set(Object.values(texts)).size).toBe(4);
     // And it reads as "not yet", pointing at the action that resolves it.
-    expect(texts["noWorkingCopyYet"]).toMatch(/base keyboard/i);
+    expect(texts["noWorkingCopyYet"]).toMatch(/starting keyboard/i);
     expect(texts["noWorkingCopyYet"]).not.toBe(texts["noWritePath"]);
   });
 
@@ -692,7 +692,7 @@ describe("enrichment — the meta line (provenance + recorded time, collapsed)",
       </ul>,
     );
     expect(screen.getByTestId("decision-entry-meta").textContent).toMatch(
-      /Carried from the base keyboard/,
+      /Carried from the starting keyboard/,
     );
   });
 });
@@ -828,7 +828,7 @@ describe("enrichment — the expanded detail (what was recorded)", () => {
     );
     fireEvent.click(screen.getByTestId("decision-entry-expand"));
     expect(screen.getByTestId("decision-entry-impact").textContent).toMatch(
-      /Updated the existing keyboard built on this base/,
+      /Updated the existing keyboard from this starting point/,
     );
   });
 });

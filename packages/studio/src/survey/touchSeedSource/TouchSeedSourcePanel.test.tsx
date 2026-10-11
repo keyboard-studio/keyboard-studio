@@ -367,7 +367,7 @@ describe("TouchSeedSourcePanel — advisories", () => {
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-reseed").textContent).toContain(
-      "discards the base's shipped phone/desktop touch platforms",
+      "discards the starting keyboard's shipped phone/desktop touch platforms",
     );
   });
 
@@ -420,7 +420,7 @@ describe("TouchSeedSourcePanel — confirm", () => {
     // The drop advisory is present on the Reseed card regardless of which
     // choice is currently selected (it reflects the base's shipped platforms).
     expect(screen.getByTestId("seed-source-reseed").textContent).toContain(
-      "discards the base's shipped phone/desktop touch platforms",
+      "discards the starting keyboard's shipped phone/desktop touch platforms",
     );
 
     fireEvent.click(screen.getByTestId("seed-source-reseed"));

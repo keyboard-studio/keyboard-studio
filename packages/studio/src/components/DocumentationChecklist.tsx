@@ -244,7 +244,7 @@ export function DocumentationChecklist() {
                       checked={effectivePreference === "keep-base-images"}
                       onChange={() => setChartPreference("keep-base-images")}
                     />
-                    <Trans id="output.docs.charts.keepBaseImages">Keep base images</Trans>
+                    <Trans id="output.docs.charts.keepStartingImages">Keep starting keyboard images</Trans>
                   </label>
                   <label style={{ display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                     <input

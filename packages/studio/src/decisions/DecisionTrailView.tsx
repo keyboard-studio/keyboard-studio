@@ -370,7 +370,7 @@ export function DecisionTrailView({
       case "layout":
         return t({ id: "trail.stage.name.layout", message: "Community keyboard layout" });
       case "choose_base":
-        return t({ id: "trail.stage.name.chooseBase", message: "Choosing a base keyboard" });
+        return t({ id: "trail.stage.name.chooseStarting", message: "Choosing a starting keyboard" });
       case "track":
         return t({ id: "trail.stage.name.track", message: "Authoring track" });
       case "project_name":

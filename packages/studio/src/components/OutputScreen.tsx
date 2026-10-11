@@ -3,7 +3,7 @@
 // Left pane: shared PickerPane. Which variant depends on whether a working
 // copy exists (spec 058):
 //   - instantiated (the normal end-of-flow arrival) -> "shipping": read-only
-//     base provenance + a "Change base keyboard" control that routes back to
+//     base provenance + a "Change starting keyboard" control that routes back to
 //     the survey's choose_base step, plus TrackOneIdentityPanel and KmnEditor.
 //     No mode toggle, no picker — nothing on the ship-it screen can re-base
 //     the working copy in place. See PickerPane.tsx's variant notes.
@@ -195,7 +195,7 @@ export function OutputScreen() {
   // predicate — do not fork a second notion of "has a working copy".
   const instantiated = useWorkingCopyStore((s) => s.isInstantiated());
 
-  // "Change base keyboard" — relocates re-basing to the survey's choose_base
+  // "Change starting keyboard" — relocates re-basing to the survey's choose_base
   // step rather than mutating the working copy from the ship-it screen. A BACK
   // action (see backToChooseBase's docstring for why an advance() would corrupt
   // the history stack), and it deliberately mutates nothing itself: the rebase
@@ -246,12 +246,12 @@ export function OutputScreen() {
         // problem, and its banner is the one carrying the control that fixes it.
         licenseUnparseable !== null
         ? t({
-            id: "output.download.aria.licenseUnreadable",
+            id: "output.download.aria.startingLicenseUnreadable",
             // Names the field the author is being sent to ("Original copyright
             // holder" in the banner below) rather than paraphrasing it, so the
             // announcement and the control it points at use the same words.
             message:
-              "Download unavailable — the base keyboard's original copyright holder could not be read. Confirm it in the banner below.",
+              "Download unavailable — the starting keyboard's original copyright holder could not be read. Confirm it in the banner below.",
           })
         : attributionMissing
           ? t({
@@ -299,7 +299,7 @@ export function OutputScreen() {
             // authored here — see PANE_SECONDARY_BUTTON in previewOutputLayout.
             style={{ ...PANE_SECONDARY_BUTTON, alignSelf: "flex-start" }}
           >
-            <Trans id="output.changeBase.label">Change base keyboard</Trans>
+            <Trans id="output.changeStarting.label">Change starting keyboard</Trans>
           </button>
         }
         narrow={narrow}
@@ -584,8 +584,8 @@ export function OutputScreen() {
               >
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
                   {"[ERROR] "}
-                  <Trans id="output.status.licenseUnreadable.title">
-                    The base keyboard&apos;s copyright notice could not be read
+                  <Trans id="output.status.startingLicenseUnreadable.title">
+                    The starting keyboard&apos;s copyright notice could not be read
                   </Trans>
                 </div>
                 <div style={{ marginBottom: 6 }}>
@@ -708,10 +708,10 @@ export function OutputScreen() {
                 style={{ fontSize: 12, color: "var(--app-warning-text)", marginTop: 4 }}
               >
                 {"[WARN] "}
-                <Trans id="output.identity.warn">
-                  Your keyboard id is still set to the base keyboard&rsquo;s
+                <Trans id="output.identity.copiedWarn">
+                  Your keyboard id is still set to the copied keyboard&rsquo;s
                   id. Downloading now will name the .zip and its internal
-                  file paths after the base id. Set your own keyboard name
+                  file paths after the copied keyboard&rsquo;s id. Set your own keyboard name
                   and id before downloading or submitting to the community
                   repository.
                 </Trans>{" "}

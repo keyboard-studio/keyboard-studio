@@ -447,8 +447,8 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
           </span>
           <span style={{ fontSize: 12, color: TEXT_DIM }}>
             {hasUsableBaseLayout
-              ? <Trans id="editor.touchSeed.importAdaptUsable">Keep the base's shipped touch layout and carry your desktop work onto it.</Trans>
-              : <Trans id="editor.touchSeed.importAdaptUnusable">There is no base touch layout to import — this option starts from an empty layout.</Trans>}
+              ? <Trans id="editor.touchSeed.importAdaptStartingUsable">Keep the starting keyboard's shipped touch layout and carry your desktop work onto it.</Trans>
+              : <Trans id="editor.touchSeed.importAdaptStartingUnusable">There is no starting touch layout to import — this option starts from an empty layout.</Trans>}
           </span>
         </button>
 
@@ -471,8 +471,8 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
           <span style={{ fontSize: 12, color: TEXT_DIM }}>
             <Trans id="editor.touchSeed.reseedDescription">Derive a fresh tablet layout from your desktop key assignments.</Trans>
             {hasOtherPlatforms && (
-              <Trans id="editor.touchSeed.reseedDiscardsPlatforms">
-                {" "}Choosing this discards the base's shipped phone/desktop touch platforms — only a tablet layout is produced.
+              <Trans id="editor.touchSeed.reseedDiscardsStartingPlatforms">
+                {" "}Choosing this discards the starting keyboard's shipped phone/desktop touch platforms — only a tablet layout is produced.
               </Trans>
             )}
           </span>
@@ -495,7 +495,7 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
   const previewContent = selected === "import-adapt" ? (
     <div style={previewCardStyle} data-testid="seed-source-preview">
       <p style={previewEyebrowStyle}>
-        <Trans id="editor.touchSeed.baseLayoutEyebrow">Base touch layout</Trans>
+        <Trans id="editor.touchSeed.startingLayoutEyebrow">Starting touch layout</Trans>
       </p>
       {preview !== null && (
         <p style={{ margin: "0 0 10px 0", fontSize: 13, color: TEXT_MAIN, fontFamily: FONT }}>
@@ -511,8 +511,8 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
           style={{ margin: "0 0 10px 0", fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}
         >
           {isMalformed
-            ? <Trans id="editor.touchSeed.malformedNote">This base's touch layout could not be read (malformed JSON) — treated as no layout.</Trans>
-            : <Trans id="editor.touchSeed.absentNote">This base ships no touch layout.</Trans>}
+            ? <Trans id="editor.touchSeed.startingMalformedNote">The starting keyboard's touch layout could not be read (malformed JSON) — treated as no layout.</Trans>
+            : <Trans id="editor.touchSeed.startingAbsentNote">The starting keyboard ships no touch layout.</Trans>}
         </p>
       )}
 

@@ -10,7 +10,7 @@
 //
 // Copy stays neutral per the A2 tradeoff principle: the count label states a
 // number, never advice, and the toggle is just Show/Hide notes. Findings with
-// origin upstream — inherited from the base keyboard, untouched by the
+// origin upstream — inherited from the starting keyboard, untouched by the
 // author — render muted under their own subheading, mirroring the chip rail
 // convention for upstream findings.
 
@@ -140,8 +140,8 @@ export function DocumentationFindingsSummary({
                   color: TEXT_DIM,
                 }}
               >
-                <Trans id="docFindingsSummary.inheritedHeading">
-                  Inherited from the base keyboard
+                <Trans id="docFindingsSummary.startingInheritedHeading">
+                  Inherited from the starting keyboard
                 </Trans>
               </p>
               {upstream.map((f, i) => (

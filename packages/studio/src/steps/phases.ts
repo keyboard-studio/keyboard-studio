@@ -89,7 +89,7 @@ export const PHASES: readonly PhaseDef[] = [
   },
   {
     letter: "B",
-    label: msg({ id: "phaseStepper.phase.b", message: "Base keyboard" }),
+    label: msg({ id: "phaseStepper.phase.starting", message: "Starting keyboard" }),
     // attribution (#1901): the author/copyright step walks between
     // track and project_name — same "Base keyboard" phase as its
     // neighbours (it settles who the base-derived keyboard belongs to).

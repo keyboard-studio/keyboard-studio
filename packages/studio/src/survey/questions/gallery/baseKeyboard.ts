@@ -21,7 +21,7 @@ export const definition = {
   id: "baseKeyboard",
   type: "notice" as const,
   prompt: "Which existing keyboard should yours start from?",
-  audit_label: "Base keyboard",
+  audit_label: "Starting keyboard",
 };
 
 // The base-keyboard decision value type is declared with the renderer in

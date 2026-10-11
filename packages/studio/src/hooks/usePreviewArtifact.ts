@@ -357,7 +357,7 @@ export function usePreviewArtifact(): PreviewArtifact {
    */
   const emissionBlockReason: string | null =
     licenseUnparseable !== null
-      ? "The base keyboard's copyright notice could not be read — supply the original holder before downloading."
+      ? "The starting keyboard's copyright notice could not be read — supply the original holder before downloading."
       : attributionMissing
         ? "Add the author and copyright holder before downloading."
         : null;

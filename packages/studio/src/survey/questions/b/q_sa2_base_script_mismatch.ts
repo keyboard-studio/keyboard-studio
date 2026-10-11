@@ -15,14 +15,14 @@ export const definition = {
   prompt:
     "This starting keyboard's own script differs from the script you chose. Retarget it to your script?",
   help_text:
-    "The base keyboard you picked was written for a different (or mixed) " +
+    "The starting keyboard you picked was written for a different (or mixed) " +
     "script. We can retarget its layout to the script you chose, or keep the " +
-    "base's script if you picked it on purpose.",
+    "starting keyboard's script if you picked it on purpose.",
   type: "radio" as const,
   required: true,
   options: [
     { value: "retarget", label: "Retarget to the script I chose" },
-    { value: "keep-base", label: "Keep the base keyboard's script" },
+    { value: "keep-base", label: "Keep the starting keyboard's script" },
   ],
   next: null,
 } satisfies import("../../types.ts").FlowQuestion;
@@ -32,7 +32,7 @@ const VALID_VALUES = new Set(["retarget", "keep-base"]);
 export function validate(value: string | string[] | undefined): ValidationResult {
   const v = typeof value === "string" ? value : "";
   if (!v) {
-    return { ok: false, code: "required", message: "Please confirm the base keyboard's script." };
+    return { ok: false, code: "required", message: "Please confirm the starting keyboard's script." };
   }
   if (!VALID_VALUES.has(v)) {
     return { ok: false, code: "invalid_option", message: `"${v}" is not a valid choice.` };
@@ -42,8 +42,8 @@ export function validate(value: string | string[] | undefined): ValidationResult
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
-    { value: "retarget", note: "align the base to the chosen script" },
-    { value: "keep-base", note: "keep the base's own script" },
+    { value: "retarget", note: "align the starting keyboard to the chosen script" },
+    { value: "keep-base", note: "keep the starting keyboard's own script" },
   ],
   invalid: [
     { value: "", expectedCode: "required" },
