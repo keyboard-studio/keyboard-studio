@@ -19,6 +19,7 @@ import {
 } from "../lib/scriptAxes.ts";
 import type { ScriptClass } from "@keyboard-studio/contracts";
 import { ruleTarget } from "./flowUtils.ts";
+import { evalConditionGrammar } from "../survey/conditionGrammar.ts";
 
 export interface ScriptRoutingRow {
   /** Raw il_target_script option value (e.g. "Latn", "romanization-Latn"). */
@@ -39,11 +40,18 @@ export interface ScriptRoutingRow {
 
 const ID_TARGET_SCRIPT = "il_target_script";
 
-/** Minimal matcher for the `value == 'X'` (optionally `or`-joined) condition form. */
+/**
+ * Match a goto rule's condition against an answer value, through the shared
+ * condition grammar (`survey/conditionGrammar.ts`) — the same evaluator
+ * `SurveyRunner.resolveNext` uses, so routing here cannot drift from the
+ * live walk. Only `value` is mappable in this context; a `ctx.*` clause is
+ * unmappable and counts as false (propagate: false, the live behaviour).
+ */
 function conditionMatches(condition: string | undefined, value: string): boolean {
   if (!condition) return true; // a default/fallthrough rule
-  return condition.split(" or ").some((clause) =>
-    clause.trim().match(/^value\s*==\s*'([^']*)'$/)?.[1] === value
+  return (
+    evalConditionGrammar(condition, (lhs) => (lhs === "value" ? value : undefined), false) ===
+    true
   );
 }
 
