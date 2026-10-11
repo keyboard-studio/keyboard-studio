@@ -939,6 +939,14 @@
       "decisions": [],
       "notes": "Proposed — planning spec only (PR #1936); no implementation yet. Acknowledged to register the section; implementation is future work."
     },
+    "specs/086-context-normalization-group": {
+      "title": "Feature Specification: Context normalization group",
+      "hash": "sha256:e941c0d01dbc2742",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
     "specs/087-decision-backend": {
       "title": "Backend Streamlining: Decisions as the Only Unit",
       "hash": "sha256:54ac0790f34155e4",

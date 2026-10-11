@@ -19,10 +19,18 @@
 // logic is testable without a compile.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import type { applyFacetTransform as ApplyFacetTransform, ContextToleranceOverlay } from "@keyboard-studio/engine";
+import {
+  isNormalizationStepBatch,
+  type applyFacetTransform as ApplyFacetTransform,
+  type ContextToleranceOverlay,
+} from "@keyboard-studio/engine";
 
 import type { ContextToleranceState } from "../stores/workingCopyStore.ts";
-import { buildContextToleranceProposal } from "../survey/marks/contextToleranceProposal.ts";
+import {
+  buildContextToleranceProposal,
+  buildNormalizationStepProposal,
+  NORMALIZATION_STEP_SITE,
+} from "../survey/marks/contextToleranceProposal.ts";
 import type { ContextToleranceEngine } from "./contextToleranceEngine.ts";
 
 type Ready = Extract<ContextToleranceState, { status: "ready" }>;
@@ -41,7 +49,13 @@ export type ContextToleranceApplyOutcome =
   | { kind: "refused"; reason: string };
 
 export interface ContextToleranceApplyDeps {
-  engine: Pick<ContextToleranceEngine, "createContextToleranceMigrationRule" | "buildContextToleranceOverlay">;
+  engine: Pick<
+    ContextToleranceEngine,
+    | "createContextToleranceMigrationRule"
+    | "buildContextToleranceOverlay"
+    | "createNormalizationStepMigrationRule"
+    | "buildNormalizationStepOverlay"
+  >;
   applyFacetTransform: typeof ApplyFacetTransform;
 }
 
@@ -52,6 +66,10 @@ export async function applyContextToleranceDecision(
 ): Promise<ContextToleranceApplyOutcome> {
   if (analysis.fingerprint !== decision.fingerprint) {
     return { kind: "stale", staleSiteIds: [...decision.acceptedSiteIds] };
+  }
+
+  if (analysis.normalizationStep !== undefined) {
+    return applyNormalizationStepDecision(decision, analysis, analysis.normalizationStep, deps);
   }
 
   const ruleIdBySite = new Map(analysis.fixableRuleIds.map((id) => [analysis.siteKeys[id] ?? id, id] as const));
@@ -95,7 +113,39 @@ export function contextTolerancePatch(
     applyContextToleranceOverlay: (ir: KeyboardIR, o: ContextToleranceOverlay) => { ir: KeyboardIR };
   },
 ): Pick<KeyboardIR, "groups" | "comments"> {
-  const stripped = previous === null ? working : engine.removeContextToleranceOverlay(working, previous);
-  const target = next === null ? stripped : engine.applyContextToleranceOverlay(stripped, next).ir;
+  // A normalization step also moves the entry point, which is outside the seam's
+  // declared writes, so it lives only in the overlay the projection replays;
+  // the working IR carries no step and has nothing to strip or add for it.
+  const stripped =
+    previous === null || previous.batches.some(isNormalizationStepBatch)
+      ? working
+      : engine.removeContextToleranceOverlay(working, previous);
+  const target =
+    next === null || next.batches.some(isNormalizationStepBatch)
+      ? stripped
+      : engine.applyContextToleranceOverlay(stripped, next).ir;
   return { groups: target.groups, comments: target.comments };
+}
+
+/**
+ * The step is one all-or-nothing site: accepted when the decision names it,
+ * otherwise nothing is applied. The gate verifies the candidate exactly as it
+ * does for the variants; the overlay records the step for the projection.
+ */
+async function applyNormalizationStepDecision(
+  decision: ContextToleranceApplyDecision,
+  analysis: Ready,
+  step: NonNullable<Ready["normalizationStep"]>,
+  deps: ContextToleranceApplyDeps,
+): Promise<ContextToleranceApplyOutcome> {
+  const staleSiteIds = decision.acceptedSiteIds.filter((k) => k !== NORMALIZATION_STEP_SITE);
+  if (!decision.acceptedSiteIds.includes(NORMALIZATION_STEP_SITE)) return { kind: "stale", staleSiteIds };
+
+  const proposal = buildNormalizationStepProposal({ ruleCount: step.ruleCount, framing: "", description: "" });
+  const ruleOverride = deps.engine.createNormalizationStepMigrationRule(step);
+  const result = await deps.applyFacetTransform(analysis.analysedIr, proposal, { ruleOverride });
+  if (result.status !== "committed") {
+    return { kind: "refused", reason: result.failure.reason };
+  }
+  return { kind: "applied", overlay: deps.engine.buildNormalizationStepOverlay(step), staleSiteIds };
 }

@@ -15,6 +15,9 @@
  * - Strip `groupNodeId` on RawKmnFragment — holds a minted group nodeId; after
  *   emit→re-parse the owning group gets a new minted id (a differently-named
  *   field not caught by the plain nodeId strip).
+ * - Strip `storeSketch` on RawKmnFragment — a lenient parser annotation
+ *   derived from *earlier* stores, so an IR filtered in place (e.g. by
+ *   carveFilterIr) keeps the pre-filter sketch while a re-parse recomputes it.
  * - Sort the `stores` array by name so file-order vs canonical-order
  *   differences do not cause false failures.
  * - Sort the `raw` array by reason (order not semantically significant).
@@ -29,6 +32,7 @@ export function normaliseForComparison(ir: KeyboardIR): unknown {
       if (key === "nodeId") return "__stripped__";
       if (key === "sourceLine") return undefined;
       if (key === "groupNodeId") return "__stripped__";
+      if (key === "storeSketch") return undefined;
       if (key === "anchorRef" && value != null && typeof value === "object") {
         return { ...(value as object), nodeId: "__stripped__" };
       }

@@ -1,0 +1,17 @@
+{
+  "generatorVersion": "1",
+  "corpusCommit": "435f82d69bfc926eb03c2d8632571b41b6da3266",
+  "regressed": [
+    "dives_akuru_inscript",
+    "easy_chakma",
+    "grantha_inscript",
+    "kaithi_inscript",
+    "kirat_rai_inscript",
+    "malar_tirhuta",
+    "nlci_tamil_winscript",
+    "siddham_inscript",
+    "takri",
+    "tirhuta",
+    "todhri"
+  ]
+}

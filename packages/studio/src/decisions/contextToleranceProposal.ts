@@ -7,6 +7,11 @@
 // the proposal is read off the result being recorded rather than off any
 // store. Accepting everything therefore records `tool-proposed` / `analysis`;
 // a partial or declined outcome records `hand-set` with the offer attached.
+//
+// A normalization step (spec 086) is one all-or-nothing site, so its
+// `proposedSiteIds` is `["normalization-step"]` and the outcome is only ever
+// accept (`["normalization-step"]`) or decline (`[]`), never partial. The
+// question ids are unchanged, so no branching is needed here.
 
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { ProposalLookup } from "./recordSurveyAnswers.ts";

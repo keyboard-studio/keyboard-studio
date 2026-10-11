@@ -71,7 +71,9 @@ export * from "./validator";
 export * from "./ir/backspaceContext";
 export * from "./ir/composable";
 export * from "./ir/deadkeys";
+export * from "./ir/usBaseLayout";
 export * from "./ir/producedSet";
+export * from "./ir/outputRepertoire";
 // The reachability-aware sibling view (spec 063). Deliberately a separate
 // function, not an option on buildProducedSet - see both module headers.
 export * from "./ir/reachableProducedSet";

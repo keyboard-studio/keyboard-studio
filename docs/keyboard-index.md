@@ -42,15 +42,20 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
+| Easy Chakma | `easy_chakma` | `ccp` | Bivuti Chakma | `../keyboards/release/e/easy_chakma` |
+| Thuɔŋjäŋ | `el_dinka` | `din-Latn`, `dip-Latn`, `diw-Latn`, `dib-Latn`, `dks-Latn`, `dik-Latn` | © 2015-2018 Enabling Languages | `../keyboards/release/el/el_dinka` |
 | Naija NFD | `el_naija` | `abn-Latn`, `bky-Latn`, `bwr-Latn`, `deg-Latn`, `igb-Latn`, `bin-Latn`, `efi-Latn`, `eka-Latn`, `ekp-Latn`, `elm-Latn`, `enn-Latn`, `ish-Latn`, `gbr-Latn`, `aaa-Latn`, `gkn-Latn` … (+37 more) | Andrew Cunningham and Chinedu Uchechukwu | `../keyboards/release/el/el_naija` |
+| pan-Sahelian | `el_pan_sahelian` | `fub` | © Enabling Languages | `../keyboards/release/el/el_pan_sahelian` |
 | Pasifika | `el_pasifika` | `mi-Latn`, `rar-Latn`, `fj`, `haw-Latn`, `niu`, `sm`, `ty-Latn`, `to` | © 2018 Enabling Languages | `../keyboards/release/el/el_pasifika` |
 | Övdalsk | `elfdalian` | `ovd` | Craig Cornelius | `../keyboards/experimental/e/elfdalian` |
 | தமிழ்99 \| Tamil99 | `ekwtamil99uni` | `ta` | Mugunth, Umar, K. Sethu | `../keyboards/release/e/ekwtamil99uni` |
 | Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
 | Dane-Z̲aa Z̲áágéʔ | `fv_dane_zaa_zaage` | `bea` | Clarissa Forbes | `../keyboards/release/fv/fv_dane_zaa_zaage` |
 | X̱aayda-X̱aad Kil | `fv_hlgaagilda_xaayda_kil` | `hax` | (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey | `../keyboards/release/fv/fv_hlgaagilda_xaayda_kil` |
+| Northern Tutchone | `fv_northern_tutchone` | `ttm-Latn` | (c) 2008-2019 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey | `../keyboards/release/fv/fv_northern_tutchone` |
 | ᓀᐦᐃᔭᐍᐏᐣ (Plains Cree) | `fv_plains_cree` | `crk` | (c) 2015-2025 FirstVoices, SIL Global, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_plains_cree` |
 | ᑐᑊᘁᗕᑋᗸ (Southern Carrier) | `fv_southern_carrier` | `caf-Cans` | (c) 2015-2024 FirstVoices, SIL International, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_southern_carrier` |
+| Łingít | `fv_tlingit` | `tli` | © 2015-2024 FirstVoices, SIL International, 2015 First Peoples' Cultural Foundation, parts 2007 Chris Harvey | `../keyboards/release/fv/fv_tlingit` |
 | Galaxie Greek (Mnemonic) | `galaxie_greek_mnemonic` | `grc-Grek`, `el` | Hampton Keathley | `../keyboards/release/g/galaxie_greek_mnemonic` |
 | Gautami Bangla/Bengali | `gautami_bangla_bengali` | `bn-IN` | Gautam Sengupta | `../keyboards/release/gautami/gautami_bangla_bengali` |
 | Gautami Devanagari | `gautami_devanagari` | `hi`, `sa` | Gautam Sengupta | `../keyboards/release/gautami/gautami_devanagari` |
@@ -100,16 +105,19 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Telugu Winscript (NLCI) | `nlci_telugu_winscript` | `te` | Binila Sanki, SG NLCI | `../keyboards/release/nlci/nlci_telugu_winscript` |
 | Philippines (SIL) | `sil_philippines` | `tl`, `abc-Latn`, `abp-Latn`, `abx-Latn`, `agn-Latn`, `agt-Latn`, `agy-Latn`, `akl-Latn`, `alj-Latn`, `apf-Latn`, `atd-Latn`, `att-Latn`, `bcl-Latn`, `bgs-Latn`, `bhk-Latn` … (+110 more) | Kåre J. Strømme | `../keyboards/release/sil/sil_philippines` |
 | Senegal Bayot AZERTY | `sil_senegal_bda_azerty` | `bda` | SIL Senegal | `../keyboards/release/sil/sil_senegal_bda_azerty` |
+| Tchad | `sil_tchad` | `shu-Latn`, `sjg`, `bmi`, `bva`, `bjv`, `bxv`, `bes`, `bid`, `btf`, `bvo`, `glc`, `bvf`, `bub`, `bdm`, `bso` … (+115 more) | Jeff Heath | `../keyboards/release/sil/sil_tchad` |
 | Tchad QWERTY | `sil_tchad_qwerty` | `amj`, `sjg`, `bmi`, `bva`, `bjv`, `bxv`, `bes`, `bid`, `btf`, `bvo`, `glc`, `bvf`, `bub`, `bdm`, `bso` … (+116 more) | Jeff Heath & Roger Nadoumngar | `../keyboards/release/sil/sil_tchad_qwerty` |
 | Uganda-Tanzania Bantu (SIL) | `sil_uganda_tanzania` | `sw`, `lg-Latn`, `swh-Latn`, `asa-Latn`, `bdp-Latn`, `bez-Latn`, `bou-Latn`, `cgg-Latn`, `cwa-Latn`, `cwe-Latn`, `dhs-Latn`, `dne-Latn`, `doe-Latn`, `fip-Latn`, `gmx-Latn` … (+96 more) | 2004-2020 SIL International | `../keyboards/release/sil/sil_uganda_tanzania` |
 | SIL Yi | `sil_yi` | `ii` | Andy Eatough, Dennis Walters, David Rowe | `../keyboards/release/sil/sil_yi` |
 | Yorùbá with Dot | `sil_yoruba_dot` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba_dot` |
 | Yorùbá 8 | `sil_yoruba8` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba8` |
 | Sorani Behdini (Qwerty) | `sorani_behdini_arab_qwerty` | `ku-Arab`, `kmr-Arab`, `ku-Arab-TR`, `ckb` | © SIL Global | `../keyboards/release/s/sorani_behdini_arab_qwerty` |
+| Takri | `takri` | `xnr-Takr` | (c) manik | `../keyboards/release/t/takri` |
 | Tamil 99 | `tamil99` | `ta` | Muthu Nedumaran | `../keyboards/release/tamil/tamil99` |
 | த99-விரிவு \| ta99 Extended | `thamizha_tamil99_ext` | `ta` | Umar(csd_one@yahoo.com), Mugunth (mugunth@gmail.com) and K. Sethu (skhome@gmail.com) | `../keyboards/release/t/thamizha_tamil99_ext` |
 | சுரதா-பாமுனி \| Suratha Bamini | `thamizha_bamini` | `ta` | © thamizha.com and SIL Global | `../keyboards/release/t/thamizha_bamini` |
 | புதிய தட்டெழுதி \| New Typewriter | `thamizha_new_typewriter` | `ta` | Mugunth (mugunth@gmail.com), Umar (csd_one@yahoo.com) and K. Sethu (skhome@gmail.com) | `../keyboards/release/t/thamizha_new_typewriter` |
+| Todhri | `todhri` | `sq-Todr`, `als-Todr` | © SIL Global | `../keyboards/release/t/todhri` |
 | Triqui Itunyoso | `triqui_itunyoso` | `trq` | Kayla Shames | `../keyboards/release/t/triqui_itunyoso` |
 | Unifon | `unifon` | `en` | SIL International | `../keyboards/experimental/u/unifon` |
 | Vietnamese Telex | `vietnamese_telex` | `vi` | Mike Vo | `../keyboards/release/v/vietnamese_telex` |

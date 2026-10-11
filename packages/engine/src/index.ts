@@ -153,12 +153,18 @@ export type {
 export {
   applyContextToleranceOverlay,
   buildContextToleranceOverlay,
+  buildNormalizationStepOverlay,
+  isNormalizationStepBatch,
+  NORMALIZATION_STEP_SITE_ID,
+  overlayHasNormalizationStep,
   presentContextToleranceSites,
   removeContextToleranceOverlay,
 } from "./pattern-apply/context-tolerance-overlay.js";
 export type {
   ContextToleranceOverlay,
   ContextToleranceOverlayBatch,
+  ContextToleranceRulesBatch,
+  NormalizationStepBatch,
   ContextToleranceOverlayResult,
 } from "./pattern-apply/context-tolerance-overlay.js";
 

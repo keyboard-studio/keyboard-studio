@@ -99,4 +99,29 @@ describe("context-tolerance decision on the trail (spec 078)", () => {
     expect(JSON.stringify(spec)).toContain("Diacritics typed as separate characters");
     expect(JSON.stringify(spec)).not.toMatch(/"known":false/);
   });
+
+  describe("normalization step decisions (spec 086)", () => {
+    const STEP = ["normalization-step"];
+    const stepDecision = (kind: "accept" | "decline"): MarksContextToleranceDecision => ({
+      decision: kind,
+      acceptedSiteIds: kind === "accept" ? STEP : [],
+      proposedSiteIds: STEP,
+      fingerprint: "normalization-step|abc|1",
+    });
+
+    it("accept is tool-proposed on the unchanged question id, never partial", () => {
+      record(stepDecision("accept"));
+      const [entry] = entries();
+      expect(entries()).toHaveLength(1);
+      expect(entry!.payload).toMatchObject({ kind: "survey-answer", questionId: "marks.context_tolerance", value: "accept" });
+      expect(entry!.provenance).toEqual({ agency: "tool-proposed", source: "analysis" });
+    });
+
+    it("decline is hand-set with the step offer attached", () => {
+      record(stepDecision("decline"));
+      const [entry] = entries();
+      expect(entry!.payload).toMatchObject({ value: "decline" });
+      expect(entry!.provenance).toEqual({ agency: "hand-set", proposed: { value: "accept", siteIds: STEP } });
+    });
+  });
 });
