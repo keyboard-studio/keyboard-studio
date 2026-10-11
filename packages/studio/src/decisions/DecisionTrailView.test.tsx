@@ -702,3 +702,66 @@ describe("FR-068 — not-asked steps read as 'passed — {reason}'", () => {
     expect(within(group).getByTestId("decision-stage-not-asked").textContent).toMatch(/passed —/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Decisions-page enrichment: the supersede links actually GO somewhere.
+// Before, "Replaced by a later decision" was a dead-end marker and a hidden
+// superseded entry could only be reached by the global toggle. Revealing
+// un-hides the target, expands its stage if needed, and scrolls to it.
+// ---------------------------------------------------------------------------
+
+describe("enrichment — supersede reveal", () => {
+  const scrolledTo: (string | null)[] = [];
+
+  function stubScrollIntoView() {
+    scrolledTo.length = 0;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolledTo.push(this.getAttribute("data-entry-id"));
+    };
+  }
+
+  const rowFor = (entryId: string): HTMLElement =>
+    screen
+      .getAllByTestId("decision-entry")
+      .find((r) => r.getAttribute("data-entry-id") === entryId)!;
+
+  it("a live entry's show-replaced link un-hides the superseded entry and scrolls to it", () => {
+    stubScrollIntoView();
+    renderTrail(recordOf([answerEntry("d1"), answerEntry("d2", { supersedes: "d1" })]));
+    expect(rowFor("d1").hasAttribute("hidden")).toBe(true);
+
+    fireEvent.click(within(rowFor("d2")).getByTestId("decision-entry-show-replaced"));
+
+    expect(rowFor("d1").hasAttribute("hidden")).toBe(false);
+    expect(scrolledTo).toContain("d1");
+  });
+
+  it("a superseded entry's show-replacement link scrolls to its replacement", () => {
+    stubScrollIntoView();
+    renderTrail(recordOf([answerEntry("d1"), answerEntry("d2", { supersedes: "d1" })]));
+    fireEvent.click(screen.getByTestId("decision-superseded-toggle"));
+
+    fireEvent.click(within(rowFor("d1")).getByTestId("decision-entry-show-replacement"));
+
+    expect(scrolledTo).toContain("d2");
+  });
+
+  it("revealing an entry in a collapsed stage expands that stage", () => {
+    stubScrollIntoView();
+    renderTrail(
+      recordOf([
+        answerEntry("d1"),
+        answerEntry("d2", { stepId: "characters", supersedes: "d1" }),
+      ]),
+    );
+    // Collapse the identity stage: d1 leaves the DOM entirely (a collapsed
+    // stage renders no entries), so only a reveal can bring it back.
+    fireEvent.click(within(groupFor("identity")).getByTestId("decision-stage-toggle"));
+    expect(within(groupFor("identity")).queryAllByTestId("decision-entry")).toHaveLength(0);
+
+    fireEvent.click(within(rowFor("d2")).getByTestId("decision-entry-show-replaced"));
+
+    expect(within(groupFor("identity")).queryAllByTestId("decision-entry")).toHaveLength(1);
+    expect(scrolledTo).toContain("d1");
+  });
+});

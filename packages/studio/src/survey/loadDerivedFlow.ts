@@ -27,7 +27,26 @@ export function loadDerivedFlowDef(
   modules: readonly QuestionModule[],
   provenanceModules: readonly QuestionModule[] = [],
 ): FlowDef {
-  const ordered = orderDecisions(modules);
+  // Spec 091 FR-003 (Delta P3): a module may declare `requires` on a
+  // decision settled OUTSIDE its flow — track_choice requires
+  // "base-keyboard" (settled by the choose_base gallery module), and
+  // project_display_name requires "authoring-track" (settled by the track
+  // flow). Such an edge constrains the wizard-level derivation
+  // (decisions/deriveScreens over the full module list), never this flow's
+  // internal order: the provider is not a member here. Scope each module's
+  // requires to the decisions this flow itself provides before sorting.
+  // An unresolved requirement is still a fail-fast error in the full-list
+  // derivation and the registry's provider index, so a typo cannot pass
+  // silently — it just cannot be diagnosed from one flow alone.
+  const providedHere = new Set(modules.flatMap((m) => m.provides ?? []));
+  const scoped = modules.map((m) =>
+    m.requires === undefined || m.requires.every((r) => providedHere.has(r))
+      ? m
+      : { ...m, requires: m.requires.filter((r) => providedHere.has(r)) },
+  );
+  const orderedScoped = orderDecisions(scoped);
+  const byId = new Map(modules.map((m) => [m.definition.id, m] as const));
+  const ordered = orderedScoped.map((m) => byId.get(m.definition.id)!);
   if (ordered.length === 0) {
     throw new Error("loadDerivedFlowDef: modules list must not be empty");
   }

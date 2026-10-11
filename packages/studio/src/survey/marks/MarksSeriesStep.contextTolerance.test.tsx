@@ -11,7 +11,7 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { render } from "../../test/renderWithI18n.tsx";
 import { useWorkingCopyStore, type ContextToleranceState } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { MarksSeriesStep } from "./MarksSeriesStep.tsx";
+import { MarksStepHost } from "./MarksStepHost.tsx";
 
 vi.mock("../../flags/contextToleranceFlag.ts", () => ({ isContextToleranceEnabled: () => true }));
 
@@ -87,7 +87,7 @@ function walkToStation(): void {
 function renderSeries() {
   const onComplete = vi.fn();
   act(() => {
-    render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
+    render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
   });
   return onComplete;
 }

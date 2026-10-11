@@ -30,15 +30,17 @@ events:
   - { stepId: identity, questionId: il_language_autonym, value: "Nîhithawîwin" }
   - { stepId: identity, questionId: il_language_code, value: "cr" }
   - { stepId: identity, questionId: il_target_script, value: "other" }
-  - { stepId: identity, questionId: il_author_name, value: "Bill Jancewicz" }
-  - { stepId: identity, questionId: il_author_email, value: "" }
-  - { stepId: identity, questionId: il_copyright_holder, value: "" }
 
   # --- choose_base (Track 2: adapt bj_cree_woods) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "bj_cree_woods" }
 
   # --- track (adapt — project_name is skipped, side-trail CYOA fork, derived from gatedBy) ---
   - { stepId: track, questionId: track_choice, value: "adapt" }
+
+  # --- attribution (attribution flow, #1901: asked after the track choice) ---
+  - { stepId: attribution, questionId: il_author_name, value: "Bill Jancewicz" }
+  - { stepId: attribution, questionId: il_author_email, value: "" }
+  - { stepId: attribution, questionId: il_copyright_holder, value: "" }
 
   # --- characters (phase_b_characters flow, syllabic branch) ---
   - { stepId: characters, questionId: pb_existing_keyboards, value: "Legacy font-encoded Cree typewriter layout" }

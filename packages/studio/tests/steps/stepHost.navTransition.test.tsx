@@ -20,6 +20,10 @@ import { useStepNavStore } from "../../src/stores/stepNavStore.ts";
 
 vi.mock("../../src/survey/FlowStepHost.tsx", () => import("../../src/test/studioShellMocks/FlowStepHost.tsx"));
 vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
+// CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
+// the barrel), so the shallow stubs must be registered for the files too.
+vi.mock("../../src/survey/Prefill.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("../../src/survey/PhaseB.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
   import("../../src/test/studioShellMocks/BaseResolution.tsx"),
 );
@@ -135,8 +139,13 @@ function expectCleanNav(context: string): void {
 }
 
 async function click(testId: string): Promise<void> {
+  // findBy (not getBy): the characters step's Phase B mounts behind a lazy
+  // boundary since spec 090 T021 (its module graph would otherwise close
+  // the registry cycle), so its buttons can land a tick after the click
+  // that summons them.
+  const el = await screen.findByTestId(testId, {}, { timeout: 15000 });
   await act(async () => {
-    fireEvent.click(screen.getByTestId(testId));
+    fireEvent.click(el);
   });
 }
 
@@ -146,6 +155,8 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["layout-continue"] },
   { testIds: ["base-preview", "base-confirm"] },
   { testIds: ["track-copy"] },
+  { testIds: ["survey-advance"] },
+  // #1901: the attribution step sits between track and project_name.
   { testIds: ["survey-advance"] },
   { testIds: ["prefill-confirm"] },
   { testIds: ["phase-b-done"], settleFor: "punctuation-done" },
@@ -214,5 +225,7 @@ describe("footer nav across step transitions (spec 081 US3)", () => {
     });
     expect(navGroup()).toBeNull();
     expect(useStepNavStore.getState().entries).toEqual({});
-  });
+    // Generous timeout: the walk crosses the characters step's lazy PhaseB
+    // boundary (spec 090 T021), whose first load under vitest is slow.
+  }, 60000);
 });

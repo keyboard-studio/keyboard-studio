@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Tier B content-i18n sidecar extractor (spec 046 T027). Walks a fixed, render-verified allowlist of prose fields out of content/patterns/**/*.yaml, content/adaptation-questions/*.yaml, and packages/contracts/data/criteria.json, and flattens them into content/i18n/en/*.json for Crowdin. Never touches the content records themselves. No build step; run via tsx.",
   "scripts": {
-    "extract": "tsx cli.ts",
+    "extract": "tsx --import ./registerMacroShim.ts cli.ts",
     "test": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {

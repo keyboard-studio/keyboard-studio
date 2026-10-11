@@ -25,7 +25,8 @@ import type {
 } from "@keyboard-studio/contracts";
 import { useRulesDemoArtifactStore, type RulesDemoArtifact } from "../../stores/rulesDemoArtifactStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveIdentityResume } from "../../decisions/identitySelectors.ts";
 import { answerString } from "../../survey/answerString.ts";
 import {
   rulesBody,
@@ -114,7 +115,9 @@ export function DemoPane(props: DemoPaneProps = {}) {
     [pickedLayout],
   );
   const layoutStepFamily = useLayoutFamilyAnswer();
-  const identityPhaseResult = useSurveySessionStore((s) => s.identityPhaseResult);
+  // Spec 089: the identity phase result is rebuilt from the decision store.
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityPhaseResult = deriveIdentityResume(decisions);
   const layoutFamily = useMemo<LayoutFamilyAnswer | null>(() => {
     if (layoutStepFamily !== undefined) return layoutStepFamily;
     if (identityPhaseResult === null) return null;

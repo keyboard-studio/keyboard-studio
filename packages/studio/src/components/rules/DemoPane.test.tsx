@@ -1,6 +1,6 @@
-// DemoPane likely-host inputs: the community-layout step's answer ("Which
-// keyboard layout do your typists use?", answer `host_layout`) must reach
-// the demo's host-layout selector — not only the legacy identity-phase
+// DemoPane likely-host inputs: the community-layout step's pick (the
+// `windows-layout` decision since spec 090 T011) must reach the demo's
+// host-layout selector — not only the legacy identity-phase
 // `layout_family` answer.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -9,7 +9,18 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { DemoPane } from "./DemoPane.tsx";
 import type { RulesDemoArtifact } from "../../stores/rulesDemoArtifactStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
-import { saveLayoutFamilyAnswer, savePickedWindowsLayout } from "../../lib/layoutFamily.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { saveLayoutFamilyAnswer } from "../../lib/layoutFamily.ts";
+
+/** Record a layout pick the way the gallery host does (spec 090 T011). */
+function pickWindowsLayout(layoutId: string): void {
+  useDecisionStore.getState().record({
+    id: "windows-layout",
+    value: { layoutId, origin: "confirmed" },
+    provenance: "asked",
+    step: "layout",
+  });
+}
 
 const IDLE: RulesDemoArtifact = {
   status: "idle",
@@ -27,22 +38,23 @@ function renderPane() {
 
 beforeEach(() => {
   useSurveyAnswerStore.getState().reset();
+  useDecisionStore.getState().reset();
 });
 afterEach(cleanup);
 
 describe("DemoPane host layout follows the layout step", () => {
   it("preselects the picked reference layout (French AZERTY)", () => {
-    savePickedWindowsLayout("basic_kbdfr");
+    pickWindowsLayout("basic_kbdfr");
     expect(renderPane().value).toBe("azerty");
   });
 
   it("maps the US-International pick onto the demo's intl id", () => {
-    savePickedWindowsLayout("basic_kbdusx");
+    pickWindowsLayout("basic_kbdusx");
     expect(renderPane().value).toBe("intl");
   });
 
   it("uses a pick's derived family when the pick is not a reference host", () => {
-    savePickedWindowsLayout("basic_kbdgr");
+    pickWindowsLayout("basic_kbdgr");
     expect(renderPane().value).toBe("qwertz");
   });
 

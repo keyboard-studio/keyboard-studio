@@ -129,7 +129,6 @@ export type WorkingCopySnapshot = Omit<
   | "contextToleranceOverlay"
   | "contextNormalizationStep"
   | "baseWelcomeImages"
-  | "phaseAnswersByStep"
   | "disabledFamilyIds"
   | "keptGuardRuleIds"
   | "dismissedMissingGroups"
@@ -202,13 +201,6 @@ export type WorkingCopySnapshot = Omit<
    * its `cacheKey` matches the current source. `DRAFT_VERSION` does not bump.
    */
   contextNormalizationStep?: WorkingCopyData["contextNormalizationStep"];
-  /**
-   * Optional (spec 079 D-4): which step recorded which phase answers. A
-   * snapshot written before this field existed has none, and the store then
-   * adopts each phase's stored `answers` under the `"legacy"` owner rather
-   * than inventing an attribution.
-   */
-  phaseAnswersByStep?: WorkingCopyData["phaseAnswersByStep"];
 };
 
 export function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
@@ -429,7 +421,6 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     touchEditorMode: s.touchEditorMode,
     contextToleranceOverlay: s.contextToleranceOverlay,
     contextNormalizationStep: serializeNormalizationStep(s.contextNormalizationStep),
-    phaseAnswersByStep: s.phaseAnswersByStep,
   };
 }
 
@@ -524,10 +515,9 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     touchEditorMode: snapshot.touchEditorMode ?? "character",
     contextToleranceOverlay: snapshot.contextToleranceOverlay ?? null,
     contextNormalizationStep: snapshot.contextNormalizationStep ?? null,
-    // spec 079 D-4: absent on a pre-079 snapshot. `{}` is safe — the store
-    // adopts each phase's stored answers under "legacy" when the sidecar does
-    // not describe them.
-    phaseAnswersByStep: snapshot.phaseAnswersByStep ?? {},
+    // spec 090 T063: a pre-090 snapshot may still carry the retired
+    // per-step answer sidecar (spec 079 D-4) — it is deliberately not
+    // read here, so the field is dropped on restore and never re-saved.
   };
 }
 

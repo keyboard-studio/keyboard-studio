@@ -41,6 +41,7 @@ import { useViewStateStore } from "../stores/viewStateStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useStepNavStore } from "../stores/stepNavStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { discardActiveDraft } from "../lib/draftPersistence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -335,6 +336,8 @@ export function WelcomeScreen() {
                 useStepWalkStore.getState().reset();
                 useStepNavStore.getState().reset();
                 useSurveyAnswerStore.getState().reset();
+                // Spec 088 FR-007: decision records reset with the answers.
+                useDecisionStore.getState().reset();
                 leaveWelcome(() => navigateTo("survey"));
               }}
               style={{

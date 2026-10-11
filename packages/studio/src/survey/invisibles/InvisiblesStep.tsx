@@ -17,8 +17,8 @@
 // a right-to-left author and COLLAPSED — never hidden — for everyone else, so
 // an LTR author who genuinely needs a direction mark can still find it.
 //
-// Decisions live in the draft store's sticky `invisibleDecisions`
-// (keyed `U+XXXX`), NOT in `chars`: an accepted character reaches the phase-C
+// Decisions live in the invisibles-inventory decision record's sticky
+// decisions (keyed `U+XXXX`), NOT in `chars`: an accepted character reaches the phase-C
 // confirmed inventory through `phaseCConfirmedInventory()` and never lands in
 // the `controls` bucket again (FR-014). On first render every `\p{Cf}`
 // character an earlier code-point entry left in `controls` is carried over
@@ -45,13 +45,19 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { SurveyAnswer } from "@keyboard-studio/contracts";
 import { parseUPlusNotation } from "@keyboard-studio/contracts";
-import type { EditorStepProps } from "../../steps/types.ts";
+import type {
+  DecisionId,
+  DecisionRendererProps,
+  DecisionSet,
+} from "../../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../../stores/phaseBDraftStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
+import { useInventoryDraft } from "../useInventoryDraft.ts";
+import type { InventoryDecisionValue } from "../phaseBDraftOps.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 import { isFormatChar } from "../charNormUtils.ts";
 import type { SurveyContext } from "../types.ts";
@@ -77,6 +83,37 @@ import {
 export type WritingDirection = "rtl" | "ltr" | "unknown";
 
 /**
+ * The direction-relevant answers, read from the decision records. The
+ * questions' modules provide `reserve-writing-direction` (Phase A
+ * `writing_direction`), `non-roman-branch` (Phase B `pb_non_roman_branch`)
+ * and `rtl-direction-confirm` (Phase B `pb_rtl_direction_confirm`), and
+ * `recordAnswersAsDecisions` writes each answer under its provided id at
+ * completion. Until spec 090 T063 these answers were read out of the
+ * phase results; the phase slot carries no answers now, so the decision
+ * set is the source. The list is ordered Phase A before Phase B — the
+ * precedence `writingDirectionFrom` relies on (a Phase A direction
+ * answer wins outright).
+ */
+export function directionAnswersFromDecisions(
+  decisions: DecisionSet,
+): SurveyAnswer[] {
+  const out: SurveyAnswer[] = [];
+  const push = (id: DecisionId, questionId: string): void => {
+    const record = decisions[id];
+    if (record === undefined || record.value === undefined || record.value === null) return;
+    out.push({
+      questionId,
+      answerType: "select",
+      value: typeof record.value === "string" ? record.value : String(record.value),
+    });
+  };
+  push("reserve-writing-direction", "writing_direction");
+  push("non-roman-branch", "pb_non_roman_branch");
+  push("rtl-direction-confirm", "pb_rtl_direction_confirm");
+  return out;
+}
+
+/**
  * The author's writing direction, read from what they already told us — the
  * Phase A `writing_direction` answer, the Phase B right-to-left branch (its
  * `pb_rtl_direction_confirm` question is only ever asked on that branch, so
@@ -85,20 +122,18 @@ export type WritingDirection = "rtl" | "ltr" | "unknown";
  * `"unknown"` when none of those has been answered.
  */
 export function writingDirectionFrom(
-  phaseResults: readonly SurveyPhaseResult[],
+  answers: readonly SurveyAnswer[],
   surveyContext: SurveyContext,
 ): WritingDirection {
   let rtlBranch = false;
-  for (const phase of phaseResults) {
-    for (const a of phase.answers) {
-      const v = typeof a.value === "string" ? a.value : String(a.value);
-      if (a.questionId === "writing_direction") {
-        if (v === "rtl") return "rtl";
-        if (v === "ltr") return "ltr";
-      }
-      if (a.questionId === "pb_rtl_direction_confirm") rtlBranch = true;
-      if (a.questionId === "pb_non_roman_branch" && v === "rtl") rtlBranch = true;
+  for (const a of answers) {
+    const v = typeof a.value === "string" ? a.value : String(a.value);
+    if (a.questionId === "writing_direction") {
+      if (v === "rtl") return "rtl";
+      if (v === "ltr") return "ltr";
     }
+    if (a.questionId === "pb_rtl_direction_confirm") rtlBranch = true;
+    if (a.questionId === "pb_non_roman_branch" && v === "rtl") rtlBranch = true;
   }
   if (rtlBranch) return "rtl";
   const family = surveyContext.script_family ?? surveyContext.routing_group;
@@ -191,20 +226,31 @@ function CandidateRow({ candidate, checked, onToggle }: CandidateRowProps) {
 // InvisiblesStep
 // ---------------------------------------------------------------------------
 
-const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
+const INVISIBLES_STEP_ID = "invisibles";
+
+const InvisiblesStep: ComponentType<DecisionRendererProps<InventoryDecisionValue>> = () => {
+  const { onComplete, onBack } = useGalleryStepContext();
   const { t } = useLingui();
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
+  const directionAnswers = useMemo(
+    () => directionAnswersFromDecisions(decisions),
+    [decisions],
+  );
   const direction = useMemo(
-    () => writingDirectionFrom(phaseResults, surveyContext),
-    [phaseResults, surveyContext],
+    () => writingDirectionFrom(directionAnswers, surveyContext),
+    [directionAnswers, surveyContext],
   );
 
-  const controls = usePhaseBDraftStore((s) => s.controls);
-  const invisibleDecisions = usePhaseBDraftStore((s) => s.invisibleDecisions);
-  const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
-  const declineInvisible = usePhaseBDraftStore((s) => s.declineInvisible);
-  const adoptControlsAsInvisibles = usePhaseBDraftStore((s) => s.adoptControlsAsInvisibles);
+  // The shared Phase B/C draft, as decision values (spec 090 T022): the
+  // toggles are the bound ops, recorded through the gallery host under
+  // this step's attribution.
+  const draft = useInventoryDraft(INVISIBLES_STEP_ID);
+  const controls = draft.controls;
+  const invisibleDecisions = draft.invisibleDecisions;
+  const acceptInvisible = draft.ops.acceptInvisible;
+  const declineInvisible = draft.ops.declineInvisible;
+  const adoptControlsAsInvisibles = draft.ops.adoptControlsAsInvisibles;
 
   // Carry-over (FR-017): capture what the code-point field left in `controls`
   // BEFORE adopting it, so the candidate list keeps offering those characters

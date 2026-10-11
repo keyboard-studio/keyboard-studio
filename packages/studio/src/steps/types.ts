@@ -7,7 +7,7 @@
 
 import type { IRPath } from "@keyboard-studio/contracts";
 import type { SurveyContext } from "../survey/types.ts";
-import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
+
 import type { EvidenceKeyFnId } from "./evidence.ts";
 
 // Re-export SurveyContext so consumers can import from one place.
@@ -36,9 +36,20 @@ export interface EvidenceDeclaration {
  * (FR-007). `{ exempt }` needs a written justification; the manifest test fails
  * on an empty one, which is what makes "unjustified exemptions: zero" (SC-007)
  * a failing test rather than a checklist item.
+ *
+ * `"decision-store"` was added by spec 090 (D-090-29, lead ruling on
+ * D-090-19): a step whose settled value is a decision record in the
+ * decision store (088 FR-007, the draft's `decisions` slice), declared
+ * decision-store-first. Any answer-store residue such a step keeps
+ * (within-step position, step-status slot, the spec 079 evidence layer)
+ * is named in the step's manifest comment — the declaration names where
+ * the step's ANSWERS live, not where its residue lives. `"phase-b-draft"`
+ * remains in the union as spec 079 vocabulary; no step declares it since
+ * spec 090 deleted that store (T025).
  */
 export type PersistenceDeclaration =
   | "answer-store"
+  | "decision-store"
   | "phase-b-draft"
   | "working-copy"
   | { exempt: string };
@@ -53,21 +64,13 @@ export interface StepBase {
   kind: StepKind;
   /** Human label (dashboard + chrome). */
   title: string;
-  /**
-   * Decisions this step settles: its flows' question decisions plus any it
-   * settles itself. Step order is DERIVED from provides/requires by the same
-   * sort that orders questions (steps/stepOrder.ts); there is no hand-ordered
-   * list. Declared in steps/stepDependencies.ts and spread onto the step.
-   */
-  provides?: readonly DecisionId[];
-  /** Decisions that must be settled before this step runs (real preconditions only). */
-  requires?: readonly DecisionId[];
-  /**
-   * Present when the step is asked only for some answers. A gated step is a
-   * side trail; it rejoins the main line at the next ungated step in the
-   * derived order (steps/stepOrder.ts `deriveStepStructure`).
-   */
-  gatedBy?: (decisions: DecisionSet) => boolean;
+  // Spec 091 T014: the ordering fields this interface used to carry —
+  // `provides`, `requires`, `gatedBy`, `flowRefs` — are deleted. What a
+  // screen settles, needs, and when it is walked is derived from the
+  // decision modules (decisions/deriveScreens.ts): membership and gates
+  // live on the derived screens, and steps/manifest.ts publishes them as
+  // `screenGates` / `screenTrails`. A Step is a host declaration only:
+  // component, inputs, writes, persistence, specRef, lock.
   /**
    * Lock gate placed AFTER this step completes. Only two locks exist in the flow
    * (spec §3.5): "physical" and "touch". A validation on the derived order
@@ -90,12 +93,6 @@ export interface StepBase {
    * Ignored when layout:"full".
    */
   rightPane?: "preview" | "character-map";
-  /**
-   * ids into steps/flowSources.ts: survey flows that run inside / hang under
-   * this step on the Flow Map. Used by Stage 1 to derive drill-downs without
-   * a separate FLOW_SOURCES array (spec 024, ADR-0001).
-   */
-  flowRefs?: readonly string[];
   /**
    * Which spec unit(s) govern this step (spec 031 FR-001). Vocabulary:
    * `§N` / `§Na` (spec.md monolith section), or `specs/<slug>` (extracted

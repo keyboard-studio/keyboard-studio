@@ -268,6 +268,36 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
     expect(help).not.toMatch(/<\/html>/i);
   });
 
+  it("tags the page with the language the help is written in, not the keyboard's (FR-006 as amended)", () => {
+    // sil_cameroon_azerty-style: a Cameroonian keyboard whose help is English + French.
+    const bilingual = baseInput({
+      answers: answersWith({ docLanguageTags: ["en", "fr"] }),
+      primaryBcp47: "bum",
+    });
+    expect(renderWelcomeHtm(bilingual, null)).toContain('<html lang="en">');
+    expect(renderWelcomeHtm(bilingual, null)).not.toContain('lang="bum"');
+
+    // winchus-style: help entirely in Spanish, a national language.
+    const spanish = baseInput({ answers: answersWith({ docLanguageTags: ["es"] }), primaryBcp47: "cbi" });
+    expect(renderWelcomeHtm(spanish, null)).toContain('<html lang="es">');
+
+    // No language given: falls back to the keyboard's own tag, as before.
+    const unstated = baseInput({ answers: answersWith(), primaryBcp47: "bum" });
+    expect(renderWelcomeHtm(unstated, null)).toContain('<html lang="bum">');
+  });
+
+  it("retags an inherited base page and its help.php with the written language", () => {
+    const englishBase = '<html lang="en"><body><h1>Hello</h1></body></html>';
+    const input = baseInput({
+      answers: answersWith({ description: "Nouveau contenu.", docLanguageTags: ["fr", "en"] }),
+      primaryBcp47: "bum",
+    });
+    const welcome = renderWelcomeHtm(input, englishBase);
+    expect(welcome).toContain('<html lang="fr">');
+    expect(welcome.match(/lang=/g)).toHaveLength(1);
+    expect(renderHelpPhp(input, englishBase)).toContain('<html lang="fr">');
+  });
+
   it("never embeds a version number or copyright year (FR-007)", () => {
     const input = baseInput({ answers: answersWith() });
     for (const rendered of [renderReadmeMd(input), renderReadmeHtm(input), renderWelcomeHtm(input, null), renderHelpPhp(input, null)]) {

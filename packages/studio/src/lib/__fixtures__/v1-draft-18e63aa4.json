@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "savedAt": 1791334913771,
+  "projectKey": "fixture_keyboard",
+  "displayName": "Fixture Keyboard",
+  "languageTag": null,
+  "workingCopy": {
+    "instantiationMode": "new-from-base",
+    "baseKeyboard": {
+      "id": "basic_kbdfr",
+      "displayName": "French Basic",
+      "languages": []
+    },
+    "baseVfsEntries": [],
+    "baseIr": {
+      "origin": "scaffolded",
+      "header": {
+        "keyboardId": "test",
+        "name": "test",
+        "bcp47": [],
+        "copyright": "",
+        "version": "10.0",
+        "targets": [],
+        "storeDirectives": []
+      },
+      "stores": [],
+      "groups": [],
+      "comments": [],
+      "raw": [],
+      "recognizedPatterns": [],
+      "facets": {
+        "casing": {
+          "provenance": "undetermined"
+        }
+      }
+    },
+    "identity": null,
+    "attribution": null,
+    "licenseUnparseable": null,
+    "baseHolderOverride": null,
+    "baseLicenseText": null,
+    "helpDocs": null,
+    "baseWelcomeHtmText": null,
+    "baseHelpPhpText": null,
+    "baseReadmeMdText": null,
+    "baseHistoryMdText": null,
+    "baseWelcomeConvention": null,
+    "baseWelcomeImagesDropped": false,
+    "historyEntryState": null,
+    "chartPreference": null,
+    "baseDocProfile": null,
+    "baselineDocFindings": null,
+    "ir": {
+      "origin": "scaffolded",
+      "header": {
+        "keyboardId": "test",
+        "name": "test",
+        "bcp47": [],
+        "copyright": "",
+        "version": "10.0",
+        "targets": [],
+        "storeDirectives": []
+      },
+      "stores": [],
+      "groups": [],
+      "comments": [],
+      "raw": [],
+      "recognizedPatterns": [],
+      "facets": {
+        "casing": {
+          "provenance": "undetermined"
+        }
+      }
+    },
+    "deletedNodeIds": [],
+    "deletedItemIds": [],
+    "deletedTouchKeyIds": [],
+    "disabledFamilyIds": [],
+    "keptGuardRuleIds": [],
+    "dismissedMissingGroups": [],
+    "narrowedGuardQuestions": [],
+    "carveChars": [],
+    "undoStack": [],
+    "phaseResults": [],
+    "irAxes": {},
+    "desktopLocked": false,
+    "sequenceFlaggedChars": [],
+    "touchLayoutJson": null,
+    "touchDraft": null,
+    "galleryIntrosSeen": {
+      "mechanism": false,
+      "touch": false
+    },
+    "staleSteps": [],
+    "validatorFindings": [],
+    "axisFills": [],
+    "closedKeyboardCard": null,
+    "carveDispositions": [],
+    "carveTouchKeepInert": [],
+    "keyEditOverlay": {
+      "ops": []
+    },
+    "deadkeyOverlay": {
+      "ops": []
+    },
+    "touchEditorMode": "character",
+    "contextToleranceOverlay": null,
+    "phaseAnswersByStep": {}
+  },
+  "traversal": {
+    "activeStepId": "identity",
+    "history": [],
+    "visited": [
+      "identity"
+    ],
+    "lastNavigation": "advance",
+    "marksMigrationNeeded": false,
+    "identityResult": null,
+    "identityPhaseResult": null,
+    "surveyContext": {},
+    "selectedTrack": "copy",
+    "scaffoldSpec": {
+      "keyboardId": "fixture_keyboard",
+      "displayName": "Fixture Keyboard"
+    },
+    "localBase": null,
+    "baseConfirmed": false,
+    "charactersSubStage": "prefill",
+    "touchSeedSource": null,
+    "discoveryMethod": null,
+    "markedForLaterDesktop": [],
+    "markedForLaterTouch": []
+  },
+  "phaseBDraft": {
+    "chars": [],
+    "declaredRoles": {},
+    "provenance": {},
+    "exemplarDigraphs": [],
+    "loanwordChars": [],
+    "rejected": [],
+    "proposalConfidence": {},
+    "exemplarMethodDeclined": false,
+    "seededProposals": [],
+    "invisibleDecisions": {},
+    "selectedFont": "noto-sans"
+  },
+  "decisionRecord": {
+    "format": "keyboard-studio.decision-record",
+    "version": 2,
+    "keyboardId": null,
+    "entries": [],
+    "truncated": null
+  },
+  "surveyAnswers": {
+    "steps": {
+      "identity": {
+        "answers": {
+          "il_language_code": {
+            "value": "fr",
+            "answerType": "text",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "capture",
+            "savedAt": 1791334913771
+          },
+          "il_copyright_holder": {
+            "value": "Fixture Author",
+            "answerType": "text",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "capture",
+            "savedAt": 1791334913771
+          }
+        },
+        "position": null,
+        "status": {
+          "kind": "in-progress"
+        },
+        "lastRecorded": {}
+      },
+      "track": {
+        "answers": {
+          "track_choice": {
+            "value": "copy",
+            "answerType": "select",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "capture",
+            "savedAt": 1791334913771
+          }
+        },
+        "position": null,
+        "status": {
+          "kind": "in-progress"
+        },
+        "lastRecorded": {}
+      },
+      "project_name": {
+        "answers": {
+          "project_display_name": {
+            "value": "Fixture Keyboard",
+            "answerType": "text",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "capture",
+            "savedAt": 1791334913771
+          },
+          "project_keyboard_id": {
+            "value": "fixture_keyboard",
+            "answerType": "text",
+            "origin": "confirmed",
+            "stage": "confirmed",
+            "evidenceKey": null,
+            "screenId": "capture",
+            "savedAt": 1791334913771
+          }
+        },
+        "position": null,
+        "status": {
+          "kind": "in-progress"
+        },
+        "lastRecorded": {}
+      }
+    },
+    "recordedScreenOf": {}
+  }
+}

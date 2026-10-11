@@ -1,8 +1,10 @@
 // useContextToleranceApply — the separate effect that applies a recorded
 // context-tolerance decision (spec 078 FR-005a second half, FR-008, FR-009).
 //
-// Keyed off the decision the marks step recorded
-// (`session.marksContextTolerance`) and the latest analysis:
+// Keyed off the decision the marks step recorded (spec 090 T023: the
+// `marks-treatment` decision value's `contextTolerance` — before T023 this
+// read the phase-result derivation `session.marksContextTolerance`) and
+// the latest analysis:
 //   - accept / partial, not yet applied for this decision: verify the fix
 //     (lib/contextToleranceApply.ts), then commit it in two places at once —
 //     the working IR, through `applyMutatePatch` against the manifest-declared
@@ -23,6 +25,12 @@ import {
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import {
+  getMarksTreatmentValue,
+  recordMarksTreatmentValue,
+  type MarksTreatmentValue,
+} from "../survey/marks/marksValue.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { CONTEXT_TOLERANCE_WRITES } from "../steps/contextToleranceWrites.ts";
 import { applyContextToleranceDecision, contextTolerancePatch } from "../lib/contextToleranceApply.ts";
@@ -44,20 +52,31 @@ function commitOverlay(
   store.setContextToleranceOverlay(next);
 }
 
-/** Record `appliedFingerprint` on the phase result that carries the decision. */
+/**
+ * Record `appliedFingerprint` on the decision that carries it (spec 090
+ * T023: the marks-treatment decision value — before T023 this mutated the
+ * phase result). The re-record goes through the decide core with the
+ * marks stub, whose apply is a no-op: stamping the fingerprint must not
+ * re-run the mark guards.
+ */
 function markApplied(fingerprint: string): void {
-  const store = useWorkingCopyStore.getState();
-  const entry = [...store.phaseResults].reverse().find((p) => p.marksContextTolerance !== undefined);
-  if (entry?.marksContextTolerance === undefined) return;
-  if (entry.marksContextTolerance.appliedFingerprint === fingerprint) return;
-  store.recordPhase({ ...entry, marksContextTolerance: { ...entry.marksContextTolerance, appliedFingerprint: fingerprint } });
+  const value = getMarksTreatmentValue();
+  if (value?.contextTolerance == null) return;
+  if (value.contextTolerance.appliedFingerprint === fingerprint) return;
+  recordMarksTreatmentValue({
+    ...value,
+    contextTolerance: { ...value.contextTolerance, appliedFingerprint: fingerprint },
+  });
 }
 
 const decisionKey = (d: { fingerprint: string; acceptedSiteIds: readonly string[] }): string =>
   `${d.fingerprint}|${d.acceptedSiteIds.join(",")}`;
 
 export function useContextToleranceApply(enabled: boolean): ContextToleranceApplyNotes | null {
-  const decision = useWorkingCopyStore((s) => s.session.marksContextTolerance);
+  const decision = useDecisionStore((s) => {
+    const value = s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined;
+    return value?.contextTolerance ?? undefined;
+  });
   const analysis = useWorkingCopyStore((s) => s.contextTolerance);
   const applied = useWorkingCopyStore((s) => s.contextToleranceOverlay);
   const [notes, setNotes] = useState<ContextToleranceApplyNotes | null>(null);

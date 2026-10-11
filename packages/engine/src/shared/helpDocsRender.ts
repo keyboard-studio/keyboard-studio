@@ -135,6 +135,15 @@ function renderDocBodyHtml(answers: HelpDocsAnswers | null, description: string)
   return parts.join("\n");
 }
 
+/**
+ * The `lang` for authored prose (FR-006 as amended in the spec 061
+ * AS-BUILT): the first language the author said the help is written in,
+ * else the keyboard's own primary language.
+ */
+function proseLang(answers: HelpDocsAnswers | null, primaryBcp47: string | undefined): string | undefined {
+  return nonBlank(answers?.docLanguageTags?.[0]) ?? primaryBcp47;
+}
+
 /** Set (or insert) the `<html lang="...">` attribute (FR-006). No-op when `lang` is absent/blank. */
 function setHtmlLang(htmlText: string, lang: string | undefined): string {
   const value = nonBlank(lang);
@@ -397,8 +406,8 @@ export function renderWelcomeHtm(
   const doc =
     baseWelcomeHtmText !== null
       ? mergeWithBase(baseWelcomeHtmText, bodyWithLayout)
-      : buildFreshHtmlDoc(bodyWithLayout, primaryBcp47);
-  return setHtmlLang(doc, primaryBcp47);
+      : buildFreshHtmlDoc(bodyWithLayout, proseLang(answers, primaryBcp47));
+  return setHtmlLang(doc, proseLang(answers, primaryBcp47));
 }
 
 /**
@@ -469,7 +478,7 @@ export function renderHelpPhp(
     // Inherited page may already be a full document (older bases) or a
     // header-plus-fragment (criteria-compliant). setHtmlLang is a no-op when
     // there is no `<html>` tag.
-    return setHtmlLang(mergeWithBase(baseHelpPhpText, bodyHtml), primaryBcp47);
+    return setHtmlLang(mergeWithBase(baseHelpPhpText, bodyHtml), proseLang(answers, primaryBcp47));
   }
   // Fresh page: header + body fragment only — never nest a document inside
   // the site's `header.php` chrome (criterion 11.4).

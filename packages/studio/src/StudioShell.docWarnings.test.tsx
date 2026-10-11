@@ -22,7 +22,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
+import { resetInventoryDecisions } from "./survey/useInventoryDraft.ts";
 
 // ---------------------------------------------------------------------------
 // Shallow stubs for every child component plus the heavy hooks (shared
@@ -32,13 +32,17 @@ import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
 
 vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
 vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+// CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
+// the barrel), so the shallow stubs must be registered for the files too.
+vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
-vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
-  import("./test/studioShellMocks/TouchSeedSourcePanel.tsx"),
+vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
+  import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
 vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
@@ -122,7 +126,7 @@ afterEach(() => {
   cleanup();
   // Spec 079 R-07: alphabetEvidenceKey / sticky decisions survive store.reset();
   // global test-setup only calls reset(), so clear them here.
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
   vi.clearAllMocks();
   localStorage.clear();
 });

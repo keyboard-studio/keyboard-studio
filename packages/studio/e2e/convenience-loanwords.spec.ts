@@ -34,6 +34,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseTrackCopy,
+  driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
   seedReturningVisitor,
@@ -62,6 +63,7 @@ async function reachBafutAlphabet(page: Page): Promise<void> {
   // the needed set never consults the exemplar index there and this walk
   // would pass whether or not loanword letters are counted as needed.
   await chooseTrackCopy(page);
+  await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
 

@@ -4,9 +4,10 @@
 // this test re-pointed at ProjectNameStepFactoryComponent from
 // editors/adapters/flowStepOptions.tsx. All assertions are PRESERVED.
 //
-// The factory reads defaultDisplayName from surveySessionStore.identityResult
-// (autonym or english). Tests set identityResult in the store before rendering
-// rather than passing a defaultDisplayName prop.
+// The factory derives defaultDisplayName from the identity result over the
+// decision store (spec 089: deriveIdentityResult — autonym or english).
+// Tests record the identity decisions before rendering rather than passing
+// a defaultDisplayName prop.
 //
 // Asserts the displayName->slug seed chain:
 //   1. project_display_name renders with the defaultDisplayName seed.
@@ -28,7 +29,16 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { ProjectNameStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+
+/** Record the identity decisions a completed identity step records. */
+function seedIdentity(autonym: string, english: string, languageSubtag: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: english, provenance: "asked" });
+  record({ id: "language-autonym", value: autonym, provenance: "asked" });
+  record({ id: "language-code", value: languageSubtag, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 
@@ -70,23 +80,14 @@ describe("flow-parity: track + project_name derived flows load cleanly", () => {
 // ---------------------------------------------------------------------------
 
 describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real SurveyRunner)", () => {
-  it("seeds project_display_name from identityResult and auto-populates project_keyboard_id slug", async () => {
+  it("seeds project_display_name from the recorded identity decisions and auto-populates project_keyboard_id slug", async () => {
     const displayName = "Hausa (QWERTY)";
     const expectedSlug = slugifyKeyboardId(displayName);
 
-    // Set identityResult so the factory derives defaultDisplayName from autonym.
+    // Record the identity decisions so the factory derives
+    // defaultDisplayName from the autonym.
     act(() => {
-      useSurveySessionStore.setState({
-        identityResult: {
-          autonym: displayName,
-          english: displayName,
-          languageSubtag: "ha",
-          targetScriptRaw: "Latn",
-          bcp47: "ha",
-          supported: true,
-          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-        },
-      });
+      seedIdentity(displayName, displayName, "ha");
     });
 
     let capturedDisplayName: string | undefined;
@@ -142,17 +143,7 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
     const editedSlug = slugifyKeyboardId(editedName);
 
     act(() => {
-      useSurveySessionStore.setState({
-        identityResult: {
-          autonym: defaultName,
-          english: defaultName,
-          languageSubtag: "ewo",
-          targetScriptRaw: "Latn",
-          bcp47: "ewo",
-          supported: true,
-          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-        },
-      });
+      seedIdentity(defaultName, defaultName, "ewo");
     });
 
     const onComplete = vi.fn();
@@ -202,18 +193,7 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
     const english = "Bafut";
 
     act(() => {
-      useSurveySessionStore.setState({
-        identityResult: {
-          autonym,
-          english,
-          languageSubtag: "bfd",
-          targetScriptRaw: "Latn",
-          bcp47: "bfd",
-          supported: true,
-          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-        },
-        scaffoldSpec: null,
-      });
+      seedIdentity(autonym, english, "bfd");
     });
 
     const onComplete = vi.fn();
@@ -234,17 +214,7 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
 
   it("onBack fires when Back is clicked", async () => {
     act(() => {
-      useSurveySessionStore.setState({
-        identityResult: {
-          autonym: "Test",
-          english: "Test",
-          languageSubtag: "te",
-          targetScriptRaw: "Latn",
-          bcp47: "te",
-          supported: true,
-          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-        },
-      });
+      seedIdentity("Test", "Test", "te");
     });
 
     const onBack = vi.fn();

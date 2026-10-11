@@ -35,8 +35,8 @@ const PROBES: Readonly<Record<string, readonly ValidateProbe[]>> = {
   ],
   pf_doc_language: [
     { value: "klingon", rejects: "invalid_option", note: "an unoffered option" },
-    { value: undefined, accepts: true, note: "optional — blank means English" },
-    { value: "", accepts: true, note: "optional — blank means English" },
+    { value: undefined, accepts: true, note: "optional" },
+    { value: "", accepts: true, note: "optional" },
   ],
   pf_welcome_paragraph: [
     { value: "Keyboard untuk mengetik Ewondo (ʼÉwondo) di komputer.", accepts: true, note: "Unicode description" },

@@ -72,5 +72,18 @@ const mod: QuestionModule = {
   // Decision spike (km/decisions-spike).
   provides: ["language-autonym"],
   requires: ["language-name"],
+  // Spec 092 (T033): the langtags autonym seed as a lookup default,
+  // mirroring IdentityLite's getSeedValue exactly — the resolved entry's
+  // first own-script name (source "langtags"); failing that, the Q1
+  // English answer with NO source (no langtags behind it); failing both,
+  // absent. Evaluation wiring is G-12 in spec 092's plan.
+  lookupDefault: (ctx) => {
+    const locals = ctx.identity?.localNames;
+    if (locals !== undefined && locals.length > 0 && locals[0]!.trim() !== "") {
+      return { value: locals[0], source: "langtags" };
+    }
+    const q1 = ctx.identity?.q1English;
+    return q1 !== undefined && q1 !== "" ? { value: q1 } : undefined;
+  },
 };
 export default mod;

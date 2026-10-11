@@ -1,7 +1,9 @@
 // advance.test.ts — unit tests for the pure advance policy (spec 028 T007).
 //
 // Covers every case in advance-and-stephost.contract.md §1:
-//   - copy/adapt fork at "track"
+//   - copy/adapt fork at "attribution" (the track case forwards there
+//     since #1901 — the fork is evaluated after the post-track
+//     author/copyright questions are answered)
 //   - project_name → characters (side-trail rejoin hop)
 //   - identity supported/unsupported (terminal branch)
 //   - help → done + navigate:"output"
@@ -10,8 +12,14 @@
 
 import { describe, it, expect } from "vitest";
 import { advance, nextMainLineStepAfter, manifestIndexOf } from "./advance.ts";
-import { manifest, validateManifestShape } from "./manifest.ts";
+import { buildManifest, manifest, validateManifestShape } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
+import type { DecisionId } from "../decisions/decisionTypes.ts";
+import {
+  decisionModules,
+  declaredScreenGates,
+} from "../survey/questions/registry.ts";
 
 // ---------------------------------------------------------------------------
 // walkSpine — drive advance() from "identity" to a terminal, collecting the
@@ -21,17 +29,34 @@ import { STEP_TRAILS } from "./stepOrder.ts";
 // ---------------------------------------------------------------------------
 
 type WalkStep =
-  | "identity" | "layout" | "choose_base" | "track" | "project_name" | "characters"
+  | "identity" | "layout" | "choose_base" | "track" | "attribution" | "project_name" | "characters"
   | "carve" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
 ): { sequence: WalkStep[]; navigateAtEnd: "output" | undefined } {
+  // Spec 088 T020 (fixture construction only): the gate set is a DecisionSet
+  // literal matching the context's track — advance() reads gates from it.
+  const fullCtx = {
+    ...ctx,
+    touchSeedSource: null,
+    allCharactersImplemented: true,
+    decisions:
+      ctx.selectedTrack === null
+        ? {}
+        : {
+            "authoring-track": {
+              id: "authoring-track" as const,
+              value: ctx.selectedTrack,
+              provenance: "asked" as const,
+            },
+          },
+  };
   const sequence: WalkStep[] = ["identity"];
   let current: WalkStep = "identity";
   let navigateAtEnd: "output" | undefined;
   for (let guard = 0; guard < 50; guard++) {
-    const outcome = advance(current, undefined, ctx);
+    const outcome = advance(current, undefined, fullCtx);
     sequence.push(outcome.next as WalkStep);
     if (outcome.navigate !== undefined) navigateAtEnd = outcome.navigate;
     if (outcome.next === "done" || outcome.next === "unsupported") break;
@@ -48,9 +73,15 @@ function walkSpine(
 // finished" success path for the full-walk assertions below; the Phase F
 // hard-gate's own false-branch behavior is covered separately (see "advance:
 // help — hard gate" below).
-const copyCtx = { selectedTrack: "copy" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true };
-const adaptCtx = { selectedTrack: "adapt" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true };
-const unsupported = { selectedTrack: null, identitySupported: false, touchSeedSource: null, allCharactersImplemented: true };
+const copyCtx = {
+  selectedTrack: "copy" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true,
+  decisions: { "authoring-track": { id: "authoring-track" as const, value: "copy", provenance: "asked" as const } },
+};
+const adaptCtx = {
+  selectedTrack: "adapt" as const, identitySupported: true, touchSeedSource: null, allCharactersImplemented: true,
+  decisions: { "authoring-track": { id: "authoring-track" as const, value: "adapt", provenance: "asked" as const } },
+};
+const unsupported = { selectedTrack: null, identitySupported: false, touchSeedSource: null, allCharactersImplemented: true, decisions: {} };
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf
@@ -87,9 +118,13 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("choose_base")).toBe("track");
   });
 
-  it("track → characters (skips project_name which is a derived side trail)", () => {
-    // project_name is a derived side trail so nextMainLineStepAfter("track") skips it.
-    expect(nextMainLineStepAfter("track")).toBe("characters");
+  it("track → attribution (#1901: the post-track author/copyright step)", () => {
+    expect(nextMainLineStepAfter("track")).toBe("attribution");
+  });
+
+  it("attribution → characters (skips project_name which is a derived side trail)", () => {
+    // project_name is a derived side trail so nextMainLineStepAfter("attribution") skips it.
+    expect(nextMainLineStepAfter("attribution")).toBe("characters");
   });
 
   it("characters → marks (spec 071)", () => {
@@ -147,22 +182,22 @@ describe("nextMainLineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> project_name -> characters -> marks -> carve -> deadkeys -> rules -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> choose_base -> track -> attribution -> project_name -> characters -> marks -> carve -> deadkeys -> rules -> mechanisms -> touch_seed_source -> touch -> help -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     // Spec 035 R4/R12: with no recorded fork choice (copyCtx.touchSeedSource === null),
     // mechanisms routes through the off-spine touch_seed_source fork before touch.
     expect(sequence).toEqual([
-      "identity", "layout", "choose_base", "track", "project_name", "characters",
+      "identity", "layout", "choose_base", "track", "attribution", "project_name", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
   });
 
-  it("SR-2 adapt track: same spine but project_name is skipped", () => {
+  it("SR-2 adapt track: same spine but project_name is skipped (attribution is walked)", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "layout", "choose_base", "track", "characters",
+      "identity", "layout", "choose_base", "track", "attribution", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     expect(sequence).not.toContain("project_name");
@@ -220,7 +255,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   it("spine ids (spine !== false) are in the locked order", () => {
     const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
-      "identity", "layout", "choose_base", "track", "characters",
+      "identity", "layout", "choose_base", "track", "attribution", "characters",
       "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "touch", "help", "package",
     ]);
   });
@@ -267,29 +302,43 @@ describe("advance: choose_base", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — track step (copy/adapt fork)
+// advance — track step → attribution; the copy/adapt fork lives at
+// "attribution" since #1901 (the fork is evaluated once the post-track
+// author/copyright questions are answered).
 // ---------------------------------------------------------------------------
 
-describe("advance: track — copy fork", () => {
-  it("copy track → project_name (side-trail)", () => {
+describe("advance: track → attribution (#1901)", () => {
+  it("copy track → attribution", () => {
     const { next } = advance("track", undefined, copyCtx);
+    expect(next).toBe("attribution");
+  });
+
+  it("adapt track → attribution", () => {
+    const { next } = advance("track", undefined, adaptCtx);
+    expect(next).toBe("attribution");
+  });
+});
+
+describe("advance: attribution — copy fork", () => {
+  it("copy track → project_name (side-trail)", () => {
+    const { next } = advance("attribution", undefined, copyCtx);
     expect(next).toBe("project_name");
   });
 
   it("copy track does NOT carry setCharactersSubStage", () => {
-    const outcome = advance("track", undefined, copyCtx);
+    const outcome = advance("attribution", undefined, copyCtx);
     expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
 
-describe("advance: track — adapt fork (US2)", () => {
+describe("advance: attribution — adapt fork (US2)", () => {
   it("adapt track → characters (skips project_name)", () => {
-    const { next } = advance("track", undefined, adaptCtx);
+    const { next } = advance("attribution", undefined, adaptCtx);
     expect(next).toBe("characters");
   });
 
   it("adapt track carries setCharactersSubStage:'prefill'", () => {
-    const outcome = advance("track", undefined, adaptCtx);
+    const outcome = advance("attribution", undefined, adaptCtx);
     expect(outcome.setCharactersSubStage).toBe("prefill");
   });
 });
@@ -357,12 +406,26 @@ describe("advance: spine hops", () => {
   });
 
   it("mechanisms → touch directly when a fork choice IS recorded (spec 035 R12 fork memory)", () => {
-    const withChoice = { ...copyCtx, touchSeedSource: "import-adapt" as const };
+    const withChoice = {
+      ...copyCtx,
+      touchSeedSource: "import-adapt" as const,
+      decisions: {
+        ...copyCtx.decisions,
+        "touch-seed-source": { id: "touch-seed-source" as const, value: "import-adapt", provenance: "asked" as const },
+      },
+    };
     expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
   it("mechanisms → touch directly for the other recorded choice too", () => {
-    const withChoice = { ...copyCtx, touchSeedSource: "reseed-from-desktop" as const };
+    const withChoice = {
+      ...copyCtx,
+      touchSeedSource: "reseed-from-desktop" as const,
+      decisions: {
+        ...copyCtx.decisions,
+        "touch-seed-source": { id: "touch-seed-source" as const, value: "reseed-from-desktop", provenance: "asked" as const },
+      },
+    };
     expect(advance("mechanisms", undefined, withChoice).next).toBe("touch");
   });
 
@@ -432,23 +495,31 @@ describe("advance: terminals (idempotent, not called in practice)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — track step: null selectedTrack recovery (P1-B invariant guard)
+// advance — attribution step: null selectedTrack recovery (P1-B invariant
+// guard; the guard moved with the fork at #1901 — it used to sit on the
+// track case, which now forwards unconditionally)
 // ---------------------------------------------------------------------------
 
-describe("advance: track — null selectedTrack recovery", () => {
+describe("advance: attribution — null selectedTrack recovery", () => {
+  it("the track case forwards to attribution even with a null track (no fork there)", () => {
+    const outcome = advance("track", undefined, { selectedTrack: null, identitySupported: true });
+    expect(outcome.next).toBe("attribution");
+  });
+
   it("null selectedTrack defaults to copy path (project_name), not adapt", () => {
-    // TrackStepAdapter must always set selectedTrack before onComplete; null here
-    // is an invariant violation. The guard defaults to copy (project_name) — the
-    // safer fork, as it does not skip a step.
+    // The track step's completion must always record the authoring-track
+    // decision before attribution is reached; null here is an invariant
+    // violation. The guard defaults to copy (project_name) — the safer
+    // fork, as it does not skip a step.
     // Note: we do not assert console.error in this suite because vitest's spy
     // setup would require importing vi and mocking before the module loads;
     // the console.error call is documented in advance.ts and visible in test output.
-    const outcome = advance("track", undefined, { selectedTrack: null, identitySupported: true });
+    const outcome = advance("attribution", undefined, { selectedTrack: null, identitySupported: true });
     expect(outcome.next).toBe("project_name");
   });
 
   it("null selectedTrack recovery does NOT carry setCharactersSubStage", () => {
-    const outcome = advance("track", undefined, { selectedTrack: null, identitySupported: true });
+    const outcome = advance("attribution", undefined, { selectedTrack: null, identitySupported: true });
     expect(outcome.setCharactersSubStage).toBeUndefined();
   });
 });
@@ -476,5 +547,147 @@ describe("advance: pure — result is ignored", () => {
     const c = advance("characters", "string-result", copyCtx);
     expect(a.next).toBe(b.next);
     expect(b.next).toBe(c.next);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 088 T020 (US2): routing reads the DecisionSet, not session fields.
+// The contexts below deliberately carry selectedTrack/touchSeedSource values
+// that DISAGREE with their `decisions` — the outcomes must follow the
+// decisions, proving the gate no longer reads the fields.
+// ---------------------------------------------------------------------------
+
+describe("advance: gates read the DecisionSet (spec 088 T020)", () => {
+  it("adapt in the DecisionSet skips project_name even when the field says copy", () => {
+    // The fork is evaluated at the attribution step's completion (#1901):
+    // the project_name gate reads the DecisionSet, not the field.
+    const outcome = advance("attribution", undefined, {
+      selectedTrack: "copy",
+      identitySupported: true,
+      touchSeedSource: null,
+      allCharactersImplemented: true,
+      decisions: {
+        "authoring-track": { id: "authoring-track", value: "adapt", provenance: "asked" },
+      },
+    });
+    expect(outcome.next).toBe("characters");
+  });
+
+  it("a recorded touch-seed-source in the DecisionSet routes mechanisms straight to touch", () => {
+    const outcome = advance("mechanisms", undefined, {
+      selectedTrack: "copy",
+      identitySupported: true,
+      touchSeedSource: null,
+      allCharactersImplemented: true,
+      decisions: {
+        "authoring-track": { id: "authoring-track", value: "copy", provenance: "asked" },
+        "touch-seed-source": { id: "touch-seed-source", value: "import-adapt", provenance: "asked" },
+      },
+    });
+    expect(outcome.next).toBe("touch");
+  });
+
+  it("no touch-seed-source record routes mechanisms to the seed chooser", () => {
+    const outcome = advance("mechanisms", undefined, {
+      selectedTrack: "copy",
+      identitySupported: true,
+      touchSeedSource: "import-adapt",
+      allCharactersImplemented: true,
+      decisions: {
+        "authoring-track": { id: "authoring-track", value: "copy", provenance: "asked" },
+      },
+    });
+    expect(outcome.next).toBe("touch_seed_source");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 091 T021 (US3) — walk-level tests over derived screens.
+//
+// The split-run case exercises the T010 seam the host walks (buildManifest
+// over a supplied module list): advance() itself is id-based over the live
+// manifest, so the split is asserted on the built sequence and the derived
+// screens' labels, and the gate cases are asserted through advance() on the
+// live manifest.
+// ---------------------------------------------------------------------------
+
+describe("spec 091 T021 — derived screens in the walk", () => {
+  // The SC-001 declaration edit (same as T009/T011): il_language_autonym
+  // gains requires: ["base-keyboard"] and its `next` is re-pointed.
+  const editedModules = decisionModules.map((m) =>
+    m.definition.id === "il_language_autonym"
+      ? {
+          ...m,
+          requires: [...(m.requires ?? []), "base-keyboard" as DecisionId],
+          definition: { ...m.definition, next: null },
+        }
+      : m,
+  );
+
+  it("a split run yields two screens with the same group label, in derived order", () => {
+    const screens = deriveScreens(editedModules, declaredScreenGates);
+    const identityScreens = screens.filter((s) => s.id === "identity");
+    expect(identityScreens).toHaveLength(2);
+    // Same group label on both halves of the split run.
+    expect(identityScreens.map((s) => s.group)).toEqual(["identity", "identity"]);
+    // Derived order: first identity run, layout, choose_base, second run.
+    const ids = screens.map((s) => s.id);
+    const firstIdx = ids.indexOf("identity");
+    const secondIdx = ids.lastIndexOf("identity");
+    expect(ids.indexOf("layout")).toBeGreaterThan(firstIdx);
+    expect(ids.indexOf("choose_base")).toBeGreaterThan(ids.indexOf("layout"));
+    expect(secondIdx).toBeGreaterThan(ids.indexOf("choose_base"));
+
+    // The manifest the host walks (T010 seam) carries the same sequence.
+    const built = buildManifest(editedModules);
+    expect(built.map((s) => s.id)).toEqual([...ids, "package"]);
+    expect(built.filter((s) => s.id === "identity")).toHaveLength(2);
+  });
+
+  it("baseline contrast: the unedited registry walks a single identity screen", () => {
+    const built = buildManifest(decisionModules);
+    expect(built.filter((s) => s.id === "identity")).toHaveLength(1);
+    expect(built.map((s) => s.id)).toEqual(manifest.map((s) => s.id));
+  });
+
+  it("a screen whose decisions are all gated off is skipped by advance (adapt skips project_name)", () => {
+    // The fork is evaluated at the attribution step (#1901): track
+    // forwards there on both tracks first.
+    expect(advance("track", undefined, adaptCtx).next).toBe("attribution");
+    const outcome = advance("attribution", undefined, adaptCtx);
+    expect(outcome.next).toBe("characters");
+  });
+
+  it("the same screen is walked when its gate passes (copy walks project_name)", () => {
+    const outcome = advance("attribution", undefined, copyCtx);
+    expect(outcome.next).toBe("project_name");
+    // And the walked side trail rejoins the spine at characters.
+    expect(advance("project_name", undefined, copyCtx).next).toBe("characters");
+  });
+
+  it("a partially gated screen is walked: characters carries routing-gated questions but no screen gate", () => {
+    // The characters screen has no entry in the derived screen gates (its
+    // members' gates are per-question routing), so advance lands on it and
+    // walks through it on BOTH tracks.
+    expect(advance("attribution", undefined, adaptCtx).next).toBe("characters");
+    expect(advance("characters", undefined, adaptCtx).next).toBe("marks");
+    expect(advance("characters", undefined, copyCtx).next).toBe("marks");
+  });
+
+  it("the touch_seed_source screen is walked while unrecorded and skipped once its decision exists", () => {
+    const unrecorded = advance("mechanisms", undefined, copyCtx);
+    expect(unrecorded.next).toBe("touch_seed_source");
+    const recorded = advance("mechanisms", undefined, {
+      ...copyCtx,
+      decisions: {
+        ...copyCtx.decisions,
+        "touch-seed-source": {
+          id: "touch-seed-source" as const,
+          value: "import-adapt",
+          provenance: "asked" as const,
+        },
+      },
+    });
+    expect(recorded.next).toBe("touch");
   });
 });

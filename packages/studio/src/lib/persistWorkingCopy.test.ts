@@ -514,6 +514,38 @@ describe("persistWorkingCopy", () => {
       expect(snapshot.deletedTouchKeyIds).toEqual(["phone:default:U_0063"]);
     });
 
+    it("spec 090 T063: a snapshot still carrying the retired answer sidecar has it dropped on restore and never re-saved", () => {
+      const ir = makeScaffoldedIR();
+      const staleSnapshot = {
+        instantiationMode: "new-from-base",
+        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        baseVfsEntries: [],
+        baseIr: ir,
+        identity: null,
+        ir,
+        deletedNodeIds: [],
+        deletedItemIds: [],
+        deletedTouchKeyIds: [],
+        undoStack: [],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        sequenceFlaggedChars: [],
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+        staleSteps: [],
+        validatorFindings: [],
+        axisFills: [],
+        phaseAnswersByStep: { C: { legacy: [] } },
+      } as unknown as WorkingCopySnapshot;
+
+      const patch = prepareWorkingCopySnapshot(staleSnapshot);
+      expect("phaseAnswersByStep" in patch).toBe(false);
+      // And a fresh snapshot of the store never writes the field at all.
+      expect("phaseAnswersByStep" in snapshotWorkingCopyData()).toBe(false);
+    });
+
     it("prepareWorkingCopySnapshot tolerates a pre-existing snapshot missing the field", () => {
       const ir = makeScaffoldedIR();
       const legacySnapshot = {
@@ -550,8 +582,8 @@ describe("persistWorkingCopy", () => {
   //
   // Both fields join WorkingCopySnapshot as OPTIONAL with a tolerant fallback
   // read in prepareWorkingCopySnapshot, per data-model.md §9 / R10.3: DRAFT_VERSION
-  // stays 1 (VR-1 discards a version-mismatched draft rather than migrating it,
-  // so a bump would throw away every author's in-progress keyboard).
+  // stays at its current value (VR-1 discards a version-mismatched draft rather
+  // than migrating it, so a bump would throw away every author's in-progress keyboard).
   // -------------------------------------------------------------------------
 
   describe("contextNormalizationStep persistence (spec 086)", () => {
@@ -568,7 +600,7 @@ describe("persistWorkingCopy", () => {
       useWorkingCopyStore.getState().reset();
       expect(rehydrateWorkingCopyFromSession()).toBe(true);
       expect(useWorkingCopyStore.getState().contextNormalizationStep).toEqual(stored);
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2);
     });
   });
 
@@ -614,7 +646,7 @@ describe("persistWorkingCopy", () => {
 
   describe("keyEditOverlay / touchEditorMode persistence (T058)", () => {
     it("DRAFT_VERSION stays 1 — these fields are additive, not a version bump", () => {
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2); // spec 088 FR-007
     });
 
     it("round-trip through sessionStorage snapshot/rehydrate", () => {

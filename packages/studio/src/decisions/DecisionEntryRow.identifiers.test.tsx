@@ -89,6 +89,9 @@ function collectRowText(): string {
     "decision-entry-superseded",
     "decision-entry-expand",
     "decision-entry-impact",
+    // The enrichment's meta line renders provenance + time on every row;
+    // it is author-facing text like the rest, so the guard scans it too.
+    "decision-entry-meta",
   ]) {
     const el = screen.queryByTestId(testId);
     if (el) parts.push(el.textContent ?? "");
@@ -338,5 +341,35 @@ describe("the shed and impact-unavailable states (FR-008 over the expanded regio
     });
     assertNoIdentifierLeak(text, []);
     expect(text).toMatch(/changed nothing/i);
+  });
+});
+
+describe("decision entries (FR-008 over the enriched row)", () => {
+  it("shows the value's own characters, never the decisionId or a field code", () => {
+    const decisionId = "punctuation-inventory";
+    const entry: DecisionEntry = {
+      entryId: "e-decision",
+      stepId: "punctuation",
+      payload: {
+        kind: "decision",
+        decisionId,
+        value: {
+          accepted: [{ char: "«", provenance: "asked" }],
+          declined: [{ char: "»", provenance: "asked" }],
+        },
+        summary: "Punctuation inventory: 2 items",
+      },
+      provenance: { agency: "hand-set" },
+      recordedAt: 1,
+      supersedes: null,
+    };
+    const text = renderRow(entry, {
+      resolveImpact: () => ({ state: "none" }),
+      expand: true,
+    });
+    assertNoIdentifierLeak(text, [decisionId]);
+    // The enrichment's whole point, pinned: the decided characters render.
+    expect(text).toMatch(/accepted: «/);
+    expect(text).toMatch(/declined: »/);
   });
 });

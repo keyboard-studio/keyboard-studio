@@ -31,7 +31,7 @@ import { createVirtualFS, type KeyboardIR, type SurveyPhaseResult } from "@keybo
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { classifyRemovalCapabilities, parseKmn } from "@keyboard-studio/engine";
 import { render } from "../../src/test/renderWithI18n.tsx";
-import { ConvenienceCharsStep } from "../../src/survey/convenience/ConvenienceCharsStep.tsx";
+import { ConvenienceStepHost } from "../../src/survey/convenience/ConvenienceStepHost.tsx";
 import { CarveGalleryV2 } from "../../src/editors/carve/CarveGalleryV2.tsx";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../../src/stores/surveyAnswerStore.ts";
@@ -90,7 +90,7 @@ describe("Convenience letters gate, real data: opens for a surplus-letter orthog
   it("renders every surplus letter pair basic_kbdus leaves over Samoan's alphabet", async () => {
     seed("sm", SAMOAN_BASES);
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceStepHost onComplete={onComplete} />);
 
     await screen.findByTestId("convenience-chars");
     expect(onComplete).not.toHaveBeenCalled();
@@ -107,7 +107,7 @@ describe("Convenience letters gate, real data: opens for a surplus-letter orthog
     // withStepNav (spec 081 FR-051): Continue now renders in the footer's nav
     // cluster, not the step body — same harness ConvenienceCharsStep.test.tsx
     // uses for every nav assertion.
-    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
+    render(<ConvenienceStepHost onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     // Keep everything except q/Q.
@@ -144,7 +144,7 @@ describe("Convenience letters gate, real data: loanword-only letters are surplus
   it("offers the letters Bafut lists only as loanwords", async () => {
     seed("bfd", BAFUT_BASES);
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceStepHost onComplete={onComplete} />);
 
     await screen.findByTestId("convenience-chars");
     expect(onComplete).not.toHaveBeenCalled();
@@ -156,7 +156,7 @@ describe("Convenience letters gate, real data: loanword-only letters are surplus
 
   it("does not offer a loanword letter the author added to the alphabet", async () => {
     seed("bfd", [...BAFUT_BASES, "q"]);
-    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    render(<ConvenienceStepHost onComplete={vi.fn()} />);
 
     await screen.findByTestId("convenience-chars");
     expect(screen.queryByLabelText("Keep q Q")).toBeNull();
@@ -177,7 +177,7 @@ describe("Convenience letters gate, real data: recorded loanword letters", () =>
       loanwordChars: ["q", "Q"],
     });
     expect(useWorkingCopyStore.getState().session.alphabet?.bases).not.toContain("q");
-    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    render(<ConvenienceStepHost onComplete={vi.fn()} />);
 
     await screen.findByTestId("convenience-chars");
     expect(screen.queryByLabelText("Keep q Q")).toBeNull();
@@ -189,7 +189,7 @@ describe("Convenience letters gate, real data: stays shut when there is no surpl
   it("completes without rendering for English on basic_kbdus, recording no-surplus", async () => {
     seed("en", [..."abcdefghijklmnopqrstuvwxyz"]);
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceStepHost onComplete={onComplete} />);
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("convenience-chars")).toBeNull();

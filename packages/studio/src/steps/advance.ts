@@ -16,8 +16,8 @@
 // R9 (boundary).
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { decisionsFromTraversal } from "./decisionsFromTraversal.ts";
-import { manifest } from "./manifest.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import { manifest, screenGates } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
 import type { Step } from "./types.ts";
 
@@ -34,6 +34,7 @@ type ActiveStepId =
   | "layout"
   | "choose_base"
   | "track"
+  | "attribution"
   | "project_name"
   | "characters"
   | "carve"
@@ -66,6 +67,12 @@ type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
 // ---------------------------------------------------------------------------
 
 export interface AdvanceContext {
+  /**
+   * Spec 088 FR-004: the live decision set, read from the decision store by
+   * the host. `gatedBy` is evaluated over THIS set and nothing else — no
+   * decision set is rebuilt from session fields anywhere.
+   */
+  readonly decisions: DecisionSet;
   /** "copy" | "adapt" | null — the track selected at the track step. */
   readonly selectedTrack: Track | null;
   /** Whether the identity step's chosen script is supported in v1. */
@@ -124,10 +131,11 @@ export const STEPS_WITH_APPLY_COMPLETION: ReadonlySet<string> = new Set([
   "characters",
   "marks",
   "carve",
-  "mechanisms",
-  "touch",
   "help",
 ]);
+// ("mechanisms" left the set at spec 090 T041 and "touch" at T042: their
+// R1/R2 effects re-homed to lib/assignLoopCompletion.ts, fired by
+// AddPhysicalAdapter / AddTouchAdapter — D-090-38.)
 
 // ---------------------------------------------------------------------------
 // manifestIndexOf — moved from StudioShell.tsx (was private, now exported).
@@ -166,14 +174,16 @@ export function nextMainLineStepAfter(currentId: string): ActiveStepId {
 }
 
 /**
- * Does a side-trail step apply for this context? The condition is the step's
- * own `gatedBy` (steps/stepDependencies.ts) — the single source — evaluated
- * over the decisions the context already records.
+ * Does a side-trail step apply for this context? The condition is the
+ * step's DERIVED SCREEN gate (spec 091 T015 — steps no longer carry
+ * `gatedBy`; steps/manifest.ts publishes the derived gates as
+ * `screenGates`) — the single source — evaluated over the decisions the
+ * context already records.
  */
 function stepApplies(step: Step | undefined, ctx: AdvanceContext): boolean {
-  const gate = step?.gatedBy;
+  const gate = step === undefined ? undefined : screenGates.get(step.id);
   if (gate === undefined) return true;
-  return gate(decisionsFromTraversal(ctx.selectedTrack, ctx.touchSeedSource));
+  return gate(ctx.decisions ?? {});
 }
 
 function stepById(stepId: string): Step | undefined {
@@ -208,27 +218,35 @@ export function advance(
       return { next: nextMainLineStepAfter("choose_base") }; // track
 
     case "track":
+      // #1901: both tracks continue to the attribution step — the
+      // author/copyright questions are asked after the track choice
+      // because their proposals are track-shaped. The copy/update fork
+      // is evaluated at the attribution step's completion, below.
+      return { next: "attribution" };
+
+    case "attribution":
       if (ctx.selectedTrack !== null) {
         if (stepApplies(stepById("project_name"), ctx)) {
           // Copy-track: project_name side-trail (gated on the copy track).
           return { next: "project_name" };
         }
-        // Adapt-track: skip the project_name side trail → characters.
+        // Update-track: skip the project_name side trail → characters.
         // Also signals host to call setCharactersSubStage("prefill") post-advance.
         return {
-          next: nextMainLineStepAfter("track"),  // characters
+          next: nextMainLineStepAfter("attribution"),  // characters
           setCharactersSubStage: "prefill",
         };
       } else {
-        // Invariant violation: selectedTrack is null here, but
-        // makeFlowStepComponent(trackOptions).onCommit always calls setSelectedTrack
-        // before invoking onComplete. A null at this point means something went wrong
-        // upstream. Log the violation and default to the copy path (project_name) —
-        // copy is the safer default because it does NOT skip a step. Do NOT silently
-        // route as adapt (which skips project_name and could confuse the user).
+        // Invariant violation: selectedTrack is null here, but the track
+        // step's completion recorded the authoring-track decision before
+        // this step could be reached. A null at this point means something
+        // went wrong upstream. Log the violation and default to the copy
+        // path (project_name) — copy is the safer default because it does
+        // NOT skip a step. Do NOT silently route as update (which skips
+        // project_name and could confuse the user).
         devLog.error(
-          "[advance] invariant violation: selectedTrack is null at track step. " +
-          "trackOptions.onCommit must set selectedTrack before calling onComplete. " +
+          "[advance] invariant violation: selectedTrack is null at attribution step. " +
+          "The track step must record the authoring-track decision before attribution is reached. " +
           "Defaulting to copy path (project_name) to avoid silent wrong-fork routing."
         );
         return { next: "project_name" };

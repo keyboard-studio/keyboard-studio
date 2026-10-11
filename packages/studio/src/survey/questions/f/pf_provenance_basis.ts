@@ -60,5 +60,21 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-provenance-basis"], requires: ["help-more-detail"] };
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  provides: ["help-provenance-basis"],
+  requires: ["help-more-detail"],
+  // Spec 092 (T036; G-17): the starting-point provenance basis is this
+  // module's extract, replacing the PHASE_F_SEEDS table entry. The
+  // derivation (lib/phaseFSeeds.ts's proposeProvenanceBasis) is
+  // computed by the live wiring over the working-copy slices and read
+  // off the context — question modules import nothing from lib/
+  // (mutate-seam rule), the same pattern as the welcome prefill.
+  // Source "base" in the old table = extracted provenance with the
+  // base keyboard's id as source.
+  extract: (ctx) => ctx.phaseF?.provenanceBasisProposal,
+};
 export default mod;

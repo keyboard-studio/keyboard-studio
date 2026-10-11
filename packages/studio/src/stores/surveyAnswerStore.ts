@@ -15,6 +15,19 @@
 //   - not a re-proposal engine. A shape change never writes here; `reconcile()`
 //     (steps/evidence.ts) is a pure read over what is saved (R-03).
 //
+// The narrowed role (spec 090 T026, D-090-29): the gallery steps' settled
+// values are decision records now — they live in the decision store, and
+// their manifest steps declare `persistence: "decision-store"`. No gallery
+// DECISION is held here. What a gallery step still keeps in this store is
+// exactly its declared residue: within-step position, its step-status slot,
+// and the spec 079 evidence layer (marks' per-toggle answers, characters'
+// per-grapheme addition answers, punctuation's one inventory answer — the
+// draft surface those steps record into as the author works, from which
+// the decision value is composed at commit points), plus the legacy
+// convenience booleans the adoption shim reads from older drafts
+// (D-090-17). Question steps' answers are unchanged: this remains their
+// store, under the rule above.
+//
 // Persistence: folded into the durable draft as `DurableDraft.surveyAnswers`
 // (lib/draftPersistence.ts), on the existing autosave timer — no timer here.
 //

@@ -24,7 +24,7 @@
 import { formatIRPath } from "@keyboard-studio/contracts";
 import type { IRPath, LintFinding } from "@keyboard-studio/contracts";
 import type { Step } from "../steps/types.ts";
-import { deriveStepStructure } from "../steps/stepOrder.ts";
+import { deriveStepStructure, type StepTrail } from "../decisions/orderDecisions.ts";
 import { computeDataEdges } from "./model.ts";
 import type { StepGraph, StepGraphEdge } from "./model.ts";
 
@@ -272,8 +272,15 @@ export interface RejoinViolation {
  * next ungated step in the (derived) manifest order, so it can only dead-end
  * when no ungated step follows it. Flags exactly that.
  */
-export function checkRejoin(manifest: readonly Step[]): RejoinViolation[] {
-  const trails = deriveStepStructure(manifest);
+export function checkRejoin(
+  manifest: readonly Step[],
+  // Trail structure over the manifest's steps. Production passes the
+  // derived SCREEN trails (steps/manifest.ts `screenTrails`, threaded by
+  // runCompleteness' caller); the default derives from the steps' own
+  // gatedBy, which is what synthetic fixtures declare. This module must
+  // NOT import steps/manifest.ts (see buildMinimalStepGraph's cycle note).
+  trails: ReadonlyMap<string, StepTrail> = deriveStepStructure(manifest),
+): RejoinViolation[] {
   const violations: RejoinViolation[] = [];
 
   for (const step of manifest) {
@@ -345,8 +352,8 @@ export function checkSpinePrefixShippability(
   manifest: readonly Step[],
   wc: WcForCompleteness,
   findings: readonly LintFinding[] = [],
+  trails: ReadonlyMap<string, StepTrail> = deriveStepStructure(manifest),
 ): number[] {
-  const trails = deriveStepStructure(manifest);
   const spineSteps = manifest.filter((s) => trails.get(s.id)?.spine === true);
   const unshippable: number[] = [];
 
@@ -454,8 +461,10 @@ export function checkInputsSatisfiableFromManifest(manifest: readonly Step[]): O
  *
  * Returns the ids of unreachable steps.
  */
-export function findUnreachable(manifest: readonly Step[]): string[] {
-  const trails = deriveStepStructure(manifest);
+export function findUnreachable(
+  manifest: readonly Step[],
+  trails: ReadonlyMap<string, StepTrail> = deriveStepStructure(manifest),
+): string[] {
   return manifest
     .filter((s) => {
       const trail = trails.get(s.id);
@@ -575,8 +584,10 @@ export interface CompletenessReport {
  *
  * Instead, we build a minimal StepGraph inline from the manifest Step[].
  */
-function buildMinimalStepGraph(manifest: readonly Step[]): StepGraph {
-  const trails = deriveStepStructure(manifest);
+function buildMinimalStepGraph(
+  manifest: readonly Step[],
+  trails: ReadonlyMap<string, StepTrail> = deriveStepStructure(manifest),
+): StepGraph {
   const nodes = manifest.map((step, idx) => ({
     id: step.id,
     label: step.title,
@@ -627,8 +638,11 @@ export function runCompleteness(
   wc: WcForCompleteness,
   reopened: ReadonlySet<string> = new Set(),
   findings: readonly LintFinding[] = [],
+  // Derived screen trails for the real manifest (spec 091 T014), passed
+  // by the caller (StudioShell) — this module cannot import them (cycle).
+  trails: ReadonlyMap<string, StepTrail> = deriveStepStructure(manifest),
 ): CompletenessReport {
-  const graph = buildMinimalStepGraph(manifest);
+  const graph = buildMinimalStepGraph(manifest, trails);
 
   // C1: transitive staleness fixpoint (contract-named).
   const stale = computeStaleness(graph, reopened);
@@ -637,18 +651,18 @@ export function runCompleteness(
   const cycles = findCycles(graph);
 
   // C3: side-trail rejoin check.
-  const rejoinViolations = checkRejoin(manifest);
+  const rejoinViolations = checkRejoin(manifest, trails);
 
   // C4: spine-prefix shippability — structural proxy + REAL Layer-A validator
   // graduation (US5/T034). `findings` are the already-debounced useValidator
   // output, REUSED here (no second debounce / async loop — V3/Article IV).
-  const unshippablePrefixes = checkSpinePrefixShippability(manifest, wc, findings);
+  const unshippablePrefixes = checkSpinePrefixShippability(manifest, wc, findings, trails);
 
   // C5: orphan inputs (contract-named).
   const orphanInputs = checkInputsSatisfiable(graph);
 
   // C7: unreachable steps.
-  const unreachable = findUnreachable(manifest);
+  const unreachable = findUnreachable(manifest, trails);
 
   return {
     stale,

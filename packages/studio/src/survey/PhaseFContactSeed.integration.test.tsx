@@ -22,7 +22,7 @@ import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 // useLingui(), which throws without an <I18nProvider> ancestor.
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseFStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 
 afterEach(() => {
   cleanup();
@@ -52,7 +52,21 @@ function typeInto(value: string): void {
  * (No) -> pf_credits -> pf_contact_info.
  */
 function walkToContactField(ctx: Record<string, string | undefined>): string {
-  useSurveySessionStore.getState().setSurveyContext(ctx);
+  // Spec 089: the factory derives its context from the decision store —
+  // author_contact comes from the recorded author-email decision, and the
+  // context exists only once the identity decisions are recorded (Phase F
+  // is never reached before identity completes in the real flow either).
+  {
+    const record = useDecisionStore.getState().record;
+    record({ id: "language-name", value: "Bafut", provenance: "asked" });
+    record({ id: "language-autonym", value: "Bafut", provenance: "asked" });
+    record({ id: "language-code", value: "bfd", provenance: "asked" });
+    record({ id: "target-script", value: "Latn", provenance: "asked" });
+    record({ id: "author-name", value: "Bafut Literacy", provenance: "asked" });
+    if (ctx.author_contact !== undefined) {
+      record({ id: "author-email", value: ctx.author_contact, provenance: "asked" });
+    }
+  }
   render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
   // 1. pf_welcome_paragraph — required, so it must be filled to advance.
@@ -99,7 +113,15 @@ describe("Phase F — pf_contact_info pre-fill (end to end)", () => {
   // finish, which is the whole point of keeping the question optional.
   it("lets the author clear the pre-filled value and still complete the flow", () => {
     let completed = false;
-    useSurveySessionStore.getState().setSurveyContext({ author_contact: CONTACT });
+    {
+      const record = useDecisionStore.getState().record;
+      record({ id: "language-name", value: "Bafut", provenance: "asked" });
+      record({ id: "language-autonym", value: "Bafut", provenance: "asked" });
+      record({ id: "language-code", value: "bfd", provenance: "asked" });
+      record({ id: "target-script", value: "Latn", provenance: "asked" });
+      record({ id: "author-name", value: "Bafut Literacy", provenance: "asked" });
+      record({ id: "author-email", value: CONTACT, provenance: "asked" });
+    }
     render(
       <PhaseFStepFactoryComponent
         onComplete={() => {

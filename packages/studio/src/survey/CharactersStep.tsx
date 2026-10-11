@@ -1,23 +1,37 @@
 // CharactersStep — self-contained characters step adapter (spec 027 Stage 4).
 //
-// Owns the prefill -> PhaseB substage internally. Satisfies EditorStepProps so
-// the manifest can drive it as a component (first runtime use of step.component).
+// Owns the prefill -> PhaseB substage internally. Since spec 090 T021 this
+// component is the `character-inventory` gallery module's RENDERER, hosted
+// by CharactersStepHost (the manifest component): navigation arrives via
+// GalleryStepContext, and the Phase B draft it drives is the recorded
+// decision value — edited through the shared inventory-draft surface
+// (useInventoryDraft.ts, research D-090-10), never a store write.
 //
 // Store reads:
 //   surveySessionStore: identityResult, localBase, surveyContext, charactersSubStage
 //   workingCopyStore:   validatorFindings (via useValidatorFindings hook)
 //
 // No survey-level side effects (Article IV / G2): the component reports
-// completion and back via props; the host (SurveyView) runs the reducer path.
+// completion and back via the step context; the host (SurveyView) runs the
+// reducer path.
 //
 // placementMap is intentionally omitted from PhaseB props (D-INT-2, v1).
 
 import { useEffect, useRef, type ComponentType } from "react";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-import type { EditorStepProps } from "../steps/types.ts";
+import type { LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { SurveyContext } from "./types.ts";
+import type { DecisionRendererProps } from "../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../steps/galleryHost.tsx";
 import { alphabetKeyOf, graphemeFitsScript } from "../steps/evidence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore, draftConfirmedAlphabet } from "../stores/phaseBDraftStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveIdentityResult, deriveSurveyContext } from "../decisions/identitySelectors.ts";
+import { draftConfirmedAlphabet, type CharacterInventoryValue } from "./phaseBDraftOps.ts";
+import {
+  getCharacterInventoryValue,
+  inventoryOps,
+  useCharacterInventoryValue,
+} from "./useInventoryDraft.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
@@ -25,8 +39,40 @@ import { useStepWalkStore, peekStepCursor } from "../stores/stepWalkStore.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import { ADDITION_ANSWER_PREFIX } from "./characterFlags.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
-import { Prefill, PhaseB } from "./index.ts";
+// The substage views (Prefill, PhaseB) arrive through the gallery
+// host's step-context extras, supplied by CharactersStepHost — NOT by
+// import. Both views transitively import the question registry
+// (PhaseB via steps/flowSources, Prefill via IdentityLite), and since
+// T021 the registry imports THIS component (as the character-inventory
+// module's renderer, via the module file): importing either view from
+// here — statically, lazily, or even type-only (this repo's depcruise
+// counts a type-only import of a .tsx module as an import edge) —
+// closes that cycle in the static module graph (depcruise
+// no-circular — the D-090-7 cycle, closed for good in T060). Their
+// prop shapes are therefore mirrored structurally below, from types
+// this file already imports.
+import { Suspense } from "react";
 
+/**
+ * The extras shape CharactersStepHost supplies (see galleryHost.tsx).
+ * The prop shapes mirror PrefillProps / the PhaseBProps subset this
+ * component passes — structural typing keeps the real components
+ * assignable without an import edge to their files.
+ */
+export interface CharactersStepExtras {
+  Prefill: ComponentType<{
+    identity: IdentityLiteResult;
+    base: BaseKeyboard;
+    onConfirm: () => void;
+    onBack?: () => void;
+  }>;
+  PhaseB: ComponentType<{
+    context?: SurveyContext;
+    onComplete: (result: SurveyPhaseResult) => void;
+    onBack?: () => void;
+    findingsByQuestionId?: Record<string, LintFinding[]>;
+  }>;
+}
 // Manifest step id — matches steps/manifest.ts's "characters" entry.
 //
 // SINGLE WRITER (spec 079 T035/T081/FR-004): this component is the ONLY place
@@ -80,7 +126,7 @@ const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const
  *      evidence (unchanged from before this task);
  *   4. re-seeding for the NEW evidence happens the normal way once PhaseB
  *      re-renders against the fresh (empty) draft;
- *   5. `rejected` is untouched by `reset()` (phaseBDraftStore.ts), so a
+ *   5. `rejected` is untouched by `reset()` (phaseBDraftOps.ts), so a
  *      removal the author made of a PROPOSED character is re-applied for
  *      free — nothing here needs to replay it;
  *   6-7. every author addition is re-added regardless of fit (`draft.add`
@@ -91,7 +137,8 @@ const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const
  *      or removes it (T080).
  */
 function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void {
-  const draft = usePhaseBDraftStore.getState();
+  const draft = getCharacterInventoryValue();
+  const ops = inventoryOps(CHARACTERS_STEP_ID);
   const key = alphabetKeyOf(identity, base);
   const oldKey = draft.alphabetEvidenceKey;
   if (draft.chars.length > 0 && oldKey === key) return;
@@ -106,21 +153,17 @@ function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void 
           .map(([grapheme]) => grapheme)
       : [];
 
-  draft.reset();
+  ops.reset();
   if (oldKey !== undefined) {
-    usePhaseBDraftStore.setState({
-      seededProposals: usePhaseBDraftStore
-        .getState()
-        .seededProposals.filter((k) => !PUNCTUATION_SEED_PREFIXES.some((p) => k.startsWith(p))),
-    });
+    ops.clearSeededProposals(PUNCTUATION_SEED_PREFIXES);
   }
-  usePhaseBDraftStore.getState().setAlphabetEvidenceKey(key);
+  ops.setAlphabetEvidenceKey(key);
 
   if (authorAdditions.length === 0) return;
   const targetScript = identity.prefill.script;
   const saveAnswer = useSurveyAnswerStore.getState().saveAnswer;
   for (const grapheme of authorAdditions) {
-    usePhaseBDraftStore.getState().add(grapheme);
+    ops.add(grapheme);
     if (!graphemeFitsScript(grapheme, targetScript)) {
       saveAnswer(CHARACTERS_STEP_ID, `${ADDITION_ANSWER_PREFIX}${grapheme}`, {
         value: grapheme,
@@ -135,20 +178,27 @@ function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void 
 }
 
 /**
- * Self-contained characters step adapter.
+ * Self-contained characters step adapter — the `character-inventory`
+ * module's renderer (spec 090 T021).
  *
  * Hosts the prefill -> PhaseB substage driven by the persisted
  * `charactersSubStage` store slot, so back-from-carve remounts at PhaseB
- * rather than replaying prefill (spec 027 §4).
+ * rather than replaying prefill (spec 027 §4). The DecisionRendererProps
+ * value is the shared accumulator's current record; the draft edits
+ * themselves flow through useInventoryDraft (D-090-10), so the props are
+ * accepted for the contract and not otherwise consumed here.
  */
-const CharactersStep: ComponentType<EditorStepProps> = ({
-  onComplete,
-  onBack,
-}: EditorStepProps) => {
+const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValue>> = () => {
+  const { onComplete, onBack, extras } = useGalleryStepContext();
+  const views = extras as unknown as CharactersStepExtras | undefined;
+  const Prefill = views?.Prefill;
+  const PhaseB = views?.PhaseB;
   // --- store reads (selectors) ---
-  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  // Spec 089 FR-005: identity + context are derived from the decision store.
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityResult = deriveIdentityResult(decisions);
   const localBase = useSurveySessionStore((s) => s.localBase);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const surveyContext = deriveSurveyContext(decisions);
   const charactersSubStage = useSurveySessionStore((s) => s.charactersSubStage);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
@@ -208,7 +258,7 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
   // The build list is done once it holds letters — not when every optional
   // box on it has been filled.
-  const hasDraftLetters = usePhaseBDraftStore((s) => s.chars.length > 0);
+  const hasDraftLetters = useCharacterInventoryValue().chars.length > 0;
   useEffect(() => {
     if (discoveryMethod === "manual") return;
     const stops: StepWalkPositions =
@@ -225,7 +275,7 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
   // Guard: prefill requires both identity and base (unreachable once the step
   // is properly entered, but matches today's null fallback).
   if (charactersSubStage === "prefill") {
-    if (identityResult === null || localBase === null) {
+    if (identityResult === null || localBase === null || Prefill === undefined) {
       return null;
     }
     return (
@@ -250,16 +300,21 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
 
   // substage === "B"
   // NOTE: placementMap intentionally omitted (D-INT-2).
+  if (PhaseB === undefined) {
+    return null;
+  }
   return (
+    <Suspense fallback={null}>
     <PhaseB
       context={surveyContext}
       onComplete={(result) => {
         // Commit the three-store ConfirmedAlphabet alongside the flat
-        // confirmedInventory (spec 071 US5): the build-list draft store is
-        // canonical for it; a manual-flow completion leaves the draft empty,
-        // so the field stays absent there (additive optional).
+        // confirmedInventory (spec 071 US5): the character-inventory
+        // decision value is canonical for it; a manual-flow completion
+        // leaves the draft empty, so the field stays absent there
+        // (additive optional).
         const phaseResult = result as SurveyPhaseResult;
-        const alphabet = draftConfirmedAlphabet();
+        const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
         const hasStores =
           alphabet.bases.length > 0 ||
           alphabet.marks.length > 0 ||
@@ -269,6 +324,7 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
       onBack={() => setCharactersSubStage("prefill")}
       findingsByQuestionId={findingsByQuestionId}
     />
+    </Suspense>
   );
 };
 

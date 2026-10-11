@@ -14,6 +14,10 @@
     "§8",
     "specs/018-qu-wire-track"
   ],
+  "attribution": [
+    "§8",
+    "specs/064-keyboard-attribution"
+  ],
   "project_name": [
     "§8"
   ],
@@ -98,6 +102,15 @@
     "specs/080-documentation-completeness"
   ],
   "pf_doc_language": [
+    "specs/061-help-docs-generation"
+  ],
+  "pf_doc_language_other": [
+    "specs/061-help-docs-generation"
+  ],
+  "pf_doc_language_second": [
+    "specs/061-help-docs-generation"
+  ],
+  "pf_doc_language_second_other": [
     "specs/061-help-docs-generation"
   ],
   "pf_contact_info": [

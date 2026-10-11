@@ -80,6 +80,15 @@ export interface CarveMutateOptions {
   dispositions?: CarveDisposition[];
   /** A6 loud/soft for the suppression stage. Default false (soft). */
   loud?: boolean;
+  /**
+   * Optional sink for the carve pipeline's warnings (slot-removal blocks
+   * and skips from deriveCarvedIr). The patch shape cannot carry them, so
+   * without a sink they are dropped — callers that surface projection
+   * warnings (projectWorkingCopyVfs) pass one. Added in spec 089 T021's
+   * wake: the legacy projection path pushed applyStoreSlotRemovals'
+   * warnings directly, and the un-gated seam path must not lose them.
+   */
+  onWarnings?: (warnings: readonly string[]) => void;
 }
 
 /**
@@ -162,12 +171,13 @@ export function buildCarvePatch(
   // derivation below. deletedItemIds carries the #1809 §1 aggregated union
   // (effectiveItemIds) so the pipeline and the legacy derivation consume the
   // same pruned result.
-  const { ir: carved } = deriveCarvedIr(baseIr, {
+  const { ir: carved, warnings: carveWarnings } = deriveCarvedIr(baseIr, {
     deletedNodeIds,
     deletedItemIds: effectiveItemIds,
     dispositions,
     ...(opts?.loud === true ? { loud: true as const } : {}),
   });
+  if (carveWarnings.length > 0) opts?.onWarnings?.(carveWarnings);
 
   return {
     groups: carved.groups,

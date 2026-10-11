@@ -8,7 +8,8 @@
 // sourced suggestions to tick, a type-in box, and the right-pane character
 // map (StudioShell's SurveyView swaps it in via this step's
 // rightPane:"character-map", scope "punctuation"). All three toggle the SAME
-// shared phaseBDraftStore draft the alphabet screen used, so punctuation
+// shared Phase B/C draft the alphabet screen used (since spec 090 the
+// character-inventory decision value — see ../useInventoryDraft.ts), so punctuation
 // captured during Phase B arrives here pre-selected and map picks land in
 // the same draft (its derived `punctuation` category is this page's list).
 //
@@ -52,11 +53,17 @@ import {
   computeInventoryDelta,
   glyphCategory,
 } from "@keyboard-studio/engine";
-import type { EditorStepProps } from "../../steps/types.ts";
+import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { usePhaseBDraftStore, type DraftProvenance } from "../../stores/phaseBDraftStore.ts";
+import {
+  getCharacterInventoryValue,
+  useInventoryDraft,
+} from "../useInventoryDraft.ts";
+import type { DraftProvenance, InventoryDecisionValue } from "../phaseBDraftOps.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { punctuationKey } from "../../steps/evidence.ts";
 import { derivePunctuationFlags } from "./punctuationFlags.ts";
@@ -226,23 +233,27 @@ const groupCaption = { margin: "0 0 8px 0", fontSize: 11, color: TEXT_DIM } as c
 // PunctuationStep
 // ---------------------------------------------------------------------------
 
-const PunctuationStep: ComponentType<EditorStepProps> = (
-  { onComplete, onBack }: EditorStepProps,
-) => {
+const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValue>> = () => {
+  const { onComplete, onBack } = useGalleryStepContext();
   const { t, i18n } = useLingui();
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 
-  const chars = usePhaseBDraftStore((s) => s.chars);
-  const punctuation = usePhaseBDraftStore((s) => s.punctuation);
-  const provenance = usePhaseBDraftStore((s) => s.provenance);
-  const rejected = usePhaseBDraftStore((s) => s.rejected);
-  const addChar = usePhaseBDraftStore((s) => s.add);
-  const addProposed = usePhaseBDraftStore((s) => s.addProposed);
-  const removeChar = usePhaseBDraftStore((s) => s.remove);
-  const seedProposals = usePhaseBDraftStore((s) => s.seedProposals);
-  const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
+  // The shared Phase B/C draft, as decision values (spec 090 T022): reads
+  // subscribe to the character-inventory record; edits are the bound ops,
+  // recorded through the gallery host under this step's attribution.
+  const draft = useInventoryDraft(PUNCTUATION_STEP_ID);
+  const chars = draft.chars;
+  const punctuation = draft.punctuation;
+  const provenance = draft.provenance;
+  const rejected = draft.rejected;
+  const addChar = draft.ops.add;
+  const addProposed = draft.ops.addProposed;
+  const removeChar = draft.ops.remove;
+  const seedProposals = draft.ops.seedProposals;
+  const acceptInvisible = draft.ops.acceptInvisible;
 
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const confirmedForKey = useSurveyAnswerStore(
@@ -344,19 +355,22 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   // (FR-007..FR-009): the builder substitutes the ASCII floor when the base's
   // output is not fully known, and the provenance says which it was.
   //
-  // The rejection ledger and the author's picks are read from the store WHEN
-  // the effect fires rather than subscribed to: subscribing would re-run this
-  // on every provenance change (including the CLDR seed's own writes) for no
-  // purpose, since the seed key makes every re-run a no-op anyway.
+  // The rejection ledger and the author's picks are read from the decision
+  // record WHEN the effect fires rather than subscribed to: subscribing would
+  // re-run this on every provenance change (including the CLDR seed's own
+  // writes) for no purpose, since the seed key makes every re-run a no-op
+  // anyway.
   useEffect(() => {
     if (loading || baseCoverage === null) return;
     const seedKey = "punctuation-base:" + (baseKeyboard?.id ?? "working-copy");
-    const draft = usePhaseBDraftStore.getState();
+    const currentDraft = getCharacterInventoryValue();
     const proposal = buildPunctuationProposal({
       exemplars: inventory,
       baseCoverage,
-      rejected: new Set(draft.rejected),
-      authorChosen: new Set(Object.keys(draft.provenance).filter((c) => draft.provenance[c] === "author")),
+      rejected: new Set(currentDraft.rejected),
+      authorChosen: new Set(
+        Object.keys(currentDraft.provenance).filter((c) => currentDraft.provenance[c] === "author"),
+      ),
     });
     // This page collects Unicode PUNCTUATION only, so the floor's nine symbol
     // members ($ + < = > ^ ` | ~) are not proposed here: they would land in

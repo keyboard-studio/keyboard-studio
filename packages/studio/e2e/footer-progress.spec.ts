@@ -18,6 +18,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   seedReturningVisitor,
@@ -79,6 +80,10 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // the growth half of FR-042/FR-061, measured across a question the
     // decision record actually captures as a `survey-answer` entry.
     await chooseAdaptTrack(page);
+    // #1901: attribution stands between track and prefill now; its
+    // questions append their own dots, which only strengthens the
+    // growth comparison below.
+    await driveAttributionStep(page);
 
     const prefillConfirm = page.getByTestId("prefill-confirm");
     await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });

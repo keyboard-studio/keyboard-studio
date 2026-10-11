@@ -22,6 +22,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
@@ -42,6 +43,7 @@ async function reachPhaseBChooser(page: Page): Promise<void> {
   await driveIdentityLite(page, EWONDO);
   await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
   await confirmPrefill(page);
   await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 30_000 });
 }
