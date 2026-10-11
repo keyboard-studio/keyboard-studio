@@ -231,7 +231,23 @@ describe("buildOutputRepertoire", () => {
     });
     const r = buildOutputRepertoire(ir);
     expect(r.clusters.size).toBeGreaterThan(0);
-    expect(r.truncatedBy === undefined || r.truncatedBy.every((x) => ["clusters", "selections", "alternatives"].includes(x))).toBe(true);
+    expect(r.truncated).toBe(true);
+    expect(r.truncatedBy).toContain("clusters");
+  });
+
+  it("flags truncation when an unpaired output index exceeds the alternatives bound", () => {
+    const items = Array.from({ length: 300 }, (_, i) => String.fromCodePoint(0x4e00 + i)).join("");
+    const ir = makeTestIR({
+      groups: [
+        irGroup({
+          rules: [ruleOf([{ kind: "char", value: "q" }], [{ kind: "index", storeRef: "big", offset: 1 }])],
+        }),
+      ],
+      stores: [charStore({ name: "big", chars: items })],
+    });
+    const r = buildOutputRepertoire(ir);
+    expect(r.truncated).toBe(true);
+    expect(r.truncatedBy).toContain("alternatives");
   });
 
   it("types a three-mark cluster one key at a time when the keyboard has three-mark atoms", () => {
