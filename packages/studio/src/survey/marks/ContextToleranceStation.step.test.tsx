@@ -103,6 +103,8 @@ describe("ContextToleranceStation, normalization step", () => {
       fingerprint: FINGERPRINT,
     });
     expect(screen.getByText(/step that converts pasted letters/)).toBeTruthy();
+    // The prior view is still the step view: its heading stays direction-neutral.
+    expect(screen.getByRole("heading", { name: "Letters and diacritics written in a different form" })).toBeTruthy();
     expect(screen.getByTestId("context-tolerance-change")).toBeTruthy();
   });
 });
