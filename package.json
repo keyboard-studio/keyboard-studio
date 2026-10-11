@@ -56,7 +56,8 @@
     "crowdin:upload": "crowdin upload sources",
     "crowdin:download": "crowdin download",
     "crowdin:diagnose": "node utilities/crowdin-diagnose/index.js",
-    "crowdin:diagnose:selftest": "node utilities/crowdin-diagnose/selftest.js"
+    "crowdin:diagnose:selftest": "node utilities/crowdin-diagnose/selftest.js",
+    "test:affected": "node scripts/test-affected.mjs"
   },
   "devDependencies": {
     "@crowdin/cli": "^4.14.4",

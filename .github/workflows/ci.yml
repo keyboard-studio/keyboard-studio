@@ -22,6 +22,13 @@ on:
     # no CI at all (the spec 089 golden-walk capture/verify lives in the
     # e2e lane and keys off the PR base ref).
     branches: [main, dev, 'km/*']
+  # Nightly full-gate run (km/ci-fast-gates, 2026-10-11): the corpus gate
+  # and the golden walk are path-gated on pull requests (see the
+  # `changes` job), so a scheduled run — where `changes` reports every
+  # gate on — remains the unconditional backstop.
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
 
 # Cancel a superseded run when a newer commit lands on the same ref, so a
 # rapid second push doesn't leave the first full run burning runner minutes.
@@ -35,7 +42,85 @@ env:
   KEYBOARDS_CORPUS_SHA: 435f82d69bfc926eb03c2d8632571b41b6da3266
 
 jobs:
+  # Path gate for the expensive lanes (km/ci-fast-gates, 2026-10-11 —
+  # this is issue #2004's km/ci-lightening gating, re-applied onto main
+  # after PR #1984's merge resolved ci.yml toward the union version and
+  # dropped the interim #2006 gating). Measured 2026-10-11 on current
+  # main: a keyboard-adjacent build is ~77 min — Test (all packages)
+  # ~23 min (engine alone 18m41s, corpus sweeps inside the unit suite),
+  # corpus gate ~50 min run SERIAL, everything else ~4 min. This job
+  # diffs the PR and reports which gates the change can reach:
+  #   corpus — engine/contracts, the corpus harness, fetch/codegen
+  #     scripts. corpus=true also runs the corpus-sweep unit tests,
+  #     which no longer run in the default suite (see vitest configs).
+  #   golden — the studio surfaces whose emitted bytes the walk
+  #     compares, plus engine/contracts.
+  # ci.yml / root package.json / lockfile changes, the `run-corpus` /
+  # `run-golden` / `run-all-gates` labels, and every non-PR run turn
+  # every gate on; an unavailable diff fails open. The corpus gate
+  # stays INSIDE `build` — the required status check in the main
+  # rulesets — so relevant PRs are blocked by it exactly as before.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      corpus: ${{ steps.gates.outputs.corpus }}
+      golden: ${{ steps.gates.outputs.golden }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide which expensive gates this change needs
+        id: gates
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          corpus=false
+          golden=false
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            corpus=true
+            golden=true
+          else
+            files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" 2>/dev/null || true)"
+            if [ -z "$files" ]; then
+              # Diff unavailable — fail open and run everything.
+              corpus=true
+              golden=true
+            else
+              while IFS= read -r f; do
+                case "$f" in
+                  .github/workflows/ci.yml|package.json|pnpm-lock.yaml)
+                    corpus=true; golden=true ;;
+                  packages/engine/*|packages/contracts/*)
+                    corpus=true; golden=true ;;
+                  utilities/nfd-tolerance-corpus/*|scripts/*)
+                    corpus=true ;;
+                  packages/studio/src/decisions/*|packages/studio/src/steps/*|packages/studio/src/stores/*|packages/studio/src/survey/*|packages/studio/src/lib/*|packages/studio/src/StudioShell.*|packages/studio/e2e/*)
+                    golden=true ;;
+                esac
+              done <<< "$files"
+            fi
+            case "$PR_LABELS" in
+              *'"run-corpus"'*) corpus=true ;;
+            esac
+            case "$PR_LABELS" in
+              *'"run-golden"'*) golden=true ;;
+            esac
+            case "$PR_LABELS" in
+              *'"run-all-gates"'*) corpus=true; golden=true ;;
+            esac
+          fi
+          echo "corpus=$corpus" >> "$GITHUB_OUTPUT"
+          echo "golden=$golden" >> "$GITHUB_OUTPUT"
+          echo "Expensive gates for this run: corpus=$corpus golden=$golden (event: $GITHUB_EVENT_NAME)"
+
   build:
+    needs: changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -174,13 +259,28 @@ jobs:
       - name: Test (all packages)
         run: pnpm -r test
 
+      # Corpus-sweep unit tests (km/ci-fast-gates): *.corpus.test.ts
+      # files sweep the pinned corpus and accounted for
+      # much of the engine suite's 18m41s in the step above. They are
+      # excluded from the packages' default vitest configs and run here
+      # instead — only when the `changes` job says this PR can affect
+      # the corpus surface at all. Same files, same assertions; only
+      # their trigger changed.
+      - name: Test (corpus sweeps — engine + studio, path-gated)
+        if: needs.changes.outputs.corpus == 'true'
+        run: |
+          pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts
+          pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts
+
       # spec 086 SC-005: the generation-time budget (p95 under 5 s over every
       # parseable corpus keyboard) is opt-in via KS_CORPUS_PERF, so the line above
       # never runs it. This job holds the pinned corpus, so gate it here. (The
       # parity suite needs no flag: it fails when CI is set and the corpus is
-      # missing.)
+      # missing.) Runs under the corpus vitest config (km/ci-fast-gates):
+      # the default config now excludes corpus files even when named.
       - name: Test (context normalization generation-time budget, corpus)
-        run: pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/generation-time.corpus
+        if: needs.changes.outputs.corpus == 'true'
+        run: pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts normalization-step/generation-time.corpus
         env:
           KS_CORPUS_PERF: "1"
 
@@ -222,8 +322,20 @@ jobs:
       - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
         run: pnpm run test:nfd-tolerance-corpus
 
+      # Path-gated by the `changes` job and parallelised
+      # (km/ci-fast-gates): the harness verifies keyboards in parallel
+      # worker processes via --jobs, but its default is 1 — serial —
+      # which is how this step took ~50 min on a 4-vCPU runner. --jobs 4
+      # matches the runner; same keyboards, same verdict, ~1/4 the wall
+      # time. It still runs inside this required `build` check on every
+      # PR that can affect it, on pushes to main, and nightly.
+      - name: Corpus gate (skipped — change cannot reach the transform)
+        if: needs.changes.outputs.corpus != 'true'
+        run: echo "Corpus gate skipped — this change touches no engine/contracts/corpus path. Add the run-corpus label to force it."
+
       - name: Corpus gate (context tolerance — zero regressed keyboards)
-        run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed
+        if: needs.changes.outputs.corpus == 'true'
+        run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed --jobs 4
 
       # spec 086: the committed verification record for the context normalization
       # step must be fresh for every corpus keyboard (source hash and generator
@@ -267,6 +379,7 @@ jobs:
   # make it blocking once it is.
   e2e:
     name: e2e (Playwright, non-blocking)
+    needs: changes
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 60
@@ -336,7 +449,7 @@ jobs:
       # golden-walk-baseline artifact below), this step skips and the
       # verify step compares against the committed baseline.
       - name: Golden-walk baseline capture (from PR base, if uncommitted)
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
+        if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
@@ -344,7 +457,7 @@ jobs:
           persist-credentials: false
 
       - name: Capture golden-walk baseline on base code
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
+        if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && github.event_name == 'pull_request' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' && hashFiles('packages/studio/e2e/fixtures/golden-walk/basic-kbdfr-copy.zip') == '' }}
         run: |
           cp packages/studio/e2e/golden-walk.spec.ts .golden-base/packages/studio/e2e/
           cp -r packages/studio/e2e/helpers .golden-base/packages/studio/e2e/
@@ -422,5 +535,5 @@ jobs:
       # missing (never a vacuous pass). Last in the job so its
       # results.json does not displace the main lane's summary above.
       - name: Playwright (spec 089 golden walk, verify)
-        if: ${{ !cancelled() && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
+        if: ${{ !cancelled() && needs.changes.outputs.golden == 'true' && hashFiles('packages/studio/e2e/golden-walk.spec.ts') != '' }}
         run: pnpm --filter @keyboard-studio/studio test:e2e golden-walk
