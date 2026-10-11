@@ -20,7 +20,7 @@ When the proposal is a step:
 
 - **Intro:** "Adds {N} rules. None of your rules change." (N = `ruleCount`; pluralised via ICU).
 - **Examples:** up to 5 rows, each showing the pasted form → the result, with the character names from the `ContextToleranceNotice` naming helper.
-- **Disclosure:** "Text pasted next to the cursor is converted to this keyboard's own form when you type" (FR-018).
+- **Disclosure:** "When you type, pasted text next to the cursor is converted if it is a joined or separate form of a letter this keyboard can produce. Other pasted text is left as it is." (FR-018).
 - **Actions:** one confirm ("Add this step") and "Leave my keyboard as it is". There are no per-site ticks.
 - **Facet transform:** one affected site, `siteId = "normalization-step"`.
 
@@ -38,7 +38,7 @@ New message ids follow the spec 046 grammar under `marks.context_tolerance.step.
 | `marks.context_tolerance.step.examples.row` | `NormalizationExamples.tsx`, one per example row | Visually hidden spoken form of a row: "{pasted} becomes {result}", built from codepoint names. Sighted users see the glyphs; screen readers get this text |
 | `marks.context_tolerance.step.disclosure.rewrite` | station | The FR-018 disclosure |
 | `marks.context_tolerance.step.action.accept` | station confirm button | "Add this step" |
-| `marks.context_tolerance.step.prior.accepted` | station, when the author returns to a step they accepted | "You chose to add the step that converts pasted text to this keyboard's own form." A declined step reuses `marks.contextTolerance.station.prior.declined` |
+| `marks.context_tolerance.step.prior.accepted` | station, when the author returns to a step they accepted | "You chose to add the step that converts pasted letters and diacritics to the form this keyboard produces." A declined step reuses `marks.contextTolerance.station.prior.declined` |
 | `marks.context_tolerance.step.fallback.reason.<reason>` | station, 062 fallback line | One id per reason: `no_unicode_entry`, `opaque_entry`, `opaque_output_store`, `time_bound`, `no_alternates`, `name_collision`, `verification_regressed` |
 
 ## Decision trail
