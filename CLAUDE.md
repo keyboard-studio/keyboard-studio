@@ -328,7 +328,8 @@ so check `gh pr list --state open --json number,title,headRefName` before pickin
 - Windows environment: no emoji in console output (global CLAUDE.md rule). Use `[OK]`, `[ERROR]`,
   `[WARN]`.
 - File references in user-facing text use markdown links (`[spec.md](spec.md)`), not backticks.
-- **Keyboard vocabulary** (Keyman's terms; the full glossary is pending in issue 1810). The
+- **Keyboard vocabulary** (Keyman's terms; the full glossary is
+  [docs/design-notes/keyboard-vocabulary-glossary.md](docs/design-notes/keyboard-vocabulary-glossary.md)). The
   **base keyboard** is the OS layout Keyman runs on top of, which supplies the fallback character
   for every keystroke a Keyman keyboard doesn't handle. The keyboard Track 1 starts from is the
   **copied keyboard**. The **starting point** is what the working copy was instantiated from: the

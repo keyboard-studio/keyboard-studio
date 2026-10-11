@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:3dd31e1716481027",
+      "hash": "sha256:7724d18d3effa223",
       "status": "reference",
       "implements": [],
       "decisions": [],
