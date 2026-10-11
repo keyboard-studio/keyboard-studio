@@ -44,7 +44,7 @@
     "adaptation-catalog-lint": "node utilities/adaptation-catalog-lint/index.js",
     "i18n-catalog-lint": "node utilities/i18n-catalog-lint/index.js",
     "i18n-catalog-sort": "node utilities/i18n-catalog-sort/index.js",
-    "content-i18n-freshness": "tsx --tsconfig utilities/i18n-content-extract/tsconfig.json utilities/i18n-content-extract/cli.ts --check --quiet",
+    "content-i18n-freshness": "tsx --tsconfig utilities/i18n-content-extract/tsconfig.json --import ./utilities/i18n-content-extract/registerMacroShim.ts utilities/i18n-content-extract/cli.ts --check --quiet",
     "content-i18n-lint": "node utilities/content-i18n-lint/index.js",
     "content-i18n-normalize": "node utilities/content-i18n-normalize/index.js",
     "i18n-prune-unconfigured-locales": "node utilities/i18n-prune-unconfigured-locales/index.js",

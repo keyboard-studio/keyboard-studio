@@ -154,7 +154,14 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
     expect(applyCarveToVfsSpy).toHaveBeenCalledWith(vfs, "test_kb", ir, new Set(), { irRewritten: false });
   });
 
-  it("forwards deletedNodeIds to applyCarveToVfs", async () => {
+  // Spec 089 T021/T022: deletions no longer reach applyCarveToVfs as a set.
+  // The (now unconditional) seam path runs applyCarveMutate over the base IR
+  // first — deletedNodeIds/deletedItemIds are consumed THERE — and hands
+  // applyCarveToVfs the already-filtered IR with an EMPTY deletion set and
+  // irRewritten: true. The byte-level proof that the deletions still take
+  // effect lives in projectWorkingCopyVfs.flagParity.test.ts (real pipeline,
+  // golden artifacts); these tests pin the new call shape.
+  it("forwards deletedNodeIds into the seam carve (filtered IR + empty set to applyCarveToVfs)", async () => {
     const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
     const vfs = makeVfs();
     const ir = makeTestIR([]);
@@ -168,11 +175,22 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
       getPattern: () => undefined,
       identity: null,
     });
-    expect(applyCarveToVfsSpy).toHaveBeenCalledWith(vfs, "test_kb", ir, deleted, { irRewritten: false });
+    expect(applyCarveToVfsSpy).toHaveBeenCalledWith(
+      vfs,
+      "test_kb",
+      expect.any(Object),
+      new Set(),
+      { irRewritten: true },
+    );
+    // The IR handed over is the seam's output, not the base IR itself.
+    const seamIr = applyCarveToVfsSpy.mock.calls[0]![2];
+    expect(seamIr).not.toBe(ir);
   });
 
-  // AC#2 regression: deletedItemIds-only path must merge into the applyCarveToVfs call.
-  it("merges deletedItemIds (only) into the set passed to applyCarveToVfs", async () => {
+  // AC#2 regression, re-pinned: a deletedItemIds-only edit likewise routes
+  // through the seam (the union merge now happens inside the projection,
+  // feeding applyCarveMutate — see effectiveItemIds there).
+  it("merges deletedItemIds (only) into the seam carve", async () => {
     const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
     const vfs = makeVfs();
     const ir = makeTestIR([]);
@@ -189,14 +207,14 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
     expect(applyCarveToVfsSpy).toHaveBeenCalledWith(
       vfs,
       "test_kb",
-      ir,
-      new Set(["rule#0", "rule#1"]),
-      { irRewritten: false },
+      expect.any(Object),
+      new Set(),
+      { irRewritten: true },
     );
   });
 
-  // AC#2 regression: when both non-empty, the merged union must be passed.
-  it("merges deletedNodeIds + deletedItemIds into a union set for applyCarveToVfs", async () => {
+  // AC#2 regression, re-pinned: when both are non-empty, both feed the seam.
+  it("merges deletedNodeIds + deletedItemIds into the seam carve", async () => {
     const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
     const vfs = makeVfs();
     const ir = makeTestIR([]);
@@ -213,9 +231,9 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
     expect(applyCarveToVfsSpy).toHaveBeenCalledWith(
       vfs,
       "test_kb",
-      ir,
-      new Set(["group#A", "rule#0"]),
-      { irRewritten: false },
+      expect.any(Object),
+      new Set(),
+      { irRewritten: true },
     );
   });
 });

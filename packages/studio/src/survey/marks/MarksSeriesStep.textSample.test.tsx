@@ -14,11 +14,12 @@ import { render } from "../../test/renderWithI18n.tsx";
 import type { BaseKeyboard, ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { createCharacterDiscoveryService } from "@keyboard-studio/engine";
 import type { CldrLoader } from "@keyboard-studio/engine";
-import { MarksSeriesStep } from "./MarksSeriesStep.tsx";
+import { MarksStepHost } from "./MarksStepHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
-import { usePhaseBDraftStore, draftConfirmedAlphabet } from "../../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDraft } from "../../survey/useInventoryDraft.ts";
+import { draftConfirmedAlphabet } from "../../survey/phaseBDraftOps.ts";
 
 const ACUTE = "́";
 const DOT_BELOW = "̣";
@@ -34,14 +35,14 @@ const service = createCharacterDiscoveryService(
 
 async function alphabetFromSample(sample: string): Promise<ConfirmedAlphabet> {
   const harvested = await service.harvestFromText(sample, {} as BaseKeyboard);
-  for (const { char } of harvested) usePhaseBDraftStore.getState().addProposed(char, "text");
-  return draftConfirmedAlphabet();
+  for (const { char } of harvested) inventoryOps("characters").addProposed(char, "text");
+  return draftConfirmedAlphabet(getCharacterInventoryValue());
 }
 
 function renderSeries(alphabet: ConfirmedAlphabet): void {
   useWorkingCopyStore.getState().recordPhase({ phase: "B", answers: [], alphabet });
   act(() => {
-    render(<MarksSeriesStep onComplete={() => {}} />, { withStepNav: true });
+    render(<MarksStepHost onComplete={() => {}} />, { withStepNav: true });
   });
 }
 
@@ -68,7 +69,7 @@ function tickedCombinations(station: HTMLElement): string[] {
 }
 
 beforeEach(() => {
-  usePhaseBDraftStore.getState().reset();
+  resetInventoryDraft();
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
   useSurveyAnswerStore.getState().reset();
@@ -121,7 +122,7 @@ describe("MarksSeriesStep — S5 stacking from a text sample", () => {
 
   it("keeps the stack when the single-mark sibling is removed from the draft", async () => {
     await alphabetFromSample("ẹ́ é");
-    usePhaseBDraftStore.getState().remove("é");
-    expect(draftConfirmedAlphabet().attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE] });
+    inventoryOps("characters").remove("é");
+    expect(draftConfirmedAlphabet(getCharacterInventoryValue()).attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE] });
   });
 });

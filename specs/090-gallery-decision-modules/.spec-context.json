@@ -1,0 +1,23 @@
+{
+  "workflow": "speckit",
+  "specName": "Gallery and picker decisions become modules",
+  "branch": "km/gallery-decision-modules",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:54:03.195Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:54:03.330Z"
+    }
+  ]
+}

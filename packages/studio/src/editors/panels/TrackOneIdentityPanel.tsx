@@ -22,7 +22,8 @@ import { useEffect, useRef, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { validateKeyboardId } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import { TextField, Label, ErrorText } from "../../ui/index.ts";
 import { CARD_BORDER, TEXT_DIM, WARNING } from "../../ui/theme.ts";
 
@@ -36,9 +37,11 @@ export function TrackOneIdentityPanel() {
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const setIdentity = useWorkingCopyStore((s) => s.setIdentity);
-  // The identity-lite answers, still in the survey session. `bcp47` is the tag the
-  // series composed; `english` is the language's English name (spec 059 FR-001/FR-002).
-  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  // The identity-lite answers, derived from the decision store (spec 089).
+  // `bcp47` is the tag the series composed; `english` is the language's
+  // English name (spec 059 FR-001/FR-002).
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityResult = deriveIdentityResult(decisions);
   const identityBcp47 = (identity?.bcp47 ?? identityResult?.bcp47 ?? "").trim();
   const identityLanguageName = (identity?.languageName ?? identityResult?.english ?? "").trim();
 

@@ -4,9 +4,11 @@
 // layout does your community use?") promoted from the reserve registry into
 // the main flow. This module owns two things:
 //
-//   1. The answer's storage: the survey answer store (durable via the draft
-//      autosave, editable — answering again overwrites, never ask-once).
-//      The canonical slot is step "layout", answer "layout_family".
+//   1. The legacy answer's storage: the survey answer store (durable via the
+//      draft autosave, editable — answering again overwrites, never
+//      ask-once). The canonical slot is step "layout", answer
+//      "layout_family". (The layout PICK itself is the `windows-layout`
+//      decision since spec 090 T011 — see the readers below.)
 //   2. The FR-023 likely-host resolution ORDER: (a) the author's layout_family
 //      answer, refined by bcp47 region where coarse (qwerty + en-GB → UK
 //      English); (b) `likelyHostLayouts(bcp47[])` when the question is
@@ -19,6 +21,7 @@
 
 import { useMemo } from "react";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { peekDecision, useDecisionStore } from "../stores/decisionStore.ts";
 import type { StepAnswers, StepId } from "../steps/answerTypes.ts";
 // T011's reference module — consumed, never reimplemented.
 import {
@@ -48,18 +51,15 @@ function firstString(value: unknown): string | undefined {
 }
 
 /**
- * The community-layout step (spec 076 A4) stores the picked Windows layout's
- * catalog id ("basic_kbdfr") under this answer, on the same "layout" step as
- * the legacy 4-value `layout_family` answer. The pick is the richer signal
- * (it names an exact layout, from which family and reference host derive), so
- * it wins; a stored legacy family answer keeps working when no pick exists.
+ * The community-layout step's pick (spec 090 T011): since the gallery
+ * migration the picked Windows layout's catalog id ("basic_kbdfr") lives in
+ * the `windows-layout` DECISION (survey/questions/gallery/windowsLayout.ts),
+ * recorded by the gallery host — the `host_layout` survey answer is retired
+ * and `savePickedWindowsLayout` is deleted. The pick is the richer signal
+ * (it names an exact layout, from which family and reference host derive),
+ * so it wins; a stored legacy `layout_family` answer keeps working when no
+ * pick exists.
  */
-export const HOST_LAYOUT_ANSWER_ID = "host_layout";
-
-function readPickFromSteps(steps: Record<StepId, StepAnswers>): WindowsLayout | undefined {
-  return windowsLayoutById(firstString(steps[LAYOUT_FAMILY_STEP_ID]?.answers[HOST_LAYOUT_ANSWER_ID]?.value));
-}
-
 function readLegacyFamily(steps: Record<StepId, StepAnswers>): LayoutFamilyValue | undefined {
   const raw = firstString(steps[LAYOUT_FAMILY_STEP_ID]?.answers[LAYOUT_FAMILY_ANSWER_ID]?.value);
   return isLayoutFamilyValue(raw) ? raw : undefined;
@@ -69,49 +69,41 @@ function pickFamily(pick: WindowsLayout | undefined): LayoutFamilyValue | undefi
   return pick !== undefined && pick.family !== "other" ? pick.family : undefined;
 }
 
-/** Effective family: the pick's derived family, else the legacy stored answer. */
-function readFromSteps(steps: Record<StepId, StepAnswers>): LayoutFamilyValue | undefined {
-  return pickFamily(readPickFromSteps(steps)) ?? readLegacyFamily(steps);
+/** The picked layout's catalog id from a decision value, if well-formed. */
+function pickedLayoutId(value: unknown): string | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const layoutId = (value as { layoutId?: unknown }).layoutId;
+  return typeof layoutId === "string" ? layoutId : undefined;
 }
 
 /** The Windows layout the author picked on the layout step, if any. */
 export function getPickedWindowsLayout(): WindowsLayout | undefined {
-  return readPickFromSteps(useSurveyAnswerStore.getState().steps);
+  return windowsLayoutById(pickedLayoutId(peekDecision("windows-layout")?.value));
 }
 
-/** Reactive read of the picked layout id (undefined until the author confirms one). */
+/** Reactive read of the picked layout (undefined until the author confirms one). */
 export function usePickedWindowsLayout(): WindowsLayout | undefined {
-  return useSurveyAnswerStore((s) => readPickFromSteps(s.steps));
-}
-
-/**
- * Persist the picked layout id immediately (per-question persistence). Origin
- * "proposed" when the author confirmed the studio's suggestion unchanged,
- * "overturned" when they chose a different layout than it suggested.
- */
-export function savePickedWindowsLayout(
-  layoutId: string,
-  origin: "proposed" | "confirmed" | "overturned" = "confirmed",
-  screenId = "layout",
-): void {
-  useSurveyAnswerStore.getState().saveAnswer(LAYOUT_FAMILY_STEP_ID, HOST_LAYOUT_ANSWER_ID, {
-    value: layoutId,
-    answerType: "select",
-    origin,
-    stage: "draft",
-    evidenceKey: null,
-    screenId,
-  });
+  return useDecisionStore((s) =>
+    windowsLayoutById(pickedLayoutId(s.decisions["windows-layout"]?.value)),
+  );
 }
 
 /** The stored layout_family answer, if the author has given one. */
 export function getLayoutFamilyAnswer(): LayoutFamilyValue | undefined {
-  return readFromSteps(useSurveyAnswerStore.getState().steps);
+  return (
+    pickFamily(getPickedWindowsLayout()) ??
+    readLegacyFamily(useSurveyAnswerStore.getState().steps)
+  );
 }
 
 /** Reactive read of the stored answer for components. */
 export function useLayoutFamilyAnswer(): LayoutFamilyValue | undefined {
-  return useSurveyAnswerStore((s) => readFromSteps(s.steps));
+  const steps = useSurveyAnswerStore((s) => s.steps);
+  const picked = usePickedWindowsLayout();
+  return useMemo(
+    () => pickFamily(picked) ?? readLegacyFamily(steps),
+    [picked, steps],
+  );
 }
 
 /**

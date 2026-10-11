@@ -1,10 +1,11 @@
 // manifest — the survey steps, in DERIVED order (not a hand-ordered list).
 //
 // The decision registry is the single source of order (spec 087 Q3, SC-003).
-// Each step below is a declaration — component, inputs, writes, persistence —
-// held in an unordered pool. Its provides / requires / gatedBy come from
-// steps/stepDependencies.ts, and `manifest` is the pool sorted by the same
-// sort that orders questions (steps/stepOrder.ts → decisions/orderDecisions.ts).
+// Each step below is a host declaration — component, inputs, writes,
+// persistence — held in an unordered pool. What a screen settles, needs,
+// and when it is walked is derived from the decision modules
+// (decisions/deriveScreens.ts, spec 091); `manifest` is the pool arranged
+// by that derived screen order via buildManifest below.
 // Nothing in this file says what comes before what.
 //
 // The runtime (T028) and the dashboard (T031) both read `manifest`. Editing a
@@ -25,19 +26,27 @@
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
-import { CharactersStep } from "../survey/CharactersStep.tsx";
-import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
+import {
+  decisionModules,
+  declaredScreenGates,
+  galleryModules,
+} from "../survey/questions/registry.ts";
+import { deriveScreens, type DerivedScreen } from "../decisions/deriveScreens.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import type { StepTrail } from "../decisions/orderDecisions.ts";
+import type { QuestionModule } from "../survey/types.ts";
+import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
+import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
-import { stepDependencies } from "./stepDependencies.ts";
-import { STEP_ORDER, STEP_TRAILS } from "./stepOrder.ts";
-import { PunctuationStep } from "../survey/punctuation/PunctuationStep.tsx";
-import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
-import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
+import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
+import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
+import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
 import {
   identityStep,
   layoutStep,
   chooseBaseStep,
   trackStep,
+  attributionStep,
   projectNameStep,
   carveStep,
   deadkeysStep,
@@ -65,7 +74,6 @@ import {
 const charactersStep: Step = {
   kind: "editor-step",
   id: "characters",
-  ...stepDependencies("characters"),
   title: "Characters",
   inputs: [],
   // DEC-D1 (subsumption, Matt 2026-06-29): the opaque charactersStep subsumes the
@@ -78,11 +86,14 @@ const charactersStep: Step = {
   // step. (The session-level ScriptPrefill is a non-IR signal — not an irPath —
   // so it carries no C5 obligation; irPath('header','script') does not exist.)
   writes: [irPath("header", "bcp47")],
-  // CharactersStep component — self-contained prefill/PhaseB substage adapter
+  // CharactersStepHost — the gallery host around CharactersStep, the
+  // character-inventory module's renderer (spec 090 T021); the component
+  // itself remains the self-contained prefill/PhaseB substage adapter
   // (spec 027 Stage 4; first runtime use of step.component).
-  component: CharactersStep,
+  component: CharactersStepHost,
   // phase_b_characters runs inside the characters step (spec 024, Stage 1);
-  // its flowRefs come from stepDependencies.
+  // its modules are intra-step members of the derived characters screen
+  // (spec 091: their `group` names this screen).
   // Right pane swaps from the live OSK preview to the interactive character
   // map for the Phase B build-list screen only (SurveyView further gates this
   // on discoveryMethod === "build-list" — the manual step-by-step path and the
@@ -93,21 +104,21 @@ const charactersStep: Step = {
     inputs: ["language tag", "script", "variant", "base keyboard"],
     keyFn: "alphabet",
   },
-  persistence: "phase-b-draft", // the alphabet; its sub-screen position and manual-path answers live in the answer store
+  persistence: "decision-store", // the alphabet (character-inventory decision, spec 090); its sub-screen position and manual-path answers live in the answer store (spec 079 evidence layer, D-090-29)
 } as const;
 
 // ---------------------------------------------------------------------------
 // Step declarations: an UNORDERED pool (FR-008)
 //
 // Nothing here says what comes before what. Order, side-trail membership and
-// join targets are derived from provides/requires/gatedBy
-// (steps/stepDependencies.ts -> steps/stepOrder.ts). The comments on individual
-// steps describe WHY a step needs what it needs, not where it sits.
+// join targets are derived from the decision modules' provides / requires /
+// screenRequires (decisions/deriveScreens.ts, spec 091). The comments on
+// individual steps describe WHY a step needs what it needs, not where it sits.
 //
 // Rules still validated on the derived order (validateManifestShape):
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M5 — unique ids.
-//   plus: the pool and the dependency table name exactly the same steps.
+//   plus: the pool and the derived screens name exactly the same steps.
 // ---------------------------------------------------------------------------
 
 const stepPool: readonly Step[] = [
@@ -126,9 +137,16 @@ const stepPool: readonly Step[] = [
   // --- Track selection (copy vs adapt) ---
   trackStep,
 
+  // --- Attribution (author / copyright, #1901) ---
+  // Both tracks walk it, immediately after the track choice: the
+  // questions' proposals are track-shaped (profile confirmation on
+  // copy; the base's copyright holder seeded on update).
+  attributionStep,
+
   // --- Project name (copy-track only) ---
-  // Gated side trail (stepDependencies): copy-track takes this step, adapt-track
-  // bypasses it, and both reconverge at the next ungated step.
+  // Gated side trail (declared screen gate, registry.ts): copy-track takes
+  // this step, adapt-track bypasses it, and both reconverge at the next
+  // ungated step.
   projectNameStep,
 
   // --- Character inventory (Phase A / Phase B question battery) ---
@@ -144,19 +162,21 @@ const stepPool: readonly Step[] = [
   {
     kind: "editor-step",
     id: "marks",
-    ...stepDependencies("marks"),
     title: "Accents & marks",
     inputs: [],
     // spec 078: the step's own write is the context-tolerance decision; these
     // are the paths the separate apply effect commits the accepted rules to.
     writes: [...CONTEXT_TOLERANCE_WRITES],
-    component: MarksSeriesStep,
+    component: MarksStepHost,
     specRef: ["specs/071-marks-question-series", "specs/052-marks-treatment-question"],
     evidence: {
       inputs: ["the confirmed alphabet: its bases, marks and attested combinations"],
       keyFn: "marks",
     },
-    persistence: "answer-store",
+    // The marks-treatment decision (spec 090); the per-toggle evidence
+    // answers and the step-status slot live in the answer store (spec 079
+    // evidence layer, kept by D-090-29).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Punctuation (clone of the Phase B build-list, scoped to punctuation) ---
@@ -164,25 +184,26 @@ const stepPool: readonly Step[] = [
   // character map's letters/numerals/marks fold points at (the alphabet map
   // deliberately withholds punctuation — see CharacterMapPane.tsx). Same
   // build-list anatomy as Phase B — suggestions, type-in, right-pane character
-  // map (scope "punctuation") — all toggling the shared phaseBDraftStore
-  // draft. Emits its picks as confirmedInventory on a phase:"C" result (see
+  // map (scope "punctuation") — all toggling the shared Phase B/C draft (the
+  // character-inventory decision value since spec 090). Emits its picks as confirmedInventory on a phase:"C" result (see
   // PunctuationStep.tsx for why not "B"), which the merged session unions in,
   // shielding them from carve and placing any the base cannot type.
   {
     kind: "editor-step",
     id: "punctuation",
-    ...stepDependencies("punctuation"),
     title: "Punctuation",
     inputs: [],
     writes: [],
-    component: PunctuationStep,
+    component: PunctuationStepHost,
     // Right pane swaps to the interactive character map, as on the Phase B
     // build-list screen — but unconditionally: this step has no
     // discoveryMethod fork (SurveyView's gate special-cases "characters" only).
     rightPane: "character-map",
     specRef: ["§8", "specs/020-qu-wire-buildlist", "specs/075-punctuation-defaults"],
     evidence: { inputs: ["resolved language tag", "base keyboard"], keyFn: "punctuation" },
-    persistence: "phase-b-draft",
+    // The punctuation-inventory decision (spec 090); its one evidence
+    // answer lives in the answer store (spec 079 evidence layer, D-090-29).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Invisible characters (spec 075 US3) ---
@@ -199,14 +220,15 @@ const stepPool: readonly Step[] = [
   {
     kind: "editor-step",
     id: "invisibles",
-    ...stepDependencies("invisibles"),
     title: "Invisible characters",
     inputs: [],
     writes: [],
-    component: InvisiblesStep,
+    component: InvisiblesStepHost,
     specRef: ["specs/075-punctuation-defaults"],
     evidence: { inputs: ["the invisible-character candidates offered"], keyFn: "invisibles" },
-    persistence: "phase-b-draft",
+    // The invisibles-inventory decision (spec 090); no answer-store
+    // residue — this step's answer writes were retired in full (T022).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Convenience characters (pre-carve keep question) ---
@@ -221,17 +243,19 @@ const stepPool: readonly Step[] = [
   {
     kind: "editor-step",
     id: "convenience",
-    ...stepDependencies("convenience"),
     title: "Convenience letters",
     inputs: [],
     writes: [],
-    component: ConvenienceCharsStep,
+    component: ConvenienceStepHost,
     specRef: "specs/051-carve-orthography-trim",
     evidence: {
       inputs: ["surplus basic-Latin candidates on the base", "whether the orthography signal is known"],
       keyFn: "convenience",
     },
-    persistence: "answer-store",
+    // The retained-convenience-chars decision (spec 090); the step-status
+    // slot lives in the answer store, whose legacy booleans the adoption
+    // shim still reads from older drafts (D-090-17, kept by D-090-29).
+    persistence: "decision-store",
   } satisfies Step,
 
   // --- Carve (Phase D: remove unwanted base keys) ---
@@ -275,24 +299,107 @@ const stepPool: readonly Step[] = [
 ];
 
 /**
- * The steps in derived order: the pool sorted by STEP_ORDER (which is derived
- * from each step's provides/requires, never listed by hand). A pool/table
- * mismatch is a hard error at module load.
+ * Build the manifest from a module list (spec 091 T010 — the registry seam
+ * SC-001 needs): derive the screens from the supplied modules (default:
+ * the live registry's `decisionModules`), append the ruled terminal
+ * "package" screen, and arrange the step pool in that order. A derived
+ * screen with no pool declaration is a hard error. A supplied list may
+ * legitimately repeat a pool step (a split question run yields two
+ * screens with the same host) — the pool/screen bijection is asserted
+ * only for the default build, below.
+ */
+export function buildManifest(
+  modules: readonly QuestionModule[] = decisionModules,
+): readonly Step[] {
+  const screenOrder = [...deriveScreens(modules).map((s) => s.id), "package"];
+  return screenOrder.map((id) => {
+    const found = stepPool.find((s) => s.id === id);
+    if (found === undefined) {
+      throw new Error(
+        `[manifest] screen "${id}" derived from the module list has no step declaration in the pool`,
+      );
+    }
+    return found;
+  });
+}
+
+/**
+ * The steps in derived order: the pool arranged by the derived screen
+ * order (never listed by hand). A pool/screen mismatch in the LIVE
+ * registry is a hard error at module load.
  */
 export const manifest: readonly Step[] = ((): readonly Step[] => {
-  if (stepPool.length !== STEP_ORDER.length) {
+  const built = buildManifest();
+  if (built.length !== stepPool.length) {
     throw new Error(
-      `[manifest] ${stepPool.length} steps declared but ${STEP_ORDER.length} in stepDependencies`,
+      `[manifest] ${stepPool.length} steps declared but ${built.length} screens derived from the live registry`,
     );
   }
-  return STEP_ORDER.map((id) => {
-  const found = stepPool.find((s) => s.id === id);
-  if (found === undefined) {
-    throw new Error(`[manifest] step "${id}" is declared in stepDependencies but has no step`);
-  }
-  return found;
-  });
+  return built;
 })();
+
+/**
+ * The derived screens of the live registry, computed once (spec 091).
+ * The manifest above is arranged by these screens; the gate and trail
+ * views below are published from the same derivation so every consumer
+ * reads one source.
+ */
+export const derivedScreens: readonly DerivedScreen[] = deriveScreens(
+  decisionModules,
+  declaredScreenGates,
+);
+
+/**
+ * Derived screen gates by screen id (spec 091 T015): present only for a
+ * screen whose every member decision is gated. Steps no longer carry
+ * `gatedBy` (T014) — gate reads (steps/advance.ts, lib/resolveLocation.ts
+ * via its ResolveContext) come from here.
+ */
+export const screenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
+  new Map(
+    derivedScreens.flatMap((s) =>
+      s.gatedBy !== undefined ? [[s.id, s.gatedBy] as const] : [],
+    ),
+  );
+
+/**
+ * Derived screen trails by screen id (spine membership + join target),
+ * including the ruled terminal "package" screen (ungated spine). The
+ * Flow Map and completeness checks read trails from here (spec 091 T014)
+ * instead of re-deriving them from step declarations.
+ */
+export const screenTrails: ReadonlyMap<string, StepTrail> = new Map<string, StepTrail>([
+  ...derivedScreens.map(
+    (s) =>
+      [
+        s.id,
+        s.joinTarget !== undefined
+          ? { spine: s.spine, joinTarget: s.joinTarget }
+          : { spine: s.spine },
+      ] as const,
+  ),
+  ["package", { spine: true }],
+]);
+
+/**
+ * Gallery-hosted steps (spec 090 T005): screen id → the gallery module
+ * that settles the screen's gallery decision. Derived from screen
+ * membership (spec 091 T014): a screen appears here exactly when one of
+ * its member decisions is provided by a registered gallery module. Step
+ * wrappers and StepHost resolve their module through this map and render
+ * it via the gallery host (steps/galleryHost.tsx). A screen settling two
+ * gallery decisions would be ambiguous — the coverage test
+ * (decisions/galleryModules.coverage.test.ts) pins one provider per
+ * settles id, and no screen settles more than one.
+ */
+export const galleryModuleByStep: ReadonlyMap<string, QuestionModule> = new Map(
+  derivedScreens.flatMap((screen) => {
+    const mod = galleryModules.find((m) =>
+      (m.provides ?? []).some((id) => screen.decisionIds.includes(id)),
+    );
+    return mod === undefined ? [] : [[screen.id, mod] as const];
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M3, M5, layout).
@@ -305,18 +412,19 @@ export const manifest: readonly Step[] = ((): readonly Step[] => {
 // stays boundary-clean here in steps/.
 //
 // The order itself is not asserted here: it is derived, and stepOrder.parity
-// .test.ts pins the derivation against a frozen literal. What stays here are
-// validations ON the derived order.
+// .test.ts pins the derivation against the main@18e63aa4 baseline (FR-005).
+// What stays here are validations ON the derived order.
 // ---------------------------------------------------------------------------
 
 export function validateManifestShape(): void {
   const ids = manifest.map((s) => s.id);
 
   // The array is the derived order, and every derived side trail can rejoin.
-  if (ids.length !== STEP_ORDER.length || ids.some((id, i) => id !== STEP_ORDER[i])) {
-    throw new Error(`[manifest] manifest order is not the derived STEP_ORDER`);
+  const derivedOrder = [...derivedScreens.map((s) => s.id), "package"];
+  if (ids.length !== derivedOrder.length || ids.some((id, i) => id !== derivedOrder[i])) {
+    throw new Error(`[manifest] manifest order is not the derived screen order`);
   }
-  for (const [id, trail] of STEP_TRAILS) {
+  for (const [id, trail] of screenTrails) {
     if (!trail.spine && trail.joinTarget === undefined) {
       throw new Error(`[manifest] gated step "${id}" has no ungated successor to rejoin at`);
     }

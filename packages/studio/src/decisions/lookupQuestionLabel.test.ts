@@ -8,6 +8,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { I18n } from "@lingui/core";
 import {
+  createLookupDecisionLabel,
   createLookupQuestionLabel,
   type QuestionLabelSource,
 } from "./lookupQuestionLabel.ts";
@@ -154,5 +155,31 @@ describe("createLookupQuestionLabel", () => {
     const mod = questionRegistry[id!];
     const lookup = createLookupQuestionLabel();
     expect(lookup(id!)).toBe(mod!.definition.prompt);
+  });
+});
+
+describe("createLookupDecisionLabel (decisions-page enrichment)", () => {
+  it("bridges a decision id through its providing module to that module's label", () => {
+    // "punctuation-inventory" is a DECISION id (the punctuation gallery
+    // module's `provides`), not a question id — the registry is keyed by
+    // the module's own id, "punctuationInventory", which is the key the
+    // stub source is consulted under.
+    const lookup = createLookupDecisionLabel(
+      undefined,
+      stubSource({
+        punctuationInventory: { prompt: "Which punctuation?", audit_label: "Punctuation inventory" },
+      }),
+    );
+    expect(lookup("punctuation-inventory")).toBe("Punctuation inventory");
+  });
+
+  it("resolves against the live registry by default", () => {
+    const lookup = createLookupDecisionLabel();
+    expect(lookup("punctuation-inventory")).toBe("Punctuation inventory");
+  });
+
+  it("returns undefined for a decision no module provides", () => {
+    const lookup = createLookupDecisionLabel(undefined, stubSource({}));
+    expect(lookup("no-such-decision")).toBeUndefined();
   });
 });

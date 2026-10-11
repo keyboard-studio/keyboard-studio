@@ -1,8 +1,8 @@
 // Per-question module: pb_standard_letters (Phase B)
 // Ported verbatim from content/flows/phase_b_characters.yaml.
 
-import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
-import type { KeyboardIR, IRStore } from "@keyboard-studio/contracts";
+import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import type { IRStore } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 
 export const definition = {
@@ -100,19 +100,23 @@ const SCRIPT_GROUP_STORE_NAME = "kmStandardLetters";
 
 /**
  * Write the standard-letters script-group discriminator into `stores[]` —
- * spec-014 FR-006b. Scoped to the declared `writes` path `stores[]`.
+ * spec-014 FR-006b, carried into the decision-apply seam (spec 089 T008).
+ * Scoped to the declared `writes` path `stores[]`.
  *
  * Because a `stores[]` patch replaces the whole array under the path-scoped
  * merge, this rebuilds the array from `ctx.ir.stores`, replacing any existing
  * entry named `kmStandardLetters` (so re-answering is idempotent — M4) and
- * leaving every other store untouched. An invalid/empty answer is a no-op (M5).
+ * leaving every other store untouched. An invalid/empty answer is a no-op (M5),
+ * as is a null working IR (nothing instantiated yet — the runner skips the
+ * `ir` channel in that case regardless).
  */
-export function mutate(
+export function apply(
   value: string | string[] | undefined,
-  ctx: MutateContext,
-): Partial<KeyboardIR> {
+  ctx: ApplyContext,
+): WorkingCopyPatch {
   const v = typeof value === "string" ? value : "";
   if (!VALID_VALUES.has(v)) return {};
+  if (ctx.ir === null) return {};
 
   const existing = ctx.ir.stores;
   const idx = existing.findIndex((s) => s.name === SCRIPT_GROUP_STORE_NAME);
@@ -126,13 +130,13 @@ export function mutate(
     idx === -1
       ? [...existing, entry]
       : existing.map((s, i) => (i === idx ? entry : s));
-  return { stores: next };
+  return { ir: { stores: next } };
 }
 
 const mod: QuestionModule = {
   definition,
   validate,
-  mutate,
+  apply,
   fixtures,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("stores", ARRAY_INDEX)],

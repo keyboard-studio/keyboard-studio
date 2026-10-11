@@ -1,8 +1,8 @@
 // envFlag — shared "import.meta.env flag, with a ?param URL-query fallback"
 // helper. Consolidates the pattern previously duplicated across
 // lib/e2eHook.ts (VITE_E2E / ?e2e=1), stores/debugPinsStore.ts
-// (VITE_KM_DEBUG / ?debug=1), and flags/mutateFlag.ts (VITE_KM_MUTATE_SEAM,
-// no URL fallback).
+// (VITE_KM_DEBUG / ?debug=1), and the since-deleted mutate flag
+// (env-only, no URL fallback).
 
 /**
  * Read a boolean feature flag: `import.meta.env[envKey] === "1"`, with an
@@ -12,7 +12,7 @@
  * param — either being exactly `"1"` returns `true`.
  *
  * SSR/Node-CI safety differs by whether a URL fallback is requested:
- *   - When `urlParam` is omitted (e.g. mutateFlag, which has no URL
+ *   - When `urlParam` is omitted (an env-only flag with no URL
  *     override), the only browser API touched is `import.meta.env`, so the
  *     try/catch around that read is sufficient — the env check still runs
  *     even outside a browser (e.g. a bare Node import where `import.meta.env`

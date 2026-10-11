@@ -71,7 +71,8 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { deriveProjectLabel } from "../lib/projectLabel.ts";
 import {
   listDrafts,
@@ -167,7 +168,8 @@ export function CurrentKeyboardIndicator() {
   // rename must show up immediately, not after the next `listDrafts()`
   // snapshot.
   // ---------------------------------------------------------------------------
-  const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const scaffoldSpec = deriveScaffoldSpec(decisions);
   const identity = useWorkingCopyStore((s) => s.identity);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 

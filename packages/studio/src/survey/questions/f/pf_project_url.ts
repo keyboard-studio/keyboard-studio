@@ -52,5 +52,14 @@ const mod: QuestionModule = {
   writes: [],
   provides: ["help-project-url"], requires: ["help-more-detail"],
   outputs: [{ target: "package-descriptor", field: "websiteUrl" }],
+  // Spec 092 (T036; G-17): the starting-point project URL is this
+  // module's extract, replacing the PHASE_F_SEEDS table entry. The
+  // derivation (lib/phaseFSeeds.ts's proposeProjectUrl) is computed by
+  // the live wiring over the working-copy slices and read off the
+  // context — question modules import nothing from lib/ (mutate-seam
+  // rule), the same pattern as the welcome prefill. Source "base" in
+  // the old table = extracted provenance with the base keyboard's id
+  // as source.
+  extract: (ctx) => ctx.phaseF?.projectUrlProposal,
 };
 export default mod;

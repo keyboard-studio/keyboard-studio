@@ -37,7 +37,7 @@ import {
 import type { WcForCompleteness } from "./completeness.ts";
 import { buildManifestStepGraph } from "./buildStepGraph.ts";
 import type { StepGraph } from "./model.ts";
-import { manifest } from "../steps/manifest.ts";
+import { manifest, screenTrails } from "../steps/manifest.ts";
 import { deriveStepStructure } from "../steps/stepOrder.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Step, EditorStep } from "../steps/types.ts";
@@ -527,7 +527,7 @@ describe("C6 — real manifest passes all five checks with empty stale set", () 
   const wc: WcForCompleteness = { desktopLocked: false, touchLayoutJson: null };
 
   it("C6: real manifest has no rejoin violations", () => {
-    expect(checkRejoin(manifest)).toEqual([]);
+    expect(checkRejoin(manifest, screenTrails)).toEqual([]);
   });
 
   it("C6: real manifest has no data-edge cycles", () => {
@@ -541,7 +541,7 @@ describe("C6 — real manifest passes all five checks with empty stale set", () 
   });
 
   it("C6: real manifest has no unreachable steps", () => {
-    expect(findUnreachable(manifest)).toEqual([]);
+    expect(findUnreachable(manifest, screenTrails)).toEqual([]);
   });
 
   it("C6: real manifest yields empty stale set when nothing is reopened", () => {
@@ -550,7 +550,9 @@ describe("C6 — real manifest passes all five checks with empty stale set", () 
   });
 
   it("C6: runCompleteness on real manifest with no reopened steps is clean", () => {
-    const report = runCompleteness(manifest, wc);
+    // Spec 091 T014: the real manifest's trails are the derived screen
+    // trails, threaded explicitly (completeness.ts cannot import them).
+    const report = runCompleteness(manifest, wc, new Set(), [], screenTrails);
     expect(report.cycles).toEqual([]);
     expect(report.rejoinViolations).toEqual([]);
     expect(report.orphanInputs).toEqual([]);

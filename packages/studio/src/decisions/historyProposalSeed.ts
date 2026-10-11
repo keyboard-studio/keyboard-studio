@@ -81,8 +81,17 @@ export function buildHistoryProposalSeed(
       continue;
     }
 
-    // What remains is a "survey-answer" payload (the DecisionPayload union's
-    // third member) — only its char-list shape declares characters.
+    if (payload.kind === "decision") {
+      // spec 090 US5: a gallery decision contributes nothing here — the seed
+      // reads char-list answers (characters the author added) and the two
+      // editor counts above, and a gallery decision is neither. Its
+      // characters, where it has any, already reached this seed through the
+      // answers and editor entries of the steps that produced them.
+      continue;
+    }
+
+    // What remains is a "survey-answer" payload — only its char-list shape
+    // declares characters.
     if (payload.answerType === "char-list") {
       charactersAdded.push(...payload.value);
     }

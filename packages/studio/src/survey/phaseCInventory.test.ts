@@ -2,17 +2,17 @@
 // (spec 075 FR-014 / FR-024, contract §4).
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, recordInvisiblesInventoryValue, resetInventoryDecisions } from "./useInventoryDraft.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { acceptedInvisibleChars, phaseCConfirmedInventory } from "./phaseCInventory.ts";
 
 beforeEach(() => {
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 describe("phaseCConfirmedInventory", () => {
   it("is the union of the draft's punctuation slice and the accepted invisible decisions", () => {
-    const s = usePhaseBDraftStore.getState();
+    const s = inventoryOps("characters");
     s.add("!");
     s.add("?");
     s.add("a"); // a letter — the alphabet's, not phase C's
@@ -21,7 +21,7 @@ describe("phaseCConfirmedInventory", () => {
   });
 
   it("a declined decision contributes nothing; an unanswered one is simply absent", () => {
-    const s = usePhaseBDraftStore.getState();
+    const s = inventoryOps("characters");
     s.add("!");
     s.declineInvisible("U+200D");
     s.acceptInvisible("U+00AD");
@@ -29,7 +29,7 @@ describe("phaseCConfirmedInventory", () => {
   });
 
   it("a character present in both inputs appears once, NFC-deduped", () => {
-    const s = usePhaseBDraftStore.getState();
+    const s = inventoryOps("characters");
     // U+00AD SOFT HYPHEN is a format character (Cf); glyphCategory files it
     // under `controls`, not `punctuation`, so reach the punctuation slice with a
     // real punctuation char and prove the dedupe with the invisible side.
@@ -39,16 +39,30 @@ describe("phaseCConfirmedInventory", () => {
   });
 
   it("accepted invisibles are NOT in the draft's chars — they reach the inventory without touching the pick list (FR-014)", () => {
-    usePhaseBDraftStore.getState().acceptInvisible("U+200B");
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().controls).toEqual([]);
+    inventoryOps("characters").acceptInvisible("U+200B");
+    expect(getCharacterInventoryValue().chars).toEqual([]);
+    expect(getCharacterInventoryValue().controls).toEqual([]);
     expect(phaseCConfirmedInventory()).toEqual(["​"]);
   });
 
-  it("acceptedInvisibleChars ignores a malformed key a hand-edited snapshot could carry", () => {
-    usePhaseBDraftStore.setState({
-      invisibleDecisions: { "U+200C": "accepted", "not-a-code-point": "accepted", "U+DFFF": "accepted" },
-    });
+  it("acceptedInvisibleChars ignores a malformed entry a hand-edited snapshot could carry", () => {
+    // The old snapshot carried a decisions RECORD keyed by U+ notation, so
+    // garbage keys ("not-a-code-point", "U+DFFF") could persist verbatim.
+    // The decision value carries ITEMS and the keys are derived, so the
+    // malformed classes that can still arrive are chars whose derived key
+    // the contracts parser rejects: a lone surrogate (U+DFFF) and a
+    // noncharacter (U+FDD0). Both must be ignored, not propagated.
+    recordInvisiblesInventoryValue(
+      {
+        accepted: [
+          { char: "\u200C", provenance: "asked" },
+          { char: "\uDFFF", provenance: "asked" },
+          { char: "\uFDD0", provenance: "asked" },
+        ],
+        declined: [],
+      },
+      "characters",
+    );
     expect(acceptedInvisibleChars()).toEqual(["\u200C"]);
   });
 });
@@ -63,7 +77,7 @@ describe("phase-C inventory union pin (FR-024)", () => {
     const wc = useWorkingCopyStore.getState();
     wc.recordPhase({ phase: "B", answers: [], confirmedInventory: ["a", "b"] });
 
-    const s = usePhaseBDraftStore.getState();
+    const s = inventoryOps("characters");
     s.add("!");
     wc.recordPhase({ phase: "C", answers: [], confirmedInventory: phaseCConfirmedInventory() });
     let c = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");

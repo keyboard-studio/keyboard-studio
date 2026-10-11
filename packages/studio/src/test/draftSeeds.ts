@@ -8,7 +8,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { resetInventoryDraft } from "../survey/useInventoryDraft.ts";
 import { installDraftAutosave, saveDraft } from "../lib/draftPersistence.ts";
 import { makeScaffoldedIR } from "./irFixtures.ts";
 
@@ -24,7 +24,7 @@ export function instantiateMinimal(baseId: string, displayName = "Test Keyboard"
 function resetLiveStores(): void {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
+  resetInventoryDraft();
 }
 
 /**

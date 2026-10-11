@@ -85,7 +85,7 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
-import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/stepIds.ts";
 import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
 import { cursorCharIn } from "../../lib/stepWalk.ts";
 import { peekStepCursor } from "../../stores/stepWalkStore.ts";

@@ -13,7 +13,8 @@
 // writes:  header.keyboardId — the keyboard ID is stored here.
 
 import { irPath, validateKeyboardId } from "@keyboard-studio/contracts";
-import type { QuestionModule, ValidationResult } from "../../types.ts";
+import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
+import { deriveProjectIdentity } from "../../../decisions/identitySelectors.ts";
 
 export const definition = {
   id: "project_keyboard_id",
@@ -67,13 +68,31 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
+/**
+ * Decision apply (spec 089 T013): the project_name completion's identity
+ * lands on the working copy from the recorded decisions — the exact
+ * composition the deleted `projectNameOptions.onCommit` performed
+ * (spec 059): `{ keyboardId, displayName, ...identityLanguagePatch(...) }`,
+ * composed by `deriveProjectIdentity` over `ctx.decisions`. This module is
+ * the identity channel's authorized writer (apply-contract A3).
+ */
+export function apply(_value: string | string[] | undefined, ctx: ApplyContext): WorkingCopyPatch {
+  const identity = deriveProjectIdentity(ctx.decisions);
+  return identity === null ? {} : { identity };
+}
+
 const mod: QuestionModule = {
   definition,
   validate,
+  apply,
   fixtures,
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "keyboardId")],
   provides: ["project-keyboard-id"],
   requires: ["project-display-name"],
+  // Spec 091 (Delta P2/P6): the project_name screen's copy-track gate is
+  // declared once for the screen in the registry's `declaredScreenGates`
+  // (a manifest-level fork gate is not routing-expressible, and spec 087
+  // FR-005 forbids a module-level gatedBy).
 };
 export default mod;

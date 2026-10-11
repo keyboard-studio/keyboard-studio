@@ -29,6 +29,7 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   driveIdentityLite,
   pickBaseKeyboard,
@@ -43,6 +44,7 @@ async function adapt(page: Page, keyboardId: string): Promise<void> {
   await driveIdentityLite(page);
   await pickBaseKeyboard(page, keyboardId);
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
   await confirmPrefill(page);
 }
 

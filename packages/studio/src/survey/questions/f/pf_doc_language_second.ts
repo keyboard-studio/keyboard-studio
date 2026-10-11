@@ -70,5 +70,19 @@ const mod: QuestionModule = {
   writes: [],
   provides: ["help-doc-language-second"], requires: ["help-doc-language"],
   specRef: "specs/061-help-docs-generation",
+  // #2002's seed, in the spec 092 (T036) lookup-default shape: derived
+  // from the identity phase's composed BCP47 tag (supplied by the live
+  // wiring as ctx.phaseF.bcp47Tag) — an English or tag-less project
+  // gets no second language; anything else is proposed its own language
+  // as the second, the pair the old single "bilingual" answer proposed.
+  // The author can overturn it.
+  lookupDefault: (ctx) => {
+    const tag = ctx.phaseF?.bcp47Tag;
+    const primary = typeof tag === "string" ? tag.split("-")[0]?.toLowerCase() ?? "" : "";
+    return {
+      value: primary === "" || primary === "en" ? "none" : "target",
+      source: "identity",
+    };
+  },
 };
 export default mod;

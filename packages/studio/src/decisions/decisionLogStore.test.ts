@@ -337,3 +337,104 @@ function decisionFieldsOf(entry: DecisionEntry) {
     supersedes: entry.supersedes,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Spec 088 US4 (FR-008, contract C-5): survey-answer slots are keyed by the
+// DECISION the question provides, not by (step, question). Real registry
+// questions: il_copyright_holder -> copyright-holder, il_language_code ->
+// language-code. Unresolvable ids keep the legacy step-based slot.
+// ---------------------------------------------------------------------------
+
+describe("spec 088 — decision-keyed slots (C-5)", () => {
+  it("slotKeyOf keys a resolvable question by its decision id, on any step", () => {
+    const fromIdentity = slotKeyOf("identity", answer("il_copyright_holder", "A"));
+    const fromElsewhere = slotKeyOf("project_name", answer("il_copyright_holder", "B"));
+    expect(fromIdentity).toBe(fromElsewhere);
+    expect(fromIdentity).toContain("copyright-holder");
+  });
+
+  it("the same decision recorded from two different steps supersedes into one slot", () => {
+    const store = useDecisionLogStore.getState();
+    const first = store.append({
+      stepId: "identity",
+      payload: answer("il_copyright_holder", "First Author"),
+      provenance: HAND_SET,
+    });
+    const second = store.append({
+      stepId: "project_name",
+      payload: answer("il_copyright_holder", "Second Author"),
+      provenance: HAND_SET,
+    });
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    const entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(2);
+    // One chain: the second entry supersedes the first despite the move.
+    expect(entries[1]!.supersedes).toBe(entries[0]!.entryId);
+    const live = liveEntryForSlot(
+      entries,
+      slotKeyOf("identity", answer("il_copyright_holder", "ignored")),
+    );
+    expect(live?.entryId).toBe(entries[1]!.entryId);
+    // DecisionEntry.stepId is still written on both, as display metadata.
+    expect(entries[0]!.stepId).toBe("identity");
+    expect(entries[1]!.stepId).toBe("project_name");
+  });
+
+  it("two different decisions on one step never supersede", () => {
+    const store = useDecisionLogStore.getState();
+    store.append({ stepId: "identity", payload: answer("il_copyright_holder", "A"), provenance: HAND_SET });
+    store.append({ stepId: "identity", payload: answer("il_language_code", "fr"), provenance: HAND_SET });
+    const entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(2);
+    expect(entries[1]!.supersedes).toBeNull();
+  });
+
+  it("an unresolvable question id keeps the legacy step-based slot and its history", () => {
+    const store = useDecisionLogStore.getState();
+    store.append({ stepId: "identity", payload: answer("zz_removed_question", "one"), provenance: HAND_SET });
+    store.append({ stepId: "identity", payload: answer("zz_removed_question", "two"), provenance: HAND_SET });
+    // Same step + same question still supersedes (the legacy behaviour)…
+    let entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(2);
+    expect(entries[1]!.supersedes).toBe(entries[0]!.entryId);
+    // …but the same orphan question on ANOTHER step is a different slot —
+    // never merged into a wrong decision (C-5.2).
+    store.append({ stepId: "project_name", payload: answer("zz_removed_question", "three"), provenance: HAND_SET });
+    entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(3);
+    expect(entries[2]!.supersedes).toBeNull();
+  });
+
+  it("a hydrated pre-088 record re-keys with no stored migration", () => {
+    // A record as a pre-088 build wrote it: the same decision answered on
+    // "identity". Slot keys are computed, never stored, so after hydrate an
+    // append from a different step joins the same chain unaided.
+    const store = useDecisionLogStore.getState();
+    store.hydrate({
+      format: "keyboard-studio.decision-record",
+      version: DECISION_RECORD_VERSION,
+      keyboardId: "fixture_keyboard",
+      entries: [
+        {
+          entryId: "d1",
+          stepId: "identity",
+          payload: answer("il_copyright_holder", "First Author"),
+          provenance: HAND_SET,
+          recordedAt: 1,
+          supersedes: null,
+        },
+      ],
+      truncated: null,
+    });
+    const appended = store.append({
+      stepId: "project_name",
+      payload: answer("il_copyright_holder", "Second Author"),
+      provenance: HAND_SET,
+    });
+    expect(appended).not.toBeNull();
+    const entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(2);
+    expect(entries[1]!.supersedes).toBe("d1");
+  });
+});

@@ -163,7 +163,11 @@ export interface ProgressDotsInput {
 }
 
 // ---------------------------------------------------------------------------
-// Stage labels
+// Stage labels — keyed by DERIVED SCREEN id (spec 091 T020): the screen ids
+// are the structural keys the derivation produces (a question screen's group
+// key, a singleton's declared screen key), and the message ids below are
+// unchanged from the step-era map. A screen this map does not name falls
+// back to its raw id (stageLabel), never blank.
 // ---------------------------------------------------------------------------
 
 const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
@@ -190,11 +194,11 @@ const SCREEN_OF_STAGE_MESSAGE = (stage: string, position: number, total: number)
     message: `${{ stage: stage }} — ${{ position: position }} of ${{ total: total }}`,
   });
 
-/** A manifest step's localized name, falling back to the raw id (never
- * blank, never throws) for a step this map does not (yet) name. Exported —
+/** A derived screen's localized name, falling back to the raw id (never
+ * blank, never throws) for a screen this map does not (yet) name. Exported —
  * `components/StepHost.tsx`'s FR-016 notice (T064) names affected steps
  * through the SAME map, so the notice and the strip can never disagree about
- * what a step is called. */
+ * what a screen is called. */
 export function stageLabel(stepId: string, i18n?: I18n): string {
   const descriptor = STAGE_LABEL_MESSAGE[stepId];
   return descriptor === undefined ? stepId : resolveMessage(i18n, descriptor);

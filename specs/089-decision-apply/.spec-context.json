@@ -1,0 +1,23 @@
+{
+  "workflow": "speckit",
+  "specName": "Question decisions write only through `apply`",
+  "branch": "km/decision-apply",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:55:35.097Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-07T00:55:35.276Z"
+    }
+  ]
+}

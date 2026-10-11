@@ -19,6 +19,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { instantiateFromExistingWithIdentitySeed } from "./confirmRebase.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
@@ -145,6 +147,37 @@ describe("delivered artifact — adapt track (US3, FR-005, FR-006)", () => {
     // identity.bcp47 from `basicKbdus.languages[0]` ("en") before the author
     // answered (SC-002).
     expect(kps).not.toContain('<Language ID="en">en</Language>');
+  });
+
+  it("declares the author's language name when instantiation carried the identity seed", async () => {
+    // Regression pin (union-tree copy-edit adapt failure): the live adapt
+    // path instantiates through the identity-seeded wrapper, and NO later
+    // step calls setIdentity on the adapt track — so the descriptor's
+    // <Language> text must come from the seed alone. The pre-fix path
+    // emitted `<Language ID="fr">fr</Language>` (the base's raw tag as its
+    // own display text) for exactly this state.
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const record = useDecisionStore.getState().record;
+    record({ id: "language-name", value: "Bambara", provenance: "asked" });
+    record({ id: "language-autonym", value: "Bambara", provenance: "asked" });
+    record({ id: "language-code", value: "bm", provenance: "asked" });
+    record({ id: "target-script", value: "Latn", provenance: "asked" });
+    try {
+      const vfs = createVirtualFS([
+        { path: "source/basic_kbdus.kmn", content: BASE_KMN, isBinary: false },
+      ]);
+      const ir = makeTestIR([]);
+      ir.header.version = "1.0";
+      instantiateFromExistingWithIdentitySeed(basicKbdus, { vfs, ir });
+
+      const result = await serializeWorkingCopy();
+      expect(result).not.toBeNull();
+
+      const kps = descriptorText("basic_kbdus");
+      expect(languageElements(kps)).toEqual(['<Language ID="bm-Latn">Bambara</Language>']);
+    } finally {
+      useDecisionStore.getState().reset();
+    }
   });
 
   it("derives the Files list from what this build emits, not from the base's repo (D-09)", async () => {

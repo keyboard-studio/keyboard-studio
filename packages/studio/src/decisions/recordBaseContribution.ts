@@ -102,7 +102,12 @@ function inheritedMetadataOf(base: BaseKeyboard): { field: string; value: string
 }
 
 /**
- * Record the base's contribution at `choose_base` completion, once.
+ * Record the base's contribution, once per instantiation. Fired by
+ * StudioShell's doCommit (via the recorder's `recordBaseContributionNow`)
+ * immediately after instantiation produces the working copy — NOT at
+ * `choose_base` completion, which precedes instantiation on the live
+ * flow (spec 093 final pass; the completion-time fire read an empty
+ * store and wrote nothing).
  *
  * @returns the new `entryId`, or `null` when the store shows no instantiated
  *   working copy yet (research D-11) — never a fabricated zero baseline.

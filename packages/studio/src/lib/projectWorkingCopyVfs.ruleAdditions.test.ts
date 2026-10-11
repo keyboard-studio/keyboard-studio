@@ -22,7 +22,7 @@ import { createVirtualFS, type VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import type { IRRule, IRStore, KeyboardIR } from "@keyboard-studio/contracts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
-import { deriveRuleAdditions } from "./ruleAdditions.js";
+import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures

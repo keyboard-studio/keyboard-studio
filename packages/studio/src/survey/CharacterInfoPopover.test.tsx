@@ -27,7 +27,7 @@ import { render } from "../test/renderWithI18n.tsx";
 import { CharacterMapPane } from "./CharacterMapPane.tsx";
 import { resetUnicodeTableForTests } from "./characterMap/unicodeTable.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { CharacterMapGroup } from "../lib/services.ts";
 
@@ -170,14 +170,23 @@ const TEST_BASE = {
   version: "1.0",
 };
 
+/** Record the identity decisions a completed identity step records (spec 089:
+ * the survey context / scaffold spec are derived from these, never seeded
+ * into the session store directly). */
+function seedIdentityDecisions(languageCode: string, languageName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: languageName, provenance: "asked" });
+  record({ id: "language-autonym", value: languageName, provenance: "asked" });
+  record({ id: "language-code", value: languageCode, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
+
 function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
   useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
   });
-  useSurveySessionStore
-    .getState()
-    .setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+  seedIdentityDecisions(bcp47.split("-")[0]!, languageName);
 }
 
 beforeEach(() => {

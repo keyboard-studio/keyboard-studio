@@ -122,6 +122,11 @@ const mod: QuestionModule = {
   writes: [],
   provides: ["help-history-entry"],
   specRef: "specs/080-documentation-completeness",
+  // Spec 092 (T036): the "confirm" proposal is this module's lookup
+  // default, replacing the PHASE_F_SEEDS table entry — an analysis
+  // proposal (the studio derived a HISTORY entry from the starting
+  // point; the author confirms, edits, or replaces it).
+  lookupDefault: () => ({ value: "confirm", source: "analysis" }),
 };
 export default mod;
 

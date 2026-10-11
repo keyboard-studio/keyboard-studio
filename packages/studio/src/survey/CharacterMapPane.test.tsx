@@ -2,13 +2,13 @@
 // character map (spec character-map pane work).
 //
 // Strategy (mirrors BuildListView.test.tsx, the sibling component that
-// mutates the same shared phaseBDraftStore):
+// mutates the same shared character-inventory value):
 //   - characterMapGroups is mocked via vi.mock("../lib/services.ts") so no
 //     network/CLDR traffic occurs and the returned groups are deterministic.
 //   - baseIr/bcp47/languageName are read by the pane from the REAL
 //     workingCopyStore/surveySessionStore singletons (not mocked) — seeded
 //     directly, matching BuildListView.test.tsx's convention.
-//   - phaseBDraftStore is the real singleton store; reset in before/afterEach
+//   - the inventory draft is the real decision-backed state; reset in before/afterEach
 //     so selection state never bleeds across tests.
 //
 // Out of scope (per task boundary): the engine's buildCharacterMap builder
@@ -27,8 +27,8 @@ import {
   zoomPercent,
 } from "./CharacterMapPane.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { getCharacterInventoryValue, inventoryOps } from "../survey/useInventoryDraft.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup } from "@keyboard-studio/contracts";
 import type { CharacterMapGroup } from "../lib/services.ts";
@@ -123,12 +123,23 @@ const TEST_BASE = {
   version: "1.0",
 };
 
+/** Record the identity decisions a completed identity step records (spec 089:
+ * the survey context / scaffold spec are derived from these, never seeded
+ * into the session store directly). */
+function seedIdentityDecisions(languageCode: string, languageName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: languageName, provenance: "asked" });
+  record({ id: "language-autonym", value: languageName, provenance: "asked" });
+  record({ id: "language-code", value: languageCode, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
+
 function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
   useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
   });
-  useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+  seedIdentityDecisions(bcp47.split("-")[0]!, languageName);
 }
 
 /** Seed a base whose IR PRODUCES the given glyphs (one rule per char). */
@@ -143,7 +154,7 @@ function seedBaseProducing(produced: string[], bcp47 = "yo", languageName = "Yor
     vfs: { files: new Map() },
     ir: makeTestIR([group]),
   });
-  useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+  seedIdentityDecisions(bcp47.split("-")[0]!, languageName);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +233,7 @@ describe("CharacterMapPane — data path", () => {
 
     // Still toggleable exactly like a normal (glyph-rendering) cell.
     fireEvent.click(bButton);
-    expect(usePhaseBDraftStore.getState().chars).toContain("b");
+    expect(getCharacterInventoryValue().chars).toContain("b");
     expect(bButton.getAttribute("aria-pressed")).toBe("true");
 
     // The unaffected "a" cell still renders its real glyph.
@@ -265,13 +276,13 @@ describe("CharacterMapPane — data path", () => {
 
     fireEvent.click(aButton);
 
-    expect(usePhaseBDraftStore.getState().chars).toContain("a");
+    expect(getCharacterInventoryValue().chars).toContain("a");
     const aButtonAfter = within(latinGroup).getByRole("button", { name: /Remove a \(U\+0061\)/ });
     expect(aButtonAfter.getAttribute("aria-pressed")).toBe("true");
 
     // Click again — removes it.
     fireEvent.click(aButtonAfter);
-    expect(usePhaseBDraftStore.getState().chars).not.toContain("a");
+    expect(getCharacterInventoryValue().chars).not.toContain("a");
     const aButtonFinal = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
     expect(aButtonFinal.getAttribute("aria-pressed")).toBe("false");
   });
@@ -348,12 +359,12 @@ describe("CharacterMapPane — data path", () => {
     const group = screen.getByLabelText("Latin characters (main)");
     fireEvent.click(within(group).getByRole("button", { name: /Add a \(U\+0061\)/ }));
     // The lowercase and its (hidden) uppercase both join the alphabet.
-    expect(usePhaseBDraftStore.getState().chars).toContain("a");
-    expect(usePhaseBDraftStore.getState().chars).toContain("A");
+    expect(getCharacterInventoryValue().chars).toContain("a");
+    expect(getCharacterInventoryValue().chars).toContain("A");
     // Clicking the now-selected cell removes both.
     fireEvent.click(within(group).getByRole("button", { name: /Remove a \(U\+0061\)/ }));
-    expect(usePhaseBDraftStore.getState().chars).not.toContain("a");
-    expect(usePhaseBDraftStore.getState().chars).not.toContain("A");
+    expect(getCharacterInventoryValue().chars).not.toContain("a");
+    expect(getCharacterInventoryValue().chars).not.toContain("A");
   });
 
   it("tints base-keyboard output glyphs (with an accessible hint) until the author selects them", async () => {
@@ -402,16 +413,16 @@ describe("CharacterMapPane — data path", () => {
         ],
       },
     ]);
-    usePhaseBDraftStore.getState().add("a");
-    usePhaseBDraftStore.getState().addLoanword("q");
-    usePhaseBDraftStore.getState().addLoanword("Q");
+    inventoryOps("characters").add("a");
+    inventoryOps("characters").addLoanword("q");
+    inventoryOps("characters").addLoanword("Q");
     render(<CharacterMapPane />);
     const qCell = await screen.findByRole("button", { name: /Remove q \(U\+0071\)/ });
     expect(qCell.getAttribute("aria-pressed")).toBe("true");
 
     fireEvent.click(qCell);
-    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+    expect(getCharacterInventoryValue().loanwordChars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual(["a"]);
   });
 
   it("shows only letters, numerals, and marks; excludes symbols and separators (spec 047)", async () => {
@@ -470,9 +481,9 @@ describe("CharacterMapPane — data path", () => {
     ).toBeNull();
   });
 
-  it("a cell already present in phaseBDraftStore.chars renders aria-pressed=true on mount", async () => {
+  it("a cell already present in the inventory chars renders aria-pressed=true on mount", async () => {
     seedBaseAndLanguage();
-    usePhaseBDraftStore.getState().setAll(["b"]);
+    inventoryOps("characters").setAll(["b"]);
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -495,7 +506,7 @@ describe("CharacterMapPane — data path", () => {
 describe("CharacterMapPane — short-circuit (no verified character list)", () => {
   it("baseIr === null: renders the no-verified-list message and never calls characterMapGroups", () => {
     // No instantiateFromBase call — baseIr stays null (workingCopyStore default).
-    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "yo", language_name: "Yoruba" });
+    seedIdentityDecisions("yo", "Yoruba");
     render(<CharacterMapPane />);
 
     expect(screen.getByText(/No verified character list for Yoruba/i)).toBeTruthy();
@@ -536,7 +547,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.change(input, { target: { value: "U+0041" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
-    expect(usePhaseBDraftStore.getState().chars).toContain("A");
+    expect(getCharacterInventoryValue().chars).toContain("A");
     expect((input as HTMLInputElement).value).toBe("");
     // #1589/#1596 sibling: one full catalog sentence, not a translated
     // "Added" word spliced with raw char/codepoint data. Includes
@@ -556,11 +567,11 @@ describe("CharacterMapPane — raw code point entry", () => {
 
     fireEvent.change(input, { target: { value: "u+0042" } });
     fireEvent.click(addButton);
-    expect(usePhaseBDraftStore.getState().chars).toContain("B");
+    expect(getCharacterInventoryValue().chars).toContain("B");
 
     fireEvent.change(input, { target: { value: "0043" } });
     fireEvent.click(addButton);
-    expect(usePhaseBDraftStore.getState().chars).toContain("C");
+    expect(getCharacterInventoryValue().chars).toContain("C");
   });
 
   it("rejects an out-of-range code point and shows an inline error without mutating the store", async () => {
@@ -576,7 +587,7 @@ describe("CharacterMapPane — raw code point entry", () => {
 
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 
   it("rejects a surrogate-half code point", async () => {
@@ -591,7 +602,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 
   it("rejects a noncharacter code point (plane-end and Arabic-presentation-forms range)", async () => {
@@ -607,12 +618,12 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.change(input, { target: { value: "U+FFFF" } });
     fireEvent.click(addButton);
     expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
 
     fireEvent.change(input, { target: { value: "U+FDD0" } });
     fireEvent.click(addButton);
     expect(screen.getByText(/enter a valid code point/i)).toBeTruthy();
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 
   it("allows a PUA code point after the role prompt (the escape hatch's whole point, spec 071 FR-004)", async () => {
@@ -627,11 +638,11 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     // FR-004: nothing is added until the designer answers letter-or-mark.
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
     expect(screen.getByTestId("pua-role-prompt")).toBeTruthy();
     fireEvent.click(screen.getByTestId("pua-role-letter"));
 
-    expect(usePhaseBDraftStore.getState().chars).toContain("\u{E000}");
+    expect(getCharacterInventoryValue().chars).toContain("\u{E000}");
     // #1589/#1596 sibling: this announcement was previously hardcoded
     // English with no t() call at all — now a real catalog sentence.
     expect(screen.getByText("Added \u{E000} (U+E000) as a letter")).toBeTruthy();
@@ -649,7 +660,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     fireEvent.click(screen.getByTestId("pua-role-mark"));
 
-    const state = usePhaseBDraftStore.getState();
+    const state = getCharacterInventoryValue();
     expect(state.marks).toContain("\u{E001}");
     expect(state.bases).not.toContain("\u{E001}");
     expect(state.declaredRoles["\u{E001}"]).toBe("mark");
@@ -668,7 +679,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     fireEvent.click(screen.getByTestId("pua-role-letter"));
 
-    const state = usePhaseBDraftStore.getState();
+    const state = getCharacterInventoryValue();
     expect(state.bases).toContain("\u{E002}");
     expect(state.marks).not.toContain("\u{E002}");
     expect(state.declaredRoles["\u{E002}"]).toBe("letter");
@@ -686,7 +697,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
     expect(screen.queryByTestId("pua-role-prompt")).toBeNull();
   });
 
@@ -826,7 +837,7 @@ describe("CharacterMapPane — search filter", () => {
       },
     ]);
     act(() => {
-      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "yo", language_name: "Yoruba2" });
+      seedIdentityDecisions("yo", "Yoruba2");
     });
 
     await waitFor(() => {
@@ -987,7 +998,7 @@ describe("CharacterMapPane — search filter", () => {
     // (act + setSurveyContext) — this re-triggers the fetch effect, which
     // resets searchFilters to ALL_FILTERS (and closes the filters panel).
     act(() => {
-      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "fr", language_name: "French" });
+      seedIdentityDecisions("fr", "French");
     });
 
     await waitFor(() => {
@@ -1325,7 +1336,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
     const checkbox = screen.getByRole("checkbox", { name: "Show only blocks my keyboard uses" });
     expect((checkbox as HTMLInputElement).checked).toBe(true);
     expect(screen.getByLabelText("Greek characters")).toBeTruthy();
-    expect(usePhaseBDraftStore.getState().chars).toContain("α");
+    expect(getCharacterInventoryValue().chars).toContain("α");
   });
 
   it("search is whole-set: finds a hidden-block character even while the box is checked", async () => {
@@ -1514,7 +1525,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
     // (act + setSurveyContext) — this re-triggers the fetch effect, which
     // resets hiddenGroups at ~line 210.
     act(() => {
-      useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "fr", language_name: "French" });
+      seedIdentityDecisions("fr", "French");
     });
 
     await waitFor(() => {

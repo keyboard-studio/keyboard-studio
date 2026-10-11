@@ -17,19 +17,30 @@
 import { describe, it, expect } from "vitest";
 import { manifest } from "./manifest.ts";
 import type { Step } from "./types.ts";
-import { STEP_TRAILS } from "./stepOrder.ts";
 import { assertUniqueIds } from "./types.test.ts";
-import { questionRegistry } from "../survey/questions/registry.ts";
+import {
+  decisionModules,
+  declaredScreenGates,
+  questionRegistry,
+} from "../survey/questions/registry.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Derived (not declared) trail membership — see steps/stepOrder.ts. */
+/**
+ * Derived screen trails (spec 091 T018): spine membership and join
+ * targets are read from the derived screens, not from step declarations.
+ * "package" is the ruled terminal screen (spine, no join target).
+ */
+const derivedScreenById = new Map(
+  deriveScreens(decisionModules, declaredScreenGates).map((s) => [s.id, s] as const),
+);
 const spineOf = (s: Step | undefined): boolean | undefined =>
-  s === undefined ? undefined : STEP_TRAILS.get(s.id)?.spine;
+  s === undefined ? undefined : s.id === "package" ? true : derivedScreenById.get(s.id)?.spine;
 const joinOf = (s: Step | undefined): string | undefined =>
-  s === undefined ? undefined : STEP_TRAILS.get(s.id)?.joinTarget;
+  s === undefined ? undefined : derivedScreenById.get(s.id)?.joinTarget;
 
 const spineSteps = (steps: readonly Step[]): Step[] =>
   steps.filter((s) => spineOf(s) === true);
@@ -108,6 +119,8 @@ const EXPECTED_SPINE_ORDER = [
   "layout",
   "choose_base",
   "track",
+  // #1901: the author/copyright step walks right after the track choice.
+  "attribution",
   "characters",
   "marks",
   "punctuation",
@@ -123,6 +136,17 @@ const EXPECTED_SPINE_ORDER = [
 ] as const;
 
 describe("M2 — spine order matches FR-012", () => {
+  it("manifest ≡ derived screens (spec 091 T018): same ids, same order, same trails", () => {
+    const screens = deriveScreens(decisionModules, declaredScreenGates);
+    expect(manifest.map((s) => s.id)).toEqual([...screens.map((s) => s.id), "package"]);
+    for (const screen of screens) {
+      const step = manifest.find((s) => s.id === screen.id);
+      expect(step, screen.id).toBeDefined();
+      expect(spineOf(step), screen.id).toBe(screen.spine);
+      expect(joinOf(step), screen.id).toBe(screen.joinTarget);
+    }
+  });
+
   it("spine steps appear in the functional order (Identity → … → Package)", () => {
     const actualSpineIds = spineSteps(manifest).map((s) => s.id);
     expect(actualSpineIds).toEqual([...EXPECTED_SPINE_ORDER]);

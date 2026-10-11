@@ -16,6 +16,7 @@ import {
   driveIdentityLite,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   drivePunctuationStep,
@@ -52,6 +53,7 @@ async function startToCharacters(page: Page): Promise<void> {
   });
   await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
   await confirmPrefill(page);
 }
 

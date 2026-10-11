@@ -61,6 +61,7 @@ import {
   driveIdentityLite as driveIdentityLiteBase,
   pickBaseKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   driveMechanismsGallery,
@@ -211,6 +212,7 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     await driveIdentityLite(page);
     await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
 
     // Spec 057 FR-072: a mid-walk tab round trip, folded into an existing long

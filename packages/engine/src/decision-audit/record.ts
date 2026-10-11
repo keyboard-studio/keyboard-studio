@@ -116,7 +116,18 @@ function serializeEntry(entry: DecisionEntry): unknown {
               sampleTruncated: entry.payload.summary.sampleTruncated,
             },
           }
-        : {
+        : entry.payload.kind === "decision"
+          ? {
+              // spec 090 US5 (D-090-48): the value is JSON by contract, so it
+              // is written as-is — key order inside it is the producer's, and
+              // byte-stability is claimed for the record's own fields, not for
+              // the inside of a module's value.
+              kind: entry.payload.kind,
+              decisionId: entry.payload.decisionId,
+              value: entry.payload.value,
+              summary: entry.payload.summary,
+            }
+          : {
             // base-contribution (specs/055-legible-decision-trail D-11),
             // written by the studio's recordBaseContribution.ts at
             // `choose_base` completion. `startingKeyCount` is optional and is
@@ -192,17 +203,19 @@ function unreadable(): ParseDecisionRecordResult {
 }
 
 /**
- * Migrate one raw candidate entry to the v2 shape BEFORE schema validation,
- * for a record whose declared `version` is older than
+ * Migrate one raw candidate entry to the current shape BEFORE schema
+ * validation, for a record whose declared `version` is older than
  * {@link DECISION_RECORD_VERSION}.
  *
  * This has to happen ahead of `DecisionEntrySchema.safeParse`, not after: the
- * v2 schema's `DecisionImpactSchema` requires a non-empty `files` array, so a
+ * schema's `DecisionImpactSchema` requires a non-empty `files` array, so a
  * v1 entry's flat `path`/`hunks`/`magnitude` capture fails validation
  * outright and would otherwise be dropped and counted in `droppedCount`
  * before `normalizeDecisionRecord` ever saw it — silently discarding exactly
  * the captured impact this migration exists to carry forward (specs/055
- * T008 blocking finding).
+ * T008 blocking finding). (A v2 candidate passes through the same seam
+ * unchanged — the v2 -> v3 stage transforms nothing — so it validates
+ * against the current schema directly.)
  *
  * Wrapped in a singleton record and a try/catch so one malformed candidate
  * cannot poison a sibling's migration and cannot break the "never throws"
@@ -211,7 +224,7 @@ function unreadable(): ParseDecisionRecordResult {
  * UNCHANGED, where it fails validation and is dropped exactly as it would
  * have been without this step.
  */
-function migrateRawEntryIfPreV2(candidate: unknown, version: number): unknown {
+function migrateRawEntryIfPreCurrent(candidate: unknown, version: number): unknown {
   if (version >= DECISION_RECORD_VERSION) return candidate;
   try {
     const wrapped: PreMigrationDecisionRecord = {
@@ -269,7 +282,7 @@ export function parseDecisionRecord(text: string | null | undefined): ParseDecis
   const seenIds = new Set<string>();
   let droppedCount = 0;
   for (const candidate of rawEntries) {
-    const migrated = migrateRawEntryIfPreV2(candidate, version);
+    const migrated = migrateRawEntryIfPreCurrent(candidate, version);
     const parsed = DecisionEntrySchema.safeParse(migrated);
     if (!parsed.success) {
       droppedCount++;
@@ -305,14 +318,14 @@ export function parseDecisionRecord(text: string | null | undefined): ParseDecis
   return {
     record: {
       format: DECISION_RECORD_FORMAT,
-      // A pre-v2 record has had every surviving entry migrated to the v2 shape
-      // by `migrateRawEntryIfPreV2` above, so the record returned here IS a v2
-      // record and must say so. Handing back the stale `1` would re-fire that
-      // migration on the next read — over entries appended in between, whose
-      // counts were genuinely measured — and strip them (FR-005a). An
-      // unrecognised FUTURE version is passed through untouched: contract §5
-      // row 3 reads a newer build's record entry by entry without claiming it
-      // as this build's own format.
+      // A pre-current record has had every surviving entry migrated to the
+      // current shape by `migrateRawEntryIfPreCurrent` above, so the record
+      // returned here IS a current-version record and must say so. Handing
+      // back the stale `1` would re-fire that migration on the next read —
+      // over entries appended in between, whose counts were genuinely
+      // measured — and strip them (FR-005a). An unrecognised FUTURE version
+      // is passed through untouched: contract §5 row 3 reads a newer build's
+      // record entry by entry without claiming it as this build's own format.
       version: version < DECISION_RECORD_VERSION ? DECISION_RECORD_VERSION : version,
       keyboardId,
       entries: repaired,

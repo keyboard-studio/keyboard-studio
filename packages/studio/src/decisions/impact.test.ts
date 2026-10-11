@@ -5,9 +5,11 @@
 // underivable impact reports WHICH of the two reasons applies rather than
 // degrading to an empty diff.
 //
-// The mutate-seam-off case is not an edge case here: it is the SHIPPED default
-// (flags/mutateFlag.ts), so it is the behaviour most survey entries will actually
-// take, and it must say so honestly.
+// The no-rederivable-write-path case is not an edge case here: most survey
+// questions declare no IR `apply`, so it is the behaviour most survey
+// entries will actually take, and it must say so honestly. (Spec 089 T020:
+// the counterfactual re-runs the module's `apply` — the retired `mutate`
+// seam's successor — and T021 deleted the flag that used to gate it.)
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -24,6 +26,7 @@ import type {
   SurveyAnswer,
 } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import {
   resolveImpact,
   resolveImpactAsync,
@@ -119,13 +122,36 @@ describe("shed entries", () => {
 });
 
 describe("underivable impacts report a reason (FR-011)", () => {
-  it("reports no-rederivable-write-path with the mutate seam off — the shipped default", () => {
-    // No VITE_KM_MUTATE_SEAM in the test env, so isMutateSeamEnabled() is false:
-    // exactly the default build's behaviour.
+  it("reports no-rederivable-write-path when the question's module declares no apply", () => {
+    // The default entry's questionId has no module at all — nothing to
+    // re-run, so no counterfactual exists. Most real questions land here
+    // too (they declare no IR apply).
     expect(resolveImpact(entry(), deps())).toEqual({
       state: "unavailable",
       reason: "no-rederivable-write-path",
     });
+  });
+
+  it("derives a counterfactual by re-running the module's apply (spec 089 T020)", () => {
+    // pb_standard_letters declares apply + writes: the counterfactual
+    // re-runs it against the working IR and diffs the emitted texts.
+    const ir = makeTestIR([]);
+    const e = entry({
+      stepId: "characters",
+      payload: {
+        kind: "survey-answer",
+        questionId: "pb_standard_letters",
+        answerType: "select",
+        value: "extended-latin",
+      },
+    });
+    const impact = resolveImpact(e, deps({ getWorkingIR: () => ir }));
+    expect(impact?.state).toBe("captured");
+    if (impact?.state === "captured") {
+      expect(impact.files).toHaveLength(1);
+      expect(impact.files[0]!.path).toMatch(/\.kmn$/);
+      expect(impact.files[0]!.hunks.length).toBeGreaterThan(0);
+    }
   });
 
   it("reports lock-gate-dependency for a step behind a lock that has passed", () => {

@@ -13,7 +13,7 @@
 //
 // CENTRALIZED COMPLETION PATH (contract §2, FR-004):
 //   1. If result is SurveyPhaseResult-shaped: recordPhase(result) +
-//      routeAnswersThroughMutate(result, deps)
+//      recordAnswersAsDecisions(result, deps) + applyDecisionEffects(result, deps)
 //   2. If step.id in STEPS_WITH_APPLY_COMPLETION: applyStepCompletion(id, result, deps)
 //   3. advance(id, result, { selectedTrack, identitySupported, touchSeedSource }) →
 //      { next, navigate?, setCharactersSubStage? }
@@ -46,12 +46,17 @@ import {
   type ActiveStepId,
 } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { manifest } from "../steps/manifest.ts";
-import type { EditorStep } from "../steps/types.ts";
+import { getDecisionSnapshot, selectTouchSeedSource, selectTrack, useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
+import type { DecisionId } from "../decisions/decisionTypes.ts";
+import { manifest as defaultManifest } from "../steps/manifest.ts";
+import type { EditorStep, Step } from "../steps/types.ts";
 import {
+  applyDecisionEffects,
   applyStepCompletion,
+  recordAnswersAsDecisions,
   recordStepCompletion,
-  routeAnswersThroughMutate,
   type ReducerDeps,
 } from "../steps/reducer.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
@@ -68,7 +73,7 @@ import { useInventoryCoverageGate } from "../hooks/useInventoryCoverageGate.ts";
 
 // ---------------------------------------------------------------------------
 // isSurveyPhaseResult — shape guard for the generic completion path.
-// Guards recordPhase + routeAnswersThroughMutate — these are only called when
+// Guards recordPhase + applyDecisionEffects — these are only called when
 // the result is SurveyPhaseResult-shaped (phase: string, answers: array).
 // ---------------------------------------------------------------------------
 
@@ -92,6 +97,16 @@ export interface StepHostProps {
   onStartOver: () => void;
   /** Optional: shared survey context to pass as EditorStepProps.ctx. */
   ctx?: SurveyContext;
+  /**
+   * Optional: the manifest to resolve the active step from (spec 091
+   * T010 — the seam the SC-001 test drives: a manifest built by
+   * steps/manifest.ts `buildManifest` from a supplied module list).
+   * Defaults to the live built manifest; StudioShell passes nothing, so
+   * production behaviour is unchanged. Step RESOLUTION reads this list;
+   * the advance() navigation policy keeps reading the default manifest
+   * until Phase 4 (T012) rewires it.
+   */
+  manifest?: readonly Step[];
 }
 
 // ---------------------------------------------------------------------------
@@ -183,11 +198,14 @@ const DEEP_LINK_CONTINUE_BUTTON_STYLE: CSSProperties = {
 // StepHost
 // ---------------------------------------------------------------------------
 
-export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): ReactNode {
+export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp }: StepHostProps): ReactNode {
+  const manifest = manifestProp ?? defaultManifest;
   const { t, i18n } = useLingui();
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
-  // identityResult is read here only for the terminal panels (unsupported stub).
-  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  // The identity result is read here only for the terminal panels
+  // (unsupported stub) — derived from the decision store (spec 089 FR-005).
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityResult = deriveIdentityResult(decisions);
   const sessionAdvance = useSurveySessionStore((s) => s.advance);
   // Subscribed (not snapshotted once) so the Back affordance's gating below
   // stays live across advance/pop/reset — F7 defect 2: a stale "always show
@@ -335,9 +353,9 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
 
   if (activeStepId === "unsupported") {
     // Always render a visible panel (spec 028 edge case + FR): never null.
-    // identityResult may be null if the session is in an unexpected state —
-    // fall back to a generic "Script not supported" panel so there is no
-    // invisible failure.
+    // The derived identity result may be null if the session is in an
+    // unexpected state — fall back to a generic "Script not supported"
+    // panel so there is no invisible failure.
     if (identityResult !== null) {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "flex-start" }}>
@@ -429,11 +447,34 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     // never wrong.
     pendingBeforeRef.current = { workToDo, visited: useSurveySessionStore.getState().visited };
 
-    // 1. If SurveyPhaseResult-shaped: recordPhase + routeAnswersThroughMutate.
+    // 1. If SurveyPhaseResult-shaped: recordPhase, record the completion's
+    //    decisions, then run their effects (spec 089 contract A6 — recording
+    //    precedes applying, so an apply composes from a decision set that
+    //    includes its own completion's records).
     if (isSurveyPhaseResult(result)) {
       // spec 079 D-4: the step owns its own answers within the phase slot.
       recordPhase(result, { stepId: resolvedStep.id });
-      routeAnswersThroughMutate(result, reducerDeps);
+      // Spec 088 FR-003 (contract C-2): the same completion writes one
+      // decision record per provided decision into the decision store.
+      recordAnswersAsDecisions(result, resolvedStep.id, reducerDeps);
+      // Spec 089 FR-001/FR-002: run each answered module's apply()
+      // unconditionally through the checked patch sink.
+      applyDecisionEffects(result, reducerDeps);
+      // Spec 093 T009: the recorded change recalculates its downstream
+      // closure and the working copy is rebuilt by replay from the
+      // checkpoint before the first changed decision — the rebuilt
+      // state installs over the incremental applies above, so what the
+      // author continues from is the derived working copy. A no-op when
+      // the host wired no rebuild (pre-093 behaviour) or when this
+      // completion recorded no decisions.
+      if (reducerDeps.rebuildFromDecisions !== undefined) {
+        const changed: DecisionId[] = [];
+        for (const answer of result.answers) {
+          const mod = questionRegistry[answer.questionId];
+          if (mod?.provides !== undefined) changed.push(...mod.provides);
+        }
+        if (changed.length > 0) reducerDeps.rebuildFromDecisions(changed);
+      }
     }
 
     // 2. If step has reducer side effects: applyStepCompletion.
@@ -451,24 +492,25 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
     recordStepCompletion(resolvedStep.id, result, reducerDeps);
 
     // 3. Pure advance policy → next step + optional signals.
-    //    Read selectedTrack and identityResult from getState() — NOT from the
-    //    render-time closure. Adapters (e.g. TrackStepAdapter) call setSelectedTrack()
-    //    synchronously BEFORE invoking onComplete, so the Zustand store already holds
-    //    the post-mutation value; but the React selector closure still holds the
-    //    pre-mutation snapshot. getState() returns the current committed store value.
-    const postMutationState = useSurveySessionStore.getState();
+    //    Read the track and identity support from the decision snapshot —
+    //    NOT from a render-time closure: the completion above has just
+    //    recorded this step's decisions, so the snapshot already holds the
+    //    post-completion values.
+    // Spec 088 FR-004/FR-005: routing reads the decision store. The track
+    // and seed values are selectors over the store snapshot (the session
+    // fields they used to be read from are deleted), and the snapshot
+    // itself is the gate set advance() evaluates.
+    const decisions = getDecisionSnapshot();
     // resolvedStep.id is StepBase.id (string). The manifest guarantees all step
     // ids are valid ActiveStepId values, so the cast is safe. advance() is
     // defined in advance.ts with a local ActiveStepId mirror — not imported from
     // stores/ (depcruise boundary preserved).
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     const outcome = advance(resolvedStep.id as Parameters<typeof advance>[0], result, {
-      selectedTrack: postMutationState.selectedTrack,
-      identitySupported: postMutationState.identityResult?.supported ?? true,
-      // Structurally identical to advance.ts's local TouchSeedSource mirror
-      // (both "import-adapt" | "reseed-from-desktop" | null) — no cast needed,
-      // same as selectedTrack above (Track mirror).
-      touchSeedSource: postMutationState.touchSeedSource,
+      decisions,
+      selectedTrack: selectTrack(decisions),
+      identitySupported: deriveIdentityResult(decisions)?.supported ?? true,
+      touchSeedSource: selectTouchSeedSource(decisions),
       allCharactersImplemented,
     });
 

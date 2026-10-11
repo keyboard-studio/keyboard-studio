@@ -3,12 +3,14 @@
     "stepId": "identity",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setIdentityResult",
-      "setSurveyContext",
+      "recordAll",
       "advance"
     ],
     "workingCopyMutations": [
       "recordPhase"
+    ],
+    "decisionMutations": [
+      "recordAll"
     ],
     "navigateTo": []
   },
@@ -16,32 +18,57 @@
     "stepId": "layout",
     "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setBaseConfirmed",
       "setLocalBase",
-      "setBaseConfirmed",
+      "record",
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
     "stepId": "track",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setSelectedTrack",
+      "recordAll",
       "advance"
     ],
     "workingCopyMutations": [
       "recordPhase"
+    ],
+    "decisionMutations": [
+      "recordAll"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "attribution",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "recordAll",
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "recordPhase",
+      "setAttribution"
+    ],
+    "decisionMutations": [
+      "recordAll"
     ],
     "navigateTo": []
   },
@@ -49,13 +76,16 @@
     "stepId": "project_name",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setScaffoldSpec",
+      "recordAll",
       "advance",
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [
-      "setIdentity",
-      "recordPhase"
+      "recordPhase",
+      "setIdentity"
+    ],
+    "decisionMutations": [
+      "recordAll"
     ],
     "navigateTo": []
   },
@@ -63,9 +93,15 @@
     "stepId": "characters/prefill",
     "applyStepCompletion": [],
     "storeMutations": [
+      "record",
+      "record",
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record",
+      "record"
+    ],
     "navigateTo": []
   },
   {
@@ -76,11 +112,15 @@
     ],
     "storeMutations": [
       "advance",
+      "record",
       "advance"
     ],
     "workingCopyMutations": [
       "recordPhase",
       "recordPhase"
+    ],
+    "decisionMutations": [
+      "record"
     ],
     "navigateTo": []
   },
@@ -93,6 +133,7 @@
     "workingCopyMutations": [
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -106,6 +147,7 @@
       "recordPhase",
       "recordPhase"
     ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -114,9 +156,13 @@
       "carve"
     ],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
@@ -126,27 +172,34 @@
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
     "stepId": "rules",
     "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
     "stepId": "mechanisms",
-    "applyStepCompletion": [
-      "mechanisms"
-    ],
+    "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [
       "lockDesktop"
+    ],
+    "decisionMutations": [
+      "record"
     ],
     "navigateTo": []
   },
@@ -154,21 +207,28 @@
     "stepId": "touch_seed_source",
     "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [],
+    "decisionMutations": [
+      "record"
+    ],
     "navigateTo": []
   },
   {
     "stepId": "touch",
-    "applyStepCompletion": [
-      "touch"
-    ],
+    "applyStepCompletion": [],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [
-      "setTouchLayoutJson"
+      "setTouchLayoutJson",
+      "setHistoryEntryState"
+    ],
+    "decisionMutations": [
+      "record"
     ],
     "navigateTo": []
   },
@@ -178,10 +238,14 @@
       "help"
     ],
     "storeMutations": [
+      "record",
       "advance"
     ],
     "workingCopyMutations": [
       "recordPhase"
+    ],
+    "decisionMutations": [
+      "record"
     ],
     "navigateTo": [
       "output"

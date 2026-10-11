@@ -2,7 +2,7 @@
 // button per callback so a test can click through the wizard; the rest are
 // inert.
 
-import { fakeIdentity, fakePhaseResult } from "./fakes.ts";
+import { fakeIdentity, fakeIdentityPhaseResult, fakePhaseResult } from "./fakes.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 export function IdentityLite({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) {
@@ -10,7 +10,7 @@ export function IdentityLite({ onComplete }: { onComplete: (result: unknown, ide
   usePublishStepNav({
     forward: {
       label: "survey-advance",
-      onClick: () => onComplete(fakePhaseResult, fakeIdentity),
+      onClick: () => onComplete(fakeIdentityPhaseResult, fakeIdentity),
       testId: "survey-advance",
     },
   });

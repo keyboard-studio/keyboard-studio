@@ -113,9 +113,20 @@ module.exports = {
         'Forbidden: decisions/ -> dashboard/, editors/, stores/, components/ ' +
         '(the trail components read no store — the record is passed down from StudioShell, ' +
         'same as completenessReport; recording reaches the reducer via an injected ' +
-        'ReducerDeps.recordDecision, not by reaching into stores/ or editors/ directly).',
+        'ReducerDeps.recordDecision, not by reaching into stores/ or editors/ directly). ' +
+        'EXEMPTION (spec 093 final pass, lead ruling — option (a), followups.md): the three ' +
+        'named store-wiring halves — decisions/liveExtraction.ts, decisions/rebuildWorkingCopy.ts, ' +
+        'decisions/rebuildPerf.measure.ts — are exempt from the stores/ ban. The principle: this ' +
+        'rule guards the PURE CORE (ordering, closure, replay, the decision types); a wiring half ' +
+        'imports its stores by definition — it is the seam where the pure core meets the live ' +
+        'stores, and there is nowhere else for that import to live. Core modules are never ' +
+        'exempted: a store import appearing in any other decisions/ module is a violation.',
       severity: 'error',
-      from: { path: '^packages/studio/src/decisions/' },
+      from: {
+        path: '^packages/studio/src/decisions/',
+        pathNot:
+          '^packages/studio/src/decisions/(liveExtraction|rebuildWorkingCopy|rebuildPerf\\.measure)\\.ts$',
+      },
       to:   { path: '^packages/studio/src/(dashboard|editors|stores|components)/' },
     },
     {
@@ -132,6 +143,21 @@ module.exports = {
       severity: 'error',
       from: { path: '^packages/studio/src/survey/questions/' },
       to:   { path: '^packages/studio/src/(stores|editors|lib)/' },
+    },
+    {
+      name: 'gallery-modules-no-store-writes',
+      comment:
+        'Spec 090 FR-003 layer 1: gallery decision modules (survey/questions/gallery/) ' +
+        'are pure descriptors — provides/requires, a typed apply returning a patch, and ' +
+        'a renderer that receives its decision value via props and reports changes via ' +
+        'onChange. They must not import any store: the gallery host (steps/galleryHost.tsx) ' +
+        'is the only write path for a gallery decision. (The broader ' +
+        'question-modules-no-bypass-mutate-seam rule already forbids stores/ for all of ' +
+        'survey/questions/; this rule names the gallery invariant so a future relaxation ' +
+        'of the broad rule cannot silently reopen it.)',
+      severity: 'error',
+      from: { path: '^packages/studio/src/survey/questions/gallery/' },
+      to:   { path: '^packages/studio/src/stores/' },
     },
     {
       name: 'renderer-no-direct-editor-import',

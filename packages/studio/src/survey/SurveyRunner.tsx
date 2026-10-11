@@ -43,6 +43,9 @@ import {
 } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore, type SavedAnswer } from "../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { runLiveExtractionFromStores } from "../decisions/liveExtraction.ts";
+import { questionRegistry } from "./questions/registry.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import {
   surveyCard,
@@ -377,6 +380,19 @@ export interface SurveyRunnerProps {
   resumeAnswers?: Readonly<Record<string, string | string[]>>;
 }
 
+/** The contracts proposal-source union, for pass-through of lookup sources. */
+const PROPOSAL_SOURCES: ReadonlySet<string> = new Set([
+  "langtags",
+  "cldr",
+  "corpus",
+  "axis-fill",
+  "base",
+  "identity",
+  "region",
+  "derived-from-axis",
+  "analysis",
+]);
+
 export function SurveyRunner({
   flow,
   context = {},
@@ -413,10 +429,99 @@ export function SurveyRunner({
   const getSeedSourceRef = useRef(getSeedSource);
   getSeedSourceRef.current = getSeedSource;
 
+  // Spec 092 (T031, FR-003): decision records are the runner's first seed
+  // source. A record the extraction pass seeded (provenance extracted /
+  // default) IS the question's seed — value from the record, the source
+  // label rendered from the record (see recordProvenanceCaption below) —
+  // so a converted step needs no per-step seed callbacks at all. Hosts
+  // whose seeders are not yet converted keep working through the prop
+  // fallback in callerProposal.
+  function recordForQuestion(questionId: string) {
+    const mod = questionRegistry[questionId];
+    const decisionId = mod?.provides?.[0];
+    if (decisionId === undefined) return undefined;
+    return useDecisionStore.getState().decisions[decisionId];
+  }
+
+  function recordProposal(questionId: string): SeedProposal | undefined {
+    let record = recordForQuestion(questionId);
+    if (record === undefined) {
+      // Spec 092 (G-9): a gate that opens only after setup — e.g.
+      // pf_more_detail_gate answered "Yes" during the Phase F step itself —
+      // can make a module's extract/lookup default applicable only now.
+      // The setup pass skipped it (gated off against the pre-pass set, the
+      // demo runner's semantics); re-running the idempotent pass here,
+      // at question-push time, materialises its record so the seed and
+      // its caption arrive exactly as if the gate had been open at setup.
+      const mod = questionRegistry[questionId];
+      if (mod !== undefined && (mod.extract !== undefined || mod.lookupDefault !== undefined)) {
+        try {
+          runLiveExtractionFromStores();
+        } catch (err) {
+          devLog.error(
+            "[live-extraction] question-push pass re-run failed:",
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+        record = recordForQuestion(questionId);
+      }
+    }
+    if (record === undefined) return undefined;
+    if (record.provenance !== "extracted" && record.provenance !== "default") {
+      return undefined;
+    }
+    const value = record.value;
+    if (typeof value !== "string" && !Array.isArray(value)) return undefined;
+    // The record's free-form source names a keyboard id for extractions,
+    // which the contracts proposal-source union does not carry; the label
+    // rides the caption channel instead. Lookup sources that ARE in the
+    // union ("langtags", "identity", "base", "analysis", …) pass through
+    // so the committed answer's record keeps naming them.
+    const source = record.source;
+    return source !== undefined && PROPOSAL_SOURCES.has(source)
+      ? { value, source: source as DecisionProposalSource }
+      : { value };
+  }
+
+  // Spec 092 (T031): the record-driven provenance caption. An extracted
+  // seed names its source ("from <keyboard id>", the demo's rendering);
+  // an answered record with an `offered` value shows the offer beside the
+  // author's answer, sourced from the base-keyboard record. Lookup-default
+  // captions stay with the adapters that own their wording (e.g. the
+  // langtags caption), via getSeedProvenance.
+  function recordProvenanceCaption(questionId: string): string | undefined {
+    const record = recordForQuestion(questionId);
+    if (record === undefined) return undefined;
+    if (record.provenance === "extracted") {
+      return record.source !== undefined ? `from ${record.source}` : undefined;
+    }
+    if (record.provenance === "default" && record.source === "langtags") {
+      // The shared langtags caption (spec 030 FR-010) — the same message
+      // IdentityLite's seeder rendered, now keyed off the record.
+      return t({
+        id: "survey.identityLite.langtagsCaption",
+        message: "Suggested from langtags — edit if needed",
+      });
+    }
+    if (record.provenance === "asked" && record.offered !== undefined) {
+      const base = useDecisionStore.getState().decisions["base-keyboard"]?.value as
+        | { id?: unknown }
+        | undefined;
+      const baseId = typeof base?.id === "string" ? base.id : undefined;
+      if (baseId === undefined) return undefined;
+      return typeof record.offered === "string"
+        ? `from ${baseId}: ${record.offered}`
+        : `from ${baseId}`;
+    }
+    return undefined;
+  }
+
   // The caller's seed for a question, as the proposal its entry carries. Only a
   // caller seed is a proposal: a debug pin is a test convenience, not something
   // the studio suggested.
   function callerProposal(questionId: string): SeedProposal | undefined {
+    const fromRecord = recordProposal(questionId);
+    if (fromRecord !== undefined) return fromRecord;
     const value = getSeedValueRef.current?.(questionId);
     if (value === undefined) return undefined;
     const source = getSeedSourceRef.current?.(questionId);
@@ -1140,7 +1245,8 @@ export function SurveyRunner({
             );
           }
           const provenance = getSeedProvenanceRef.current?.(currentQId);
-          if (provenance === undefined) return null;
+          const caption = provenance?.caption ?? recordProvenanceCaption(currentQId);
+          if (caption === undefined) return null;
           return (
             <p
               aria-live="polite"
@@ -1152,7 +1258,7 @@ export function SurveyRunner({
                 lineHeight: 1.5,
               }}
             >
-              {provenance.caption}
+              {caption}
             </p>
           );
         })()}

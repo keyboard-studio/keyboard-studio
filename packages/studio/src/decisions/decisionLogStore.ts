@@ -20,7 +20,7 @@
 // linear history rather than five siblings all claiming to replace the original.
 //
 // No persistence of its own — draftPersistence.ts snapshots and rehydrates this
-// store, the same arrangement phaseBDraftStore.ts has.
+// store, the same arrangement the decision store has.
 
 import { create } from "zustand";
 import {
@@ -35,6 +35,8 @@ import {
   type DecisionRecord,
 } from "@keyboard-studio/contracts";
 import { normalizeDecisionRecord } from "@keyboard-studio/engine";
+import { questionRegistry } from "../survey/questions/registry.ts";
+import { deepEqual } from "./deepEqual.ts";
 
 /**
  * A decision to record. The store owns `entryId`, `recordedAt`, and `supersedes`
@@ -137,17 +139,38 @@ const SLOT_DELIMITER = "\u0000";
  * The "slot" a decision occupies, for deciding whether a new decision replaces
  * an earlier one.
  *
- * A survey answer's slot is its question within its step; an editor action's is
- * its editor within its step. Two different questions in the same step are two
- * slots and never supersede each other — which is exactly why the slot is not
- * just `stepId`. The single-letter middle part discriminates the payload kinds,
- * so a question and an editor that happen to share an id are still two slots.
+ * A survey answer's slot is its DECISION (spec 088 FR-008, contract C-5):
+ * the question id resolves through the registry's `provides` to the decision
+ * the question answers, and the slot is keyed by that decision id — so the
+ * same decision answered from a different step supersedes, and two different
+ * decisions on one step never do. (Multi-provide questions key by their
+ * first provided id; every entry for the question shares the slot either
+ * way.) A question id that no longer resolves — a migrated orphan, a
+ * question from a newer build — keeps the legacy step-based slot below, so
+ * its history is preserved rather than merged into a wrong decision
+ * (C-5.2). An editor action's slot is its editor within its step. The
+ * single-letter middle part discriminates the payload kinds, so a question
+ * and an editor that happen to share an id are still two slots.
  *
- * The key is compared with `===` and never parsed back apart.
+ * The key is compared with `===` and never parsed back apart — and never
+ * persisted: keys are computed from the live registry on every read, so a
+ * restored record re-keys itself with no stored migration.
  */
 export function slotKeyOf(stepId: string, payload: DecisionPayload): string {
   const d = SLOT_DELIMITER;
-  if (payload.kind === "survey-answer") return `${stepId}${d}q${d}${payload.questionId}`;
+  if (payload.kind === "survey-answer") {
+    const decisionId = questionRegistry[payload.questionId]?.provides?.[0];
+    if (decisionId !== undefined) return `${decisionId}${d}q${d}${decisionId}`;
+    return `${stepId}${d}q${d}${payload.questionId}`;
+  }
+  if (payload.kind === "decision") {
+    // spec 090 US5 (D-090-48): a gallery decision's slot is its DECISION,
+    // keyed exactly like the survey-answer slot above — step-independent, so
+    // the same decision settled from a different step supersedes rather than
+    // duplicating. The "d" discriminator keeps it out of the "q" key space:
+    // a question decision and a gallery decision never share a slot.
+    return `${payload.decisionId}${d}d${d}${payload.decisionId}`;
+  }
   if (payload.kind === "editor-action") return `${stepId}${d}e${d}${payload.actionType}`;
   // base-contribution (specs/055-legible-decision-trail D-11), recorded once at
   // `choose_base` by recordBaseContribution.ts. The slot only needs to exist
@@ -185,6 +208,14 @@ export function payloadsEqual(a: DecisionPayload, b: DecisionPayload): boolean {
       x.sample.length === y.sample.length &&
       x.sample.every((v, i) => v === y.sample[i])
     );
+  }
+  if (a.kind === "decision" && b.kind === "decision") {
+    // The VALUE is the decision (spec 090 US5): deep-compared, since gallery
+    // values are objects/arrays, not the scalar shapes the survey arm
+    // handles. The summary is the host's rendering OF the value, so equal
+    // values are the same decision even if a later build words the summary
+    // differently — the recorded summary stands.
+    return a.decisionId === b.decisionId && deepEqual(a.value, b.value);
   }
   if (a.kind === "base-contribution" && b.kind === "base-contribution") {
     // `startingKeyCount` is optional (absent means "not measured", never a
@@ -268,8 +299,8 @@ function highestSeq(entries: readonly DecisionEntry[]): number {
   return max;
 }
 
-// Monotonic id counter, module-side like phaseBDraftStore's `picks`: it is
-// bookkeeping, not state any component subscribes to.
+// Monotonic id counter, module-side: it is bookkeeping, not state any
+// component subscribes to.
 let seq = 0;
 
 /** Reset the id counter. Exported for tests that assert on exact entry ids. */
@@ -354,7 +385,7 @@ export const useDecisionLogStore = create<DecisionLogState>((set, get) => ({
     // contract §5), regardless of how `record` got here. In the studio's own
     // read path it has already been normalized once, by the engine's
     // `parseDecisionRecord` — `normalizeDecisionRecord` is a no-op there (a
-    // `version >= 2` record passes through by reference). This call is the
+    // current-version record passes through by reference). This call is the
     // defensive second seam: nothing here mutates `record` or writes
     // anything back to storage; it only decides what goes into memory.
     const normalized = normalizeDecisionRecord(record);
@@ -365,7 +396,7 @@ export const useDecisionLogStore = create<DecisionLogState>((set, get) => ({
     set({
       record: {
         format: DECISION_RECORD_FORMAT,
-        // Whatever came in, what goes into memory is v2-shaped —
+        // Whatever came in, what goes into memory is current-shaped —
         // `normalizeDecisionRecord` guarantees that and already tags its
         // result accordingly. `Math.max` is this seam's own restatement of
         // that floor rather than a second opinion about it (see the module

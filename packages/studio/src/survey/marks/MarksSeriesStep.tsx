@@ -32,6 +32,15 @@
 // Editors are pure (Article IV / G2): this component reports completion via
 // onComplete with a SurveyPhaseResult carrying `marksWorklist`; the manifest
 // reducer path (StepHost.handleComplete → recordPhase) owns the session merge.
+//
+// spec 090 T023 (D-090-11): this component is the `marks-treatment` gallery
+// module's renderer. The answer composite, the completion payload and the
+// context-tolerance decision are recorded as the decision value through
+// onChange at the same commit points the decision log is written (each
+// station's Next, and completion); the module's apply runs the mark guards
+// from the recorded completion payload — the retired reducer MARKS handler's
+// commit point. The survey-answer store below remains spec 079's evidence
+// layer (reconcile/flags), untouched.
 
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -62,6 +71,7 @@ import {
   expandCaseCounterpartAttachments,
   expandCaseCounterpartPromotions,
   deriveMarksComputedAxes,
+  detectBaseMarkMechanism,
   promotableCharacters,
   prunePromotions,
   treatmentFor,
@@ -76,9 +86,17 @@ import {
   type PromotedComposedCharacter,
 } from "@keyboard-studio/engine";
 import type { MarkInputOrder } from "@keyboard-studio/contracts";
-import type { EditorStepProps } from "../../steps/types.ts";
+import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
+import {
+  EMPTY_MARKS_VALUE,
+  type MarksCompletion,
+  type MarksTreatmentValue,
+} from "./marksValue.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore, type SavedAnswer } from "../../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../../lib/questionRecorder.ts";
 import {
@@ -110,7 +128,7 @@ import {
   CONTEXT_TOLERANCE_QUESTION_ID,
   CONTEXT_TOLERANCE_SITES_QUESTION_ID,
   SITE_ID_SEPARATOR,
-} from "../../decisions/contextToleranceProposal.ts";
+} from "../../decisions/contextToleranceIds.ts";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -189,9 +207,9 @@ export function classNeedsTreatmentScreen(
 /**
  * The series' phase result: reported on completion (or on the S0 skip). The
  * chosen output form is now a real contract field (SurveyPhaseResult.marksOutputForm,
- * spec 071) — the reducer (steps/reducer.ts MarksCompleteResult) still reads
- * it off this result to decide whether to generate stepwise backspace-unwrap
- * stores; carve's needed-set derivation reads it off the merged session.
+ * spec 071) — the marks-treatment module's apply reads the same payload off
+ * the recorded decision value (spec 090 T023) to run the mark guards; carve's
+ * needed-set derivation reads it off the merged session.
  *
  * spec 079 R-04: `answers` now carries every station's recorded answers (not
  * just the final one) — `decisionLogStore.append`'s identical-value no-op
@@ -256,17 +274,29 @@ const EMPTY_ANSWERS: Record<string, SavedAnswer> = {};
  * as {@link EMPTY_ANSWERS}. */
 const EMPTY_LAST_RECORDED: Record<string, string> = {};
 
-const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
+const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>> = ({
+  value: marksValueProp,
+  onChange: onMarksChange,
+}: DecisionRendererProps<MarksTreatmentValue>) => {
+  const { onComplete, onBack } = useGalleryStepContext();
+  const marksValue = marksValueProp ?? EMPTY_MARKS_VALUE;
   const { t, i18n } = useLingui();
   const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const importedOrder = useWorkingCopyStore((s) => s.session.axes.markInputOrder);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   // spec 078: the context-tolerance analysis (published by the compile gate)
   // and the decision a previous pass through this series recorded.
   const toleranceEnabled = isContextToleranceEnabled();
   const tolerance = useWorkingCopyStore((s) => s.contextTolerance);
-  const priorTolerance = useWorkingCopyStore((s) => s.session.marksContextTolerance);
+  // spec 090 T023: the prior decision's home is the marks-treatment decision
+  // value (the apply hook stamps appliedFingerprint onto the value, not the
+  // phase result, so the session copy can lag it); the session derivation is
+  // the fallback for drafts restored from before the value existed.
+  const sessionPriorTolerance = useWorkingCopyStore((s) => s.session.marksContextTolerance);
+  const priorTolerance =
+    marksValueProp !== undefined ? (marksValue.contextTolerance ?? undefined) : sessionPriorTolerance;
 
   const saveAnswer = useSurveyAnswerStore((s) => s.saveAnswer);
   const setPosition = useSurveyAnswerStore((s) => s.setPosition);
@@ -811,13 +841,18 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   useEffect(() => {
     if (gate.skip && !completedRef.current) {
       completedRef.current = true;
+      // spec 090 T023: the skip is a completion with no payload — record the
+      // empty value when none exists (an existing value, e.g. from a pass
+      // completed before the alphabet lost its marks, is left untouched,
+      // exactly as the retired reducer MARKS handler left the IR untouched).
+      if (marksValueProp === undefined) onMarksChange(EMPTY_MARKS_VALUE);
       if (useSurveySessionStore.getState().lastNavigation === "pop" && onBack !== undefined) {
         onBack();
       } else {
         onComplete(seriesResult());
       }
     }
-  }, [gate.skip, onComplete, onBack]);
+  }, [gate.skip, onComplete, onBack, marksValueProp, onMarksChange]);
 
   if (gate.skip) return null;
   // No visible station at all is not expected once the gate is open (marks
@@ -926,7 +961,48 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     // spec 079 R-04: every station's answers, not only the final one — the
     // decision log already no-ops on an identical repeat.
     const answers = visibleStations.flatMap((stationId) => answersForStation(stationId));
-    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, resolvedToleranceDecision(toleranceOverride)));
+    const toleranceDecision = resolvedToleranceDecision(toleranceOverride);
+    // The value mirrors the session merge's last-wins semantics for the
+    // tolerance decision (contracts: mergePhaseResults keeps the prior
+    // decision when a result carries none): a completion reporting no
+    // decision preserves the value's existing one rather than clearing
+    // it — clearing would make the apply hook remove a fix the session
+    // still considers decided.
+    const effectiveTolerance = toleranceDecision ?? priorTolerance ?? null;
+    // spec 090 T023 (D-090-11): record the completion payload in the
+    // decision value BEFORE reporting completion — the gallery host runs
+    // the module's apply (the mark guards) as part of the record, at the
+    // same commit point the retired reducer MARKS handler ran them. The
+    // R10 migration determination reads the pre-guard working IR here,
+    // the exact input the reducer read; MarksStepHost mirrors it into
+    // the session (apply has no session channel).
+    const workingIr = useWorkingCopyStore.getState().ir;
+    const migrationNeeded =
+      outputForm === "base-plus-mark" &&
+      workingIr !== null &&
+      detectBaseMarkMechanism(workingIr) === "precomposed";
+    recordValue(answers, { worklist, outputForm, migrationNeeded }, effectiveTolerance);
+    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision));
+  }
+
+  /**
+   * Record the marks-treatment decision value (spec 090 T023): the answer
+   * composite in record form, the completion payload (null unless the
+   * series is completing — an answer record after a completion therefore
+   * clears it, so a stale payload can never re-apply), and the
+   * context-tolerance decision the value currently carries.
+   */
+  function recordValue(
+    stationAnswers: SurveyAnswer[],
+    completion: MarksCompletion | null,
+    tolerance: MarksContextToleranceDecision | null,
+  ): void {
+    const answers: Record<string, string | string[] | boolean | undefined> = {};
+    for (const a of stationAnswers) answers[a.questionId] = a.value;
+    if (tolerance !== null) {
+      for (const a of contextToleranceAnswers(tolerance)) answers[a.questionId] = a.value;
+    }
+    onMarksChange({ answers, completion, contextTolerance: tolerance });
   }
 
   /**
@@ -1083,6 +1159,15 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       // The final station's answers ride step completion instead (R-05), so
       // the mark-guards keyboard effect and the decision capture land together.
       recordScreen(activeStation, answersForStation(activeStation));
+      // spec 090 T023: the decision value tracks the answer composite at
+      // the same commit point, with no completion payload — including
+      // after a completed pass, where this record is what clears the
+      // stale completion (D-090-11).
+      recordValue(
+        visibleStations.flatMap((stationId) => answersForStation(stationId)),
+        null,
+        priorTolerance ?? null,
+      );
       setPosition(STEP_ID, visibleStations[nextIndex]!);
     } else {
       // Stamp the final station as the position before completing, so the

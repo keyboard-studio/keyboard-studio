@@ -33,6 +33,8 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { currentRuleSetValue } from "./ruleSetValue.ts";
 import { isExcludedScript } from "../../lib/excludedScriptFamilies.ts";
 import { UnsupportedScriptStub } from "../../components/UnsupportedScriptStub.tsx";
 import { DemoPane } from "../../components/rules/DemoPane.tsx";
@@ -47,12 +49,20 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
   const { t } = useLingui();
   const script = useWorkingCopyStore((s) => s.baseKeyboard?.script);
 
-  // Galleries' convention: the step's result lives in the working copy, so
-  // completion carries no answer payload. Guarded against double-clicks.
+  // The step's result lives in the working copy, so completion carries
+  // no answer payload. Guarded against double-clicks. Spec 090 T034:
+  // completion also records the `rule-set` decision — the derived
+  // builder result — so the step leaves a decision (and, per US5, a
+  // log entry) instead of discarding its result at onComplete.
   const completedRef = useRef(false);
   const complete = () => {
     if (completedRef.current) return;
     completedRef.current = true;
+    useDecisionStore.getState().record({
+      id: "rule-set",
+      value: currentRuleSetValue(),
+      provenance: "asked",
+    });
     onComplete(undefined);
   };
 

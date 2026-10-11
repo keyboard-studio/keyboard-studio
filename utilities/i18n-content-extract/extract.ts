@@ -158,7 +158,7 @@ export function extractCriteriaStrings(): ContentCatalog {
  * `options[].label`, `options[].note` (spec 050 research.md D4; `audit_label`
  * per spec 055 contracts/catalog-audit-label.contract.md §2). Read only from
  * `mod.definition` of every LIVE module (identity-lite, B, F incl. the demoted tip
- * slots, and the G flows) —
+ * slots, and the G flows incl. the post-track attribution flow added by #1901) —
  * `mod.fixtures` (test vectors) and every control field (id, type, required,
  * next, options_source, engine_resolved, advisory, option.value) are never
  * read. `option.note` is rendered prose, not control: RadioField paints it as
@@ -176,6 +176,7 @@ export function extractFlowQuestionStrings(): ContentCatalog {
     ...flowModules.phase_f_helpdocs,
     ...demotedPhaseFModules,
     ...flowModules.track,
+    ...flowModules.attribution,
     ...flowModules.project_name,
   ];
 

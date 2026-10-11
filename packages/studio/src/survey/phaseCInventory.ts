@@ -16,12 +16,13 @@
 // fall into the unrendered `controls` bucket (FR-014).
 
 import { parseUPlusNotation } from "@keyboard-studio/contracts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { getInvisiblesInventoryValue, getCharacterInventoryValue } from "./useInventoryDraft.ts";
+import { invisibleDecisionsOf } from "./phaseBDraftOps.ts";
 import { nfcDedup } from "./charNormUtils.ts";
 
 /** The characters of every `"accepted"` invisible decision, in insertion order. */
 export function acceptedInvisibleChars(): string[] {
-  const decisions = usePhaseBDraftStore.getState().invisibleDecisions;
+  const decisions = invisibleDecisionsOf(getInvisiblesInventoryValue());
   const out: string[] = [];
   for (const [notation, decision] of Object.entries(decisions)) {
     if (decision !== "accepted") continue;
@@ -38,6 +39,6 @@ export function acceptedInvisibleChars(): string[] {
  * invisible characters — what every phase-C inventory emitter reports.
  */
 export function phaseCConfirmedInventory(): string[] {
-  const s = usePhaseBDraftStore.getState();
+  const s = getCharacterInventoryValue();
   return nfcDedup([], [...s.punctuation, ...acceptedInvisibleChars()]);
 }

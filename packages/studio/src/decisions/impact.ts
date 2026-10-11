@@ -15,15 +15,17 @@
 //      disagreement SC-005 forbids.
 //
 //   2. A COUNTERFACTUAL, for a survey answer with no stored capture: re-run the
-//      question module's pure `mutate(value, ctx)` against the pre-decision IR and
-//      diff the two emitted texts. The mutate seam is the declared write path, so
-//      re-running it is "the same process" in FR-009's sense.
+//      question module's pure `apply(value, ctx)` against the pre-decision IR and
+//      diff the two emitted texts. The apply seam is the declared write path
+//      (spec 089), so re-running it is "the same process" in FR-009's sense.
+//      Only the patch's `ir` channel participates — the counterfactual is an
+//      IR diff.
 //
 // AND A LIMITATION STATED OUT LOUD
 //
-// `flags/mutateFlag.ts` documents the mutate seam as OFF by default and roughly
-// half-complete. So in a shipped build, path 2 mostly does not fire and those
-// entries report `"no-rederivable-write-path"` instead. That is the honest answer
+// Path 2 fires only for modules that declare BOTH `apply` and a non-empty
+// `writes` set (today: the IR-writing modules). Every other survey entry
+// reports `"no-rederivable-write-path"` instead. That is the honest answer
 // — the studio genuinely cannot isolate the change — and it is why FR-011 exists
 // at all. What it must never do is render an empty diff as though the decision had
 // done nothing (research D-05); `"none"` and `"unavailable"` are different states
@@ -36,7 +38,6 @@ import type {
   KeyboardIR,
 } from "@keyboard-studio/contracts";
 import { diffLines, diffMagnitude, emitKmn } from "@keyboard-studio/engine";
-import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -88,7 +89,8 @@ function isBehindPassedLock(entry: DecisionEntry, deps: ResolveImpactDeps): bool
 }
 
 /**
- * Derive one entry's counterfactual by re-running its question module's `mutate`.
+ * Derive one entry's counterfactual by re-running its question module's
+ * `apply` and taking the returned patch's `ir` channel.
  *
  * Returns `null` when it cannot be derived, leaving the caller to report the
  * reason — this function never invents an impact.
@@ -98,11 +100,10 @@ function deriveCounterfactual(
   value: string | string[] | undefined,
   deps: ResolveImpactDeps,
 ): DecisionImpact | null {
-  if (!isMutateSeamEnabled()) return null;
   if (entry.payload.kind !== "survey-answer") return null;
 
   const mod = questionRegistry[entry.payload.questionId];
-  if (mod?.mutate === undefined) return null;
+  if (mod?.apply === undefined) return null;
   const writes = mod.writes ?? [];
   if (writes.length === 0) return null;
 
@@ -110,8 +111,12 @@ function deriveCounterfactual(
   if (base === null) return null;
 
   try {
-    const patch = mod.mutate(value, { ir: base, writes });
-    const next = applyMutatePatch(base, patch, writes);
+    // The decision set is empty BY CONSTRUCTION here: the `writes` gate
+    // above restricts this path to IR-writing modules, whose applies are
+    // value+IR driven and never read ctx.decisions. If an apply ever does
+    // both, ResolveImpactDeps grows a decisions getter — do not fake one.
+    const patch = mod.apply(value, { decisions: {}, ir: base, writes, currentHistoryEntryState: null });
+    const next = applyMutatePatch(base, patch.ir ?? {}, writes);
     // Emit BOTH sides through the codec so the comparison is like-for-like. The
     // absolute text is not what is shown — the difference is — so emitting the
     // pre-decision IR here rather than reusing the shipped text is correct: both
@@ -132,7 +137,7 @@ function deriveCounterfactual(
       magnitude,
     };
   } catch {
-    // A rejected patch (out-of-`writes` containment) or a throwing `mutate` is a
+    // A rejected patch (out-of-`writes` containment) or a throwing `apply` is a
     // failure to derive, not an impact of `none`.
     return null;
   }
@@ -165,7 +170,7 @@ export function resolveImpact(
     requestedValue !== undefined
       ? requestedValue
       : entry.payload.kind === "survey-answer"
-        ? // `boolean` answers have no `mutate` counterpart in the seam's
+        ? // `boolean` answers have no counterpart in apply's
           // string|string[] value space; they resolve to unavailable below rather
           // than being coerced into a value the module never expects.
           (typeof entry.payload.value === "boolean" ? undefined : entry.payload.value)
@@ -189,7 +194,7 @@ export function resolveImpact(
 //
 // `resolveImpact` above is unchanged and still the whole answer for a stored
 // capture. What it could not do is attribute a decision recorded BEFORE a working
-// copy existed: the identity questions have no `mutate()`, so they fell to
+// copy existed: the identity questions declare no IR `apply()`, so they fell to
 // `"no-rederivable-write-path"` — which was true until spec 059 gave their answers
 // a write path into the package descriptor, and false afterwards.
 //

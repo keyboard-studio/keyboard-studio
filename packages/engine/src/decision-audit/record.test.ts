@@ -67,6 +67,24 @@ function recordOf(...entries: DecisionEntry[]): DecisionRecord {
   return { ...makeEmptyDecisionRecord("hausa_std"), entries };
 }
 
+/** A spec-090 `decision` entry: a gallery decision's value + host summary. */
+function decisionEntry(overrides: Partial<DecisionEntry> = {}): DecisionEntry {
+  return {
+    entryId: "d3",
+    stepId: "rules",
+    payload: {
+      kind: "decision",
+      decisionId: "rule-set",
+      value: { additions: [{ id: "r1" }, { id: "r2" }] },
+      summary: "Rule set: 2 items",
+    },
+    provenance: { agency: "hand-set" },
+    recordedAt: 1_700_000_002_000,
+    supersedes: null,
+    ...overrides,
+  };
+}
+
 describe("serializeDecisionRecord", () => {
   it("round-trips a record through serialize → parse", () => {
     const record = recordOf(surveyEntry(), editorEntry());
@@ -74,6 +92,49 @@ describe("serializeDecisionRecord", () => {
     expect(result.unreadable).toBe(false);
     expect(result.droppedCount).toBe(0);
     expect(result.record).toEqual(record);
+  });
+
+  it("round-trips a decision entry (spec 090 US5): value and summary intact", () => {
+    const record = recordOf(decisionEntry());
+    const result = parseDecisionRecord(serializeDecisionRecord(record));
+    expect(result.unreadable).toBe(false);
+    expect(result.droppedCount).toBe(0);
+    expect(result.record).toEqual(record);
+  });
+
+  it("reads a v2 record's entries unchanged and re-tags it current (spec 090 US5)", () => {
+    // The v2 -> v3 stage is tag-only: a v2 record contains no decision
+    // entries and needs none invented, and its editor counts — genuinely
+    // measured under v2 — must survive the read (FR-005a).
+    const v2 = {
+      format: DECISION_RECORD_FORMAT,
+      version: 2,
+      keyboardId: "hausa_std",
+      entries: [surveyEntry(), editorEntry()],
+      truncated: null,
+    };
+    const result = parseDecisionRecord(JSON.stringify(v2));
+    expect(result.unreadable).toBe(false);
+    expect(result.droppedCount).toBe(0);
+    expect(result.record.version).toBe(DECISION_RECORD_VERSION);
+    expect(result.record.entries).toEqual(v2.entries);
+  });
+
+  it("drops a decision entry whose summary exceeds the bound, keeping siblings", () => {
+    const oversized = decisionEntry({
+      entryId: "d4",
+      payload: {
+        kind: "decision",
+        decisionId: "rule-set",
+        value: {},
+        summary: "x".repeat(201),
+      },
+    });
+    const result = parseDecisionRecord(
+      serializeDecisionRecord(recordOf(decisionEntry(), oversized)),
+    );
+    expect(result.record.entries.map((e) => e.entryId)).toEqual(["d3"]);
+    expect(result.droppedCount).toBe(1);
   });
 
   it("is byte-identical for equal input regardless of key insertion order", () => {

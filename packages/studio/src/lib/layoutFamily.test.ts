@@ -6,8 +6,8 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import {
-  HOST_LAYOUT_ANSWER_ID,
   LAYOUT_FAMILY_ANSWER_ID,
   LAYOUT_FAMILY_STEP_ID,
   REFERENCE_HOSTS,
@@ -15,14 +15,24 @@ import {
   getPickedWindowsLayout,
   resolveLikelyHostLayouts,
   saveLayoutFamilyAnswer,
-  savePickedWindowsLayout,
   setLikelyHostDeps,
 } from "./layoutFamily.ts";
 import type { LikelyHostDeps } from "./layoutFamily.ts";
 import { WINDOWS_LAYOUTS } from "./windowsLayouts.ts";
 
+/** Record a layout pick the way the gallery host does (spec 090 T011). */
+function pickWindowsLayout(layoutId: string): void {
+  useDecisionStore.getState().record({
+    id: "windows-layout",
+    value: { layoutId, origin: "confirmed" },
+    provenance: "asked",
+    step: "layout",
+  });
+}
+
 beforeEach(() => {
   useSurveyAnswerStore.getState().reset();
+  useDecisionStore.getState().reset();
   setLikelyHostDeps(undefined);
 });
 
@@ -139,27 +149,27 @@ describe("resolveLikelyHostLayouts — real T011 default path", () => {
 // spec 076 A4 - the community-layout step's picked layout
 // ---------------------------------------------------------------------------
 
-describe("picked Windows layout (host_layout answer)", () => {
-  it("persists the catalog id under step layout / answer host_layout", () => {
-    savePickedWindowsLayout("basic_kbdfr");
-    const saved = useSurveyAnswerStore.getState().steps[LAYOUT_FAMILY_STEP_ID]?.answers[HOST_LAYOUT_ANSWER_ID];
-    expect(saved?.value).toBe("basic_kbdfr");
+describe("picked Windows layout (windows-layout decision, spec 090 T011)", () => {
+  it("resolves the catalog layout from the recorded decision", () => {
+    pickWindowsLayout("basic_kbdfr");
+    const record = useDecisionStore.getState().decisions["windows-layout"];
+    expect(record?.value).toEqual({ layoutId: "basic_kbdfr", origin: "confirmed" });
     expect(getPickedWindowsLayout()?.id).toBe("basic_kbdfr");
   });
 
   it("ignores an id that is not in the catalog", () => {
-    savePickedWindowsLayout("basic_kbd_nonexistent");
+    pickWindowsLayout("basic_kbd_nonexistent");
     expect(getPickedWindowsLayout()).toBeUndefined();
   });
 
   it("derives the family from the pick", () => {
-    savePickedWindowsLayout("basic_kbdgr");
+    pickWindowsLayout("basic_kbdgr");
     expect(getLayoutFamilyAnswer()).toBe("qwertz");
   });
 
   it("the pick wins over a legacy stored layout_family answer", () => {
     saveLayoutFamilyAnswer("qwertz");
-    savePickedWindowsLayout("basic_kbdfr");
+    pickWindowsLayout("basic_kbdfr");
     expect(getLayoutFamilyAnswer()).toBe("azerty");
   });
 
@@ -172,7 +182,7 @@ describe("picked Windows layout (host_layout answer)", () => {
   it("an other-family pick contributes no family (falls through to bcp47)", () => {
     const other = WINDOWS_LAYOUTS.find((l) => l.family === "other");
     expect(other).toBeDefined();
-    savePickedWindowsLayout(other!.id);
+    pickWindowsLayout(other!.id);
     expect(getLayoutFamilyAnswer()).toBeUndefined();
   });
 });

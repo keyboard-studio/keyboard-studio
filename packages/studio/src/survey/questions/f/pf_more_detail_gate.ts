@@ -57,5 +57,17 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], provides: ["help-more-detail"] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [],
+  provides: ["help-more-detail"],
+  // Spec 092 (T036): the gate's "No" is a plain lookup default (no data
+  // stands behind it, so no source), replacing the PHASE_F_SEEDS table
+  // entry. Choice questions open with a defensible default so none is
+  // left blank; the author can overturn it.
+  lookupDefault: () => ({ value: "false" }),
+};
 export default mod;

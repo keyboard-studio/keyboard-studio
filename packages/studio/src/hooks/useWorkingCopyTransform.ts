@@ -82,7 +82,7 @@ import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.t
 import {
   deriveRuleAdditions,
   ruleAdditionsKey as ruleAdditionsMemoKey,
-} from "../lib/ruleAdditions.ts";
+} from "../survey/rules/ruleAdditions.ts";
 
 /** Stable empty default for `liveLayoutOverride.keyEditOps` when the option
  * (or the whole override) is omitted — avoids allocating a fresh empty array
