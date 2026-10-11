@@ -139,31 +139,31 @@ function FallbackReasonLine({ reason }: { reason: FallbackReason }) {
   const { t } = useLingui();
   const text = {
     "no-unicode-entry": t({
-      id: "marks.context_tolerance.step.fallback.reason.no_unicode_entry",
+      id: "marks.contextTolerance.step.fallback.reason.noUnicodeEntry",
       message: "The one-step fix was not offered because this keyboard does not start in Unicode mode.",
     }),
     "opaque-entry": t({
-      id: "marks.context_tolerance.step.fallback.reason.opaque_entry",
+      id: "marks.contextTolerance.step.fallback.reason.opaqueEntry",
       message: "The one-step fix was not offered because this keyboard's first group could not be read in full.",
     }),
     "opaque-output-store": t({
-      id: "marks.context_tolerance.step.fallback.reason.opaque_output_store",
+      id: "marks.contextTolerance.step.fallback.reason.opaqueOutputStore",
       message: "The one-step fix was not offered because some of this keyboard's output characters could not be read in full.",
     }),
     "time-bound": t({
-      id: "marks.context_tolerance.step.fallback.reason.time_bound",
+      id: "marks.contextTolerance.step.fallback.reason.timeBound",
       message: "The one-step fix was not offered because working it out took too long for this keyboard.",
     }),
     "no-alternates": t({
-      id: "marks.context_tolerance.step.fallback.reason.no_alternates",
+      id: "marks.contextTolerance.step.fallback.reason.noAlternates",
       message: "The one-step fix was not offered because this keyboard has no characters that can be written two ways.",
     }),
     "name-collision": t({
-      id: "marks.context_tolerance.step.fallback.reason.name_collision",
+      id: "marks.contextTolerance.step.fallback.reason.nameCollision",
       message: "The one-step fix was not offered because this keyboard already has its own group with the name the fix would use.",
     }),
     "verification-regressed": t({
-      id: "marks.context_tolerance.step.fallback.reason.verification_regressed",
+      id: "marks.contextTolerance.step.fallback.reason.verificationRegressed",
       message: "The one-step fix was not offered because when checked against this keyboard, it did not give the same result as the keyboard's own rules.",
     }),
   }[reason];
@@ -201,7 +201,7 @@ export function ContextToleranceStation({
           {step !== undefined
             ? prior.decision === "accept"
               ? t({
-                  id: "marks.context_tolerance.step.prior.accepted",
+                  id: "marks.contextTolerance.step.prior.accepted",
                   message: "You chose to add the step that converts pasted letters and diacritics to the form this keyboard produces.",
                 })
               : t({
@@ -246,11 +246,11 @@ export function ContextToleranceStation({
           heading={
             <>
               <h3 style={{ margin: 0 }}>
-                <Trans id="marks.context_tolerance.step.heading">Letters and diacritics written in a different form</Trans>
+                <Trans id="marks.contextTolerance.step.heading">Letters and diacritics written in a different form</Trans>
               </h3>
               <p style={mutedParaFlush}>
                 {t({
-                  id: "marks.context_tolerance.step.intro",
+                  id: "marks.contextTolerance.step.intro",
                   message: plural(ruleCount, {
                     one: "Adds # rule. None of your rules change.",
                     other: "Adds # rules. None of your rules change.",
@@ -259,17 +259,17 @@ export function ContextToleranceStation({
               </p>
             </>
           }
-          confirmLabel={<Trans id="marks.context_tolerance.step.action.accept">Add this step</Trans>}
+          confirmLabel={<Trans id="marks.contextTolerance.step.action.accept">Add this step</Trans>}
           cancelLabel={<Trans id="marks.contextTolerance.station.decline">Leave my keyboard as it is</Trans>}
           onConfirm={(confirmed) => onDecide(decisionFromProposal(confirmed, fingerprint))}
           onCancel={() => onDecide(declineDecision(proposal, fingerprint))}
         >
           <h4 style={{ margin: "4px 0 0 0", fontSize: 13 }}>
-            <Trans id="marks.context_tolerance.step.examples.heading">Examples of text it converts</Trans>
+            <Trans id="marks.contextTolerance.step.examples.heading">Examples of text it converts</Trans>
           </h4>
           <NormalizationExamples examples={step.examples} {...(loadNames !== undefined ? { loadNames } : {})} />
           <p style={mutedParaFlush}>
-            <Trans id="marks.context_tolerance.step.disclosure.rewrite">
+            <Trans id="marks.contextTolerance.step.disclosure.rewrite">
               When you type, pasted text next to the cursor is converted if it is a joined or separate form of a letter this keyboard can produce. Other pasted text is left as it is.
             </Trans>
           </p>

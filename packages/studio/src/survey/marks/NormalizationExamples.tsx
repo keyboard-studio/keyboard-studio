@@ -69,7 +69,7 @@ export function NormalizationExamples({ examples, loadNames = defaultLoadNames }
               {glyphs(row.pasted)} → {glyphs(row.result)}
             </span>
             <span style={visuallyHidden}>
-              {t({ id: "marks.context_tolerance.step.examples.row", message: `${pasted} becomes ${result}` })}
+              {t({ id: "marks.contextTolerance.step.examples.row", message: `${pasted} becomes ${result}` })}
             </span>
           </li>
         );
