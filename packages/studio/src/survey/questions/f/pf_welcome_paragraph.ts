@@ -20,7 +20,7 @@ export const definition = {
   // being confusing when it doesn't apply.
   prompt:
     "In 1–3 sentences, what is this keyboard for? If we found a description " +
-    "in the base keyboard, it's already filled in below — keep it, edit it, " +
+    "in the starting keyboard, it's already filled in below — keep it, edit it, " +
     "or replace it.",
   audit_label: "Keyboard description",
   help_text:

@@ -71,7 +71,7 @@ installMechanismGalleryHooks();
 describe("MechanismGallery — no base keyboard", () => {
   it("renders the no-base-selected prompt when selectedBaseKeyboard is null", () => {
     render(<MechanismGallery selectedBaseKeyboard={null} />, { withStepNav: true });
-    expect(screen.getByText(/No base keyboard selected/i)).toBeTruthy();
+    expect(screen.getByText(/No starting keyboard selected/i)).toBeTruthy();
   });
 
   it("does NOT render a status line or Add key button when base is null", () => {

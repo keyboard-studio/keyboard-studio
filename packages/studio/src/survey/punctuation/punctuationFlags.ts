@@ -46,7 +46,7 @@ export function derivePunctuationFlags(
       screenId: PUNCTUATION_STEP_ID,
       reason: {
         code: "evidence-added",
-        subject: "your language or base keyboard",
+        subject: "your language or starting keyboard",
         sourceStepId: PUNCTUATION_STEP_ID,
       },
     },

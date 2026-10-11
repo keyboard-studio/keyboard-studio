@@ -488,7 +488,7 @@ function renderOutputWithBasePicked() {
 
 function getIdentityStatusRegion() {
   const regions = screen.getAllByRole("status");
-  const el = regions.find((e) => e.textContent?.includes("base id"));
+  const el = regions.find((e) => e.textContent?.includes("copied keyboard"));
   expect(el).toBeTruthy();
   return el!;
 }

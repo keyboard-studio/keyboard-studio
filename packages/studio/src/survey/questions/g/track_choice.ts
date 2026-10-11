@@ -20,7 +20,7 @@ export const definition = {
   prompt: "How do you want to work with {{base_name}}?",
   audit_label: "Authoring approach",
   help_text:
-    "Choose how you want to use this base keyboard. " +
+    "Choose how you want to use this starting keyboard. " +
     "Copy creates an independent new keyboard you can fully rename and own. " +
     "Adapt lets you modify the existing keyboard keeping its name and ID.",
   required: true,

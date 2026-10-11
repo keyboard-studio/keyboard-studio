@@ -181,7 +181,7 @@ describe("BaseResolution — Back in every render state (spec 081 FR-015)", () =
     listAllOverride.current = () => new Promise<BaseKeyboard[]>(() => {});
     const onBack = vi.fn();
     renderControlled({ onBack });
-    expect(screen.getByText("Loading base keyboards...")).toBeTruthy();
+    expect(screen.getByText("Loading starting keyboards...")).toBeTruthy();
     expectWorkingBack(onBack);
   });
 
@@ -189,7 +189,7 @@ describe("BaseResolution — Back in every render state (spec 081 FR-015)", () =
     listAllOverride.current = () => Promise.reject(new Error("offline"));
     const onBack = vi.fn();
     renderControlled({ onBack });
-    await waitFor(() => screen.getByText("Could not load base keyboards."));
+    await waitFor(() => screen.getByText("Could not load starting keyboards."));
     expectWorkingBack(onBack);
   });
 
@@ -197,7 +197,7 @@ describe("BaseResolution — Back in every render state (spec 081 FR-015)", () =
     listAllOverride.current = () => Promise.resolve([]);
     const onBack = vi.fn();
     renderControlled({ onBack });
-    await waitFor(() => screen.getByText(/No base keyboards found/));
+    await waitFor(() => screen.getByText(/No starting keyboards found/));
     expectWorkingBack(onBack);
   });
 

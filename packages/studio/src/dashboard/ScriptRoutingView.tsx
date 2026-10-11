@@ -161,11 +161,11 @@ export function ScriptRoutingView({ flow }: ScriptRoutingViewProps) {
           lineHeight: 1.5,
         }}
       >
-        <Trans id="dashboard.scriptRouting.azerty.note">
+        <Trans id="dashboard.scriptRouting.azerty.startingNote">
           <strong style={{ color: COLORS.gray.text }}>Where AZERTY comes from.</strong> AZERTY is the third §9
           routing group but is <em>not</em> derivable from the script — every Latin script above starts as{" "}
-          <code style={{ fontFamily: MONO }}>{"qwerty-qwertz"}</code>. AZERTY is a base-layout refinement
-          resolved <strong>after</strong> the author picks a base, from that base&rsquo;s structural shape (see{" "}
+          <code style={{ fontFamily: MONO }}>{"qwerty-qwertz"}</code>. AZERTY is a refinement of the starting layout
+          resolved <strong>after</strong> the author picks a starting keyboard, from that keyboard&rsquo;s structural shape (see{" "}
           <code style={{ fontFamily: MONO }}>{"lib/scriptAxes.ts"}</code> —{" "}
           <code style={{ fontFamily: MONO }}>{"RoutingGroup"}</code>{" "}
           vs <code style={{ fontFamily: MONO }}>{"ScriptRoutingGroup"}</code>). That is why it has no row here.

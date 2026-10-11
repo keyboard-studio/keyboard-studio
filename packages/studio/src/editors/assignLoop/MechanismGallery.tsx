@@ -3759,8 +3759,8 @@ export function MechanismGallery({
       <GalleryEmptyState
         {...(onBack !== undefined ? { onBack } : {})}
         message={
-          <Trans id="editor.assignLoop.noBaseKeyboardSelected">
-            No base keyboard selected. Go back to choose a starting point.
+          <Trans id="editor.assignLoop.noStartingKeyboardSelected">
+            No starting keyboard selected. Go back to choose a starting point.
           </Trans>
         }
       />
@@ -3801,10 +3801,10 @@ export function MechanismGallery({
           message: "Welcome to the Mechanism Gallery",
         })}
         body={
-          <Trans id="editor.assignLoop.intro.body">
+          <Trans id="editor.assignLoop.intro.startingBody">
             This is where you build your keyboard. For each character your
-            language needs that the base layout doesn&rsquo;t already have,
-            you&rsquo;ll choose how to type it on a physical (desktop) keyboard.
+            language needs that the starting keyboard doesn&rsquo;t already have,
+            you&rsquo;ll choose how to type it on a desktop keyboard.
           </Trans>
         }
         bullets={[
@@ -4660,8 +4660,8 @@ export function MechanismGallery({
                 <div
                   role="group"
                   aria-label={t({
-                    id: "editor.assignLoop.existingMethodsGroupAriaLabel",
-                    message: "Existing methods from the base keyboard",
+                    id: "editor.assignLoop.startingMethodsGroupAriaLabel",
+                    message: "Existing methods from the starting keyboard",
                   })}
                   style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
                 >

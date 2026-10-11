@@ -9,7 +9,7 @@ export const definition = {
   help_text:
     "The grid shows characters common in your script, with characters your " +
     "language is known to use highlighted at the top. Tick each one you need. " +
-    "Characters your base keyboard already produces are shown greyed out -- " +
+    "Characters your starting keyboard already produces are shown greyed out -- " +
     "you can still tick them if you want to confirm them explicitly. When " +
     "done, click Continue. You can combine this with the step-by-step " +
     "questions to catch anything the grid did not include.",

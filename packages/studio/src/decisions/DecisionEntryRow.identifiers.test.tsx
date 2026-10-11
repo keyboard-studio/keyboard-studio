@@ -174,7 +174,7 @@ describe("survey agencies (FR-008/FR-009) — questionId never renders raw", () 
     const text = renderRow(entry);
     assertNoIdentifierLeak(text, [questionId, stepId]);
     expect(text).toMatch(/Language name \(English\)/);
-    expect(text).toMatch(/from the base keyboard/i);
+    expect(text).toMatch(/from the starting keyboard/i);
   });
 
   it("a question absent from the catalog (FR-014) degrades to prose, never the raw id and never blank", () => {

@@ -133,9 +133,9 @@ describe("FR-013 — the headline distinguishes provenance for the same value", 
     expect(accepted!.textContent).toContain("langtags");
   });
 
-  it("names the base for a base-derived value", () => {
+  it("names the starting keyboard for a base-derived value", () => {
     renderTrail(recordOf([answerEntry("d1", { provenance: { agency: "base-derived", source: "base" } })]));
-    expect(screen.getByTestId("decision-entry-headline").textContent).toMatch(/base/i);
+    expect(screen.getByTestId("decision-entry-headline").textContent).toMatch(/starting keyboard/i);
   });
 
   it("shows an editor step's counts", () => {
@@ -600,7 +600,7 @@ describe("stage-toggle accessible name (trail a11y review P1)", () => {
       screen.getByRole("button", { name: "Hide decisions for Keyboard identity" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Hide decisions for Choosing a base keyboard" }),
+      screen.getByRole("button", { name: "Hide decisions for Choosing a starting keyboard" }),
     ).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Hide decisions for Edited the character gallery" }),

@@ -14,15 +14,15 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 export const definition = {
   id: "q_ip2_keep_device_targets",
   prompt:
-    "Your starting keyboard targets a different set of devices than you declared. Keep the base's device targets, or use the ones you declared?",
+    "Your starting keyboard targets a different set of devices than you declared. Keep the starting keyboard's device targets, or use the ones you declared?",
   help_text:
-    "Keeping the base's targets carries its touch/web layers forward; using your " +
+    "Keeping the starting keyboard's targets carries its touch/web layers forward; using your " +
     "declared mix routes touch work through the normal derivation flow. You can " +
     "confirm either — nothing is applied silently.",
   type: "radio" as const,
   required: true,
   options: [
-    { value: "keep", label: "Keep the base's device targets" },
+    { value: "keep", label: "Keep the starting keyboard's device targets" },
     { value: "propose", label: "Use the device targets I declared" },
     { value: "discard", label: "Desktop only" },
   ],
@@ -44,7 +44,7 @@ export function validate(value: string | string[] | undefined): ValidationResult
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
-    { value: "keep", note: "inherit the base device mix" },
+    { value: "keep", note: "inherit the starting keyboard's device mix" },
     { value: "propose", note: "use the declared device mix" },
     { value: "discard", note: "desktop-only" },
   ],

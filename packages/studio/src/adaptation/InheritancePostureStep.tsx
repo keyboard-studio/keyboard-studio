@@ -58,7 +58,7 @@ const FACET_LABELS: Record<PostureFacet, MessageDescriptor> = {
 };
 
 const POSTURE_LABELS: Record<PostureEntry["posture"], MessageDescriptor> = {
-  keep: msg({ id: "adaptation.posture.option.keep", message: "Keep the base's" }),
+  keep: msg({ id: "adaptation.posture.option.keepStarting", message: "Keep the starting keyboard's" }),
   propose: msg({ id: "adaptation.posture.option.propose", message: "Let the studio re-propose" }),
   discard: msg({ id: "adaptation.posture.option.discard", message: "Discard" }),
 };

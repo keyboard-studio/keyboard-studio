@@ -10,7 +10,7 @@ export const definition = {
     "Does your language use any punctuation marks that are not on a standard English keyboard?",
   help_text:
     "Standard English punctuation (period, comma, question mark, quotes, and " +
-    "so on) is usually already on the base keyboard. Answer Yes only if your " +
+    "so on) is usually already on the starting keyboard. Answer Yes only if your " +
     "language needs punctuation that is not part of standard English, for " +
     "example a special word-separator, a different style of quotation marks, " +
     "or a tonal or sentence-boundary mark.",

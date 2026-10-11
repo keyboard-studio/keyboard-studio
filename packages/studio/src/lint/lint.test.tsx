@@ -301,7 +301,7 @@ describe("LintSummary — upstream findings are excluded from the headline count
     render(<LintSummary findings={[upstream, upstream, authoredWarning]} />);
     expect(screen.getByText(/1 warning/)).toBeTruthy();
     expect(screen.queryByText(/3 warnings/)).toBeNull();
-    expect(screen.getByTestId("lint-summary-upstream-count").textContent).toContain("2 inherited from the base keyboard");
+    expect(screen.getByTestId("lint-summary-upstream-count").textContent).toContain("2 inherited from the starting keyboard");
   });
 
   it("announces only the authored count in the live region", () => {

@@ -42,7 +42,7 @@ export type { CarveRemovalItem, CarvedLayoutValue } from "../../carve/carveValue
 export const definition = {
   id: "carvedLayout",
   type: "notice" as const,
-  prompt: "What should be removed from the base keyboard?",
+  prompt: "What should be removed from the starting keyboard?",
   audit_label: "Carved layout",
 };
 

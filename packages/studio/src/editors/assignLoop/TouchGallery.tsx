@@ -6459,8 +6459,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           <div
             role="group"
             aria-label={t({
-              id: "editor.assignLoop.touch.existingMethodsGroupAriaLabel",
-              message: "Existing touch methods from the base keyboard",
+              id: "editor.assignLoop.touch.startingMethodsGroupAriaLabel",
+              message: "Existing touch methods from the starting keyboard",
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           >

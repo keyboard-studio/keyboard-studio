@@ -151,7 +151,7 @@ describe("TrackOneIdentityPanel — base-id warning", () => {
     // Initial state: id is seeded to base id; warning should be visible.
     const warn = screen.queryByRole("status");
     expect(warn).not.toBeNull();
-    expect(warn?.textContent).toMatch(/base keyboard/i);
+    expect(warn?.textContent).toMatch(/copied keyboard/i);
   });
 
   it("hides the base-id warning once keyboardId differs from the base id", () => {

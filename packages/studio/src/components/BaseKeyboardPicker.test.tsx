@@ -15,7 +15,7 @@
 //   - Import badge on committed selection (AC#2)
 //   - Loading state (never-resolving promise → "Loading…" visible)
 //   - Error state (listAll rejects → role="alert")
-//   - Empty catalog (listAll resolves [] → role="status" "No base keyboards found")
+//   - Empty catalog (listAll resolves [] → role="status" "No starting keyboards found")
 //   - Zero-match (type "zzzz" → role="status" "No keyboards match", Enter does NOT call onChange)
 //   - Controlled value (render with a value prop, list closed → input shows displayName)
 
@@ -506,9 +506,9 @@ describe("BaseKeyboardPicker — loading state", () => {
     // Replace listAllImpl with a never-resolving promise
     listAllImpl = () => new Promise(() => { /* never resolves */ });
     renderPicker();
-    // The component renders role="status" with "Loading base keyboards..." while loading
+    // The component renders role="status" with "Loading starting keyboards..." while loading
     expect(screen.getByRole("status")).toBeTruthy();
-    expect(screen.getByText(/loading base keyboards/i)).toBeTruthy();
+    expect(screen.getByText(/loading starting keyboards/i)).toBeTruthy();
   });
 
   it("combobox input is NOT present while loading", () => {
@@ -541,16 +541,16 @@ describe("BaseKeyboardPicker — error state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 13. Empty catalog: listAll resolves [] → role="status" "No base keyboards found"
+// 13. Empty catalog: listAll resolves [] → role="status" "No starting keyboards found"
 // ---------------------------------------------------------------------------
 
 describe("BaseKeyboardPicker — empty catalog", () => {
-  it("renders role='status' with 'No base keyboards found' when listAll returns []", async () => {
+  it("renders role='status' with 'No starting keyboards found' when listAll returns []", async () => {
     listAllImpl = () => Promise.resolve([]);
     renderPicker();
     await waitFor(() => {
       const statuses = screen.getAllByRole("status");
-      const noKbd = statuses.find((el) => el.textContent?.match(/No base keyboards found/i));
+      const noKbd = statuses.find((el) => el.textContent?.match(/No starting keyboards found/i));
       expect(noKbd).toBeDefined();
     });
   });
@@ -680,10 +680,10 @@ describe("BaseKeyboardPicker — scoped search (scopeIds)", () => {
     expect(screen.queryByRole("button", { name: /search all keyboards/i })).toBeNull();
   });
 
-  it("custom label prop replaces the default 'Base keyboard' label", async () => {
+  it("custom label prop replaces the default 'Starting keyboard' label", async () => {
     renderPicker({ label: "Search keyboards" });
     await waitForCombobox();
     expect(screen.getByText("Search keyboards")).toBeTruthy();
-    expect(screen.queryByText("Base keyboard")).toBeNull();
+    expect(screen.queryByText("Starting keyboard")).toBeNull();
   });
 });

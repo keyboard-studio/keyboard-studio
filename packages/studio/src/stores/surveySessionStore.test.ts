@@ -225,7 +225,7 @@ describe("surveySessionStore", () => {
     });
   });
 
-  // backToChooseBase — OutputScreen's "Change base keyboard" escape hatch
+  // backToChooseBase — OutputScreen's "Change starting keyboard" escape hatch
   // (spec 058). Re-basing was removed from the ship-it screen; this routes the
   // author back to the picker where the preview-before-commit gate lives.
   describe("backToChooseBase", () => {

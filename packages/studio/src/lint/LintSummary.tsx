@@ -165,8 +165,8 @@ export function LintSummary({ findings }: LintSummaryProps) {
             style={{ fontSize: 12, color: "var(--app-text-subtle)" }}
           >
             {t({
-              id: "lint.summary.upstreamCount",
-              message: `${{ count: upstreamCount }} inherited from the base keyboard`,
+              id: "lint.summary.startingInheritedCount",
+              message: `${{ count: upstreamCount }} inherited from the starting keyboard`,
             })}
           </span>
         )}

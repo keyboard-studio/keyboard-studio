@@ -90,8 +90,8 @@ export function WindowsLayoutRenderer({ value, onChange }: DecisionRendererProps
         <Trans id="layout.step.heading">Which keyboard layout do your typists use?</Trans>
       </h2>
       <p style={mutedParaFlush}>
-        <Trans id="layout.step.intro">
-          This is the physical layout on your community&apos;s computers (the Windows layout). It
+        <Trans id="layout.step.baseKeyboardIntro">
+          This is the base keyboard on your community&apos;s computers (the Windows layout). It
           tells the studio which keys your typists already have, so it can show what would happen
           on their machines. Confirm the suggestion or search for another.
         </Trans>

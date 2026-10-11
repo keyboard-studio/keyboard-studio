@@ -2,7 +2,7 @@
 //
 // What these lock down:
 //   (a) With a working copy (the normal end-of-flow arrival) the pane drops the
-//       "Open base" / "New from base" mode toggle and the base picker, and shows
+//       "Open starting keyboard" / "New from a starting keyboard" mode toggle and the base picker, and shows
 //       read-only provenance instead. The toggle could never report how the
 //       working copy was actually created — `pickerMode` is per-screen local
 //       state re-initialized to "open" on every mount — and selecting a
@@ -11,7 +11,7 @@
 //   (b) Cold arrival at #output (bookmark / typed hash, no working copy) keeps
 //       the full picker, which is the documented reason a picker is reachable
 //       from this screen at all.
-//   (c) "Change base keyboard" is a pure navigation action: it routes to the
+//   (c) "Change starting keyboard" is a pure navigation action: it routes to the
 //       survey's choose_base step, rewinds history, clears the baseConfirmed
 //       commit gate, and mutates the working copy not at all.
 //   (d) The download control announces the id it will actually emit
@@ -89,8 +89,8 @@ describe("OutputScreen — left-pane scope", () => {
 
     expect(modeToggle()).toBeNull();
     expect(screen.queryByTestId("base-picker-stub")).toBeNull();
-    expect(screen.queryByText("Open base")).toBeNull();
-    expect(screen.queryByText("New from base")).toBeNull();
+    expect(screen.queryByText("Open starting keyboard")).toBeNull();
+    expect(screen.queryByText("New from a starting keyboard")).toBeNull();
 
     // The base is still visible — as provenance, not as a control.
     const provenance = screen.getByTestId("output-base-provenance");
@@ -122,7 +122,7 @@ describe("OutputScreen — left-pane scope", () => {
     expect(screen.queryByTestId("output-base-provenance")).toBeNull();
   });
 
-  it("'Change base keyboard' routes to the survey's choose_base step and mutates nothing", async () => {
+  it("'Change starting keyboard' routes to the survey's choose_base step and mutates nothing", async () => {
     seedInstantiatedWorkingCopy(undefined, { attributed: true });
     // Walk far enough that choose_base is genuinely behind the author, and arm
     // the commit gate the way a real confirmed base does.

@@ -38,7 +38,7 @@ export interface PrefillRow {
 /** Human labels for the script-alignment confirmation rows (spec 038 US1). */
 const SCRIPT_ALIGNMENT_LABELS: Record<string, MessageDescriptor> = {
   q_sa1_target_script_spread: msg({ id: "survey.prefill.scriptAlignment.scriptCommunity", message: "Script community" }),
-  q_sa2_base_script_mismatch: msg({ id: "survey.prefill.scriptAlignment.baseScript", message: "Base script" }),
+  q_sa2_base_script_mismatch: msg({ id: "survey.prefill.scriptAlignment.startingScript", message: "Starting script" }),
   q_sa3_latin_flavor: msg({ id: "survey.prefill.scriptAlignment.latinSubProfile", message: "Latin sub-profile" }),
 };
 
@@ -81,7 +81,7 @@ const LABEL_SCRIPT_CLASS = msg({ id: "survey.prefill.row.scriptClass.label", mes
 const LABEL_ROUTING_GROUP = msg({ id: "survey.prefill.row.routingGroup.label", message: "Routing group (§9)" });
 const NOTE_DERIVED_FROM_SCRIPT = msg({ id: "survey.prefill.row.derivedFromScript.note", message: "derived from script" });
 const LABEL_STARTING_KEYBOARD = msg({ id: "survey.prefill.row.startingKeyboard.label", message: "Starting keyboard" });
-const NOTE_YOUR_CHOSEN_BASE = msg({ id: "survey.prefill.row.startingKeyboard.note", message: "your chosen base" });
+const NOTE_YOUR_CHOSEN_BASE = msg({ id: "survey.prefill.row.startingKeyboard.note", message: "your chosen starting keyboard" });
 
 /**
  * Build the prefill confirmation rows from the identity-lite result and the
@@ -200,9 +200,9 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
             lineHeight: 1.5,
           }}
         >
-          <Trans id="survey.prefill.deferredNote">
+          <Trans id="survey.prefill.deferredStartingNote">
             Spare keys (A7), the full BCP47 tag, display name, and copyright are
-            confirmed later from your base keyboard and the documentation step.
+            confirmed later from your starting keyboard and the documentation step.
           </Trans>
         </p>
       </div>

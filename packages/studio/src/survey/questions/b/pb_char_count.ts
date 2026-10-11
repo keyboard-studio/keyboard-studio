@@ -8,7 +8,7 @@ export const definition = {
   id: "pb_char_count",
   audit_label: "New character count",
   prompt:
-    "Roughly how many NEW characters does your keyboard need to add, beyond what the base keyboard already has?",
+    "Roughly how many NEW characters does your keyboard need to add, beyond what the starting keyboard already has?",
   help_text:
     "Count only characters that are not already on a standard keyboard for " +
     "your layout. Do not count the regular A-Z letters or standard " +

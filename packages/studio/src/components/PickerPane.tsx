@@ -25,7 +25,7 @@
 //   time:
 //     - `pickerMode` is per-screen local state that re-initializes to "open"
 //       on every mount, so on Output the toggle could never report how the
-//       working copy was actually created (it showed "Open base" even for a
+//       working copy was actually created (it showed "Open starting keyboard" even for a
 //       Track 1 scaffold) — a mode INPUT sitting where an author reads a state
 //       DISPLAY.
 //     - selecting a different base re-instantiates the working copy under
@@ -108,7 +108,7 @@ function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
     },
     {
       field: "id",
-      label: <Trans id="picker.shipping.provenance.id">Base ID</Trans>,
+      label: <Trans id="picker.shipping.provenance.startingId">Starting keyboard ID</Trans>,
       value: kb.id,
     },
     {
@@ -188,7 +188,7 @@ export function PickerPane({
             aria-pressed={pickerMode === "open"}
             style={modeToggleStyle(pickerMode === "open")}
           >
-            <Trans id="picker.modeToggle.open">Open base</Trans>
+            <Trans id="picker.modeToggle.openStarting">Open starting keyboard</Trans>
           </button>
           <button
             type="button"
@@ -196,7 +196,7 @@ export function PickerPane({
             aria-pressed={pickerMode === "scaffold"}
             style={modeToggleStyle(pickerMode === "scaffold")}
           >
-            <Trans id="picker.modeToggle.scaffold">New from base</Trans>
+            <Trans id="picker.modeToggle.scaffoldFromStarting">New from a starting keyboard</Trans>
           </button>
         </div>
       )}
@@ -283,8 +283,8 @@ export function PickerPane({
             Check the details below, then download or submit your keyboard from the right.
           </Trans>
         ) : (
-          <Trans id="picker.intro">
-            Pick a base keyboard to start; the right pane shows the compiled result.
+          <Trans id="picker.startingIntro">
+            Pick a starting keyboard; the right pane shows the compiled result.
           </Trans>
         )}
       </p>

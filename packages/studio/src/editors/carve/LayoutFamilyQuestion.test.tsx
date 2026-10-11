@@ -27,7 +27,7 @@ describe("LayoutFamilyQuestion", () => {
   it("renders the existing question's prompt and four options unchanged", () => {
     render(<LayoutFamilyQuestion />);
     expect(
-      screen.getByText("Which physical keyboard layout does your community use?"),
+      screen.getByText("Which base keyboard layout does your community use?"),
     ).toBeTruthy();
     expect(screen.getByRole("radio", { name: /QWERTY \(used in most English-speaking countries/ })).toBeTruthy();
     expect(screen.getByRole("radio", { name: /QWERTZ \(used in Germany/ })).toBeTruthy();

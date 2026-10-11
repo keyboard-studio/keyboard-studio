@@ -39,7 +39,7 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
 
   return (
     <div style={{ color: "var(--app-text)", fontFamily: "system-ui, sans-serif" }}>
-      <h2 style={HEADING}><Trans id="editor.trackStep.heading">How do you want to use this base?</Trans></h2>
+      <h2 style={HEADING}><Trans id="editor.trackStep.keyboardHeading">How do you want to use this keyboard?</Trans></h2>
       <p style={SUBTLE}>
         <Trans id="editor.trackStep.intro">
           You chose <strong>{base.displayName}</strong>. Pick how you want to work with it.

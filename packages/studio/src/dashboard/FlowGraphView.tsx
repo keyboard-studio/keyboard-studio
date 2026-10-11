@@ -789,9 +789,9 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
               // base keyboard exists to project.
               <p style={noticeStyle}>
                 {t({
-                  id: "dashboard.flowGraph.alternative.unavailable.noWorkingCopyYet",
+                  id: "dashboard.flowGraph.alternative.unavailable.chooseStarting",
                   message:
-                    "This step comes before a keyboard exists to change, so an alternative cannot be derived yet. Choose a base keyboard and it will appear here.",
+                    "This step comes before a keyboard exists to change, so an alternative cannot be derived yet. Choose a starting keyboard and it will appear here.",
                 })}
               </p>
             ) : (
