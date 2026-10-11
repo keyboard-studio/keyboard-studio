@@ -298,7 +298,7 @@ describe("carveViaSplice", () => {
 `;
     const { ir } = parse(kmn, "test");
 
-    // An id that exists nowhere in baseIr (stale overlay entry, or a node from
+    // An id that exists nowhere in startIr (stale overlay entry, or a node from
     // another keyboard) must not fail the splice — the cascade resolves it to
     // nothing, so there is no span to resolve and nothing to delete.
     const result = carveViaSplice(kmn, ir, new Set(["nonexistent-node"]));

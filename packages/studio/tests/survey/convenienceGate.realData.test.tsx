@@ -50,7 +50,7 @@ function basicKbdusIR(): KeyboardIR {
 /** Instantiate basic_kbdus the way choose_base does, for the given language and alphabet. */
 function seed(bcp47: string, bases: string[]): void {
   const ir = basicKbdusIR();
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs: createVirtualFS(),
     ir,
     removalCapabilities: classifyRemovalCapabilities(ir),

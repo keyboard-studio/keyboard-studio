@@ -16,7 +16,7 @@
 //
 // WHY RECOMPILE instead of reusing the preview's `stage.compileResult`: the
 // preview compiled `stage.vfs`, while the output projection is built from the
-// store's baseVfs and carries the assignments and the final keyboard id. The two
+// store's startVfs and carries the assignments and the final keyboard id. The two
 // can differ. Shipping a package whose `.kmx` was built from different source
 // than its own descriptor would be a silent correctness bug, and it is precisely
 // the class of defect the descriptor's single-writer rule exists to prevent.

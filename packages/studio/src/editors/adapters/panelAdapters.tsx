@@ -12,9 +12,9 @@
 //       forwards the result; the identity step's effects are the recorded
 //       decisions and il_copyright_holder's apply, both at StepHost's
 //       boundary. Its context and resume are decision-derived (FR-005).
-//     - BaseResolutionAdapter (chooseBaseStep): the base-keyboard gallery
+//     - StartResolutionAdapter (chooseStartStep): the base-keyboard gallery
 //       host wrapper (spec 090 T013) — the decision write is the hosted
-//       renderer's onChange; setLocalBase is called before onComplete as
+//       renderer's onChange; setLocalStart is called before onComplete as
 //       the preview/compile channel only.
 //     - ScaffoldFormAdapter: retained (legacy; not in manifest).
 //     - TrackOneIdentityPanelAdapter: stub for the reserved "package" step.
@@ -26,7 +26,7 @@
 //     advance → session.advance(next)
 //     [setCharactersSubStage if advanceOutcome carries it]
 //   For steps whose handlers call store mutators BEFORE advance
-//   (setLocalBase), those writes are placed
+//   (setLocalStart), those writes are placed
 //   in the ADAPTER so they fire before onComplete triggers the host's advance call.
 //
 // Boundary: editors/adapters/ → stores/ and hooks/ is allowed by depcruise.
@@ -37,13 +37,13 @@ import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { GalleryHost } from "../../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../../lib/galleryHostDeps.ts";
-import baseKeyboardModule from "../../survey/questions/gallery/baseKeyboard.ts";
-import type { BasePreviewExtras } from "../../survey/chooseBase/BaseKeyboardRenderer.tsx";
+import startKeyboardModule from "../../survey/questions/gallery/baseKeyboard.ts";
+import type { StartPreviewExtras } from "../../survey/chooseStart/StartKeyboardRenderer.tsx";
 import { ScaffoldForm } from "../panels/ScaffoldForm.tsx";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { TrackOneIdentityPanel } from "../panels/TrackOneIdentityPanel.tsx";
-import type { SuggestTarget } from "../../lib/suggestBase.ts";
-import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
+import type { SuggestTarget } from "../../lib/suggestStart.ts";
+import { useStartPreviewStatusStore } from "../../stores/startPreviewStatusStore.ts";
 import { IdentityLite } from "../../survey/index.ts";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
@@ -128,15 +128,15 @@ export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
 }
 
 // ---------------------------------------------------------------------------
-// BaseResolutionAdapter (preview-before-commit; gallery host wrapper since
+// StartResolutionAdapter (preview-before-commit; gallery host wrapper since
 // spec 090 T013)
 //
-// BaseResolution separates PREVIEW (every search-result / suggestion-card
+// StartResolution separates PREVIEW (every search-result / suggestion-card
 // click) from COMMIT (the single "Choose this keyboard" button). Preview
-// writes setLocalBase (which drives the live compile pipeline in StudioShell)
+// writes setLocalStart (which drives the live compile pipeline in StudioShell)
 // WITHOUT calling onComplete — the wizard does not advance and the working
 // copy is not instantiated. Commit lives in the hosted renderer
-// (survey/chooseBase/BaseKeyboardRenderer.tsx): it runs the F1 rebase-confirm
+// (survey/chooseStart/StartKeyboardRenderer.tsx): it runs the F1 rebase-confirm
 // gate (confirmRebaseTo) SYNCHRONOUSLY, before anything else — window.confirm
 // is itself synchronous, so a Cancel returns immediately and neither the
 // decision record nor onComplete ever fire; the wizard stays on the picker
@@ -151,29 +151,29 @@ export function TrackOneIdentityPanelAdapter(_props: EditorStepProps) {
 // ---------------------------------------------------------------------------
 
 /**
- * Adapter for BaseResolution. Reads the suggest target from the identity
+ * Adapter for StartResolution. Reads the suggest target from the identity
  * result derived over the decision store (spec 089 FR-005 — recorded by the
  * identity step's completion before this step is reached).
  *
- * previewStatus is read from basePreviewStatusStore (published by
+ * previewStatus is read from startPreviewStatusStore (published by
  * StudioShell's SurveyView) so this adapter never imports useKeyboardArtifact
  * or the compile pipeline directly.
  */
-export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
+export function StartResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
   const decisions = useDecisionStore((s) => s.decisions);
   const identityResult = deriveIdentityResult(decisions);
-  const localBase = useSurveySessionStore((s) => s.localBase);
-  const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+  const localStart = useSurveySessionStore((s) => s.localStart);
+  const setLocalStart = useSurveySessionStore((s) => s.setLocalStart);
 
-  const previewStatus = useBasePreviewStatusStore((s) => s.status);
+  const previewStatus = useStartPreviewStatusStore((s) => s.status);
 
   // Spec 090 T013: the adapter is now the gallery-host WRAPPER for the
   // base-keyboard module. The decision write (the confirm) lives in the
-  // renderer (survey/chooseBase/BaseKeyboardRenderer.tsx) and reports
+  // renderer (survey/chooseStart/StartKeyboardRenderer.tsx) and reports
   // through the host's onChange; StudioShell's instantiation effect arms
-  // off the recorded decision, so `setBaseConfirmed` is gone entirely.
+  // off the recorded decision, so `setStartConfirmed` is gone entirely.
   // What remains here is host-layer plumbing: the suggest target and the
-  // preview channel — `setLocalBase` drives StudioShell's live compile
+  // preview channel — `setLocalStart` drives StudioShell's live compile
   // pipeline for the PREVIEWED base (preview-before-commit), exactly as
   // StudioShell's own restore path writes it; a preview is not a decision
   // and records nothing.
@@ -187,25 +187,25 @@ export function BaseResolutionAdapter({ onComplete, onBack }: EditorStepProps) {
     ...(identityResult?.bcp47 ? { bcp47: identityResult.bcp47 } : {}),
   };
 
-  const basePreview: BasePreviewExtras = {
+  const startPreview: StartPreviewExtras = {
     target,
-    previewedBase: localBase,
+    previewedBase: localStart,
     previewStatus,
     onPreview: (base) => {
-      setLocalBase(base);
+      setLocalStart(base);
     },
   };
 
   return (
     <GalleryHost
-      module={baseKeyboardModule}
+      module={startKeyboardModule}
       record={record}
       stepId="choose_base"
       deps={deps}
       stepContext={{
         onComplete,
         ...(onBack !== undefined && { onBack }),
-        extras: { basePreview },
+        extras: { startPreview },
       }}
     />
   );

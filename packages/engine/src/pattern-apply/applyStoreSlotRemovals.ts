@@ -101,8 +101,8 @@
 //   This differs from whole-node deletion ids (bare nodeId, no `#`) so the two can be
 //   unambiguously partitioned at the call site.
 //
-// baseIr is never mutated. Structural-sharing shallow copy:
-//   { ...baseIr, stores: baseIr.stores.map(s => replacedById.get(s.nodeId) ?? s) }
+// startIr is never mutated. Structural-sharing shallow copy:
+//   { ...startIr, stores: startIr.stores.map(s => replacedById.get(s.nodeId) ?? s) }
 // Untouched stores keep the same object reference; groups/comments/raw are passed
 // through by reference.
 
@@ -704,7 +704,7 @@ function blockedWarning(store: IRStore, storeNodeId: string, reason: StoreSlotBl
 }
 
 /**
- * Edit targeted store slots in a new IR without mutating `baseIr`.
+ * Edit targeted store slots in a new IR without mutating `startIr`.
  *
  * Each `slotId` in `slotIds` must have the form `"<storeNodeId>#<itemsIndex>"`.
  * Slot ids are grouped by store, classified via the shared pairing-graph
@@ -712,7 +712,7 @@ function blockedWarning(store: IRStore, storeNodeId: string, reason: StoreSlotBl
  * pair-set is spliced at the SAME positions in one pass, or the whole batch
  * is blocked/refused together.
  *
- * @param baseIr  Source-of-truth IR. Never mutated.
+ * @param startIr  Source-of-truth IR. Never mutated.
  * @param slotIds Set of slot ids encoding which store items to edit.
  * @param options Optional behavior flags. `carveNotAnyHygiene` opts in to the
  *                carve-scoped `notany()` hygiene exception (issue #1809,
@@ -723,7 +723,7 @@ function blockedWarning(store: IRStore, storeNodeId: string, reason: StoreSlotBl
  * @returns       New IR, diagnostic warnings, and count of applied edits.
  */
 export function applyStoreSlotRemovals(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   slotIds: ReadonlySet<string>,
   options: { carveNotAnyHygiene?: boolean } = {},
 ): StoreSlotRemovalResult {
@@ -731,7 +731,7 @@ export function applyStoreSlotRemovals(
   const notices: string[] = [];
 
   if (slotIds.size === 0) {
-    return { ir: baseIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0 };
   }
 
   // --- Parse and group slot ids by storeNodeId ----------------------------
@@ -757,16 +757,16 @@ export function applyStoreSlotRemovals(
 
   if (targetsByStore.size === 0) {
     // All ids were malformed.
-    return { ir: baseIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0 };
   }
 
-  const analysis = analyzeStores(baseIr);
+  const analysis = analyzeStores(startIr);
 
   // --- Classify each directly-targeted store, grouping into pair-work -----
   const workByKey = new Map<string, PairWork>();
 
   for (const [storeNodeId, indexSet] of targetsByStore) {
-    const store = baseIr.stores.find((s) => s.nodeId === storeNodeId);
+    const store = startIr.stores.find((s) => s.nodeId === storeNodeId);
     if (store === undefined) {
       warnings.push(
         `[store-slot] store not found in IR (nodeId: ${storeNodeId}); slot(s) skipped.`,
@@ -893,13 +893,13 @@ export function applyStoreSlotRemovals(
 
   if (replacedById.size === 0) {
     // Nothing survived the guards.
-    return { ir: baseIr, warnings, notices, appliedCount: 0 };
+    return { ir: startIr, warnings, notices, appliedCount: 0 };
   }
 
   // --- Structural-sharing shallow copy of the IR --------------------------
   const newIr: KeyboardIR = {
-    ...baseIr,
-    stores: baseIr.stores.map((s) => replacedById.get(s.nodeId) ?? s),
+    ...startIr,
+    stores: startIr.stores.map((s) => replacedById.get(s.nodeId) ?? s),
     // groups, comments, raw, touchLayout, visualKeyboard passed through by reference.
   };
 

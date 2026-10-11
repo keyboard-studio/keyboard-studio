@@ -28,7 +28,7 @@ import { test, expect } from "playwright/test";
 import {
   seedReturningVisitor,
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   chooseTrackCopy,
   acceptProjectName,
@@ -44,7 +44,7 @@ async function driveToTrackChoice(page: Parameters<typeof driveIdentityLite>[0])
   // Identity carries no author/copyright questions anymore (#1901) — they
   // are the attribution step's, after the track choice.
   await driveIdentityLite(page, { languageCode: "fr" });
-  await pickBaseKeyboard(page, "basic_kbdfr");
+  await pickStartKeyboard(page, "basic_kbdfr");
 }
 
 /**

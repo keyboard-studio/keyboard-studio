@@ -1,15 +1,15 @@
 // T021 [US2] — genealogical base-tier integration (spec 036 US2, FR-014..017c).
 //
 // Exercises the studio-side composition: the REAL Glottolog bridge (over the
-// pinned classification data) merged into the existing suggestBases ranking. A
+// pinned classification data) merged into the existing suggestStarts ranking. A
 // target with no direct keyboard must surface a genealogical base AHEAD of a
 // pure same-script match. resolveLanguage is stubbed (as the studio wires it
 // from langtags): German de→deu is a same-family relative of English; a plain
 // Latin base supports no relative.
 
 import { describe, expect, it } from "vitest";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts/fixtures";
-import { suggestBases } from "./suggestBase.ts";
+import { makeStartKeyboard } from "@keyboard-studio/contracts/fixtures";
+import { suggestStarts } from "./suggestStart.ts";
 import {
   applyGenealogicalTier,
   makeResolveLanguage,
@@ -17,7 +17,7 @@ import {
 } from "./genealogyTier.ts";
 import type { LanguageDefaults } from "@keyboard-studio/contracts";
 
-const germanBase = makeBaseKeyboard({
+const germanStart = makeStartKeyboard({
   id: "german_kbd",
   script: "Latn",
   path: "release/g/german_kbd",
@@ -25,7 +25,7 @@ const germanBase = makeBaseKeyboard({
   displayName: "German",
   version: "1.0",
 });
-const plainLatin = makeBaseKeyboard({
+const plainLatin = makeStartKeyboard({
   id: "plain_latin",
   script: "Latn",
   path: "release/p/plain_latin",
@@ -52,9 +52,9 @@ const languagesById = { german_kbd: ["de"], plain_latin: ["fi"] };
 
 describe("applyGenealogicalTier — integration over real relatedness", () => {
   it("ranks a genealogical base ahead of a pure script-match", () => {
-    const bases = [germanBase, plainLatin];
+    const bases = [germanStart, plainLatin];
     const target = { script: "Latn", bcp47: "en" };
-    const ranked = suggestBases(bases, target, { languagesById });
+    const ranked = suggestStarts(bases, target, { languagesById });
     // Both are plain script-matches before the genealogical merge.
     expect(ranked.every((s) => s.reason === "script-match")).toBe(true);
 
@@ -82,7 +82,7 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
     // ancestor (equal up-leg) but Dutch sits on a shorter down-leg — so Dutch is
     // the closer relative by TOTAL path length. The Dutch base must rank ahead
     // of the German one, and its distance must be strictly smaller.
-    const dutchBase = makeBaseKeyboard({
+    const dutchStart = makeStartKeyboard({
       id: "dutch_kbd",
       script: "Latn",
       path: "release/d/dutch_kbd",
@@ -92,7 +92,7 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
     });
     const target = { script: "Latn", bcp47: "en" };
     const byId = { dutch_kbd: ["nl"], german_kbd: ["de"] };
-    const ranked = suggestBases([germanBase, dutchBase], target, {
+    const ranked = suggestStarts([germanStart, dutchStart], target, {
       languagesById: byId,
     });
     const resolved = applyGenealogicalTier(ranked, target, {
@@ -110,7 +110,7 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
   it("leaves ranking unchanged when no base supports a relative", () => {
     const bases = [plainLatin];
     const target = { script: "Latn", bcp47: "en" };
-    const ranked = suggestBases(bases, target, { languagesById });
+    const ranked = suggestStarts(bases, target, { languagesById });
     const resolved = applyGenealogicalTier(ranked, target, {
       resolveLanguage,
       languagesById,
@@ -121,7 +121,7 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
   it("never downgrades a language-match to genealogical", () => {
     // A base that directly supports English keeps language-match even though
     // English is trivially 'related' to itself's relatives.
-    const englishBase = makeBaseKeyboard({
+    const englishStart = makeStartKeyboard({
       id: "english_kbd",
       script: "Latn",
       path: "release/e/english_kbd",
@@ -131,7 +131,7 @@ describe("applyGenealogicalTier — integration over real relatedness", () => {
     });
     const target = { script: "Latn", bcp47: "en" };
     const byId = { english_kbd: ["en"], german_kbd: ["de"] };
-    const ranked = suggestBases([englishBase, germanBase], target, {
+    const ranked = suggestStarts([englishStart, germanStart], target, {
       languagesById: byId,
     });
     const resolved = applyGenealogicalTier(ranked, target, {

@@ -2,7 +2,7 @@
 
 import type { ScaffolderService, ScaffoldOptions, ScaffoldResult } from "../scaffolder";
 import { validateScaffolderKeyboardId as contractsValidateKeyboardId } from "../scaffolder";
-import type { BaseKeyboard } from "../baseKeyboard";
+import type { StartKeyboard } from "../startKeyboard";
 import { scaffoldedFS } from "./mockVirtualFS";
 
 // Three templates matching spec §9's Three-group routing exactly.
@@ -23,7 +23,7 @@ export const mockScaffolder: ScaffolderService = {
   },
 
   scaffold(
-    _base: BaseKeyboard,
+    _base: StartKeyboard,
     keyboardId: string,
     _displayName: string,
     opts?: ScaffoldOptions

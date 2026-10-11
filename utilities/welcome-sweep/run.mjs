@@ -63,7 +63,7 @@ if (!existsSync(path.join(keyboardsRoot, "release"))) {
 
 const { fetchKeyboardSourceToVfs } = await import(pathToFileURL(loaderFile).href);
 const { buildKpsContent } = await import(pathToFileURL(path.join(engineDist, "package-descriptor", "build.js")).href);
-const { parseKpsFiles } = await import(pathToFileURL(path.join(engineDist, "base-browser", "kps-parser.js")).href);
+const { parseKpsFiles } = await import(pathToFileURL(path.join(engineDist, "start-browser", "kps-parser.js")).href);
 const { extractWelcomeImageRefs } = await import(pathToFileURL(path.join(engineDist, "shared", "helpDocsRender.js")).href);
 // The contracts dist is emitted with extensionless relative imports (bundler
 // resolution), which bare node cannot load, so the VirtualFS is not imported.

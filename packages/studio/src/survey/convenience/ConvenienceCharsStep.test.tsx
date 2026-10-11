@@ -27,7 +27,7 @@ vi.mock("../../lib/services.ts", () => ({
 }));
 
 /** A base keyboard producing the whole of basic Latin, both cases. */
-function fullLatinBase(): Set<string> {
+function fullLatinStart(): Set<string> {
   const s = new Set<string>();
   for (const c of "abcdefghijklmnopqrstuvwxyz") {
     s.add(c);
@@ -42,7 +42,7 @@ describe("computeConvenienceGate", () => {
   it("applies when the base produces basic-Latin letters the orthography does not use", () => {
     const gate = computeConvenienceGate({
       ...INSTANTIATED,
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set(["a", "b", "c"]),
     });
     expect(gate.kind).toBe("applies");
@@ -52,7 +52,7 @@ describe("computeConvenienceGate", () => {
   it("is not-applicable when the orthography uses every basic-Latin letter (a genuine no-surplus base)", () => {
     const gate = computeConvenienceGate({
       ...INSTANTIATED,
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set("abcdefghijklmnopqrstuvwxyz".split("")),
     });
     expect(gate).toEqual({ kind: "not-applicable", reason: { code: "convenience-no-surplus" } });
@@ -74,7 +74,7 @@ describe("computeConvenienceGate", () => {
     const gate = computeConvenienceGate({
       instantiated: true,
       hasSignal: false,
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set(),
     });
     expect(gate).toEqual({ kind: "unknown", reason: { code: "convenience-signal-unknown" } });
@@ -84,7 +84,7 @@ describe("computeConvenienceGate", () => {
     const gate = computeConvenienceGate({
       instantiated: false,
       hasSignal: true,
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set(["a"]),
     });
     expect(gate).toEqual({ kind: "not-applicable", reason: { code: "convenience-not-instantiated" } });

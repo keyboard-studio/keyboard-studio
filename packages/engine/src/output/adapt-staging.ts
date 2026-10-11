@@ -106,7 +106,7 @@ export function stageAdaptHistory(
   // is the ONE HISTORY.md composer (a null entry renders exactly the
   // attribution stub this function always wrote), so the two can never drift.
   const existing = vfs.get("HISTORY.md");
-  const baseHistoryText =
+  const startHistoryText =
     existing !== undefined && typeof existing.content === "string" && existing.content.length > 0
       ? existing.content
       : null;
@@ -116,7 +116,7 @@ export function stageAdaptHistory(
       version: bumpedVersion,
       dateIso,
       adaptedFrom: { id: originalId, version: originalVersion },
-      baseHistoryText,
+      startHistoryText,
     }),
     false,
   );

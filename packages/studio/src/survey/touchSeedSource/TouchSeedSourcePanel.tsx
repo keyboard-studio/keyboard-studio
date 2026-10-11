@@ -35,7 +35,7 @@
 // characters) annotate the choices but never disable either one — the author
 // decides which seed to use, "usable" is not auto-classified.
 //
-// GRACEFUL DEGRADATION: if there is no baseIr yet, or the seed derivation
+// GRACEFUL DEGRADATION: if there is no startIr yet, or the seed derivation
 // throws, the OSK is not mounted at all (a blank iframe with no explanation is
 // exactly the failure mode this guards against) — a graceful fallback message
 // renders in its place, reusing the seed-source-reseed-preview-error pattern.
@@ -62,7 +62,7 @@ import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import type { TouchSeedSourceValue } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { type TouchSeedSource } from "../../stores/surveySessionStore.ts";
-import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
+import { resolveStartTouchJson } from "../../lib/resolveStartTouchJson.ts";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
 import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
@@ -79,7 +79,7 @@ import {
   BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT,
 } from "../../lib/galleryTheme.ts";
 
-/** No desktop work to replay when there is no baseIr yet (mirrors TouchGallery's EMPTY_MODS). */
+/** No desktop work to replay when there is no startIr yet (mirrors TouchGallery's EMPTY_MODS). */
 const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ function pickPreviewPlatformId(platformIds: readonly string[]): string | undefin
   return PREVIEW_PLATFORM_ORDER.find((id) => platformIds.includes(id)) ?? platformIds[0];
 }
 
-export interface BaseTouchLayoutSummary {
+export interface StartTouchLayoutSummary {
   /** Platform ids the source layout ships, e.g. ["phone", "tablet"]. */
   platformIds: string[];
   /** The platform id preferred for display, per {@link PREVIEW_PLATFORM_ORDER}. */
@@ -121,7 +121,7 @@ export interface BaseTouchLayoutSummary {
  * treated as "no usable base layout" by the caller (R4): the malformed case is
  * reported with a distinct note, but neither case blocks either choice.
  */
-export function parseBaseTouchPreview(json: string | undefined): BaseTouchLayoutSummary | null {
+export function parseBaseTouchPreview(json: string | undefined): StartTouchLayoutSummary | null {
   if (json === undefined) return null;
   let parsed: unknown;
   try {
@@ -230,9 +230,9 @@ const fallbackNoteStyle: CSSProperties = {
 export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererProps<TouchSeedSourceValue>) {
   const { t } = useLingui();
   const { onComplete, onBack } = useGalleryStepContext();
-  const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
   // The recorded choice arrives as the renderer's value (spec 090 T012);
@@ -242,19 +242,19 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
   // Desktop modifications to replay onto the seed preview (spec 035 R3) —
   // same read/derive pattern as TouchGallery's own `mods` memo (carve
   // removals + Phase C letter placements), with the same EMPTY_MODS
-  // fallback when baseIr hasn't loaded yet.
+  // fallback when startIr hasn't loaded yet.
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
   const mods = useMemo<DesktopModifications>(() => {
-    if (baseIr === null) return EMPTY_MODS;
-    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
+    if (startIr === null) return EMPTY_MODS;
+    return deriveDesktopModifications(startIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseIr, modsDepsKey]);
+  }, [startIr, modsDepsKey]);
 
-  const rawJson = useMemo(() => resolveBaseTouchJson(baseVfs), [baseVfs]);
+  const rawJson = useMemo(() => resolveStartTouchJson(startVfs), [startVfs]);
   const preview = useMemo(() => parseBaseTouchPreview(rawJson), [rawJson]);
 
   const hasUsableBaseLayout = preview !== null;
@@ -279,24 +279,24 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
   // ---------------------------------------------------------------------------
 
   const currentSeedPreview = useMemo<{ json: string; unplacedChars: string[] } | null>(() => {
-    if (baseIr === null) return null;
+    if (startIr === null) return null;
     try {
       const baseTouchJson = selected === "reseed-from-desktop" ? undefined : rawJson;
-      const { layout, unplacedChars } = deriveSeedLayout(baseIr, {
+      const { layout, unplacedChars } = deriveSeedLayout(startIr, {
         ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
         mods,
         seedSource: selected,
       });
       return { json: emitTouchLayout(layout), unplacedChars };
     } catch (err) {
-      // A genuine derivation failure (as opposed to "no baseIr yet", handled
+      // A genuine derivation failure (as opposed to "no startIr yet", handled
       // by the guard above) has no other signal — the graceful fallback note
       // still renders, but this is otherwise silent, so log it for anyone
       // debugging in devtools.
       devLog.error("[TouchSeedSourcePanel] seed preview derivation failed:", err);
       return null;
     }
-  }, [baseIr, selected, rawJson, mods]);
+  }, [startIr, selected, rawJson, mods]);
 
   // Named string locals computed BEFORE the JSX below — the message body
   // must not embed a conditional (ternary) expression as a direct <Trans>
@@ -338,7 +338,7 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
     [currentSeedPreview],
   );
 
-  const { stage, retry } = useKeyboardArtifact(baseKeyboard, scaffoldSpec, vfsTransform);
+  const { stage, retry } = useKeyboardArtifact(startKeyboard, scaffoldSpec, vfsTransform);
 
   /**
    * Render the real, live OSK in forced mobile/touch mode, or — when the seed
@@ -357,7 +357,7 @@ export function TouchSeedSourceRenderer({ value, onChange }: DecisionRendererPro
     }
     return (
       <div data-testid="seed-source-osk-preview">
-        <OSKFrame baseKeyboard={baseKeyboard} oskMode="tablet" stage={stage} retry={retry} />
+        <OSKFrame startKeyboard={startKeyboard} oskMode="tablet" stage={stage} retry={retry} />
       </div>
     );
   }

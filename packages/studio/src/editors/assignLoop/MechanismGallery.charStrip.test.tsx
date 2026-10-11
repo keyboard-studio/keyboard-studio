@@ -42,7 +42,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
   it("renders the char-scroll-strip with one chip per lettersToAdd character", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
@@ -57,7 +57,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
     // it: "a" must render before "A", and "e" before "E".
     seedInventory(["A", "a", "E", "e"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -86,7 +86,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true }
+        <MechanismGallery selectedStartKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true }
       );
     });
 
@@ -116,7 +116,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
   it("clicking a later character's chip moves forward to it too — the old prev-only button could never do this", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // Starting on "á" (idx 0) — jump straight to "í" (idx 2, the last
@@ -133,7 +133,7 @@ describe("MechanismGallery — character-scroll-strip navigation", () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true }
+        <MechanismGallery selectedStartKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true }
       );
     });
     expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
@@ -222,7 +222,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
   it("the current char's badge starts RED at 0, then GREEN at 1 after a real Apply records the assignment", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -278,7 +278,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
 
     // The base produces none of ʒ/̌/ǯ — every one of these is session-
     // introduced (or, for ǯ, only reachable by composing two that are).
@@ -314,7 +314,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     });
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -359,7 +359,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
 
     seedInventory(["ʒ", "̌", "ǯ"]);
 
@@ -405,7 +405,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     });
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -425,7 +425,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
 
     // "ʒ" alone (no caron, no ǯ) — not NFD-decomposable, so composition can
     // never fire for it; this pins the "own-key-only" side of the case table
@@ -460,7 +460,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     });
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -478,7 +478,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
 
     seedInventory(["ʒ", "̌", "ǯ"]);
 
@@ -508,7 +508,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     });
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -567,7 +567,7 @@ describe("MechanismGallery — UsesSequencesCard (integration)", () => {
     ]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     expectCurrentChar("n");
@@ -584,7 +584,7 @@ describe("MechanismGallery — UsesSequencesCard (integration)", () => {
   it("control: renders no uses-sequences-card for a character with no recorded using-sequence anywhere in the assignments", async () => {
     seedInventory(["x"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expectCurrentChar("x");
     expect(screen.queryByTestId("uses-sequences-card")).toBeNull();

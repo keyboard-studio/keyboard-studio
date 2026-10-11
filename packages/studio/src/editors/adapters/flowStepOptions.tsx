@@ -44,8 +44,8 @@ function decisionString(decisions: DecisionSet, id: DecisionId): string | undefi
 // ---------------------------------------------------------------------------
 // track options — reproduces TrackStepAdapter + PhaseTrack behaviour exactly.
 //
-// Context: { base_name: localBase.displayName }
-// Guard: localBase must be non-null (adapter rendered null if null; factory
+// Context: { base_name: localStart.displayName }
+// Guard: localStart must be non-null (adapter rendered null if null; factory
 //   will produce a null return to match).
 // Seeds: track_choice from the session's currently-recorded selectedTrack, so
 //   arriving at this step by deep link or by walking Back shows the recorded
@@ -68,8 +68,8 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
   title: "Authoring Track",
 
   buildContext(deps: FlowStepDeps) {
-    // Match TrackStepAdapter: base_name from localBase.displayName.
-    return { base_name: deps.localBase?.displayName ?? "" };
+    // Match TrackStepAdapter: base_name from localStart.displayName.
+    return { base_name: deps.localStart?.displayName ?? "" };
   },
 
   seeds: {
@@ -371,9 +371,9 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
   const state = useWorkingCopyStore.getState();
   return {
     instantiationMode: state.instantiationMode,
-    baseDocProfile: state.baseDocProfile,
-    baseWelcomeHtmText: state.baseWelcomeHtmText,
-    baseHelpPhpText: state.baseHelpPhpText,
+    startDocProfile: state.startDocProfile,
+    startWelcomeHtmText: state.startWelcomeHtmText,
+    startHelpPhpText: state.startHelpPhpText,
   };
 }
 
@@ -392,13 +392,13 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
 /**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
  * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`bumpKeyboardVersion`
- * derivation exactly (`baseIr.header.version?.trim() || "1.0"`, bumped only
+ * derivation exactly (`startIr.header.version?.trim() || "1.0"`, bumped only
  * on an adaptation) so the survey-time proposal and the final output-time
  * heading never disagree about which version they're for.
  */
 function deriveHistoryVersion(): string {
   const state = useWorkingCopyStore.getState();
-  const rawVersion = state.baseIr?.header.version?.trim() || "1.0";
+  const rawVersion = state.startIr?.header.version?.trim() || "1.0";
   return state.instantiationMode === "adapt-existing" ? bumpKeyboardVersion(rawVersion) : rawVersion;
 }
 

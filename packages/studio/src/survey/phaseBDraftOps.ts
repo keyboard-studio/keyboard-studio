@@ -213,7 +213,7 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
       chars.push(g);
     }
   };
-  const pushBase = (b: string): void => {
+  const pushStart = (b: string): void => {
     if (!baseSeen.has(b)) {
       baseSeen.add(b);
       bases.push(b);
@@ -241,7 +241,7 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
       const role = pick.role ?? declaredRoles[nfc] ?? "letter";
       declaredRoles[nfc] = role;
       if (role === "mark") pushMark(nfc);
-      else pushBase(nfc);
+      else pushStart(nfc);
       continue;
     }
     if (isCombiningMarkChar(nfc)) {
@@ -250,14 +250,14 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
     }
     const decomposition = decomposeGrapheme(nfc);
     if (decomposition !== null) {
-      pushBase(decomposition.base);
+      pushStart(decomposition.base);
       for (const m of decomposition.marks) pushMark(m);
       pushStack({ base: decomposition.base, marks: decomposition.marks });
       continue;
     }
     switch (glyphCategory(nfc)) {
       case "letter":
-        pushBase(nfc);
+        pushStart(nfc);
         break;
       case "number":
         pushNumber(nfc);

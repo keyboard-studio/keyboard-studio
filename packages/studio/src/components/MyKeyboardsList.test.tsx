@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { MyKeyboardsList, mergeProjectEntries } from "./MyKeyboardsList.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { listServerDrafts, type ServerDraftMeta } from "../lib/serverDraftStore.ts";
@@ -118,10 +118,10 @@ function seedLocalIndex(entries: Fixture[]): void {
  * ever changed.
  */
 function seedRealDraft(projectKey: string, displayName: string): void {
-  const base = { id: projectKey, displayName, languages: [] } as unknown as BaseKeyboard;
+  const base = { id: projectKey, displayName, languages: [] } as unknown as StartKeyboard;
   useWorkingCopyStore
     .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
+    .instantiateFromStart(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
   saveDraft(projectKey);
 }
 

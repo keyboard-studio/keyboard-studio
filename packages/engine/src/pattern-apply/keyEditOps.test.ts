@@ -225,7 +225,7 @@ describe("resolveSubKeyEntry", () => {
     const layout = makeTouchKeyRuleJoinLayout();
     const host = resolveKeyAddress(
       layout,
-      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressHost),
+      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressBase),
     );
     const loc = resolveSubKeyEntry(host!.key, { kind: "sk", id: "U_00A1" });
     expect(loc?.collection).toBe("sk");
@@ -236,21 +236,21 @@ describe("resolveSubKeyEntry", () => {
     const layout = makeTouchKeyRuleJoinLayout();
     const host = resolveKeyAddress(
       layout,
-      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressHost),
+      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressBase),
     );
     const loc = resolveSubKeyEntry(host!.key, { kind: "flick", id: "n" });
     expect(loc).toEqual({ collection: "flick", direction: "n", key: expect.objectContaining({ id: "U_2049" }) });
   });
 
   it("resolves a multitap sub-entry by id (ad hoc key; fixture carries none)", () => {
-    const hostWithMultitap: AddressableKeyLike = {
+    const baseWithMultitap: AddressableKeyLike = {
       id: "T_HOST",
       multitap: [
         { id: "T_HOST_2" },
         { id: "T_HOST_3" },
       ],
     };
-    const loc = resolveSubKeyEntry(hostWithMultitap, { kind: "multitap", id: "T_HOST_3" });
+    const loc = resolveSubKeyEntry(baseWithMultitap, { kind: "multitap", id: "T_HOST_3" });
     expect(loc).toEqual({ collection: "multitap", index: 1, key: { id: "T_HOST_3" } });
   });
 
@@ -258,7 +258,7 @@ describe("resolveSubKeyEntry", () => {
     const layout = makeTouchKeyRuleJoinLayout();
     const host = resolveKeyAddress(
       layout,
-      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressHost),
+      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressBase),
     );
     // The host has sk + flick, but no multitap entries.
     expect(resolveSubKeyEntry(host!.key, { kind: "multitap", id: "anything" })).toBeUndefined();
@@ -268,7 +268,7 @@ describe("resolveSubKeyEntry", () => {
     const layout = makeTouchKeyRuleJoinLayout();
     const host = resolveKeyAddress(
       layout,
-      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressHost),
+      mainKeyParts("phone", "default", TOUCH_JOIN_IDS.longpressBase),
     );
     expect(resolveSubKeyEntry(host!.key, { kind: "sk", id: "U_NOPE" })).toBeUndefined();
     expect(resolveSubKeyEntry(host!.key, { kind: "flick", id: "sw" })).toBeUndefined();

@@ -16,7 +16,7 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   confirmPrefill,
@@ -26,7 +26,7 @@ import {
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Footer Test",
   english: "Footer Test English",
   targetScript: "other",
@@ -64,9 +64,9 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     });
 
     // The footer appears the moment a project exists — right after the base
-    // is selected, `deriveProjectLabel`'s third tier (`baseKeyboard.displayName`)
+    // is selected, `deriveProjectLabel`'s third tier (`startKeyboard.displayName`)
     // already resolves, ahead of Phase A completing an identity patch.
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await expect(footer(page)).toBeVisible({ timeout: 20_000 });
     await expect(footer(page)).toContainText(/./); // some project name text present
 
@@ -191,7 +191,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await expect(footer(page)).toBeVisible({ timeout: 20_000 });
 
     // "identity" is the step the author is still walking through (its own

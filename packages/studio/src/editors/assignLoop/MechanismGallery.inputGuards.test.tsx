@@ -40,7 +40,7 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
   it("selecting 'Enter my own character...' reveals a custom text input", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -52,7 +52,7 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
   it("a custom literal character resolves to a vkey and Apply records the mapped key", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -74,7 +74,7 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
   it("custom U+ notation resolves through to the mapped key and shows the resolved character", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -96,7 +96,7 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
   it("an unmappable custom character shows an error and blocks Apply", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -113,7 +113,7 @@ describe("MechanismGallery — custom key option (S-01 swap)", () => {
   it("invalid U+ notation blocks Apply", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -135,7 +135,7 @@ describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => 
     // accentChar keeps the old convention (the trigger's literal character).
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
@@ -251,7 +251,7 @@ describe("MechanismGallery — custom key option (S-08 ralt)", () => {
     instantiateWithModifiersInUse("K_Q", ["RALT"]);
     seedInventory(["ŵ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
@@ -296,7 +296,7 @@ describe("MechanismGallery — delimiter guard (straight quotes)", () => {
   it("blocks Apply when the deadkey base-letter box resolves to a straight apostrophe", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
@@ -309,7 +309,7 @@ describe("MechanismGallery — delimiter guard (straight quotes)", () => {
   it("blocks Apply and shows the steer-to-U+02BC message when the deadkey CUSTOM TRIGGER character resolves to a straight quote", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
@@ -329,7 +329,7 @@ describe("MechanismGallery — delimiter guard (straight quotes)", () => {
   it("a straight apostrophe in the SWAP custom-character picker still maps to K_QUOTE and is NOT blocked", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -369,7 +369,7 @@ describe("MechanismGallery — single-grapheme guard on character boxes", () => 
   it("rejects a two-character literal paste in the deadkey base-letter box with the 'coming later' reason", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
@@ -387,7 +387,7 @@ describe("MechanismGallery — single-grapheme guard on character boxes", () => 
   it("accepts a base+combining sequence with a precomposed NFC form (n + U+0303 -> ñ) in the deadkey base-letter box", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     // "n" + U+0303 COMBINING TILDE precomposes under NFC to the single code
@@ -412,7 +412,7 @@ describe("MechanismGallery — multi-token compose (deadkey base-letter box)", (
   it("accepts a U+-composed single grapheme in the deadkey base-letter box", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
@@ -425,7 +425,7 @@ describe("MechanismGallery — multi-token compose (deadkey base-letter box)", (
   it("rejects a two-token compose that does NOT collapse to one grapheme in the deadkey base-letter box", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
@@ -449,7 +449,7 @@ describe("MechanismGallery — lone combining mark caution on the deadkey base-l
   it("shows a caution (does not block Apply) when the base letter is a bare combining mark", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
@@ -467,7 +467,7 @@ describe("MechanismGallery — lone combining mark caution on the deadkey base-l
   it("does not show the caution for a plain base letter", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
@@ -489,7 +489,7 @@ describe("MechanismGallery — no sentinel leak in the deadkey preview line", ()
   it("shows a neutral placeholder instead of the raw '__custom__' sentinel when custom trigger mode is unresolved", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
@@ -502,7 +502,7 @@ describe("MechanismGallery — no sentinel leak in the deadkey preview line", ()
   it("shows a neutral placeholder when the custom trigger character is unmappable (customError)", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
@@ -516,7 +516,7 @@ describe("MechanismGallery — no sentinel leak in the deadkey preview line", ()
   it("shows the resolved character (not the sentinel or placeholder) once the custom trigger resolves", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
@@ -539,7 +539,7 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
   it("marks the lone-combining-mark caution as a polite status region (deadkey base-letter box)", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.change(screen.getByLabelText(/Base letter for deadkey/i), {
@@ -555,7 +555,7 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
   it("marks the KeyPickerField custom-resolution reflection as a polite status region (SWAP custom key)", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -572,7 +572,7 @@ describe("MechanismGallery — accessible live-region roles on validation feedba
   it("marks the KeyPickerField custom-resolution error as an alert region (SWAP custom key)", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -598,7 +598,7 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
   it("the deadkey base-letter box carries no placeholder attribute", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     expect(screen.getByLabelText(/Base letter for deadkey/i).getAttribute("placeholder")).toBeNull();
@@ -607,7 +607,7 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
   it("the SWAP custom key input carries no placeholder attribute", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -618,7 +618,7 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
   it("the RALT custom key input carries no placeholder attribute", async () => {
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), CUSTOM_KEY_OPTION_VALUE);
@@ -629,7 +629,7 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
   it("the deadkey trigger custom input carries no placeholder attribute", async () => {
     seedInventory(["ā"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     await changeSelectMenu(screen.getByLabelText(/Trigger key for deadkey/i), CUSTOM_KEY_OPTION_VALUE);
@@ -640,7 +640,7 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
   it("shows a single character-box help caption near the method chooser, not repeated per box", async () => {
     seedInventory(["x"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     expect(
       screen.getAllByText(
@@ -658,7 +658,7 @@ describe("MechanismGallery — no in-box placeholders (Fix 1)", () => {
     // single-character) should appear once custom mode activates.
     seedInventory(["ẑ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     fireEvent.click(screen.getByText(/Assign to a key/i));
     expect(

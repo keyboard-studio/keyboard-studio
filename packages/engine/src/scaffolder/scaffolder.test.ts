@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createScaffolderService, renameFilesInVfs } from "./index.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { runAllChecks } from "../validator/index.js";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 
 const BASE_KMN = `store(&NAME) 'Base Keyboard'
 store(&COPYRIGHT) 'Copyright © 2020 Base Author'
@@ -16,7 +16,7 @@ group(main) using keys
 + [K_B] > 'b'
 `;
 
-const baseKeyboard: BaseKeyboard = {
+const startKeyboard: StartKeyboard = {
   id: "base_keyboard",
   path: "release/b/base_keyboard",
   script: "Latn",
@@ -122,7 +122,7 @@ describe("createScaffolderService", () => {
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       const kmnEntry = vfs.get("source/my_keyboard.kmn");
       expect(kmnEntry).toBeDefined();
@@ -140,7 +140,7 @@ describe("createScaffolderService", () => {
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       const kmnEntry = vfs.get("source/my_keyboard.kmn");
       const content = kmnEntry!.content as string;
@@ -166,7 +166,7 @@ describe("createScaffolderService", () => {
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       const requiredPaths = [
         "source/my_keyboard.kmn",
@@ -199,7 +199,7 @@ describe("createScaffolderService", () => {
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       expect(vfs.get("source/my_keyboard.ico")).toBeUndefined();
       expect(vfs.get("source/my_keyboard.kmn")!.content as string).not.toMatch(/&BITMAP/i);
@@ -221,7 +221,7 @@ describe("createScaffolderService", () => {
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       // Renamed to the new id (the base's icon basename matched the base id), so
       // the &BITMAP reference must follow it.
@@ -244,7 +244,7 @@ describe("createScaffolderService", () => {
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       const kmnEntry = vfs.get("source/my_keyboard.kmn");
       const content = kmnEntry!.content as string;
@@ -255,7 +255,7 @@ describe("createScaffolderService", () => {
     it("rejects scaffold with invalid keyboardId", async () => {
       const service = createScaffolderService();
       await expect(
-        service.scaffold(baseKeyboard, "bad id", "Bad Keyboard")
+        service.scaffold(startKeyboard, "bad id", "Bad Keyboard")
       ).rejects.toThrow(/invalid keyboardId/);
     });
 
@@ -263,7 +263,7 @@ describe("createScaffolderService", () => {
       const mockFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
 
-      const { vfs } = await service.scaffold(baseKeyboard, "new_keyboard", "New Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "new_keyboard", "New Keyboard");
 
       expect(vfs.get("source/new_keyboard.kmn")?.content).toContain("begin Unicode > use(main)");
       expect(vfs.get("LICENSE.md")?.content).toContain("MIT License");
@@ -273,7 +273,7 @@ describe("createScaffolderService", () => {
       const mockFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
 
-      const { vfs, warnings } = await service.scaffold(baseKeyboard, "new_keyboard", "New Keyboard");
+      const { vfs, warnings } = await service.scaffold(startKeyboard, "new_keyboard", "New Keyboard");
 
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toMatch(/base keyboard source unavailable/);
@@ -287,7 +287,7 @@ describe("createScaffolderService", () => {
       });
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
 
-      const { warnings } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { warnings } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       // The scaffolder itself adds no warnings; loader optional-file misses (.kps, .kpj)
       // are forwarded and are non-fatal.
@@ -302,7 +302,7 @@ describe("createScaffolderService", () => {
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard", {
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard", {
         group: "azerty",
       });
 
@@ -312,7 +312,7 @@ describe("createScaffolderService", () => {
     });
 
     it("structurally detects an AZERTY base whose id lacks an azerty/fr token (regression: #384)", async () => {
-      // base_keyboard's id has no "azerty"/"fr*" token, so the id-string
+      // start_keyboard's id has no "azerty"/"fr*" token, so the id-string
       // heuristic alone would route it to qwerty-qwertz. The NCAPS base row is
       // structurally AZERTY (K_Q->a, K_A->q, K_Z->w) and must win.
       const azertyKmn = `store(&KEYBOARDVERSION) '1.0'
@@ -332,7 +332,7 @@ group(main) using keys
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
       // No explicit group passed — relies on structural detection.
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
       const content = vfs.get("source/my_keyboard.kmn")!.content as string;
       // Extended AZERTY CasedKeys range (includes [K_0]..[K_9]) proves group=azerty.
@@ -354,7 +354,7 @@ group(main) using keys
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard", {
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard", {
         group: "qwerty-qwertz",
       });
 
@@ -371,7 +371,7 @@ group(main) using keys
       });
 
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard", {
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard", {
         group: "non-roman",
       });
 
@@ -392,7 +392,7 @@ describe("scaffold — displayName sanitization", () => {
 
   it("escapes single quote in KMN store(&NAME) with typographic apostrophe", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "O'Brien's Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
     expect(content).toContain("store(&NAME) 'O’Brien’s Keyboard'");
     expect(content).not.toContain("store(&NAME) 'O'Brien");
@@ -400,7 +400,7 @@ describe("scaffold — displayName sanitization", () => {
 
   it("escapes single quote in store(&COPYRIGHT)", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "O'Brien's Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
     // spec 064 SC-001: the display name is no longer used as the holder, so the
     // base's notice survives. Display-name ESCAPING is still covered by the
@@ -413,14 +413,14 @@ describe("scaffold — displayName sanitization", () => {
     const notFoundFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
     const service = createScaffolderService({ fetchImpl: notFoundFetch as typeof fetch });
     // U+0027 straight apostrophe in input; expect U+2019 right single quotation mark in output.
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "O'Brien's Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
     expect(content).toContain("store(&NAME) 'O’Brien’s Keyboard'");
   });
 
   it("HTML-escapes < > & in welcome.htm", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "<script>alert('xss')</script>");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "<script>alert('xss')</script>");
     const content = vfs.get("source/welcome/welcome.htm")!.content as string;
     expect(content).not.toContain("<script>");
     expect(content).toContain("&lt;script&gt;");
@@ -428,14 +428,14 @@ describe("scaffold — displayName sanitization", () => {
 
   it("HTML-escapes & in readme.htm", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "Foo & Bar");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "Foo & Bar");
     const content = vfs.get("source/readme.htm")!.content as string;
     expect(content).toContain("Foo &amp; Bar keyboard");
   });
 
   it("defuses */ in PHP block comment", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard */ eval('bad')");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard */ eval('bad')");
     const content = vfs.get("source/help/my_keyboard.php")!.content as string;
     // spec 080 FR-003: the stub now opens with the help-site header, whose
     // single-quoted $pagename may legitimately contain '*/' (not a comment
@@ -449,7 +449,7 @@ describe("scaffold — displayName sanitization", () => {
 
   it("strips newlines from displayName (prevents KMN line injection)", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My\nKeyboard\nInjected");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My\nKeyboard\nInjected");
     const kmnContent = vfs.get("source/my_keyboard.kmn")!.content as string;
     const nameLines = kmnContent.split("\n").filter((l) => l.startsWith("store(&NAME)"));
     expect(nameLines).toHaveLength(1);
@@ -458,7 +458,7 @@ describe("scaffold — displayName sanitization", () => {
 
   it("strips null bytes and control characters", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My\x00Keyboard\x01Name");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My\x00Keyboard\x01Name");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
     expect(content).not.toContain("\x00");
     expect(content).not.toContain("\x01");
@@ -516,7 +516,7 @@ describe("scaffold — additional coverage", () => {
       return Promise.resolve(makeNotFoundResponse());
     });
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
     expect(vfs.get("source/base_keyboard.kmn")).toBeUndefined();
     expect(vfs.get("source/my_keyboard.kmn")).toBeDefined();
   });
@@ -525,20 +525,20 @@ describe("scaffold — additional coverage", () => {
     const kmnWithExisting = BASE_KMN + "store(&CasedKeys) [K_A]..[K_Z]\n";
     const mockFetch = vi.fn().mockResolvedValue(makeTextResponse(kmnWithExisting));
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
     const count = (content.match(/store\(&CasedKeys\)/gi) ?? []).length;
     expect(count).toBe(1);
   });
 
   it("auto-detects non-roman for non-Latn script", async () => {
-    const nonLatnBase = { ...baseKeyboard, script: "Deva" };
+    const nonLatnStart = { ...startKeyboard, script: "Deva" };
     const mockFetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
       return Promise.resolve(makeNotFoundResponse());
     });
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-    const { vfs } = await service.scaffold(nonLatnBase, "my_keyboard", "My Keyboard");
+    const { vfs } = await service.scaffold(nonLatnStart, "my_keyboard", "My Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
     expect(content).not.toContain("store(&CasedKeys)");
   });
@@ -568,7 +568,7 @@ group(main) using keys
       return Promise.resolve(makeNotFoundResponse());
     });
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
-    const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+    const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
 
     const entry = vfs.get("source/my_keyboard.keyman-touch-layout");
     expect(entry).toBeDefined();
@@ -604,14 +604,14 @@ group(main) using keys
         Promise.resolve(url.includes(".kmn") ? makeTextResponse(kmn) : makeNotFoundResponse()),
       ) as unknown as typeof fetch;
 
-    const scaffoldKps = async (kmn: string, base: BaseKeyboard, id: string): Promise<string> => {
+    const scaffoldKps = async (kmn: string, base: StartKeyboard, id: string): Promise<string> => {
       const service = createScaffolderService({ fetchImpl: fetchKmn(kmn) });
       const { vfs } = await service.scaffold(base, id, "My Keyboard");
       return vfs.get(`source/${id}.kps`)!.content as string;
     };
 
     it("emits a buildable .kps, not the empty stub (FollowKeyboardVersion + Description + populated Files)", async () => {
-      const kps = await scaffoldKps(BASE_KMN, baseKeyboard, "my_keyboard");
+      const kps = await scaffoldKps(BASE_KMN, startKeyboard, "my_keyboard");
       expect(kps).not.toBe("<Package><Info/><Files/></Package>");
       expect(kps).toContain("<FollowKeyboardVersion/>");
       expect(kps).toMatch(/<Description[^>]*>.+<\/Description>/);
@@ -621,19 +621,19 @@ group(main) using keys
 
     it("lists the .js for web/touch targets and omits .kvk when there is no visual keyboard", async () => {
       // BASE_KMN: &TARGETS 'any' (web) and no &VISUALKEYBOARD.
-      const kps = await scaffoldKps(BASE_KMN, baseKeyboard, "my_keyboard");
+      const kps = await scaffoldKps(BASE_KMN, startKeyboard, "my_keyboard");
       expect(kps).toContain("..\\build\\my_keyboard.js");
       expect(kps).not.toContain("my_keyboard.kvk");
     });
 
     it("omits the .js for desktop-only targets (referencing an unproduced .js would fail kmc KM04003)", async () => {
-      const kps = await scaffoldKps(DESKTOP_KMN, baseKeyboard, "my_keyboard");
+      const kps = await scaffoldKps(DESKTOP_KMN, startKeyboard, "my_keyboard");
       expect(kps).not.toContain("my_keyboard.js");
       expect(kps).toContain("..\\build\\my_keyboard.kmx");
     });
 
     it("lists the .kvk when the keyboard declares a visual keyboard", async () => {
-      const kps = await scaffoldKps(VK_KMN, baseKeyboard, "my_keyboard");
+      const kps = await scaffoldKps(VK_KMN, startKeyboard, "my_keyboard");
       expect(kps).toContain("..\\build\\my_keyboard.kvk");
     });
 
@@ -644,19 +644,19 @@ group(main) using keys
     // projection's step 3.6 replaces this block with the AUTHOR's tag before
     // anything ships (FR-001). The `und` fallback is unchanged.
     it("threads base.languages[0] into <Languages>, falling back to 'und' when absent", async () => {
-      const withLang: BaseKeyboard = { ...baseKeyboard, languages: ["ak", "en"] };
+      const withLang: StartKeyboard = { ...startKeyboard, languages: ["ak", "en"] };
       const kpsLang = await scaffoldKps(BASE_KMN, withLang, "kb_lang");
       expect(kpsLang).toContain('<Language ID="ak">');
       expect(kpsLang.match(/<Language\b/g)).toHaveLength(1);
       expect(kpsLang).not.toContain('<Language ID="en">');
 
-      const kpsUnd = await scaffoldKps(BASE_KMN, baseKeyboard, "kb_und");
+      const kpsUnd = await scaffoldKps(BASE_KMN, startKeyboard, "kb_und");
       expect(kpsUnd).toContain('<Language ID="und">');
     });
 
     it("propagates base.version into <Keyboard><Version> instead of hardcoding 1.0", async () => {
-      const v2Base: BaseKeyboard = { ...baseKeyboard, version: "2.0" };
-      const kps = await scaffoldKps(BASE_KMN, v2Base, "my_keyboard");
+      const v2Start: StartKeyboard = { ...startKeyboard, version: "2.0" };
+      const kps = await scaffoldKps(BASE_KMN, v2Start, "my_keyboard");
       // Version must appear inside <Keyboards><Keyboard>, not as the hardcoded "1.0".
       expect(kps).toContain("<Version>2.0</Version>");
       expect(kps).not.toContain("<Version>1.0</Version>");
@@ -690,7 +690,7 @@ describe("attribution emission (spec 064)", () => {
   }
 
   async function scaffoldWith(opts: Record<string, unknown>) {
-    return serviceWithBase().scaffold(baseKeyboard, "my_keyboard", "My Keyboard", opts);
+    return serviceWithBase().scaffold(startKeyboard, "my_keyboard", "My Keyboard", opts);
   }
 
   function texts(vfs: import("@keyboard-studio/contracts").VirtualFS) {
@@ -727,11 +727,11 @@ describe("attribution emission (spec 064)", () => {
   // SC-006: the license body is a constant (all 920 shipped files are MIT with
   // one canonical body).
   it("SC-006: the MIT body is byte-identical across differently-named keyboards", async () => {
-    const a = await serviceWithBase().scaffold(baseKeyboard, "kb_one", "Keyboard One", {
+    const a = await serviceWithBase().scaffold(startKeyboard, "kb_one", "Keyboard One", {
       attribution: ATTRIBUTION,
       emitYear: YEAR,
     });
-    const b = await serviceWithBase().scaffold(baseKeyboard, "kb_two", "Keyboard Two", {
+    const b = await serviceWithBase().scaffold(startKeyboard, "kb_two", "Keyboard Two", {
       attribution: { ...ATTRIBUTION, copyrightHolder: "Someone Else" },
       emitYear: 2019,
     });
@@ -862,7 +862,7 @@ describe("derived keyboard accumulates the base's copyright (spec 064 US2)", () 
 
   async function derive(licenseText: string | null) {
     return serviceWithLicense(licenseText).scaffold(
-      baseKeyboard,
+      startKeyboard,
       "my_keyboard",
       "My Keyboard",
       { attribution: NEW_AUTHOR, emitYear: 2026 },
@@ -911,7 +911,7 @@ describe("derived keyboard accumulates the base's copyright (spec 064 US2)", () 
 
   it("EXTENDS the year range when the same holder derives again, without duplicating", async () => {
     const { vfs } = await serviceWithLicense(license("Copyright © 2016 Second Author")).scaffold(
-      baseKeyboard,
+      startKeyboard,
       "my_keyboard",
       "My Keyboard",
       { attribution: NEW_AUTHOR, emitYear: 2026 },
@@ -983,10 +983,10 @@ describe("D5 escape hatch — baseHolderOverride (spec 064)", () => {
   }
 
   async function run(override?: string) {
-    return svc(UNREADABLE).scaffold(baseKeyboard, "my_keyboard", "My Keyboard", {
+    return svc(UNREADABLE).scaffold(startKeyboard, "my_keyboard", "My Keyboard", {
       attribution: NEW_AUTHOR,
       emitYear: 2026,
-      ...(override !== undefined ? { baseHolderOverride: override } : {}),
+      ...(override !== undefined ? { startHolderOverride: override } : {}),
     });
   }
 
@@ -1063,7 +1063,7 @@ describe("single-line copyright metadata uses the Portions convention (spec 064 
 
   async function fields(licenseText: string | null) {
     const { vfs } = await svc(licenseText).scaffold(
-      baseKeyboard,
+      startKeyboard,
       "my_keyboard",
       "My Keyboard",
       { attribution: NEW_AUTHOR, emitYear: 2026 },

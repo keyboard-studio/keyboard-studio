@@ -3,18 +3,18 @@
 // Coverage goal: the default flow can navigate straight to #output (e.g.
 // handlePhaseFComplete -> navigateTo("output")) without ever visiting
 // #preview. OutputScreen mounts its own independent usePreviewArtifact()
-// instance (see the hook's module comment) and its local `baseKeyboard` state
+// instance (see the hook's module comment) and its local `startKeyboard` state
 // used to always start at null, gating the download affordance
 // (data-testid="emit-download" in OutputScreen.tsx) closed even when the
 // working-copy store already has an instantiated base from an earlier step.
 //
-// Fix under test: usePreviewArtifact's local baseKeyboard is lazy-initialized
-// from useWorkingCopyStore.getState().baseKeyboard, so a freshly-mounted
+// Fix under test: usePreviewArtifact's local startKeyboard is lazy-initialized
+// from useWorkingCopyStore.getState().startKeyboard, so a freshly-mounted
 // screen picks up the already-instantiated base immediately.
 //
 // Approach: mock @keyboard-studio/engine minimally (loadEngine() just needs
 // the three required exports to resolve as a module) so useKeyboardArtifact's
-// effect does not throw; assert on the hook's returned baseKeyboard value
+// effect does not throw; assert on the hook's returned startKeyboard value
 // synchronously at mount, before any async compile settles.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -46,7 +46,7 @@ describe("usePreviewArtifact — mount seeding from the working-copy store", () 
   it("starts with baseKeyboard === null when the store has no instantiated base", async () => {
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
     const { result } = renderHook(() => usePreviewArtifact());
-    expect(result.current.baseKeyboard).toBeNull();
+    expect(result.current.startKeyboard).toBeNull();
   });
 
   it("seeds baseKeyboard from the store's already-instantiated base at mount (no prior #preview visit)", async () => {
@@ -56,7 +56,7 @@ describe("usePreviewArtifact — mount seeding from the working-copy store", () 
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs,
       ir: makeTestIR([]),
     });
@@ -64,7 +64,7 @@ describe("usePreviewArtifact — mount seeding from the working-copy store", () 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
     const { result } = renderHook(() => usePreviewArtifact());
 
-    expect(result.current.baseKeyboard).not.toBeNull();
-    expect(result.current.baseKeyboard?.id).toBe(basicKbdus.id);
+    expect(result.current.startKeyboard).not.toBeNull();
+    expect(result.current.startKeyboard?.id).toBe(basicKbdus.id);
   });
 });

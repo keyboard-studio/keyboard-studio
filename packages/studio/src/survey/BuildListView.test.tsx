@@ -5,7 +5,7 @@
 //   - BuildListView: tested through the exported PhaseB component. The
 //     IntroChooser renders first with "build-list" pre-selected; clicking
 //     "Continue" transitions to BuildListView.
-//   - useWorkingCopyStore is seeded directly before each test that needs a baseIr.
+//   - useWorkingCopyStore is seeded directly before each test that needs a startIr.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, fireEvent, act, cleanup } from "@testing-library/react";
@@ -217,7 +217,7 @@ describe("CharChipEditor", () => {
 
 describe("BuildListView — end-to-end onComplete", () => {
   it("Done fires onComplete with NFC-normalized, deduped union of typed chars", async () => {
-    useWorkingCopyStore.getState().instantiateFromBase(
+    useWorkingCopyStore.getState().instantiateFromStart(
       {
         id: "test_kb",
         path: "release/t/test_kb",

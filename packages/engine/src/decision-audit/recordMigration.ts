@@ -123,6 +123,27 @@ function normalizePayload(payload: DecisionPayload): DecisionPayload {
   };
 }
 
+/**
+ * The #1810 identifier rename stage (unstaged by record version — it applies
+ * to ANY record written before the rename, including a current-version one):
+ * a `base-contribution` payload's starting-keyboard id was stored as
+ * `baseId`; it is now `startId`. The payload's `kind` discriminant
+ * (`"base-contribution"`) and its `baseDisplayName` field are wire names
+ * and deliberately do NOT change. A payload already carrying `startId`
+ * passes through untouched (same reference), as does every other payload.
+ */
+function normalizeContributionPayload(payload: DecisionPayload): DecisionPayload {
+  if (payload.kind !== "base-contribution") return payload;
+  const raw = payload as unknown as Record<string, unknown>;
+  if (typeof raw.startId === "string" || typeof raw.baseId !== "string") return payload;
+  const { baseId: _legacyId, ...rest } = raw;
+  return {
+    ...rest,
+    kind: "base-contribution",
+    startId: raw.baseId,
+  } as unknown as DecisionPayload;
+}
+
 function normalizeEntry(entry: PreMigrationEntry): DecisionEntry {
   const payload = normalizePayload(entry.payload);
   if (entry.impact === undefined) {
@@ -136,7 +157,10 @@ function normalizeEntry(entry: PreMigrationEntry): DecisionEntry {
  * Normalize a record on read.
  *
  * Normalization is STAGED by the record's own version, and each stage runs
- * only over the records it describes:
+ * only over the records it describes — with one unstaged exception: the
+ * #1810 contribution-field rename ({@link normalizeContributionPayload})
+ * runs at every version, because pre-rename records exist at the current
+ * version too.
  *
  *   - `version < 2` — including one with no `version` at all, which a pre-055
  *     build may not have written — is normalized entry by entry per
@@ -166,15 +190,27 @@ function normalizeEntry(entry: PreMigrationEntry): DecisionEntry {
  */
 export function normalizeDecisionRecord(record: PreMigrationDecisionRecord): DecisionRecord {
   const version = typeof record.version === "number" ? record.version : 1;
-  if (version >= DECISION_RECORD_VERSION) return record as DecisionRecord;
+  // The #1810 rename stage runs at every version, ahead of the staged
+  // transforms (and ahead of schema validation in parseDecisionRecord, which
+  // would otherwise drop a pre-rename contribution entry outright).
+  const contributionNormalized = record.entries.map((entry) => {
+    const payload = normalizeContributionPayload(entry.payload as DecisionPayload);
+    return payload === entry.payload ? entry : { ...entry, payload };
+  });
+  const anyContributionRenamed = contributionNormalized.some((e, i) => e !== record.entries[i]);
+  if (version >= DECISION_RECORD_VERSION) {
+    if (!anyContributionRenamed) return record as DecisionRecord;
+    return { ...record, entries: contributionNormalized as unknown as DecisionEntry[] } as DecisionRecord;
+  }
+  const staged =
+    version < 2
+      ? contributionNormalized.map((e) => normalizeEntry(e as PreMigrationEntry))
+      : (contributionNormalized as unknown as DecisionEntry[]);
   return {
     format: record.format,
     version: DECISION_RECORD_VERSION,
     keyboardId: record.keyboardId,
-    entries:
-      version < 2
-        ? record.entries.map(normalizeEntry)
-        : (record.entries as unknown as DecisionEntry[]),
+    entries: staged,
     truncated: record.truncated,
   };
 }

@@ -81,7 +81,7 @@ function seedKeyModeFixture(opts: {
     },
   ]);
   const ir = makeTestIR([]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],

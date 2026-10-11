@@ -77,7 +77,7 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite as driveIdentityLiteBase,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   confirmPrefill,
@@ -89,13 +89,13 @@ import {
 // Fixture constants
 // ---------------------------------------------------------------------------
 
-const BASE_KEYBOARD_ID = "bambara";
+const START_KEYBOARD_ID = "bambara";
 
 /** Same role as touch-key-assign.spec.ts's PLACED_CHAR — an atomic (non-decomposable) new letter that makes the characters -> carve -> mechanisms spine walkable without dragging in the marks series. */
 const PLACED_CHAR = "ø";
 const PLACED_CHAR_UPPER = "Ø";
-const PLACED_CHAR_HOST_KEY = "K_W";
-const PLACED_CHAR_UPPER_HOST_KEY = "K_X";
+const PLACED_CHAR_BASE_KEY = "K_W";
+const PLACED_CHAR_UPPER_BASE_KEY = "K_X";
 
 /** The character assigned to the NEWLY ADDED key (step 2 of the walk). */
 const ASSIGNED_NOTATION = "U+025B";
@@ -114,7 +114,7 @@ const DELETE_KEY_TESTID = "key-property-panel-delete";
 /** The key property panel's disclosure for the character-assignment surface (spec 065 T028-T039). */
 const ASSIGN_DISCLOSURE_TESTID = "key-property-panel-assign-disclosure";
 
-const TOUCH_LAYOUT_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
+const TOUCH_LAYOUT_PATH = `source/${START_KEYBOARD_ID}.keyman-touch-layout`;
 
 /**
  * The layer the walk actually edits — the grid opens on `phone:default`, so the
@@ -144,7 +144,7 @@ const EDITED_LAYER = "default";
  *
  * Both deltas land BEFORE the touch stage is reached and are correct product
  * behaviour, not regressions: the same propagation also rewrites
- * `source/${BASE_KEYBOARD_ID}.kvks` (combo -> kvks token mapping), which is why
+ * `source/${START_KEYBOARD_ID}.kvks` (combo -> kvks token mapping), which is why
  * that file joins `.kmn` and the touch layout in (d)'s excused list.
  *
  * This spec was `test.skip`ped from birth, so neither premise was ever executed.
@@ -162,7 +162,7 @@ const EDITED_LAYER = "default";
 type KsE2EFileSnapshot = Readonly<Record<string, string>>;
 
 interface KsE2EHook {
-  snapshotBaseFiles(): KsE2EFileSnapshot | null;
+  snapshotStartFiles(): KsE2EFileSnapshot | null;
   snapshotOutputFiles(): Promise<KsE2EFileSnapshot | null>;
 }
 
@@ -247,7 +247,7 @@ function layerKeys(
  *   after the add          envelope {font, defaultHint}   sk[] += default/K_W, shift/K_X
  *   after assign / remove  unchanged from the add
  *
- * `K_W` and `K_X` are `PLACED_CHAR_HOST_KEY` / `PLACED_CHAR_UPPER_HOST_KEY` —
+ * `K_W` and `K_X` are `PLACED_CHAR_BASE_KEY` / `PLACED_CHAR_UPPER_BASE_KEY` —
  * the longpress hosts `driveMechanisms` placed ø and Ø on, long before key mode
  * is entered. Those menus are spliced into the raw JSON the first time the touch
  * layout is rewritten, and `applyTouchAssignmentsToRawJson` promotes
@@ -306,7 +306,7 @@ async function skipCarve(page: Page): Promise<void> {
   await page.getByTestId("carve-continue").click();
 }
 
-async function placeMechanismCharacter(page: Page, char: string, hostKey: string): Promise<void> {
+async function placeMechanismCharacter(page: Page, char: string, baseKey: string): Promise<void> {
   const applyButton = page.getByRole("button", { name: `Apply method for ${char}` });
   await expect(applyButton).toBeVisible({ timeout: 15_000 });
   if (await applyButton.isDisabled()) {
@@ -314,7 +314,7 @@ async function placeMechanismCharacter(page: Page, char: string, hostKey: string
     await page.getByRole("button", { name: "Layer 1 for layer-switch combo" }).click();
     await page.locator('ul[role="listbox"]').locator('li[data-value="RALT"]').click();
     await page.getByRole("button", { name: "Physical key for Assign to a key" }).click();
-    await page.locator('ul[role="listbox"]').locator(`li[data-value="${hostKey}"]`).click();
+    await page.locator('ul[role="listbox"]').locator(`li[data-value="${baseKey}"]`).click();
   }
   await expect(applyButton).toBeEnabled();
   await applyButton.click();
@@ -325,9 +325,9 @@ async function driveMechanisms(page: Page): Promise<void> {
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();
   }
-  await placeMechanismCharacter(page, PLACED_CHAR, PLACED_CHAR_HOST_KEY);
+  await placeMechanismCharacter(page, PLACED_CHAR, PLACED_CHAR_BASE_KEY);
   await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
-  await placeMechanismCharacter(page, PLACED_CHAR_UPPER, PLACED_CHAR_UPPER_HOST_KEY);
+  await placeMechanismCharacter(page, PLACED_CHAR_UPPER, PLACED_CHAR_UPPER_BASE_KEY);
   await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
 }
 
@@ -354,8 +354,8 @@ async function enterTouchKeyMode(page: Page): Promise<void> {
 }
 
 /** The shipped source as instantiated, via the flag-gated `__ksE2E__` hook. */
-async function snapshotBaseFiles(page: Page): Promise<KsE2EFileSnapshot> {
-  const files = await page.evaluate(() => window.__ksE2E__?.snapshotBaseFiles() ?? null);
+async function snapshotStartFiles(page: Page): Promise<KsE2EFileSnapshot> {
+  const files = await page.evaluate(() => window.__ksE2E__?.snapshotStartFiles() ?? null);
   expect(files, "base VFS snapshot (is VITE_E2E / ?e2e=1 active?)").not.toBeNull();
   return files as KsE2EFileSnapshot;
 }
@@ -381,7 +381,7 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 063 SC-006)"
     await page.goto("/?e2e=1");
 
     await driveIdentityLite(page);
-    await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+    await pickStartKeyboard(page, START_KEYBOARD_ID);
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
     await confirmPrefill(page);
@@ -395,9 +395,9 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 063 SC-006)"
     // The shipped source, captured BEFORE any edit — the baseline every
     // assertion below compares against.
     // -----------------------------------------------------------------------
-    const baseFiles = await snapshotBaseFiles(page);
+    const baseFiles = await snapshotStartFiles(page);
     const baseLayoutText = baseFiles[TOUCH_LAYOUT_PATH];
-    expect(baseLayoutText, `${TOUCH_LAYOUT_PATH} must ship with ${BASE_KEYBOARD_ID}`).toBeDefined();
+    expect(baseLayoutText, `${TOUCH_LAYOUT_PATH} must ship with ${START_KEYBOARD_ID}`).toBeDefined();
     const baseLayout = JSON.parse(baseLayoutText as string) as TouchLayoutJson;
     const baseKeys = indexKeys(baseLayout);
     expect(baseKeys.size, "the shipped layout must have keys to be faithful to").toBeGreaterThan(0);

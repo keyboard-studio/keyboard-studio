@@ -41,7 +41,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
 
     // "ǯ" is composable from a session-produced ezh + that SAME deadkey's
     // session-produced bare caron byproduct (identical fixture shape to the
@@ -110,7 +110,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
       );
     });
 
@@ -169,7 +169,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
 
     // Base-produced characters stay OUT of lettersToAdd (same as the "z" case
     // in the Done-button tests below) — reach it via the SHOW-ALL strip.
@@ -197,7 +197,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
       );
     });
 
@@ -227,7 +227,7 @@ describe("MechanismGallery — kbgen suggestion row text (S-01 keycap convention
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
 
     seedInventory(["x"]);
 
@@ -253,7 +253,7 @@ describe("MechanismGallery — kbgen suggestion row text (S-01 keycap convention
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
       );
     });
 
@@ -284,7 +284,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           onBack={onBack}
           placementMap={corpusBackedQwerty}
         />, { withStepNav: true }
@@ -347,7 +347,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={corpusBackedQwerty}
         />, { withStepNav: true }
       );
@@ -418,7 +418,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
         />, { withStepNav: true }
       );
@@ -438,7 +438,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
         />, { withStepNav: true }
       );
@@ -473,7 +473,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
         />, { withStepNav: true }
       );
@@ -521,7 +521,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={capsPlacementMap}
         />, { withStepNav: true }
       );
@@ -574,7 +574,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -609,7 +609,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -642,7 +642,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -667,7 +667,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -691,7 +691,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -750,7 +750,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -803,7 +803,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -860,7 +860,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -919,7 +919,7 @@ describe("MechanismGallery — suggestion row suppressed by non-chip coverage", 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -953,7 +953,7 @@ describe("MechanismGallery — suggestion row suppressed by non-chip coverage", 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
         />, { withStepNav: true }
       );
@@ -981,7 +981,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
         />, { withStepNav: true }
       );
@@ -1002,7 +1002,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
         />, { withStepNav: true }
       );
@@ -1044,7 +1044,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
         />, { withStepNav: true }
       );
@@ -1065,7 +1065,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
     await act(async () => {
       render(
         <MechanismGallery
-          selectedBaseKeyboard={basicKbdus}
+          selectedStartKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
         />, { withStepNav: true }
       );

@@ -1,8 +1,8 @@
 // addTouchAdapter — wraps TouchGallery as an EditorStep (P4a, T012).
 //
 // TouchGallery's onComplete receives TouchAssignment[] — the adapter wraps
-// them in a TouchCompleteResult-shaped payload (assignments + baseIr +
-// baseVfs + mods + seedSource) carrying the full spec 035 replay + R11
+// them in a TouchCompleteResult-shaped payload (assignments + startIr +
+// startVfs + mods + seedSource) carrying the full spec 035 replay + R11
 // emission inputs.
 //
 // mods (spec 035 R3 — carve removals + Phase C letter placements) is computed
@@ -46,15 +46,15 @@ const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
  * loop). Satisfies React.ComponentType<EditorStepProps>.
  *
  * Wraps TouchGallery's raw TouchAssignment[] in a TouchCompleteResult so
- * the completion effects receive assignments + baseIr + baseVfs + mods +
+ * the completion effects receive assignments + startIr + startVfs + mods +
  * seedSource and can apply the spec 035 replay + R11 emission matrix
  * correctly.
  */
 export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
-  // Self-source baseIr and baseVfs from the working-copy store (FR-007).
+  // Self-source startIr and startVfs from the working-copy store (FR-007).
   // These are the post-lockDesktop snapshots needed by buildTouchLayoutJson.
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
@@ -78,13 +78,13 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
 
   const mods = useMemo<DesktopModifications>(() => {
-    if (baseIr === null) return EMPTY_MODS;
-    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
+    if (startIr === null) return EMPTY_MODS;
+    return deriveDesktopModifications(startIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseIr, modsDepsKey]);
+  }, [startIr, modsDepsKey]);
 
   function handleComplete(assignments: TouchAssignment[]) {
-    const payload: TouchCompleteResult = { assignments, baseIr, baseVfs, mods, seedSource };
+    const payload: TouchCompleteResult = { assignments, startIr, startVfs, mods, seedSource };
     useDecisionStore.getState().record({
       id: "touch-layout",
       value: currentTouchLayoutValue(),

@@ -40,7 +40,7 @@ afterEach(() => {
 async function renderGallery(): Promise<void> {
   seedInventory(["á"]);
   await act(async () => {
-    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
+    render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
   });
 }
 

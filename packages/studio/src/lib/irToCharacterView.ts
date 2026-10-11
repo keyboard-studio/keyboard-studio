@@ -388,7 +388,7 @@ function sequenceShapeCells(ir: KeyboardIR): { ch: string; keys: string[] }[] {
     // desktop key behind it, never rendered as a desktop step) routes through
     // the shared irToCarveNodes.ts helper so the touch-only check lives in
     // exactly one place (mirrors slotItemLabel / expandParallelStoreRule's
-    // faithfulBaseLabel there).
+    // faithfulStartLabel there).
     if (item.kind === 'vkey') return desktopVkeyLabel(item.name);
     return undefined;
   };

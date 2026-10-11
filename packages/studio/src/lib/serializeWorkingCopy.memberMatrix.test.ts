@@ -29,10 +29,10 @@ const BASE_IMAGES = [
 ];
 
 type Instantiation = "net-new" | "track1-copy" | "track2-adapt";
-type BaseDocs = "flat" | "folder" | "none";
+type StartDocs = "flat" | "folder" | "none";
 
 const INSTANTIATIONS: Instantiation[] = ["net-new", "track1-copy", "track2-adapt"];
-const BASE_DOC_SHAPES: BaseDocs[] = ["flat", "folder", "none"];
+const BASE_DOC_SHAPES: StartDocs[] = ["flat", "folder", "none"];
 
 function memberPaths(keyboardId: string): string[] {
   return [
@@ -45,7 +45,7 @@ function memberPaths(keyboardId: string): string[] {
   ];
 }
 
-function seed(instantiation: Instantiation, baseDocs: BaseDocs) {
+function seed(instantiation: Instantiation, startDocs: StartDocs) {
   const vfs = createVirtualFS([
     { path: `source/${basicKbdus.id}.kmn`, content: KMN_TEXT, isBinary: false },
   ]);
@@ -55,28 +55,28 @@ function seed(instantiation: Instantiation, baseDocs: BaseDocs) {
   if (instantiation === "track2-adapt") {
     store.instantiateFromExisting(basicKbdus, { vfs, ir });
   } else {
-    store.instantiateFromBase(basicKbdus, { vfs, ir });
+    store.instantiateFromStart(basicKbdus, { vfs, ir });
   }
   const wc = useWorkingCopyStore.getState();
 
   // What the instantiation seam (useKeyboardArtifact) sets per track and base
   // shape: prose only on the adapt track (FR-007); images on both tracks (R9);
   // a net-new keyboard has no base documentation at all.
-  const baseWelcomeHtml = `<html><body><p>${BASE_PROSE}</p></body></html>`;
+  const startWelcomeHtml = `<html><body><p>${BASE_PROSE}</p></body></html>`;
   if (instantiation !== "net-new") {
-    if (baseDocs === "flat") {
-      wc.setBaseWelcomeConvention("flat");
-      if (instantiation === "track2-adapt") wc.setBaseWelcomeHtmText(baseWelcomeHtml);
-    } else if (baseDocs === "folder") {
-      wc.setBaseWelcomeConvention("folder");
-      wc.setBaseWelcomeImages(BASE_IMAGES);
+    if (startDocs === "flat") {
+      wc.setStartWelcomeConvention("flat");
+      if (instantiation === "track2-adapt") wc.setStartWelcomeHtmText(startWelcomeHtml);
+    } else if (startDocs === "folder") {
+      wc.setStartWelcomeConvention("folder");
+      wc.setStartWelcomeImages(BASE_IMAGES);
       if (instantiation === "track2-adapt") {
-        wc.setBaseWelcomeHtmText(baseWelcomeHtml);
-        wc.setBaseReadmeMdText(`# Base\n\n${BASE_PROSE}\n`);
-        wc.setBaseHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
+        wc.setStartWelcomeHtmText(startWelcomeHtml);
+        wc.setStartReadmeMdText(`# Base\n\n${BASE_PROSE}\n`);
+        wc.setStartHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
       }
     } else {
-      wc.setBaseWelcomeConvention("absent");
+      wc.setStartWelcomeConvention("absent");
     }
   }
   wc.setHelpDocs({ description: "Author prose.", usageTips: [] });
@@ -91,28 +91,28 @@ afterEach(() => {
 });
 
 describe.each(INSTANTIATIONS)("SC-001 member matrix — %s", (instantiation) => {
-  describe.each(BASE_DOC_SHAPES)("base docs: %s", (baseDocs) => {
+  describe.each(BASE_DOC_SHAPES)("base docs: %s", (startDocs) => {
     it("ships all six documentation members, the welcome page at the folder path, no flat file", async () => {
-      seed(instantiation, baseDocs);
+      seed(instantiation, startDocs);
       const projected = await projectWorkingCopyForOutput();
       expect(projected).not.toBeNull();
       const vfs = projected!.vfs;
 
       for (const path of memberPaths(projected!.keyboardId)) {
         const entry = vfs.get(path);
-        expect(entry, `${instantiation} × ${baseDocs}: ${path} must ship`).toBeDefined();
+        expect(entry, `${instantiation} × ${startDocs}: ${path} must ship`).toBeDefined();
         expect(typeof entry!.content === "string" && entry!.content.length > 0, `${path} must be non-empty text`).toBe(true);
       }
       expect(vfs.get("source/welcome.htm"), "the flat welcome path must never ship (FR-002)").toBeUndefined();
     });
 
     it("carries the base's welcome images exactly when the base shipped them, and prose only on the adapt track", async () => {
-      seed(instantiation, baseDocs);
+      seed(instantiation, startDocs);
       const projected = await projectWorkingCopyForOutput();
       const vfs = projected!.vfs;
       const welcome = vfs.get("source/welcome/welcome.htm")!.content as string;
 
-      const expectImages = instantiation !== "net-new" && baseDocs === "folder";
+      const expectImages = instantiation !== "net-new" && startDocs === "folder";
       for (const img of BASE_IMAGES) {
         const entry = vfs.get(`source/${img.path}`);
         if (expectImages) {
@@ -129,8 +129,8 @@ describe.each(INSTANTIATIONS)("SC-001 member matrix — %s", (instantiation) => 
         }
       }
 
-      const expectProse = instantiation === "track2-adapt" && baseDocs !== "none";
-      expect(welcome.includes(BASE_PROSE), `${instantiation} × ${baseDocs}: base prose inherited?`).toBe(expectProse);
+      const expectProse = instantiation === "track2-adapt" && startDocs !== "none";
+      expect(welcome.includes(BASE_PROSE), `${instantiation} × ${startDocs}: base prose inherited?`).toBe(expectProse);
       // The fixture base ships no help page, so the help page is derived from
       // the welcome page and carries the same body (criterion 11.9).
       const help = vfs.get(`source/help/${projected!.keyboardId}.php`)!.content as string;

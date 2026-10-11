@@ -88,7 +88,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set([findRuleId(ir, "a")]),
       assignments: [],
@@ -123,7 +123,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       assignments: [],
@@ -147,7 +147,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set([extrasGroup.nodeId]),
       deletedItemIds: new Set([findRuleId(ir, "a")]),
       assignments: [],
@@ -172,7 +172,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     expect(content).not.toContain("K_C");
   });
 
-  // baseIr must not be mutated by the projection.
+  // startIr must not be mutated by the projection.
   it("does not mutate baseIr when deletedItemIds is used", () => {
     const rule0 = makeRule("rule#0", "K_A", "a");
     const rule1 = makeRule("rule#1", "K_B", "b");
@@ -183,7 +183,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["rule#0"]),
       assignments: [],
@@ -191,7 +191,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
       identity: null,
     });
 
-    // baseIr must still have both rules.
+    // startIr must still have both rules.
     expect(ir.groups[0]?.rules.length).toBe(2);
     expect(ir.groups[0]?.rules[0]?.nodeId).toBe("rule#0");
   });
@@ -214,7 +214,7 @@ describe("projectWorkingCopyVfs deleted-items + fragment-bearing keyboard — re
   //   (d) the fragment itself appears in the emitted .kmn
   //   (e) the fragment appears before the surviving rule (position-faithful)
   //   (f) no opaque-fragment gate warning is returned
-  //   (g) baseIr is not mutated
+  //   (g) startIr is not mutated
   it("AC#1: deletes a rule from a fragment-bearing keyboard; user store and fragment survive in order", () => {
     // Rule at sourceLine 30 (to be deleted).
     const rule0 = makeRule("rule#0", "K_A", "a");
@@ -253,7 +253,7 @@ describe("projectWorkingCopyVfs deleted-items + fragment-bearing keyboard — re
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["rule#0"]),
       assignments: [],
@@ -285,7 +285,7 @@ describe("projectWorkingCopyVfs deleted-items + fragment-bearing keyboard — re
     expect(fragIdx).toBeLessThan(ruleIdx);
   });
 
-  // (g) baseIr must not be mutated by the projection.
+  // (g) startIr must not be mutated by the projection.
   it("does not mutate baseIr when projecting a fragment-bearing keyboard", () => {
     const rule0 = makeRule("rule#0", "K_A", "a");
     const entryGroup = makeGroup("group#main", "main", [rule0]);
@@ -302,7 +302,7 @@ describe("projectWorkingCopyVfs deleted-items + fragment-bearing keyboard — re
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["rule#0"]),
       assignments: [],

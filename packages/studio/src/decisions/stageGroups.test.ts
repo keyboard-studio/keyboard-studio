@@ -61,7 +61,7 @@ function baseEntry(
     stepId: "choose_base",
     payload: {
       kind: "base-contribution",
-      baseId: "base_kb",
+      startId: "base_kb",
       baseDisplayName: "Base KB",
       startingKeyCount,
       derivedAxes: [],
@@ -217,13 +217,13 @@ describe("buildStageGroups — absent counts roll up as unmeasured, never zero (
 
   it("an absent startingKeyCount on a base-contribution entry rolls up as undefined, not 0", () => {
     const groups = buildStageGroups({ entries: [baseEntry(undefined)] });
-    const chooseBase = groups.find((g) => g.stepId === "choose_base")!;
+    const chooseStart = groups.find((g) => g.stepId === "choose_base")!;
 
-    expect(chooseBase.rollUp).toEqual({ kind: "base-contribution", startingKeyCount: undefined });
+    expect(chooseStart.rollUp).toEqual({ kind: "base-contribution", startingKeyCount: undefined });
     // Guard against a `?? 0`-shaped regression: the field must be `undefined`,
     // never the number 0.
-    if (chooseBase.rollUp.kind === "base-contribution") {
-      expect(chooseBase.rollUp.startingKeyCount).not.toBe(0);
+    if (chooseStart.rollUp.kind === "base-contribution") {
+      expect(chooseStart.rollUp.startingKeyCount).not.toBe(0);
     }
   });
 });

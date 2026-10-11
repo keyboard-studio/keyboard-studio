@@ -17,7 +17,7 @@ import type { LanguageDefaults } from "../langtags";
  * Single canonical implementation — was previously duplicated (with a
  * near-identical loop) in engine's characterMap.ts (explicitScriptSubtag),
  * engine's suggestMissing.ts (effectiveScriptIsLatin's inline loop), and
- * studio's suggestBase.ts (hasExplicitScriptSubtag).
+ * studio's suggestStart.ts (hasExplicitScriptSubtag).
  *
  * @param tag  Full BCP47 tag, e.g. "az-Latn" or "hi".
  * @returns  The title-cased 4-letter script subtag, or `undefined` if none is

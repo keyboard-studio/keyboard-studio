@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { candidateChars, surplusBasicLatinCandidates } from "./convenienceChars.js";
 
 /** A base keyboard that produces the whole of basic Latin, both cases. */
-function fullLatinBase(): Set<string> {
+function fullLatinStart(): Set<string> {
   const s = new Set<string>();
   for (const c of "abcdefghijklmnopqrstuvwxyz") {
     s.add(c);
@@ -15,7 +15,7 @@ describe("surplusBasicLatinCandidates", () => {
   it("offers the letters the base produces that the orthography does not use", () => {
     // An orthography using only a..e leaves f..z surplus on a full-Latin base.
     const candidates = surplusBasicLatinCandidates({
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set(["a", "b", "c", "d", "e"]),
     });
     expect(candidates.map((c) => c.primary).join("")).toBe("fghijklmnopqrstuvwxyz");
@@ -62,21 +62,21 @@ describe("surplusBasicLatinCandidates", () => {
   it("suppresses a pair when EITHER case is needed", () => {
     // Lowercase needed.
     expect(surplusBasicLatinCandidates({
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set(["q"]),
     }).map((c) => c.primary)).not.toContain("q");
 
     // Uppercase needed — the lowercase must not be offered for removal either,
     // or keeping "Q" while dropping "q" becomes reachable.
     expect(surplusBasicLatinCandidates({
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set(["Q"]),
     }).map((c) => c.primary)).not.toContain("q");
   });
 
   it("offers nothing when the orthography uses all of a..z", () => {
     const needed = new Set("abcdefghijklmnopqrstuvwxyz".split(""));
-    expect(surplusBasicLatinCandidates({ produced: fullLatinBase(), needed })).toEqual([]);
+    expect(surplusBasicLatinCandidates({ produced: fullLatinStart(), needed })).toEqual([]);
   });
 
   it("offers nothing for a base that produces no basic Latin at all", () => {
@@ -96,7 +96,7 @@ describe("surplusBasicLatinCandidates", () => {
     // both "i" and "ı" outright, so the pair is suppressed by the needed-set
     // check before casing could matter.
     const candidates = surplusBasicLatinCandidates({
-      produced: fullLatinBase(),
+      produced: fullLatinStart(),
       needed: new Set(["i", "ı", "İ", "I"]),
     });
     expect(candidates.map((c) => c.primary)).not.toContain("i");

@@ -29,7 +29,7 @@
 //     branching, no context rules — so every character is its own
 //     independently-removable glyph in the Carve gallery (confirmed via a
 //     throwaway recognizePatterns() probe: recognizedRatio is 0 for Track 1
-//     adapt, since instantiateFromBase never calls the recognizer, so the
+//     adapt, since instantiateFromStart never calls the recognizer, so the
 //     whole keyboard renders as ONE "main" group card with 104 flat glyphs —
 //     no cascade-delete dialog fires for a character produced by exactly one
 //     rule).
@@ -59,7 +59,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   confirmPrefill,
@@ -75,7 +75,7 @@ import {
 // Fixture constants
 // ---------------------------------------------------------------------------
 
-const BASE_KEYBOARD_ID = "bambara";
+const START_KEYBOARD_ID = "bambara";
 
 /** N (>=2) carve targets — each produced by exactly ONE rule (K_COLON / K_QUOTE
  *  unshifted), so clicking their glyph chip plain-toggles (no cascade dialog). */
@@ -92,13 +92,13 @@ const SURVIVOR_CHAR = "ɔ";
  *  base letter pre-filled "e", trigger key "K_COLON") leaves Apply already
  *  enabled with zero field edits (mirrors MechanismGallery.methods.test.tsx's
  *  "defaults to the deadkey method" case for "á"). deriveDesktopModifications
- *  extracts hostKey "K_E" from the resulting S-02 assignment's baseLetters
- *  slot (extractMechanismHostKey.ts), landing "é" as a longpress (sk[])
+ *  extracts baseKey "K_E" from the resulting S-02 assignment's baseLetters
+ *  slot (extractMechanismBaseKey.ts), landing "é" as a longpress (sk[])
  *  alternate on the K_E touch key (whose base text "e" is non-empty). */
 const PLACED_CHAR = "é";
 
-const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
-const TOUCH_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
+const KMN_ZIP_PATH = `source/${START_KEYBOARD_ID}.kmn`;
+const TOUCH_ZIP_PATH = `source/${START_KEYBOARD_ID}.keyman-touch-layout`;
 
 /**
  * FORMERLY the pre-existing 1.4.3 (Contrast Minimum) offender on the Phase B
@@ -121,7 +121,7 @@ const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 /**
  * Identity-lite for touch-derivation (spec 036 language-identify flow).
- * Latin script keeps routing through the ranked BaseResolution picker
+ * Latin script keeps routing through the ranked StartResolution picker
  * (not the §9 CJK/Ethiopic/Hangul stub).
  */
 async function driveIdentityLite(page: Page): Promise<void> {
@@ -130,14 +130,14 @@ async function driveIdentityLite(page: Page): Promise<void> {
     autonym: "Bamanankan",
     script: "Latn",
   });
-  // Additional wait for BaseResolution to render its picker (spec 035 may take longer)
+  // Additional wait for StartResolution to render its picker (spec 035 may take longer)
   await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });
 }
 
 /**
  * characters step, Phase B sub-stage (build-list method) — adds exactly the
  * ONE placed character ("é"). Bambara produces no accented Latin letters at
- * all, so "é" is genuinely absent from buildProducedSet(baseIr): it survives
+ * all, so "é" is genuinely absent from buildProducedSet(startIr): it survives
  * into MechanismGallery's `lettersToAdd` (the M placement below), rather than
  * being pre-empted into the "already produced" empty-diff fast path that
  * carve.spec.ts/copy-edit.spec.ts deliberately use for their own (different)
@@ -210,7 +210,7 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     await page.goto("/");
 
     await driveIdentityLite(page);
-    await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+    await pickStartKeyboard(page, START_KEYBOARD_ID);
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
     await confirmPrefill(page);

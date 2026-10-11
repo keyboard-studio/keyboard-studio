@@ -49,11 +49,11 @@ export function welcomeFolderFileNames(images: readonly WelcomeFolderImage[] | n
  * the folder). Case-insensitive, like the descriptor comparison.
  */
 export function missingInheritedImageRefs(
-  baseWelcomeHtmText: string,
+  startWelcomeHtmText: string,
   carriedNames: readonly string[],
 ): string[] {
   const carried = new Set(carriedNames.map((n) => n.toLowerCase()));
-  return extractWelcomeImageRefs(baseWelcomeHtmText).filter((ref) => {
+  return extractWelcomeImageRefs(startWelcomeHtmText).filter((ref) => {
     const key = ref.toLowerCase();
     const bare = key.startsWith(`${WELCOME_FOLDER}/`) ? key.slice(WELCOME_FOLDER.length + 1) : key;
     return !carried.has(bare);

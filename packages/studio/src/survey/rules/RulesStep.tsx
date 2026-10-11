@@ -47,7 +47,7 @@ import { phaseHeading, leadParagraph } from "../surveyStyles.ts";
 
 const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
-  const script = useWorkingCopyStore((s) => s.baseKeyboard?.script);
+  const script = useWorkingCopyStore((s) => s.startKeyboard?.script);
 
   // The step's result lives in the working copy, so completion carries
   // no answer payload. Guarded against double-clicks. Spec 090 T034:

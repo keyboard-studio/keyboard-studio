@@ -10,7 +10,7 @@ import type { KeyboardEvent } from "react";
 import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
 import {
@@ -92,7 +92,7 @@ const NOTE_YOUR_CHOSEN_BASE = msg({ id: "survey.prefill.row.startingKeyboard.not
  */
 export function buildPrefillRows(
   identity: IdentityLiteResult,
-  base: BaseKeyboard,
+  base: StartKeyboard,
   i18n?: I18n,
 ): PrefillRow[] {
   const { prefill } = identity;
@@ -113,7 +113,7 @@ export function buildPrefillRows(
 
 export interface PrefillProps {
   identity: IdentityLiteResult;
-  base: BaseKeyboard;
+  base: StartKeyboard;
   onConfirm: () => void;
   onBack?: () => void;
 }

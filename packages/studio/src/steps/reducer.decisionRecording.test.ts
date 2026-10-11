@@ -17,7 +17,7 @@
 //
 //   - the step RESULT is the payload the step's own adapter passes to
 //     `onComplete` — `undefined` for carve and mechanisms (carveAdapter.tsx,
-//     addPhysicalAdapter.tsx), the `{ assignments, baseIr, baseVfs, mods,
+//     addPhysicalAdapter.tsx), the `{ assignments, startIr, startVfs, mods,
 //     seedSource }` object for touch (addTouchAdapter.tsx), a real
 //     `SurveyPhaseResult` for the question steps;
 //   - every COUNT the recorder reports is read out of the real working-copy
@@ -50,8 +50,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type {
-  BaseContribution,
-  BaseKeyboard,
+  StartContribution,
+  StartKeyboard,
   DecisionEntry,
   DecisionImpact,
   EditorActionSummary,
@@ -83,7 +83,7 @@ import { toRailNodes } from "../lib/irToCarveNodes.ts";
 // Fixture keyboard — small, but parsed by the real codec
 // ---------------------------------------------------------------------------
 
-const BASE_ID = "test_base";
+const START_ID = "test_base";
 
 // Two rules, so the base occupies exactly {K_A, K_B}; one non-system store, so a
 // store-slot item deletion has a real slot id to name.
@@ -103,8 +103,8 @@ const KMN = [
   "",
 ].join("\n");
 
-const BASE: BaseKeyboard = {
-  id: BASE_ID,
+const BASE: StartKeyboard = {
+  id: START_ID,
   path: "release/t/test_base",
   script: "Latn",
   targets: ["windows"],
@@ -112,10 +112,10 @@ const BASE: BaseKeyboard = {
   version: "1.0",
 };
 
-function makeBaseVfs(): VirtualFS {
+function makeStartVfs(): VirtualFS {
   return createVirtualFS([
-    { path: `source/${BASE_ID}.kmn`, content: KMN, isBinary: false },
-    { path: `source/${BASE_ID}.kps`, content: "<Package/>", isBinary: false },
+    { path: `source/${START_ID}.kmn`, content: KMN, isBinary: false },
+    { path: `source/${START_ID}.kps`, content: "<Package/>", isBinary: false },
   ]);
 }
 
@@ -124,13 +124,13 @@ function makeBaseVfs(): VirtualFS {
  * the parsed IR.
  *
  * The IR comes from the real codec rather than a hand-built literal: `keysAdded`
- * is measured against `occupiedHostKeys(applyCarveMutate(baseIr, …))`, which
+ * is measured against `occupiedBaseKeys(applyCarveMutate(startIr, …))`, which
  * walks parsed rule shapes. A cast stand-in would occupy nothing, and every key
  * would then look newly added.
  */
 function instantiate(): KeyboardIR {
-  const ir = parseKmn(KMN, `${BASE_ID}.kmn`).ir;
-  useWorkingCopyStore.getState().instantiateFromBase(BASE, { vfs: makeBaseVfs(), ir });
+  const ir = parseKmn(KMN, `${START_ID}.kmn`).ir;
+  useWorkingCopyStore.getState().instantiateFromStart(BASE, { vfs: makeStartVfs(), ir });
   return ir;
 }
 
@@ -161,7 +161,7 @@ function vowelSlotId(ir: KeyboardIR, index: number): string {
  * differs from `BASE`, and its layout is deliberately a different size, so an
  * entry that named the wrong base could not accidentally pass.
  */
-const OTHER_BASE: BaseKeyboard = {
+const OTHER_BASE: StartKeyboard = {
   id: "other_base",
   path: "release/o/other_base",
   script: "Arab",
@@ -190,7 +190,7 @@ const OTHER_KMN = [
  * A postfix-shaped base — `any(equalD) + '=' > index(equalU,1)` is the exact
  * structure `detectMarkInputOrderFromImport` recognises, so instantiating from
  * it makes the store seed `irAxes.markInputOrder` (workingCopyStore's
- * `seedIrAxesFromBaseIr`). That is the only production path that puts a derived
+ * `seedIrAxesFromStartIr`). That is the only production path that puts a derived
  * axis on a freshly instantiated working copy, and FR-031 requires the entry to
  * state those axes.
  */
@@ -210,7 +210,7 @@ const POSTFIX_KMN = [
   "",
 ].join("\n");
 
-const POSTFIX_BASE: BaseKeyboard = {
+const POSTFIX_BASE: StartKeyboard = {
   id: "postfix_base",
   path: "release/p/postfix_base",
   script: "Latn",
@@ -220,9 +220,9 @@ const POSTFIX_BASE: BaseKeyboard = {
 };
 
 /** Instantiate an arbitrary base the way the choose-base step does. */
-function instantiateOther(base: BaseKeyboard, kmn: string): KeyboardIR {
+function instantiateOther(base: StartKeyboard, kmn: string): KeyboardIR {
   const ir = parseKmn(kmn, `${base.id}.kmn`).ir;
-  useWorkingCopyStore.getState().instantiateFromBase(base, {
+  useWorkingCopyStore.getState().instantiateFromStart(base, {
     vfs: createVirtualFS([{ path: `source/${base.id}.kmn`, content: kmn, isBinary: false }]),
     ir,
   });
@@ -230,15 +230,15 @@ function instantiateOther(base: BaseKeyboard, kmn: string): KeyboardIR {
 }
 
 /**
- * `ChooseBaseAdapter`'s completion payload — the `InstantiateResult` the
+ * `ChooseStartAdapter`'s completion payload — the `InstantiateResult` the
  * reducer's `choose_base` branch consumes.
  *
  * Recording runs AFTER `applyStepCompletion` (StepHost step 2 then 2b), so in
  * these tests the store is instantiated first and this payload is what the step
  * carried. `track: "copy"` is Track 1 — the reducer routes anything but
- * `"adapt"` to `instantiateFromBaseIfConfirmed`.
+ * `"adapt"` to `instantiateFromStartIfConfirmed`.
  */
-function chooseBaseResult(base: BaseKeyboard, ir: KeyboardIR | null): InstantiateResult {
+function chooseStartResult(base: StartKeyboard, ir: KeyboardIR | null): InstantiateResult {
   return { base, vfs: null, ir, track: "copy" };
 }
 
@@ -248,7 +248,7 @@ function chooseBaseResult(base: BaseKeyboard, ir: KeyboardIR | null): Instantiat
  *
  * The rule/node carve gallery deleted a glyph with `deleteItem(g.gid)` (its
  * `toggleGlyph`) and tallied its own total as the sum of
- * `node.glyphs.length` — the same two halves `recordBaseContribution`'s `countStartingKeys` and the recorder's
+ * `node.glyphs.length` — the same two halves `recordStartContribution`'s `countStartingKeys` and the recorder's
  * `keysRemoved` read. Deriving the ids from the rail rather than hand-listing
  * them is what makes the FR-034 unit assertion below a real comparison.
  */
@@ -267,21 +267,21 @@ const ADAPTER_EMITS_NOTHING = undefined;
 
 /**
  * The touch step's payload, assembled the way `AddTouchAdapter` assembles it:
- * the gallery's assignments plus the store-sourced `baseIr` / `baseVfs`, the
+ * the gallery's assignments plus the store-sourced `startIr` / `startVfs`, the
  * `mods` derived through the same `deriveDesktopModifications` call, and the raw
  * seed-source fork choice.
  */
 function touchCompleteResult(assignments: readonly MechanismAssignment[]): unknown {
   const wc = useWorkingCopyStore.getState();
-  const { baseIr, baseVfs, deletedNodeIds, deletedItemIds, phaseResults } = wc;
+  const { startIr, startVfs, deletedNodeIds, deletedItemIds, phaseResults } = wc;
   return {
     assignments,
-    baseIr,
-    baseVfs,
+    startIr,
+    startVfs,
     mods:
-      baseIr === null
+      startIr === null
         ? { removals: [], placements: [] }
-        : deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults),
+        : deriveDesktopModifications(startIr, deletedNodeIds, deletedItemIds, phaseResults),
     // Spec 088: the fork choice is read from the decision store.
     seedSource: selectTouchSeedSource(getDecisionSnapshot()),
   };
@@ -370,17 +370,17 @@ function realRecorder(
  * pass: the host records the completion (StepHost.handleComplete →
  * recordStepCompletion), and the base-contribution baseline is fired
  * LATER, by StudioShell's doCommit, once instantiation has produced the
- * working copy (`recorder.recordBaseContributionNow()`). The completion
+ * working copy (`recorder.recordStartContributionNow()`). The completion
  * alone no longer writes the baseline — before the fix it fired inside
  * the completion, read a not-yet-instantiated store, and wrote nothing.
  */
-function completeChooseBase(
+function completeChooseStart(
   recorder: DecisionRecorder,
-  base: BaseKeyboard,
+  base: StartKeyboard,
   ir: KeyboardIR | null,
 ): void {
-  recordStepCompletion("choose_base", chooseBaseResult(base, ir), depsWith(recorder));
-  recorder.recordBaseContributionNow();
+  recordStepCompletion("choose_base", chooseStartResult(base, ir), depsWith(recorder));
+  recorder.recordStartContributionNow();
 }
 
 /**
@@ -389,18 +389,18 @@ function completeChooseBase(
  * A helper rather than an index, because "how many are there" is itself an
  * assertion in several tests below (once per instantiation, never per revisit).
  */
-function baseContributions(): (DecisionEntry & { payload: BaseContribution })[] {
+function startContributions(): (DecisionEntry & { payload: StartContribution })[] {
   return useDecisionLogStore
     .getState()
     .record.entries.filter(
-      (e): e is DecisionEntry & { payload: BaseContribution } =>
+      (e): e is DecisionEntry & { payload: StartContribution } =>
         e.payload.kind === "base-contribution",
     );
 }
 
 /** The single base-contribution entry, or a failure if there is not exactly one. */
-function onlyBaseContribution(): DecisionEntry & { payload: BaseContribution } {
-  const entries = baseContributions();
+function onlyStartContribution(): DecisionEntry & { payload: StartContribution } {
+  const entries = startContributions();
   expect(entries).toHaveLength(1);
   return entries[0]!;
 }
@@ -614,7 +614,7 @@ describe("FR-005 / FR-005a — absence and a present zero are different statemen
   });
 
   it("mechanism_edit leaves keysAdded ABSENT when there is no working copy to measure against", () => {
-    // No instantiate(): `getBaseIr()` is null, so occupancy has no baseline. A
+    // No instantiate(): `getStartIr()` is null, so occupancy has no baseline. A
     // fabricated 0 here would be indistinguishable from "added nothing".
     useWorkingCopyStore.getState().recordAssignments([ADDS_K_Q]);
 
@@ -690,7 +690,7 @@ describe("FR-001 — a step completion with survey answers", () => {
       phaseResult([{ questionId: "il_language_english", answerType: "text", value: "Hausa" }]),
       depsWith(realRecorder()),
     );
-    expect(useDecisionLogStore.getState().record.keyboardId).toBe(BASE_ID);
+    expect(useDecisionLogStore.getState().record.keyboardId).toBe(START_ID);
   });
 
   it("records nothing for a step that carries no answers and is not an editor", () => {
@@ -881,7 +881,7 @@ const SESSION: ReadonlyArray<{ stepId: string; result: () => unknown; mutate: ()
     stepId: "carve",
     result: () => ADAPTER_EMITS_NOTHING,
     mutate: () => {
-      const ir = useWorkingCopyStore.getState().baseIr;
+      const ir = useWorkingCopyStore.getState().startIr;
       if (ir === null) throw new Error("no working copy to carve");
       useWorkingCopyStore.getState().deleteNode(ruleNodeIdFor(ir, "K_B"));
     },
@@ -911,7 +911,7 @@ const SESSION: ReadonlyArray<{ stepId: string; result: () => unknown; mutate: ()
 function cloneablePayload(result: unknown): unknown {
   if (typeof result !== "object" || result === null) return result;
   const rest: Record<string, unknown> = { ...(result as Record<string, unknown>) };
-  delete rest["baseVfs"];
+  delete rest["startVfs"];
   return structuredClone(rest);
 }
 
@@ -996,7 +996,7 @@ describe("impact attribution", () => {
   const CAPTURED: DecisionImpact = {
     state: "captured",
     files: [
-      { path: `source/${BASE_ID}.kmn`, hunks: [], magnitude: { added: 2, removed: 0 } },
+      { path: `source/${START_ID}.kmn`, hunks: [], magnitude: { added: 2, removed: 0 } },
     ],
     magnitude: { added: 2, removed: 0 },
   };
@@ -1109,13 +1109,13 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     // this completion — happens only once the track decision exists, so
     // the entry is written from a fully instantiated copy: real base id,
     // real starting key count, and the mode matching the chosen track.
-    const ir = parseKmn(KMN, `${BASE_ID}.kmn`).ir;
-    useWorkingCopyStore.getState().instantiateFromExisting(BASE, { vfs: makeBaseVfs(), ir });
+    const ir = parseKmn(KMN, `${START_ID}.kmn`).ir;
+    useWorkingCopyStore.getState().instantiateFromExisting(BASE, { vfs: makeStartVfs(), ir });
 
-    completeChooseBase(realRecorder(), BASE, ir);
+    completeChooseStart(realRecorder(), BASE, ir);
 
-    const entry = onlyBaseContribution();
-    expect(entry.payload.baseId).toBe(BASE_ID);
+    const entry = onlyStartContribution();
+    expect(entry.payload.startId).toBe(START_ID);
     expect(entry.payload.instantiationMode).toBe("adapt-existing");
     expect(entry.payload.startingKeyCount).toBe(railGlyphGids(ir).length);
     expect(entry.payload.startingKeyCount).toBeGreaterThan(0);
@@ -1124,11 +1124,11 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
   it("records the base chosen and what it left in the working copy", () => {
     const ir = instantiate();
 
-    completeChooseBase(realRecorder(), BASE, ir);
+    completeChooseStart(realRecorder(), BASE, ir);
 
-    const entry = onlyBaseContribution();
+    const entry = onlyStartContribution();
     expect(entry.stepId).toBe("choose_base");
-    expect(entry.payload.baseId).toBe(BASE_ID);
+    expect(entry.payload.startId).toBe(START_ID);
     expect(entry.payload.baseDisplayName).toBe("Test Base");
     expect(entry.payload.instantiationMode).toBe("new-from-base");
     // The base's own properties, carried onto the working copy as-is and coded
@@ -1148,16 +1148,16 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
   });
 
   it("states the axes instantiation derived onto the working copy", () => {
-    // A postfix-shaped base: `instantiateFromBase` runs it through the engine's
+    // A postfix-shaped base: `instantiateFromStart` runs it through the engine's
     // structural detector and seeds `irAxes.markInputOrder`. The plain fixture
     // seeds nothing, so this is the case that can tell an empty list from a
     // missing derivation.
     const ir = instantiateOther(POSTFIX_BASE, POSTFIX_KMN);
     expect(Object.keys(useWorkingCopyStore.getState().irAxes)).toEqual(["markInputOrder"]);
 
-    completeChooseBase(realRecorder(), POSTFIX_BASE, ir);
+    completeChooseStart(realRecorder(), POSTFIX_BASE, ir);
 
-    expect(onlyBaseContribution().payload.derivedAxes).toEqual(["markInputOrder"]);
+    expect(onlyStartContribution().payload.derivedAxes).toEqual(["markInputOrder"]);
   });
 
   it("derives the contribution from the instantiated working copy, not the step's payload (FR-035)", () => {
@@ -1169,10 +1169,10 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     const otherIr = parseKmn(OTHER_KMN, `${OTHER_BASE.id}.kmn`).ir;
     expect(railGlyphGids(otherIr).length).not.toBe(railGlyphGids(ir).length);
 
-    completeChooseBase(realRecorder(), OTHER_BASE, otherIr);
+    completeChooseStart(realRecorder(), OTHER_BASE, otherIr);
 
-    const entry = onlyBaseContribution();
-    expect(entry.payload.baseId).toBe(BASE_ID);
+    const entry = onlyStartContribution();
+    expect(entry.payload.startId).toBe(START_ID);
     expect(entry.payload.baseDisplayName).toBe("Test Base");
     expect(entry.payload.inheritedMetadata).toContainEqual({ field: "script", value: "Latn" });
     expect(entry.payload.startingKeyCount).toBe(railGlyphGids(ir).length);
@@ -1180,15 +1180,15 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
 
   it("writes NO entry at all when nothing was instantiated (FR-030, research D-11)", () => {
     // The production shape of this: a Track-1 rebase whose confirm the author
-    // cancelled, so `instantiateFromBaseIfConfirmed` no-ops and the step
+    // cancelled, so `instantiateFromStartIfConfirmed` no-ops and the step
     // completes with the store still empty. There is no working copy to measure.
     const recorder = realRecorder();
     const deps = depsWith(recorder);
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, null), deps);
+    recordStepCompletion("choose_base", chooseStartResult(BASE, null), deps);
     // doCommit still fires the baseline after a cancelled instantiation —
     // it reads an empty store and writes nothing (the null is not papered
     // over at the new fire point either).
-    recorder.recordBaseContributionNow();
+    recorder.recordStartContributionNow();
 
     // A later step DOES record, so this is an assertion about the absence of a
     // base-contribution entry — not about an inert recorder.
@@ -1198,7 +1198,7 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
       deps,
     );
 
-    expect(baseContributions()).toEqual([]);
+    expect(startContributions()).toEqual([]);
     expect(useDecisionLogStore.getState().record.entries).toHaveLength(1);
     expect(useDecisionLogStore.getState().record.entries[0]!.payload.kind).toBe("survey-answer");
   });
@@ -1209,41 +1209,41 @@ describe("SC-012 / FR-030..FR-031 — what the base contributed", () => {
     const recorder = realRecorder();
     const deps = depsWith(recorder);
     const ir = instantiate();
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
-    recorder.recordBaseContributionNow();
-    const first = onlyBaseContribution();
+    recordStepCompletion("choose_base", chooseStartResult(BASE, ir), deps);
+    recorder.recordStartContributionNow();
+    const first = onlyStartContribution();
 
     const otherIr = instantiateOther(OTHER_BASE, OTHER_KMN);
-    recordStepCompletion("choose_base", chooseBaseResult(OTHER_BASE, otherIr), deps);
-    recorder.recordBaseContributionNow();
+    recordStepCompletion("choose_base", chooseStartResult(OTHER_BASE, otherIr), deps);
+    recorder.recordStartContributionNow();
 
-    const entries = baseContributions();
+    const entries = startContributions();
     expect(entries).toHaveLength(2);
     // The first entry is untouched — the swap appended, it did not rewrite.
     expect(entries[0]).toEqual(first);
-    expect(entries[1]!.payload.baseId).toBe(OTHER_BASE.id);
+    expect(entries[1]!.payload.startId).toBe(OTHER_BASE.id);
     expect(entries[1]!.supersedes).toBe(first.entryId);
     expect(entries[1]!.payload.startingKeyCount).toBe(railGlyphGids(otherIr).length);
   });
 
   it("does not append a second entry when choose_base is revisited with no change", () => {
     // Production shape: the author walks back into choose_base and re-confirms
-    // the SAME base. `instantiateFromBaseIfConfirmed` no-ops on that redundant
-    // re-fire (the store's baseKeyboard/baseIr/instantiationMode are untouched),
+    // the SAME base. `instantiateFromStartIfConfirmed` no-ops on that redundant
+    // re-fire (the store's startKeyboard/startIr/instantiationMode are untouched),
     // so the recorder reads the identical baseline a second time. That must not
     // read as a second decision (SC-002) — only a genuine base SWAP may
     // supersede (the sibling test above).
     const recorder = realRecorder();
     const deps = depsWith(recorder);
     const ir = instantiate();
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
-    recorder.recordBaseContributionNow();
-    const first = onlyBaseContribution();
+    recordStepCompletion("choose_base", chooseStartResult(BASE, ir), deps);
+    recorder.recordStartContributionNow();
+    const first = onlyStartContribution();
 
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
-    recorder.recordBaseContributionNow();
+    recordStepCompletion("choose_base", chooseStartResult(BASE, ir), deps);
+    recorder.recordStartContributionNow();
 
-    const entries = baseContributions();
+    const entries = startContributions();
     expect(entries).toHaveLength(1);
     expect(entries[0]).toEqual(first);
   });
@@ -1254,9 +1254,9 @@ describe("FR-034 — a stage's counts are interpretable against the baseline", (
     const ir = instantiate();
     const recorder = realRecorder();
     const deps = depsWith(recorder);
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
-    recorder.recordBaseContributionNow();
-    const starting = onlyBaseContribution().payload.startingKeyCount;
+    recordStepCompletion("choose_base", chooseStartResult(BASE, ir), deps);
+    recorder.recordStartContributionNow();
+    const starting = onlyStartContribution().payload.startingKeyCount;
 
     // Carve away EVERY unit the rail offers, through the store's per-item
     // delete action. If the baseline were counted in a
@@ -1277,9 +1277,9 @@ describe("FR-034 — a stage's counts are interpretable against the baseline", (
     const ir = instantiate();
     const recorder = realRecorder();
     const deps = depsWith(recorder);
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
-    recorder.recordBaseContributionNow();
-    const starting = onlyBaseContribution().payload.startingKeyCount ?? 0;
+    recordStepCompletion("choose_base", chooseStartResult(BASE, ir), deps);
+    recorder.recordStartContributionNow();
+    const starting = onlyStartContribution().payload.startingKeyCount ?? 0;
 
     // One rule node removed out of the whole starting layout — the removal count
     // alone says nothing, and it is the baseline beside it that makes it "1 of n".
@@ -1377,9 +1377,9 @@ describe("FR-033 — the author's replacement supersedes the base's value", () =
     const recorder = realRecorder();
     const deps = depsWith(recorder);
     const ir = instantiate();
-    recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
-    recorder.recordBaseContributionNow();
-    const baseEntry = onlyBaseContribution();
+    recordStepCompletion("choose_base", chooseStartResult(BASE, ir), deps);
+    recorder.recordStartContributionNow();
+    const baseEntry = onlyStartContribution();
 
     // The base's script, accepted as offered.
     recordStepCompletion(
@@ -1409,6 +1409,6 @@ describe("FR-033 — the author's replacement supersedes the base's value", () =
 
     // And the base's own contribution entry is untouched by any of it — it
     // records what the session started with, which the override does not change.
-    expect(onlyBaseContribution()).toEqual(baseEntry);
+    expect(onlyStartContribution()).toEqual(baseEntry);
   });
 });

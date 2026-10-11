@@ -47,7 +47,7 @@ function TrivialTouchStep({ onComplete }: EditorStepProps): React.ReactElement {
       type="button"
       data-testid="touch-confirm"
       onClick={() => {
-        const payload = { assignments: [], baseIr: null, baseVfs: null };
+        const payload = { assignments: [], startIr: null, startVfs: null };
         // Mirror AddTouchAdapter's completion wiring (spec 090 T042): the
         // adapter fires the touch completion effects — whose clearStale is
         // the staleness side effect under test — before reporting the
@@ -130,7 +130,7 @@ function makeEditorStep(id: string): EditorStep {
 const STALENESS_MANIFEST: readonly Step[] = [makeEditorStep("touch")];
 
 function seedProject(): void {
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs: createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c\n", isBinary: false }]),
     ir: makeTestIR([]),
   });
@@ -159,9 +159,9 @@ function makeRecordDecision(touchKeysAffected: number): ReducerDeps["recordDecis
 
 function makeReducerDeps(touchKeysAffected: number): ReducerDeps {
   return {
-    instantiateFromBase: vi.fn(),
+    instantiateFromStart: vi.fn(),
     instantiateFromExisting: vi.fn(),
-    instantiateFromBaseIfConfirmed: vi.fn(() => true),
+    instantiateFromStartIfConfirmed: vi.fn(() => true),
     recordDecision: makeRecordDecision(touchKeysAffected),
   };
 }

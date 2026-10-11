@@ -1,6 +1,6 @@
 // PatternLibraryService.filterFor() — strategy-ranked pattern matching (spec §7.2 §9).
 
-import type { BaseKeyboard, DiscoveryAxisVector, Pattern, PatternMatch } from "@keyboard-studio/contracts";
+import type { StartKeyboard, DiscoveryAxisVector, Pattern, PatternMatch } from "@keyboard-studio/contracts";
 import { toPatternMatch } from "@keyboard-studio/contracts";
 import { getPatterns } from "./loader.js";
 import { selectStrategy } from "../strategy-selector/index.js";
@@ -38,7 +38,7 @@ import { selectStrategy } from "../strategy-selector/index.js";
  * Module-level function satisfying {@link PatternLibraryService}.filterFor (consistent with getPatterns/getById).
  */
 export async function filterFor(
-  base: BaseKeyboard,
+  base: StartKeyboard,
   axes?: DiscoveryAxisVector,
 ): Promise<PatternMatch[]> {
   return rankPatterns(getPatterns(), base, axes);
@@ -56,7 +56,7 @@ export async function filterFor(
  */
 export function rankPatterns(
   all: Pattern[],
-  base: BaseKeyboard,
+  base: StartKeyboard,
   axes?: DiscoveryAxisVector,
 ): PatternMatch[] {
   // §9 Three-group routing: exclude reorder patterns for Latin-script keyboards.

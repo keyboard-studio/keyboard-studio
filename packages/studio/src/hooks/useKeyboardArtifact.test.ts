@@ -3,7 +3,7 @@
 // Coverage goals:
 //   1. onInstantiate fires exactly once on a full fetch→compile run.
 //   2. onInstantiate is NOT fired when recompile() is called (isFullRun=false).
-//   3. onInstantiate is NOT called when baseKeyboard is null (idle path).
+//   3. onInstantiate is NOT called when startKeyboard is null (idle path).
 //   4. onInstantiate receives the base keyboard and a non-null IR on a full run.
 //   5. (slice 4) When parseKmn throws but compile succeeds, the hook reaches
 //      the "ready" stage (preview not blanked), parsedIr passed to onInstantiate
@@ -24,7 +24,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { mixedDiagnosticsResult } from "@keyboard-studio/contracts/fixtures";
 import type { OnInstantiateCallback, VfsTransform } from "./useKeyboardArtifact";
@@ -46,7 +46,7 @@ const mockEngine = {
     Promise.resolve(mixedDiagnosticsResult),
   ),
   fetchKeyboardSourceToVfs: vi.fn(
-    (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+    (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
       // Seed a .kmn file so findKmnPath and parseKmn work in the hook.
       vfs.set("source/test_kb.kmn", "c test\n", false);
       return Promise.resolve({});
@@ -91,7 +91,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => ({
 // Fixture
 // ---------------------------------------------------------------------------
 
-const baseKb: BaseKeyboard = {
+const baseKb: StartKeyboard = {
   id: "test_kb",
   path: "release/t/test_kb",
   script: "Latn",
@@ -182,7 +182,7 @@ describe("useKeyboardArtifact — onInstantiate timing", () => {
     // IR so downstream touch authoring edits a COPY of the existing layout
     // (scaffoldTouchLayout Case B) rather than regenerating a default (Case A).
     mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
-      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+      (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
         vfs.set("source/test_kb.kmn", "c test\n", false);
         vfs.set(
           "source/test_kb.keyman-touch-layout",
@@ -440,7 +440,7 @@ describe("useKeyboardArtifact — open-base unbacked &BITMAP guard (regression g
 
   it("drops &BITMAP from the working copy when its icon never arrived", async () => {
     mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
-      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+      (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
         // No source/test_kb.ico entry — the icon fetch "failed" (optional sibling).
         vfs.set("source/test_kb.kmn", kmnWithBitmap, false);
         return Promise.resolve({});
@@ -471,7 +471,7 @@ describe("useKeyboardArtifact — open-base unbacked &BITMAP guard (regression g
 
   it("keeps &BITMAP when its icon is present in the VFS", async () => {
     mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
-      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+      (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
         vfs.set("source/test_kb.kmn", kmnWithBitmap, false);
         vfs.set("source/test_kb.ico", new Uint8Array([0, 0, 1, 0]), true);
         return Promise.resolve({});
@@ -502,7 +502,7 @@ describe("useKeyboardArtifact — open-base unbacked &BITMAP guard (regression g
 // ---------------------------------------------------------------------------
 // Regression guard: Track 1 (no scaffoldSpec) identity-rename compile.
 //
-// projectWorkingCopyVfs's Step 4 id-rename pass renames source/<baseId>.kmn to
+// projectWorkingCopyVfs's Step 4 id-rename pass renames source/<startId>.kmn to
 // source/<targetId>.kmn inside the VFS when the author changes the keyboard id
 // with no scaffoldSpec present. Before this fix, runCompile always compiled
 // scaffoldSpec?.keyboardId ?? kb.id — the stale base id — so compile() looked
@@ -602,7 +602,7 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (Track 1 id r
 // vfsTransform prop reference changes after the initial fetch — e.g. an
 // identity-rename edit while already on the ready stage). This is a distinct
 // code path from the initial-run capture above: it restores the clean
-// baseVfsRef snapshot, re-invokes the transform, and recompiles WITHOUT a
+// startVfsRef snapshot, re-invokes the transform, and recompiles WITHOUT a
 // re-fetch. effectiveKeyboardIdRef must be re-derived correctly on every
 // reapply, including when the transform throws.
 // ---------------------------------------------------------------------------
@@ -676,7 +676,7 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effe
     expect(mockEngine.compile).toHaveBeenLastCalledWith(expect.anything(), "renamed_kb");
 
     // Revert: a later transform run reports no effectiveKeyboardId. The
-    // baseVfsRef snapshot restore means this transform sees the ORIGINAL
+    // startVfsRef snapshot restore means this transform sees the ORIGINAL
     // (un-renamed) VFS again, matching what the author reverting the id
     // field actually does in the real transform.
     mockEngine.compile.mockClear();

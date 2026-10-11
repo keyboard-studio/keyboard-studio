@@ -1,13 +1,13 @@
 // Tests for useInventoryDiff — §8 inventory diff hook.
 //
 // Coverage:
-//   1. baseIr null: lettersToAdd = full inventory, alreadyProduced = [].
-//   2. baseIr with {a,e}: inventory {a,e,ŋ,ɓ} → lettersToAdd={ŋ,ɓ}, alreadyProduced={a,e}.
+//   1. startIr null: lettersToAdd = full inventory, alreadyProduced = [].
+//   2. startIr with {a,e}: inventory {a,e,ŋ,ɓ} → lettersToAdd={ŋ,ɓ}, alreadyProduced={a,e}.
 //   3. Empty inventory: lettersToAdd=[], alreadyProduced=[].
 //   4. Base produces full inventory: lettersToAdd=[], alreadyProduced=all.
 //   5. NFC edge: decomposed inventory entry matches precomposed base output.
 //   6. Memoization: same InventoryDiff reference when nothing changes.
-//   7. New reference when baseIr changes (mock a new produced set).
+//   7. New reference when startIr changes (mock a new produced set).
 //   8. New reference when inventory changes.
 //   9. Opaque fragment: a char produced only via a fragment's producedOutput
 //      sketch lands in alreadyProduced, not lettersToAdd.
@@ -43,12 +43,12 @@ function makeGroupWithChars(chars: string[]): IRGroup {
   };
 }
 
-function seedBaseWithChars(chars: string[]) {
+function seedStartWithChars(chars: string[]) {
   const ir = makeTestIR([makeGroupWithChars(chars)]);
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 }
 
 function setInventory(chars: string[]) {
@@ -63,13 +63,13 @@ function setInventory(chars: string[]) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. baseIr null — fallback to full inventory
+// 1. startIr null — fallback to full inventory
 // ---------------------------------------------------------------------------
 
 describe("useInventoryDiff — baseIr null fallback", () => {
   it("returns lettersToAdd = full inventory when baseIr is null", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    // Set inventory without instantiating (baseIr stays null).
+    // Set inventory without instantiating (startIr stays null).
     setInventory(["a", "e", "ŋ", "ɓ"]);
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.lettersToAdd).toEqual(["a", "e", "ŋ", "ɓ"]);
@@ -91,7 +91,7 @@ describe("useInventoryDiff — baseIr null fallback", () => {
 describe("useInventoryDiff — core diff", () => {
   it("lettersToAdd = {ŋ,ɓ} and alreadyProduced = {a,e} when base produces {a,e}", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    seedBaseWithChars(["a", "e"]);
+    seedStartWithChars(["a", "e"]);
     setInventory(["a", "e", "ŋ", "ɓ"]);
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.lettersToAdd).toEqual(["ŋ", "ɓ"]);
@@ -100,7 +100,7 @@ describe("useInventoryDiff — core diff", () => {
 
   it("lettersToAdd is empty when base produces the full inventory", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    seedBaseWithChars(["a", "e", "ŋ", "ɓ"]);
+    seedStartWithChars(["a", "e", "ŋ", "ɓ"]);
     setInventory(["a", "e", "ŋ", "ɓ"]);
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.lettersToAdd).toEqual([]);
@@ -110,7 +110,7 @@ describe("useInventoryDiff — core diff", () => {
   it("alreadyProduced is empty when base produces nothing in the inventory", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
     // Base produces only 'x'; inventory has none of those.
-    seedBaseWithChars(["x"]);
+    seedStartWithChars(["x"]);
     setInventory(["a", "e", "ŋ", "ɓ"]);
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.lettersToAdd).toEqual(["a", "e", "ŋ", "ɓ"]);
@@ -119,7 +119,7 @@ describe("useInventoryDiff — core diff", () => {
 
   it("empty inventory always gives empty arrays regardless of what the base produces", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    seedBaseWithChars(["a", "e"]);
+    seedStartWithChars(["a", "e"]);
     // No Phase B answer — confirmedInventory defaults to [].
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.lettersToAdd).toEqual([]);
@@ -138,7 +138,7 @@ describe("useInventoryDiff — NFC normalization", () => {
     // normalizes it); buildProducedSet output is also NFC. The hook's own
     // .normalize("NFC") guard is defense-in-depth for any hypothetical bypass.
     const eAcute = "\u00e9"; // é precomposed NFC (U+00E9)
-    seedBaseWithChars([eAcute]);
+    seedStartWithChars([eAcute]);
     setInventory([eAcute, "\u014b"]); // ŋ = eng (U+014B)
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.alreadyProduced).toContain(eAcute);
@@ -153,7 +153,7 @@ describe("useInventoryDiff — NFC normalization", () => {
     // The hook receives NFC and the lookup works correctly.
     const nfdEntry = "e\u0301"; // NFD: e + combining acute accent
     const nfcForm  = "\u00e9";  // NFC: é precomposed
-    seedBaseWithChars([nfcForm]);
+    seedStartWithChars([nfcForm]);
     setInventory([nfdEntry, "\u014b"]);
     // After mergePhaseResults normalization, nfdEntry becomes nfcForm in the session.
     const { result } = renderHook(() => useInventoryDiff());
@@ -172,7 +172,7 @@ describe("useInventoryDiff — composability", () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
     // Base produces "U" and the bare combining circumflex accent (U+0302)
     // separately, but never the precomposed "Û" (U+00DB) directly.
-    seedBaseWithChars(["U", "̂"]);
+    seedStartWithChars(["U", "̂"]);
     setInventory(["Û", "ŋ"]); // Û (precomposed), ŋ
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.alreadyProduced).toContain("Û");
@@ -183,7 +183,7 @@ describe("useInventoryDiff — composability", () => {
   it("a precomposed inventory char stays in lettersToAdd when only the base letter is produced", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
     // Base produces "U" only — no combining circumflex anywhere.
-    seedBaseWithChars(["U"]);
+    seedStartWithChars(["U"]);
     setInventory(["Û"]); // Û
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.lettersToAdd).toContain("Û");
@@ -223,7 +223,7 @@ describe("useInventoryDiff — lowercase-first ordering", () => {
 
   it("applies the same ordering after the base-diff filter (post-lettersToAdd)", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    seedBaseWithChars(["x"]); // base produces none of the inventory below
+    seedStartWithChars(["x"]); // base produces none of the inventory below
     setInventory(["E", "a", "D"]);
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.lettersToAdd).toEqual(["a", "E", "D"]);
@@ -237,7 +237,7 @@ describe("useInventoryDiff — lowercase-first ordering", () => {
 describe("useInventoryDiff — memoization", () => {
   it("returns the same object reference when nothing changes between renders", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    seedBaseWithChars(["a", "e"]);
+    seedStartWithChars(["a", "e"]);
     setInventory(["a", "e", "ŋ", "ɓ"]);
     const { result, rerender } = renderHook(() => useInventoryDiff());
     const first = result.current;
@@ -247,18 +247,18 @@ describe("useInventoryDiff — memoization", () => {
 
   it("returns a new object when baseIr changes (new base instantiated)", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    seedBaseWithChars(["a", "e"]);
+    seedStartWithChars(["a", "e"]);
     setInventory(["a", "e", "ŋ", "ɓ"]);
     const { result } = renderHook(() => useInventoryDiff());
     const first = result.current;
 
     act(() => {
       // Re-instantiate with a different base IR (different base id not required
-      // here — instantiateFromBase idempotence guard keys on base.id, but we
+      // here — instantiateFromStart idempotence guard keys on base.id, but we
       // want to force a new IR. Use a different keyboard id via the store reset
       // + re-instantiate cycle.)
       useWorkingCopyStore.getState().reset();
-      seedBaseWithChars(["a", "e", "ŋ"]); // base now produces ŋ too
+      seedStartWithChars(["a", "e", "ŋ"]); // base now produces ŋ too
       setInventory(["a", "e", "ŋ", "ɓ"]);
     });
 
@@ -267,7 +267,7 @@ describe("useInventoryDiff — memoization", () => {
 
   it("returns a new object when inventory changes", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
-    seedBaseWithChars(["a", "e"]);
+    seedStartWithChars(["a", "e"]);
     setInventory(["a", "e", "ŋ"]);
     const { result } = renderHook(() => useInventoryDiff());
     const first = result.current;
@@ -306,7 +306,7 @@ describe("useInventoryDiff — opaque fragment producedOutput", () => {
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     setInventory(["a", "ᐌ", "ɓ"]);
     const { result } = renderHook(() => useInventoryDiff());
     expect(result.current.alreadyProduced).toEqual(["a", "ᐌ"]);
@@ -332,7 +332,7 @@ describe("useInventoryDiff — opaque fragment producedOutput", () => {
 //
 // This is deliberately the SESSION-ASSIGNMENT path: the existing composition-
 // row tests above (§10, "composability") seed the composable parts via
-// seedBaseWithChars — i.e. base-IR rules already present before any session
+// seedStartWithChars — i.e. base-IR rules already present before any session
 // assignment exists — which does NOT exercise buildSessionProducedSet's
 // physical-assignment round trip at all (that call short-circuits to the
 // base-only set whenever there are no physical assignments). This suite is
@@ -376,7 +376,7 @@ describe("useInventoryDiff — session-aware composability (symptom-2 fix)", () 
   it("producedSet contains the precomposed 'ӝ' (U+04DD) once separate session assignments produce 'ж' and the bare U+0308 byproduct — via augmentWithComposable, not a direct target match", async () => {
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
     // Base produces nothing at all — every glyph below is session-introduced.
-    seedBaseWithChars([]);
+    seedStartWithChars([]);
     setInventory(["ж", "ӝ"]);
 
     // Assignment 1: an unrelated deadkey whose COMPOSED OUTPUT store happens
@@ -424,7 +424,7 @@ describe("useInventoryDiff — session-aware composability (symptom-2 fix)", () 
     const { useInventoryDiff } = await import("./useInventoryDiff.ts");
     const { unimplementedDesktopChars } = await import("../lib/unimplementedInventory.ts");
 
-    seedBaseWithChars([]);
+    seedStartWithChars([]);
     setInventory(["ж", "ӝ"]);
 
     const producesZhe = makeDeadkeyAssignment("ж", {

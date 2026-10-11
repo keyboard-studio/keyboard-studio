@@ -239,9 +239,9 @@ export type SurveyAnswerValue = SurveyAnswer["value"];
  * `derivedAxes` and `inheritedMetadata[].field` carry codes, not prose; the
  * trail renders them through the catalog (FR-008).
  */
-export interface BaseContribution {
+export interface StartContribution {
   kind: "base-contribution";
-  baseId: string;
+  startId: string;
   baseDisplayName: string;
   startingKeyCount?: number;
   derivedAxes: readonly string[];
@@ -286,7 +286,7 @@ export type DecisionPayload =
       };
     }[AnswerType]
   | { kind: "editor-action"; actionType: EditorActionType; summary: EditorActionSummary }
-  | BaseContribution
+  | StartContribution
   | {
       kind: "decision";
       /** The decision id (spec 088's id space) this entry records. */

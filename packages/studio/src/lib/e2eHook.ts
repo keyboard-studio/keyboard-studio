@@ -68,7 +68,7 @@ export interface KsE2EHook {
    * what the wizard's UI currently displays (the whole point of F1 is that
    * those two could silently disagree).
    */
-  getBaseKeyboardId: () => string | null;
+  getStartKeyboardId: () => string | null;
   /**
    * Count of recorded survey phase results on the working copy. Added for the
    * F1 regression spec to assert that a cancelled rebase (or a same-base
@@ -77,12 +77,12 @@ export interface KsE2EHook {
    */
   getPhaseResultsCount: () => number;
   /**
-   * The SHIPPED SOURCE as instantiated — a snapshot of the store's `baseVfs`,
+   * The SHIPPED SOURCE as instantiated — a snapshot of the store's `startVfs`,
    * before any projection layer. Null before instantiation. Added for spec 063
    * SC-006 (T112), which has to compare "what the base shipped" against "what
    * we emit" for every file the author never touched.
    */
-  snapshotBaseFiles: () => KsE2EFileSnapshot | null;
+  snapshotStartFiles: () => KsE2EFileSnapshot | null;
   /**
    * The EMITTED ARTIFACT — a snapshot of the fully projected output VFS, i.e.
    * exactly what `serializeWorkingCopy` would zip. Runs the same
@@ -131,11 +131,11 @@ export function installE2eHook(): void {
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
     getDeletedItemIds: () => [...useWorkingCopyStore.getState().deletedItemIds],
     getCarveChars: () => [...useWorkingCopyStore.getState().carveChars],
-    getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
+    getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id ?? null,
     getPhaseResultsCount: () => useWorkingCopyStore.getState().phaseResults.length,
-    snapshotBaseFiles: () => {
-      const { baseVfs } = useWorkingCopyStore.getState();
-      return baseVfs === null ? null : snapshotVfs(baseVfs);
+    snapshotStartFiles: () => {
+      const { startVfs } = useWorkingCopyStore.getState();
+      return startVfs === null ? null : snapshotVfs(startVfs);
     },
     snapshotOutputFiles: async () => {
       const projected = await projectWorkingCopyForOutput();

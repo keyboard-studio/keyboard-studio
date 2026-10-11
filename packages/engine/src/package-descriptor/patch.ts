@@ -45,7 +45,7 @@ import {
   type PackageDescriptorIdentity,
 } from "./build.js";
 import { escapeHtml } from "../shared/escapeHtml.js";
-import { kpsRefToPosix } from "../base-browser/kps-parser.js";
+import { kpsRefToPosix } from "../start-browser/kps-parser.js";
 
 export interface ApplyIdentityToKpsResult {
   /**

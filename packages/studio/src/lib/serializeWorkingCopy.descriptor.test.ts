@@ -94,7 +94,7 @@ function seedCopyTrack(baseKpsLanguageTag = "en") {
   ]);
   const ir = makeTestIR([]);
   ir.header.version = "1.0";
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   return { vfs, ir };
 }
 
@@ -372,8 +372,8 @@ describe("delivered artifact — a descriptor always ships, even with no identit
     ]);
     const ir = makeTestIR([]);
     ir.header.version = "1.0";
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
-    // Deliberately NO setIdentity() — instantiateFromBase leaves identity null.
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    // Deliberately NO setIdentity() — instantiateFromStart leaves identity null.
     expect(useWorkingCopyStore.getState().identity).toBeNull();
     return { vfs, ir };
   }
@@ -507,7 +507,7 @@ function seedCopyTrackWithFlatStub() {
   ]);
   const ir = makeTestIR([]);
   ir.header.version = "1.0";
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   return { vfs, ir };
 }
 
@@ -517,9 +517,9 @@ describe("delivered artifact — the welcome folder (spec 079 FR-002, FR-006, SC
     seedAdaptTrackWithoutDescriptor("1.0");
     const wc = useWorkingCopyStore.getState();
     wc.setIdentity(AUTHOR_IDENTITY);
-    wc.setBaseWelcomeConvention("folder");
-    wc.setBaseWelcomeHtmText('<html><body><p>Base prose.</p><img src="desktop_layout_default.png"></body></html>');
-    wc.setBaseWelcomeImages(BASE_IMAGES);
+    wc.setStartWelcomeConvention("folder");
+    wc.setStartWelcomeHtmText('<html><body><p>Base prose.</p><img src="desktop_layout_default.png"></body></html>');
+    wc.setStartWelcomeImages(BASE_IMAGES);
     wc.setHelpDocs({ description: "Author prose.", usageTips: [] });
 
     const result = await serializeWorkingCopy();
@@ -542,7 +542,7 @@ describe("delivered artifact — the welcome folder (spec 079 FR-002, FR-006, SC
     seedAdaptTrackWithoutDescriptor("1.0");
     const wc = useWorkingCopyStore.getState();
     wc.setIdentity(AUTHOR_IDENTITY);
-    wc.setBaseWelcomeImages(BASE_IMAGES);
+    wc.setStartWelcomeImages(BASE_IMAGES);
 
     await serializeWorkingCopy();
 
@@ -564,7 +564,7 @@ describe("delivered artifact — the welcome folder (spec 079 FR-002, FR-006, SC
     seedCopyTrackWithFlatStub();
     const wc = useWorkingCopyStore.getState();
     wc.setIdentity(AUTHOR_IDENTITY);
-    wc.setBaseWelcomeImages([BASE_IMAGES[0]!]);
+    wc.setStartWelcomeImages([BASE_IMAGES[0]!]);
 
     const result = await serializeWorkingCopy();
 
@@ -584,10 +584,10 @@ describe("delivered artifact — the welcome folder (spec 079 FR-002, FR-006, SC
     seedAdaptTrackWithoutDescriptor("1.0");
     const wc = useWorkingCopyStore.getState();
     wc.setIdentity(AUTHOR_IDENTITY);
-    wc.setBaseWelcomeHtmText(
+    wc.setStartWelcomeHtmText(
       '<html><body><img src="desktop_layout_default.png"><img src="ghost.png"><img src="welcome/also_ghost.png"></body></html>',
     );
-    wc.setBaseWelcomeImages([BASE_IMAGES[0]!]);
+    wc.setStartWelcomeImages([BASE_IMAGES[0]!]);
     wc.setHelpDocs({ description: "Author prose.", usageTips: [] });
 
     const result = await serializeWorkingCopy();
@@ -639,7 +639,7 @@ describe("delivered artifact — generated layout charts in <Files> (spec 079 FR
     seedCopyTrackWithFlatStub();
     const wc = useWorkingCopyStore.getState();
     wc.setIdentity(AUTHOR_IDENTITY);
-    wc.setBaseWelcomeImages([BASE_IMAGES[0]!]);
+    wc.setStartWelcomeImages([BASE_IMAGES[0]!]);
 
     await serializeWorkingCopy();
     expect(fileNames(descriptorText("basic_kbdus")).some((n) => n.includes("ks-layout-"))).toBe(false);

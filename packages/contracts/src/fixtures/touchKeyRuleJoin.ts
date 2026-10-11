@@ -92,7 +92,7 @@ export const TOUCH_JOIN_IDS = {
   /** The one genuinely dead key: no rule, no nextlayer, producing sp class. */
   dead: "T_NORULE",
   /** Longpress host with `U_` sub-keys and a flick. */
-  longpressHost: "T_0021",
+  longpressBase: "T_0021",
   /** In-layer duplicate pair, NOT disambiguated. */
   duplicate: "T_DUP",
   /** In-layer duplicate pair disambiguated by a per-key `layer` override. */
@@ -369,7 +369,7 @@ function makePhoneLayers(): TouchLayoutIR["platforms"][number]["layers"] {
         },
         {
           keys: [
-            key(TOUCH_JOIN_IDS.longpressHost, {
+            key(TOUCH_JOIN_IDS.longpressBase, {
               text: "!",
               sk: [
                 key("U_00A1", { text: "¡", default: true }),

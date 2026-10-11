@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
-import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { StartKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
@@ -158,7 +158,7 @@ describe("draftPersistence", () => {
     it("prefers identity.keyboardId when present", () => {
       const key = deriveProjectKeyFromWorkingCopy({
         identity: { keyboardId: "from-identity" },
-        baseKeyboard: { id: "from-base", displayName: "X", languages: [] } as BaseKeyboard,
+        startKeyboard: { id: "from-base", displayName: "X", languages: [] } as StartKeyboard,
       });
       expect(key).toBe("from-identity");
     });
@@ -166,13 +166,13 @@ describe("draftPersistence", () => {
     it("falls back to baseKeyboard.id when identity has no keyboardId yet (Track 1 immediate-instantiation window)", () => {
       const key = deriveProjectKeyFromWorkingCopy({
         identity: null,
-        baseKeyboard: { id: "from-base", displayName: "X", languages: [] } as BaseKeyboard,
+        startKeyboard: { id: "from-base", displayName: "X", languages: [] } as StartKeyboard,
       });
       expect(key).toBe("from-base");
     });
 
     it("returns null before any instantiation (both sources absent)", () => {
-      expect(deriveProjectKeyFromWorkingCopy({ identity: null, baseKeyboard: null })).toBeNull();
+      expect(deriveProjectKeyFromWorkingCopy({ identity: null, startKeyboard: null })).toBeNull();
     });
   });
 
@@ -246,9 +246,9 @@ describe("draftPersistence", () => {
     });
 
     it("saveDraft persists an un-confirmed base preview (L2) under the pending key", () => {
-      const base = { id: "preview_only", displayName: "Preview Only", languages: [] } as unknown as BaseKeyboard;
+      const base = { id: "preview_only", displayName: "Preview Only", languages: [] } as unknown as StartKeyboard;
       useSurveySessionStore.getState().advance("choose_base");
-      useSurveySessionStore.getState().setLocalBase(base);
+      useSurveySessionStore.getState().setLocalStart(base);
       // Explicitly NOT confirmed — the working copy stays uninstantiated.
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
 
@@ -256,13 +256,13 @@ describe("draftPersistence", () => {
 
       const saved = JSON.parse(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))!) as DurableDraft;
       expect(saved.workingCopy.instantiationMode).toBeNull();
-      expect(saved.traversal.localBase?.id).toBe("preview_only");
+      expect(saved.traversal.localStart?.id).toBe("preview_only");
     });
 
     it("loadDraft restores pending-slot progress (activeStepId + localBase) even though instantiationMode is null", () => {
-      const base = { id: "preview_only_2", displayName: "Preview Only 2", languages: [] } as unknown as BaseKeyboard;
+      const base = { id: "preview_only_2", displayName: "Preview Only 2", languages: [] } as unknown as StartKeyboard;
       useSurveySessionStore.getState().advance("choose_base");
-      useSurveySessionStore.getState().setLocalBase(base);
+      useSurveySessionStore.getState().setLocalStart(base);
       saveDraft(PENDING_PROJECT_KEY);
 
       // Cold reset — nothing left to inherit from.
@@ -275,7 +275,7 @@ describe("draftPersistence", () => {
       expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
       const session = useSurveySessionStore.getState();
       expect(session.activeStepId).toBe("choose_base");
-      expect(session.localBase?.id).toBe("preview_only_2");
+      expect(session.localStart?.id).toBe("preview_only_2");
       expect(wasDraftRestoredThisBoot()).toBe(true);
     });
 
@@ -453,17 +453,17 @@ describe("draftPersistence", () => {
 
     it("a corrupt Base64 VFS entry that makes applyWorkingCopySnapshot/atob throw is caught, removes the record, and returns false (not a crash on boot)", () => {
       const pk = "p0-corrupt-base64";
-      const base: BaseKeyboard = {
+      const base: StartKeyboard = {
         id: pk,
         displayName: "Corrupt Base64 Test",
         languages: [],
-      } as unknown as BaseKeyboard;
+      } as unknown as StartKeyboard;
       // A real binary VFS entry, correctly Base64-encoded at first — mirrors the
       // G-1/G-5 round-trip test's fixture shape rather than a stripped-down one.
       const vfs = createVirtualFS([
         { path: "source/welcome/welcome.htm", content: new Uint8Array([1, 2, 3, 4]), isBinary: true },
       ]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeScaffoldedIR() });
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir: makeScaffoldedIR() });
 
       saveDraft(pk);
       const stored = localStorage.getItem(draftKey(pk));
@@ -473,8 +473,8 @@ describe("draftPersistence", () => {
       // entry — atob() rejects "!" as outside the Base64 alphabet — while leaving
       // isBinary: true so deserializeEntry still takes the atob() path.
       const envelope = JSON.parse(stored!) as DurableDraft;
-      const entries = (envelope.workingCopy as unknown as { baseVfsEntries: Array<{ isBinary: boolean; content: string }> })
-        .baseVfsEntries;
+      const entries = (envelope.workingCopy as unknown as { startVfsEntries: Array<{ isBinary: boolean; content: string }> })
+        .startVfsEntries;
       expect(entries.length).toBeGreaterThan(0);
       expect(entries[0]!.isBinary).toBe(true);
       entries[0]!.content = "!!!not-valid-base64!!!";
@@ -529,17 +529,17 @@ describe("draftPersistence", () => {
       // not (or vice-versa). Guards against reordering the commits so that one
       // store is mutated before the throwing preparation runs.
       const pk = "atomic-both-stores";
-      const base = { id: pk, displayName: "Atomic Test", languages: [] } as unknown as BaseKeyboard;
+      const base = { id: pk, displayName: "Atomic Test", languages: [] } as unknown as StartKeyboard;
       const vfs = createVirtualFS([
         { path: "source/icon.ico", content: new Uint8Array([9, 8, 7, 6]), isBinary: true },
       ]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeScaffoldedIR() });
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir: makeScaffoldedIR() });
       saveDraft(pk);
 
       // Corrupt the (isBinary) VFS entry so prepareWorkingCopySnapshot's atob() throws.
       const envelope = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
-      const entries = (envelope.workingCopy as unknown as { baseVfsEntries: Array<{ isBinary: boolean; content: string }> })
-        .baseVfsEntries;
+      const entries = (envelope.workingCopy as unknown as { startVfsEntries: Array<{ isBinary: boolean; content: string }> })
+        .startVfsEntries;
       entries[0]!.content = "@@@not-base64@@@";
       localStorage.setItem(draftKey(pk), JSON.stringify(envelope));
 
@@ -647,17 +647,17 @@ describe("draftPersistence", () => {
 
   describe("G-1/G-5: round-trip save + load restores BOTH stores from a single draft", () => {
     it("restores working-copy IR/identity/deletions/phaseResults AND traversal position/history/touch-seed decision, never re-instantiating a second working copy", () => {
-      const base: BaseKeyboard = {
+      const base: StartKeyboard = {
         id: "test_keyboard",
         displayName: "Test Keyboard",
         languages: ["en"],
-      } as BaseKeyboard;
+      } as StartKeyboard;
       const ir = makeIrWithRemovableRule();
       const vfs = createVirtualFS([
         { path: "source/test_keyboard.kmn", content: "c Test\n", isBinary: false },
       ]);
 
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir });
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir });
       useWorkingCopyStore.getState().setIdentity({
         keyboardId: "test_keyboard",
         displayName: "Test Keyboard",
@@ -696,18 +696,18 @@ describe("draftPersistence", () => {
       expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
 
       // G-5: restore must patch the SAME store, never construct a second one.
-      const instantiateFromBaseSpy = vi.spyOn(useWorkingCopyStore.getState(), "instantiateFromBase");
+      const instantiateFromStartSpy = vi.spyOn(useWorkingCopyStore.getState(), "instantiateFromStart");
       const instantiateFromExistingSpy = vi.spyOn(useWorkingCopyStore.getState(), "instantiateFromExisting");
 
       const result = loadDraft(projectKey!);
       expect(result).toBe(true);
 
-      expect(instantiateFromBaseSpy).not.toHaveBeenCalled();
+      expect(instantiateFromStartSpy).not.toHaveBeenCalled();
       expect(instantiateFromExistingSpy).not.toHaveBeenCalled();
 
       const wc = useWorkingCopyStore.getState();
       expect(wc.instantiationMode).toBe("new-from-base");
-      expect(wc.baseKeyboard?.id).toBe("test_keyboard");
+      expect(wc.startKeyboard?.id).toBe("test_keyboard");
       expect(wc.identity?.bcp47).toBe("en-Latn");
       expect(wc.deletedNodeIds.has("rule-s01-1")).toBe(true);
       expect(wc.phaseResults).toHaveLength(1);
@@ -729,13 +729,13 @@ describe("draftPersistence", () => {
   // its VR-1/VR-2/VR-3-mirroring validation branches or its catch path.
   describe("applyRemoteDraft: cloud-restore banner Resume validation + apply", () => {
     it("applies a valid remote envelope, restoring both stores without touching the boot-restore flags", () => {
-      const base: BaseKeyboard = {
+      const base: StartKeyboard = {
         id: "remote_valid_project",
         displayName: "Remote Valid",
         languages: ["en"],
-      } as BaseKeyboard;
+      } as StartKeyboard;
       const ir = makeIrWithRemovableRule();
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: createVirtualFS([]), ir });
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs: createVirtualFS([]), ir });
       useWorkingCopyStore.getState().deleteNode("rule-s01-1");
       useSurveySessionStore.getState().advance("choose_base");
 
@@ -757,7 +757,7 @@ describe("draftPersistence", () => {
 
       const wc = useWorkingCopyStore.getState();
       expect(wc.instantiationMode).toBe("new-from-base");
-      expect(wc.baseKeyboard?.id).toBe("remote_valid_project");
+      expect(wc.startKeyboard?.id).toBe("remote_valid_project");
       expect(wc.deletedNodeIds.has("rule-s01-1")).toBe(true);
       expect(useSurveySessionStore.getState().activeStepId).toBe("choose_base");
 
@@ -817,22 +817,22 @@ describe("draftPersistence", () => {
     });
 
     it("catch path: an envelope that parses the shape checks but throws while applying (corrupt Base64 VFS entry) returns false and never partially restores", () => {
-      const base: BaseKeyboard = {
+      const base: StartKeyboard = {
         id: "remote_corrupt_project",
         displayName: "Remote Corrupt",
         languages: [],
-      } as unknown as BaseKeyboard;
+      } as unknown as StartKeyboard;
       const vfs = createVirtualFS([
         { path: "source/welcome/welcome.htm", content: new Uint8Array([1, 2, 3, 4]), isBinary: true },
       ]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeScaffoldedIR() });
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir: makeScaffoldedIR() });
       saveDraft("remote_corrupt_project");
       const stored = localStorage.getItem(draftKey("remote_corrupt_project"));
       expect(stored).not.toBeNull();
       const envelope = JSON.parse(stored!) as DurableDraft;
 
-      const entries = (envelope.workingCopy as unknown as { baseVfsEntries: Array<{ isBinary: boolean; content: string }> })
-        .baseVfsEntries;
+      const entries = (envelope.workingCopy as unknown as { startVfsEntries: Array<{ isBinary: boolean; content: string }> })
+        .startVfsEntries;
       expect(entries.length).toBeGreaterThan(0);
       expect(entries[0]!.isBinary).toBe(true);
       entries[0]!.content = "!!!not-valid-base64!!!";
@@ -864,12 +864,12 @@ describe("draftPersistence", () => {
     });
 
     it("holds the restored envelope's savedAt after a successful loadDraft, distinct from Date.now() at call time", () => {
-      const base: BaseKeyboard = {
+      const base: StartKeyboard = {
         id: "restored_savedat_project",
         displayName: "Restored SavedAt",
         languages: ["en"],
-      } as BaseKeyboard;
-      useWorkingCopyStore.getState().instantiateFromBase(base, {
+      } as StartKeyboard;
+      useWorkingCopyStore.getState().instantiateFromStart(base, {
         vfs: createVirtualFS([]),
         ir: makeScaffoldedIR(),
       });
@@ -890,8 +890,8 @@ describe("draftPersistence", () => {
       const olderSavedAt = 1_600_000_000_000;
       const newerSavedAt = 1_650_000_000_000;
 
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "restored_savedat_a", displayName: "A", languages: ["en"] } as BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "restored_savedat_a", displayName: "A", languages: ["en"] } as StartKeyboard,
         { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
       );
       vi.spyOn(Date, "now").mockReturnValue(olderSavedAt);
@@ -902,8 +902,8 @@ describe("draftPersistence", () => {
       expect(loadDraft("restored_savedat_a")).toBe(true);
       expect(restoredDraftSavedAt()).toBe(olderSavedAt);
 
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "restored_savedat_b", displayName: "B", languages: ["en"] } as BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "restored_savedat_b", displayName: "B", languages: ["en"] } as StartKeyboard,
         { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
       );
       vi.spyOn(Date, "now").mockReturnValue(newerSavedAt);
@@ -1416,7 +1416,7 @@ describe("draftPersistence", () => {
         record({ id: "target-script", value: "Latn", provenance: "asked" });
       }
       useSurveySessionStore.setState({
-        localBase: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
+        localStart: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
       });
       inventoryOps("characters").add("a");
       saveDraft(pk);
@@ -1673,12 +1673,12 @@ describe("draftPersistence", () => {
     });
 
     it("the DurableDraft envelope carries projectKey/displayName/languageTag identity fields (future project-list seam)", () => {
-      const base: BaseKeyboard = {
+      const base: StartKeyboard = {
         id: "proj_x",
         displayName: "Base Display Name",
         languages: ["yo"],
-      } as BaseKeyboard;
-      useWorkingCopyStore.getState().instantiateFromBase(base, {
+      } as StartKeyboard;
+      useWorkingCopyStore.getState().instantiateFromStart(base, {
         vfs: createVirtualFS([]),
         ir: makeScaffoldedIR(),
       });
@@ -1734,8 +1734,8 @@ describe("draftPersistence", () => {
         id: "proj_b",
         displayName: "French Basic",
         languages: [],
-      } as unknown as BaseKeyboard;
-      useWorkingCopyStore.getState().instantiateFromBase(baseB, {
+      } as unknown as StartKeyboard;
+      useWorkingCopyStore.getState().instantiateFromStart(baseB, {
         vfs: createVirtualFS([]),
         ir: makeScaffoldedIR(),
       });

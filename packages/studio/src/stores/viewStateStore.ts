@@ -22,7 +22,7 @@
 // (FR-052).
 
 import { create } from "zustand";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { OskMode } from "../components/OskModeToggle.tsx";
 
 /** The flow map's section tabs (mirrors `Section` in dashboard/DashboardView.tsx). */
@@ -40,7 +40,7 @@ export type OskSurface = "survey" | "compare";
  * serialized — see the Compare isolation contract (FR-021).
  */
 export interface CompareSession {
-  readonly baseKeyboard: BaseKeyboard;
+  readonly startKeyboard: StartKeyboard;
   readonly oskMode: OskMode;
 }
 

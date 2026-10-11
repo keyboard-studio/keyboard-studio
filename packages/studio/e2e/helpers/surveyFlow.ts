@@ -243,21 +243,21 @@ export async function driveIdentityLite(
 
   // Robustness check for the phase boundary: the layout step hands off
   // to the base keyboard picker. Wait on that landmark rather than trusting
-  // the question count above. BaseResolution.tsx renders its root with
+  // the question count above. StartResolution.tsx renders its root with
   // data-testid="base-picker" (the visible field inside is a "Search
   // keyboards" labeled input, not a role=combobox named "Base keyboard").
   await expect(page.getByTestId("base-picker")).toBeVisible({
     // Cold-start guard: the base picker enumerates the entire ../keyboards
     // clone from disk on first render, which can take well over 20s on a cold
     // dev server. This wait is the single cold-start margin for every walk
-    // spec (all pass through driveIdentityLite before pickBaseKeyboard), so it
+    // spec (all pass through driveIdentityLite before pickStartKeyboard), so it
     // stays at 90s rather than the 15s used for warm intra-survey transitions.
     timeout: 90_000,
   });
 }
 
 /**
- * Resolve the base keyboard via the BaseKeyboardPicker combobox.
+ * Resolve the base keyboard via the StartKeyboardPicker combobox.
  *
  * Two paths:
  *   - Fast: if the keyboard appears as a ranked suggestion card, click it directly.
@@ -266,7 +266,7 @@ export async function driveIdentityLite(
  * @param page Page instance
  * @param keyboardId The keyboard ID to select (e.g. "bj_cree_woods", "basic_kbdfr")
  */
-export async function pickBaseKeyboard(
+export async function pickStartKeyboard(
   page: Page,
   keyboardId: string,
 ): Promise<void> {
@@ -858,7 +858,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
   const continueButton = page.getByTestId("touch-continue");
   // A ui/SelectMenu like the target-script field above — its options are
   // portalled to document.body, so they go through selectMenuOption.
-  const hostKeySelect = page.getByRole("button", { name: "Host key for long-press" });
+  const baseKeySelect = page.getByRole("button", { name: "Host key for long-press" });
   const applyButton = page.getByRole("button", { name: /^Apply touch method for/ });
 
   for (let guard = 0; guard < 200; guard++) {
@@ -866,11 +866,11 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     if (!stillPresent) return;
 
     // canGoNext (gates continueButton) requires the character to already be
-    // configured; a fresh character always starts disabled (method/hostKey
+    // configured; a fresh character always starts disabled (method/baseKey
     // reset on every currentChar change), so a disabled continueButton means
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
-      await selectMenuOption(page, hostKeySelect, "K_A");
+      await selectMenuOption(page, baseKeySelect, "K_A");
       await applyButton.click();
     }
     await continueButton.click();

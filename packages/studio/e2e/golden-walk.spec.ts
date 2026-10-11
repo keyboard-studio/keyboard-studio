@@ -68,7 +68,7 @@ import { fileURLToPath } from "node:url";
 import {
   seedReturningVisitor,
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseTrackCopy,
   driveAttributionStep,
   acceptProjectName,
@@ -115,7 +115,7 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
   await page.goto("/");
 
   await driveIdentityLite(page, { languageCode: "fr" });
-  await pickBaseKeyboard(page, "basic_kbdfr");
+  await pickStartKeyboard(page, "basic_kbdfr");
   await chooseTrackCopy(page);
   await driveAttributionStep(page, { authorName: "Test Author" });
   await acceptProjectName(page);

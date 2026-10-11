@@ -38,7 +38,7 @@ const BASE_KMN = [
   "",
 ].join("\n");
 
-function parseBase(): KeyboardIR {
+function parseStart(): KeyboardIR {
   return parseKmn(BASE_KMN, "test_kb").ir;
 }
 
@@ -154,11 +154,11 @@ interface ProjectOpts {
   ruleAdditions?: ReturnType<typeof deriveRuleAdditions>;
 }
 
-function project(vfs: VirtualFS, baseIr: KeyboardIR, opts: ProjectOpts = {}) {
+function project(vfs: VirtualFS, startIr: KeyboardIR, opts: ProjectOpts = {}) {
   return projectWorkingCopyVfs({
     vfs,
     keyboardId: "test_kb",
-    baseIr,
+    startIr,
     deletedNodeIds: opts.deletedNodeIds ?? new Set<string>(),
     deletedItemIds: opts.deletedItemIds ?? new Set<string>(),
     assignments: [],
@@ -185,7 +185,7 @@ function withAppended(base: KeyboardIR, extra: IRRule[], stores: IRStore[] = [])
 
 describe("projectWorkingCopyVfs rules-step seam — real engine, no mock", () => {
   it("1. pack install: marked rules and the marked store reach the emitted .kmn", () => {
-    const base = parseBase();
+    const base = parseStart();
     const working = withAppended(base, [packRule("rule#pack-1"), packRule("rule#pack-2")], [
       packStore(),
     ]);
@@ -207,7 +207,7 @@ describe("projectWorkingCopyVfs rules-step seam — real engine, no mock", () =>
   });
 
   it("2. guard synthesis: a marked guard clone appended by 'Add all' is emitted", () => {
-    const base = parseBase();
+    const base = parseStart();
     const working = withAppended(base, [guardClone("rule#synth-1")]);
     const vfs = makeVfs();
 
@@ -219,7 +219,7 @@ describe("projectWorkingCopyVfs rules-step seam — real engine, no mock", () =>
   });
 
   it("3. Narrow: the exception is emitted immediately BEFORE its guard", () => {
-    const base = parseBase();
+    const base = parseStart();
     const guardId = guardRuleId(base);
     const exception = narrowException("rule#narrow-1");
     const working: KeyboardIR = {
@@ -250,7 +250,7 @@ describe("projectWorkingCopyVfs rules-step seam — real engine, no mock", () =>
   });
 
   it("4. unmarked working-IR extras are NOT imported (context-tolerance + touch synthesis)", () => {
-    const base = parseBase();
+    const base = parseStart();
     const working = withAppended(base, [
       packRule("rule#pack-1"),
       toleranceStyleRule(),
@@ -270,7 +270,7 @@ describe("projectWorkingCopyVfs rules-step seam — real engine, no mock", () =>
   });
 
   it("5. the no-additions path stays byte-identical (omitted vs empty derivation)", () => {
-    const base = parseBase();
+    const base = parseStart();
     const kaId = findRuleIdByOutput(base, "a");
 
     const vfsOmitted = makeVfs();
@@ -288,7 +288,7 @@ describe("projectWorkingCopyVfs rules-step seam — real engine, no mock", () =>
   });
 
   it("6. a marked addition filtered by the deletion set is never resurrected", () => {
-    const base = parseBase();
+    const base = parseStart();
     const working = withAppended(base, [packRule("rule#pack-9")]);
     const vfs = makeVfs();
 

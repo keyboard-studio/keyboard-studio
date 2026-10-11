@@ -97,7 +97,7 @@ interface ComboProposalParts {
 
 interface TouchProposalParts {
   mechanism: "touch";
-  hostKey: string;
+  baseKey: string;
   /** Layer the parallel placement targets — always `casePairTouchTarget`'s
    *  output for the combo being edited (the editing combo plus SHIFT). */
   targetLayer: TouchLayerId;

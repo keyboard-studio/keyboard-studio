@@ -100,7 +100,7 @@ vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
 });
 
 // ---------------------------------------------------------------------------
-// Mock useKeyboardArtifact — capture the (baseKeyboard, scaffoldSpec,
+// Mock useKeyboardArtifact — capture the (startKeyboard, scaffoldSpec,
 // vfsTransform) triple passed in, same pattern as the TouchGallery.*.test.tsx
 // suites. No
 // real fetch/compile/WASM runs in jsdom.
@@ -111,7 +111,7 @@ type CapturedVfsTransform = (vfs: VirtualFS, kbId: string) => { warnings: string
 const { capturedArtifactCallRef } = vi.hoisted(() => ({
   capturedArtifactCallRef: {
     current: null as null | {
-      baseKeyboard: unknown;
+      startKeyboard: unknown;
       scaffoldSpec: unknown;
       vfsTransform: CapturedVfsTransform | null | undefined;
     },
@@ -120,11 +120,11 @@ const { capturedArtifactCallRef } = vi.hoisted(() => ({
 
 vi.mock("../../hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: (
-    baseKeyboard: unknown,
+    startKeyboard: unknown,
     scaffoldSpec: unknown,
     vfsTransform: CapturedVfsTransform | null | undefined,
   ) => {
-    capturedArtifactCallRef.current = { baseKeyboard, scaffoldSpec, vfsTransform };
+    capturedArtifactCallRef.current = { startKeyboard, scaffoldSpec, vfsTransform };
     return { stage: { kind: "idle" } as Stage, retry: vi.fn(), recompile: vi.fn() };
   },
 }));
@@ -197,8 +197,8 @@ const fakeTouchAssignment: TouchAssignment = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Seed baseVfs/baseIr, optionally with a `.keyman-touch-layout` file and/or IR groups. */
-function seedBase(touchLayoutJson?: string, groups: IRGroup[] = []) {
+/** Seed startVfs/startIr, optionally with a `.keyman-touch-layout` file and/or IR groups. */
+function seedStart(touchLayoutJson?: string, groups: IRGroup[] = []) {
   const files = [{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }];
   if (touchLayoutJson !== undefined) {
     files.push({
@@ -209,7 +209,7 @@ function seedBase(touchLayoutJson?: string, groups: IRGroup[] = []) {
   }
   const vfs = createVirtualFS(files);
   const ir = makeTestIR(groups);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 }
 
 /**
@@ -227,9 +227,9 @@ function makeOverflowGroup(overflowChar: string): IRGroup {
   });
 }
 
-/** Seed baseVfs/baseIr from a fully-built KeyboardIR (bypassing makeTestIR),
+/** Seed startVfs/startIr from a fully-built KeyboardIR (bypassing makeTestIR),
  *  for fixtures that need stores/recognizedPatterns alongside groups. */
-function seedBaseWithIr(ir: KeyboardIR, touchLayoutJson?: string) {
+function seedStartWithIr(ir: KeyboardIR, touchLayoutJson?: string) {
   const files = [{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }];
   if (touchLayoutJson !== undefined) {
     files.push({
@@ -239,7 +239,7 @@ function seedBaseWithIr(ir: KeyboardIR, touchLayoutJson?: string) {
     });
   }
   const vfs = createVirtualFS(files);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 }
 
 /**
@@ -306,7 +306,7 @@ afterEach(() => {
 
 describe("TouchSeedSourcePanel — default selection", () => {
   it("defaults to Import & adapt when the base ships a usable touch layout", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-import-adapt").getAttribute("aria-pressed")).toBe("true");
@@ -314,7 +314,7 @@ describe("TouchSeedSourcePanel — default selection", () => {
   });
 
   it("defaults to Reseed from desktop when the base has no touch layout", () => {
-    seedBase(); // no touch-layout file
+    seedStart(); // no touch-layout file
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
@@ -327,7 +327,7 @@ describe("TouchSeedSourcePanel — default selection", () => {
   });
 
   it("treats malformed base touch-layout JSON as absent, with a distinct note", () => {
-    seedBase(MALFORMED_JSON);
+    seedStart(MALFORMED_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     // Same default as "absent" (Reseed selected)...
@@ -346,7 +346,7 @@ describe("TouchSeedSourcePanel — default selection", () => {
 
 describe("TouchSeedSourcePanel — advisories", () => {
   it("shows the no-phone-platform warning when the base ships only tablet", () => {
-    seedBase(TABLET_ONLY_JSON);
+    seedStart(TABLET_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-no-phone-warn")).toBeTruthy();
@@ -356,14 +356,14 @@ describe("TouchSeedSourcePanel — advisories", () => {
   });
 
   it("does NOT show the no-phone-platform warning when the base ships phone", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.queryByTestId("seed-source-no-phone-warn")).toBeNull();
   });
 
   it("states the Reseed option discards phone/desktop platforms when the base ships one", () => {
-    seedBase(PHONE_AND_TABLET_JSON);
+    seedStart(PHONE_AND_TABLET_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-reseed").textContent).toContain(
@@ -372,7 +372,7 @@ describe("TouchSeedSourcePanel — advisories", () => {
   });
 
   it("does not mention discarding platforms when the base ships phone only", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-reseed").textContent).not.toContain("discards");
@@ -385,7 +385,7 @@ describe("TouchSeedSourcePanel — advisories", () => {
 
 describe("TouchSeedSourcePanel — confirm", () => {
   it("confirm records the touch-seed-source decision with the selection, then onComplete", () => {
-    seedBase(); // absent -> default reseed
+    seedStart(); // absent -> default reseed
     let completed = false;
     render(
       <TouchSeedSourceHost
@@ -405,7 +405,7 @@ describe("TouchSeedSourcePanel — confirm", () => {
   });
 
   it("explicit Reseed on a base that ships a layout shows the drop advisory and records reseed-from-desktop on confirm", () => {
-    seedBase(PHONE_AND_TABLET_JSON); // usable base layout -> default is Import & adapt
+    seedStart(PHONE_AND_TABLET_JSON); // usable base layout -> default is Import & adapt
     let completed = false;
     render(
       <TouchSeedSourceHost
@@ -431,7 +431,7 @@ describe("TouchSeedSourcePanel — confirm", () => {
   });
 
   it("Back button calls the supplied onBack", () => {
-    seedBase();
+    seedStart();
     let backCalled = false;
     render(
       <TouchSeedSourceHost
@@ -454,7 +454,7 @@ describe("TouchSeedSourcePanel — confirm", () => {
 
 describe("TouchSeedSourcePanel — live preview (R4a)", () => {
   it("shows the base-layout preview when Import & adapt is selected, and the derived reseed preview when Reseed is selected", () => {
-    seedBase(PHONE_ONLY_JSON); // usable base layout -> default is Import & adapt
+    seedStart(PHONE_ONLY_JSON); // usable base layout -> default is Import & adapt
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     // Default selection (Import & adapt) shows the base preview, not the
@@ -468,20 +468,20 @@ describe("TouchSeedSourcePanel — live preview (R4a)", () => {
     // hides the base-layout preview.
     expect(screen.queryByTestId("seed-source-preview")).toBeNull();
     expect(screen.getByTestId("seed-source-reseed-preview")).toBeTruthy();
-    // The pure deriveSeedLayout call succeeds against the seeded baseIr, so
+    // The pure deriveSeedLayout call succeeds against the seeded startIr, so
     // this is the success branch (a rendered layout), not the error note.
     expect(screen.queryByTestId("seed-source-reseed-preview-error")).toBeNull();
   });
 
   it("renders the reseed-preview graceful fallback note when there is no baseIr to derive from", () => {
-    // Fresh store, no instantiateFromBase call -> baseIr stays null.
+    // Fresh store, no instantiateFromStart call -> startIr stays null.
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     // No usable base layout either -> default selection is already Reseed.
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("seed-source-reseed-preview")).toBeTruthy();
     expect(screen.getByTestId("seed-source-reseed-preview-error")).toBeTruthy();
-    // No baseIr -> no artifact to build -> the OSK is never mounted.
+    // No startIr -> no artifact to build -> the OSK is never mounted.
     expect(screen.queryByTestId("osk-frame")).toBeNull();
   });
 
@@ -517,7 +517,7 @@ describe("TouchSeedSourcePanel — live preview (R4a)", () => {
 
 describe("TouchSeedSourcePanel — real OSK preview (R4b)", () => {
   it("mounts the real OSK forced into tablet mode, with no desktop/mobile toggle on this screen", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     const osk = screen.getByTestId("osk-frame");
@@ -528,16 +528,16 @@ describe("TouchSeedSourcePanel — real OSK preview (R4b)", () => {
   });
 
   it("feeds useKeyboardArtifact the working copy's baseKeyboard", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
-    expect(capturedArtifactCallRef.current?.baseKeyboard).toBe(
-      useWorkingCopyStore.getState().baseKeyboard,
+    expect(capturedArtifactCallRef.current?.startKeyboard).toBe(
+      useWorkingCopyStore.getState().startKeyboard,
     );
   });
 
   it("injects a DIFFERENT derived .keyman-touch-layout per selected card — Import & adapt carries the base's shipped key, Reseed derives fresh", () => {
-    seedBase(PHONE_ONLY_JSON); // ships a "q"/"w" phone layout -> default Import & adapt
+    seedStart(PHONE_ONLY_JSON); // ships a "q"/"w" phone layout -> default Import & adapt
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     const importAdaptVfs = runCapturedVfsTransform("basic_kbdus");
@@ -557,7 +557,7 @@ describe("TouchSeedSourcePanel — real OSK preview (R4b)", () => {
   });
 
   it("does not inject a .keyman-touch-layout entry when the seed derivation failed (graceful, no partial/stale artifact)", () => {
-    seedBase(); // no baseIr issue here, but force the catch branch below
+    seedStart(); // no startIr issue here, but force the catch branch below
     vi.mocked(deriveSeedLayout).mockImplementationOnce(() => {
       throw new Error("simulated genuine derivation failure");
     });
@@ -585,7 +585,7 @@ describe("TouchSeedSourcePanel — real OSK preview (R4b)", () => {
 describe("TouchSeedSourcePanel — reseed extras advisory", () => {
   it("does not show the advisory note for a character spilled onto the space bar's extras sk[] — it is reachable there", () => {
     const overflowChar = "ʔ"; // LATIN LETTER GLOTTAL STOP — no compact slot, no known neighbor
-    seedBase(undefined, [makeOverflowGroup(overflowChar)]); // no base layout -> default is Reseed
+    seedStart(undefined, [makeOverflowGroup(overflowChar)]); // no base layout -> default is Reseed
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
@@ -593,7 +593,7 @@ describe("TouchSeedSourcePanel — reseed extras advisory", () => {
   });
 
   it("does not show the reseed-extras advisory note when nothing was spilled", () => {
-    seedBase(); // no groups -> no overflow characters at all
+    seedStart(); // no groups -> no overflow characters at all
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.queryByTestId("seed-source-reseed-extras-note")).toBeNull();
@@ -601,7 +601,7 @@ describe("TouchSeedSourcePanel — reseed extras advisory", () => {
 
   it("shows the advisory note listing a rejected deadkey-successor candidate that is genuinely unreachable elsewhere", () => {
     const symbol = "§";
-    seedBaseWithIr(makeUnreachableSymbolIR(symbol)); // no base layout -> default is Reseed
+    seedStartWithIr(makeUnreachableSymbolIR(symbol)); // no base layout -> default is Reseed
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
@@ -616,7 +616,7 @@ describe("TouchSeedSourcePanel — reseed extras advisory", () => {
 
   it("never gates either choice — both cards stay clickable when the advisory is showing", () => {
     const symbol = "§";
-    seedBaseWithIr(makeUnreachableSymbolIR(symbol));
+    seedStartWithIr(makeUnreachableSymbolIR(symbol));
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.getByTestId("seed-source-reseed-extras-note")).toBeTruthy();
@@ -626,13 +626,13 @@ describe("TouchSeedSourcePanel — reseed extras advisory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// P2 fix: a genuine deriveSeedLayout failure (as opposed to "no baseIr yet")
+// P2 fix: a genuine deriveSeedLayout failure (as opposed to "no startIr yet")
 // must be logged, not swallowed identically to the expected empty case.
 // ---------------------------------------------------------------------------
 
 describe("TouchSeedSourcePanel — reseed derivation error logging", () => {
   it("logs via devLog.error and still renders the graceful fallback when deriveSeedLayout throws", () => {
-    seedBase();
+    seedStart();
     const errorSpy = vi.spyOn(devLog, "error").mockImplementation(() => undefined);
     vi.mocked(deriveSeedLayout).mockImplementationOnce(() => {
       throw new Error("simulated genuine derivation failure");
@@ -653,7 +653,7 @@ describe("TouchSeedSourcePanel — reseed derivation error logging", () => {
 
 describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
   it("does not warn on a fresh entry (no recorded choice yet), even if a stray draft existed", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     // no seed decision recorded (fresh) — the warning must never depend on
     // touchDraft alone.
     useWorkingCopyStore.getState().setTouchDraft({
@@ -668,7 +668,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
   });
 
   it("does not warn when re-confirming the SAME recorded choice, even with a draft present", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     seedRecordedSeed("import-adapt");
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", fakeTouchAssignment]],
@@ -684,7 +684,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
   });
 
   it("warns when re-entry picks a DIFFERENT value than the recorded choice, with a draft present", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     seedRecordedSeed("import-adapt");
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", fakeTouchAssignment]],
@@ -701,7 +701,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
   });
 
   it("does not warn on a different selection when no touch draft exists", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     seedRecordedSeed("import-adapt");
     // touchDraft stays null (no in-progress touch edits).
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
@@ -713,7 +713,7 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
   });
 
   it("confirming a changed selection past the warning records the new choice AND clears touchDraft", () => {
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     seedRecordedSeed("import-adapt");
     useWorkingCopyStore.getState().setTouchDraft({
       charTouchEntries: [["ä", fakeTouchAssignment]],
@@ -747,7 +747,7 @@ describe("TouchSeedSourcePanel — leave and return (spec 079 FR-051, T029)", ()
     // A usable base layout means the base's own default is "import-adapt" —
     // the author explicitly overriding it to "reseed-from-desktop" is the
     // choice that must survive, not merely happen to match the default.
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     const first = render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("seed-source-reseed"));
     fireEvent.click(screen.getByTestId("seed-source-confirm"));
@@ -776,7 +776,7 @@ describe("TouchSeedSourcePanel — narrow viewport preview sheet", () => {
 
   function renderNarrow() {
     setViewport(390, 844);
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
   }
 
@@ -818,7 +818,7 @@ describe("TouchSeedSourcePanel — narrow viewport preview sheet", () => {
 
   it("desktop (1280px) keeps the inline preview and shows no trigger", () => {
     setViewport(1280, 800);
-    seedBase(PHONE_ONLY_JSON);
+    seedStart(PHONE_ONLY_JSON);
     render(<TouchSeedSourceHost onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
 
     expect(screen.queryByTestId("seed-source-show-preview")).toBeNull();

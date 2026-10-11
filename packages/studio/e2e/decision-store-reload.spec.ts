@@ -23,7 +23,7 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseTrackCopy,
   driveAttributionStep,
   acceptProjectName,
@@ -54,7 +54,7 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
   await page.goto("/");
 
   await driveIdentityLite(page, { languageCode: "fr" });
-  await pickBaseKeyboard(page, "basic_kbdfr");
+  await pickStartKeyboard(page, "basic_kbdfr");
   await chooseTrackCopy(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);

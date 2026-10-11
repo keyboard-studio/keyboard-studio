@@ -40,7 +40,7 @@ installTouchGalleryHooks();
 // this exported pure function — unit-testing it directly here avoids relying
 // on the disabled Apply button as the sole proof the invariant holds (a
 // disabled button never fires its onClick in jsdom, so driving this through
-// the UI cannot exercise the null-resolvedHostKey branch at all).
+// the UI cannot exercise the null-resolvedBaseKey branch at all).
 // ---------------------------------------------------------------------------
 
 describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
@@ -365,8 +365,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/long.press on a key/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     await act(async () => {
       fireEvent.click(
@@ -424,8 +424,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/long.press on a key/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     await act(async () => {
       fireEvent.click(
@@ -467,8 +467,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/swipe a key \(flick\)/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     const directionSelect = screen.getByRole("button", {
       name: /flick direction/i,
@@ -515,8 +515,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/swipe a key \(flick\)/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     const directionSelect = screen.getByRole("button", {
       name: /flick direction/i,
@@ -580,8 +580,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/tap multiple times \(multitap\)/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     await act(async () => {
       fireEvent.click(
@@ -638,8 +638,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/replace a key/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     await act(async () => {
       fireEvent.click(
@@ -698,8 +698,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/tap multiple times \(multitap\)/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     const applyBtn =
       screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
@@ -728,8 +728,8 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
     await openChooser(/replace a key/i);
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_B");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_B");
 
     const applyBtn =
       screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
@@ -795,8 +795,8 @@ describe("TouchGallery — uppercase current char (spec 074 FR-006 layer-picker 
     expect(selectMenuValue(layerSelect)).toBe("SHIFT");
     expect(screen.getByText(/Resulting layer: Shift/i)).toBeTruthy();
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_A");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_A");
 
     const applyBtn =
       screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
@@ -850,8 +850,8 @@ describe("TouchGallery — uppercase current char (spec 074 FR-006 layer-picker 
     expect(selectMenuValue(layerSelect)).toBe("SHIFT");
     expect(screen.getByText(/Not yet a layer this keyboard uses/i)).toBeTruthy();
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_A");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_A");
 
     const applyBtn = () =>
       screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
@@ -908,8 +908,8 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     );
   }
 
-  async function applyOnHostKey(hostKey: string) {
-    await changeSelectMenu(screen.getByRole("button", { name: /host key/i }), hostKey);
+  async function applyOnBaseKey(baseKey: string) {
+    await changeSelectMenu(screen.getByRole("button", { name: /host key/i }), baseKey);
     const applyBtn =
       screen.queryAllByRole("button").find((b) => b.textContent?.trim() === "Apply method") ??
       null;
@@ -934,7 +934,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     await denyAnySuggestion();
     await selectLayerToken("RALT");
     expect(screen.getByText(/Resulting layer: RAlt/i)).toBeTruthy();
-    await applyOnHostKey("K_A");
+    await applyOnBaseKey("K_A");
 
     // The proposal is raised at all — under the id-keyed rule this banner never
     // appeared for any layer but the base one.
@@ -976,7 +976,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
 
     await denyAnySuggestion();
     await selectLayerToken("RALT");
-    await applyOnHostKey("K_A");
+    await applyOnBaseKey("K_A");
 
     expect(screen.queryByText(/has an uppercase form/i)).toBeNull();
     // The source placement itself still lands normally.
@@ -998,7 +998,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     });
 
     await denyAnySuggestion();
-    await applyOnHostKey("K_A"); // no layer slot -> base/default layer
+    await applyOnBaseKey("K_A"); // no layer slot -> base/default layer
 
     expect(screen.getByText(/has an uppercase form, Θ/i)).toBeTruthy();
     await act(async () => {

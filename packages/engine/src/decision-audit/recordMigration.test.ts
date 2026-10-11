@@ -239,3 +239,71 @@ describe("normalizeDecisionRecord — v2 stage (spec 090 US5: tag only)", () => 
     expect(normalizeDecisionRecord(current)).toBe(current);
   });
 });
+
+describe("normalizeDecisionRecord — #1810 contribution-field rename (unstaged)", () => {
+  // A record written by the build BEFORE the #1810 identifier rename, at the
+  // CURRENT record version: its base-contribution payload carries the legacy
+  // `baseId` field. The rename stage must lift it to `startId` at any
+  // version, or DecisionEntrySchema would drop the entry on read.
+  const legacyContribution = {
+    entryId: "e-contribution",
+    stepId: "choose_base",
+    payload: {
+      kind: "base-contribution",
+      baseId: "sil_cameroon_qwerty",
+      baseDisplayName: "Cameroon QWERTY",
+      startingKeyCount: 47,
+      derivedAxes: ["markInputOrder"],
+      inheritedMetadata: [{ field: "copyright", value: "(c) SIL" }],
+      instantiationMode: "new-from-base",
+    },
+    provenance: { agency: "extracted" },
+    recordedAt: 1_700_000_000_000,
+    supersedes: null,
+    impact: null,
+  } as unknown as PreMigrationDecisionRecord["entries"][number];
+
+  it("lifts a legacy baseId to startId at the current record version", () => {
+    const record: PreMigrationDecisionRecord = {
+      format: DECISION_RECORD_FORMAT,
+      version: DECISION_RECORD_VERSION,
+      keyboardId: "sil_bambara",
+      entries: [legacyContribution],
+      truncated: false,
+    };
+    const normalized = normalizeDecisionRecord(record);
+    const payload = normalized.entries[0]!.payload;
+    if (payload.kind !== "base-contribution") throw new Error("expected base-contribution");
+    expect(payload.startId).toBe("sil_cameroon_qwerty");
+    // Wire names that deliberately did NOT rename:
+    expect(payload.kind).toBe("base-contribution");
+    expect(payload.baseDisplayName).toBe("Cameroon QWERTY");
+    expect("baseId" in payload).toBe(false);
+    // The rest of the payload survives intact.
+    expect(payload.startingKeyCount).toBe(47);
+    expect(payload.derivedAxes).toEqual(["markInputOrder"]);
+  });
+
+  it("leaves a current-shape contribution payload untouched", () => {
+    const current = {
+      ...legacyContribution,
+      payload: {
+        kind: "base-contribution",
+        startId: "sil_cameroon_qwerty",
+        baseDisplayName: "Cameroon QWERTY",
+        derivedAxes: [],
+        inheritedMetadata: [],
+        instantiationMode: "new-from-base",
+      },
+    } as unknown as PreMigrationDecisionRecord["entries"][number];
+    const record: PreMigrationDecisionRecord = {
+      format: DECISION_RECORD_FORMAT,
+      version: DECISION_RECORD_VERSION,
+      keyboardId: "sil_bambara",
+      entries: [current],
+      truncated: false,
+    };
+    const normalized = normalizeDecisionRecord(record);
+    expect(normalized).toBe(record);
+  });
+});

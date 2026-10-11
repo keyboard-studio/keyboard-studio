@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildPosture,
   postureFor,
-  reconcilePostureOnBaseSwitch,
+  reconcilePostureOnStartSwitch,
   type InheritancePosture,
 } from "./posture.ts";
 import type { AdaptationEvidence } from "./evidence.ts";
@@ -31,7 +31,7 @@ function evidence(overrides: Partial<AdaptationEvidence> = {}): AdaptationEviden
 describe("buildPosture", () => {
   it("yields a full set of all-`default` entries on skip — never blank (US2 sc.4)", () => {
     const posture = buildPosture(evidence(), "base_x");
-    expect(posture.baseId).toBe("base_x");
+    expect(posture.startId).toBe("base_x");
     expect(posture.entries).toHaveLength(4);
     expect(posture.entries.every((e) => e.source === "default")).toBe(true);
     expect(posture.entries.map((e) => e.facet).sort()).toEqual([
@@ -100,7 +100,7 @@ describe("reconcilePostureOnBaseSwitch — mid-session base switch", () => {
     // Author confirmed the input-strategies posture on base A.
     const base: InheritancePosture = buildPosture(evidence(), "base_a");
     const confirmed: InheritancePosture = {
-      baseId: "base_a",
+      startId: "base_a",
       entries: base.entries.map((e) =>
         e.facet === "input-strategies" ? { ...e, posture: "discard", source: "confirmed" } : e,
       ),
@@ -109,9 +109,9 @@ describe("reconcilePostureOnBaseSwitch — mid-session base switch", () => {
     // Switch to base B: only the device mix changed (touch dropped); the strategy
     // fingerprint is identical, so its provenance is unchanged.
     const next = evidence({ baseTargetMix: ["desktop"] });
-    const reconciled = reconcilePostureOnBaseSwitch(confirmed, next, "base_b");
+    const reconciled = reconcilePostureOnStartSwitch(confirmed, next, "base_b");
 
-    expect(reconciled.baseId).toBe("base_b");
+    expect(reconciled.startId).toBe("base_b");
     // Unchanged-evidence + confirmed → persists.
     const strat = postureFor(reconciled, "input-strategies");
     expect(strat.source).toBe("confirmed");

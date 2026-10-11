@@ -227,7 +227,7 @@ function sortByLayoutOrder(
  * shows KEYS (cells), never a sub-entry on its own, so a character reachable
  * only via a longpress/multitap/flick still resolves to the cell hosting it.
  */
-function hostAddressFromMethodId(methodId: string): string {
+function baseAddressFromMethodId(methodId: string): string {
   const parsed = parseTouchKeyAddress(methodId);
   // Defensive only: every id `enumerateTouchMethodsForChar` returns was built
   // by one of the three address builders in touchKeyAddress.ts, which always
@@ -243,7 +243,7 @@ export function findProducingKeyAddresses(
 ): readonly string[] {
   const methods = enumerateTouchMethodsForChar(layout, char);
   const addresses = new Set<string>();
-  for (const method of methods) addresses.add(hostAddressFromMethodId(method.id));
+  for (const method of methods) addresses.add(baseAddressFromMethodId(method.id));
   return [...addresses];
 }
 

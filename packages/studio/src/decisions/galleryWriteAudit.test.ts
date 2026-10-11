@@ -44,10 +44,10 @@ export const GALLERY_WRITE_AUDIT: readonly GalleryWriteAuditEntry[] = [
     trees: [
       "survey/layout/LayoutStep.tsx",
       "survey/touchSeedSource/TouchSeedSourcePanel.tsx",
-      "survey/chooseBase/BaseKeyboardRenderer.tsx",
-      "editors/panels/BaseResolution.tsx",
+      "survey/chooseStart/StartKeyboardRenderer.tsx",
+      "editors/panels/StartResolution.tsx",
     ],
-    identifiers: ["saveAnswer", "setLocalBase", "setBaseConfirmed", "setTouchSeedSource"],
+    identifiers: ["saveAnswer", "setLocalStart", "setStartConfirmed", "setTouchSeedSource"],
   },
   {
     // US2 (T027): the Phase B/C store write path is retired — T025 deleted

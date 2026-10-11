@@ -6,7 +6,7 @@
 //   - It calls `useKeyboardArtifact` with **no** `onInstantiate` callback.
 //     That is the whole isolation guarantee. `usePreviewArtifact` passes one,
 //     and on a settle for a DIFFERENT base it reaches
-//     `instantiateFromBaseIfConfirmed` — which asks the author whether to
+//     `instantiateFromStartIfConfirmed` — which asks the author whether to
 //     discard their edits and, on yes, rebases the working copy and clears
 //     `phaseResults`/`irAxes`. With no callback there is no such settle
 //     handler, so there is no dialog to answer and nothing to rebase. The
@@ -28,16 +28,16 @@
 // still needs its instantiate path and its download gate (FR-026, D-6).
 
 import { useCallback } from "react";
-import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
+import type { StartKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
 import { useKeyboardArtifact } from "./useKeyboardArtifact.ts";
 import { useViewStateStore } from "../stores/viewStateStore.ts";
 import type { OskMode } from "../components/OskModeToggle.tsx";
 
 export interface CompareArtifact {
   /** The foreign keyboard currently loaded for inspection, or null. */
-  baseKeyboard: BaseKeyboard | null;
+  startKeyboard: StartKeyboard | null;
   /** Load a keyboard for inspection. Writes only to view state (Q5). */
-  setBaseKeyboard: (kb: BaseKeyboard | null) => void;
+  setStartKeyboard: (kb: StartKeyboard | null) => void;
 
   /** Which OSK view is open. View state, not authoring state. */
   oskMode: OskMode;
@@ -57,27 +57,27 @@ export function useCompareArtifact(): CompareArtifact {
   const selection = useViewStateStore((s) => s.compareSelection);
   const setCompareSelection = useViewStateStore((s) => s.setCompareSelection);
 
-  const baseKeyboard = selection?.baseKeyboard ?? null;
+  const startKeyboard = selection?.startKeyboard ?? null;
   const oskMode = selection?.oskMode ?? "desktop";
 
-  const setBaseKeyboard = useCallback(
-    (kb: BaseKeyboard | null) => {
-      setCompareSelection(kb === null ? null : { baseKeyboard: kb, oskMode });
+  const setStartKeyboard = useCallback(
+    (kb: StartKeyboard | null) => {
+      setCompareSelection(kb === null ? null : { startKeyboard: kb, oskMode });
     },
     [setCompareSelection, oskMode],
   );
 
   const setOskMode = useCallback(
     (mode: OskMode) => {
-      if (baseKeyboard === null) return;
-      setCompareSelection({ baseKeyboard, oskMode: mode });
+      if (startKeyboard === null) return;
+      setCompareSelection({ startKeyboard, oskMode: mode });
     },
-    [setCompareSelection, baseKeyboard],
+    [setCompareSelection, startKeyboard],
   );
 
   // No scaffold spec (there is no scaffold form on this tab), no VFS
   // transform, and — the point of the whole module — no onInstantiate.
-  const { stage, retry } = useKeyboardArtifact(baseKeyboard, null, null, null);
+  const { stage, retry } = useKeyboardArtifact(startKeyboard, null, null, null);
 
   const diagnostics: CompilerDiagnostic[] =
     stage.kind === "ready"
@@ -86,5 +86,5 @@ export function useCompareArtifact(): CompareArtifact {
         ? stage.compileResult.diagnostics
         : [];
 
-  return { baseKeyboard, setBaseKeyboard, oskMode, setOskMode, stage, retry, diagnostics };
+  return { startKeyboard, setStartKeyboard, oskMode, setOskMode, stage, retry, diagnostics };
 }

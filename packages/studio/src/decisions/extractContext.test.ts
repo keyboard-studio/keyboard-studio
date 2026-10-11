@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { parseKmn } from "@keyboard-studio/engine";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard } from "@keyboard-studio/contracts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import characterInventoryModule from "../survey/questions/gallery/characterInventory.ts";
 import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
@@ -27,7 +27,7 @@ group(main) using keys
 `;
 
 // The real catalog entry (same metadata the base browser carries).
-const cameroonCatalog = makeBaseKeyboard({
+const cameroonCatalog = makeStartKeyboard({
   id: "sil_cameroon_qwerty",
   script: "Latn",
   path: "release/sil/sil_cameroon_qwerty",
@@ -96,7 +96,7 @@ describe("real catalog keyboard extraction (T020)", () => {
 describe("regional catalog tags", () => {
   it("extracts only the language subtag, so the composed tag keeps BCP 47 order", () => {
     const { ir } = parseKmn(CAMEROON_KMN, "sil_cameroon_qwerty");
-    const regional = makeBaseKeyboard({
+    const regional = makeStartKeyboard({
       id: "sil_cameroon_qwerty",
       script: "Latn",
       path: "release/sil/sil_cameroon_qwerty",

@@ -173,23 +173,23 @@ export const PENDING_PROJECT_KEY = "__pending__" as const;
 //
 // "A stable per-project id derived from the working copy's keyboard id at
 // instantiation" (data-model.md). `identity.keyboardId` is the authoritative
-// source once set, but for Track 1 (instantiateFromBase) `identity` is reset
+// source once set, but for Track 1 (instantiateFromStart) `identity` is reset
 // to null immediately at instantiation and only gains `keyboardId` later (at
-// the project_name step) — so `baseKeyboard.id` is the immediate fallback,
+// the project_name step) — so `startKeyboard.id` is the immediate fallback,
 // available from the first instant of EITHER track's instantiation. Track 2
 // (instantiateFromExisting) sets identity.keyboardId = keyboard.id right away,
 // so both sources agree there.
 // ---------------------------------------------------------------------------
 
 /** Narrow slice of WorkingCopyData needed to derive the per-project key. */
-export type ProjectKeySource = Pick<WorkingCopyData, "identity" | "baseKeyboard">;
+export type ProjectKeySource = Pick<WorkingCopyData, "identity" | "startKeyboard">;
 
 /**
  * Derive the stable per-project key from working-copy state. Returns null
  * before any instantiation (both sources absent).
  */
 export function deriveProjectKeyFromWorkingCopy(wc: ProjectKeySource): string | null {
-  return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
+  return wc.identity?.keyboardId ?? wc.startKeyboard?.id ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -529,7 +529,7 @@ function readEnvelopeForReconciliation(projectKey: string): DurableDraft | null 
  *
  *   1. `deriveProjectKeyFromWorkingCopy(stale's OWN stored envelope) === K2`
  *      — `stale`'s own on-disk content (its `identity.keyboardId ??
- *      baseKeyboard.id`, the exact lineage `deriveProjectKeyFromWorkingCopy`
+ *      startKeyboard.id`, the exact lineage `deriveProjectKeyFromWorkingCopy`
  *      already uses everywhere else in this module) says it belongs under
  *      K2, not the K1 it happens to be filed under. This is a POSITIVE claim
  *      from the stale record's own content, not an outside guess.
@@ -744,7 +744,7 @@ export function hasMeaningfulProgress(): boolean {
     peekDecision("target-script") !== undefined ||
     session.history.length > 0 ||
     session.activeStepId !== "identity" ||
-    session.localBase !== null
+    session.localStart !== null
   );
 }
 
@@ -798,7 +798,7 @@ export function saveDraft(projectKey: string): void {
   const displayName = deriveProjectLabel({
     scaffoldSpec: deriveScaffoldSpec(decisions),
     identity: wc.identity,
-    baseKeyboard: wc.baseKeyboard,
+    startKeyboard: wc.startKeyboard,
   });
 
   // languageTag: identity-lite's computed BCP47 tag first (may be "" if the
@@ -925,10 +925,10 @@ function stringEntries(v: unknown): Record<string, string> {
 function stampPre079Alphabet(): void {
   const draft = getCharacterInventoryValue();
   if (draft.alphabetEvidenceKey !== undefined || draft.chars.length === 0) return;
-  const { localBase } = useSurveySessionStore.getState();
+  const { localStart } = useSurveySessionStore.getState();
   const identityResult = deriveIdentityResult(getDecisionSnapshot());
-  if (identityResult === null || localBase === null) return;
-  inventoryOps("characters").setAlphabetEvidenceKey(alphabetKeyOf(identityResult, localBase));
+  if (identityResult === null || localStart === null) return;
+  inventoryOps("characters").setAlphabetEvidenceKey(alphabetKeyOf(identityResult, localStart));
 }
 
 /**
@@ -1247,8 +1247,15 @@ export function migrateDraftEnvelope(raw: unknown): MigrateDraftResult | null {
   const decisions: Partial<Record<DecisionId, Decision<unknown>>> = {};
   const orphans: MigrationOrphan[] = [];
   const wc = isPlainRecord(raw.workingCopy) ? raw.workingCopy : null;
-  const baseKeyboard = wc !== null && isPlainRecord(wc.baseKeyboard) ? wc.baseKeyboard : null;
-  const baseSourceName = typeof baseKeyboard?.id === "string" ? baseKeyboard.id : undefined;
+  // #1810 rename: a v1 working copy stores the starting keyboard under the
+  // legacy `baseKeyboard` key; current snapshots use `startKeyboard`.
+  const startKeyboard =
+    wc !== null && isPlainRecord(wc.startKeyboard)
+      ? wc.startKeyboard
+      : wc !== null && isPlainRecord(wc.baseKeyboard)
+        ? wc.baseKeyboard
+        : null;
+  const baseSourceName = typeof startKeyboard?.id === "string" ? startKeyboard.id : undefined;
 
   // 1. Answers → records (or retained gallery answers, or orphans).
   let migratedSurveyAnswers = source.surveyAnswers;

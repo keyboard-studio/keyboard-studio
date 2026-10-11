@@ -17,7 +17,7 @@
  *     no specificity reordering — so a shift assignment on such a key needs
  *     both the CAPS and NCAPS combos to stay correct per Layer-A Check #10),
  *   - the .kmn rule-line text to inject for a given shift assignment, a bare
- *     base-layer assignment (buildBaseRuleLines), and a combined base+shift
+ *     base-layer assignment (buildStartRuleLines), and a combined base+shift
  *     case-pair assignment (buildCasePairRuleLines) — the latter exists so a
  *     base-layer swap on a CAPS-handling key plus a confirmed shift-layer
  *     companion can be expressed as ONE set of rules instead of two
@@ -139,7 +139,7 @@ export function buildShiftRuleLines(
  *   pair here keeps the two states visible in the emitted source even though
  *   the output is identical for both.
  */
-export function buildBaseRuleLines(
+export function buildStartRuleLines(
   vkey: string,
   baseChar: string,
   opts: { capsHandling: boolean },
@@ -157,7 +157,7 @@ export function buildBaseRuleLines(
  * counterpart on the shift layer.
  *
  * - No CAPS handling on the key: `+ [K_X] > <base>` and `+ [SHIFT K_X] > <shift>`
- *   — identical to independently calling {@link buildBaseRuleLines} and
+ *   — identical to independently calling {@link buildStartRuleLines} and
  *   {@link buildShiftRuleLines} with `capsHandling: false`, since the two
  *   rules target disjoint contexts (no CAPS/NCAPS modifier on either) and
  *   cannot conflict.
@@ -166,7 +166,7 @@ export function buildBaseRuleLines(
  *     `+ [NCAPS K_X] > <base>`, `+ [NCAPS SHIFT K_X] > <shift>`,
  *     `+ [CAPS K_X] > <shift>`, `+ [CAPS SHIFT K_X] > <base>`.
  *   Callers on a CAPS-handling key MUST use this single combined builder
- *   rather than calling buildBaseRuleLines + buildShiftRuleLines separately:
+ *   rather than calling buildStartRuleLines + buildShiftRuleLines separately:
  *   each of those would independently emit its own `[CAPS K_X]`/`[NCAPS K_X]`
  *   line (base pair maps CAPS to <base>, shift pair maps CAPS to <shift>),
  *   producing two conflicting rules for the same context where the

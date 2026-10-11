@@ -71,7 +71,7 @@ import {
   expandCaseCounterpartAttachments,
   expandCaseCounterpartPromotions,
   deriveMarksComputedAxes,
-  detectBaseMarkMechanism,
+  detectStartMarkMechanism,
   promotableCharacters,
   prunePromotions,
   treatmentFor,
@@ -283,7 +283,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   const { t, i18n } = useLingui();
   const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const importedOrder = useWorkingCopyStore((s) => s.session.axes.markInputOrder);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
   const decisions = useDecisionStore((s) => s.decisions);
   const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   // spec 078: the context-tolerance analysis (published by the compile gate)
@@ -331,7 +331,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // keyboard's OTHER attested scripts are. Opening the gate for "mixed" folds
   // exactly the cased subset and leaves caseless characters alone; it doesn't
   // require new filtering, because that's what these primitives already do.
-  const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
+  const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
   const isCasedBase = casingValue === "cased" || casingValue === "mixed";
   // Attestation is case-symmetric behind the same gate: a mark seen only on a
   // capital must still pre-tick the lowercase row, the only one shown below,
@@ -397,19 +397,19 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // options JSDoc). Every other report of key availability in the product is a
   // projection of this same measurement (SC-008).
   const keyBudget = useMemo(
-    () => (baseIr != null ? measureKeyBudget(baseIr) : null),
-    [baseIr],
+    () => (startIr != null ? measureKeyBudget(startIr) : null),
+    [startIr],
   );
 
   const treatmentPrefills = useMemo(
     () =>
       computeMarkTreatmentPrefills(gate.alphabet, classes, proposals, {
-        baseIr,
+        startIr,
         keyBudget,
         attachments: expandedAttachments,
         ...fold,
       }),
-    [gate.alphabet, classes, proposals, baseIr, keyBudget, expandedAttachments, fold],
+    [gate.alphabet, classes, proposals, startIr, keyBudget, expandedAttachments, fold],
   );
 
   // What each class could promote — offered on lowercase/caseless bases only.
@@ -986,7 +986,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     const migrationNeeded =
       outputForm === "base-plus-mark" &&
       workingIr !== null &&
-      detectBaseMarkMechanism(workingIr) === "precomposed";
+      detectStartMarkMechanism(workingIr) === "precomposed";
     recordValue(answers, { worklist, outputForm, migrationNeeded }, effectiveTolerance);
     onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision));
   }

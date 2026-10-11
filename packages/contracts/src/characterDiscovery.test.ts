@@ -11,7 +11,7 @@ import type {
   CharacterDiscoveryService,
 } from "./characterDiscovery";
 import { makeLinguistInventory } from "./linguistInventory";
-import { basicKbdus } from "./fixtures/baseKeyboards";
+import { basicKbdus } from "./fixtures/startKeyboards";
 
 describe("InventoryChar shape", () => {
   it("frequency-bearing entry carries count + method", () => {

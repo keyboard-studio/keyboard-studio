@@ -32,7 +32,7 @@ const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 export default defineConfig({
   testDir: "e2e",
   // Full authoring walks are long: a test also pays a cold ../keyboards catalog
-  // enumeration (BaseResolution's listAll over the whole local clone) plus a
+  // enumeration (StartResolution's listAll over the whole local clone) plus a
   // kmcmplib WASM compile before download. 240s gives headroom.
   timeout: 240_000,
   // global-setup.ts warms the catalog cache with one request before any

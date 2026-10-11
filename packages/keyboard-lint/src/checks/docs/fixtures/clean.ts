@@ -31,7 +31,7 @@ export const CLEAN_DOC_LINT_INPUT: DocLintInput = {
       "<?php\n  $pagename = 'Test Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<p>Welcome to Test Keyboard</p>",
   },
   deletedFilenames: ["old-icon.ico"],
-  baseHistoryMdText: "## 1.0 (2024-01-01)\n* Initial release.\n",
+  startHistoryMdText: "## 1.0 (2024-01-01)\n* Initial release.\n",
 };
 
 /**

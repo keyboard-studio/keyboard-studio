@@ -225,10 +225,10 @@ function ownCharsForNode(key: TouchKeyIR, ruleIndex: TouchKeyRuleIndex | undefin
 
 /**
  * Display for the host key — mirrors `enumerateTouchMethodsForChar.ts`'s
- * private `hostLabel` exactly (not exported there, so duplicated here; same
+ * private `baseLabel` exactly (not exported there, so duplicated here; same
  * tradeoff as `ownCharsForNode` above).
  */
-function hostLabel(key: TouchKeyIR): string | undefined {
+function baseLabel(key: TouchKeyIR): string | undefined {
   return key.text ?? key.output ?? unicodeKeyIdToChar(key.id);
 }
 
@@ -303,8 +303,8 @@ function collectDiscardTargets(
   op: KeyEditOperation,
   ruleIndex: TouchKeyRuleIndex | undefined,
 ): readonly DiscardTarget[] {
-  const host = hostLabel(resolved.key);
-  const hostField = host !== undefined ? { host } : {};
+  const host = baseLabel(resolved.key);
+  const baseField = host !== undefined ? { host } : {};
 
   switch (op.kind) {
     case "add":
@@ -323,13 +323,13 @@ function collectDiscardTargets(
     case "remove":
     case "suppress": {
       const targets: DiscardTarget[] = [
-        { address: op.address, kind: "tap", ...hostField, lostChars: ownCharsForNode(resolved.key, ruleIndex) },
+        { address: op.address, kind: "tap", ...baseField, lostChars: ownCharsForNode(resolved.key, ruleIndex) },
       ];
       for (const sub of resolved.key.sk ?? []) {
         targets.push({
           address: touchSubKeyAddress(parts.platform, parts.layerId, resolved.key.id, "sk", sub.id),
           kind: "longpress",
-          ...hostField,
+          ...baseField,
           lostChars: ownCharsForNode(sub, ruleIndex),
         });
       }
@@ -337,7 +337,7 @@ function collectDiscardTargets(
         targets.push({
           address: touchSubKeyAddress(parts.platform, parts.layerId, resolved.key.id, "multitap", sub.id),
           kind: "multitap",
-          ...hostField,
+          ...baseField,
           lostChars: ownCharsForNode(sub, ruleIndex),
         });
       }
@@ -348,7 +348,7 @@ function collectDiscardTargets(
             address: touchFlickAddress(parts.platform, parts.layerId, resolved.key.id, direction),
             kind: "flick",
             direction,
-            ...hostField,
+            ...baseField,
             lostChars: ownCharsForNode(sub, ruleIndex),
           });
         }
@@ -365,7 +365,7 @@ function collectDiscardTargets(
           address: addr.address,
           kind: addr.kind,
           ...(addr.direction !== undefined ? { direction: addr.direction } : {}),
-          ...hostField,
+          ...baseField,
           lostChars: ownCharsForNode(subLoc.key, ruleIndex),
         },
       ];
@@ -394,7 +394,7 @@ function collectDiscardTargets(
           address: addr.address,
           kind: addr.kind,
           ...(addr.direction !== undefined ? { direction: addr.direction } : {}),
-          ...hostField,
+          ...baseField,
           lostChars: lost,
         },
       ];
@@ -413,7 +413,7 @@ function collectDiscardTargets(
       const lost = before.filter((ch) => !afterSet.has(ch));
       if (lost.length === 0) return [];
 
-      return [{ address: op.address, kind: "tap", ...hostField, lostChars: lost }];
+      return [{ address: op.address, kind: "tap", ...baseField, lostChars: lost }];
     }
   }
 }
@@ -477,11 +477,11 @@ function toSurvivingLocation(
   platform: string,
   layerId: string,
   char: string,
-  hostKey: TouchKeyIR,
+  baseKey: TouchKeyIR,
   direction: string | undefined,
 ): TouchMethodDescriptor {
-  const host = hostLabel(hostKey);
-  const isLayerSwitch = kind === "tap" && hostKey.nextlayer !== undefined;
+  const host = baseLabel(baseKey);
+  const isLayerSwitch = kind === "tap" && baseKey.nextlayer !== undefined;
   return {
     id: address,
     kind,

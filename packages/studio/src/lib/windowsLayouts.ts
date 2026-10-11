@@ -10,19 +10,19 @@
 
 import { z } from "zod";
 import generated from "./generated/windowsLayouts.generated.json";
-import { likelyHostLayouts } from "./referenceHostLayouts.ts";
-import type { HostLayoutId, LayoutFamilyAnswer } from "./referenceHostLayouts.ts";
+import { likelyBaseLayouts } from "./referenceBaseLayouts.ts";
+import type { BaseLayoutId, LayoutFamilyAnswer } from "./referenceBaseLayouts.ts";
 
 export type WindowsLayoutFamily = LayoutFamilyAnswer | "other";
 
-const HostIdSchema = z.enum(["us", "us-intl", "azerty", "qwertz", "uk"]);
+const BaseLayoutIdSchema = z.enum(["us", "us-intl", "azerty", "qwertz", "uk"]);
 
 const WindowsLayoutSchema = z.object({
   id: z.string().regex(/^basic_kbd/),
   name: z.string().min(1),
   languages: z.array(z.object({ id: z.string(), name: z.string() })),
   family: z.enum(["qwerty", "qwertz", "azerty", "non-roman", "other"]),
-  host: HostIdSchema.optional(),
+  host: BaseLayoutIdSchema.optional(),
 });
 
 const CatalogSchema = z.object({
@@ -35,7 +35,7 @@ export interface WindowsLayout {
   languages: readonly { id: string; name: string }[];
   family: WindowsLayoutFamily;
   /** Present when this layout IS one of the five reference hosts. */
-  host?: HostLayoutId;
+  host?: BaseLayoutId;
 }
 
 const parsed = CatalogSchema.parse(generated);
@@ -55,7 +55,7 @@ export function windowsLayoutById(id: string | undefined): WindowsLayout | undef
 }
 
 /** The catalog entry for a reference host (e.g. "azerty" -> basic_kbdfr). */
-export function windowsLayoutForHost(host: HostLayoutId): WindowsLayout | undefined {
+export function windowsLayoutForBase(host: BaseLayoutId): WindowsLayout | undefined {
   return WINDOWS_LAYOUTS.find((l) => l.host === host);
 }
 
@@ -139,9 +139,9 @@ export function proposeWindowsLayout(bcp47: string | undefined): LayoutProposal 
   const tag = (bcp47 ?? "").trim();
   if (tag === "") return fallback();
 
-  const hosts = likelyHostLayouts([tag]);
+  const hosts = likelyBaseLayouts([tag]);
   if (hosts.length === 1) {
-    const layout = windowsLayoutForHost(hosts[0]!);
+    const layout = windowsLayoutForBase(hosts[0]!);
     if (layout !== undefined) return { layout, basis: "region" };
   }
 

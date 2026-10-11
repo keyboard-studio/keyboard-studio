@@ -248,7 +248,7 @@ describe("useCasePairCompanion — Georgian suppression", () => {
       raised = result.current.propose({
         mechanism: "touch",
         originalChar: "ა",
-        hostKey: "K_A",
+        baseKey: "K_A",
         targetLayer: "shift",
         baseRef: { patternId: "simple_swap", slotValues: { kmnRules: "" } },
       });

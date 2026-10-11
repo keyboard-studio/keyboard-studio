@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts/fixtures";
+import { makeStartKeyboard } from "@keyboard-studio/contracts/fixtures";
 import { parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { serializeWorkingCopy } from "./serializeWorkingCopy.ts";
@@ -66,7 +66,7 @@ describe("serializeWorkingCopy — carved keycaps in the output bundle (#1803)",
       { path: "source/test_kb.kmn", content: KMN, isBinary: false },
       { path: "source/test_kb.kvks", content: KVKS, isBinary: false },
     ]);
-    const base = makeBaseKeyboard({
+    const base = makeStartKeyboard({
       id: "test_kb",
       path: "release/test/test_kb",
       script: "Latn",
@@ -76,7 +76,7 @@ describe("serializeWorkingCopy — carved keycaps in the output bundle (#1803)",
       sourceUrl: "https://example.invalid/test_kb",
       languages: ["en"],
     });
-    useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir });
     const extraGroup = ir.groups.find((g) => g.name === "extra");
     if (extraGroup === undefined) throw new Error("fixture group 'extra' not found");
     useWorkingCopyStore.getState().deleteNode(extraGroup.nodeId);

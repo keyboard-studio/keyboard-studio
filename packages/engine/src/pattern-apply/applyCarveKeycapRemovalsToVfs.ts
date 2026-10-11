@@ -27,7 +27,7 @@ import { isPlusSeparator } from "../shared/rule-shape.js";
 
 /** The carve deletion sets, pre-partitioned the way projectWorkingCopyVfs does. */
 export interface CarveKeycapRemovalInput {
-  /** Slot ids `"<storeNodeId>#<i>"` already validated against `baseIr.stores`. */
+  /** Slot ids `"<storeNodeId>#<i>"` already validated against `startIr.stores`. */
   slotIds: ReadonlySet<string>;
   /**
    * Whole-node deletion ids (rule, group, store, fragment nodeIds — the same
@@ -80,13 +80,13 @@ export interface CarveKeycapRemovalInput {
  * Pure — exported for direct unit testing.
  */
 export function collectCarvedKeycapTexts(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   removals: CarveKeycapRemovalInput,
 ): Set<string> {
   const { slotIds, wholeNodeIds } = removals;
 
-  const storeByNodeId = new Map(baseIr.stores.map((s) => [s.nodeId, s]));
-  const storeByName = new Map(baseIr.stores.map((s) => [s.name, s]));
+  const storeByNodeId = new Map(startIr.stores.map((s) => [s.nodeId, s]));
+  const storeByName = new Map(startIr.stores.map((s) => [s.name, s]));
 
   // Lazy per-store blocked-classification cache (classifyStoreSlotEdit scans
   // every rule, so compute at most once per store actually referenced).
@@ -94,7 +94,7 @@ export function collectCarvedKeycapTexts(
   const isBlockedStore = (store: IRStore): boolean => {
     let blocked = blockedCache.get(store.nodeId);
     if (blocked === undefined) {
-      blocked = classifyStoreSlotEdit(store, baseIr).mode === "blocked";
+      blocked = classifyStoreSlotEdit(store, startIr).mode === "blocked";
       blockedCache.set(store.nodeId, blocked);
     }
     return blocked;
@@ -108,7 +108,7 @@ export function collectCarvedKeycapTexts(
   // deletes its rules, so a group-level carve contributes its rules'
   // characters here. Without this the .kmn loses the group's rules while the
   // .kvks keeps their keycaps (#1803).
-  const cascade = resolveCarveCascade(baseIr, wholeNodeIds);
+  const cascade = resolveCarveCascade(startIr, wholeNodeIds);
 
   for (const slotId of slotIds) {
     const parsed = parseSlotId(slotId);
@@ -120,7 +120,7 @@ export function collectCarvedKeycapTexts(
     }
   }
 
-  for (const group of baseIr.groups) {
+  for (const group of startIr.groups) {
     for (const rule of group.rules) {
       if (!cascade.deletedRuleIds.has(rule.nodeId)) continue;
       const outEls = rule.output as { kind: string; value?: string }[];
@@ -143,7 +143,7 @@ export function collectCarvedKeycapTexts(
   const survivors = new Set<string>();
   const outputStoreNames = new Set<string>();
 
-  for (const group of baseIr.groups) {
+  for (const group of startIr.groups) {
     if (cascade.deletedGroupIds.has(group.nodeId)) continue;
     for (const rule of group.rules) {
       if (cascade.deletedRuleIds.has(rule.nodeId)) continue;
@@ -217,19 +217,19 @@ export function collectCarvedKeycapTexts(
  *
  * @param vfs        The in-memory virtual filesystem (mutated in place).
  * @param keyboardId The keyboard identifier (used to derive asset paths).
- * @param baseIr     The source-of-truth IR the deletion ids refer to.
+ * @param startIr     The source-of-truth IR the deletion ids refer to.
  * @param removals   Pre-partitioned carve deletion sets.
  * @returns `{ warnings }` — diagnostic messages for any non-fatal issues.
  */
 export function applyCarveKeycapRemovalsToVfs(
   vfs: VirtualFS,
   keyboardId: string,
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   removals: CarveKeycapRemovalInput,
 ): { warnings: string[] } {
   const warnings: string[] = [];
 
-  const carved = collectCarvedKeycapTexts(baseIr, removals);
+  const carved = collectCarvedKeycapTexts(startIr, removals);
   if (carved.size === 0) return { warnings };
 
   const { kvksPath, touchPath } = resolveOskAssetPaths(vfs, keyboardId);

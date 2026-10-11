@@ -17,7 +17,7 @@ describe("resolveTouchLayerId", () => {
   });
 
   it("falls back to DEFAULT_TOUCH_LAYER when the layer slot is absent", () => {
-    expect(resolveTouchLayerId({ hostKey: "K_A" })).toBe(DEFAULT_TOUCH_LAYER);
+    expect(resolveTouchLayerId({ baseKey: "K_A" })).toBe(DEFAULT_TOUCH_LAYER);
   });
 
   it("falls back to DEFAULT_TOUCH_LAYER when slotValues itself is undefined", () => {

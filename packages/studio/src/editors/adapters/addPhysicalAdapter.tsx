@@ -1,6 +1,6 @@
 // addPhysicalAdapter — wraps MechanismGallery as an EditorStep (P4a, T011).
 //
-// MechanismGallery requires selectedBaseKeyboard from the working-copy store.
+// MechanismGallery requires selectedStartKeyboard from the working-copy store.
 // The adapter reads it directly from the store so the step contract stays
 // (onComplete, onBack, ctx) and the manifest (P4b) need not thread it through.
 //
@@ -31,7 +31,7 @@ import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
  * so the host does not need to thread gallery-specific props (FR-007).
  */
 export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   // FR-007: placement priors loaded here (moved from SurveyView.corpusPlacementMap).
   const placementMap = usePlacementPriors();
   // Spec 046: the marks-series exit state (session.marksWorklist) rides in as
@@ -51,7 +51,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
 
   return (
     <MechanismGallery
-      selectedBaseKeyboard={baseKeyboard}
+      selectedStartKeyboard={startKeyboard}
       onComplete={handleComplete}
       {...(placementMap ? { placementMap } : {})}
       {...(marksWorklist !== undefined ? { worklist: marksWorklist } : {})}

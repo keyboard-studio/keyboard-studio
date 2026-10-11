@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard } from "@keyboard-studio/contracts";
 import { kpsWebSite, proposeProjectUrl, proposeProvenanceBasis } from "./phaseFSeeds.ts";
 
-const BASE = makeBaseKeyboard({
+const BASE = makeStartKeyboard({
   id: "sil_bafut",
   path: "release/sil/sil_bafut",
   script: "Latn",
@@ -40,34 +40,34 @@ describe("proposeProjectUrl", () => {
 
   it("proposes the released package's website on an update", () => {
     expect(
-      proposeProjectUrl({ instantiationMode: "adapt-existing", baseKeyboard: BASE, baseVfs: vfsWithKps(kps) }),
+      proposeProjectUrl({ instantiationMode: "adapt-existing", startKeyboard: BASE, startVfs: vfsWithKps(kps) }),
     ).toBe("https://bafut.org");
   });
 
   it("proposes nothing on a copy, whose website is not the original's", () => {
     expect(
-      proposeProjectUrl({ instantiationMode: "new-from-base", baseKeyboard: BASE, baseVfs: vfsWithKps(kps) }),
+      proposeProjectUrl({ instantiationMode: "new-from-base", startKeyboard: BASE, startVfs: vfsWithKps(kps) }),
     ).toBeUndefined();
   });
 
   it("proposes nothing without a .kps", () => {
     expect(
-      proposeProjectUrl({ instantiationMode: "adapt-existing", baseKeyboard: BASE, baseVfs: createVirtualFS() }),
+      proposeProjectUrl({ instantiationMode: "adapt-existing", startKeyboard: BASE, startVfs: createVirtualFS() }),
     ).toBeUndefined();
   });
 });
 
 describe("proposeProvenanceBasis", () => {
   it("names the copied keyboard on a copy", () => {
-    expect(proposeProvenanceBasis({ instantiationMode: "new-from-base", baseKeyboard: BASE, baseVfs: null })).toBe(
+    expect(proposeProvenanceBasis({ instantiationMode: "new-from-base", startKeyboard: BASE, startVfs: null })).toBe(
       "This keyboard started as a copy of the Bafut keyboard (sil_bafut).",
     );
   });
 
   it("proposes nothing on an update or before instantiation", () => {
     expect(
-      proposeProvenanceBasis({ instantiationMode: "adapt-existing", baseKeyboard: BASE, baseVfs: null }),
+      proposeProvenanceBasis({ instantiationMode: "adapt-existing", startKeyboard: BASE, startVfs: null }),
     ).toBeUndefined();
-    expect(proposeProvenanceBasis({ instantiationMode: null, baseKeyboard: null, baseVfs: null })).toBeUndefined();
+    expect(proposeProvenanceBasis({ instantiationMode: null, startKeyboard: null, startVfs: null })).toBeUndefined();
   });
 });

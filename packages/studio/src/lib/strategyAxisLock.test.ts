@@ -24,7 +24,7 @@
 import { describe, it, expect } from "vitest";
 import { selectStrategy } from "@keyboard-studio/engine";
 import { mergePhaseResults } from "@keyboard-studio/contracts";
-import type { DiscoveryAxisVector, SurveyPhaseResult, BaseKeyboard } from "@keyboard-studio/contracts";
+import type { DiscoveryAxisVector, SurveyPhaseResult, StartKeyboard } from "@keyboard-studio/contracts";
 import { getPatternLibraryService } from "./browserPatternLibrary.ts";
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ describe("spec 022 — default build-list path: the A1/A3/A4 gap is pre-existing
   });
 
   // The Latin base the gallery ranks against (mirrors browserPatternLibrary.test.ts).
-  const base: BaseKeyboard = {
+  const base: StartKeyboard = {
     id: "basic_kbdus",
     path: "release/b/basic_kbdus",
     script: "Latn",

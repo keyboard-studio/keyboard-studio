@@ -86,7 +86,7 @@ group(main) using keys
     expect(readStore("VISUALKEYBOARD")).toBe("ewondo.kvks");
     expect(readStore("LAYOUTFILE")).toBe("ewondo.keyman-touch-layout");
     expect(readStore("KMW_EMBEDCSS")).toBe("ewondo.css");
-    // &BITMAP with a non-baseId-named icon (sil_cameroon_qwerty uses
+    // &BITMAP with a non-startId-named icon (sil_cameroon_qwerty uses
     // `Cameroon.ico`) is preserved — `renameFilesInVfs` won't rename
     // the file either, so the store still points at a valid filename.
     expect(readStore("BITMAP")).toBe("Cameroon.ico");

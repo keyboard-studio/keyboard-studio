@@ -205,11 +205,11 @@ const fakeReducerDeps: ReducerDeps = {
   lockDesktop: vi.fn(),
   setTouchLayoutJson: vi.fn(),
   clearStale: vi.fn(),
-  instantiateFromBase: vi.fn(),
+  instantiateFromStart: vi.fn(),
   instantiateFromExisting: vi.fn(),
   buildTouchLayoutJson: vi.fn(() => ({ json: null, warnings: [] })),
-  resolveBaseTouchJson: vi.fn(() => undefined),
-  instantiateFromBaseIfConfirmed: vi.fn(() => true),
+  resolveStartTouchJson: vi.fn(() => undefined),
+  instantiateFromStartIfConfirmed: vi.fn(() => true),
 };
 
 /** A snapshotter that captures nothing (mirrors reducer.decisionRecording.test.ts's inertSnapshotter). */
@@ -248,7 +248,7 @@ function reducerDepsWithDecisionStore(): ReducerDeps {
     writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
     readDecisionSet: () => getDecisionSnapshot(),
     getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
-    getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id,
+    getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
   };
 }
 
@@ -318,7 +318,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
     const entriesAfterFirstComplete = useDecisionLogStore.getState().record.entries.length;
     expect(entriesAfterFirstComplete).toBeGreaterThan(0);
-    const irAfterFirstComplete = useWorkingCopyStore.getState().baseIr;
+    const irAfterFirstComplete = useWorkingCopyStore.getState().startIr;
     first.unmount();
 
     // Revisit: land back on "marks" (a finished step) the way an ordinary
@@ -332,7 +332,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
 
     expect(useDecisionLogStore.getState().record.entries.length).toBe(entriesAfterFirstComplete);
-    expect(useWorkingCopyStore.getState().baseIr).toBe(irAfterFirstComplete);
+    expect(useWorkingCopyStore.getState().startIr).toBe(irAfterFirstComplete);
   });
 
   it("a finished single-screen step (invisibles): re-completing with the identical answers appends no new decision entry", () => {
@@ -347,7 +347,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
     const entriesAfterFirstComplete = useDecisionLogStore.getState().record.entries.length;
     expect(entriesAfterFirstComplete).toBeGreaterThan(0);
-    const irAfterFirstComplete = useWorkingCopyStore.getState().baseIr;
+    const irAfterFirstComplete = useWorkingCopyStore.getState().startIr;
     first.unmount();
 
     act(() => {
@@ -359,7 +359,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
 
     expect(useDecisionLogStore.getState().record.entries.length).toBe(entriesAfterFirstComplete);
-    expect(useWorkingCopyStore.getState().baseIr).toBe(irAfterFirstComplete);
+    expect(useWorkingCopyStore.getState().startIr).toBe(irAfterFirstComplete);
   });
 });
 
@@ -376,9 +376,9 @@ describe("StepHost — choose_base revisit keeps the instantiated base (spec 079
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
-    const baseKeyboardBefore = useWorkingCopyStore.getState().baseKeyboard;
-    const baseIrBefore = useWorkingCopyStore.getState().baseIr;
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    const startKeyboardBefore = useWorkingCopyStore.getState().startKeyboard;
+    const startIrBefore = useWorkingCopyStore.getState().startIr;
 
     act(() => {
       useSurveySessionStore.getState().advance("choose_base");
@@ -389,8 +389,8 @@ describe("StepHost — choose_base revisit keeps the instantiated base (spec 079
 
     render(<StepHost reducerDeps={fakeReducerDeps} onStartOver={() => {}} />);
     expect(screen.getByTestId("step-marker")).toBeTruthy();
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBe(baseKeyboardBefore);
-    expect(useWorkingCopyStore.getState().baseIr).toBe(baseIrBefore);
+    expect(useWorkingCopyStore.getState().startKeyboard).toBe(startKeyboardBefore);
+    expect(useWorkingCopyStore.getState().startIr).toBe(startIrBefore);
   });
 });
 

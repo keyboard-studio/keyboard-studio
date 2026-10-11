@@ -2,7 +2,7 @@
 // studio's own submission gates."
 //
 // For each of the five SC-001 corpus keyboards (real .kmn sources, real codec):
-//   1. instantiate the Track 1 working copy (instantiateFromBase, adapt track);
+//   1. instantiate the Track 1 working copy (instantiateFromStart, adapt track);
 //   2. run the unified decision flow (identity + track + inventory + standard
 //      letters modules) with fixture answers and the keyboard's own extractable
 //      facts;

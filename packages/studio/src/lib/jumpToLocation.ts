@@ -126,7 +126,7 @@ export function liveResolveContext(): ResolveContext {
     traversal: snapshotTraversal(),
     // Spec 088 C-3.2: the gate view over the decision store, seed omitted.
     decisions: decisionsWithoutTouchSeed(getDecisionSnapshot()),
-    hasProject: useWorkingCopyStore.getState().baseKeyboard !== null,
+    hasProject: useWorkingCopyStore.getState().startKeyboard !== null,
     // Within-step stops for the stages whose walks are not flow questions
     // (a gallery's characters). Without this a footer dot naming a character
     // would resolve `question-not-in-build` and refuse itself — see

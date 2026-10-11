@@ -28,7 +28,7 @@
 // statement, so the multi-vs-single branch below is not optional plumbing.
 
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   DecisionImpact,
   DiscoveryAxisVector,
   KeyboardIR,
@@ -44,9 +44,9 @@ import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
 import { recordGalleryDecisions } from "./recordGalleryDecisions.ts";
 import type { Decision } from "./decisionTypes.ts";
 import {
-  recordBaseContribution,
+  recordStartContribution,
   type InstantiatedMode,
-} from "./recordBaseContribution.ts";
+} from "./recordStartContribution.ts";
 import type { SourceSnapshotter } from "./snapshotSource.ts";
 
 export interface DecisionRecorderDeps {
@@ -64,7 +64,7 @@ export interface DecisionRecorderDeps {
    */
   getMechanismAssignments: () => readonly MechanismAssignment[];
   /** The base IR the working copy was instantiated from, or `null`. */
-  getBaseIr: () => KeyboardIR | null;
+  getStartIr: () => KeyboardIR | null;
   /** Ids of the carved-away rule/store nodes, for the carve projection. */
   getDeletedNodeIds: () => ReadonlySet<string>;
   /** Ids of the carved-away store-slot items, for the carve projection. */
@@ -82,17 +82,17 @@ export interface DecisionRecorderDeps {
   getKeyboardId: () => string | null;
   /**
    * The chosen base keyboard, or `null` before instantiation — feeds
-   * `recordBaseContribution` at `choose_base` completion only (specs/055
+   * `recordStartContribution` at `choose_base` completion only (specs/055
    * FR-030..FR-035, research D-11).
    */
-  getBaseKeyboard: () => BaseKeyboard | null;
+  getStartKeyboard: () => StartKeyboard | null;
   /** Axes the studio has derived onto the working copy so far. */
   getIrAxes: () => Partial<DiscoveryAxisVector>;
   /** `null` before instantiation; one of the two literals once instantiated. */
   getInstantiationMode: () => InstantiatedMode | null;
   /**
    * Same map the carve gallery reads to build its rail nodes — see
-   * `RecordBaseContributionDeps.getRemovalCapabilities` (recordBaseContribution.ts)
+   * `RecordStartContributionDeps.getRemovalCapabilities` (recordStartContribution.ts)
    * for why a starting count must be read against this rather than defaulted.
    */
   getRemovalCapabilities: () => Map<string, RemovalCapability>;
@@ -137,7 +137,7 @@ export type RecordQuestionAnswers = (
 /**
  * The recorder: callable as the reducer's `recordDecision` (step completion),
  * plus `recordQuestionAnswers` for every earlier Next inside a step, plus
- * `recordBaseContributionNow` for the post-instantiation baseline (below).
+ * `recordStartContributionNow` for the post-instantiation baseline (below).
  */
 export interface DecisionRecorder {
   (event: { stepId: string; result: unknown }): void;
@@ -153,7 +153,7 @@ export interface DecisionRecorder {
    * entry). Returns the entry id, or null when no working copy is
    * instantiated (the record is not papered over).
    */
-  recordBaseContributionNow: () => string | null;
+  recordStartContributionNow: () => string | null;
 }
 
 /**
@@ -243,9 +243,9 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
     // handleComplete reaches this callback synchronously, while the actual
     // instantiation runs later in StudioShell's doCommit (gated on BOTH
     // setup decisions), so the fire read a not-yet-existent working copy
-    // and `recordBaseContribution` returned null — completing choose_base
+    // and `recordStartContribution` returned null — completing choose_base
     // left no base-contribution entry. The baseline now records from
-    // doCommit via `recordBaseContributionNow` (attached below), the one
+    // doCommit via `recordStartContributionNow` (attached below), the one
     // moment the instantiated copy exists. (On a re-confirm the old fire
     // was worse than null: it described the OUTGOING base.)
 
@@ -268,7 +268,7 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
       getDeletionCounts: deps.getDeletionCounts,
       getDeletedIds: deps.getDeletedIds,
       getMechanismAssignments: deps.getMechanismAssignments,
-      getBaseIr: deps.getBaseIr,
+      getStartIr: deps.getStartIr,
       getDeletedNodeIds: deps.getDeletedNodeIds,
       getDeletedItemIds: deps.getDeletedItemIds,
       ...(deps.getCarveChars !== undefined ? { getCarveChars: deps.getCarveChars } : {}),
@@ -314,17 +314,17 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
     captureAndAttach(ids);
   };
 
-  recordDecision.recordBaseContributionNow = () => {
+  recordDecision.recordStartContributionNow = () => {
     const log = useDecisionLogStore.getState();
     // FR-004: carry the identity onto the record as soon as there is one.
     log.setKeyboardId(deps.getKeyboardId());
     // The baseline gets no `DecisionImpact` attached (no captureAndAttach):
     // it is not a diff the snapshotter's boundary capture describes —
     // there is no "before" to compare against.
-    return recordBaseContribution({
+    return recordStartContribution({
       append: log.append,
-      getBaseKeyboard: deps.getBaseKeyboard,
-      getBaseIr: deps.getBaseIr,
+      getStartKeyboard: deps.getStartKeyboard,
+      getStartIr: deps.getStartIr,
       getIrAxes: deps.getIrAxes,
       getInstantiationMode: deps.getInstantiationMode,
       getRemovalCapabilities: deps.getRemovalCapabilities,

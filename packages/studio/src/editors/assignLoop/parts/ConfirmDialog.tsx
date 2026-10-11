@@ -94,9 +94,9 @@ export function ConfirmDialog({
     }
   }
 
-  const baseId = useId();
-  const titleId = `${baseId}-title`;
-  const bodyId = `${baseId}-body`;
+  const startId = useId();
+  const titleId = `${startId}-title`;
+  const bodyId = `${startId}-body`;
 
   const btnBase: React.CSSProperties = {
     font: '600 13px var(--app-font)', cursor: 'pointer',

@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { BREAKPOINTS } from "../ui/breakpoints.ts";
 import { useViewport } from "../hooks/useViewport.ts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
@@ -25,7 +25,7 @@ import { PreviewPaneOverlay } from "./PreviewPaneOverlay.tsx";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 
 export interface OSKFrameProps {
-  baseKeyboard: BaseKeyboard | null;
+  startKeyboard: StartKeyboard | null;
   oskMode: OskMode;
   /** Lifted from useKeyboardArtifact in the parent screen. */
   stage: Stage;
@@ -63,7 +63,7 @@ const OSK_MIN_HEIGHT_PX = 240;
 const OSK_DESKTOP_HEIGHT_PX = 560;
 
 export function OSKFrame({
-  baseKeyboard,
+  startKeyboard,
   oskMode,
   stage,
   retry,
@@ -150,12 +150,12 @@ export function OSKFrame({
   useEffect(() => {
     if (stage.kind !== "ready") return;
     if (!engineReady) return;
-    if (!baseKeyboard) return;
+    if (!startKeyboard) return;
     if (!stage.jsBlobUrl) return;
     // Use the keyboard ID that was actually compiled — it's carried on the
     // ready stage so this always matches the `Keyboard_<id>` the .js exposes.
     // Previously read from identity?.keyboardId, which failed for contexts
-    // (e.g. GalleryPreviewWithPatterns) that compile with baseKeyboard.id
+    // (e.g. GalleryPreviewWithPatterns) that compile with startKeyboard.id
     // while the store identity holds a different Track-1 scaffolded id.
     const activeKeyboardId = stage.keyboardId;
     // Prefer the working-copy identity's bcp47 (Track 1 author-chosen language)
@@ -165,7 +165,7 @@ export function OSKFrame({
     const activeBcp47 =
       (identity?.bcp47 && identity.bcp47.trim() !== ""
         ? identity.bcp47
-        : undefined) ?? baseKeyboard.languages?.[0];
+        : undefined) ?? startKeyboard.languages?.[0];
     send({
       type: "SET_KEYBOARD",
       jsUrl: stage.jsBlobUrl,
@@ -184,7 +184,7 @@ export function OSKFrame({
         ? { keyboardCssUrls: stage.keyboardCssUrls }
         : {}),
     });
-  }, [stage, engineReady, baseKeyboard, identity?.bcp47, send]);
+  }, [stage, engineReady, startKeyboard, identity?.bcp47, send]);
 
   useEffect(() => {
     if (!engineReady) return;
@@ -203,8 +203,8 @@ export function OSKFrame({
     send({ type: "FOCUS_TARGET" });
   }, [autoFocus, keyboardActivations, send]);
 
-  if (baseKeyboard !== null && isExcludedScript(baseKeyboard.script)) {
-    return <UnsupportedScriptStub script={baseKeyboard.script} />;
+  if (startKeyboard !== null && isExcludedScript(startKeyboard.script)) {
+    return <UnsupportedScriptStub script={startKeyboard.script} />;
   }
 
   return (

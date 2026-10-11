@@ -473,7 +473,7 @@ export function DecisionTrailView({
       case "editor-summary": {
         const stage = stageLabel(rollUp.actionType);
         // `detail` is a GENERIC placeholder (mirrors
-        // trail.entry.headline.baseContribution.withDetail's pattern): this id
+        // trail.entry.headline.startContribution.withDetail's pattern): this id
         // means "stage name, then a pre-formatted parenthetical", one meaning
         // shared by all three "composed" roll-up kinds below. The dimension
         // list itself is already localized/pluralized by `dimensionLabel`

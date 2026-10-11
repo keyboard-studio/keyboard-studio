@@ -242,7 +242,7 @@ describe("editorMutate — carve re-derivation from baseIr (M4 / reversibility)"
   it("re-deriving from baseIr with a SHRINKING deletion set yields fewer deletions", () => {
     const ir = carveIR();
     expect(applyCarveMutate(ir, new Set(["s1"]), new Set()).stores.map((s) => s.nodeId)).toEqual(["dkt"]);
-    // Restore: derive from baseIr again with the shrunk (empty) set — s1 returns.
+    // Restore: derive from startIr again with the shrunk (empty) set — s1 returns.
     expect(applyCarveMutate(ir, new Set(), new Set()).stores.map((s) => s.nodeId)).toEqual(["dkt", "s1"]);
   });
 });

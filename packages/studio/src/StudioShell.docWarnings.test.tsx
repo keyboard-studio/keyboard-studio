@@ -36,7 +36,7 @@ vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.t
 // the barrel), so the shallow stubs must be registered for the files too.
 vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/panels/StartResolution.tsx", () => import("./test/studioShellMocks/StartResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
@@ -98,7 +98,7 @@ async function mountShell(): Promise<void> {
   await act(async () => {
     render(
       <>
-        <SurveyView baseKeyboard={null} />
+        <SurveyView startKeyboard={null} />
         <ActiveStepNav />
       </>,
     );

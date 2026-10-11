@@ -45,7 +45,7 @@ const { trivialStep } = vi.hoisted(() => {
 vi.mock("../steps/registerEditorSteps.ts", () => ({
   identityStep: trivialStep("identity"),
   layoutStep: trivialStep("layout"),
-  chooseBaseStep: trivialStep("choose_base"),
+  chooseStartStep: trivialStep("choose_base"),
   trackStep: trivialStep("track"),
   attributionStep: trivialStep("attribution"),
   projectNameStep: trivialStep("project_name"),
@@ -79,11 +79,11 @@ const fakeReducerDeps: ReducerDeps = {
   lockDesktop: vi.fn(),
   setTouchLayoutJson: vi.fn(),
   clearStale: vi.fn(),
-  instantiateFromBase: vi.fn(),
+  instantiateFromStart: vi.fn(),
   instantiateFromExisting: vi.fn(),
   buildTouchLayoutJson: vi.fn(() => ({ json: null, warnings: [] })),
-  resolveBaseTouchJson: vi.fn(() => undefined),
-  instantiateFromBaseIfConfirmed: vi.fn(() => true),
+  resolveStartTouchJson: vi.fn(() => undefined),
+  instantiateFromStartIfConfirmed: vi.fn(() => true),
 };
 
 // The declaration edit, in a test registry (same edit as T009's pure test:

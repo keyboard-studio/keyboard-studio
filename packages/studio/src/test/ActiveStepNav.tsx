@@ -4,7 +4,7 @@
 // active step's entry, keyed on it. This does the same, without the rest of
 // the footer.
 //
-//   render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+//   render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
 
 import type { ReactElement } from "react";
 import { StepNavCluster } from "../components/StepNavCluster.tsx";

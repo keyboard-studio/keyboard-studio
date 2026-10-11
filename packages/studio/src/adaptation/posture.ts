@@ -12,7 +12,7 @@
 // posture-entry mutator.
 
 import type { AdaptationEvidence } from "./evidence.ts";
-import { extractBaseScriptPosture } from "../survey/questions/a/il_target_script.ts";
+import { extractStartScriptPosture } from "../survey/questions/a/il_target_script.ts";
 import { TRUST_POLICY_DEFAULTS, type TrustPolicy } from "./trustPolicy.ts";
 
 export type PostureFacet = "script" | "input-strategies" | "device-targets" | "script-conventions";
@@ -27,7 +27,7 @@ export interface PostureEntry {
 
 export interface InheritancePosture {
   /** The confirmed base; posture is per-base and re-fires on a base switch. */
-  baseId: string;
+  startId: string;
   entries: PostureEntry[];
 }
 
@@ -43,19 +43,19 @@ function fmtMix(mix: readonly string[]): string {
  */
 export function buildPosture(
   evidence: AdaptationEvidence,
-  baseId: string,
+  startId: string,
   policy: TrustPolicy = TRUST_POLICY_DEFAULTS,
 ): InheritancePosture {
   const { distribution, residue } = evidence.strategyFingerprint;
   const hasFingerprint = residue < 1 && Object.keys(distribution).length > 0;
-  const script = extractBaseScriptPosture(evidence.baseScriptDistribution, policy.singleScriptThreshold);
+  const script = extractStartScriptPosture(evidence.baseScriptDistribution, policy.singleScriptThreshold);
   const deviceMatch = sameSet(evidence.baseTargetMix, evidence.statedDeviceMix);
 
   const entries: PostureEntry[] = [
     {
       facet: "script",
       // Re-derive for the chosen target unless the base is single-script under
-      // the same extraction (extractBaseScriptPosture) q_sa2 reads — the two
+      // the same extraction (extractStartScriptPosture) q_sa2 reads — the two
       // paths must agree on what counts as "cleanly single-script".
       posture: script.posture === "single-script" ? "keep" : "propose",
       source: "default",
@@ -82,7 +82,7 @@ export function buildPosture(
       provenance: `base neutral-residue conventions (${evidence.provenanceTier})`,
     },
   ];
-  return { baseId, entries };
+  return { startId, entries };
 }
 
 /**
@@ -101,13 +101,13 @@ export function postureFor(posture: InheritancePosture, facet: PostureFacet): Po
  * (provenance) changed reset to `default`; entries whose evidence is unchanged
  * keep their prior posture + source (Edge case: mid-session base switch).
  */
-export function reconcilePostureOnBaseSwitch(
+export function reconcilePostureOnStartSwitch(
   prev: InheritancePosture,
   evidence: AdaptationEvidence,
-  newBaseId: string,
+  newStartId: string,
   policy: TrustPolicy = TRUST_POLICY_DEFAULTS,
 ): InheritancePosture {
-  const rebuilt = buildPosture(evidence, newBaseId, policy);
+  const rebuilt = buildPosture(evidence, newStartId, policy);
   const entries = rebuilt.entries.map((fresh) => {
     const before = prev.entries.find((e) => e.facet === fresh.facet);
     // Unchanged evidence + an author decision worth preserving → keep it.
@@ -116,7 +116,7 @@ export function reconcilePostureOnBaseSwitch(
     }
     return fresh;
   });
-  return { baseId: newBaseId, entries };
+  return { startId: newStartId, entries };
 }
 
 function sameSet(a: readonly string[], b: readonly string[]): boolean {

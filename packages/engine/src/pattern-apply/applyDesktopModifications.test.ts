@@ -286,7 +286,7 @@ describe("applyDesktopModifications — placements", () => {
     const layout = makeLayout([emptyKey]);
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "ñ", hostKey: "K_X" }],
+      placements: [{ char: "ñ", baseKey: "K_X" }],
     });
     expect(warnings).toHaveLength(0);
     const all = phoneDefaultKeys(out);
@@ -300,7 +300,7 @@ describe("applyDesktopModifications — placements", () => {
     const layout = makeLayout([key]);
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "á", hostKey: "K_A" }],
+      placements: [{ char: "á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
     const updated = getKey(out, "K_A")!;
@@ -312,7 +312,7 @@ describe("applyDesktopModifications — placements", () => {
     const layout = makeLayout([makeKey("K_A")]);
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "ñ", hostKey: "K_NONEXISTENT" }],
+      placements: [{ char: "ñ", baseKey: "K_NONEXISTENT" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/K_NONEXISTENT/);
@@ -327,7 +327,7 @@ describe("applyDesktopModifications — placements", () => {
     const layout = makeLayout([emptyKey]);
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: nfdChar, hostKey: "K_X" }],
+      placements: [{ char: nfdChar, baseKey: "K_X" }],
     });
     expect(warnings).toHaveLength(0);
     const placed = phoneDefaultKeys(out).find((k) => k.id === "U_00F1")!;
@@ -354,7 +354,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }], // "Á" = "A" with acute (upper)
+      placements: [{ char: "Á", baseKey: "K_A" }], // "Á" = "A" with acute (upper)
     });
     expect(warnings).toHaveLength(0);
 
@@ -377,7 +377,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
 
@@ -401,7 +401,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
 
@@ -420,7 +420,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
 
     const shiftKa = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
@@ -433,7 +433,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "á", hostKey: "K_A" }], // "á" = "a" with acute (lower)
+      placements: [{ char: "á", baseKey: "K_A" }], // "á" = "a" with acute (lower)
     });
     expect(warnings).toHaveLength(0);
 
@@ -451,7 +451,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })]); // no shift layer at all
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/shift/);
@@ -476,7 +476,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
 
@@ -497,7 +497,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/hand-set/);
@@ -514,15 +514,15 @@ describe("applyDesktopModifications — placements target the case-derived layer
   it("routes each placement of a MIXED-CASE batch to its own layer in one call", () => {
     // The per-layer working-state map is the machinery this change introduced;
     // a single-placement test never exercises two layers being accumulated
-    // concurrently. Same hostKey, both cases, one call.
+    // concurrently. Same baseKey, both cases, one call.
     const layout = makeLayout([makeKey("K_A", { text: "a", output: "a" })], {
       shiftLayer: [makeKey("K_A", { text: "A", output: "A" })],
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
       placements: [
-        { char: "á", hostKey: "K_A" },
-        { char: "Á", hostKey: "K_A" },
+        { char: "á", baseKey: "K_A" },
+        { char: "Á", baseKey: "K_A" },
       ],
     });
     expect(warnings).toHaveLength(0);
@@ -548,7 +548,7 @@ describe("applyDesktopModifications — placements target the case-derived layer
     });
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/not found/);
@@ -576,7 +576,7 @@ describe("applyDesktopModifications — provenance", () => {
     const layout = makeLayout([emptyKey]);
     const { layout: out } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "ñ", hostKey: "K_X" }],
+      placements: [{ char: "ñ", baseKey: "K_X" }],
     });
     const placed = phoneDefaultKeys(out).find((k) => k.id === "U_00F1")!;
     expect(placed.provenance).toBe("physical-suggested");
@@ -587,7 +587,7 @@ describe("applyDesktopModifications — provenance", () => {
     const layout = makeLayout([key]);
     const { layout: out } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "á", hostKey: "K_A" }],
+      placements: [{ char: "á", baseKey: "K_A" }],
     });
     expect(getKey(out, "K_A")!.provenance).toBe("physical-suggested");
   });
@@ -597,7 +597,7 @@ describe("applyDesktopModifications — provenance", () => {
     const layout = makeLayout([handSetKey]);
     const { layout: out, warnings } = applyDesktopModifications(layout, {
       removals: [],
-      placements: [{ char: "á", hostKey: "K_A" }],
+      placements: [{ char: "á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/hand-set/);
@@ -629,7 +629,7 @@ describe("applyDesktopModifications — purity", () => {
     const clone = deepClone(layout);
     applyDesktopModifications(layout, {
       removals: ["a"],
-      placements: [{ char: "ñ", hostKey: "K_B" }],
+      placements: [{ char: "ñ", baseKey: "K_B" }],
     });
     expect(layout).toEqual(clone);
   });
@@ -666,8 +666,8 @@ describe("applyDesktopModifications — determinism", () => {
     const mods = {
       removals: ["á", "c"],
       placements: [
-        { char: "ñ", hostKey: "K_B" },
-        { char: "ő", hostKey: "K_NONEXISTENT" },
+        { char: "ñ", baseKey: "K_B" },
+        { char: "ő", baseKey: "K_NONEXISTENT" },
       ],
     };
 

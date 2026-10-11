@@ -340,7 +340,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
       ],
       suggestionResolvedChars: [],
       bulkAccentGroups: [
-        { id: "ă:K_A", hostKey: "K_A", baseChar: "ă", members: ["à", "À"] },
+        { id: "ă:K_A", baseKey: "K_A", baseChar: "ă", members: ["à", "À"] },
       ],
     });
 
@@ -593,10 +593,10 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     expect(bulkGroups()).toHaveLength(1);
 
     // Remove the base "ă"'s chip via the Configured row.
-    const removeBase = individualChipFor("ă");
-    expect(removeBase).toBeTruthy();
+    const removeStart = individualChipFor("ă");
+    expect(removeStart).toBeTruthy();
     await act(async () => {
-      fireEvent.click(removeBase!);
+      fireEvent.click(removeStart!);
     });
 
     // Only the base is gone. The siblings are independent long-press alternates
@@ -621,10 +621,10 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     expect(touchMechanismsFor("ă")).toHaveLength(1);
     expect(screen.getByText(/is part of a family of accented letters/i)).toBeTruthy();
 
-    const removeBase = individualChipFor("ă");
-    expect(removeBase).toBeTruthy();
+    const removeStart = individualChipFor("ă");
+    expect(removeStart).toBeTruthy();
     await act(async () => {
-      fireEvent.click(removeBase!);
+      fireEvent.click(removeStart!);
     });
 
     expect(touchMechanismsFor("ă")).toHaveLength(0);
@@ -640,14 +640,14 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     seedStore({ withInventory: ["è", "à"] });
     const lp = (
       char: string,
-      hostKey: string,
+      baseKey: string,
       layer: string,
     ): MechanismAssignment => ({
       scope: "individual",
       target: char,
       modality: "touch",
       mechanisms: [
-        { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+        { patternId: "longpress_alternates", slotValues: { hostKey: baseKey, char, layer } },
       ],
       source: "user",
     });
@@ -660,8 +660,8 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
       ],
       suggestionResolvedChars: [],
       bulkAccentGroups: [
-        { id: "é:K_E", hostKey: "K_E", baseChar: "é", members: ["ê"] },
-        { id: "á:K_A", hostKey: "K_A", baseChar: "á", members: ["â"] },
+        { id: "é:K_E", baseKey: "K_E", baseChar: "é", members: ["ê"] },
+        { id: "á:K_A", baseKey: "K_A", baseChar: "á", members: ["â"] },
       ],
     });
 
@@ -683,7 +683,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
 // ---------------------------------------------------------------------------
 // Corpus longpress-host tie-breaker (placement-priors v2's PlacementMap.touch)
 // —  fires ONLY when the NFD-decomposition path finds nothing; NFD stays
-// authoritative. See touchCorpusFallbackHostKey in TouchGallery.tsx.
+// authoritative. See touchCorpusFallbackBaseKey in TouchGallery.tsx.
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v2)", () => {

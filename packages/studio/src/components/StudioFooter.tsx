@@ -89,10 +89,10 @@ export function StudioFooter() {
   const decisions = useDecisionStore((s) => s.decisions);
   const scaffoldSpec = deriveScaffoldSpec(decisions);
   const identity = useWorkingCopyStore((s) => s.identity);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const projectLabel = useMemo(
-    () => deriveProjectLabel({ scaffoldSpec, identity, baseKeyboard }),
-    [scaffoldSpec, identity, baseKeyboard],
+    () => deriveProjectLabel({ scaffoldSpec, identity, startKeyboard }),
+    [scaffoldSpec, identity, startKeyboard],
   );
 
   // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ export function StudioFooter() {
 
   const record = useDecisionLogStore((s) => s.record);
 
-  const hasProject = baseKeyboard !== null;
+  const hasProject = startKeyboard !== null;
 
   // ---------------------------------------------------------------------------
   // Within-step walks — the per-question / per-character stops each stage's own

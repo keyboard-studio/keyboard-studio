@@ -66,7 +66,7 @@
 // receives the Phase E touch layout.
 //
 // The function mutates `vfs` in-place. Callers that need the original VFS
-// preserved must clone it before calling (e.g. createVirtualFS(baseVfs.entries())).
+// preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
 import type {
   KeyboardIR,
@@ -128,7 +128,7 @@ const EMPTY_DELETION_SET: ReadonlySet<string> = new Set<string>();
  * - `vfs`             — the VFS to mutate in-place (clone before calling if you
  *                       need to preserve the original).
  * - `keyboardId`      — keyboard identifier used to derive source/<id>.kmn paths.
- * - `baseIr`          — the source-of-truth IR (never mutated by projection).
+ * - `startIr`          — the source-of-truth IR (never mutated by projection).
  * - `deletedNodeIds`  — set of carve deletions.
  * - `assignments`     — mechanism assignments from phaseResults. Physical-only
  *                       filtering is applied inside this function defensively, so
@@ -163,7 +163,7 @@ export interface ProjectWorkingCopyVfsInput {
    * Omit or pass the same value as `keyboardId` to skip the rename pass.
    */
   targetKeyboardId?: string;
-  baseIr: KeyboardIR;
+  startIr: KeyboardIR;
   deletedNodeIds: ReadonlySet<string>;
   /** Individual rule nodeIds (and store-slot ids) removed via character-level carving. */
   deletedItemIds?: ReadonlySet<string>;
@@ -257,8 +257,8 @@ export interface ProjectWorkingCopyVfsInput {
    * output path passes this same value as its display-name fallback, so the two
    * compare equal and the name store is left untouched.
    *
-   * Optional. When omitted, the comparison falls back to `baseIr.header.name`.
-   * The gallery's `BaseKeyboard.displayName` and the parsed `baseIr.header.name`
+   * Optional. When omitted, the comparison falls back to `startIr.header.name`.
+   * The gallery's `StartKeyboard.displayName` and the parsed `startIr.header.name`
    * are the same in practice; passing it explicitly lets a caller whose overlay
    * fallback is the gallery name (rather than the parsed `.kmn` name) match on
    * the exact value it fell back to.
@@ -272,7 +272,7 @@ export interface ProjectWorkingCopyVfsInput {
   /**
    * The rules survey step's additions (spec 082: pack install, guard
    * synthesis, Narrow exceptions), pre-derived by the caller with
-   * `deriveRuleAdditions(workingIr, baseIr)`. Spliced into the
+   * `deriveRuleAdditions(workingIr, startIr)`. Spliced into the
    * carve-filtered IR in working-IR order by step 1.8 before the `.kmn`
    * re-emit, so the additions take effect in the preview and download.
    *
@@ -342,7 +342,7 @@ export interface ProjectWorkingCopyVfsResult {
  * in-place, returning any accumulated warnings.
  *
  * `input.vfs` IS mutated. Callers that need the original VFS preserved must
- * clone it before calling: `createVirtualFS(baseVfs.entries())`.
+ * clone it before calling: `createVirtualFS(startVfs.entries())`.
  *
  * Projection steps are identical for both the OSK preview path
  * (`useWorkingCopyTransform`) and the output/serialization path
@@ -355,7 +355,7 @@ export function projectWorkingCopyVfs(
     vfs,
     keyboardId,
     targetKeyboardId,
-    baseIr,
+    startIr,
     deletedNodeIds,
     deletedItemIds = new Set<string>(),
     carveChars = new Set<string>(),
@@ -398,16 +398,16 @@ export function projectWorkingCopyVfs(
   // An id that does not parse as a slot id (parseSlotId returns null — e.g. bare
   // rule nodeIds whose suffix is not an integer) falls through to wholeNodeItemIds
   // and is treated as a whole-node deletion. An id that does parse as a slot id
-  // but whose store is not found in baseIr also falls through to wholeNodeItemIds
+  // but whose store is not found in startIr also falls through to wholeNodeItemIds
   // and becomes a no-op whole-node deletion (applyStoreSlotRemovals never sees it).
-  const storeNodeIdSet = new Set(baseIr.stores.map((s) => s.nodeId));
+  const storeNodeIdSet = new Set(startIr.stores.map((s) => s.nodeId));
 
   // Issue #1809, ruling §1: ONE aggregated carved set R, one nomination pass.
   // Union the aggregated pass over the incremental per-character union before
   // partitioning, so the .kmn slot pruning, the whole-node filter, and the
   // keycap projection below all consume the same pruned result (§11).
   const effectiveItemIds = unionAggregatedCarveIds(
-    baseIr,
+    startIr,
     deletedItemIds,
     carveChars,
   );
@@ -437,7 +437,7 @@ export function projectWorkingCopyVfs(
   //
   // T015 carve pipeline (suppression → slot removals → filter, carvePipeline.ts
   // in the engine). When dispositions are present, the pipeline derives the
-  // carved IR from the PRE-carve baseIr — the T013 constraint: guard selector
+  // carved IR from the PRE-carve startIr — the T013 constraint: guard selector
   // chars are read from the pre-removal stores and are unrecoverable after
   // slot removal. Since spec 089 T021 the pipeline runs through the mutate
   // seam (applyCarveMutate) whenever there is a projection edit; the legacy
@@ -446,7 +446,7 @@ export function projectWorkingCopyVfs(
   // deletions inside applyCarveToVfs).
   //
   // The slot partition above is kept for that legacy path and for the keycap
-  // cascade (step 1.5), which is driven off baseIr.
+  // cascade (step 1.5), which is driven off startIr.
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
 
   // spec-014 T016c — carve IR-projection via the single mutate() write seam.
@@ -457,13 +457,13 @@ export function projectWorkingCopyVfs(
   // the emit step only serializes — the seam, not applyCarveToVfs's internal
   // filter, is the canonical IR producer (M6/SC-001).
   //
-  // The patch is built from baseIr (never a slot-rewritten IR) so it is a
+  // The patch is built from startIr (never a slot-rewritten IR) so it is a
   // pure function of the overlay (idempotent + reversible). The entry-group
   // safety gate is preserved: when the deletion set would remove the entry group
   // we DEFER to the legacy applyCarveToVfs call, which warns and skips the
   // re-emit (the seam IR would otherwise have silently dropped it). This keeps
   // the emitted artifact byte-identical to the flag-off path.
-  const entryGroup = baseIr.groups.find((g) => !g.readonly);
+  const entryGroup = startIr.groups.find((g) => !g.readonly);
   const entryGroupDeleted =
     entryGroup !== undefined && allWholeNodeIds.has(entryGroup.nodeId);
 
@@ -500,12 +500,12 @@ export function projectWorkingCopyVfs(
   let carveIr: KeyboardIR;
   if (!entryGroupDeleted && hasProjectionEdit) {
     // Seam path (T015): applyCarveMutate runs the shared pipeline
-    // (suppression → slot removals → filter) from the pre-carve baseIr.
+    // (suppression → slot removals → filter) from the pre-carve startIr.
     // effectiveItemIds already carries the #1809 §1 aggregated union, so
     // carveChars takes the plain default (buildCarvePatch would union it
     // again idempotently).
     const seamIr = applyCarveMutate(
-      baseIr,
+      startIr,
       deletedNodeIds,
       effectiveItemIds,
       undefined,
@@ -541,11 +541,11 @@ export function projectWorkingCopyVfs(
     //     When all slot ids are rejected by the transform's guards, irRewritten
     //     still triggers a (harmless, idempotent) re-emit of the unmodified IR.
     // Carve-scoped `notany()` hygiene (issue #1809, ruling §3).
-    const removalResult = applyStoreSlotRemovals(baseIr, slotIds, {
+    const removalResult = applyStoreSlotRemovals(startIr, slotIds, {
       carveNotAnyHygiene: true,
     });
     warnings.push(...removalResult.warnings);
-    carveIr = removalResult.ir; // equals baseIr when slotIds was empty
+    carveIr = removalResult.ir; // equals startIr when slotIds was empty
     // spec 082: splice the rules step's additions into the carve-filtered IR
     // (in working-IR order; carve-deleted and disabled-family rules are never
     // resurrected — spliceRuleAdditions skips anything in allWholeNodeIds).
@@ -574,7 +574,7 @@ export function projectWorkingCopyVfs(
       const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(
         vfs,
         keyboardId,
-        baseIr,
+        startIr,
         {
           slotIds,
           wholeNodeIds: allWholeNodeIds,
@@ -768,9 +768,9 @@ export function projectWorkingCopyVfs(
   // round-trips the JSON through JSON.parse/stringify even when nothing
   // changes, which would needlessly reformat (and break byte-identical
   // golden-artifact comparisons for) a keyboard that never touches this
-  // pattern, so the cheap baseIr/assignment check below gates the call.
+  // pattern, so the cheap startIr/assignment check below gates the call.
   //
-  // Re-parses the just-written .kmn (rather than reusing baseIr/carveIr)
+  // Re-parses the just-written .kmn (rather than reusing startIr/carveIr)
   // so a combo the author just added via step 2 gets real key text instead
   // of blanks — feeding propagateDesktopLayersToTouch a stale IR is a known
   // limitation of the engine helper. Runs AFTER step 2 (assignments) so it
@@ -782,8 +782,8 @@ export function projectWorkingCopyVfs(
   const hasLayerSwitchAssignment = physicalAssignments.some((a) =>
     a.mechanisms.some((m) => m.patternId === "modifier_as_layer_switch"),
   );
-  const hasLayerSwitchInBaseIr = collectLayerCombosInUse(baseIr).length > 0;
-  if (hasLayerSwitchAssignment || hasLayerSwitchInBaseIr) {
+  const hasLayerSwitchInStartIr = collectLayerCombosInUse(startIr).length > 0;
+  if (hasLayerSwitchAssignment || hasLayerSwitchInStartIr) {
     const touchLayoutPath = findTouchLayoutPath(vfs);
     if (touchLayoutPath !== undefined) {
       const touchEntry = vfs.get(touchLayoutPath);
@@ -855,7 +855,7 @@ export function projectWorkingCopyVfs(
   // The display name is treated as an EDIT, reflected only when it CHANGES.
   // `store(&NAME)` is rewritten in place ONLY when the effective display name
   // DIFFERS from the base keyboard's own name (`baseDisplayName`, falling back
-  // to `baseIr.header.name`). When they match — which includes the no-identity-
+  // to `startIr.header.name`). When they match — which includes the no-identity-
   // set case, where `serializeWorkingCopy` passes the base's own display name
   // straight back as a fallback so the `.kmp` descriptor writer (step 3.6) has a
   // non-null overlay to key on — the name is NOT an edit and the base's name
@@ -868,7 +868,7 @@ export function projectWorkingCopyVfs(
   // `serializeWorkingCopy`) and the OSK preview (`useWorkingCopyTransform`) pass
   // through, so they cannot disagree about whether the name changed.
   if (identity !== null) {
-    const baseName = baseDisplayName ?? baseIr.header.name;
+    const baseName = baseDisplayName ?? startIr.header.name;
     const identityArg: { name?: string; copyright?: string; version?: string } =
       {};
     if (
@@ -994,7 +994,7 @@ export function projectWorkingCopyVfs(
         // Preserve the base keyboard's release version on the copy path. Without
         // this, resetIdentity() defaults &KEYBOARDVERSION to "1.0" while the .kps
         // <Version> and the zip filename both keep the base version (serialize-
-        // WorkingCopy uses baseIr.header.version) — leaving the three disagreeing
+        // WorkingCopy uses startIr.header.version) — leaving the three disagreeing
         // inside one package. An explicit identity.version still wins; an empty
         // base version falls through so resetIdentity applies its "1.0" default
         // (matching serializeWorkingCopy's `|| "1.0"`).

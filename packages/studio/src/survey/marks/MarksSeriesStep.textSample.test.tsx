@@ -11,7 +11,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { screen, cleanup, act, fireEvent } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import type { BaseKeyboard, ConfirmedAlphabet } from "@keyboard-studio/contracts";
+import type { StartKeyboard, ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { createCharacterDiscoveryService } from "@keyboard-studio/engine";
 import type { CldrLoader } from "@keyboard-studio/engine";
 import { MarksStepHost } from "./MarksStepHost.tsx";
@@ -34,7 +34,7 @@ const service = createCharacterDiscoveryService(
 );
 
 async function alphabetFromSample(sample: string): Promise<ConfirmedAlphabet> {
-  const harvested = await service.harvestFromText(sample, {} as BaseKeyboard);
+  const harvested = await service.harvestFromText(sample, {} as StartKeyboard);
   for (const { char } of harvested) inventoryOps("characters").addProposed(char, "text");
   return draftConfirmedAlphabet(getCharacterInventoryValue());
 }

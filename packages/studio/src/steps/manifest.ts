@@ -44,7 +44,7 @@ import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.t
 import {
   identityStep,
   layoutStep,
-  chooseBaseStep,
+  chooseStartStep,
   trackStep,
   attributionStep,
   projectNameStep,
@@ -132,7 +132,7 @@ const stepPool: readonly Step[] = [
   layoutStep,
 
   // --- Base selection (base picker only) ---
-  chooseBaseStep,
+  chooseStartStep,
 
   // --- Track selection (copy vs adapt) ---
   trackStep,

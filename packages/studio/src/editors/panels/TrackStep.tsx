@@ -1,18 +1,18 @@
 // TrackStep — wizard stage that lets the author choose Track 1 (Copy) or
-// Track 2 (Adapt) for their selected base keyboard. Rendered after BaseResolution
+// Track 2 (Adapt) for their selected base keyboard. Rendered after StartResolution
 // confirms a base, before the project-name step (Track 1) or prefill (Track 2).
 // spec §8 v1.3.0: two authoring tracks.
 
 import { useState } from "react";
 import { Trans } from "@lingui/react/macro";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { Button, Card } from "../../ui/index.ts";
 import { TEXT_DIM } from "../../ui/theme.ts";
 
 export type Track = "copy" | "adapt";
 
 export interface TrackStepProps {
-  base: BaseKeyboard;
+  base: StartKeyboard;
   onNext: (track: Track) => void;
   onBack: () => void;
 }

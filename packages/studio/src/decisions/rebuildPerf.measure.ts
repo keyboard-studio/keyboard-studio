@@ -47,7 +47,7 @@ import { cpus, platform, release } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard } from "@keyboard-studio/contracts";
 import type { SurveyPhaseResult, VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { questionRegistry } from "../survey/questions/registry.ts";
@@ -201,7 +201,7 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
       const kmnText = readVfsText(vfs, `source/${KB.id}.kmn`);
       if (kmnText === undefined) throw new Error("fixture .kmn present in VFS");
       const { ir } = parseKmn(kmnText, KB.id);
-      const base = makeBaseKeyboard({
+      const base = makeStartKeyboard({
         id: KB.id,
         script: KB.script,
         path: `release/${KB.group}/${KB.id}`,
@@ -211,8 +211,8 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
         languages: ["aae"],
       });
       const store = useWorkingCopyStore;
-      store.getState().instantiateFromBase(base, { vfs, ir });
-      expect(store.getState().baseKeyboard?.id).toBe(KB.id);
+      store.getState().instantiateFromStart(base, { vfs, ir });
+      expect(store.getState().startKeyboard?.id).toBe(KB.id);
 
       const extractCtx = buildExtractContext(ir, base);
       const flowDecisions = runDecisionFlow({

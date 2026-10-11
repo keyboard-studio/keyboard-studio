@@ -5,7 +5,7 @@
 // extract names its module, idempotent second run.
 
 import { describe, it, expect } from "vitest";
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
 import type { Decision, DecisionSet } from "./decisionTypes.ts";
 import type { ExtractContext } from "./extractContext.ts";
@@ -32,7 +32,7 @@ function fixtureIR(overrides: Partial<KeyboardIR["header"]> = {}): KeyboardIR {
   };
 }
 
-function fixtureCatalog(): BaseKeyboard {
+function fixtureCatalog(): StartKeyboard {
   return {
     id: "basic_kbdfr",
     path: "release/basic/basic_kbdfr",

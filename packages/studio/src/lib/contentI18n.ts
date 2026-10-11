@@ -141,7 +141,7 @@ export function resolveContentString(
 /**
  * Test-only: seed the locale-catalog cache directly, bypassing
  * `activateContentLocale`'s dynamic import entirely. Mirrors
- * `_setCorpusCacheForTesting` in BaseKeyboardPicker.tsx — mocking an aliased
+ * `_setCorpusCacheForTesting` in StartKeyboardPicker.tsx — mocking an aliased
  * dynamic import (`vi.mock("@content-i18n/...")`) is worker-fragile across
  * co-scheduled test files (see that function's #829 note), so tests seed the
  * cache directly instead of relying on the mock as the load-bearing mechanism.

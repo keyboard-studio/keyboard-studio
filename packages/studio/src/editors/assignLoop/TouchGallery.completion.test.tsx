@@ -71,7 +71,7 @@ function seedShippedPlusSwapped(opts: {
     { path: "source/basic_kbdus.keyman-touch-layout", content: shippedLayoutJson, isBinary: false },
   ]);
   const ir = makeTestIR([]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   const swapAssignment: MechanismAssignment = {
     scope: "individual",
     target: opts.swappedChar,
@@ -153,7 +153,7 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
       { path: "source/basic_kbdus.keyman-touch-layout", content: shippedLayoutJson, isBinary: false },
     ]);
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
       answers: [],
@@ -184,8 +184,8 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
     await act(async () => {
       fireEvent.click(replaceCard!);
     });
-    const hostKeySelect = screen.getByLabelText(/Host key to replace/i);
-    await changeSelectMenu(hostKeySelect, "K_1");
+    const baseKeySelect = screen.getByLabelText(/Host key to replace/i);
+    await changeSelectMenu(baseKeySelect, "K_1");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;

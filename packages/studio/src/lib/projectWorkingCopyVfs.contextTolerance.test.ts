@@ -53,7 +53,7 @@ function project(contextToleranceOverlay: ContextToleranceOverlay | null) {
   const result = projectWorkingCopyVfs({
     vfs,
     keyboardId: "projected",
-    baseIr: parseKmn(KMN, "projected").ir,
+    startIr: parseKmn(KMN, "projected").ir,
     deletedNodeIds: new Set(),
     assignments: [],
     getPattern: () => undefined,

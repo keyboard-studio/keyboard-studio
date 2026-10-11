@@ -36,8 +36,8 @@ function instantiateAdaptation() {
   ir.header.version = "1.0";
   useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs: vfs(), ir });
   const wc = useWorkingCopyStore.getState();
-  wc.setBaseWelcomeHtmText(BASE_WELCOME);
-  wc.setBaseHelpPhpText(BAD_BASE_HELP);
+  wc.setStartWelcomeHtmText(BASE_WELCOME);
+  wc.setStartHelpPhpText(BAD_BASE_HELP);
   wc.setBaselineDocFindings(
     computeBaselineDocFindings({
       keyboardId: basicKbdus.id,
@@ -63,7 +63,7 @@ describe("useDocumentationFindings", () => {
   it("recomputes only when an input changes (same reference across an unrelated rerender)", () => {
     const ir = makeTestIR([]);
     ir.header.version = "1.0";
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: vfs(), ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: vfs(), ir });
     const { result, rerender } = renderHook(() => useDocumentationFindings());
     const first = result.current;
     rerender();
@@ -102,7 +102,7 @@ describe("useDocumentationFindings", () => {
   it("a Track 1 copy never classifies anything upstream (no inherited prose)", () => {
     const ir = makeTestIR([]);
     ir.header.version = "1.0";
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: vfs(), ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: vfs(), ir });
     useWorkingCopyStore.getState().setBaselineDocFindings([]);
     const { result } = renderHook(() => useDocumentationFindings());
     expect(result.current.every((f) => f.origin !== "upstream")).toBe(true);

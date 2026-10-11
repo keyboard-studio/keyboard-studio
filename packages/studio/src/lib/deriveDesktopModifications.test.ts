@@ -45,11 +45,11 @@ describe("deriveDesktopModifications — removals", () => {
       output: [{ kind: "index", storeRef: "dkt", offset: 1 }],
     };
     const group = makeGroup("group#main", "main", [rule]);
-    const baseIr = makeTestIR([group], [dkt]);
+    const startIr = makeTestIR([group], [dkt]);
 
     // Slot id "<storeNodeId>#<itemsIndex>" — carve item 0 ("x"), spliced out.
     const result = deriveDesktopModifications(
-      baseIr,
+      startIr,
       new Set(),
       new Set(["store#dkt#0"]),
       NO_PHASE_RESULTS,
@@ -71,10 +71,10 @@ describe("deriveDesktopModifications — removals", () => {
       { kind: "char", value: "d" },
     ]);
     const group = makeGroup("group#main", "main", [survivingRule, removedRule]);
-    const baseIr = makeTestIR([group]);
+    const startIr = makeTestIR([group]);
 
     const result = deriveDesktopModifications(
-      baseIr,
+      startIr,
       new Set(["rule#1"]),
       new Set(),
       NO_PHASE_RESULTS,
@@ -96,10 +96,10 @@ describe("deriveDesktopModifications — removals", () => {
       { kind: "char", value: "́" }, // combining acute
     ]);
     const group = makeGroup("group#main", "main", [survivingRule, removedRule]);
-    const baseIr = makeTestIR([group]);
+    const startIr = makeTestIR([group]);
 
     const result = deriveDesktopModifications(
-      baseIr,
+      startIr,
       new Set(["rule#1"]),
       new Set(),
       NO_PHASE_RESULTS,
@@ -116,9 +116,9 @@ describe("deriveDesktopModifications — removals", () => {
   it("no carve edits -> empty removals", () => {
     const rule = makeVkeyRule("rule#0", "K_A", [{ kind: "char", value: "a" }]);
     const group = makeGroup("group#main", "main", [rule]);
-    const baseIr = makeTestIR([group]);
+    const startIr = makeTestIR([group]);
 
-    const result = deriveDesktopModifications(baseIr, new Set(), new Set(), NO_PHASE_RESULTS);
+    const result = deriveDesktopModifications(startIr, new Set(), new Set(), NO_PHASE_RESULTS);
 
     expect(result.removals).toEqual([]);
   });
@@ -126,12 +126,12 @@ describe("deriveDesktopModifications — removals", () => {
 
 // ---------------------------------------------------------------------------
 // 4. Placements filter: only physical + individual entries surface, mapped to
-//    a hostKey extracted the same way TouchGallery's suggestion logic does.
+//    a baseKey extracted the same way TouchGallery's suggestion logic does.
 // ---------------------------------------------------------------------------
 
 describe("deriveDesktopModifications — placements", () => {
   it("surfaces only physical + individual assignments, mapped to { char, hostKey }", () => {
-    const baseIr = makeTestIR([makeGroup("group#main", "main", [])]);
+    const startIr = makeTestIR([makeGroup("group#main", "main", [])]);
 
     const physicalIndividual: MechanismAssignment = {
       scope: "individual",
@@ -151,7 +151,7 @@ describe("deriveDesktopModifications — placements", () => {
       modality: "touch",
       mechanisms: [{ patternId: "touch_key_replace" }],
     };
-    const physicalIndividualNoHostKey: MechanismAssignment = {
+    const physicalIndividualNoBaseKey: MechanismAssignment = {
       scope: "individual",
       target: "ü", // ü — unrecognized pattern, no extractable host key
       modality: "physical",
@@ -163,17 +163,17 @@ describe("deriveDesktopModifications — placements", () => {
         physicalIndividual,
         physicalClass,
         touchIndividual,
-        physicalIndividualNoHostKey,
+        physicalIndividualNoBaseKey,
       ]),
     ];
 
-    const result = deriveDesktopModifications(baseIr, new Set(), new Set(), phaseResults);
+    const result = deriveDesktopModifications(startIr, new Set(), new Set(), phaseResults);
 
-    expect(result.placements).toEqual([{ char: "é", hostKey: "K_E" }]);
+    expect(result.placements).toEqual([{ char: "é", baseKey: "K_E" }]);
   });
 
   it("extracts host keys for the deadkey_single_tap (S-02) and modifier_as_layer_switch (S-08) shapes", () => {
-    const baseIr = makeTestIR([makeGroup("group#main", "main", [])]);
+    const startIr = makeTestIR([makeGroup("group#main", "main", [])]);
 
     const deadkeyAssignment: MechanismAssignment = {
       scope: "individual",
@@ -192,16 +192,16 @@ describe("deriveDesktopModifications — placements", () => {
 
     const phaseResults = [makePhaseC([deadkeyAssignment, layerSwitchAssignment])];
 
-    const result = deriveDesktopModifications(baseIr, new Set(), new Set(), phaseResults);
+    const result = deriveDesktopModifications(startIr, new Set(), new Set(), phaseResults);
 
     expect(result.placements).toEqual([
-      { char: "à", hostKey: "K_A" },
-      { char: "ñ", hostKey: "K_N" },
+      { char: "à", baseKey: "K_A" },
+      { char: "ñ", baseKey: "K_N" },
     ]);
   });
 
   it("extracts a host key for the multi_char_sequence (S-03) shape", () => {
-    const baseIr = makeTestIR([makeGroup("group#main", "main", [])]);
+    const startIr = makeTestIR([makeGroup("group#main", "main", [])]);
 
     const sequenceAssignment: MechanismAssignment = {
       scope: "individual",
@@ -214,8 +214,8 @@ describe("deriveDesktopModifications — placements", () => {
 
     const phaseResults = [makePhaseC([sequenceAssignment])];
 
-    const result = deriveDesktopModifications(baseIr, new Set(), new Set(), phaseResults);
+    const result = deriveDesktopModifications(startIr, new Set(), new Set(), phaseResults);
 
-    expect(result.placements).toEqual([{ char: "th", hostKey: "K_T" }]);
+    expect(result.placements).toEqual([{ char: "th", baseKey: "K_T" }]);
   });
 });

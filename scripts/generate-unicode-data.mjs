@@ -231,15 +231,15 @@ for (const e of entries) {
     fail(`non-ASCII name at U+${e.start.toString(16).toUpperCase()}: ${e.name}`);
   }
   const key = `${e.cat}|${e.ccc}|${e.nameKind}`;
-  let nameBase = -1;
+  let nameStart = -1;
   if (e.nameKind === 1) {
-    nameBase = nameList.length;
+    nameStart = nameList.length;
     nameList.push(e.name);
   }
   if (key === prevKey && prevRun && prevRun[1] + 1 === e.start) {
     prevRun[1] = e.end;
   } else {
-    prevRun = [e.start, e.end, catIndex.get(e.cat), e.ccc, e.nameKind, nameBase];
+    prevRun = [e.start, e.end, catIndex.get(e.cat), e.ccc, e.nameKind, nameStart];
     runs.push(prevRun);
     prevKey = key;
   }

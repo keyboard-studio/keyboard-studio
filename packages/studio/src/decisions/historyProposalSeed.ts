@@ -3,8 +3,8 @@
 // research R6, contracts/studio-surfaces.md §3).
 //
 // NO NEW CHANGE JOURNAL (spec assumption). Every fact this module reads
-// already lives in the decision-audit record: `recordBaseContribution`
-// (decisions/recordBaseContribution.ts) writes the base's identity + version
+// already lives in the decision-audit record: `recordStartContribution`
+// (decisions/recordStartContribution.ts) writes the base's identity + version
 // once at `choose_base`; `recordEditorStep` (decisions/recordEditorStep.ts)
 // writes the carve/mechanisms editor-action summaries; `recordSurveyAnswers`
 // (decisions/recordSurveyAnswers.ts) writes one entry per char-list answer
@@ -32,7 +32,7 @@ import { snapshotDecisionRecord } from "./decisionLogStore.ts";
  * no argument; tests pass a hand-built `DecisionRecord` for determinism.
  *
  * Derivation, per field:
- * - `base`: the recorded `base-contribution` entry's `baseId` and its
+ * - `base`: the recorded `base-contribution` entry's `startId` and its
  *   `inheritedMetadata` "version" field, but ONLY when
  *   `instantiationMode === "adapt-existing"` (Track 2). Track 1
  *   (`new-from-base`, a copy) and a net-new build with no such entry at all
@@ -67,7 +67,7 @@ export function buildHistoryProposalSeed(
       if (payload.instantiationMode === "adapt-existing") {
         const version =
           payload.inheritedMetadata.find((m) => m.field === "version")?.value ?? "";
-        base = { id: payload.baseId, version };
+        base = { id: payload.startId, version };
       }
       continue;
     }

@@ -135,10 +135,10 @@ export function applyTouchAssignments(
 
   function setWorkingKey(
     state: LayerWorkState,
-    hostKey: string,
+    baseKey: string,
     updated: TouchKeyIR,
   ): void {
-    const pos = state.keyIndex.get(hostKey);
+    const pos = state.keyIndex.get(baseKey);
     if (!pos) return;
     state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
   }
@@ -150,8 +150,8 @@ export function applyTouchAssignments(
   function resolveTarget(
     slotValues: Readonly<Record<string, string>> | undefined,
     char: string,
-  ): { state: LayerWorkState; key: TouchKeyIR; hostKey: string } | undefined {
-    const hostKey = slotValues?.["hostKey"] ?? "";
+  ): { state: LayerWorkState; key: TouchKeyIR; baseKey: string } | undefined {
+    const baseKey = slotValues?.["hostKey"] ?? "";
     const layerId = resolveTouchLayerId(slotValues);
 
     const state = resolveLayerState(layerId);
@@ -162,10 +162,10 @@ export function applyTouchAssignments(
       return undefined;
     }
 
-    const pos = state.keyIndex.get(hostKey);
+    const pos = state.keyIndex.get(baseKey);
     if (!pos) {
       warnings.push(
-        `[touch-apply] host key "${hostKey}" not found in ${phonePlatform.id} layer "${layerId}" — assignment for "${char}" skipped`
+        `[touch-apply] host key "${baseKey}" not found in ${phonePlatform.id} layer "${layerId}" — assignment for "${char}" skipped`
       );
       return undefined;
     }
@@ -173,7 +173,7 @@ export function applyTouchAssignments(
     return {
       state,
       key: state.workingRows[pos.rowIdx]!.keys[pos.keyIdx]!,
-      hostKey,
+      baseKey,
     };
   }
 
@@ -194,7 +194,7 @@ export function applyTouchAssignments(
 
         const target = resolveTarget(slotValues, char);
         if (!target) continue;
-        const { state, key, hostKey } = target;
+        const { state, key, baseKey } = target;
 
         const existingSk = key.sk ?? [];
         // Dedupe: skip if already present by text/output OR by U_ id (shared
@@ -222,7 +222,7 @@ export function applyTouchAssignments(
         // Keyman runtime because the platform defaultHint is "dot"; an explicit
         // hint would override the dot and re-reveal a character.
 
-        setWorkingKey(state, hostKey, updated);
+        setWorkingKey(state, baseKey, updated);
         continue;
       }
 
@@ -232,7 +232,7 @@ export function applyTouchAssignments(
 
         const target = resolveTarget(slotValues, char);
         if (!target) continue;
-        const { state, key, hostKey } = target;
+        const { state, key, baseKey } = target;
 
         const newFlickKey: TouchKeyIR = {
           nodeId: minter.mint("touchKey"),
@@ -253,7 +253,7 @@ export function applyTouchAssignments(
           flick: mergedFlick,
         };
 
-        setWorkingKey(state, hostKey, updated);
+        setWorkingKey(state, baseKey, updated);
         continue;
       }
 
@@ -262,7 +262,7 @@ export function applyTouchAssignments(
 
         const target = resolveTarget(slotValues, char);
         if (!target) continue;
-        const { state, key, hostKey } = target;
+        const { state, key, baseKey } = target;
 
         const existingMt = key.multitap ?? [];
         // Dedupe: same predicate as longpress sk — covers id-only multitap entries.
@@ -283,7 +283,7 @@ export function applyTouchAssignments(
           multitap: [...existingMt, newMtKey],
         };
 
-        setWorkingKey(state, hostKey, updated);
+        setWorkingKey(state, baseKey, updated);
         continue;
       }
 
@@ -292,7 +292,7 @@ export function applyTouchAssignments(
 
         const target = resolveTarget(slotValues, char);
         if (!target) continue;
-        const { state, key, hostKey } = target;
+        const { state, key, baseKey } = target;
 
         // Destructure out any existing `output` field so the U_-id supersedes it.
         // Preserve all other properties: nodeId, geometry (pad, width, sp),
@@ -304,7 +304,7 @@ export function applyTouchAssignments(
           text: char,
         };
 
-        setWorkingKey(state, hostKey, updated);
+        setWorkingKey(state, baseKey, updated);
         continue;
       }
 

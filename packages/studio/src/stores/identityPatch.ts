@@ -27,10 +27,10 @@ export type IdentityPatch = Partial<{
    * Must satisfy validateKeyboardId (§10 Layer A check #1: 1-255 chars,
    * no spaces / parens / brackets / commas). When set, the projection's id
    * rename pass (projectWorkingCopyVfs step 4) renames every
-   * source/<baseId>.{kmn,kps,kvks,keyman-touch-layout,ico,css,htm,js} sibling
+   * source/<startId>.{kmn,kps,kvks,keyman-touch-layout,ico,css,htm,js} sibling
    * to source/<keyboardId>.*, rewrites the .kmn's path-bearing stores
    * (&KMW_EMBEDCSS, &KMW_HELPFILE, &VISUALKEYBOARD, &LAYOUTFILE, &BITMAP),
-   * and rewrites `.kmw-keyboard-<baseId>` selectors in *.css and the
+   * and rewrites `.kmw-keyboard-<startId>` selectors in *.css and the
    * <ID> / <kbdname> references in *.kps and *.kvks. The downloaded zip
    * filename uses this id.
    */

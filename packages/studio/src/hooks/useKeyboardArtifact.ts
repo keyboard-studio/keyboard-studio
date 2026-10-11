@@ -2,7 +2,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
@@ -21,7 +21,7 @@ import { lookupNormalizationVerification } from "../lib/normalizationVerificatio
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
   fetchKeyboardSourceToVfs: (
-    baseKeyboard: BaseKeyboard,
+    startKeyboard: StartKeyboard,
     fs: VirtualFS,
     opts?: { proxyBase?: string }
   ) => Promise<{
@@ -30,13 +30,13 @@ interface EngineModule {
     warnings?: string[];
     fonts?: KpsFontEntry[];
     stylesheets?: KpsStylesheetEntry[];
-    baseWelcomeHtmText?: string;
-    baseHelpPhpText?: string;
+    startWelcomeHtmText?: string;
+    startHelpPhpText?: string;
     // spec 080 US2 — the base documentation bundle (data-model §6).
-    baseReadmeMdText?: string;
-    baseHistoryMdText?: string;
-    baseWelcomeImages?: WelcomeFolderImage[];
-    baseWelcomeConvention?: WelcomeConvention;
+    startReadmeMdText?: string;
+    startHistoryMdText?: string;
+    startWelcomeImages?: WelcomeFolderImage[];
+    startWelcomeConvention?: WelcomeConvention;
   }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
@@ -151,7 +151,7 @@ async function loadEngine(): Promise<EngineModule | null> {
 // Maximum time the fetch step may run before we surface a retryable error.
 // A stalled proxy/network request would otherwise leave the preview overlay
 // stuck on "Loading keyboard source..." forever (the run is never superseded
-// when baseKeyboard is stable), so we bound it and fall through to the existing
+// when startKeyboard is stable), so we bound it and fall through to the existing
 // "fetch" error stage, which renders the Retry button.
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -320,7 +320,7 @@ export type VfsTransform = (
    * The keyboard id the VFS ends up keyed under after the transform runs,
    * when it differs from the `keyboardId` the transform was called with
    * (e.g. the Track 1 identity-rename projection step renames
-   * `source/<baseId>.kmn` to `source/<targetId>.kmn`). Omit or leave
+   * `source/<startId>.kmn` to `source/<targetId>.kmn`). Omit or leave
    * `undefined` when the transform did not change the effective id — the
    * caller then keeps using the `keyboardId` it already has.
    *
@@ -335,7 +335,7 @@ export type VfsTransform = (
 /**
  * Called exactly once per successful fetch→compile run, after both the
  * compile result and the parsed IR are available. The caller (OutputScreen,
- * SurveyView) uses this to call instantiateFromBase or instantiateFromExisting
+ * SurveyView) uses this to call instantiateFromStart or instantiateFromExisting
  * on the workingCopyStore — separating the pipeline from store ownership.
  *
  * `ir` is null when the engine does not expose parseKmn/recognizePatterns (i.e.
@@ -343,7 +343,7 @@ export type VfsTransform = (
  * must guard on ir !== null before passing it to the store.
  */
 export type OnInstantiateCallback = (
-  base: BaseKeyboard,
+  base: StartKeyboard,
   opts: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
 ) => void;
 
@@ -370,7 +370,7 @@ export interface KeyboardArtifactResult {
 
 /**
  * State machine that drives the fetch → vfs-load → compile pipeline for a
- * single BaseKeyboard selection. No debounce — the picker drives this
+ * single StartKeyboard selection. No debounce — the picker drives this
  * directly. The 300 ms debounce lives on the editor's keystroke cycle (§8
  * / Decision D3) and is a separate hook.
  *
@@ -388,11 +388,11 @@ export interface KeyboardArtifactResult {
  *
  * `onInstantiate` — fired exactly once per successful full run (not on
  * recompile). The hook no longer owns the working-copy IR; the caller decides
- * whether to call instantiateFromBase or instantiateFromExisting. The callback
+ * whether to call instantiateFromStart or instantiateFromExisting. The callback
  * receives ir=null when parseKmn is unavailable (mock engine path).
  */
 export function useKeyboardArtifact(
-  baseKeyboard: BaseKeyboard | null,
+  startKeyboard: StartKeyboard | null,
   scaffoldSpec?: ScaffoldSpec | null,
   vfsTransform?: VfsTransform | null,
   onInstantiate?: OnInstantiateCallback | null,
@@ -444,7 +444,7 @@ export function useKeyboardArtifact(
   // transform mutation). Restored into vfsRef before each transform-version
   // reapply so that applyCarveToVfs's no-op fast-path (empty deletedNodeIds)
   // does not cause assignments to accumulate on a stale .kmn.
-  const baseVfsRef = useRef<VirtualFS | null>(null);
+  const startVfsRef = useRef<VirtualFS | null>(null);
   // Effective keyboard id reported by the last vfsTransform application, when
   // it differs from the id the transform was invoked with (Track 1 identity
   // rename with no scaffoldSpec — see VfsTransform's effectiveKeyboardId doc).
@@ -457,7 +457,7 @@ export function useKeyboardArtifact(
 
   // vfsTransform stored in a ref so that assignment changes (which produce a
   // new function reference from useWorkingCopyTransform) do NOT re-trigger
-  // the full fetch→compile cycle. Only baseKeyboard / scaffoldSpec changes
+  // the full fetch→compile cycle. Only startKeyboard / scaffoldSpec changes
   // should restart from "fetching". Transform-only changes recompile cheaply.
   const vfsTransformRef = useRef<VfsTransform | null | undefined>(vfsTransform);
   // True once the first full fetch+compile cycle has completed. Used by the
@@ -507,7 +507,7 @@ export function useKeyboardArtifact(
     // artifact (see projectWorkingCopyVfs), so it can lag what the author runs.
     const {
       ir: workingIr,
-      baseKeyboard,
+      startKeyboard,
       setContextTolerance,
       contextToleranceOverlay,
       contextNormalizationStep,
@@ -522,7 +522,7 @@ export function useKeyboardArtifact(
       verificationLookup: lookupNormalizationVerification,
       // A copy-a-keyboard project carries a new keyboard id, but its rules are
       // the base's: the base's verification verdict applies to it (spec 086).
-      verificationLineage: baseKeyboard === null ? [] : [baseKeyboard.id],
+      verificationLineage: startKeyboard === null ? [] : [startKeyboard.id],
       onNormalizationStored: (stored) => {
         // Persist only a changed entry (spec 086 FR-016): a cache hit re-stores nothing.
         if (isCurrent() && stored.cacheKey !== contextNormalizationStep?.cacheKey) {
@@ -549,7 +549,7 @@ export function useKeyboardArtifact(
   // `isFullRun` distinguishes a full fetch→compile run (fires onInstantiate)
   // from a recompile()-only call (does NOT fire onInstantiate — no VFS change).
   const runCompile = useCallback(async (
-    kb: BaseKeyboard,
+    kb: StartKeyboard,
     thisRunId: number,
     warnings: string[] = [],
     isFullRun: boolean = false,
@@ -568,7 +568,7 @@ export function useKeyboardArtifact(
     let parsedRemovalCapabilities: Map<string, RemovalCapability> = new Map();
     // effectiveKeyboardIdRef takes precedence: it is set only when the last
     // vfsTransform application (Track 1 identity rename) actually renamed
-    // source/<baseId>.* to source/<targetId>.* inside the VFS, so the compile
+    // source/<startId>.* to source/<targetId>.* inside the VFS, so the compile
     // must read the renamed path. scaffoldSpec?.keyboardId covers the
     // Track-1-with-scaffold / new-keyboard path (no rename involved — the VFS
     // was scaffolded under this id from the start). kb.id is the fallback for
@@ -739,7 +739,7 @@ export function useKeyboardArtifact(
     if (analyseToleranceRef.current) launchContextTolerance(thisRunId, parsedIr);
   }, [scaffoldSpec?.keyboardId, onInstantiate, launchContextTolerance]);
 
-  const run = useCallback(async (kb: BaseKeyboard, thisRunId: number) => {
+  const run = useCallback(async (kb: StartKeyboard, thisRunId: number) => {
     // Reset so transform changes during this fetch do not trigger a premature
     // re-apply+recompile before the new VFS is ready. It is set back to true
     // after the transform is applied at the end of the fetch step.
@@ -841,11 +841,11 @@ export function useKeyboardArtifact(
         const attribution = wc.attribution;
         // spec 064 D5: an author-supplied original holder replaces parsing, so
         // the remedy preserves the base's notice instead of dropping it.
-        const baseHolderOverride = wc.baseHolderOverride;
+        const startHolderOverride = wc.startHolderOverride;
         const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName, {
           ...(attribution !== null ? { attribution } : {}),
-          ...(baseHolderOverride !== null && baseHolderOverride !== ""
-            ? { baseHolderOverride }
+          ...(startHolderOverride !== null && startHolderOverride !== ""
+            ? { startHolderOverride }
             : {}),
         });
         // Record (or clear) the unreadable-notice block for the download gate.
@@ -853,18 +853,18 @@ export function useKeyboardArtifact(
         // Retain the base's verbatim license so the DOWNLOAD path can inherit the
         // same holders. It completes a missing LICENSE.md, and the loader never
         // writes the base's into the VFS, so this is its only source.
-        wc.setBaseLicenseText(result.baseLicenseText ?? null);
+        wc.setStartLicenseText(result.startLicenseText ?? null);
         // spec 080 R9 / FR-007: a Track 1 copy inherits the base's welcome
         // IMAGES (carried into its own welcome folder) and nothing of its
         // prose. The prose slices are cleared explicitly rather than assumed
-        // null — instantiateFromBase does not touch them, so a prior adapt
+        // null — instantiateFromStart does not touch them, so a prior adapt
         // session's texts would otherwise survive into this copy and merge.
-        wc.setBaseWelcomeImages(result.baseWelcomeImages ?? null);
-        wc.setBaseWelcomeConvention(result.baseWelcomeConvention ?? null);
-        wc.setBaseWelcomeHtmText(null);
-        wc.setBaseHelpPhpText(null);
-        wc.setBaseReadmeMdText(null);
-        wc.setBaseHistoryMdText(null);
+        wc.setStartWelcomeImages(result.startWelcomeImages ?? null);
+        wc.setStartWelcomeConvention(result.startWelcomeConvention ?? null);
+        wc.setStartWelcomeHtmText(null);
+        wc.setStartHelpPhpText(null);
+        wc.setStartReadmeMdText(null);
+        wc.setStartHistoryMdText(null);
         // spec 080 FR-020: a copy inherits no prose, so nothing can be an
         // upstream finding — an EMPTY baseline (computed), not null (pending).
         wc.setBaselineDocFindings([]);
@@ -892,15 +892,15 @@ export function useKeyboardArtifact(
         // Track 1 (scaffold branch above) never sets these — a brand-new
         // keyboard has no prior docs of its own to merge with (research D-05).
         const wc = useWorkingCopyStore.getState();
-        wc.setBaseWelcomeHtmText(fetchResult.baseWelcomeHtmText ?? null);
-        wc.setBaseHelpPhpText(fetchResult.baseHelpPhpText ?? null);
+        wc.setStartWelcomeHtmText(fetchResult.startWelcomeHtmText ?? null);
+        wc.setStartHelpPhpText(fetchResult.startHelpPhpText ?? null);
         // spec 080 FR-006: the rest of the base's documentation bundle — README
         // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
         // images and which convention the base used (data-model §6).
-        wc.setBaseReadmeMdText(fetchResult.baseReadmeMdText ?? null);
-        wc.setBaseHistoryMdText(fetchResult.baseHistoryMdText ?? null);
-        wc.setBaseWelcomeImages(fetchResult.baseWelcomeImages ?? null);
-        wc.setBaseWelcomeConvention(fetchResult.baseWelcomeConvention ?? null);
+        wc.setStartReadmeMdText(fetchResult.startReadmeMdText ?? null);
+        wc.setStartHistoryMdText(fetchResult.startHistoryMdText ?? null);
+        wc.setStartWelcomeImages(fetchResult.startWelcomeImages ?? null);
+        wc.setStartWelcomeConvention(fetchResult.startWelcomeConvention ?? null);
         // spec 080 FR-020 (research R8): run the documentation checks ONCE
         // over the base's own files as fetched. A later finding on a still-
         // inherited member whose code appears here is the base's, not the
@@ -917,10 +917,10 @@ export function useKeyboardArtifact(
               kvksText: readVfsText(vfs, `source/${kb.id}.kvks`) ?? null,
               touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
               base: {
-                welcomeHtmText: fetchResult.baseWelcomeHtmText ?? null,
-                helpPhpText: fetchResult.baseHelpPhpText ?? null,
-                readmeMdText: fetchResult.baseReadmeMdText ?? null,
-                historyMdText: fetchResult.baseHistoryMdText ?? null,
+                welcomeHtmText: fetchResult.startWelcomeHtmText ?? null,
+                helpPhpText: fetchResult.startHelpPhpText ?? null,
+                readmeMdText: fetchResult.startReadmeMdText ?? null,
+                historyMdText: fetchResult.startHistoryMdText ?? null,
                 // The base LICENSE is never written into the VFS (loader FR-011)
                 // and the adapt track's shipped LICENSE.md is generated with no
                 // invented holder, so the base's notice has no current
@@ -951,12 +951,12 @@ export function useKeyboardArtifact(
         // the Track 1 scaffolder's dropBitmapStoreIfUnbacked; see EngineModule's
         // dropUnbackedBitmapStore docstring for why this can't just be the
         // preview-only stripDanglingAssetStores above.
-        const openBaseKmnPath = findKmnPath(vfs);
-        const openBaseKmnText = openBaseKmnPath ? readVfsText(vfs, openBaseKmnPath) : undefined;
-        if (openBaseKmnPath && openBaseKmnText !== undefined && engineRef.current.dropUnbackedBitmapStore) {
-          const { kmn: cleaned, dropped } = engineRef.current.dropUnbackedBitmapStore(openBaseKmnText, vfs);
+        const openStartKmnPath = findKmnPath(vfs);
+        const openStartKmnText = openStartKmnPath ? readVfsText(vfs, openStartKmnPath) : undefined;
+        if (openStartKmnPath && openStartKmnText !== undefined && engineRef.current.dropUnbackedBitmapStore) {
+          const { kmn: cleaned, dropped } = engineRef.current.dropUnbackedBitmapStore(openStartKmnText, vfs);
           if (dropped !== null) {
-            vfs.set(openBaseKmnPath, cleaned, false);
+            vfs.set(openStartKmnPath, cleaned, false);
             scaffoldWarnings.push(
               `icon '${dropped}' was not available, so the &BITMAP reference was dropped; the keyboard builds without an icon`,
             );
@@ -985,7 +985,7 @@ export function useKeyboardArtifact(
     // so that stale accumulated .kmn text never poisons rule ordering.
     const currentVfs = vfsRef.current;
     if (currentVfs !== null) {
-      baseVfsRef.current = createVirtualFS(currentVfs.entries());
+      startVfsRef.current = createVirtualFS(currentVfs.entries());
     }
 
     const transform = vfsTransformRef.current;
@@ -1037,20 +1037,20 @@ export function useKeyboardArtifact(
   }, [scaffoldSpec, runCompile]);
 
   useEffect(() => {
-    if (baseKeyboard === null) {
+    if (startKeyboard === null) {
       setStage({ kind: "idle" });
       vfsRef.current = null;
-      baseVfsRef.current = null;
+      startVfsRef.current = null;
       lastFullRunKeyRef.current = null;
       // IR ownership moved to the working-copy store; the hook no longer calls
-      // clearIR() here. The store's instantiateFromBase / reset owns IR lifecycle.
+      // clearIR() here. The store's instantiateFromStart / reset owns IR lifecycle.
       return;
     }
 
     // Value-key guard (see lastFullRunKeyRef): a re-render whose base and
     // scaffold target are unchanged must not restart the fetch→compile
     // cycle — the in-flight (or settled) run for this key already owns it.
-    const runKey = `${baseKeyboard.id}|${scaffoldSpec?.keyboardId ?? ""}|${scaffoldSpec?.displayName ?? ""}`;
+    const runKey = `${startKeyboard.id}|${scaffoldSpec?.keyboardId ?? ""}|${scaffoldSpec?.displayName ?? ""}`;
     if (lastFullRunKeyRef.current === runKey) return;
     lastFullRunKeyRef.current = runKey;
 
@@ -1058,8 +1058,8 @@ export function useKeyboardArtifact(
     // can survive into this keyboard's VFS via the transform-change effect.
     setTransformVersion(0);
     const thisRunId = ++runId.current;
-    void run(baseKeyboard, thisRunId);
-  }, [baseKeyboard, scaffoldSpec, run]);
+    void run(startKeyboard, thisRunId);
+  }, [startKeyboard, scaffoldSpec, run]);
 
   // When the vfsTransform changes after the initial fetch (i.e. the user
   // records an assignment), restore the clean base VFS snapshot, re-apply the
@@ -1073,19 +1073,19 @@ export function useKeyboardArtifact(
     if (
       transformVersion === 0 ||
       !hasFetchedRef.current ||
-      baseKeyboard === null ||
+      startKeyboard === null ||
       vfsRef.current === null
     ) {
       return;
     }
 
-    const keyboardId = scaffoldSpec?.keyboardId ?? baseKeyboard.id;
+    const keyboardId = scaffoldSpec?.keyboardId ?? startKeyboard.id;
     const transform = vfsTransformRef.current;
     if (transform !== null && transform !== undefined) {
       // Restore the clean base VFS snapshot so the transform always starts from
       // the unmodified keyboard source, not an accumulated previous result.
-      if (baseVfsRef.current !== null) {
-        vfsRef.current = createVirtualFS(baseVfsRef.current.entries());
+      if (startVfsRef.current !== null) {
+        vfsRef.current = createVirtualFS(startVfsRef.current.entries());
       }
       // Reset BEFORE invoking the transform, not after. If the transform
       // throws, the catch below leaves this at null rather than a stale
@@ -1116,8 +1116,8 @@ export function useKeyboardArtifact(
     }
 
     const thisRunId = ++runId.current;
-    void runCompile(baseKeyboard, thisRunId, [], false);
-  }, [transformVersion, baseKeyboard, scaffoldSpec, runCompile]);
+    void runCompile(startKeyboard, thisRunId, [], false);
+  }, [transformVersion, startKeyboard, scaffoldSpec, runCompile]);
 
   useEffect(() => {
     return () => {
@@ -1128,18 +1128,18 @@ export function useKeyboardArtifact(
   }, []);
 
   const retry = useCallback(() => {
-    if (baseKeyboard !== null) {
+    if (startKeyboard !== null) {
       const thisRunId = ++runId.current;
-      void run(baseKeyboard, thisRunId);
+      void run(startKeyboard, thisRunId);
     }
-  }, [baseKeyboard, run]);
+  }, [startKeyboard, run]);
 
   const recompile = useCallback(() => {
-    if (baseKeyboard !== null && vfsRef.current !== null) {
+    if (startKeyboard !== null && vfsRef.current !== null) {
       const thisRunId = ++runId.current;
-      void runCompile(baseKeyboard, thisRunId, [], false);
+      void runCompile(startKeyboard, thisRunId, [], false);
     }
-  }, [baseKeyboard, runCompile]);
+  }, [startKeyboard, runCompile]);
 
   return { stage, retry, recompile };
 }

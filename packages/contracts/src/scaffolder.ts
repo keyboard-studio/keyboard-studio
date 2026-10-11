@@ -1,7 +1,7 @@
 // see spec.md section 11 — project scaffolder (template-cleanup pipeline)
 
 import type { VirtualFS } from "./virtualFS";
-import type { BaseKeyboard } from "./baseKeyboard";
+import type { StartKeyboard } from "./startKeyboard";
 import type { KeyboardIR } from "./keyboard-ir";
 import type { KpsFontEntry, KpsStylesheetEntry } from "./fontEntry";
 import type { Attribution } from "./attribution";
@@ -81,7 +81,7 @@ export interface ScaffoldOptions {
    * `Copyright © SIL International`. Inventing a year here would be a fabricated
    * fact in a legal notice.
    */
-  baseHolderOverride?: string;
+  startHolderOverride?: string;
 }
 
 /**
@@ -146,7 +146,7 @@ export interface ScaffoldResult {
    * Raw text rather than the parsed block: parsing is `resolveInheritedHolders`'
    * job, and one parser shared by both paths is the point of FR-005.
    */
-  baseLicenseText?: string;
+  startLicenseText?: string;
   /**
    * The base's `source/welcome/` image files, verbatim (spec 080 FR-006,
    * research R9). Surfaced so a Track 1 copy can carry the images — and only
@@ -154,9 +154,9 @@ export interface ScaffoldResult {
    * text) is deliberately NOT surfaced here, because a copy with a new
    * identity must never inherit another keyboard's description (FR-007).
    */
-  baseWelcomeImages?: WelcomeFolderImage[];
+  startWelcomeImages?: WelcomeFolderImage[];
   /** Which welcome-page convention the base used (data-model §6). */
-  baseWelcomeConvention?: WelcomeConvention;
+  startWelcomeConvention?: WelcomeConvention;
 }
 
 /**
@@ -262,7 +262,7 @@ export interface ScaffolderService {
    * @see spec.md §14 Decision 4 (band-1 vs band-2 enforcement split)
    */
   scaffold(
-    base: BaseKeyboard,
+    base: StartKeyboard,
     keyboardId: string,
     displayName: string,
     opts?: ScaffoldOptions

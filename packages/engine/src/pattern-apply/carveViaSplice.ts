@@ -16,7 +16,7 @@
 // not something this path preserves per-line.
 //
 // Precondition (enforced by the caller, applyCarveToVfs.ts, not here): the
-// passed `baseIr`'s node source positions must correspond exactly to
+// passed `startIr`'s node source positions must correspond exactly to
 // `originalKmnText` — i.e. no other edit (store-slot content rewrite, a
 // pre-filtered mutate-seam IR) has happened between parsing this text and
 // calling this function. applyCarveToVfs.ts gates on `!opts.irRewritten` to
@@ -117,19 +117,19 @@ function mergeSpans(spans: LineSpan[]): LineSpan[] {
 }
 
 /**
- * Splice `deletedNodeIds` out of `originalKmnText`, using `baseIr`'s node
+ * Splice `deletedNodeIds` out of `originalKmnText`, using `startIr`'s node
  * positions. See file header for the full contract.
  *
- * @param originalKmnText The exact text `baseIr` was parsed from.
- * @param baseIr          Source-of-truth IR (never mutated, read-only here).
+ * @param originalKmnText The exact text `startIr` was parsed from.
+ * @param startIr          Source-of-truth IR (never mutated, read-only here).
  * @param deletedNodeIds  Set of whole-node nodeIds the author marked for deletion.
  */
 export function carveViaSplice(
   originalKmnText: string,
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
 ): CarveViaSpliceResult {
-  const cascade = resolveCarveCascade(baseIr, deletedNodeIds);
+  const cascade = resolveCarveCascade(startIr, deletedNodeIds);
   const logicalLines = joinContinuations(originalKmnText);
   const logicalLinesByStart = new Map<number, LogicalLine>(logicalLines.map((l) => [l.line, l]));
 
@@ -141,11 +141,11 @@ export function carveViaSplice(
   // deleted comment's span may coincide with its anchor rule's line, already
   // collected; the defensive mergeSpans below absorbs the overlap.
   const passes: ReadonlyArray<readonly [kind: string, items: readonly SpanSource[], deletedIds: ReadonlySet<string>]> = [
-    ["group", baseIr.groups, cascade.deletedGroupIds],
-    ["rule", baseIr.groups.flatMap((g) => g.rules), cascade.deletedRuleIds],
-    ["store", baseIr.stores, cascade.deletedStoreIds],
-    ["raw fragment", baseIr.raw, cascade.deletedRawIds],
-    ["comment", baseIr.comments, cascade.deletedCommentIds],
+    ["group", startIr.groups, cascade.deletedGroupIds],
+    ["rule", startIr.groups.flatMap((g) => g.rules), cascade.deletedRuleIds],
+    ["store", startIr.stores, cascade.deletedStoreIds],
+    ["raw fragment", startIr.raw, cascade.deletedRawIds],
+    ["comment", startIr.comments, cascade.deletedCommentIds],
   ];
   for (const [kind, items, deletedIds] of passes) {
     const failure = collectSpans(kind, items, deletedIds, logicalLinesByStart, spans);

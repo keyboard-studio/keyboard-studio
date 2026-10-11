@@ -8,7 +8,7 @@
 // Uninstall derives everything from those stamps: no extra store state.
 //
 // Scope note: the working IR is the rules step's view. The compile pipeline
-// (`projectWorkingCopyVfs`) projects from baseIr + overlays, so — exactly
+// (`projectWorkingCopyVfs`) projects from startIr + overlays, so — exactly
 // like guard-synthesis additions today — installed rules reach the compiled
 // artifact once that projection consumes working-IR additions; the engine
 // installer itself is compile-ready (IR→KMN emit) and this seam is where the

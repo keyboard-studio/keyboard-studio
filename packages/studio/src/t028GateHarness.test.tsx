@@ -98,7 +98,7 @@ import {
   type SurveyPhaseResult,
   type VirtualFS,
 } from "@keyboard-studio/contracts";
-import { makeBaseKeyboard, type BaseKeyboard } from "@keyboard-studio/contracts/fixtures";
+import { makeStartKeyboard, type StartKeyboard } from "@keyboard-studio/contracts/fixtures";
 import { SurveyView } from "./StudioShell.tsx";
 import {
   applyDecisionEffects,
@@ -127,12 +127,12 @@ import { deriveIdentityResult } from "./decisions/identitySelectors.ts";
 import { runLiveExtractionFromStores } from "./decisions/liveExtraction.ts";
 import { rebuildWorkingCopyFromStores } from "./decisions/rebuildWorkingCopy.ts";
 import {
-  instantiateFromBaseIfConfirmed,
+  instantiateFromStartIfConfirmed,
   instantiateFromExistingWithIdentitySeed,
 } from "./lib/confirmRebase.ts";
 import { decideGalleryValue } from "./steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "./lib/galleryHostDeps.ts";
-import baseKeyboardModule from "./survey/questions/gallery/baseKeyboard.ts";
+import startKeyboardModule from "./survey/questions/gallery/baseKeyboard.ts";
 import { resetInventoryDecisions } from "./survey/useInventoryDraft.ts";
 import type { CharacterInventoryValue } from "./survey/phaseBDraftOps.ts";
 import { computeConvenienceGate } from "./survey/convenience/convenienceGate.ts";
@@ -143,7 +143,7 @@ import { computeConvenienceGate } from "./survey/convenience/convenienceGate.ts"
 
 const KB_DIR = resolve(process.cwd(), "../../../keyboards/release/basic/basic_kbdfr");
 
-const basicKbdfr: BaseKeyboard = makeBaseKeyboard({
+const basicKbdfr: StartKeyboard = makeStartKeyboard({
   id: "basic_kbdfr",
   path: "release/basic/basic_kbdfr",
   script: "Latn",
@@ -155,7 +155,7 @@ const basicKbdfr: BaseKeyboard = makeBaseKeyboard({
   languages: ["fr"],
 });
 
-function loadBaseVfs(): VirtualFS {
+function loadStartVfs(): VirtualFS {
   const files: Array<{ path: string; content: string | Uint8Array; isBinary: boolean }> = [];
   const walk = (dir: string, rel: string): void => {
     for (const name of readdirSync(dir)) {
@@ -219,12 +219,12 @@ function makeLiveDeps(): ReducerDeps {
     snapshotter: inertSnapshotter(),
   });
   return {
-    instantiateFromBase: (base, opts) =>
-      useWorkingCopyStore.getState().instantiateFromBase(base, opts),
+    instantiateFromStart: (base, opts) =>
+      useWorkingCopyStore.getState().instantiateFromStart(base, opts),
     instantiateFromExisting: (base, opts) =>
       instantiateFromExistingWithIdentitySeed(base, opts),
-    instantiateFromBaseIfConfirmed: (base, opts, options) =>
-      instantiateFromBaseIfConfirmed(base, opts, options),
+    instantiateFromStartIfConfirmed: (base, opts, options) =>
+      instantiateFromStartIfConfirmed(base, opts, options),
     getWorkingIR: () => useWorkingCopyStore.getState().ir,
     setWorkingIR: (next) => useWorkingCopyStore.getState().setWorkingIR(next),
     recordDecision: recorder,
@@ -233,7 +233,7 @@ function makeLiveDeps(): ReducerDeps {
     readDecisionSet: () => getDecisionSnapshot(),
     getDecisions: () => getDecisionSnapshot(),
     getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
-    getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id,
+    getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
     getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
     applyWorkingCopyPatch: (patch, writes) => {
       const wc = useWorkingCopyStore.getState();
@@ -425,12 +425,12 @@ describe("T028 convenience-gate reproduction (union)", () => {
       useSurveySessionStore.getState().advance("choose_base");
 
       // 3. choose_base — the base-keyboard decision recorded through the real
-      // gallery host write path (BaseKeyboardRenderer's confirm path), then
+      // gallery host write path (StartKeyboardRenderer's confirm path), then
       // the track completion, then doCommit's dispatch: applyStepCompletion
       // (instantiation) + the live extraction pass, in the setup commit's
       // position (track known — spec 092's setup gate).
       decideGalleryValue(
-        baseKeyboardModule,
+        startKeyboardModule,
         { id: "basic_kbdfr", name: "French Basic" },
         { provenance: "asked" },
         "choose_base",
@@ -454,11 +454,11 @@ describe("T028 convenience-gate reproduction (union)", () => {
       // doCommit equivalent: instantiate the working copy from the real
       // corpus base (parsed + recognized with the real engine), then run
       // the extraction pass once, synchronously — StudioShell's order.
-      const vfs = loadBaseVfs();
+      const vfs = loadStartVfs();
       const kmnText = readFileSync(join(KB_DIR, "source/basic_kbdfr.kmn"), "utf-8");
       const parsed = engine.parseKmn!(kmnText, basicKbdfr.id);
       const recognized = engine.recognizePatterns!(parsed.ir);
-      useSurveySessionStore.getState().setLocalBase(basicKbdfr);
+      useSurveySessionStore.getState().setLocalStart(basicKbdfr);
       applyStepCompletion(
         "choose_base",
         {
@@ -525,7 +525,7 @@ describe("T028 convenience-gate reproduction (union)", () => {
               the session store's localBase (its :564 effect) — passing the
               real base is load-bearing: null would clear localBase and
               CharactersStep would render nothing. */}
-          <SurveyView baseKeyboard={basicKbdfr} />
+          <SurveyView startKeyboard={basicKbdfr} />
           <ActiveStepNav />
         </>,
       );

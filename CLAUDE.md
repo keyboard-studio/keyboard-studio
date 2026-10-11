@@ -334,8 +334,12 @@ so check `gh pr list --state open --json number,title,headRefName` before pickin
   for every keystroke a Keyman keyboard doesn't handle. The keyboard Track 1 starts from is the
   **copied keyboard**. The **starting point** is what the working copy was instantiated from: the
   copied keyboard in Track 1, the current released version in Track 2. Never call the copied
-  keyboard the base keyboard. The code identifiers `baseIr`, `baseVfs` and `host*` predate this
-  and are known misnomers.
+  keyboard the base keyboard. Code identifiers follow the same split: the starting-point family
+  is `start*` (`startIr`, `startVfs`, `startKeyboard`, `StartKeyboard`, `startBrowser`), and the
+  Keyman-base family is `base*` for key/layout positions on the OS layout (`baseKey`, `baseLayout`,
+  `referenceBaseLayouts`). A few persisted wire names predate the rename and are kept deliberately
+  (the decision id `base-keyboard`, the step id `choose_base`, the slot key `hostKey`, snapshot
+  readers' legacy-key fallbacks) — do not "fix" those strings.
 - Don't cite specific GitHub issue numbers inside shipped code or comments — cross-link via
   commit messages and PR bodies (spec §18).
 - **Accessibility** (spec 056): studio UI code follows the house rules in

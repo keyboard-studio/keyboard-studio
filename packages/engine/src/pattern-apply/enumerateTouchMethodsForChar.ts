@@ -123,7 +123,7 @@ export function enumerateTouchMethodsForChar(
  * identifier, not author-facing copy, so callers must fall back to a
  * localized generic rather than surfacing it (see `TouchMethodDescriptor.host`).
  */
-function hostLabel(key: TouchKeyIR): string | undefined {
+function baseLabel(key: TouchKeyIR): string | undefined {
   return key.text ?? key.output ?? unicodeKeyIdToChar(key.id);
 }
 
@@ -145,15 +145,15 @@ function collectDescriptorsForKey(
   removalSet: ReadonlySet<string>,
   out: TouchMethodDescriptor[],
 ): void {
-  const host = hostLabel(key);
-  const hostField = host !== undefined ? { host } : {};
+  const host = baseLabel(key);
+  const baseField = host !== undefined ? { host } : {};
 
   if (!isBackspaceKeyId(key.id) && keyMatchesRemovalSet(key, removalSet)) {
     const isLayerSwitch = key.nextlayer !== undefined;
     out.push({
       id: touchKeyAddress(platform, layerId, key.id),
       kind: "tap",
-      ...hostField,
+      ...baseField,
       producedChar: char,
       platform,
       layer: layerId,
@@ -169,7 +169,7 @@ function collectDescriptorsForKey(
       out.push({
         id: touchSubKeyAddress(platform, layerId, key.id, "sk", sub.id),
         kind: "longpress",
-        ...hostField,
+        ...baseField,
         producedChar: char,
         platform,
         layer: layerId,
@@ -184,7 +184,7 @@ function collectDescriptorsForKey(
       out.push({
         id: touchSubKeyAddress(platform, layerId, key.id, "multitap", sub.id),
         kind: "multitap",
-        ...hostField,
+        ...baseField,
         producedChar: char,
         platform,
         layer: layerId,
@@ -200,7 +200,7 @@ function collectDescriptorsForKey(
         out.push({
           id: touchFlickAddress(platform, layerId, key.id, direction),
           kind: "flick",
-          ...hostField,
+          ...baseField,
           producedChar: char,
           platform,
           layer: layerId,

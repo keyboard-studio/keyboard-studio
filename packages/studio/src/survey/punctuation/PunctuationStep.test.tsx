@@ -450,10 +450,10 @@ const OPAQUE: RawKmnFragment = {
   reason: "opaque test fixture",
 };
 
-function setBase(ir: ReturnType<typeof irProducing>): void {
+function setStart(ir: ReturnType<typeof irProducing>): void {
   useWorkingCopyStore.setState({
     ir,
-    baseKeyboard: {
+    startKeyboard: {
       id: "basic_kbdus",
       path: "release/b/basic_kbdus",
       script: "Latn",
@@ -476,7 +476,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
   });
 
   it("FR-006/FR-009: with complete coverage the base group is every produced punctuation char not in the CLDR group, under the base caption", async () => {
-    setBase(irProducing("ab.!?"));
+    setStart(irProducing("ab.!?"));
     mocks.inventory = hindiInventory(["\u0964", "!"]);
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
@@ -490,7 +490,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
 
   it("FR-007/FR-008: with an opaque fragment the group is the ASCII floor under the incomplete caption, and the base's real output is NOT mixed in", async () => {
     // U+061B ARABIC SEMICOLON is produced but untrustworthy: it must not appear.
-    setBase(irProducing(".\u061B", [OPAQUE]));
+    setStart(irProducing(".\u061B", [OPAQUE]));
     mocks.inventory = null;
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
@@ -508,7 +508,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
   });
 
   it("SC-003/FR-010: the two groups are disjoint, the count is the size of their union, and a char in both is rendered once under CLDR annotated as also produced by the base", async () => {
-    setBase(irProducing(".!?"));
+    setStart(irProducing(".!?"));
     mocks.inventory = hindiInventory(["\u0964", "!"]);
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
 
@@ -530,7 +530,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
   });
 
   it("FR-011: the missing-side count of the chosen punctuation is visible before Done", async () => {
-    setBase(irProducing(".!?"));
+    setStart(irProducing(".!?"));
     mocks.inventory = hindiInventory(["\u0964", "\u0965", "!"]);
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("base-punctuation-group");
@@ -547,7 +547,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
   });
 
   it("the base caption carries the always-keep note: removing here declares unsupported, but the base layout still types it", async () => {
-    setBase(irProducing(".!?"));
+    setStart(irProducing(".!?"));
     mocks.inventory = null;
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     const base = await screen.findByTestId("base-punctuation-group");
@@ -556,7 +556,7 @@ describe("PunctuationStep — the base-produced group (US2)", () => {
 
   it("FR-023: the base group is not seeded either when a phase-C inventory already exists", async () => {
     useWorkingCopyStore.getState().recordPhase({ phase: "C", answers: [], confirmedInventory: [] });
-    setBase(irProducing(".!?"));
+    setStart(irProducing(".!?"));
     mocks.inventory = null;
     render(<PunctuationStepHost onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
@@ -732,7 +732,7 @@ describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
 
 // ---------------------------------------------------------------------------
 // Spec 079 T040 (R-07, FR-022) — the FR-023 guard is scoped to the evidence the
-// inventory was confirmed on (`resolvedTag|baseId`), not "any confirmed
+// inventory was confirmed on (`resolvedTag|startId`), not "any confirmed
 // inventory". No working copy in these tests, so the base part is empty.
 // ---------------------------------------------------------------------------
 

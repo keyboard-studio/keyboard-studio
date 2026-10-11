@@ -45,9 +45,9 @@ import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 // - packages/contracts/src/copyright.ts:239 dedupeHolders — SAME-RISK is not
 //   applicable here; this IS the mechanism, not a sibling.
 // - packages/engine/src/scaffolder/index.ts:678-686 (attributionText/addHolder,
-//   fed by resolveInheritedHolders' D5 `baseHolderOverride`) — SAME-RISK.
+//   fed by resolveInheritedHolders' D5 `startHolderOverride`) — SAME-RISK.
 // - packages/studio/src/components/OutputScreen.tsx:575-595 (the D5 "Original
-//   copyright holder" free-text `<input name="baseHolder">`) — RESIDUAL-RISK:
+//   copyright holder" free-text `<input name="startHolder">`) — RESIDUAL-RISK:
 //   shown only on the license-unreadable fallback, where re-entry IS necessary
 //   (so this field's "already retained, don't re-enter" guard cannot apply). It
 //   offers no example or exact-match hint and feeds the same dedupe; if the same

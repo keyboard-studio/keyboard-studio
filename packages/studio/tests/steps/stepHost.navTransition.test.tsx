@@ -24,8 +24,8 @@ vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMoc
 // the barrel), so the shallow stubs must be registered for the files too.
 vi.mock("../../src/survey/Prefill.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("../../src/survey/PhaseB.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
-  import("../../src/test/studioShellMocks/BaseResolution.tsx"),
+vi.mock("../../src/editors/panels/StartResolution.tsx", () =>
+  import("../../src/test/studioShellMocks/StartResolution.tsx"),
 );
 vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () =>
   import("../../src/test/studioShellMocks/CarveGalleryV2.tsx"),
@@ -172,7 +172,7 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
 function Harness({ onSurvey }: { onSurvey: boolean }) {
   return (
     <>
-      {onSurvey && <SurveyView baseKeyboard={null} />}
+      {onSurvey && <SurveyView startKeyboard={null} />}
       <StudioFooter />
     </>
   );

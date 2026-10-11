@@ -39,7 +39,7 @@ const IDLE_STAGE: Stage = { kind: "idle" };
 function renderFrame(): void {
   render(
     <OSKFrame
-      baseKeyboard={null}
+      startKeyboard={null}
       oskMode="desktop"
       stage={IDLE_STAGE}
       retry={() => {}}

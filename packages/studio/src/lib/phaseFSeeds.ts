@@ -12,14 +12,14 @@
 // question's own help), and nor is anything that would need guessing about the
 // author's community or intentions.
 
-import type { BaseKeyboard, VirtualFS } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import { readVfsText } from "./vfsText.ts";
 
 /** The working-copy slices the Phase F text proposals read. */
 export interface PhaseFSeedContext {
   instantiationMode: "new-from-base" | "adapt-existing" | null;
-  baseKeyboard: BaseKeyboard | null;
-  baseVfs: VirtualFS | null;
+  startKeyboard: StartKeyboard | null;
+  startVfs: VirtualFS | null;
 }
 
 const XML_ENTITIES: Readonly<Record<string, string>> = {
@@ -56,10 +56,10 @@ export function kpsWebSite(kpsText: string | null | undefined): string | undefin
  * proposed for it.
  */
 export function proposeProjectUrl(ctx: PhaseFSeedContext): string | undefined {
-  if (ctx.instantiationMode !== "adapt-existing" || ctx.baseVfs === null) return undefined;
-  const kpsPath = ctx.baseVfs.list("source/").find((p) => p.toLowerCase().endsWith(".kps"));
+  if (ctx.instantiationMode !== "adapt-existing" || ctx.startVfs === null) return undefined;
+  const kpsPath = ctx.startVfs.list("source/").find((p) => p.toLowerCase().endsWith(".kps"));
   if (kpsPath === undefined) return undefined;
-  return kpsWebSite(readVfsText(ctx.baseVfs, kpsPath));
+  return kpsWebSite(readVfsText(ctx.startVfs, kpsPath));
 }
 
 /**
@@ -68,8 +68,8 @@ export function proposeProjectUrl(ctx: PhaseFSeedContext): string | undefined {
  * know, so nothing is proposed there.
  */
 export function proposeProvenanceBasis(ctx: PhaseFSeedContext): string | undefined {
-  if (ctx.instantiationMode !== "new-from-base" || ctx.baseKeyboard === null) return undefined;
-  const name = ctx.baseKeyboard.displayName.trim();
+  if (ctx.instantiationMode !== "new-from-base" || ctx.startKeyboard === null) return undefined;
+  const name = ctx.startKeyboard.displayName.trim();
   if (name === "") return undefined;
-  return `This keyboard started as a copy of the ${name} keyboard (${ctx.baseKeyboard.id}).`;
+  return `This keyboard started as a copy of the ${name} keyboard (${ctx.startKeyboard.id}).`;
 }

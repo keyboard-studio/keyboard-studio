@@ -145,7 +145,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -169,7 +169,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: deleted,
       assignments: [],
       getPattern: () => undefined,
@@ -197,7 +197,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["rule#0", "rule#1"]),
       assignments: [],
@@ -221,7 +221,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(["group#A"]),
       deletedItemIds: new Set(["rule#0"]),
       assignments: [],
@@ -246,7 +246,7 @@ describe("projectWorkingCopyVfs — assignments (step 2)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [assignment],
       getPattern: () => undefined,
@@ -268,7 +268,7 @@ describe("projectWorkingCopyVfs — assignments (step 2)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [physical, touch],
       getPattern: () => undefined,
@@ -287,7 +287,7 @@ describe("projectWorkingCopyVfs — assignments (step 2)", () => {
     projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makeTouchAssignment("pattern-b")], // touch only
       getPattern: () => undefined,
@@ -301,7 +301,7 @@ describe("projectWorkingCopyVfs — assignments (step 2)", () => {
     projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -316,7 +316,7 @@ describe("projectWorkingCopyVfs — assignments (step 2)", () => {
     projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makePhysicalAssignment("p")],
       getPattern: resolver,
@@ -338,7 +338,7 @@ describe("projectWorkingCopyVfs — identity (step 3)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -356,7 +356,7 @@ describe("projectWorkingCopyVfs — identity (step 3)", () => {
     projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -370,7 +370,7 @@ describe("projectWorkingCopyVfs — identity (step 3)", () => {
     projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -387,7 +387,7 @@ describe("projectWorkingCopyVfs — identity (step 3)", () => {
     const { warnings } = projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -409,7 +409,7 @@ describe("projectWorkingCopyVfs — warnings accumulation", () => {
     const { warnings } = projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makePhysicalAssignment("p")],
       getPattern: () => undefined,
@@ -424,7 +424,7 @@ describe("projectWorkingCopyVfs — warnings accumulation", () => {
     const { warnings } = projectWorkingCopyVfs({
       vfs: makeVfs(),
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -446,7 +446,7 @@ describe("projectWorkingCopyVfs — in-place mutation", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(["some-node"]),
       assignments: [],
       getPattern: () => undefined,
@@ -465,7 +465,7 @@ describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -483,7 +483,7 @@ describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -499,7 +499,7 @@ describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -519,7 +519,7 @@ describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -540,7 +540,7 @@ describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
       vfs,
       keyboardId: "sil_base",
       targetKeyboardId: "ha_sil",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -578,7 +578,7 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
       vfs,
       keyboardId: "sil_akebu",
       targetKeyboardId: "ewondo",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -611,7 +611,7 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "sil_akebu",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -636,7 +636,7 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
       vfs,
       keyboardId: "sil_akebu",
       targetKeyboardId: "ewondo",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -656,7 +656,7 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
     const result = projectWorkingCopyVfs({
       vfs,
       keyboardId: "sil_akebu",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -674,7 +674,7 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
       vfs,
       keyboardId: "sil_akebu",
       targetKeyboardId: "sil_akebu",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -712,7 +712,7 @@ group(main) using keys
       vfs,
       keyboardId: "base_kb",
       targetKeyboardId: "new_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -792,7 +792,7 @@ describe("projectWorkingCopyVfs — key edit overlay: empty overlay is a no-op",
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -815,7 +815,7 @@ describe("projectWorkingCopyVfs — key edit overlay: empty overlay is a no-op",
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -843,7 +843,7 @@ describe("projectWorkingCopyVfs — key edit overlay: ordering (step 1.7 after 1
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       // Non-empty so step 1.6 actually fires (targets a DIFFERENT key than
       // the one the set op touches, so both passes have real work to do).
@@ -875,7 +875,7 @@ describe("projectWorkingCopyVfs — key edit overlay: ordering (step 1.7 after 1
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       deletedTouchKeyIds: new Set([touchKeyAddress("phone", "default", "T_A")]),
       keyEditOps: [setOp],
@@ -913,7 +913,7 @@ describe("projectWorkingCopyVfs — key edit overlay: pass failure is reported a
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [setOp],
       assignments: [makePhysicalAssignment("p")],
@@ -944,7 +944,7 @@ describe("projectWorkingCopyVfs — key edit overlay: pass failure is reported a
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [renameOp],
       assignments: [makePhysicalAssignment("p")],
@@ -974,7 +974,7 @@ describe("projectWorkingCopyVfs — key edit overlay: rename rewrites the vkey b
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [renameOp],
       assignments: [],
@@ -1011,7 +1011,7 @@ describe("projectWorkingCopyVfs — key edit overlay: rename rewrites the vkey b
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [setOp],
       assignments: [],
@@ -1037,7 +1037,7 @@ describe("projectWorkingCopyVfs — key edit overlay: Case B fidelity (SC-006)",
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [setOp],
       assignments: [],
@@ -1122,7 +1122,7 @@ describe("projectWorkingCopyVfs — SC-008: a dead T_ key cannot reach the artif
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [
         {
@@ -1231,7 +1231,7 @@ describe("projectWorkingCopyVfs — SC-008: a dead T_ key cannot reach the artif
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: ops,
       assignments: [],
@@ -1281,7 +1281,7 @@ describe("projectWorkingCopyVfs — declared-writes containment for the key-edit
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [
         {
@@ -1425,7 +1425,7 @@ describe("projectWorkingCopyVfs — package descriptor (step 3.6)", () => {
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "basic_kbdfr",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -1451,7 +1451,7 @@ describe("projectWorkingCopyVfs — package descriptor (step 3.6)", () => {
       vfs,
       keyboardId: "basic_kbdfr",
       targetKeyboardId: "bm_sil",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -1476,7 +1476,7 @@ describe("projectWorkingCopyVfs — package descriptor (step 3.6)", () => {
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "bm_sil",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -1495,7 +1495,7 @@ describe("projectWorkingCopyVfs — package descriptor (step 3.6)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "basic_kbdfr",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
@@ -1513,7 +1513,7 @@ describe("projectWorkingCopyVfs — package descriptor (step 3.6)", () => {
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "basic_kbdfr",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [],
       getPattern: () => undefined,

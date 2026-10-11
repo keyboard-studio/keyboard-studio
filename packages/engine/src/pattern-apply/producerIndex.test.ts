@@ -36,7 +36,7 @@ function makeGroup(rules: IRRule[]): IRGroup {
 }
 
 /** `+ [K_X] > 'ch'` — a whole-rule single-char producer. */
-function makeBaseRule(nodeId: string, vkey: string, ch: string): IRRule {
+function makeStartRule(nodeId: string, vkey: string, ch: string): IRRule {
   return vkeyRule({ nodeId, vkey, output: ch });
 }
 
@@ -59,7 +59,7 @@ function makeCameroonIr(): KeyboardIR {
   return makeTestIR(
     [
       makeGroup([
-        makeBaseRule("rule#i", "K_I", "i"),
+        makeStartRule("rule#i", "K_I", "i"),
         makeFanOutRule("rule#fanout", 0x0060, "dkf0060", "dkt0060"),
       ]),
     ],
@@ -73,7 +73,7 @@ function makeCameroonIr(): KeyboardIR {
 
 describe("buildProducerIndex", () => {
   it("counts a base rule whose entire output is one character", () => {
-    const ir = makeTestIR([makeGroup([makeBaseRule("rule#i", "K_I", "i")])], []);
+    const ir = makeTestIR([makeGroup([makeStartRule("rule#i", "K_I", "i")])], []);
     expect(buildProducerIndex(ir).get("i")).toBe(1);
   });
 

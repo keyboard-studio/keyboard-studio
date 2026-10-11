@@ -5,7 +5,7 @@ import {
   parseLinguistJson,
   cldrCrossCheck,
 } from "./CharacterDiscoveryServiceImpl.js";
-import type { BaseKeyboard, InventoryFlag } from "@keyboard-studio/contracts";
+import type { StartKeyboard, InventoryFlag } from "@keyboard-studio/contracts";
 
 const noopCompleter = async () => { throw new Error("not called"); };
 
@@ -19,9 +19,9 @@ const frLoader = async (locale: string): Promise<string | null> =>
 const frService = createCharacterDiscoveryService(frLoader, noopCompleter);
 const nullService = createCharacterDiscoveryService(nullLoader, noopCompleter);
 
-// Minimal BaseKeyboard fixture (harvestFromText uses only the ASCII proxy, not
+// Minimal StartKeyboard fixture (harvestFromText uses only the ASCII proxy, not
 // any field from base, so the exact values here do not matter)
-const baseKb: BaseKeyboard = {
+const baseKb: StartKeyboard = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",
@@ -31,7 +31,7 @@ const baseKb: BaseKeyboard = {
 };
 
 describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
-  const unknownBase: BaseKeyboard = {
+  const unknownStart: StartKeyboard = {
     id: "unknown_kb",
     path: "release/u/unknown_kb",
     script: "Zzzz",
@@ -90,12 +90,12 @@ describe("CharacterDiscoveryServiceImpl.pickerCandidates", () => {
   });
 
   it("unknown script + null CLDR loader → returns []", async () => {
-    const result = await nullService.pickerCandidates(unknownBase);
+    const result = await nullService.pickerCandidates(unknownStart);
     expect(result).toEqual([]);
   });
 
   it("bcp47 provided but CLDR null + unknown script → returns []", async () => {
-    const result = await nullService.pickerCandidates(unknownBase, "zzzz");
+    const result = await nullService.pickerCandidates(unknownStart, "zzzz");
     expect(result).toEqual([]);
   });
 });

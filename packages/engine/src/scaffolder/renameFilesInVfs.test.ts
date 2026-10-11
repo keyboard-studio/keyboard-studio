@@ -98,7 +98,7 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       renameFilesInVfs(vfs, "base_id", "my_keyboard");
 
       const out = vfs.get("source/my_keyboard.kps")!.content as string;
-      // base_id_extra is a different token; must not be rewritten to my_keyboard_extra
+      // start_id_extra is a different token; must not be rewritten to my_keyboard_extra
       expect(out).toContain("source/base_id_extra.kmn");
     });
   });
@@ -139,7 +139,7 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       vfs.set("source/welcome/welcome.htm", "<html>welcome</html>");
       vfs.set("source/help/kb.css", ".help { padding: 4px; }");
       renameFilesInVfs(vfs, "base_id", "my_keyboard");
-      // Untouched: paths that don't match `source/<baseId>.<ext>`.
+      // Untouched: paths that don't match `source/<startId>.<ext>`.
       const welcomeHtm = vfs.get("source/welcome/welcome.htm");
       expect(welcomeHtm).not.toBeUndefined();
       expect(welcomeHtm?.content).toBe("<html>welcome</html>");
@@ -150,7 +150,7 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
   });
 
   describe("root-level .kpj rename (compiler-flags survival)", () => {
-    // A .kpj lives at the VFS root as `<baseId>.kpj`, not under source/.
+    // A .kpj lives at the VFS root as `<startId>.kpj`, not under source/.
     // compile() reads it as `<keyboardId>.kpj`; if it isn't renamed the flags
     // are silently dropped to defaults. These pin the rename + scoped rewrite.
     const KPJ = (id: string) =>
@@ -230,7 +230,7 @@ describe("renameFilesInVfs — scoped content rewriting", () => {
       renameFilesInVfs(vfs, "base_id", "my_keyboard");
       const out = vfs.get("my_keyboard.kpj")!.content as string;
       expect(out).toContain("<Filename>my_keyboard.kmn</Filename>");
-      // `base_id_extra` must NOT become `my_keyboard_extra` (word-boundary).
+      // `start_id_extra` must NOT become `my_keyboard_extra` (word-boundary).
       expect(out).toContain("<Filepath>source\\base_id_extra.kmn</Filepath>");
     });
 

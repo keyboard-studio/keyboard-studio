@@ -18,7 +18,7 @@
  * HANDOFF G7 starting-point item is a known open residue (see
  * specs/090-gallery-decision-modules/followups.md): the completion
  * recorder fires before the working copy is instantiated, so
- * recordBaseContribution returns null on this walk too. Asserting its
+ * recordStartContribution returns null on this walk too. Asserting its
  * presence here would fail for a reason owned by the 088/092 boundary,
  * not by 090.
  *
@@ -35,7 +35,7 @@ import * as fs from "node:fs";
 import {
   seedReturningVisitor,
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseTrackCopy,
   driveAttributionStep,
   acceptProjectName,
@@ -92,7 +92,7 @@ test("spec 090 SC-003: full walk leaves exactly one live log entry per decision"
   await page.goto("/");
 
   await driveIdentityLite(page, { languageCode: "fr" });
-  await pickBaseKeyboard(page, "basic_kbdfr");
+  await pickStartKeyboard(page, "basic_kbdfr");
   await chooseTrackCopy(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);

@@ -31,7 +31,7 @@
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setLocalBase",
+      "setLocalStart",
       "record",
       "advance"
     ],

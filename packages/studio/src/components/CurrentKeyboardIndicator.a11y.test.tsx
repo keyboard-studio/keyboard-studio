@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { render } from "../test/renderWithI18n.tsx";
-import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { CurrentKeyboardIndicator } from "./CurrentKeyboardIndicator.tsx";
 import { navigateTo } from "../lib/navigate.ts";
@@ -49,7 +49,7 @@ function makeMinimalIr(): KeyboardIR {
 }
 
 function seedCurrent(): void {
-  const base = makeBaseKeyboard({
+  const base = makeStartKeyboard({
     id: "current-kbd",
     path: "release/current-kbd",
     script: "Latn",
@@ -59,7 +59,7 @@ function seedCurrent(): void {
   });
   useWorkingCopyStore
     .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
+    .instantiateFromStart(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
 }
 
 beforeEach(() => {

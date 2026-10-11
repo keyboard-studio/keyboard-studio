@@ -36,21 +36,21 @@ export interface ResolvedCarveCascade {
 }
 
 /**
- * Resolve `deletedNodeIds` against `baseIr` into the leaf-level id sets the
+ * Resolve `deletedNodeIds` against `startIr` into the leaf-level id sets the
  * deletion actually touches, applying the group→rules, group→fragments, and
  * node→anchored-comments cascades.
  *
- * @param baseIr         Source-of-truth IR (never mutated, never read after return).
+ * @param startIr         Source-of-truth IR (never mutated, never read after return).
  * @param deletedNodeIds Set of whole-node nodeIds the author marked for deletion.
  */
 export function resolveCarveCascade(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
 ): ResolvedCarveCascade {
   const deletedGroupIds = new Set<string>();
   const deletedRuleIds = new Set<string>();
 
-  for (const g of baseIr.groups) {
+  for (const g of startIr.groups) {
     if (deletedNodeIds.has(g.nodeId)) {
       deletedGroupIds.add(g.nodeId);
       for (const r of g.rules) deletedRuleIds.add(r.nodeId);
@@ -62,10 +62,10 @@ export function resolveCarveCascade(
   }
 
   const deletedStoreIds = new Set<string>(
-    baseIr.stores.filter((s) => deletedNodeIds.has(s.nodeId)).map((s) => s.nodeId),
+    startIr.stores.filter((s) => deletedNodeIds.has(s.nodeId)).map((s) => s.nodeId),
   );
   const deletedRawIds = new Set<string>(
-    baseIr.raw
+    startIr.raw
       .filter(
         (f) =>
           deletedNodeIds.has(f.nodeId) ||
@@ -81,7 +81,7 @@ export function resolveCarveCascade(
     ...deletedRawIds,
   ]);
   const deletedCommentIds = new Set<string>(
-    baseIr.comments
+    startIr.comments
       .filter((c) => c.anchorRef !== undefined && deletedLeafIds.has(c.anchorRef.nodeId))
       .map((c) => c.nodeId),
   );

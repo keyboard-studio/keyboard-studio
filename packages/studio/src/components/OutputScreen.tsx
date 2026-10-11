@@ -49,7 +49,7 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer.ts";
-import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
+import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
 import { TrackOneIdentityPanel } from "../editors/panels/TrackOneIdentityPanel.tsx";
@@ -98,7 +98,7 @@ export function OutputScreen() {
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
 
   const {
-    baseKeyboard,
+    startKeyboard,
     canDownload,
     downloading,
     downloadError,
@@ -113,7 +113,7 @@ export function OutputScreen() {
     // spec 064: the two attribution hard-blocks and the D5 escape hatch.
     attributionMissing,
     licenseUnparseable,
-    resolveBaseHolder,
+    resolveStartHolder,
   } = artifact;
 
   // Identity prefill for the Option B submit form. Read from whichever auth
@@ -197,13 +197,13 @@ export function OutputScreen() {
 
   // "Change starting keyboard" — relocates re-basing to the survey's choose_base
   // step rather than mutating the working copy from the ship-it screen. A BACK
-  // action (see backToChooseBase's docstring for why an advance() would corrupt
+  // action (see backToChooseStart's docstring for why an advance() would corrupt
   // the history stack), and it deliberately mutates nothing itself: the rebase
   // question is answered at the destination by the existing confirmRebaseTo
   // gate, which also no-ops when the author re-picks the same base.
-  const sessionBackToChooseBase = useSurveySessionStore((s) => s.backToChooseBase);
-  const handleChangeBase = () => {
-    sessionBackToChooseBase();
+  const sessionBackToChooseStart = useSurveySessionStore((s) => s.backToChooseStart);
+  const handleChangeStart = () => {
+    sessionBackToChooseStart();
     navigateTo("survey");
   };
 
@@ -229,7 +229,7 @@ export function OutputScreen() {
   // here, it announced the BASE id ("Download keyboard us as zip") while the file
   // that landed was "dagbanli-<version>.zip" — WCAG 2.2 AA 2.5.3 / 4.1.2. Do not
   // reintroduce a second derivation of this id; extend the shared helper.
-  const downloadKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
+  const downloadKeyboardId = resolveOutputKeyboardId(identity, startKeyboard);
   const downloadAriaLabel = touchStale
     ? t({
         id: "output.download.aria.touchStale",
@@ -294,7 +294,7 @@ export function OutputScreen() {
           <button
             type="button"
             data-testid="output-change-base"
-            onClick={handleChangeBase}
+            onClick={handleChangeStart}
             // The left pane owns this treatment even though the slot content is
             // authored here — see PANE_SECONDARY_BUTTON in previewOutputLayout.
             style={{ ...PANE_SECONDARY_BUTTON, alignSelf: "flex-start" }}
@@ -306,13 +306,13 @@ export function OutputScreen() {
         leftPct={leftPct}
         dividerWidth={DIVIDER_WIDTH}
         pickerSlot={
-          <BaseKeyboardPicker
-            value={artifact.baseKeyboard}
-            onChange={artifact.handleBaseKeyboardChange}
+          <StartKeyboardPicker
+            value={artifact.startKeyboard}
+            onChange={artifact.handleStartKeyboardChange}
           />
         }
         scaffoldFormSlot={
-          artifact.pickerMode === "scaffold" && artifact.baseKeyboard !== null ? (
+          artifact.pickerMode === "scaffold" && artifact.startKeyboard !== null ? (
             <ScaffoldForm onSubmit={(spec) => { artifact.setScaffoldSpec(spec); }} />
           ) : null
         }
@@ -383,7 +383,7 @@ export function OutputScreen() {
             <Trans id="output.heading">Output</Trans>
           </h2>
         )}
-        {baseKeyboard !== null && (
+        {startKeyboard !== null && (
           <>
             {/* PRIMARY download: the installable package. A user double-clicks
                 this and the keyboard installs on Keyman for Windows, macOS,
@@ -604,14 +604,14 @@ export function OutputScreen() {
                   onSubmit={(e) => {
                     e.preventDefault();
                     const input = e.currentTarget.elements.namedItem(
-                      "baseHolder",
+                      "startHolder",
                     ) as HTMLInputElement | null;
-                    if (input !== null) resolveBaseHolder(input.value);
+                    if (input !== null) resolveStartHolder(input.value);
                   }}
                   style={{ display: "flex", gap: 6, alignItems: "center" }}
                 >
                   <input
-                    name="baseHolder"
+                    name="startHolder"
                     type="text"
                     aria-label={t({
                       id: "output.status.licenseUnreadable.holderLabel",

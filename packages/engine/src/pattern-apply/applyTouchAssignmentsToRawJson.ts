@@ -36,12 +36,12 @@
  *     `sp`" — real keys carry `sp:0`/`1`/`2`) rather than the desktop vkey
  *     id, because Keyman only assigns a real id to a layer slot once
  *     something is bound to it. Layer row/key arrays are strictly positional
- *     and same-length across sibling layers, so when `hostKey` misses the
+ *     and same-length across sibling layers, so when `baseKey` misses the
  *     target layer's id-keyed lookup, resolve its (rowIndex, keyIndex) from
  *     that platform's `"default"` layer and re-check the SAME position on
  *     the target layer. If that slot is a blank placeholder, promote it in
  *     place before applying the mechanism, rather than warning and dropping
- *     the assignment: set its `id` to `hostKey`; clear its spacer `sp` only
+ *     the assignment: set its `id` to `baseKey`; clear its spacer `sp` only
  *     (`width`/`pad`, if present, are load-bearing for row alignment and
  *     survive untouched); copy `nextlayer` VERBATIM (including its absence)
  *     from the target layer's first existing live key — scanned starting at
@@ -173,7 +173,7 @@ export function applyTouchAssignmentsToRawJson(
         patternId === "multitap" ||
         patternId === "touch_key_replace"
       ) {
-        const hostKey = slotValues?.["hostKey"] ?? "";
+        const baseKey = slotValues?.["hostKey"] ?? "";
         const char = slotValues?.["char"] ?? "";
         const layerId = resolveTouchLayerId(slotValues);
 
@@ -184,31 +184,31 @@ export function applyTouchAssignmentsToRawJson(
         const matchedPlatforms: string[] = [];
         for (const [pName, layerMaps] of platformLayerKeyMaps) {
           const targetMap = layerMaps.get(layerId);
-          if (targetMap?.has(hostKey)) {
+          if (targetMap?.has(baseKey)) {
             matchedPlatforms.push(pName);
             continue;
           }
 
           // Positional fallback: an id-based miss on a KNOWN target layer
           // (targetMap exists — the layer id itself is real) may still be
-          // resolvable by position. Resolve hostKey's (rowIndex, keyIndex) in
+          // resolvable by position. Resolve baseKey's (rowIndex, keyIndex) in
           // this platform's "default" layer, then check the SAME position on
           // the target layer for a blank placeholder to promote in place.
           if (targetMap) {
             const rowsMap = platformLayerRows.get(pName);
             const defaultRows = rowsMap?.get(DEFAULT_TOUCH_LAYER);
             const targetRows = rowsMap?.get(layerId);
-            const position = defaultRows ? findKeyPosition(defaultRows, hostKey) : undefined;
+            const position = defaultRows ? findKeyPosition(defaultRows, baseKey) : undefined;
             const candidate =
               position && targetRows ? getKeyAtPosition(targetRows, position) : undefined;
             if (candidate && isBlankPlaceholder(candidate)) {
-              candidate.id = hostKey;
+              candidate.id = baseKey;
               // Clear the spacer style only — width/pad (when the blank slot
               // carries them) are load-bearing for row alignment and must
               // survive promotion untouched.
               delete candidate["sp"];
               assignPromotedNextLayer(candidate, targetRows!, position!.rowIndex);
-              targetMap.set(hostKey, candidate);
+              targetMap.set(baseKey, candidate);
               matchedPlatforms.push(pName);
               promotedKeys.add(candidate);
             }
@@ -218,14 +218,14 @@ export function applyTouchAssignmentsToRawJson(
         // Warn only when the key is found in NO platform's target layer.
         if (matchedPlatforms.length === 0) {
           warnings.push(
-            `[touch-apply-raw] host key "${hostKey}" not found in any platform's "${layerId}" layer — assignment for "${char}" skipped`,
+            `[touch-apply-raw] host key "${baseKey}" not found in any platform's "${layerId}" layer — assignment for "${char}" skipped`,
           );
           continue;
         }
 
         // Apply to each matched platform.
         for (const pName of matchedPlatforms) {
-          const key = platformLayerKeyMaps.get(pName)!.get(layerId)!.get(hostKey)!;
+          const key = platformLayerKeyMaps.get(pName)!.get(layerId)!.get(baseKey)!;
 
           if (patternId === "longpress_alternates") {
             applyLongpress(key, char, pName, platformsGainingSk);
@@ -244,7 +244,7 @@ export function applyTouchAssignmentsToRawJson(
           // don't, so borrow the DEFAULT-layer key's text at the same host
           // key if it's still empty (else the promoted key renders invisible).
           if (promotedKeys.has(key)) {
-            borrowBaseTextIfEmpty(key, hostKey, platformLayerKeyMaps.get(pName)!);
+            borrowBaseTextIfEmpty(key, baseKey, platformLayerKeyMaps.get(pName)!);
           }
         }
         continue;
@@ -373,7 +373,7 @@ function assignPromotedNextLayer(
 }
 
 /**
- * Borrow the DEFAULT-layer key's base `text` (at the same `hostKey`) for a
+ * Borrow the DEFAULT-layer key's base `text` (at the same `baseKey`) for a
  * promoted-from-blank candidate whose base `text` is still empty after its
  * mechanism ran. `touch_key_replace` sets `text` itself; `longpress`/
  * `flick`/`multitap` do not, so without this a longpress-only promotion would
@@ -381,11 +381,11 @@ function assignPromotedNextLayer(
  */
 function borrowBaseTextIfEmpty(
   key: RawKey,
-  hostKey: string,
+  baseKey: string,
   layerKeyMaps: Map<string, Map<string, RawKey>>,
 ): void {
   if (!isEmptyText(key.text)) return;
-  const defaultKey = layerKeyMaps.get(DEFAULT_TOUCH_LAYER)?.get(hostKey);
+  const defaultKey = layerKeyMaps.get(DEFAULT_TOUCH_LAYER)?.get(baseKey);
   // `typeof` (not `isEmptyText`) narrows `defaultKey.text` from `string |
   // undefined` to `string` for the assignment below.
   if (defaultKey && typeof defaultKey.text === "string" && defaultKey.text.trim() !== "") {

@@ -8,7 +8,7 @@
 // the compile pipeline's bookkeeping into the shell; publishing the finished
 // handler into a store instead keeps it where it belongs.
 //
-// Same store-bridge pattern as basePreviewStatusStore: one writer (SurveyView,
+// Same store-bridge pattern as startPreviewStatusStore: one writer (SurveyView,
 // on mount/unmount), one reader (NavBar). Because SurveyView only mounts on
 // the #survey route, `handler === null` is exactly "not on the survey", which
 // is what gates the control's visibility — no second route check needed.

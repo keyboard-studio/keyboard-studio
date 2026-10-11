@@ -38,20 +38,20 @@ function alphabet(overrides: Partial<ConfirmedAlphabet> = {}): ConfirmedAlphabet
 
 describe("alphabetKey", () => {
   it("is deterministic for the same inputs", () => {
-    const e = { bcp47: "fr", script: "Latn", variant: "x", baseId: "kbdfr" };
+    const e = { bcp47: "fr", script: "Latn", variant: "x", startId: "kbdfr" };
     expect(alphabetKey(e)).toBe(alphabetKey({ ...e }));
   });
 
   it("changes when any field differs", () => {
-    const base = alphabetKey({ bcp47: "fr", script: "Latn", variant: null, baseId: "kbdfr" });
-    expect(alphabetKey({ bcp47: "en", script: "Latn", variant: null, baseId: "kbdfr" })).not.toBe(base);
-    expect(alphabetKey({ bcp47: "fr", script: "Cyrl", variant: null, baseId: "kbdfr" })).not.toBe(base);
-    expect(alphabetKey({ bcp47: "fr", script: "Latn", variant: "1996", baseId: "kbdfr" })).not.toBe(base);
-    expect(alphabetKey({ bcp47: "fr", script: "Latn", variant: null, baseId: "other" })).not.toBe(base);
+    const base = alphabetKey({ bcp47: "fr", script: "Latn", variant: null, startId: "kbdfr" });
+    expect(alphabetKey({ bcp47: "en", script: "Latn", variant: null, startId: "kbdfr" })).not.toBe(base);
+    expect(alphabetKey({ bcp47: "fr", script: "Cyrl", variant: null, startId: "kbdfr" })).not.toBe(base);
+    expect(alphabetKey({ bcp47: "fr", script: "Latn", variant: "1996", startId: "kbdfr" })).not.toBe(base);
+    expect(alphabetKey({ bcp47: "fr", script: "Latn", variant: null, startId: "other" })).not.toBe(base);
   });
 
   it("treats undefined and null the same for a missing field", () => {
-    expect(alphabetKey({ bcp47: "fr" })).toBe(alphabetKey({ bcp47: "fr", script: null, variant: null, baseId: null }));
+    expect(alphabetKey({ bcp47: "fr" })).toBe(alphabetKey({ bcp47: "fr", script: null, variant: null, startId: null }));
   });
 });
 
@@ -83,18 +83,18 @@ describe("marksAttachmentKey", () => {
   });
 
   it("changes when the base is ADDED to the alphabet", () => {
-    const withoutBase = alphabet({ bases: ["b"] });
-    const withBase = alphabet({ bases: ["a", "b"] });
-    expect(marksAttachmentKey(withoutBase, "́", "a")).not.toBe(
-      marksAttachmentKey(withBase, "́", "a"),
+    const withoutStart = alphabet({ bases: ["b"] });
+    const withStart = alphabet({ bases: ["a", "b"] });
+    expect(marksAttachmentKey(withoutStart, "́", "a")).not.toBe(
+      marksAttachmentKey(withStart, "́", "a"),
     );
   });
 
   it("changes when the base is REMOVED from the alphabet", () => {
-    const withBase = alphabet({ bases: ["a", "b"] });
-    const withoutBase = alphabet({ bases: ["b"] });
-    expect(marksAttachmentKey(withBase, "́", "a")).not.toBe(
-      marksAttachmentKey(withoutBase, "́", "a"),
+    const withStart = alphabet({ bases: ["a", "b"] });
+    const withoutStart = alphabet({ bases: ["b"] });
+    expect(marksAttachmentKey(withStart, "́", "a")).not.toBe(
+      marksAttachmentKey(withoutStart, "́", "a"),
     );
   });
 

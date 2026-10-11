@@ -12,7 +12,7 @@ import type { SavedAnswer } from "./answerTypes.ts";
 function harness(opts: {
   decisions?: DecisionSet;
   saved?: Record<string, SavedAnswer>;
-  baseId?: string;
+  startId?: string;
 }): { deps: ReducerDeps; written: Decision[] } {
   const written: Decision[] = [];
   const deps = {
@@ -21,7 +21,7 @@ function harness(opts: {
     },
     readDecisionSet: () => opts.decisions ?? {},
     getSavedAnswer: (stepId: string, questionId: string) => opts.saved?.[`${stepId}/${questionId}`],
-    getBaseKeyboardId: () => opts.baseId,
+    getStartKeyboardId: () => opts.startId,
   } as ReducerDeps;
   return { deps, written };
 }
@@ -83,7 +83,7 @@ describe("recordAnswersAsDecisions (spec 088 C-2)", () => {
   it("provenance: proposal accepted with source \"base\" → extracted, source = the starting-point keyboard", () => {
     const { deps, written } = harness({
       saved: { "identity/il_language_code": savedAnswer("fr", { value: "fr", source: "base" }) },
-      baseId: "basic_kbdfr",
+      startId: "basic_kbdfr",
     });
     recordAnswersAsDecisions(
       result([{ questionId: "il_language_code", answerType: "text", value: "fr" }]),

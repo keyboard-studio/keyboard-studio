@@ -46,7 +46,7 @@ installTouchGalleryHooks();
 // like every other integration suite in this file, and reuse this file's own
 // conventions rather than building a second harness (a divergent setup path
 // in the same file is a defect the task briefing itself calls out):
-//   - `useWorkingCopyStore.getState().instantiateFromBase/recordPhase/
+//   - `useWorkingCopyStore.getState().instantiateFromStart/recordPhase/
 //     markGalleryIntroSeen` — the same store-seeding calls `seedStore`/
 //     `seedKeyModeFixture` above already use.
 //   - recording the `touch-seed-source` decision in the decision store —
@@ -166,7 +166,7 @@ function seedKeyModeParityFixture() {
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
   const ir = makeTestIR([]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],

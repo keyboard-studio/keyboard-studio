@@ -10,7 +10,7 @@
 // (plan §"Completing the vocabulary"): as the corpus grows, more decisions
 // stabilize into defaults and fewer need to be asked.
 
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
 import type { Decision, DecisionId } from "./decisionTypes.ts";
 import { deepEqual } from "./deepEqual.ts";
@@ -23,7 +23,7 @@ export interface CorpusSample {
   /** IR from the real codec. */
   ir: KeyboardIR;
   /** Catalog metadata; null for non-catalog imports. */
-  catalog: BaseKeyboard | null;
+  catalog: StartKeyboard | null;
 }
 
 /** Per-decision variance observed across the sample. */

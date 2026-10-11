@@ -62,7 +62,7 @@
 import type {
   KeyboardIR,
   IRGroup,
-  BaseKeyboard,
+  StartKeyboard,
   VirtualFS,
   SurveyPhaseResult,
   SurveyAnswer,
@@ -74,7 +74,7 @@ import {
   makeConfirmedAlphabet,
   nonAlphabetConfirmedInventory,
 } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus, makeBaseKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
+import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
 import { selectStrategy, deriveCarveNeededSet } from "@keyboard-studio/engine";
 import { computeConvenienceGate } from "./convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
@@ -82,7 +82,7 @@ import { manifest } from "../steps/manifest.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import {
   applyStepCompletion,
-  CHOOSE_BASE_STEP_ID,
+  CHOOSE_START_STEP_ID,
   type ReducerDeps,
   type InstantiateResult,
 } from "../steps/reducer.ts";
@@ -168,18 +168,18 @@ function deriveConvenienceGateInputs(): { produced: Set<string>; neededSet: Set<
 
 // ---------------------------------------------------------------------------
 // Base-keyboard fixtures for the "choose_base" step (T008/T009's persona
-// source_keyboard field). basic_kbdus reuses the real BaseKeyboard fixture
+// source_keyboard field). basic_kbdus reuses the real StartKeyboard fixture
 // (@keyboard-studio/contracts/fixtures); bj_cree_woods carries the REAL
 // identity from docs/keyboard-index.md row 41 (id/path/languages) but a
 // representative SYNTHETIC IR built with makeTestIR — the same convention
 // packages/studio's other headless tests use throughout (e.g.
-// hooks/useInventoryDiff.test.ts's seedBaseWithChars) — rather than invoking
+// hooks/useInventoryDiff.test.ts's seedStartWithChars) — rather than invoking
 // the engine codec against the ../keyboards checkout, which FR-014 rules out
 // as bulk-corpus work and which this single-fixture harness has no need for.
 // ---------------------------------------------------------------------------
 
-interface BaseFixture {
-  base: BaseKeyboard;
+interface StartFixture {
+  base: StartKeyboard;
   vfs: VirtualFS;
   ir: KeyboardIR;
 }
@@ -188,7 +188,7 @@ interface BaseFixture {
  * A synthetic IR group producing every basic-Latin letter, both cases — one
  * rule per output char, built with `@keyboard-studio/contracts/fixtures`'s
  * own `irGroup`/`charRule` builders (the same ones `useInventoryDiff.test.ts`'s
- * `seedBaseWithChars` convention is built from). Gives `buildProducedSet` a
+ * `seedStartWithChars` convention is built from). Gives `buildProducedSet` a
  * real a-z/A-Z produced set for `basic_kbdus`, the signal the convenience
  * gate's surplus computation needs (see the module header) — an EMPTY IR,
  * this fixture's shape before the convenience gate needed exercising,
@@ -200,14 +200,14 @@ function basicLatinIRGroup(): IRGroup {
   return irGroup({ rules: chars.map((char) => charRule({ context: char, output: char })) });
 }
 
-const BASE_FIXTURES: Readonly<Record<string, BaseFixture>> = {
+const BASE_FIXTURES: Readonly<Record<string, StartFixture>> = {
   basic_kbdus: {
     base: basicKbdus,
     vfs: createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c basic_kbdus\n", isBinary: false }]),
     ir: makeTestIR([basicLatinIRGroup()]),
   },
   bj_cree_woods: {
-    base: makeBaseKeyboard({
+    base: makeStartKeyboard({
       id: "bj_cree_woods",
       path: "release/bj/bj_cree_woods",
       script: "Cans",
@@ -230,7 +230,7 @@ const BASE_FIXTURES: Readonly<Record<string, BaseFixture>> = {
   },
 };
 
-function resolveBaseFixture(id: string): BaseFixture {
+function resolveStartFixture(id: string): StartFixture {
   const known = BASE_FIXTURES[id];
   if (known === undefined) {
     throw new Error(
@@ -444,23 +444,23 @@ function collectEditorActionEvents(
 
 function buildReplayReducerDeps(): ReducerDeps {
   return {
-    instantiateFromBase: (base, opts) => useWorkingCopyStore.getState().instantiateFromBase(base, opts),
+    instantiateFromStart: (base, opts) => useWorkingCopyStore.getState().instantiateFromStart(base, opts),
     instantiateFromExisting: (base, opts) =>
       // The live dep is the identity-seeded wrapper (the adapt identity must
       // carry the author's composed tag + language name from the moment of
       // instantiation); the replay harness wires the same composition so a
       // replayed adapt journey produces the identity the live walk would.
       instantiateFromExistingWithIdentitySeed(base, opts),
-    instantiateFromBaseIfConfirmed: (base, opts) => {
+    instantiateFromStartIfConfirmed: (base, opts) => {
       // The real dep's declared signature allows a null vfs/ir (the pre-parse
       // state a real base resolution can transiently be in); this harness
-      // only ever calls it with the already-parsed BaseFixture, so vfs/ir are
+      // only ever calls it with the already-parsed StartFixture, so vfs/ir are
       // always non-null in practice — guarded here rather than widening
-      // instantiateFromBase's own (correctly strict) signature.
+      // instantiateFromStart's own (correctly strict) signature.
       if (opts.vfs === null || opts.ir === null) {
         throw new Error("journey-runner: instantiateFromBaseIfConfirmed called with a null vfs/ir");
       }
-      useWorkingCopyStore.getState().instantiateFromBase(base, {
+      useWorkingCopyStore.getState().instantiateFromStart(base, {
         vfs: opts.vfs,
         ir: opts.ir,
         ...(opts.removalCapabilities !== undefined ? { removalCapabilities: opts.removalCapabilities } : {}),
@@ -524,7 +524,7 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
     fixture.persona.routing_group !== undefined
       ? { routing_group: fixture.persona.routing_group }
       : {};
-  let pendingBase: BaseFixture | null = null;
+  let pendingStart: StartFixture | null = null;
 
   const groups = groupContiguousByStep(fixture.events);
   let groupCursor = 0;
@@ -559,8 +559,8 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
 
         case "choose_base": {
           const answers = answerMapFromGroup(group, "choose_base");
-          const baseId = requireStringAnswer(answers, "base_keyboard_id", "choose_base");
-          pendingBase = resolveBaseFixture(baseId);
+          const startId = requireStringAnswer(answers, "base_keyboard_id", "choose_base");
+          pendingStart = resolveStartFixture(startId);
           result = undefined;
           break;
         }
@@ -578,16 +578,16 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           // R3 (steps/reducer.ts): the real onInstantiate callback fires once
           // track is known — mirrored here rather than at "choose_base"
           // itself, matching reducer.ts's own comment on where this fires today.
-          if (pendingBase === null) {
+          if (pendingStart === null) {
             throw new Error(`journey-runner: "track" completed with no base chosen at "choose_base"`);
           }
           const instantiateResult: InstantiateResult = {
-            base: pendingBase.base,
-            vfs: pendingBase.vfs,
-            ir: pendingBase.ir,
+            base: pendingStart.base,
+            vfs: pendingStart.vfs,
+            ir: pendingStart.ir,
             track: trackValue,
           };
-          applyStepCompletion(CHOOSE_BASE_STEP_ID, instantiateResult, deps);
+          applyStepCompletion(CHOOSE_START_STEP_ID, instantiateResult, deps);
           result = phaseResult;
           break;
         }
@@ -809,8 +809,8 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           collectEditorActionEvents(group, "touch_edit");
           const touchResult: TouchCompleteResult = {
             assignments: [],
-            baseIr: useWorkingCopyStore.getState().ir,
-            baseVfs: pendingBase?.vfs ?? null,
+            startIr: useWorkingCopyStore.getState().ir,
+            startVfs: pendingStart?.vfs ?? null,
             seedSource: touchSeedSource,
           };
           // Spec 090 T042: R2 re-homed from the reducer to

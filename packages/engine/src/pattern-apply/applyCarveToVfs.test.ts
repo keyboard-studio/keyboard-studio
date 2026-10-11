@@ -6,7 +6,7 @@
 //   3. Deleted rule node: only that rule removed; group header survives.
 //   4. Deleted store node: store removed from emitted .kmn.
 //   5. Deleted raw fragment: fragment removed from emitted .kmn.
-//   6. baseIr is NOT mutated.
+//   6. startIr is NOT mutated.
 //   7. Warning produced when emit fails (invalid IR).
 
 import { describe, it, expect, vi } from "vitest";
@@ -93,7 +93,7 @@ describe("applyCarveToVfs — deletes a group", () => {
 
     applyCarveToVfs(vfs, "test", ir, new Set(["group#B"]));
 
-    // baseIr groups array is unchanged.
+    // startIr groups array is unchanged.
     expect(ir.groups.length).toBe(originalGroupCount);
     expect(ir.groups[1]?.nodeId).toBe("group#B");
   });
@@ -131,7 +131,7 @@ describe("applyCarveToVfs — deletes a rule", () => {
 
     applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
 
-    // baseIr's group still has both rules.
+    // startIr's group still has both rules.
     expect(ir.groups[0]?.rules.length).toBe(2);
   });
 });
@@ -209,7 +209,7 @@ describe("applyCarveToVfs — fragment-bearing keyboards (gate-1 removed)", () =
 
     applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
 
-    // baseIr.raw is unchanged.
+    // startIr.raw is unchanged.
     expect(ir.raw.length).toBe(1);
   });
 
@@ -299,7 +299,7 @@ describe("applyCarveToVfs — returns warnings", () => {
 describe("applyCarveToVfs — reconciles stale sibling asset paths (Track 1 rename)", () => {
   it("repoints a base-id &VISUALKEYBOARD reference at the renamed sibling that exists in the VFS", () => {
     // Track 1 shape: the VFS has been scaffolded/renamed to the new id, but
-    // baseIr (captured at keyboard selection) still references the base-id
+    // startIr (captured at keyboard selection) still references the base-id
     // .kvks. Without reconciliation the re-emitted reference dangles and
     // stripDanglingAssetStores later removes the visual keyboard entirely.
     const baseKmn = [

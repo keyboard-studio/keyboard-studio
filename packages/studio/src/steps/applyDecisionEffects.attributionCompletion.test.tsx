@@ -54,11 +54,11 @@ function makeLiveDeps(): ReducerDeps {
     lockDesktop: () => {},
     clearStale: () => {},
     setTouchLayoutJson: () => {},
-    instantiateFromBase: () => {},
+    instantiateFromStart: () => {},
     instantiateFromExisting: () => {},
     buildTouchLayoutJson: () => ({ json: null, warnings: [] }),
-    resolveBaseTouchJson: () => undefined,
-    instantiateFromBaseIfConfirmed: () => true,
+    resolveStartTouchJson: () => undefined,
+    instantiateFromStartIfConfirmed: () => true,
     getWorkingIR: () => useWorkingCopyStore.getState().ir,
     setWorkingIR: (next) => useWorkingCopyStore.getState().setWorkingIR(next),
     writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
@@ -66,7 +66,7 @@ function makeLiveDeps(): ReducerDeps {
     getDecisions: () => getDecisionSnapshot(),
     getSavedAnswer: (stepId, questionId) =>
       peekStepAnswers(stepId)?.answers[questionId],
-    getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id,
+    getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
     getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
     applyWorkingCopyPatch: (patch, writes) => {
       const wc = useWorkingCopyStore.getState();

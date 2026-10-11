@@ -4,10 +4,10 @@
 // decoupled artifact pipeline (see usePreviewArtifact's module comment). That
 // pipeline's full run() fires onInstantiate on mount for the base the survey
 // already instantiated. onInstantiate used to unconditionally call
-// instantiateFromBaseIfConfirmed, which:
+// instantiateFromStartIfConfirmed, which:
 //   - popped the rebase-confirm dialog (REBASE_CONFIRM_MESSAGE) over work
 //     already in the store, and
-//   - on confirm, re-ran Track 1 instantiateFromBase against a store that (for a
+//   - on confirm, re-ran Track 1 instantiateFromStart against a store that (for a
 //     Track 2 / adapt-existing survey) was in a different mode — a same-id
 //     "genuine switch" that reset phaseResults + irAxes, discarding the survey
 //     answers and leaving nothing valid to submit.
@@ -15,12 +15,12 @@
 //
 // Fix under test: usePreviewArtifact.onInstantiate skips instantiation entirely
 // when the store already holds a working copy for the SAME base id, and only
-// falls through to instantiateFromBaseIfConfirmed for a genuinely NEW base
+// falls through to instantiateFromStartIfConfirmed for a genuinely NEW base
 // picked via this screen's own picker.
 //
 // Approach: mock useKeyboardArtifact to CAPTURE the onInstantiate callback the
 // hook passes it (rather than driving the real WASM compile pipeline, which the
-// sibling test file avoids for good reason), and mock instantiateFromBaseIfConfirmed
+// sibling test file avoids for good reason), and mock instantiateFromStartIfConfirmed
 // as a spy. Then invoke the captured callback directly for both the same-base and
 // different-base cases and assert on whether the spy fired.
 
@@ -59,7 +59,7 @@ vi.mock("./useWorkingCopyTransform.ts", () => ({
 // Spy on the shared re-base helper. The guard's whole job is to decide whether
 // this is called.
 vi.mock("../lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: (...args: unknown[]) => hoisted.instantiateSpy(...args),
+  instantiateFromStartIfConfirmed: (...args: unknown[]) => hoisted.instantiateSpy(...args),
 }));
 
 // Import AFTER the mocks so the store is the real singleton (not mocked).

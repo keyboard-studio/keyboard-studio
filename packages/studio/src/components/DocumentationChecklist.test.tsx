@@ -28,7 +28,7 @@ import { DocumentationChecklist } from "./DocumentationChecklist.tsx";
 
 function instantiateTrackOne() {
   const vfs = createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: makeTestIR([]) });
 }
 
 function instantiateAdaptation() {
@@ -88,14 +88,14 @@ describe("DocumentationChecklist — rows", () => {
 
   it("shows inherited on an adaptation whose base ships the member (FR-006), never on a copy (FR-007)", () => {
     instantiateAdaptation();
-    useWorkingCopyStore.getState().setBaseWelcomeHtmText("<html><body><p>Base welcome.</p></body></html>");
+    useWorkingCopyStore.getState().setStartWelcomeHtmText("<html><body><p>Base welcome.</p></body></html>");
     const { unmount } = render(<DocumentationChecklist />);
     expect(screen.getByTestId("doc-member-welcome-htm").dataset["tier"]).toBe("inherited");
     unmount();
 
     useWorkingCopyStore.getState().reset();
     instantiateTrackOne();
-    useWorkingCopyStore.getState().setBaseWelcomeHtmText("<html><body><p>Base welcome.</p></body></html>");
+    useWorkingCopyStore.getState().setStartWelcomeHtmText("<html><body><p>Base welcome.</p></body></html>");
     render(<DocumentationChecklist />);
     expect(screen.getByTestId("doc-member-welcome-htm").dataset["tier"]).toBe("derived");
   });
@@ -119,8 +119,8 @@ describe("DocumentationChecklist — rows", () => {
     instantiateAdaptation();
     useWorkingCopyStore
       .getState()
-      .setBaseWelcomeHtmText('<html><body><p>Base.</p><img src="desktop.png"><img src="phone.png"></body></html>');
-    useWorkingCopyStore.getState().setBaseWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
+      .setStartWelcomeHtmText('<html><body><p>Base.</p><img src="desktop.png"><img src="phone.png"></body></html>');
+    useWorkingCopyStore.getState().setStartWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
     render(<DocumentationChecklist />);
     const row = screen.getByTestId("doc-member-welcome-htm");
     expect(within(row).getByText(/missing inherited image: phone.png/)).toBeTruthy();
@@ -166,7 +166,7 @@ describe("DocumentationChecklist — layout-chart preference (FR-015)", () => {
     expect(screen.queryByRole("radiogroup", { name: /layout images/i })).toBeNull();
     unmount();
 
-    useWorkingCopyStore.getState().setBaseWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
+    useWorkingCopyStore.getState().setStartWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
     render(<DocumentationChecklist />);
     const group = screen.getByRole("radiogroup", { name: /layout images/i });
     expect((within(group).getByLabelText(/keep starting keyboard images/i) as HTMLInputElement).checked).toBe(true);
@@ -175,7 +175,7 @@ describe("DocumentationChecklist — layout-chart preference (FR-015)", () => {
 
   it("writes setChartPreference — a store write, not a gate", () => {
     instantiateTrackOne();
-    useWorkingCopyStore.getState().setBaseWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
+    useWorkingCopyStore.getState().setStartWelcomeImages([{ path: "welcome/desktop.png", bytes: new Uint8Array([1]) }]);
     render(<DocumentationChecklist />);
     fireEvent.click(screen.getByLabelText(/regenerate layout charts/i));
     expect(useWorkingCopyStore.getState().chartPreference).toBe("regenerate");

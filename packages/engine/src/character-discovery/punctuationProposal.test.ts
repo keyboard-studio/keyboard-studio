@@ -3,9 +3,9 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, RawKmnFragment } from "@keyboard-studio/contracts";
 import {
   ASCII_PUNCTUATION_FLOOR,
-  basePunctuationCoverage,
+  startPunctuationCoverage,
   buildPunctuationProposal,
-  type BasePunctuationCoverage,
+  type StartPunctuationCoverage,
 } from "./punctuationProposal.js";
 import type { SourcedInventory } from "./exemplarTypes.js";
 import { loadExemplarIndex } from "./exemplarIndex.js";
@@ -67,7 +67,7 @@ function inventory(punctuation: string[], main: string[] = ["a"]): SourcedInvent
 }
 
 const NONE: ReadonlySet<string> = new Set();
-const known = (produced: string[]): BasePunctuationCoverage => ({ produced, coverageComplete: true });
+const known = (produced: string[]): StartPunctuationCoverage => ({ produced, coverageComplete: true });
 const intersect = (a: readonly string[], b: readonly string[]) => a.filter((x) => b.includes(x));
 
 // ---------------------------------------------------------------------------
@@ -96,21 +96,21 @@ describe("ASCII_PUNCTUATION_FLOOR", () => {
 });
 
 // ---------------------------------------------------------------------------
-// basePunctuationCoverage
+// startPunctuationCoverage
 // ---------------------------------------------------------------------------
 
-describe("basePunctuationCoverage", () => {
+describe("startPunctuationCoverage", () => {
   it("keeps only the punctuation category of the produced set, NFC-deduped", () => {
-    const cov = basePunctuationCoverage(irProducing("a.b,c!.$"));
+    const cov = startPunctuationCoverage(irProducing("a.b,c!.$"));
     // `$` is a Unicode symbol, not punctuation; letters are excluded.
     expect([...cov.produced].sort()).toEqual([",", ".", "!"].sort());
     expect(cov.coverageComplete).toBe(true);
   });
 
   it("flags coverage incomplete when an opaque fragment has no producedOutput sketch — the same test computeInventoryDelta applies", () => {
-    expect(basePunctuationCoverage(irProducing(".", [opaqueFragment()])).coverageComplete).toBe(false);
-    expect(basePunctuationCoverage(irProducing(".", [opaqueFragment([])])).coverageComplete).toBe(false);
-    expect(basePunctuationCoverage(irProducing(".", [opaqueFragment(["?"])])).coverageComplete).toBe(true);
+    expect(startPunctuationCoverage(irProducing(".", [opaqueFragment()])).coverageComplete).toBe(false);
+    expect(startPunctuationCoverage(irProducing(".", [opaqueFragment([])])).coverageComplete).toBe(false);
+    expect(startPunctuationCoverage(irProducing(".", [opaqueFragment(["?"])])).coverageComplete).toBe(true);
   });
 });
 

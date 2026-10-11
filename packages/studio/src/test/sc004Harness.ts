@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect } from "vitest";
-import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard } from "@keyboard-studio/contracts";
 import type { VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { questionRegistry } from "../survey/questions/registry.ts";
@@ -145,7 +145,7 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
     const kmnText = readVfsText(vfs, `source/${kb.id}.kmn`);
     expect(kmnText, "fixture .kmn present in VFS").toBeDefined();
     const { ir } = parseKmn(kmnText!, kb.id);
-    const base = makeBaseKeyboard({
+    const base = makeStartKeyboard({
       id: kb.id,
       script: kb.script,
       path: `release/test/${kb.id}`,
@@ -156,8 +156,8 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
     });
 
     // --- 1. Track 1 working copy -------------------------------------
-    useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir });
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(kb.id);
+    useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir });
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(kb.id);
 
     // --- 2. unified decision flow with fixture answers ----------------
     const decisions = runDecisionFlow({

@@ -72,7 +72,7 @@ export interface RebuildRequest {
   decisions: DecisionSet;
   /** The decisions that changed. */
   changed: ReadonlySet<DecisionId>;
-  /** The starting point IR the replay folds over (the store's `baseIr`). */
+  /** The starting point IR the replay folds over (the store's `startIr`). */
   startingPointIR: KeyboardIR;
   /** The session's checkpoint trail for the current starting point. */
   trail: CheckpointTrail;
@@ -240,8 +240,8 @@ export function rebuildWorkingCopyFromStores(
 ): RebuildOutcome | null {
   if (changed.length === 0) return null;
   const wc = useWorkingCopyStore.getState();
-  if (wc.baseIr === null || wc.ir === null) return null;
-  const startingPointIR = wc.baseIr;
+  if (wc.startIr === null || wc.ir === null) return null;
+  const startingPointIR = wc.startIr;
 
   if (sessionTrail === null || sessionTrailBase !== startingPointIR) {
     sessionTrail = seedTrail(startingPointIR);
@@ -295,8 +295,8 @@ export function rebuildWorkingCopyFromStores(
  */
 export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | null {
   const wc = useWorkingCopyStore.getState();
-  if (wc.baseIr === null) return null;
-  const startingPointIR = wc.baseIr;
+  if (wc.startIr === null) return null;
+  const startingPointIR = wc.startIr;
 
   const ctx = buildLiveExtractContext();
   const source = ctx.catalog?.id ?? ctx.ir?.header.keyboardId ?? ctx.ir?.header.name;

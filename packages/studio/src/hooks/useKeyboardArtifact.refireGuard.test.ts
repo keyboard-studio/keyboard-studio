@@ -19,7 +19,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR, mixedDiagnosticsResult } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { OnInstantiateCallback } from "./useKeyboardArtifact";
@@ -33,7 +33,7 @@ const mockEngine = {
     Promise.resolve(mixedDiagnosticsResult),
   ),
   fetchKeyboardSourceToVfs: vi.fn(
-    (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+    (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
       vfs.set("source/test_kb.kmn", "c test\n", false);
       return Promise.resolve({});
     },
@@ -66,7 +66,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => ({
 // returns a complete minimal ScaffoldResult. Only the two names the hook
 // imports from services.ts are provided.
 const scaffoldSpy = vi.fn(
-  (_kb: BaseKeyboard, keyboardId: string, _displayName: string, _opts?: unknown) => {
+  (_kb: StartKeyboard, keyboardId: string, _displayName: string, _opts?: unknown) => {
     const vfs = createVirtualFS();
     vfs.set(`source/${keyboardId}.kmn`, "c test\n", false);
     return Promise.resolve({
@@ -84,7 +84,7 @@ vi.mock("../lib/services.ts", async (importOriginal) => ({
   getScaffolderService: () => Promise.resolve({ scaffold: scaffoldSpy }),
 }));
 
-const baseKb: BaseKeyboard = {
+const baseKb: StartKeyboard = {
   id: "test_kb",
   path: "release/t/test_kb",
   script: "Latn",
@@ -109,7 +109,7 @@ describe("useKeyboardArtifact — full-run refire guard", () => {
     const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
 
     const { result, rerender } = renderHook(
-      (props: { kb: BaseKeyboard }) =>
+      (props: { kb: StartKeyboard }) =>
         useKeyboardArtifact(props.kb, null, null, onInstantiate),
       { initialProps: { kb: baseKb } },
     );

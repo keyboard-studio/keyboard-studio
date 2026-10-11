@@ -9,7 +9,7 @@
 //
 //   Case A — reseed from desktop (seedSource === "reseed-from-desktop", or
 //   baseTouchJson absent/empty — the import-adapt fallback, see below):
-//     baseIr (with any shipped touchLayout STRIPPED — R10) → scaffoldTouchLayout
+//     startIr (with any shipped touchLayout STRIPPED — R10) → scaffoldTouchLayout
 //       → applyDesktopModifications → applyTouchAssignments → emitTouchLayout
 //     The strip is mandatory: scaffoldTouchLayout PRESERVES-AND-AUGMENTS an
 //     existing ir.touchLayout rather than discarding it, which would silently
@@ -61,7 +61,7 @@ import {
 export interface BuildTouchLayoutJsonResult {
   /**
    * Wire-format `.keyman-touch-layout` JSON string, ready to inject into VFS.
-   * Null when the emit pipeline threw (malformed baseIr or engine error) — callers
+   * Null when the emit pipeline threw (malformed startIr or engine error) — callers
    * must treat null as "omit the touch layout" rather than injecting an empty file.
    */
   json: string | null;
@@ -130,10 +130,10 @@ function resolveSeedCase(opts: BuildTouchLayoutJsonOpts): SeedCase {
  * skeleton unchanged.
  */
 function buildCaseASeed(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   mods: DesktopModifications,
 ): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
-  const { touchLayout: _stripped, ...rest } = baseIr;
+  const { touchLayout: _stripped, ...rest } = startIr;
   const { layout: seed, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(rest, "tablet");
   const { layout, warnings } = applyDesktopModifications(seed, mods);
   return { layout, warnings, unplacedChars };
@@ -156,7 +156,7 @@ function buildCaseASeed(
  * fallback with no shipped layout) delegates to {@link buildCaseASeed}.
  */
 export function deriveSeedLayout(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   opts: BuildTouchLayoutJsonOpts,
 ): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const seedCase = resolveSeedCase(opts);
@@ -166,14 +166,14 @@ export function deriveSeedLayout(
     // there is nothing for it to spill onto the "extras" grouping.
     return { layout: parseTouchLayout(json), warnings, unplacedChars: [] };
   }
-  return buildCaseASeed(baseIr, opts.mods);
+  return buildCaseASeed(startIr, opts.mods);
 }
 
 /**
  * Derive a `.keyman-touch-layout` JSON string from a base KeyboardIR plus an
  * array of Phase E touch assignments. Pure — no side-effects, no VFS writes.
  *
- * @param baseIr        Post-lockDesktop IR snapshot (the authoritative base for
+ * @param startIr        Post-lockDesktop IR snapshot (the authoritative base for
  *                      both preview and output — do NOT pass the carve-working IR).
  * @param assignments   Non-inherited touch assignments from Phase E. Callers MUST
  *                      filter out `touch_inherited` entries before calling.
@@ -181,7 +181,7 @@ export function deriveSeedLayout(
  *                      {@link BuildTouchLayoutJsonOpts}.
  */
 export function buildTouchLayoutJson(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   assignments: ReadonlyArray<TouchAssignment>,
   opts: BuildTouchLayoutJsonOpts,
 ): BuildTouchLayoutJsonResult {
@@ -207,7 +207,7 @@ export function buildTouchLayoutJson(
 
     // Case A — reseed from desktop (explicit choice, or the import-adapt
     // fallback when there is no shipped touch layout to adapt onto).
-    const { layout: seedLayout, warnings: seedWarnings, unplacedChars } = buildCaseASeed(baseIr, opts.mods);
+    const { layout: seedLayout, warnings: seedWarnings, unplacedChars } = buildCaseASeed(startIr, opts.mods);
     const { layout, warnings: assignWarnings } = applyTouchAssignments(seedLayout, assignments);
     return { json: emitTouchLayout(layout), warnings: [...seedWarnings, ...assignWarnings], unplacedChars };
   } catch (err) {

@@ -2,7 +2,7 @@
 // (spec 079 FR-009, US4, SC-005) with the REAL SurveyRunner.
 //
 // Verifies the prefill + waived-required override travels end to end:
-//   workingCopyStore (instantiationMode / baseDocProfile / baseWelcomeHtmText)
+//   workingCopyStore (instantiationMode / startDocProfile / startWelcomeHtmText)
 //     -> phaseFOptions.seeds.getSeedValue / getRequiredOverride
 //     -> makeFlowStepComponent
 //     -> FlowStepHost
@@ -19,7 +19,7 @@ import { render } from "../test/renderWithI18n.tsx";
 import { PhaseFStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { BaseDocumentationProfile } from "@keyboard-studio/contracts";
+import type { StartDocumentationProfile } from "@keyboard-studio/contracts";
 
 afterEach(() => {
   cleanup();
@@ -27,7 +27,7 @@ afterEach(() => {
   useWorkingCopyStore.getState().reset();
 });
 
-const FULL_PROFILE: BaseDocumentationProfile = {
+const FULL_PROFILE: StartDocumentationProfile = {
   level: "full",
   members: ["welcome-htm"],
   welcomeConvention: "folder",
@@ -35,7 +35,7 @@ const FULL_PROFILE: BaseDocumentationProfile = {
   welcomeImages: [],
 };
 
-const NONE_PROFILE: BaseDocumentationProfile = {
+const NONE_PROFILE: StartDocumentationProfile = {
   level: "none",
   members: [],
   welcomeConvention: "absent",
@@ -59,9 +59,9 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
   it("SC-005: adapt-full prefills the description and a SINGLE confirm (no typing) advances", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
-      baseDocProfile: FULL_PROFILE,
-      baseWelcomeHtmText: WELCOME_HTML,
-      baseHelpPhpText: null,
+      startDocProfile: FULL_PROFILE,
+      startWelcomeHtmText: WELCOME_HTML,
+      startHelpPhpText: null,
     });
     render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
@@ -86,9 +86,9 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
   it("adapt-full: the author can still EDIT the proposal before confirming (not locked to the proposed text)", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
-      baseDocProfile: FULL_PROFILE,
-      baseWelcomeHtmText: WELCOME_HTML,
-      baseHelpPhpText: null,
+      startDocProfile: FULL_PROFILE,
+      startWelcomeHtmText: WELCOME_HTML,
+      startHelpPhpText: null,
     });
     render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
@@ -118,9 +118,9 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
   it("adapt track, base classified none: stays required, unfilled (no usable description to propose)", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
-      baseDocProfile: NONE_PROFILE,
-      baseWelcomeHtmText: null,
-      baseHelpPhpText: null,
+      startDocProfile: NONE_PROFILE,
+      startWelcomeHtmText: null,
+      startHelpPhpText: null,
     });
     render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
@@ -131,9 +131,9 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
   it("adapt track, no profile computed yet (baseDocProfile null): stays required, unfilled", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
-      baseDocProfile: null,
-      baseWelcomeHtmText: WELCOME_HTML,
-      baseHelpPhpText: null,
+      startDocProfile: null,
+      startWelcomeHtmText: WELCOME_HTML,
+      startHelpPhpText: null,
     });
     render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 

@@ -46,7 +46,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { PreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { MetadataCard } from "./MetadataCard.tsx";
 import { BG_CARD, BLUE_ACTION, CARD_BORDER, FONT_MONO, TEXT_MAIN } from "../ui/theme.ts";
@@ -96,7 +96,7 @@ function modeToggleStyle(pressed: boolean): CSSProperties {
  * each value is programmatically associated with its own term rather than
  * relying on visual adjacency (docs/accessibility.md).
  */
-function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
+function StartProvenance({ kb }: { kb: StartKeyboard }) {
   // Keyed by the FIELD, not by the value: two of these coincide readily in real
   // data (a base whose displayName is its id, or a single-script base named for
   // its script), and a duplicate React key silently drops a row from the list.
@@ -166,7 +166,7 @@ export function PickerPane({
   narrow = false,
 }: PickerPaneProps) {
   const { t } = useLingui();
-  const { baseKeyboard, pickerMode, handlePickerModeChange } = artifact;
+  const { startKeyboard, pickerMode, handlePickerModeChange } = artifact;
   const shipping = variant === "shipping";
 
   const sectionLabel = shipping
@@ -204,9 +204,9 @@ export function PickerPane({
       {/* Base: an editable picker in the full variant, read-only provenance
           (plus the route-back escape hatch) in the shipping variant. */}
       {shipping ? (
-        baseKeyboard !== null ? (
+        startKeyboard !== null ? (
           <>
-            <BaseProvenance kb={baseKeyboard} />
+            <StartProvenance kb={startKeyboard} />
             {changeBaseSlot}
           </>
         ) : null
@@ -220,8 +220,8 @@ export function PickerPane({
 
       {kmnEditorSlot}
 
-      {baseKeyboard !== null && !shipping && pickerMode === "open" ? (
-        <MetadataCard kb={baseKeyboard} />
+      {startKeyboard !== null && !shipping && pickerMode === "open" ? (
+        <MetadataCard kb={startKeyboard} />
       ) : null}
     </>
   );

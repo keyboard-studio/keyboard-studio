@@ -243,7 +243,7 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
  */
 export function buildLiveExtractContext(): ExtractContext {
   const wc = useWorkingCopyStore.getState();
-  const ctx = buildExtractContext(wc.baseIr, wc.baseKeyboard);
+  const ctx = buildExtractContext(wc.startIr, wc.startKeyboard);
   // Spec 092 (T036): Phase F's derivations read working-copy slices and
   // two identity-derived values that are not part of the bundle — supply
   // them from the same stores the old PHASE_F_SEEDS readers read, so the
@@ -254,14 +254,14 @@ export function buildLiveExtractContext(): ExtractContext {
   const surveyContext = deriveSurveyContext(useDecisionStore.getState().decisions);
   const welcomePrefill = prefillWelcomeParagraph({
     instantiationMode: wc.instantiationMode,
-    baseDocProfile: wc.baseDocProfile,
-    baseWelcomeHtmText: wc.baseWelcomeHtmText,
-    baseHelpPhpText: wc.baseHelpPhpText,
+    startDocProfile: wc.startDocProfile,
+    startWelcomeHtmText: wc.startWelcomeHtmText,
+    startHelpPhpText: wc.startHelpPhpText,
   });
   const seedContext: PhaseFSeedContext = {
     instantiationMode: wc.instantiationMode,
-    baseKeyboard: wc.baseKeyboard,
-    baseVfs: wc.baseVfs,
+    startKeyboard: wc.startKeyboard,
+    startVfs: wc.startVfs,
   };
   const projectUrlProposal = proposeProjectUrl(seedContext);
   const provenanceBasisProposal = proposeProvenanceBasis(seedContext);
@@ -283,7 +283,7 @@ export function buildLiveExtractContext(): ExtractContext {
 
 /**
  * The live wiring (T012): build the bundle from the working-copy store's
- * post-setup slots (`baseIr`, `baseKeyboard`) and run the pass over the
+ * post-setup slots (`startIr`, `startKeyboard`) and run the pass over the
  * live registry against the live decision store. Called from the setup
  * commit (StudioShell's `doCommit`, spec 092 T013) — synchronously, once
  * per instantiation, never on a timer or per step.

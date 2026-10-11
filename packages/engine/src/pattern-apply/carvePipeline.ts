@@ -75,29 +75,29 @@ export function partitionCarveItemIds(
 }
 
 /**
- * Derive the carved IR from `baseIr` and the carve overlay.
+ * Derive the carved IR from `startIr` and the carve overlay.
  *
  * Runs suppression → slot removals → whole-node filter (see the file header
- * for why this order is load-bearing). `baseIr` is never mutated. The result
+ * for why this order is load-bearing). `startIr` is never mutated. The result
  * is content-identical to the legacy (pre-suppression) pipeline when
  * `dispositions` is empty or omitted.
  */
 export function deriveCarvedIr(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   input: CarvePipelineInput,
 ): CarvePipelineResult {
   const dispositions = input.dispositions ?? [];
 
   // Stage 1 — suppression on the PRE-carve IR (T013 constraint).
   const suppressed = compileCarveSuppression(
-    baseIr,
+    startIr,
     dispositions,
     input.loud === true ? { loud: true } : {},
   );
 
   // Stage 2 — slot removals on the suppressed IR. The suppression compiler
   // never touches stores, so partitioning against the suppressed IR is
-  // equivalent to partitioning against baseIr. Carve-scoped `notany()`
+  // equivalent to partitioning against startIr. Carve-scoped `notany()`
   // hygiene (issue #1809, ruling §3): tainted chars are pruned from
   // `notany()` stores instead of blocking — this pipeline is the carve
   // apply path, so it opts in like every other carve slot-removal call.

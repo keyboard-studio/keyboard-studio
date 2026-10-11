@@ -18,7 +18,7 @@
 // already imports `vkeyLabel` FROM `irToCarveNodes.ts`, so a direct import
 // between the two would be circular; the shared rule sits below both instead.
 //
-// TouchGallery's `hostKeyShortLabel` is a DIFFERENT, already-correct casing
+// TouchGallery's `baseKeyShortLabel` is a DIFFERENT, already-correct casing
 // convention (spec 074): a touch key's displayed case reflects the touch
 // LAYER it targets (uppercase on a shift/caps layer), because a touch
 // keycap visually shows that layer's own glyph — it is not the same

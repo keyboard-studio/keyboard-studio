@@ -2,7 +2,7 @@
 // This package imports ONLY @keyboard-studio/contracts (research.md D8) — no
 // engine/studio edge, so it stays a clean dependency leaf.
 
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 
 // --- scalar aliases ---------------------------------------------------------
 
@@ -83,9 +83,9 @@ export interface RelatednessResult {
 
 /**
  * The actionable suggestion produced by the bridge (US2,
- * `findKeyboardBaseCandidates`). One entry per keyboard (D10).
+ * `findKeyboardStartCandidates`). One entry per keyboard (D10).
  */
-export interface KeyboardBaseCandidate {
+export interface KeyboardStartCandidate {
   keyboardId: string;
   /**
    * `direct` = the target has its own keyboard (distance 0, FR-017);
@@ -104,5 +104,5 @@ export interface KeyboardBaseCandidate {
   /** Other target-relatives this keyboard supports (secondary metadata, D10). */
   alsoSupports: readonly Iso639P3[];
   /** The resolved base record when the caller supplied one. */
-  base?: BaseKeyboard;
+  base?: StartKeyboard;
 }

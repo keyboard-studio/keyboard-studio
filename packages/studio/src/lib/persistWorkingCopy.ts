@@ -15,15 +15,15 @@
 //     sparse object. Keyed off the content type, NOT the entry's isBinary flag —
 //     see serializeEntry.
 //   - Set<string> fields: spread to [] for storage, new Set(arr) on rehydrate.
-//   - KeyboardIR (baseIr, ir): plain objects, safe for direct JSON round-trip.
+//   - KeyboardIR (startIr, ir): plain objects, safe for direct JSON round-trip.
 //
 // Derived-field policy — fields NOT stored; RE-DERIVED on rehydration:
 //   - removalCapabilities: Map<string, RemovalCapability> — re-derived from the
-//     restored `baseIr` via classifyRemovalCapabilities(baseIr) in
-//     rehydrateWorkingCopyFromSession. Source: baseIr (NOT the carve working
+//     restored `startIr` via classifyRemovalCapabilities(startIr) in
+//     rehydrateWorkingCopyFromSession. Source: startIr (NOT the carve working
 //     `ir`) — this mirrors the store invariant that the capability map is
 //     computed once at instantiation from the base IR and never recomputed on
-//     carve edits. If baseIr is null, stays empty Map.
+//     carve edits. If startIr is null, stays empty Map.
 //   - session: SurveySession — re-derived from the restored `irAxes` +
 //     `phaseResults` via mergePhaseResults(irAxes, phaseResults).
 //     Source: irAxes + phaseResults.
@@ -37,7 +37,7 @@
 // naming an orphaned operation's LOST CHARACTER (spec 063 FR-033b; contracts/
 // key-edit-overlay.md §8) needs the PRIOR touch layout the overlay was authored
 // against — a live, in-session value this snapshot does not retain (a snapshot's
-// `ir`/`baseIr`/`touchLayoutJson`/`keyEditOverlay` are always saved and restored
+// `ir`/`startIr`/`touchLayoutJson`/`keyEditOverlay` are always saved and restored
 // TOGETHER, so a restore never by itself produces a seed-A/seed-B mismatch; that
 // mismatch is a live event — the author navigates back, changes physical
 // assignments, and returns — owned by the touch step's own re-derivation memo,
@@ -91,7 +91,7 @@ export interface SerializedEntry {
  * no silent omission that would rehydrate at a default after a redirect.
  *
  * The base type is narrowed by serialization overrides:
- *   - `baseVfs` (a VirtualFS instance) → `baseVfsEntries` (Base64-encoded plain array)
+ *   - `startVfs` (a VirtualFS instance) → `startVfsEntries` (Base64-encoded plain array)
  *   - `deletedNodeIds` / `deletedItemIds` / `deletedTouchKeyIds` / `staleSteps`
  *     / `disabledFamilyIds` (Set<string>) → `string[]`
  * and two derived fields are dropped entirely (`removalCapabilities`, `session`)
@@ -109,7 +109,7 @@ export interface SerializedEntry {
  */
 export type WorkingCopySnapshot = Omit<
   WorkingCopyData,
-  | "baseVfs"
+  | "startVfs"
   | "deletedNodeIds"
   | "deletedItemIds"
   | "deletedTouchKeyIds"
@@ -128,13 +128,13 @@ export type WorkingCopySnapshot = Omit<
   | "contextTolerance"
   | "contextToleranceOverlay"
   | "contextNormalizationStep"
-  | "baseWelcomeImages"
+  | "startWelcomeImages"
   | "disabledFamilyIds"
   | "keptGuardRuleIds"
   | "dismissedMissingGroups"
   | "narrowedGuardQuestions"
 > & {
-  baseVfsEntries: SerializedEntry[];
+  startVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
   deletedItemIds: string[];
   deletedTouchKeyIds: string[];
@@ -163,12 +163,12 @@ export type WorkingCopySnapshot = Omit<
    * {@link BASE_WELCOME_IMAGES_BUDGET_BYTES} — the durable draft shares one
    * localStorage quota with the base VFS, and a multi-megabyte image set would
    * evict the whole draft rather than persist. Absent restores as `null`, and
-   * the over-budget case also sets `baseWelcomeImagesDropped` so the projection
+   * the over-budget case also sets `startWelcomeImagesDropped` so the projection
    * names the loss in its warnings and the documentation checklist reports it
    * rather than hides it. `DRAFT_VERSION` does not bump (additive; VR-1
    * discards a version-mismatched draft).
    */
-  baseWelcomeImages?: SerializedEntry[];
+  startWelcomeImages?: SerializedEntry[];
   /**
    * Optional (spec 063 T058 / R10.3): a snapshot written before this field
    * existed has no `keyEditOverlay` key at all. `prepareWorkingCopySnapshot`
@@ -308,24 +308,24 @@ function deserializeWelcomeImages(
 // ---------------------------------------------------------------------------
 
 // Base-VFS serialization cache (efficiency): the base VFS is set once at
-// instantiation (workingCopyStore.instantiateFromBase/FromExisting) and never
+// instantiation (workingCopyStore.instantiateFromStart/FromExisting) and never
 // mutated in place, so its Base64 serialization is invariant for the life of a
 // working copy. The durable-draft autosave calls snapshotWorkingCopyData on
 // every ~500ms debounced change during authoring, and re-encoding the whole
 // (potentially hundreds of KB) base file tree each time is pure wasted work.
-// Memoize on the baseVfs OBJECT REFERENCE: a cache hit while the same working
+// Memoize on the startVfs OBJECT REFERENCE: a cache hit while the same working
 // copy is active, an automatic recompute when a new instantiation replaces the
 // reference (or a reset sets it back to null).
-let _cachedBaseVfsRef: VirtualFS | null = null;
-let _cachedBaseVfsEntries: SerializedEntry[] = [];
+let _cachedStartVfsRef: VirtualFS | null = null;
+let _cachedStartVfsEntries: SerializedEntry[] = [];
 
-function serializeBaseVfsEntries(baseVfs: VirtualFS | null): SerializedEntry[] {
-  if (baseVfs === null) return [];
-  if (baseVfs !== _cachedBaseVfsRef) {
-    _cachedBaseVfsRef = baseVfs;
-    _cachedBaseVfsEntries = baseVfs.entries().map(serializeEntry);
+function serializeStartVfsEntries(startVfs: VirtualFS | null): SerializedEntry[] {
+  if (startVfs === null) return [];
+  if (startVfs !== _cachedStartVfsRef) {
+    _cachedStartVfsRef = startVfs;
+    _cachedStartVfsEntries = startVfs.entries().map(serializeEntry);
   }
-  return _cachedBaseVfsEntries;
+  return _cachedStartVfsEntries;
 }
 
 /**
@@ -337,18 +337,18 @@ function serializeBaseVfsEntries(baseVfs: VirtualFS | null): SerializedEntry[] {
  * calling, since each caller's guard condition is otherwise identical and the
  * check is cheap to repeat at the call site rather than hide in here.
  *
- * The base-VFS serialization is memoized on the baseVfs reference (see
- * `serializeBaseVfsEntries`) so the debounced autosave does not re-Base64 the
+ * The base-VFS serialization is memoized on the startVfs reference (see
+ * `serializeStartVfsEntries`) so the debounced autosave does not re-Base64 the
  * immutable base file tree on every write.
  */
 export function snapshotWorkingCopyData(): WorkingCopySnapshot {
   const s = useWorkingCopyStore.getState();
-  const baseWelcomeImages = serializeWelcomeImages(s.baseWelcomeImages);
+  const startWelcomeImages = serializeWelcomeImages(s.startWelcomeImages);
   return {
     instantiationMode: s.instantiationMode,
-    baseKeyboard: s.baseKeyboard,
-    baseVfsEntries: serializeBaseVfsEntries(s.baseVfs),
-    baseIr: s.baseIr,
+    startKeyboard: s.startKeyboard,
+    startVfsEntries: serializeStartVfsEntries(s.startVfs),
+    startIr: s.startIr,
     identity: s.identity,
     // spec 064: plain JSON, so it round-trips with no custom handling. Present
     // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
@@ -358,28 +358,28 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // an author who supplied the original holder should not have to re-enter it
     // after a reload, or the download block would reappear on resume.
     licenseUnparseable: s.licenseUnparseable,
-    baseHolderOverride: s.baseHolderOverride,
-    baseLicenseText: s.baseLicenseText,
+    startHolderOverride: s.startHolderOverride,
+    startLicenseText: s.startLicenseText,
     // spec 061: plain JSON / strings, straight passthrough — same reasoning as
-    // attribution/baseLicenseText above.
+    // attribution/startLicenseText above.
     helpDocs: s.helpDocs,
-    baseWelcomeHtmText: s.baseWelcomeHtmText,
-    baseHelpPhpText: s.baseHelpPhpText,
+    startWelcomeHtmText: s.startWelcomeHtmText,
+    startHelpPhpText: s.startHelpPhpText,
     // spec 080 US2: plain strings / a string literal, straight passthrough; the
     // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
-    baseReadmeMdText: s.baseReadmeMdText,
-    baseHistoryMdText: s.baseHistoryMdText,
-    baseWelcomeConvention: s.baseWelcomeConvention,
-    ...(baseWelcomeImages !== undefined ? { baseWelcomeImages } : {}),
+    startReadmeMdText: s.startReadmeMdText,
+    startHistoryMdText: s.startHistoryMdText,
+    startWelcomeConvention: s.startWelcomeConvention,
+    ...(startWelcomeImages !== undefined ? { startWelcomeImages } : {}),
     // Over budget => the images are omitted AND the omission is recorded, so a
     // resumed draft can say so instead of silently shipping without them.
-    baseWelcomeImagesDropped:
-      s.baseWelcomeImagesDropped ||
-      (s.baseWelcomeImages !== null && s.baseWelcomeImages.length > 0 && baseWelcomeImages === undefined),
+    startWelcomeImagesDropped:
+      s.startWelcomeImagesDropped ||
+      (s.startWelcomeImages !== null && s.startWelcomeImages.length > 0 && startWelcomeImages === undefined),
     // spec 080 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
     historyEntryState: s.historyEntryState,
     chartPreference: s.chartPreference,
-    baseDocProfile: s.baseDocProfile,
+    startDocProfile: s.startDocProfile,
     baselineDocFindings: s.baselineDocFindings,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
@@ -428,52 +428,90 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
  * Build the working-copy store patch from a snapshot WITHOUT mutating the
  * store. This is where all the FALLIBLE work lives — `deserializeEntry`'s
  * `atob()` can throw on a corrupt Base64 VFS entry, and the re-derivation of
- * the dropped fields runs here too (`removalCapabilities` from `baseIr`,
+ * the dropped fields runs here too (`removalCapabilities` from `startIr`,
  * `session` from `irAxes` + `phaseResults`; see the derived-field policy in the
  * module header). Separated from the commit so a caller restoring MORE than one
  * store (draftPersistence.loadDraft restores the working-copy AND survey-session
  * stores) can do every throwing step BEFORE mutating anything — a throw then
  * leaves both stores untouched rather than one patched and the other not.
  */
-export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Partial<WorkingCopyData> {
-  const baseVfs = createVirtualFS(snapshot.baseVfsEntries.map(deserializeEntry));
+/**
+ * Snapshot keys renamed by the #1810 identifier rename (the starting-point
+ * family: `base*` -> `start*`). A snapshot written before the rename carries
+ * the old keys at the SAME `DRAFT_VERSION` (VR-1 discards a version-mismatched
+ * draft, so bumping the version to force this rename would throw away every
+ * author's in-progress keyboard — the tolerant-read idiom used for additive
+ * fields applies here too): on read, an absent new key falls back to the old
+ * key's value. New snapshots are only ever written under the new keys.
+ */
+const LEGACY_SNAPSHOT_KEYS: Readonly<Record<string, string>> = {
+  startKeyboard: "baseKeyboard",
+  startIr: "baseIr",
+  startVfsEntries: "baseVfsEntries",
+  startHolderOverride: "baseHolderOverride",
+  startLicenseText: "baseLicenseText",
+  startWelcomeHtmText: "baseWelcomeHtmText",
+  startHelpPhpText: "baseHelpPhpText",
+  startReadmeMdText: "baseReadmeMdText",
+  startHistoryMdText: "baseHistoryMdText",
+  startWelcomeConvention: "baseWelcomeConvention",
+  startWelcomeImages: "baseWelcomeImages",
+  startWelcomeImagesDropped: "baseWelcomeImagesDropped",
+  startDocProfile: "baseDocProfile",
+};
+
+function withLegacySnapshotKeys(snapshot: WorkingCopySnapshot): WorkingCopySnapshot {
+  const raw = snapshot as unknown as Record<string, unknown>;
+  let patched: Record<string, unknown> | null = null;
+  for (const [newKey, oldKey] of Object.entries(LEGACY_SNAPSHOT_KEYS)) {
+    if (raw[newKey] === undefined && raw[oldKey] !== undefined) {
+      patched ??= { ...raw };
+      patched[newKey] = raw[oldKey];
+    }
+  }
+  return (patched ?? raw) as unknown as WorkingCopySnapshot;
+}
+
+export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<WorkingCopyData> {
+  const snapshot = withLegacySnapshotKeys(input);
+  const startVfs = createVirtualFS(snapshot.startVfsEntries.map(deserializeEntry));
 
   const removalCapabilities =
-    snapshot.baseIr !== null
-      ? classifyRemovalCapabilities(snapshot.baseIr)
+    snapshot.startIr !== null
+      ? classifyRemovalCapabilities(snapshot.startIr)
       : new Map<string, RemovalCapability>();
 
   const session = mergePhaseResults(snapshot.irAxes, snapshot.phaseResults);
 
   return {
     instantiationMode: snapshot.instantiationMode,
-    baseKeyboard: snapshot.baseKeyboard,
-    baseVfs,
-    baseIr: snapshot.baseIr,
+    startKeyboard: snapshot.startKeyboard,
+    startVfs,
+    startIr: snapshot.startIr,
     identity: snapshot.identity,
     // Tolerate snapshots saved before these fields existed (spec 064 landed
     // after the durable draft): an absent value must not clobber the store's
-    // null default with undefined. `baseHolderOverride` in particular decides
+    // null default with undefined. `startHolderOverride` in particular decides
     // whether the download block reappears, so it has to restore as a real null.
     attribution: snapshot.attribution ?? null,
     licenseUnparseable: snapshot.licenseUnparseable ?? null,
-    baseHolderOverride: snapshot.baseHolderOverride ?? null,
-    baseLicenseText: snapshot.baseLicenseText ?? null,
+    startHolderOverride: snapshot.startHolderOverride ?? null,
+    startLicenseText: snapshot.startLicenseText ?? null,
     // Tolerate snapshots saved before spec 061 landed: an absent value must
     // not clobber the store defaults with undefined.
     helpDocs: snapshot.helpDocs ?? null,
-    baseWelcomeHtmText: snapshot.baseWelcomeHtmText ?? null,
-    baseHelpPhpText: snapshot.baseHelpPhpText ?? null,
+    startWelcomeHtmText: snapshot.startWelcomeHtmText ?? null,
+    startHelpPhpText: snapshot.startHelpPhpText ?? null,
     // Tolerate pre-080 snapshots the same way: absent restores as null.
-    baseReadmeMdText: snapshot.baseReadmeMdText ?? null,
-    baseHistoryMdText: snapshot.baseHistoryMdText ?? null,
-    baseWelcomeConvention: snapshot.baseWelcomeConvention ?? null,
-    baseWelcomeImages: deserializeWelcomeImages(snapshot.baseWelcomeImages),
-    baseWelcomeImagesDropped: snapshot.baseWelcomeImagesDropped === true,
+    startReadmeMdText: snapshot.startReadmeMdText ?? null,
+    startHistoryMdText: snapshot.startHistoryMdText ?? null,
+    startWelcomeConvention: snapshot.startWelcomeConvention ?? null,
+    startWelcomeImages: deserializeWelcomeImages(snapshot.startWelcomeImages),
+    startWelcomeImagesDropped: snapshot.startWelcomeImagesDropped === true,
     // Tolerate snapshots saved before the documentation decisions existed.
     historyEntryState: snapshot.historyEntryState ?? null,
     chartPreference: snapshot.chartPreference ?? null,
-    baseDocProfile: snapshot.baseDocProfile ?? null,
+    startDocProfile: snapshot.startDocProfile ?? null,
     baselineDocFindings: snapshot.baselineDocFindings ?? null,
     ir: snapshot.ir,
     removalCapabilities,

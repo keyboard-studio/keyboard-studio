@@ -35,14 +35,14 @@ import type {
 import { parseKmn, emitKmn, deriveCarvedIr } from "@keyboard-studio/engine";
 import {
   lookupHostOutput,
-  REFERENCE_HOSTS,
-  type HostLayoutId,
-} from "./referenceHostLayouts.js";
+  REFERENCE_BASES,
+  type BaseLayoutId,
+} from "./referenceBaseLayouts.js";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const KMN_PATH = resolve(__dir, "__fixtures__/sil_cameroon_qwerty.kmn");
 
-const FIVE_HOSTS = Object.keys(REFERENCE_HOSTS) as HostLayoutId[];
+const FIVE_BASES = Object.keys(REFERENCE_BASES) as BaseLayoutId[];
 
 // ---------------------------------------------------------------------------
 // Rule location helpers — everything is derived from the parsed fixture.
@@ -148,7 +148,7 @@ const SUPPRESSION_OUTPUT_KINDS = new Set(["nul", "context", "beep"]);
 // The carve set, located from the real keyboard.
 // ---------------------------------------------------------------------------
 
-let baseIr: KeyboardIR;
+let startIr: KeyboardIR;
 // The blocked rules. `combo` is set for physical-key rules; deadkey-context
 // rules (no trailing vkey) carry no physical combo — they cannot leak to a
 // host, so the host sweep skips them.
@@ -162,17 +162,17 @@ let derivedSoft: KeyboardIR;
 let derivedLoud: KeyboardIR;
 
 beforeAll(() => {
-  baseIr = parseKmn(readFileSync(KMN_PATH, "utf-8"), "sil_cameroon_qwerty").ir;
+  startIr = parseKmn(readFileSync(KMN_PATH, "utf-8"), "sil_cameroon_qwerty").ir;
 
-  const raltA = findBareKeyRule(baseIr, "K_A", ["RALT"]); // + [RALT K_A] > U+025b
-  const shiftRalt4 = findBareKeyRule(baseIr, "K_4", ["SHIFT", "RALT"]); // > U+20ac
-  const raltCContext = findVkeyWithContext(baseIr, "K_C", ["RALT"], ["any"]); // any(diablock) + [RALT K_C] > context — the `+` joiner parses as a raw element, filtered by the significant-shape matcher
-  const dkDk = findContextKindsRule(baseIr, ["deadkey", "deadkey"]); // dk(003b) dk(003d) > U+003D
-  const dkMixed = findContextKindsRule(baseIr, ["deadkey", "any"]); // dk(003b) any(dkf003b) > index(...)
-  const ralt4Beep = findBareKeyRule(baseIr, "K_4", ["RALT"]); // + [RALT K_4] > BEEP
-  const raltSBeep = findBareKeyRule(baseIr, "K_S", ["RALT"]); // + [RALT K_S] > BEEP
-  const tFcfa = findBareKeyRule(baseIr, "T_FCFA", []); // + [T_FCFA] > 'FCFA'
-  const t003b = findBareKeyRule(baseIr, "T_003B", []); // + [T_003B] > U+003B
+  const raltA = findBareKeyRule(startIr, "K_A", ["RALT"]); // + [RALT K_A] > U+025b
+  const shiftRalt4 = findBareKeyRule(startIr, "K_4", ["SHIFT", "RALT"]); // > U+20ac
+  const raltCContext = findVkeyWithContext(startIr, "K_C", ["RALT"], ["any"]); // any(diablock) + [RALT K_C] > context — the `+` joiner parses as a raw element, filtered by the significant-shape matcher
+  const dkDk = findContextKindsRule(startIr, ["deadkey", "deadkey"]); // dk(003b) dk(003d) > U+003D
+  const dkMixed = findContextKindsRule(startIr, ["deadkey", "any"]); // dk(003b) any(dkf003b) > index(...)
+  const ralt4Beep = findBareKeyRule(startIr, "K_4", ["RALT"]); // + [RALT K_4] > BEEP
+  const raltSBeep = findBareKeyRule(startIr, "K_S", ["RALT"]); // + [RALT K_S] > BEEP
+  const tFcfa = findBareKeyRule(startIr, "T_FCFA", []); // + [T_FCFA] > 'FCFA'
+  const t003b = findBareKeyRule(startIr, "T_003B", []); // + [T_003B] > U+003B
 
   const blockTargets = [
     raltA,
@@ -191,7 +191,7 @@ beforeAll(() => {
     { comboId: t003b.nodeId, disposition: "allow-host", provenance: "bulk-default" },
   ];
 
-  derivedSoft = deriveCarvedIr(baseIr, {
+  derivedSoft = deriveCarvedIr(startIr, {
     deletedNodeIds: itemIds,
     deletedItemIds: itemIds,
     dispositions,
@@ -199,7 +199,7 @@ beforeAll(() => {
 
   // Loud run: the two BEEP rules with the A6 loud flag.
   const loudIds = new Set([ralt4Beep.nodeId, raltSBeep.nodeId]);
-  derivedLoud = deriveCarvedIr(baseIr, {
+  derivedLoud = deriveCarvedIr(startIr, {
     deletedNodeIds: loudIds,
     deletedItemIds: loudIds,
     dispositions: [ralt4Beep, raltSBeep].map((r) => block(r.nodeId)),
@@ -220,9 +220,9 @@ beforeAll(() => {
 
 describe("T022 sil_cameroon_qwerty carve regression (real keyboard, FR-019/FR-020, SC-008)", () => {
   it("parses the vendored keyboard cleanly, matching the import-corpus record", () => {
-    const ruleCount = baseIr.groups.reduce((n, g) => n + g.rules.length, 0);
+    const ruleCount = startIr.groups.reduce((n, g) => n + g.rules.length, 0);
     expect(ruleCount).toBe(269);
-    expect(baseIr.groups).toHaveLength(2);
+    expect(startIr.groups).toHaveLength(2);
   });
 
   it("block carve of a single-RALT-layer bare-key rule rewrites to `nul` in place", () => {
@@ -312,7 +312,7 @@ describe("T022 sil_cameroon_qwerty carve regression (real keyboard, FR-019/FR-02
     );
     expect(physical.length).toBeGreaterThan(0);
     for (const { combo } of physical) {
-      for (const host of FIVE_HOSTS) {
+      for (const host of FIVE_BASES) {
         const consuming = allRules(derivedSoft).find((r) => {
           if (r.ownedByBehaviour !== "carve-suppression") return false;
           const sig = significant(r.context);

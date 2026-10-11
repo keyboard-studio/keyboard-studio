@@ -4,7 +4,7 @@
 // Written by SurveyView as a pure projection of its `useKeyboardArtifact`
 // `Stage` — the SAME single 300 ms compile-cycle artifact the live OSK
 // preview consumes (076 D3). This is the same store-bridge pattern as
-// basePreviewStatusStore: the rules step cannot prop-drill through StepHost's
+// startPreviewStatusStore: the rules step cannot prop-drill through StepHost's
 // generic EditorStepProps, and it MUST NOT mount its own useKeyboardArtifact
 // (that would be a second compile) or its own debounce timer (SC-006 forbids
 // it). The pane is a pure READER: typing re-runs the cheap synchronous

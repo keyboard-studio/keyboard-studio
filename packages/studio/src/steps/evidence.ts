@@ -34,12 +34,12 @@ export interface AlphabetEvidence {
   bcp47?: string | null;
   script?: string | null;
   variant?: string | null;
-  baseId?: string | null;
+  startId?: string | null;
 }
 
-/** `bcp47|script|variant|baseId` — what the alphabet proposal is built from. */
+/** `bcp47|script|variant|startId` — what the alphabet proposal is built from. */
 export function alphabetKey(e: AlphabetEvidence): EvidenceKey {
-  return [e.bcp47 ?? "", e.script ?? "", e.variant ?? "", e.baseId ?? ""].join("|");
+  return [e.bcp47 ?? "", e.script ?? "", e.variant ?? "", e.startId ?? ""].join("|");
 }
 
 /**
@@ -83,7 +83,7 @@ export function alphabetKeyOf(
     bcp47: identity.bcp47,
     script: identity.prefill.script,
     variant: identity.targetScriptRaw,
-    baseId: base.id,
+    startId: base.id,
   });
 }
 
@@ -172,9 +172,9 @@ export function marksPromotedKey(alphabet: ConfirmedAlphabet, promoted: readonly
 // punctuation, invisibles, convenience
 // ---------------------------------------------------------------------------
 
-/** `resolvedTag|baseId` — the punctuation seed-key parts. */
-export function punctuationKey(resolvedTag: string | null | undefined, baseId: string | null | undefined): EvidenceKey {
-  return `${resolvedTag ?? ""}|${baseId ?? ""}`;
+/** `resolvedTag|startId` — the punctuation seed-key parts. */
+export function punctuationKey(resolvedTag: string | null | undefined, startId: string | null | undefined): EvidenceKey {
+  return `${resolvedTag ?? ""}|${startId ?? ""}`;
 }
 
 /** The sorted candidate set the invisibles step offers. */

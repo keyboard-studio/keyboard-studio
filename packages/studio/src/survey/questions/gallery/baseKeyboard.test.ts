@@ -1,4 +1,4 @@
-// baseKeyboard module tests (spec 090 T015): the module contract and the
+// startKeyboard module tests (spec 090 T015): the module contract and the
 // apply's determinism under the frozen-stores harness. The confirm flow
 // (F1 gate → record → complete) is covered by
 // editors/adapters/panelAdapters.test.tsx and
@@ -9,8 +9,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { irPath } from "@keyboard-studio/contracts";
-import baseKeyboard, { type BaseKeyboardValue } from "./baseKeyboard.ts";
-import { BaseKeyboardRenderer } from "../../chooseBase/BaseKeyboardRenderer.tsx";
+import startKeyboard, { type StartKeyboardValue } from "./baseKeyboard.ts";
+import { StartKeyboardRenderer } from "../../chooseStart/StartKeyboardRenderer.tsx";
 import { runApplyDeterministically } from "../../../decisions/applyDeterminism.ts";
 import type { ApplyContext } from "../../types.ts";
 import { useDecisionStore } from "../../../stores/decisionStore.ts";
@@ -30,7 +30,7 @@ function makeContext(): ApplyContext {
 function fingerprintStores(): string {
   return JSON.stringify({
     decisions: useDecisionStore.getState().decisions,
-    base: useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
+    base: useWorkingCopyStore.getState().startKeyboard?.id ?? null,
   });
 }
 
@@ -40,17 +40,17 @@ beforeEach(() => {
 
 describe("baseKeyboard module contract", () => {
   it("provides base-keyboard, requires language-code + target-script, writes nothing", () => {
-    expect(baseKeyboard.provides).toEqual(["base-keyboard"]);
-    expect(baseKeyboard.requires).toEqual(["language-code", "target-script"]);
-    expect(baseKeyboard.writes).toEqual([]);
-    expect(baseKeyboard.renderer).toBe(BaseKeyboardRenderer);
+    expect(startKeyboard.provides).toEqual(["base-keyboard"]);
+    expect(startKeyboard.requires).toEqual(["language-code", "target-script"]);
+    expect(startKeyboard.writes).toEqual([]);
+    expect(startKeyboard.renderer).toBe(StartKeyboardRenderer);
   });
 
   it("apply is a deterministic no-op (instantiation is not the apply's job)", () => {
-    const value: BaseKeyboardValue = { id: "sil_euro_latin", name: "EuroLatin (SIL)" };
+    const value: StartKeyboardValue = { id: "sil_euro_latin", name: "EuroLatin (SIL)" };
     expect(
       runApplyDeterministically({
-        apply: baseKeyboard.apply,
+        apply: startKeyboard.apply,
         value,
         makeContext,
         fingerprintStores,
@@ -59,7 +59,7 @@ describe("baseKeyboard module contract", () => {
     ).toEqual({});
     expect(
       runApplyDeterministically({
-        apply: baseKeyboard.apply,
+        apply: startKeyboard.apply,
         value: undefined,
         makeContext,
         fingerprintStores,

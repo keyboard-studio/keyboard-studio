@@ -224,10 +224,10 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     //
     // The lowercase-fold behavior below is gated on the working copy's
     // `casing` facet (spec 048 FR-006), not inferred per-character — so the
-    // fixture must carry a derived-cased `baseIr`, matching what a real
+    // fixture must carry a derived-cased `startIr`, matching what a real
     // Latin-base instantiation would populate.
     useWorkingCopyStore.setState({
-      baseIr: { ...makeTestIR([]), facets: { casing: { value: "cased", provenance: "derived" } } },
+      startIr: { ...makeTestIR([]), facets: { casing: { value: "cased", provenance: "derived" } } },
     });
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
@@ -265,7 +265,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     // Georgian note in casePair.ts). The interim per-character gate this
     // replaced would have folded E/A regardless; the facet-driven gate must not.
     useWorkingCopyStore.setState({
-      baseIr: { ...makeTestIR([]), facets: { casing: { value: "caseless", provenance: "derived" } } },
+      startIr: { ...makeTestIR([]), facets: { casing: { value: "caseless", provenance: "derived" } } },
     });
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
@@ -299,7 +299,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     // whatever OTHER caseless script the keyboard also attests — so "mixed"
     // must behave identically to "cased", not "caseless".
     useWorkingCopyStore.setState({
-      baseIr: { ...makeTestIR([]), facets: { casing: { value: "mixed", provenance: "derived" } } },
+      startIr: { ...makeTestIR([]), facets: { casing: { value: "mixed", provenance: "derived" } } },
     });
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
@@ -339,12 +339,12 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
   });
 
   it("spec 048 FR-006 sibling: no 'casing' facet entry at all (undetermined, baseIr present) gates OFF the fold — identical to caseless", () => {
-    // baseIr is present but its `facets` map carries no "casing" key at all
+    // startIr is present but its `facets` map carries no "casing" key at all
     // (e.g. a fresh IR that never ran deriveFacets). getEffectiveFacet falls
     // through override -> derived -> "undetermined", so .value is undefined,
     // neither "cased" nor "mixed" — isCasedBase must read false, same as caseless.
     useWorkingCopyStore.setState({
-      baseIr: { ...makeTestIR([]), facets: {} },
+      startIr: { ...makeTestIR([]), facets: {} },
     });
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
@@ -372,8 +372,8 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
   });
 
   it("spec 048 FR-006 sibling: baseIr === null (undetermined, no base at all) gates OFF the fold — identical to caseless", () => {
-    // No instantiated base keyboard yet (baseIr stays at its reset() default
-    // of null) — isCasedBase's `baseIr != null && ...` short-circuits to
+    // No instantiated base keyboard yet (startIr stays at its reset() default
+    // of null) — isCasedBase's `startIr != null && ...` short-circuits to
     // false, so the fold must not run even though the bases below ARE a
     // Unicode case pair.
     useWorkingCopyStore.getState().recordPhase({

@@ -22,7 +22,7 @@
 // picture). CharacterMapPane itself is deliberately left UNMOCKED (unlike StudioShell.test.tsx's other survey
 // children) because exercising the pane-swap means the real
 // CharacterMapPane must actually mount; its own short-circuit branch (no
-// baseIr) renders deterministically without touching lib/services.
+// startIr) renders deterministically without touching lib/services.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
@@ -44,7 +44,7 @@ vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.t
 // the barrel), so the shallow stubs must be registered for the files too.
 vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/panels/StartResolution.tsx", () => import("./test/studioShellMocks/StartResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
@@ -87,7 +87,7 @@ afterEach(() => {
 describe("SurveyView — right pane gating on the characters step", () => {
   it("discoveryMethod is null (default): OSK preview pane renders, character map does NOT", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();
@@ -104,7 +104,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("discoveryMethod === 'manual': OSK preview pane renders, character map does NOT", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();
@@ -118,7 +118,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("discoveryMethod === 'build-list' on the characters step: CharacterMapPane renders instead of the OSK preview", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();
@@ -137,7 +137,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("build-list set BEFORE reaching characters (IntroChooser ordering) still gates correctly once the step becomes active", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // Set discoveryMethod pre-emptively while still on "track" — activeRightPane
@@ -162,7 +162,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("reverting discoveryMethod to null while still on characters reverts the pane back to OSK preview", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();

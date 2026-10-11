@@ -23,7 +23,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type ChangeEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg, plural } from "@lingui/core/macro";
-import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap, BaseKeyboard } from "@keyboard-studio/contracts";
+import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap, StartKeyboard } from "@keyboard-studio/contracts";
 import { composeStack } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
@@ -1202,10 +1202,10 @@ function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
 // harvestFromText's `base` parameter is unused by its implementation today
 // (see CharacterDiscoveryServiceImpl.ts's TODO(#141-followup) — an ASCII
 // proxy stands in for the real base-keyboard output-set lookup). PhaseB has
-// no BaseKeyboard in scope at this step, so a minimal fixture stands in,
+// no StartKeyboard in scope at this step, so a minimal fixture stands in,
 // mirroring the "exact values do not matter" fixture already used by the
 // engine's own harvestFromText tests.
-const TEXT_SAMPLE_BASE: BaseKeyboard = {
+const TEXT_SAMPLE_BASE: StartKeyboard = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   // ISO-15924 script code, not user-facing text; falls outside the rule's

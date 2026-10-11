@@ -17,7 +17,7 @@
 // question (Q-TP2).
 
 import type { AdaptationEvidence } from "./evidence.ts";
-import { extractBaseScriptPosture } from "../survey/questions/a/il_target_script.ts";
+import { extractStartScriptPosture } from "../survey/questions/a/il_target_script.ts";
 import type { TrustPolicy } from "./trustPolicy.ts";
 import { adaptationCatalog, type QuestionRecord } from "./catalog.ts";
 
@@ -49,7 +49,7 @@ const PREDICATES: Record<string, Predicate> = {
 
   // "dominant-script-disagreement OR base-script == mixed".
   q_sa2_base_script_mismatch: (evidence, policy) => {
-    const cls = extractBaseScriptPosture(evidence.baseScriptDistribution, policy.singleScriptThreshold);
+    const cls = extractStartScriptPosture(evidence.baseScriptDistribution, policy.singleScriptThreshold);
     const disagreement = cls.dominantScript !== "" && cls.dominantScript !== evidence.targetScript;
     return { fires: cls.posture === "mixed" || disagreement, prefilledValue: evidence.targetScript };
   },

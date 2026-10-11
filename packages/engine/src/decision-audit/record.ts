@@ -129,13 +129,13 @@ function serializeEntry(entry: DecisionEntry): unknown {
             }
           : {
             // base-contribution (specs/055-legible-decision-trail D-11),
-            // written by the studio's recordBaseContribution.ts at
+            // written by the studio's recordStartContribution.ts at
             // `choose_base` completion. `startingKeyCount` is optional and is
             // emitted through the same `JSON.stringify`-drops-`undefined` route
             // the editor counts above rely on, so an unmeasured count is absent
             // rather than a written `0` (FR-005a).
             kind: entry.payload.kind,
-            baseId: entry.payload.baseId,
+            startId: entry.payload.startId,
             baseDisplayName: entry.payload.baseDisplayName,
             startingKeyCount: entry.payload.startingKeyCount,
             derivedAxes: [...entry.payload.derivedAxes],

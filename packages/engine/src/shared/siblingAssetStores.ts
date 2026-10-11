@@ -63,7 +63,7 @@ export interface SiblingAssetStoreEntry {
   /** Whether reconcileSiblingAssetPaths repairs a stale reference to this store. */
   reconcileRepair: boolean;
   /**
-   * The `source/<baseId><extension>` sibling-file extension `renameFilesInVfs`
+   * The `source/<startId><extension>` sibling-file extension `renameFilesInVfs`
    * (scaffolder) renames on a scaffold identity rename, if this store's file
    * has a conventional on-disk extension. Omitted for INCLUDECODES (a shared
    * constants file, not a per-keyboard sibling) and DISPLAYMAP (a PUA-font

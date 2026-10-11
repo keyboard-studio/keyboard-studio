@@ -7,7 +7,7 @@
 // rename sweep stops at the tab's author-facing surfaces and leaves this name
 // alone.
 //
-// Encapsulates: baseKeyboard / pickerMode / scaffoldSpec local state,
+// Encapsulates: startKeyboard / pickerMode / scaffoldSpec local state,
 // useKeyboardArtifact, useWorkingCopyTransform, onInstantiate, diagnostics
 // derivation, canDownload, handleDownload, the zip-blob cleanup effect, and
 // the download/identity warning state.
@@ -29,14 +29,14 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
+import type { StartKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
 import {
   useKeyboardArtifact,
   type ScaffoldSpec,
   type OnInstantiateCallback,
 } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
+import { instantiateFromStartIfConfirmed } from "../lib/confirmRebase.ts";
 import { recalculateForStartingPointChangeFromStores } from "../decisions/rebuildWorkingCopy.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import {
@@ -51,11 +51,11 @@ export type PickerMode = "open" | "scaffold";
 
 export interface PreviewArtifact {
   // Picker state
-  baseKeyboard: BaseKeyboard | null;
+  startKeyboard: StartKeyboard | null;
   pickerMode: PickerMode;
   scaffoldSpec: ScaffoldSpec | null;
   setScaffoldSpec: (spec: ScaffoldSpec | null) => void;
-  handleBaseKeyboardChange: (kb: BaseKeyboard | null) => void;
+  handleStartKeyboardChange: (kb: StartKeyboard | null) => void;
   handlePickerModeChange: (mode: PickerMode) => void;
 
   // Artifact pipeline
@@ -90,7 +90,7 @@ export interface PreviewArtifact {
    * Supply the original copyright holder to clear the block above, then re-run
    * the pipeline so it is retained in the emitted notice (D5 escape hatch).
    */
-  resolveBaseHolder: (holder: string) => void;
+  resolveStartHolder: (holder: string) => void;
 
   /** The source .zip (secondary). */
   downloading: boolean;
@@ -124,14 +124,14 @@ export function usePreviewArtifact(): PreviewArtifact {
   // rather than always starting null. The default flow can navigate straight
   // to #output (e.g. handlePhaseFComplete) without ever visiting #preview, so
   // this screen's independent pipeline instance would otherwise mount with
-  // baseKeyboard === null and never render the download affordance even
+  // startKeyboard === null and never render the download affordance even
   // though a base was already picked and instantiated earlier in the flow.
   // Lazy-init (not a useEffect sync) reads the store exactly once at mount —
-  // it does not fight handleBaseKeyboardChange's subsequent picker updates on
-  // this screen, and it does not re-run when the store's baseKeyboard later
+  // it does not fight handleStartKeyboardChange's subsequent picker updates on
+  // this screen, and it does not re-run when the store's startKeyboard later
   // changes (mirrors the read-once semantics of useState's initializer form).
-  const [baseKeyboard, setBaseKeyboard] = useState<BaseKeyboard | null>(
-    () => useWorkingCopyStore.getState().baseKeyboard,
+  const [startKeyboard, setStartKeyboard] = useState<StartKeyboard | null>(
+    () => useWorkingCopyStore.getState().startKeyboard,
   );
   const [pickerMode, setPickerMode] = useState<PickerMode>("open");
   const [scaffoldSpec, setScaffoldSpec] = useState<ScaffoldSpec | null>(null);
@@ -143,9 +143,9 @@ export function usePreviewArtifact(): PreviewArtifact {
     }
   }, []);
 
-  const handleBaseKeyboardChange = useCallback(
-    (kb: BaseKeyboard | null) => {
-      setBaseKeyboard(kb);
+  const handleStartKeyboardChange = useCallback(
+    (kb: StartKeyboard | null) => {
+      setStartKeyboard(kb);
       clearScaffoldIfOpen(pickerMode);
     },
     [pickerMode, clearScaffoldIfOpen],
@@ -163,24 +163,24 @@ export function usePreviewArtifact(): PreviewArtifact {
   // onInstantiate, fired from useKeyboardArtifact's async fetch/compile/parse
   // run) can still be in flight at the exact moment this screen mounts, so the
   // lazy init reads null even though the working copy finishes instantiating a
-  // few hundred ms later. Without this, THIS screen's local baseKeyboard stays
+  // few hundred ms later. Without this, THIS screen's local startKeyboard stays
   // permanently null (no picker value, no download affordance) even after the
   // store settles, because the lazy-init form never re-reads.
   //
-  // This effect closes that race by adopting the store's baseKeyboard the
+  // This effect closes that race by adopting the store's startKeyboard the
   // moment it FIRST transitions to non-null — but only while this screen's own
-  // local baseKeyboard is still null. Once the author (or the mount-time lazy
-  // init) has set a local baseKeyboard, this guard permanently closes, so a
+  // local startKeyboard is still null. Once the author (or the mount-time lazy
+  // init) has set a local startKeyboard, this guard permanently closes, so a
   // later, unrelated store change (e.g. a different screen re-instantiating)
-  // can never fight handleBaseKeyboardChange's picker updates on this screen —
+  // can never fight handleStartKeyboardChange's picker updates on this screen —
   // preserving the original lazy-init contract for every case except this one
   // race at mount.
-  const storeBaseKeyboardForLateAdopt = useWorkingCopyStore((s) => s.baseKeyboard);
+  const storeStartKeyboardForLateAdopt = useWorkingCopyStore((s) => s.startKeyboard);
   useEffect(() => {
-    if (baseKeyboard === null && storeBaseKeyboardForLateAdopt !== null) {
-      setBaseKeyboard(storeBaseKeyboardForLateAdopt);
+    if (startKeyboard === null && storeStartKeyboardForLateAdopt !== null) {
+      setStartKeyboard(storeStartKeyboardForLateAdopt);
     }
-  }, [baseKeyboard, storeBaseKeyboardForLateAdopt]);
+  }, [startKeyboard, storeStartKeyboardForLateAdopt]);
 
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -232,7 +232,7 @@ export function usePreviewArtifact(): PreviewArtifact {
   );
 
   // onInstantiate: explicit working-copy instantiation (spec §8 v1.3.0, Track 1).
-  // Delegates to instantiateFromBaseIfConfirmed which reads live store state via
+  // Delegates to instantiateFromStartIfConfirmed which reads live store state via
   // getState() so the stale-closure problem cannot arise even though this
   // callback is memoised.
   //
@@ -243,24 +243,24 @@ export function usePreviewArtifact(): PreviewArtifact {
   // pipeline (see the module comment), whose full run() fires onInstantiate on
   // mount. Re-instantiating from that mount would pop the rebase-confirm dialog
   // (REBASE_CONFIRM_MESSAGE) over work that is already in the store: this path
-  // only knows Track 1 instantiateFromBase, so against a Track 2 store it is a
+  // only knows Track 1 instantiateFromStart, so against a Track 2 store it is a
   // same-id/different-mode "genuine switch" that resets phaseResults + irAxes,
   // leaving nothing valid to submit. So skip entirely when the store already
   // holds a working copy for this same base; only genuinely NEW bases picked
   // via this screen's own picker fall through to instantiate. Mirrors
-  // StudioShell's instantiatedForBaseIdRef gate, keyed on the store
+  // StudioShell's instantiatedForStartIdRef gate, keyed on the store
   // (survives this screen's own mount/unmount) rather than a per-mount ref.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
-    const current = useWorkingCopyStore.getState().baseKeyboard;
+    const current = useWorkingCopyStore.getState().startKeyboard;
     if (current !== null && current.id === base.id) return;
-    const isBaseSwitch = current !== null;
-    const proceeded = instantiateFromBaseIfConfirmed(base, { vfs, ir, removalCapabilities });
+    const isStartSwitch = current !== null;
+    const proceeded = instantiateFromStartIfConfirmed(base, { vfs, ir, removalCapabilities });
     // Spec 093 T017 (owner ruling (b)): this picker is the second live
     // base-switch path and shows the same rebase consent, so it carries
     // the same RETAIN + RECALCULATE semantics as StudioShell's doCommit
     // wire-in — after a genuine switch, recalculate the retained
     // decision set against the new base and install the rebuilt copy.
-    if (proceeded && isBaseSwitch) {
+    if (proceeded && isStartSwitch) {
       try {
         recalculateForStartingPointChangeFromStores();
       } catch (err) {
@@ -275,19 +275,19 @@ export function usePreviewArtifact(): PreviewArtifact {
   // Working-copy transform — projects carve + identity layers into the pick-base
   // OSK. Returns null when the working copy is not yet instantiated.
   //
-  // previewedBaseId: this screen's own local `baseKeyboard` picker state (bug
+  // previewedStartId: this screen's own local `startKeyboard` picker state (bug
   // F4) — it can point at a candidate base the author is previewing that
   // differs from the store's already-instantiated base (e.g. re-visiting the
   // picker after a base was committed and carved). Without this, the
   // candidate base's compile would receive the committed base's carve
   // overlay (node ids that don't belong to it) and never reach "ready".
   const workingCopyTransform = useWorkingCopyTransform({
-    previewedBaseId: baseKeyboard?.id ?? null,
+    previewedStartId: startKeyboard?.id ?? null,
   });
 
   const activeSpec = pickerMode === "scaffold" ? scaffoldSpec : null;
   const { stage, retry, recompile } = useKeyboardArtifact(
-    baseKeyboard,
+    startKeyboard,
     activeSpec,
     workingCopyTransform,
     onInstantiate,
@@ -302,29 +302,29 @@ export function usePreviewArtifact(): PreviewArtifact {
 
   // Working-copy instantiation state — used for canDownload and the
   // not-instantiated guard in handleDownload.
-  const isInstantiated = useWorkingCopyStore((s) => s.baseKeyboard !== null);
+  const isInstantiated = useWorkingCopyStore((s) => s.startKeyboard !== null);
 
   // Identity-unset warning: shown non-blocking when Track 1 author has not
   // set a unique keyboard id (id still equals the base keyboard's id).
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const storeIdentity = useWorkingCopyStore((s) => s.identity);
-  const storeBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const storeStartKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const showIdentityWarn =
     instantiationMode === "new-from-base" &&
-    storeBaseKeyboard !== null &&
+    storeStartKeyboard !== null &&
     (storeIdentity?.keyboardId === undefined ||
-      storeIdentity.keyboardId === storeBaseKeyboard.id);
+      storeIdentity.keyboardId === storeStartKeyboard.id);
 
   // Inventory coverage gate — same shared hook StepHost/PhaseFGate use
   // (hooks/useInventoryCoverageGate.ts).
   const coverageGate = useInventoryCoverageGate();
 
   // canDownload: require the compile to be ready AND the working copy to be
-  // instantiated (baseVfs + baseIr available in the store) AND every
+  // instantiated (startVfs + startIr available in the store) AND every
   // inventory character implemented in every modality actually engaged this
   // session (the Phase F hard-gate truth — see the module comment above) AND
   // the package's attribution is emittable (spec 064).
-  // The serializer builds the zip from the store's baseVfs, not from
+  // The serializer builds the zip from the store's startVfs, not from
   // stage.vfs, so the download contains the full projected working copy
   // including assignments.
 
@@ -335,7 +335,7 @@ export function usePreviewArtifact(): PreviewArtifact {
   // spec 064 D5: refuse to emit while the base's own notice is unreadable — a
   // LICENSE.md naming only the current user would strip it.
   const licenseUnparseable = useWorkingCopyStore((s) => s.licenseUnparseable);
-  const setBaseHolderOverride = useWorkingCopyStore((s) => s.setBaseHolderOverride);
+  const setStartHolderOverride = useWorkingCopyStore((s) => s.setStartHolderOverride);
 
   const canDownload =
     stage.kind === "ready" &&
@@ -369,14 +369,14 @@ export function usePreviewArtifact(): PreviewArtifact {
    * The re-run is the load-bearing part — setting the override alone would clear
    * the block while leaving the already-emitted LICENSE.md without the holder.
    */
-  const resolveBaseHolder = useCallback(
+  const resolveStartHolder = useCallback(
     (holder: string) => {
       const trimmed = holder.trim();
       if (trimmed === "") return;
-      setBaseHolderOverride(trimmed);
+      setStartHolderOverride(trimmed);
       retry();
     },
-    [setBaseHolderOverride, retry],
+    [setStartHolderOverride, retry],
   );
 
   const handleDownload = useCallback(async () => {
@@ -475,11 +475,11 @@ export function usePreviewArtifact(): PreviewArtifact {
   }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason]);
 
   return {
-    baseKeyboard,
+    startKeyboard,
     pickerMode,
     scaffoldSpec,
     setScaffoldSpec,
-    handleBaseKeyboardChange,
+    handleStartKeyboardChange,
     handlePickerModeChange,
     stage,
     retry,
@@ -488,7 +488,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     canDownload,
     attributionMissing,
     licenseUnparseable,
-    resolveBaseHolder,
+    resolveStartHolder,
     downloading,
     downloadError,
     downloadWarnings,

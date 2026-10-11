@@ -12,7 +12,7 @@
 // AC#1: deletedItemIds = { "<dktX-nodeId>#1" } → emitted store has `nul` at pos 1;
 //       body rule still present; input store unchanged.
 // AC#2: One slot id + one whole-rule nodeId together → rule removed AND slot nulled.
-// AC#3: baseIr not mutated.
+// AC#3: startIr not mutated.
 // AC#4: A slot id on an input-only store that resolves to a coordinated
 //       cross-pair (#931) → succeeds as a drop on BOTH paired stores, no warning.
 // AC#4b: A slot id on a store whose positions are read by index() in a rule's
@@ -102,7 +102,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#dkt#1"]),
       assignments: [],
@@ -143,7 +143,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       assignments: [],
@@ -168,7 +168,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       // deletedItemIds carries both a slot id and a whole-rule id
       deletedItemIds: new Set(["store#dkt#1", "rule#simple"]),
@@ -193,7 +193,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
   });
 
   // ---------------------------------------------------------------------------
-  // AC#3: baseIr not mutated
+  // AC#3: startIr not mutated
   // ---------------------------------------------------------------------------
 
   it("AC#3: baseIr is not mutated by projectWorkingCopyVfs", () => {
@@ -205,7 +205,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#dkt#0", "store#dkt#1"]),
       assignments: [],
@@ -230,7 +230,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       // store#dkf is the INPUT store, cross-paired with dktX via
       // `dk(003b) any(dkfX) > index(dktX, 2)` — dropping its slot 0 ("a")
@@ -274,7 +274,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#ctxidx#0"]),
       assignments: [],
@@ -317,7 +317,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#unpaired#1"]), // drop the "q"
       assignments: [],

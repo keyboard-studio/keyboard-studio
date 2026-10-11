@@ -36,7 +36,7 @@ function markedStore(store: IRStore): IRStore {
   return { ...store, rulesStepAdded: true as const };
 }
 
-function baseIr(): KeyboardIR {
+function startIr(): KeyboardIR {
   return makeTestIR([
     irGroup({
       nodeId: "group#main",
@@ -62,7 +62,7 @@ function withAppended(base: KeyboardIR, extra: IRRule[], stores: IRStore[] = [])
 
 describe("deriveRuleAdditions", () => {
   it("collects marked rules absent from the base IR, with the full working order", () => {
-    const base = baseIr();
+    const base = startIr();
     const working = withAppended(base, [
       marked(vkeyRule({ nodeId: "rule#new", vkey: "K_C", output: "c" })),
     ]);
@@ -78,7 +78,7 @@ describe("deriveRuleAdditions", () => {
   });
 
   it("ignores unmarked rules absent from the base IR (context-tolerance / touch synthesis)", () => {
-    const base = baseIr();
+    const base = startIr();
     // No marker: the tolerance-replay and touch-synthesis flows must not leak in.
     const working = withAppended(base, [vkeyRule({ nodeId: "rule#tol", vkey: "K_T", output: "t" })]);
 
@@ -86,7 +86,7 @@ describe("deriveRuleAdditions", () => {
   });
 
   it("ignores a marked rule whose nodeId already exists in the base IR (defensive)", () => {
-    const base = baseIr();
+    const base = startIr();
     const working: KeyboardIR = {
       ...base,
       groups: base.groups.map((g) =>
@@ -126,7 +126,7 @@ describe("deriveRuleAdditions", () => {
   });
 
   it("returns the shared empty derivation for a null working IR or no additions", () => {
-    const base = baseIr();
+    const base = startIr();
     expect(deriveRuleAdditions(null, base)).toBe(EMPTY_RULE_ADDITIONS);
     expect(deriveRuleAdditions(undefined, base)).toBe(EMPTY_RULE_ADDITIONS);
     expect(deriveRuleAdditions(base, base)).toBe(EMPTY_RULE_ADDITIONS);
@@ -136,7 +136,7 @@ describe("deriveRuleAdditions", () => {
 
 describe("spliceRuleAdditions", () => {
   it("rebuilds working-IR order: a Narrow exception stays immediately before its guard", () => {
-    const base = baseIr();
+    const base = startIr();
     const narrow = marked(vkeyRule({ nodeId: "rule#narrow", vkey: "K_E", output: "e" }));
     const working: KeyboardIR = {
       ...base,
@@ -157,7 +157,7 @@ describe("spliceRuleAdditions", () => {
   });
 
   it("never resurrects an added rule the deletion set filtered out", () => {
-    const base = baseIr();
+    const base = startIr();
     const added = marked(vkeyRule({ nodeId: "rule#pack", vkey: "K_C", output: "c" }));
     const working = withAppended(base, [added]);
 
@@ -171,7 +171,7 @@ describe("spliceRuleAdditions", () => {
   });
 
   it("skips working-order ids missing from the filtered IR (carve-deleted base rules stay out)", () => {
-    const base = baseIr();
+    const base = startIr();
     const working = withAppended(base, [
       marked(vkeyRule({ nodeId: "rule#new", vkey: "K_C", output: "c" })),
     ]);
@@ -195,12 +195,12 @@ describe("spliceRuleAdditions", () => {
   });
 
   it("is the identity (same object) when there is nothing to add", () => {
-    const base = baseIr();
+    const base = startIr();
     expect(spliceRuleAdditions(base, EMPTY_RULE_ADDITIONS, new Set())).toBe(base);
   });
 
   it("does not mutate the input IR", () => {
-    const base = baseIr();
+    const base = startIr();
     const before = base.groups[0]?.rules.map((r) => r.nodeId);
     const working = withAppended(base, [
       marked(vkeyRule({ nodeId: "rule#new", vkey: "K_C", output: "c" })),
@@ -212,7 +212,7 @@ describe("spliceRuleAdditions", () => {
   });
 
   it("appends new stores and dedupes by store name", () => {
-    const base = baseIr();
+    const base = startIr();
     const store = markedStore(makeCharStore("store#newblock", "newblock", " ~"));
     const working: KeyboardIR = { ...base, stores: [...base.stores, store] };
 
@@ -235,7 +235,7 @@ describe("ruleAdditionsKey", () => {
   it("is empty when there is nothing to project and changes on reorder", () => {
     expect(ruleAdditionsKey(EMPTY_RULE_ADDITIONS)).toBe("");
 
-    const base = baseIr();
+    const base = startIr();
     const narrow = marked(vkeyRule({ nodeId: "rule#narrow", vkey: "K_E", output: "e" }));
     const before: KeyboardIR = {
       ...base,

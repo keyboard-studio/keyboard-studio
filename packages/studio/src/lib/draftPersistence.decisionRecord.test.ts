@@ -21,7 +21,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, DecisionRecord, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, DecisionRecord, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeEmptyDecisionRecord } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
@@ -57,10 +57,10 @@ function instantiate(projectId: string): void {
     id: projectId,
     displayName: "Decision Record Test",
     languages: [],
-  } as unknown as BaseKeyboard;
+  } as unknown as StartKeyboard;
   useWorkingCopyStore
     .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
+    .instantiateFromStart(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
 }
 
 /** Record one decision into the log, the way a step completion would. */

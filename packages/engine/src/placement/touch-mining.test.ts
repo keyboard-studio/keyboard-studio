@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { TouchKeyIR } from "@keyboard-studio/contracts";
-import { mineLongpressHosts, aggregateTouchHosts, touchHostsToEntries } from "./touch-mining.js";
+import { mineLongpressBases, aggregateTouchBases, touchBasesToEntries } from "./touch-mining.js";
 import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
@@ -22,7 +22,7 @@ describe("mineLongpressHosts", () => {
         rows: [{ keys: [makeKey("K_E", { text: "e", sk: [makeKey("K_E", { text: "ɛ" })] })] }],
       },
     ] });
-    const observations = mineLongpressHosts(layout);
+    const observations = mineLongpressBases(layout);
     expect(observations).toEqual([{ codepoint: "U+025B", vkey: "K_E", layerClass: "default" }]);
   });
 
@@ -32,7 +32,7 @@ describe("mineLongpressHosts", () => {
       { id: "shift", rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_E", { text: "Ɛ" })] })] }] },
       { id: "symbol", rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_E", { text: "€" })] })] }] },
     ] });
-    const observations = mineLongpressHosts(layout);
+    const observations = mineLongpressBases(layout);
     expect(observations.map((o) => o.layerClass)).toEqual(["default", "shift", "other"]);
   });
 
@@ -54,7 +54,7 @@ describe("mineLongpressHosts", () => {
     ] });
     // Outer layer is "default" — the sk's own "rightalt" annotation must not
     // override that bucketing.
-    expect(mineLongpressHosts(layout)).toEqual([
+    expect(mineLongpressBases(layout)).toEqual([
       { codepoint: "U+025B", vkey: "K_E", layerClass: "default" },
     ]);
   });
@@ -76,7 +76,7 @@ describe("mineLongpressHosts", () => {
         ],
       },
     ] });
-    expect(mineLongpressHosts(layout)).toEqual([]);
+    expect(mineLongpressBases(layout)).toEqual([]);
   });
 
   it("drops non-K_ host vkeys (T_/U_ touch-specific ids are not standard suggestable keys)", () => {
@@ -86,7 +86,7 @@ describe("mineLongpressHosts", () => {
         rows: [{ keys: [makeKey("T_sp", { sk: [makeKey("K_E", { text: "ɛ" })] })] }],
       },
     ] });
-    expect(mineLongpressHosts(layout)).toEqual([]);
+    expect(mineLongpressBases(layout)).toEqual([]);
   });
 
   it("skips a spacer-class host key (sp:8/10)", () => {
@@ -96,7 +96,7 @@ describe("mineLongpressHosts", () => {
         rows: [{ keys: [makeKey("K_E", { sp: 8, sk: [makeKey("K_E", { text: "ɛ" })] })] }],
       },
     ] });
-    expect(mineLongpressHosts(layout)).toEqual([]);
+    expect(mineLongpressBases(layout)).toEqual([]);
   });
 
   it("skips an sk sub-entry with no char-producing field", () => {
@@ -106,7 +106,7 @@ describe("mineLongpressHosts", () => {
         rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_LAYER", { nextlayer: "shift" })] })] }],
       },
     ] });
-    expect(mineLongpressHosts(layout)).toEqual([]);
+    expect(mineLongpressBases(layout)).toEqual([]);
   });
 
   it("skips a multi-codepoint sk char (not a single codepoint)", () => {
@@ -116,7 +116,7 @@ describe("mineLongpressHosts", () => {
         rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_E", { text: "ab" })] })] }],
       },
     ] });
-    expect(mineLongpressHosts(layout)).toEqual([]);
+    expect(mineLongpressBases(layout)).toEqual([]);
   });
 });
 
@@ -129,7 +129,7 @@ describe("aggregateTouchHosts / touchHostsToEntries", () => {
         { codepoint: "U+025B", vkey: "K_E", layerClass: "default" as const },
       ],
     ];
-    const entries = touchHostsToEntries(aggregateTouchHosts(perKeyboard));
+    const entries = touchBasesToEntries(aggregateTouchBases(perKeyboard));
     expect(entries).toEqual([
       { codepoint: "U+025B", hosts: [{ vkey: "K_E", layerClass: "default", priorCount: 1 }] },
     ]);
@@ -141,7 +141,7 @@ describe("aggregateTouchHosts / touchHostsToEntries", () => {
       [{ codepoint: "U+025B", vkey: "K_E", layerClass: "default" as const }],
       [{ codepoint: "U+025B", vkey: "K_3", layerClass: "other" as const }],
     ];
-    const entries = touchHostsToEntries(aggregateTouchHosts(perKeyboard));
+    const entries = touchBasesToEntries(aggregateTouchBases(perKeyboard));
     expect(entries).toEqual([
       {
         codepoint: "U+025B",
@@ -160,7 +160,7 @@ describe("aggregateTouchHosts / touchHostsToEntries", () => {
         { codepoint: "U+0020", vkey: "K_SPACE", layerClass: "default" as const },
       ],
     ];
-    const entries = touchHostsToEntries(aggregateTouchHosts(perKeyboard));
+    const entries = touchBasesToEntries(aggregateTouchBases(perKeyboard));
     expect(entries.map((e) => e.codepoint)).toEqual(["U+0020", "U+0021"]);
   });
 });

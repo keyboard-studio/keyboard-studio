@@ -66,34 +66,34 @@ function makeLayout(
 }
 
 /** Build a touch assignment for longpress. */
-function longpress(hostKey: string, char: string): TouchAssignment {
+function longpress(baseKey: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "longpress_alternates", slotValues: { hostKey, char } }],
+    mechanisms: [{ patternId: "longpress_alternates", slotValues: { hostKey: baseKey, char } }],
     source: "user",
   };
 }
 
 /** Build a touch assignment for flick. */
-function flick(hostKey: string, direction: string, char: string): TouchAssignment {
+function flick(baseKey: string, direction: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "flick_gestures", slotValues: { hostKey, direction, char } }],
+    mechanisms: [{ patternId: "flick_gestures", slotValues: { hostKey: baseKey, direction, char } }],
     source: "user",
   };
 }
 
 /** Build a touch assignment for multitap. */
-function multitap(hostKey: string, char: string): TouchAssignment {
+function multitap(baseKey: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "multitap", slotValues: { hostKey, char } }],
+    mechanisms: [{ patternId: "multitap", slotValues: { hostKey: baseKey, char } }],
     source: "user",
   };
 }
@@ -474,12 +474,12 @@ describe("applyTouchAssignments — mobile platform resolution (phone/tablet, sp
 // ---------------------------------------------------------------------------
 
 /** Build a touch assignment for touch_key_replace. */
-function keyReplace(hostKey: string, char: string): TouchAssignment {
+function keyReplace(baseKey: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey, char } }],
+    mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: baseKey, char } }],
     source: "user",
   };
 }
@@ -516,8 +516,8 @@ describe("applyTouchAssignments — touch_key_replace", () => {
   });
 
   it("preserves the original nodeId from the host key", () => {
-    const hostKey = makeKey("K_X", { nodeId: "node_K_X_original" });
-    const layout = makeLayout([hostKey]);
+    const baseKey = makeKey("K_X", { nodeId: "node_K_X_original" });
+    const layout = makeLayout([baseKey]);
     const { layout: out } = applyTouchAssignments(layout, [keyReplace("K_X", "ñ")]);
 
     const phone = out.platforms.find((p) => p.id === "phone")!;
@@ -528,11 +528,11 @@ describe("applyTouchAssignments — touch_key_replace", () => {
   });
 
   it("preserves existing sk and multitap arrays from the host key", () => {
-    const hostKey = makeKey("K_X", {
+    const baseKey = makeKey("K_X", {
       sk: [{ nodeId: "sk1", id: "U_00E1", text: "á" }],
       multitap: [{ nodeId: "mt1", id: "U_00E2", text: "â" }],
     });
-    const layout = makeLayout([hostKey]);
+    const layout = makeLayout([baseKey]);
     const { layout: out } = applyTouchAssignments(layout, [keyReplace("K_X", "ñ")]);
 
     const phone = out.platforms.find((p) => p.id === "phone")!;
@@ -546,8 +546,8 @@ describe("applyTouchAssignments — touch_key_replace", () => {
   });
 
   it("preserves geometry fields (sp, pad, width, nextlayer) from the host key", () => {
-    const hostKey = makeKey("K_X", { sp: 1, pad: 5, width: 110, nextlayer: "shift" });
-    const layout = makeLayout([hostKey]);
+    const baseKey = makeKey("K_X", { sp: 1, pad: 5, width: 110, nextlayer: "shift" });
+    const layout = makeLayout([baseKey]);
     const { layout: out } = applyTouchAssignments(layout, [keyReplace("K_X", "ñ")]);
 
     const phone = out.platforms.find((p) => p.id === "phone")!;
@@ -772,13 +772,13 @@ describe("applyTouchAssignments — emit-side verification", () => {
 // ---------------------------------------------------------------------------
 
 /** Build a touch assignment naming an explicit target layer. */
-function longpressOnLayer(hostKey: string, char: string, layer: string): TouchAssignment {
+function longpressOnLayer(baseKey: string, char: string, layer: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
     mechanisms: [
-      { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+      { patternId: "longpress_alternates", slotValues: { hostKey: baseKey, char, layer } },
     ],
     source: "user",
   };

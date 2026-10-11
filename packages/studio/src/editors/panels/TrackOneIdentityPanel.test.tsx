@@ -3,8 +3,8 @@
 // Coverage:
 //   1. Panel renders only when instantiationMode === "new-from-base".
 //   2. Panel does not render when instantiationMode is null or "adapt-existing".
-//   3. Display-name input is seeded from baseKeyboard.displayName.
-//   4. Keyboard-id input is seeded from baseKeyboard.id.
+//   3. Display-name input is seeded from startKeyboard.displayName.
+//   4. Keyboard-id input is seeded from startKeyboard.id.
 //   5. Changing display name calls setIdentity with the new displayName.
 //   6. Changing keyboard id to a valid value calls setIdentity with keyboardId.
 //   7. Invalid keyboard id shows validation error and does NOT call setIdentity.
@@ -27,7 +27,7 @@ function seedTrack1() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs,
     ir: makeTestIR([]),
   });
