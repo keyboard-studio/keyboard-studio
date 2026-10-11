@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-09",
+  "lastUpdated": "2026-10-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:d38c67b6a8b94872",
+      "hash": "sha256:7724d18d3effa223",
       "status": "reference",
       "implements": [],
       "decisions": [],

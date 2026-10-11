@@ -11,6 +11,10 @@
 > discipline in [CLAUDE.md](../CLAUDE.md). If a fact here contradicts its linked
 > home, the home wins — fix the link, don't fork the fact.
 >
+> **Vocabulary.** The keyboard terms in this document follow the
+> [keyboard vocabulary glossary](design-notes/keyboard-vocabulary-glossary.md)
+> (Keyman's terms: base keyboard, copied keyboard, starting point).
+>
 > **It is tracked.** [`utilities/spec-trace`](../utilities/spec-trace/) hashes
 > this file (as `docs/architecture.md`) alongside the spec sections and the
 > extracted feature specs, so architectural drift is visible, not silent.
