@@ -20,9 +20,11 @@ export const NORMALIZATION_STEP_GENERATOR_VERSION: string;      // bump on any o
 export const NORMALIZATION_GROUP = "generated_context_normalize";
 export function proposeNormalizationStep(ir: KeyboardIR, opts?: { budgetMs?: number }): Promise<NormalizationStepResult>;
 export function applyNormalizationStep(ir: KeyboardIR, step: NormalizationStep): KeyboardIR;   // returns new IR
-export function removeNormalizationStep(ir: KeyboardIR): KeyboardIR;                           // no-op if absent
+export function removeNormalizationStep(ir: KeyboardIR, originalEntry?: string): KeyboardIR;   // no-op if absent; `originalEntry` is the recorded entry to restore when the step's delegate target cannot be read back
 export function normalizationStepCacheKey(ir: KeyboardIR): Promise<string>;
 ```
+
+The `normalization-step` module also re-exports its `constants.ts` (`NORMALIZATION_STORE_PREFIX`, `MAX_MARK_TUPLES`, `MAX_GENERATED_STORES`, `MAX_GENERATED_RULES`); the barrel re-exports them transitively. They are generator-internal bounds, not a studio-facing surface.
 
 `buildOutputRepertoire` is the only contracts-side function. A stop request returns the clusters found so far, so the repertoire is a partial set; the generator uses `shouldStop` to honour its time budget (G7).
 

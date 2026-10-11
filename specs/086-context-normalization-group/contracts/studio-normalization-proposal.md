@@ -32,13 +32,14 @@ New message ids follow the spec 046 grammar under `marks.context_tolerance.step.
 
 | Id | Where | Text |
 |---|---|---|
+| `marks.context_tolerance.step.heading` | station, step proposal heading | "Letters and diacritics written in a different form" |
 | `marks.context_tolerance.step.intro` | station, step proposal | "Adds {N} rules. None of your rules change." (ICU plural) |
 | `marks.context_tolerance.step.examples.heading` | station | "Examples of text it converts" |
 | `marks.context_tolerance.step.examples.row` | `NormalizationExamples.tsx`, one per example row | Visually hidden spoken form of a row: "{pasted} becomes {result}", built from codepoint names. Sighted users see the glyphs; screen readers get this text |
 | `marks.context_tolerance.step.disclosure.rewrite` | station | The FR-018 disclosure |
 | `marks.context_tolerance.step.action.accept` | station confirm button | "Add this step" |
 | `marks.context_tolerance.step.prior.accepted` | station, when the author returns to a step they accepted | "You chose to add the step that converts pasted text to this keyboard's own form." A declined step reuses `marks.contextTolerance.station.prior.declined` |
-| `marks.context_tolerance.step.fallback.reason.<reason>` | station, 062 fallback line | One id per reason: `no_unicode_entry`, `opaque_entry`, `opaque_output_store`, `time_bound`, `no_alternates`, `verification_regressed` |
+| `marks.context_tolerance.step.fallback.reason.<reason>` | station, 062 fallback line | One id per reason: `no_unicode_entry`, `opaque_entry`, `opaque_output_store`, `time_bound`, `no_alternates`, `name_collision`, `verification_regressed` |
 
 ## Decision trail
 
