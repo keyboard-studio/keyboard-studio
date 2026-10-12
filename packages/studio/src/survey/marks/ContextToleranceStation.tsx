@@ -195,7 +195,11 @@ export function ContextToleranceStation({
     return (
       <div data-testid="context-tolerance-station" data-prior={prior.decision} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <h3 style={{ margin: 0 }}>
-          <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
+          {step !== undefined ? (
+            <Trans id="marks.contextTolerance.step.heading">Letters and diacritics written in a different form</Trans>
+          ) : (
+            <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
+          )}
         </h3>
         <p style={mutedParaFlush}>
           {step !== undefined
