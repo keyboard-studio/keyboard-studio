@@ -22,7 +22,7 @@
 
 import { basename, extname } from "node:path";
 
-import { parseKps, parseKpsFiles, parseKpsFontRefs } from "../../packages/engine/src/base-browser/kps-parser.js";
+import { parseKps, parseKpsFiles, parseKpsFontRefs } from "../../packages/engine/src/start-browser/kps-parser.js";
 
 import type { ScannedKeyboard } from "./scan.js";
 

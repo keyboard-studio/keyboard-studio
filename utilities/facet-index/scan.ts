@@ -27,7 +27,7 @@ import { parseKmnHeaderStores } from "../../packages/engine/src/compiler/parseKm
 import {
   dedupeKpsPathsById,
   matchKeyboardScopePath,
-} from "../../packages/engine/src/base-browser/corpus-scope.js";
+} from "../../packages/engine/src/start-browser/corpus-scope.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");

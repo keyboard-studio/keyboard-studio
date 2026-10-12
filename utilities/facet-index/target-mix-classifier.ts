@@ -22,7 +22,7 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { KeymanPlatformTarget } from "@keyboard-studio/contracts";
-import { parseKps } from "../../packages/engine/src/base-browser/kps-parser.js";
+import { parseKps } from "../../packages/engine/src/start-browser/kps-parser.js";
 
 import { findTouchLayoutSource } from "./touch-layout.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
