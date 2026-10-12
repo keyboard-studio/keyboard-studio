@@ -2,7 +2,11 @@
 // the 95th percentile of `proposeNormalizationStep` over every corpus keyboard
 // that parses must be under 5 s. Opt-in, not part of the default suite; CI runs
 // it in a dedicated step of the `build` job (which has the pinned corpus) with
-// KS_CORPUS_PERF=1. When opted in, a missing corpus fails rather than skips:
+// KS_CORPUS_PERF=1. When opted in, a missing corpus fails rather than skips.
+// Keyboards that fail to parse are not individually fatal — SC-005 scopes the
+// budget to every keyboard that parses — but they are counted and named in the
+// summary line, and the MIN_PARSED_KEYBOARDS floor below fails the suite if
+// parse failures shrink the sample materially (issue #1966):
 //
 //   KS_CORPUS_PERF=1 pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/generation-time.corpus
 
@@ -50,7 +54,7 @@ describe.skipIf(!optedIn)("normalization step generation time: corpus presence",
 describe.skipIf(!enabled)("normalization step generation time (corpus, SC-005)", () => {
   it("p95 over every parseable corpus keyboard is under 5 s", async () => {
     const timings: { id: string; ms: number }[] = [];
-    let parseFailures = 0;
+    const parseFailureIds: string[] = [];
     for (const shard of readdirSync(RELEASE_ROOT)) {
       for (const id of readdirSync(join(RELEASE_ROOT, shard))) {
         const p = join(RELEASE_ROOT, shard, id, "source", `${id}.kmn`);
@@ -59,7 +63,7 @@ describe.skipIf(!enabled)("normalization step generation time (corpus, SC-005)",
         try {
           ir = parseRebased(readFileSync(p, "utf8"), id);
         } catch {
-          parseFailures += 1;
+          parseFailureIds.push(id);
           continue;
         }
         const t0 = performance.now();
@@ -69,12 +73,15 @@ describe.skipIf(!enabled)("normalization step generation time (corpus, SC-005)",
     }
     expect(
       timings.length,
-      `only ${timings.length} keyboards parsed (${parseFailures} failed to parse); expected at least ${MIN_PARSED_KEYBOARDS}`,
+      `only ${timings.length} keyboards parsed (${parseFailureIds.length} failed to parse); expected at least ${MIN_PARSED_KEYBOARDS}`,
     ).toBeGreaterThanOrEqual(MIN_PARSED_KEYBOARDS);
     const sorted = [...timings].sort((a, b) => a.ms - b.ms);
     const p95 = sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)]!.ms;
     const slowest = sorted.slice(-10).reverse().map((t) => `${t.id} ${Math.round(t.ms)}ms`);
-    console.warn(`[WARN] ${timings.length} keyboards, p95 ${Math.round(p95)}ms; slowest ten: ${slowest.join(", ")}`);
+    const parseSummary = parseFailureIds.length
+      ? `, ${parseFailureIds.length} failed to parse (${parseFailureIds.slice(0, 10).join(", ")}${parseFailureIds.length > 10 ? ", …" : ""})`
+      : ", 0 failed to parse";
+    console.warn(`[WARN] ${timings.length} keyboards${parseSummary}, p95 ${Math.round(p95)}ms; slowest ten: ${slowest.join(", ")}`);
     expect(p95).toBeLessThan(5000);
   }, 3_600_000);
 });
