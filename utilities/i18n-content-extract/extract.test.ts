@@ -480,7 +480,7 @@ describe("extractFlowQuestionStrings", () => {
     // spec 079 T038: the prompt now also reads as a proposal when prefilled.
     expect(strings["content.flowQuestion.pf_welcome_paragraph.prompt"]).toBe(
       "In 1–3 sentences, what is this keyboard for? If we found a description " +
-        "in the base keyboard, it's already filled in below — keep it, edit it, " +
+        "in the starting keyboard, it's already filled in below — keep it, edit it, " +
         "or replace it.",
     );
     expect(strings["content.flowQuestion.project_display_name.prompt"]).toBe(
