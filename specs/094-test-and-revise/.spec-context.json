@@ -3,7 +3,7 @@
   "specName": "Test-and-revise loop before publishing",
   "branch": "094-test-and-revise",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -377,7 +377,22 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-12T18:02:56.995Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-12T18:02:56.995Z"
     }
   ],
-  "currentTask": "T045"
+  "currentTask": "T044"
 }
