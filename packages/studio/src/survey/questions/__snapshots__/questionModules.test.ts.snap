@@ -212,8 +212,6 @@ exports[`live question modules > gallery/retainedConvenienceChars.ts > definitio
 
 exports[`live question modules > gallery/ruleSet.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores]"`;
 
-exports[`live question modules > gallery/startKeyboard.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
-
 exports[`live question modules > gallery/touchLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/touchSeedSource.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
