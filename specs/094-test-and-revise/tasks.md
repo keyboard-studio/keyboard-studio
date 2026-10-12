@@ -322,7 +322,14 @@ Polish rides with this phase (constitution phase cadence).
   This job is non-blocking in CI.
 - [X] T043 [P] Add or update rows in `specs/056-ada-accessibility/wcag-2.2-aa-tracker.md` for the section list, the footer revision actions, the test-build panel, the reports form and the publish hand-over. Only flip a row to `pass` with named test evidence (T015, T016, T026, T035, T038).
 - [X] T044 [P] Update [docs/workflow-model.md](../../docs/workflow-model.md) and [docs/architecture.md](../../docs/architecture.md) to describe the Output-origin revision loop and that test builds are a `.kmp`-only projection. Update `docs/github-integration.md` only where it says Output is terminal.
-- [ ] T045 Run the full quickstart ([quickstart.md](quickstart.md) steps 1-10), `pnpm lint`, and both package suites. Record results in the phase commit. Commit `feat(studio): publish hand-over after testing, plus polish (spec 094 T038-T045)` and push.
+- [X] T045 Run the full quickstart ([quickstart.md](quickstart.md) steps 1-10), `pnpm lint`, and both package suites. Record results in the phase commit. Commit `feat(studio): publish hand-over after testing, plus polish (spec 094 T038-T045)` and push.
+
+  - Done 2026-10-12 as a scripted walk (Playwright, against the dev server), which the owner
+    accepted as the manual quickstart. Steps 1-7 and 10 passed. Step 8 passed once the adapt track
+    instantiated as adapt-existing. Step 9 is covered by unit tests only. Nobody installed a build
+    in Keyman; the package contents were checked instead. The walk found three defects, each fixed
+    in its own commit: Output did not autosave, a revision moved the walk's position, and the
+    adapt track stayed new-from-base (on main, spec 092 T013 now covers that).
 
 ---
 
