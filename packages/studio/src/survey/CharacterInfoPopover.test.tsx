@@ -6,7 +6,7 @@
 //     with a tiny stub table — the popover path under test is
 //     describeCharacter (the REAL engine helper) + the hook + the pane
 //     wiring; the real 1.5 MB table never loads in jsdom.
-//   - baseIr/bcp47/languageName come from the real workingCopyStore /
+//   - startIr/bcp47/languageName come from the real workingCopyStore /
 //     surveySessionStore singletons, seeded directly.
 //
 // What is pinned here:
@@ -27,7 +27,7 @@ import { render } from "../test/renderWithI18n.tsx";
 import { CharacterMapPane } from "./CharacterMapPane.tsx";
 import { resetUnicodeTableForTests } from "./characterMap/unicodeTable.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { CharacterMapGroup } from "../lib/services.ts";
 
@@ -138,7 +138,7 @@ function fixture(): CharacterMapGroup[] {
       block: "Latin",
       tier: "main",
       script: "Latn",
-      usedByBase: false,
+      usedByStart: false,
       cells: [
         { char: "a", isCombiningMark: false },
         { char: "b", isCombiningMark: false },
@@ -148,14 +148,14 @@ function fixture(): CharacterMapGroup[] {
       block: "Combining Diacritical Marks",
       tier: "auxiliary",
       script: "Latn",
-      usedByBase: false,
+      usedByStart: false,
       cells: [{ char: COMBINING_ACUTE, isCombiningMark: true }],
     },
     {
       block: "Devanagari",
       tier: "auxiliary",
       script: "Deva",
-      usedByBase: false,
+      usedByStart: false,
       cells: [{ char: KSSA, isCombiningMark: false }],
     },
   ];
@@ -170,14 +170,23 @@ const TEST_BASE = {
   version: "1.0",
 };
 
-function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
-  useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
+/** Record the identity decisions a completed identity step records (spec 089:
+ * the survey context / scaffold spec are derived from these, never seeded
+ * into the session store directly). */
+function seedIdentityDecisions(languageCode: string, languageName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: languageName, provenance: "asked" });
+  record({ id: "language-autonym", value: languageName, provenance: "asked" });
+  record({ id: "language-code", value: languageCode, provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
+
+function seedStartAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
+  useWorkingCopyStore.getState().instantiateFromStart(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
   });
-  useSurveySessionStore
-    .getState()
-    .setSurveyContext({ bcp47_tag: bcp47, language_name: languageName });
+  seedIdentityDecisions(bcp47.split("-")[0]!, languageName);
 }
 
 beforeEach(() => {
@@ -200,7 +209,7 @@ async function renderPaneAndGetCell(
   groupLabel: string,
   namePattern: RegExp,
 ): Promise<HTMLElement> {
-  seedBaseAndLanguage();
+  seedStartAndLanguage();
   render(<CharacterMapPane />);
   await waitFor(() => {
     expect(screen.getByLabelText(groupLabel)).toBeTruthy();
@@ -330,7 +339,7 @@ describe("CharacterInfoPopover", () => {
 
   it("moves the popover when the pointer goes from one cell to another", async () => {
     // Two cells in the fixture Latin group: a, b. Render once, grab both.
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();

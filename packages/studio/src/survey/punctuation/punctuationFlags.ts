@@ -6,7 +6,7 @@
 //
 // The punctuation step has exactly ONE saved answer — the confirmed
 // inventory, `PUNCTUATION_INVENTORY_ANSWER_ID` — keyed by
-// `steps/evidence.ts`'s `punctuationKey(resolvedTag, baseId)`. It is flagged
+// `steps/evidence.ts`'s `punctuationKey(resolvedTag, startId)`. It is flagged
 // when its recorded evidence key no longer matches the CURRENT evidence: a
 // language or base change re-derives the proposal defaults (T044's
 // `alreadyConfirmed` guard already does this), and the flag is what tells the
@@ -46,7 +46,7 @@ export function derivePunctuationFlags(
       screenId: PUNCTUATION_STEP_ID,
       reason: {
         code: "evidence-added",
-        subject: "your language or base keyboard",
+        subject: "your language or starting keyboard",
         sourceStepId: PUNCTUATION_STEP_ID,
       },
     },

@@ -5,7 +5,7 @@
  * This spec is written to FAIL against the pre-fix tree. Today the tab behind
  * `#preview` runs `usePreviewArtifact`, which passes an `onInstantiate`
  * callback into the compile pipeline; when the author picks a *different*
- * keyboard there, the settle fires `instantiateFromBaseIfConfirmed`
+ * keyboard there, the settle fires `instantiateFromStartIfConfirmed`
  * (`usePreviewArtifact.ts:172-176` -> `confirmRebase.ts:126-142`), which asks
  * `window.confirm` and — on accept — rebases the working copy, resetting
  * `phaseResults` and `irAxes`. The same screen also mounts a live
@@ -24,12 +24,12 @@
  *       alone would be a non-signal (it passes both before and after the fix,
  *       since a cancelled rebase writes nothing), so the accept branch is the
  *       one that carries FR-025's adversarial requirement: pre-fix it accepts
- *       a real rebase and the working copy's baseId/phaseResults change.
+ *       a real rebase and the working copy's startId/phaseResults change.
  *
  * Selector note: the reference specs `switch-base-exploration.spec.ts` /
- * `switch-base-rebase.spec.ts` drive `editors/panels/BaseResolution.tsx`,
+ * `switch-base-rebase.spec.ts` drive `editors/panels/StartResolution.tsx`,
  * which has `base-card-*` / `base-confirm` test ids. THIS tab's picker is
- * `components/BaseKeyboardPicker.tsx` — a plain combobox with zero
+ * `components/StartKeyboardPicker.tsx` — a plain combobox with zero
  * `data-testid` and no confirm button, where clicking an option calls
  * `commit()` and fires `onChange` immediately. Only the option-selection
  * idiom (`[id$="-opt-${id}"]`) is reused; porting the confirm-button idiom
@@ -41,7 +41,7 @@
 import { test, expect, type Page, type Dialog } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   seedReturningVisitor,
   switchTab,
 } from "./helpers/surveyFlow";
@@ -56,21 +56,21 @@ declare global {
     __ksE2E__?: {
       getWorkingIr(): { header?: unknown } | null;
       getDeletedNodeIds(): string[];
-      getBaseKeyboardId(): string | null;
+      getStartKeyboardId(): string | null;
       getPhaseResultsCount(): number;
     };
   }
 }
 
 interface ProjectState {
-  baseId: string | null;
+  startId: string | null;
   phaseResultsCount: number;
   deletedNodeIds: string[];
 }
 
 async function readProjectState(page: Page): Promise<ProjectState> {
   return page.evaluate(() => ({
-    baseId: window.__ksE2E__?.getBaseKeyboardId() ?? null,
+    startId: window.__ksE2E__?.getStartKeyboardId() ?? null,
     phaseResultsCount: window.__ksE2E__?.getPhaseResultsCount() ?? -1,
     deletedNodeIds: window.__ksE2E__?.getDeletedNodeIds() ?? [],
   }));
@@ -109,9 +109,9 @@ async function establishWorkingCopy(page: Page): Promise<void> {
     autonym: "Test Autonym",
     script: "other",
   });
-  await pickBaseKeyboard(page, OWN_BASE);
+  await pickStartKeyboard(page, OWN_BASE);
   await expect
-    .poll(async () => (await readProjectState(page)).baseId, { timeout: 60_000 })
+    .poll(async () => (await readProjectState(page)).startId, { timeout: 60_000 })
     .toBe(OWN_BASE);
 }
 
@@ -181,13 +181,13 @@ test.describe("Compare cannot write to the author's project (spec 057 US2)", () 
     page,
   }) => {
     // The adversarial branch (FR-025): answer "yes" to every dialog. Pre-fix
-    // this accepts the rebase, so baseId flips to the foreign keyboard and
+    // this accepts the rebase, so startId flips to the foreign keyboard and
     // phaseResults is cleared. Post-fix there is nothing to accept, because
     // `useCompareArtifact` passes no `onInstantiate` at all.
     const dialogs = attachDialogHarness(page, "accept");
     await establishWorkingCopy(page);
     const before = await readProjectState(page);
-    expect(before.baseId).toBe(OWN_BASE);
+    expect(before.startId).toBe(OWN_BASE);
 
     await switchTab(page, "preview");
     await loadForeignKeyboardOnCompare(page);
@@ -196,7 +196,7 @@ test.describe("Compare cannot write to the author's project (spec 057 US2)", () 
     expect(dialogs.count(), `a confirm dialog was offered: ${dialogs.lastMessage() ?? ""}`).toBe(0);
 
     const after = await readProjectState(page);
-    expect(after.baseId, "the Compare tab rebased the author's working copy").toBe(OWN_BASE);
+    expect(after.startId, "the Compare tab rebased the author's working copy").toBe(OWN_BASE);
     expect(
       after.phaseResultsCount,
       "the Compare tab discarded recorded survey answers",

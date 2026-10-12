@@ -119,17 +119,19 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
   //   phase_b_chars   -> "characters" step  (1 drill-down)
   //   phase_f_helpdocs -> "help" step       (1 drill-down)
   //   track           -> "track" step       (1 drill-down)
+  //   attribution     -> "attribution" step (1 drill-down; #1901)
   //   project_name    -> "project_name" step (1 drill-down)
   //   phase_a_identity -> status:"proposed" — excluded from live drill-downs
-  it("FR-004 — modular graphs hang under their manifest step id (identity/characters/help/track/project_name)", () => {
+  it("FR-004 — modular graphs hang under their manifest step id (identity/characters/help/track/attribution/project_name)", () => {
     expect(Object.keys(drillDowns).sort()).toEqual(
-      ["identity", CHARACTERS_STEP_ID, "help", "project_name", "track"].sort(),
+      ["identity", CHARACTERS_STEP_ID, "help", "project_name", "track", "attribution"].sort(),
     );
     // Each step now has exactly one drill-down flow.
     expect(drillDowns["identity"]!.length).toBe(1);
     expect(drillDowns[CHARACTERS_STEP_ID]!.length).toBe(1);
     expect(drillDowns["help"]!.length).toBe(1);
     expect(drillDowns["track"]!.length).toBe(1);
+    expect(drillDowns["attribution"]!.length).toBe(1);
     expect(drillDowns["project_name"]!.length).toBe(1);
     // Every live flow is accounted for across the buckets — none dropped.
     const total = Object.values(drillDowns).reduce((n, list) => n + list.length, 0);
@@ -258,10 +260,15 @@ describe.each(MAP_NODE_CASES)("map node $id", ({ id, writes, writePaths, inputPa
 });
 
 // The mechanisms -> touch_seed_source fork is pinned by name in buildStepGraph.test.ts.
-it("track is branch-defining: spine -> characters, fork -> project_name (the copy-track side-trail)", () => {
-  const from = buildManifestStepGraph().edges.filter((e) => e.from === "track");
-  expect(from.find((e) => e.kind === "spine")?.to).toBe("characters");
-  expect(from.find((e) => e.kind === "fork")?.to).toBe("project_name");
+it("track's spine now runs to attribution; attribution is branch-defining: spine -> characters, fork -> project_name (#1901)", () => {
+  const graph = buildManifestStepGraph();
+  const fromTrack = graph.edges.filter((e) => e.from === "track");
+  expect(fromTrack.find((e) => e.kind === "spine")?.to).toBe("attribution");
+  // The copy-track fork used to leave from track; since #1901 it leaves
+  // from the attribution step (asked on both tracks, after the choice).
+  const fromAttribution = graph.edges.filter((e) => e.from === "attribution");
+  expect(fromAttribution.find((e) => e.kind === "spine")?.to).toBe("characters");
+  expect(fromAttribution.find((e) => e.kind === "fork")?.to).toBe("project_name");
 });
 
 // The two side-trails (spine:false) fork off the spine and join back; in the

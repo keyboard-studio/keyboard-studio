@@ -4,7 +4,7 @@
 //
 // Coverage:
 //   1.  Self-paired drop (word-style: a store paired with ITSELF via its own
-//       any() context source) — single slot, multiple slots, baseIr not mutated.
+//       any() context source) — single slot, multiple slots, startIr not mutated.
 //   2.  Cross-paired coordinated drop (dkf/dkt-style parallel-store deadkey) —
 //       single slot, dropping a nul PARTNER slot, structural sharing of
 //       untouched stores.
@@ -86,7 +86,7 @@ function makeParallelStoreGroup(
  * Output store items: ['À', 'ε', raw(nul), raw(nul)] — a char before AND
  * after non-char items, so index-vs-position tests are non-vacuous.
  */
-function makeBaseIr(
+function makeStartIr(
   outputStoreNodeId = "store#dkt",
   inputStoreNodeId = "store#dkf",
 ): KeyboardIR {
@@ -190,19 +190,19 @@ describe("applyStoreSlotRemovals — self-paired drop (a store paired with itsel
 
 describe("applyStoreSlotRemovals — cross-paired coordinated drop", () => {
   it("classifies the output store as drop, coordinated with its paired input store", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const store = ir.stores.find((s) => s.nodeId === "store#dkt")!;
     expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "drop", coordinatedWith: ["dkfX"] });
   });
 
   it("classifies the input store (formerly blocked as paired-input/dual-use) as drop, coordinated with the output store — the Matt-directive fix", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const store = ir.stores.find((s) => s.nodeId === "store#dkf")!;
     expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "drop", coordinatedWith: ["dktX"] });
   });
 
   it("dropping a slot from the OUTPUT store also splices the SAME position out of the paired INPUT store", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { ir: result, warnings, notices, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store#dkt#0"]), // À
@@ -223,7 +223,7 @@ describe("applyStoreSlotRemovals — cross-paired coordinated drop", () => {
   });
 
   it("dropping a slot from the INPUT store also splices the SAME position out of the paired OUTPUT store (previously blocked entirely)", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { ir: result, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store#dkf#0"]), // a
@@ -245,7 +245,7 @@ describe("applyStoreSlotRemovals — cross-paired coordinated drop", () => {
     // Target position 2, where dktX holds a pre-existing nul filler and
     // dkfX holds a real char ('c'). The user drops dkfX's char at 2; the
     // guard must allow dktX's nul partner to be spliced along with it.
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store#dkf#2"]), // c
@@ -270,7 +270,7 @@ describe("applyStoreSlotRemovals — cross-paired coordinated drop", () => {
   });
 
   it("if the DIRECTLY-requested slot itself is not a char, the position is skipped for the whole pair-set (no partial splice)", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     // Target dktX position 2, which is itself a nul (not a char) — this IS the
     // directly-requested slot, so the char-kind guard still applies to it.
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
@@ -284,7 +284,7 @@ describe("applyStoreSlotRemovals — cross-paired coordinated drop", () => {
   });
 
   it("structural sharing: an unrelated third store keeps the same object reference through a coordinated drop", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const orphan: IRStore = { nodeId: "store#orphan", name: "orphanX", items: [{ kind: "char", value: "q" }], isSystem: false };
     const irWithOrphan: KeyboardIR = { ...ir, stores: [...ir.stores, orphan] };
 
@@ -301,7 +301,7 @@ describe("applyStoreSlotRemovals — cross-paired coordinated drop", () => {
 
 describe("applyStoreSlotRemovals — multi-position splice safety", () => {
   it("removes multiple positions targeted out of ascending order identically on both paired stores", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     // Target indices out of ascending order to prove the filter approach
     // (not manual splicing) handles this correctly regardless of Set iteration order.
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
@@ -989,7 +989,7 @@ describe("classifyStoreSlotEdit — matchTableOnly", () => {
   });
 
   it("does NOT flag a dkf/dkt-style paired input store — its any() reference has no `+` at all, so it is never flagged edit-only (do not over-flag)", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const dkf = ir.stores.find((s) => s.name === "dkfX")!;
     const dkt = ir.stores.find((s) => s.name === "dktX")!;
     expect(classifyStoreSlotEdit(dkf, ir)).toEqual({ mode: "drop", coordinatedWith: ["dktX"] });
@@ -1150,7 +1150,7 @@ describe("describeStorePairing", () => {
   });
 
   it("'cross': a dkf/dkt-style CROSS pair names the OTHER store, not itself", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const dkt = ir.stores.find((s) => s.name === "dktX")!;
     const dkf = ir.stores.find((s) => s.name === "dkfX")!;
     expect(describeStorePairing(dkt, ir)).toEqual({ kind: "cross", partners: ["dkfX"] });
@@ -1277,7 +1277,7 @@ describe("describeStorePairing", () => {
 
 describe("applyStoreSlotRemovals — other guards", () => {
   it("guard — missing store nodeId: warning, skip, IR unchanged by reference", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store#nonexistent#0"]),
@@ -1290,7 +1290,7 @@ describe("applyStoreSlotRemovals — other guards", () => {
   });
 
   it("guard — malformed id (no `#` separator): warning, skip", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store-dkt-0"]),
@@ -1303,7 +1303,7 @@ describe("applyStoreSlotRemovals — other guards", () => {
   });
 
   it("guard — malformed id (non-numeric index, #abc): warning, skip", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { ir: result, warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store#dkt#abc"]),
@@ -1315,7 +1315,7 @@ describe("applyStoreSlotRemovals — other guards", () => {
   });
 
   it("guard — out-of-range index warns naming EVERY member of the pair-set", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { warnings, appliedCount } = applyStoreSlotRemovals(
       ir,
       new Set(["store#dkt#999"]),
@@ -1328,7 +1328,7 @@ describe("applyStoreSlotRemovals — other guards", () => {
 
   // #931 review — a target position can be valid for ONE pair-set member but
   // out of range for ANOTHER when the two stores have unequal item-array
-  // lengths. The existing "out of range" fixture above (makeBaseIr) gives
+  // lengths. The existing "out of range" fixture above (makeStartIr) gives
   // dktX and dkfX equal length (4 each), so an out-of-range index (999) is
   // out of range for BOTH — this only exercises the guard's "invalid for
   // both" path. This fixture makes dktX2 longer (4 items) than dkfX2
@@ -1425,7 +1425,7 @@ describe("applyStoreSlotRemovals — other guards", () => {
   });
 
   it("empty slotIds returns baseIr by reference and appliedCount===0", () => {
-    const ir = makeBaseIr();
+    const ir = makeStartIr();
     const { ir: result, appliedCount, warnings } = applyStoreSlotRemovals(ir, new Set());
 
     expect(result).toBe(ir);
@@ -1794,10 +1794,10 @@ describe("applyStoreSlotRemovals — Cameroon-shaped integration (trimmed fixtur
   });
 
   it("carving the ɛ+Ɛ contributor set splices word/final self-paired and dkf003b/dkt003b cross-paired at the SAME positions, with no interior nul", () => {
-    const { ir: baseIr } = parse(CAMEROON_SHAPED_KMN, "cameroon_shaped");
+    const { ir: startIr } = parse(CAMEROON_SHAPED_KMN, "cameroon_shaped");
 
-    const lower = collectCharContributors(baseIr, "ɛ");
-    const upper = collectCharContributors(baseIr, "Ɛ");
+    const lower = collectCharContributors(startIr, "ɛ");
+    const upper = collectCharContributors(startIr, "Ɛ");
 
     // Whole-rule deletes for the two literal RALT rules.
     expect(lower.ruleNodeIds.length).toBe(1);
@@ -1811,7 +1811,7 @@ describe("applyStoreSlotRemovals — Cameroon-shaped integration (trimmed fixtur
       ...upper.storeSlotIds,
     ]);
 
-    const storeNodeIdSet = new Set(baseIr.stores.map((s) => s.nodeId));
+    const storeNodeIdSet = new Set(startIr.stores.map((s) => s.nodeId));
     const slotIds = new Set<string>();
     const wholeNodeItemIds = new Set<string>();
     for (const id of deletedItemIds) {
@@ -1827,7 +1827,7 @@ describe("applyStoreSlotRemovals — Cameroon-shaped integration (trimmed fixtur
     expect(wholeNodeItemIds.size).toBe(2);
     expect(slotIds.size).toBeGreaterThan(0);
 
-    const { ir: carvedIr, notices, appliedCount } = applyStoreSlotRemovals(baseIr, slotIds);
+    const { ir: carvedIr, notices, appliedCount } = applyStoreSlotRemovals(startIr, slotIds);
     expect(appliedCount).toBeGreaterThan(0);
     expect(notices.some((n) => n.includes("coordinated removal") && n.includes("dkf003b") && n.includes("dkt003b"))).toBe(true);
 
@@ -1838,7 +1838,7 @@ describe("applyStoreSlotRemovals — Cameroon-shaped integration (trimmed fixtur
 
     // word lost ɛ and Ɛ (self-paired drop); final is untouched (no ɛ/Ɛ in it).
     expect(word.items.map((i) => (i.kind === "char" ? i.value : i.kind))).toEqual(["a", "b", "c", "Đ", "z"]);
-    const baseFinal = baseIr.stores.find((s) => s.name === "final")!;
+    const baseFinal = startIr.stores.find((s) => s.name === "final")!;
     expect(final).toBe(baseFinal); // structural sharing: untouched store keeps the same reference
 
     // dkf003b and dkt003b both lost items[10] and items[11] (ɛ, Ɛ) — SAME

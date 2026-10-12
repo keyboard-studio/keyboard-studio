@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-09",
+  "lastUpdated": "2026-10-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -317,11 +317,11 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:6580c65c4a285ad7",
+      "hash": "sha256:7724d18d3effa223",
       "status": "reference",
       "implements": [],
       "decisions": [],
-      "notes": "Architecture / meta-flow composition layer — the system view spec-kit omits. An index over the spec architecture-core sections + the extracted feature specs; not code."
+      "notes": "Architecture / meta-flow composition layer — the system view spec-kit omits. An index over the spec architecture-core sections + the extracted feature specs; not code. Content change acknowledged 2026-10-11 (Path C): the change rode in with merged PRs #1984/#1956 and matches the code; no implementing files affected."
     },
     "specs/014-mutate-seam-touch-propagation": {
       "title": "Feature Specification: KeyboardIR `mutate` seam + touch propagation",
@@ -939,6 +939,14 @@
       "decisions": [],
       "notes": "Proposed — planning spec only (PR #1936); no implementation yet. Acknowledged to register the section; implementation is future work."
     },
+    "specs/086-context-normalization-group": {
+      "title": "Feature Specification: Context normalization group",
+      "hash": "sha256:e941c0d01dbc2742",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
     "specs/087-decision-backend": {
       "title": "Backend Streamlining: Decisions as the Only Unit",
       "hash": "sha256:54ac0790f34155e4",
@@ -953,6 +961,54 @@
       ],
       "decisions": [],
       "notes": "Implemented and merged in PR #1938 (decisions as the only unit — derived order, full retirement); all 30 tasks complete. Spec was never seeded, so it flagged as new-section post-merge. Deferred follow-ups live in specs/087-decision-backend/followups.md."
+    },
+    "specs/088-modular-decisions": {
+      "title": "Feature Specification: Decision store — one record per decision",
+      "hash": "sha256:18678399ab8ccb13",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #1984 (collapsed 088-093 stack, decision store — one record per decision). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11: no implementing files diverge; acknowledgement registers the section as built."
+    },
+    "specs/089-decision-apply": {
+      "title": "Feature Specification: Question decisions write only through `apply`",
+      "hash": "sha256:5d52dff76e5ebcd6",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #1984 (question decisions write only through apply). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11."
+    },
+    "specs/090-gallery-decision-modules": {
+      "title": "Feature Specification: Gallery and picker decisions become modules",
+      "hash": "sha256:381b5e832c23624f",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #1984 (gallery and picker decisions become modules). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11."
+    },
+    "specs/091-derived-steps": {
+      "title": "Feature Specification: Steps derived from decisions",
+      "hash": "sha256:d33c86a1466cd4d4",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #1984 (steps derived from decisions). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11."
+    },
+    "specs/092-live-extraction": {
+      "title": "Feature Specification: Live extraction from the starting point",
+      "hash": "sha256:f54af92636359336",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #1984 (live extraction from the starting point). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11."
+    },
+    "specs/093-derived-keyboard": {
+      "title": "Feature Specification: The keyboard is derived from decisions",
+      "hash": "sha256:246f7b632a08bb31",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #1984 (keyboard derived from decisions). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11."
     }
   }
 }

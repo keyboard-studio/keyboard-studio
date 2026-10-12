@@ -97,7 +97,7 @@ export interface CharScrollStripProps {
    * Signal (a) of the 3-signal badge model (charMechanisms.ts's
    * getProducerBadge) — the caller's PRE-AUGMENT base/seed-only produced set
    * (NEVER a set that has been through `augmentWithComposable`). For
-   * MechanismGallery: `buildProducedSet(baseIr, { excludeBackspaceCorrections:
+   * MechanismGallery: `buildProducedSet(startIr, { excludeBackspaceCorrections:
    * true })`. For TouchGallery: `baseTouchCoveredSet`. Optional (defaults to
    * empty) — a caller with no base/seed notion (or a test exercising
    * something other than the badge) simply omits it.

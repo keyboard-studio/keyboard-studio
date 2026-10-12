@@ -19,7 +19,7 @@
 //
 // Applied in CharacterMapPane's `filteredGroups` right after the spec-047 case
 // fold and BEFORE search / "blocks my keyboard uses" filtering, so a merged
-// group's `usedByBase` (the OR of its parts) is what that checkbox tests.
+// group's `usedByStart` (the OR of its parts) is what that checkbox tests.
 
 import { CHARACTER_MAP_BLOCKS } from "@keyboard-studio/engine";
 import type { CharacterMapGroup } from "../../lib/services.ts";
@@ -73,7 +73,7 @@ function firstCodepoint(group: CharacterMapGroup): number {
  *   loanword letters and digits must not claim to be any one of them.
  * - **`script`** is the first contributor's, which is also what decides script
  *   ordering: the target/base scripts lead, exactly as the engine emitted them.
- * - **`usedByBase`** is the OR of the contributors — a block is "used by your
+ * - **`usedByStart`** is the OR of the contributors — a block is "used by your
  *   keyboard" if any part of it is.
  */
 export function mergeBlocksAcrossTiers(
@@ -93,7 +93,7 @@ export function mergeBlocksAcrossTiers(
       });
     } else {
       hit.group.cells.push(...g.cells);
-      hit.group.usedByBase = hit.group.usedByBase || g.usedByBase;
+      hit.group.usedByStart = hit.group.usedByStart || g.usedByStart;
       hit.tiers.add(g.tier);
     }
   }

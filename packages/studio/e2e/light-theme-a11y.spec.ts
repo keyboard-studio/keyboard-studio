@@ -21,8 +21,9 @@ import { test, expect } from "playwright/test";
 import {
   seedReturningVisitor,
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   drivePunctuationStep,
@@ -91,7 +92,7 @@ for (const { name, url } of LIGHT_SCREENS) {
 // uses, so this walk stays on the cheapest path to the gallery.
 // ---------------------------------------------------------------------------
 
-const BASE_KEYBOARD_ID = "bj_cree_woods";
+const START_KEYBOARD_ID = "bj_cree_woods";
 
 // WCAG 1.4.3 (contrast) on the OSK iframe's `.kmw-spacebar-caption`
 // (KeymanWeb's own spacebar-caption element) is now fixed at the source —
@@ -114,8 +115,9 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
   await driveIdentityLite(page, { english: "Test", autonym: "Nehiyawewin", script: "other" });
   await expectNoSeriousAxeViolations(page, "base picker (light)");
 
-  await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+  await pickStartKeyboard(page, START_KEYBOARD_ID);
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
 
   // "Confirm the basics" — the densest read-only surface in the flow, and the
   // one whose label/value colour pairs were most at risk from the token swap.

@@ -25,8 +25,8 @@ import {
   resolveKeyPickerSelection,
   resolvedVkeyOf,
 } from "../../lib/charInput.ts";
-import { HostDisclosure } from "./HostDisclosure.tsx";
-import { referenceHosts } from "../../lib/referenceHosts/index.ts";
+import { BaseDisclosure } from "./BaseDisclosure.tsx";
+import { referenceBases } from "../../lib/referenceBases/index.ts";
 import {
   BG_CARD,
   BORDER,
@@ -200,7 +200,7 @@ export function DeadkeyDetailEditor({
     for (const op of ops) recordDeadkeyOp(op);
   };
 
-  const [newBase, setNewBase] = useState("");
+  const [newStart, setNewStart] = useState("");
   const [newAccented, setNewAccented] = useState("");
   const [renameIdText, setRenameIdText] = useState("");
   const [nameText, setNameText] = useState<string | null>(null);
@@ -214,12 +214,12 @@ export function DeadkeyDetailEditor({
   // the same per-host consequence rows the define flow shows, so moving the
   // trigger is an informed choice, not a blind one. (Above the
   // info-undefined early return — hooks cannot run after it.)
-  const retargetHosts = useMemo(() => {
+  const retargetBases = useMemo(() => {
     const resolution = resolveKeyPickerSelection(retargetKey, retargetCustomChar);
     const vkey = resolvedVkeyOf(resolution);
     const label =
       retargetKey === "" ? "(no new trigger chosen)" : (vkey ?? retargetCustomChar);
-    return referenceHosts({ key: label, modifiers: [] });
+    return referenceBases({ key: label, modifiers: [] });
   }, [retargetKey, retargetCustomChar]);
 
   if (info === undefined) {
@@ -256,16 +256,16 @@ export function DeadkeyDetailEditor({
     if (id === null || !info.baseStore || !info.outputStore) return;
     // Scalar count, not UTF-16 length — an astral character is one scalar
     // (mirrors the define form's accent validation).
-    if (Array.from(newBase).length !== 1 || Array.from(newAccented).length !== 1) {
+    if (Array.from(newStart).length !== 1 || Array.from(newAccented).length !== 1) {
       setSectionError("A pair is two single characters: the base letter and its accented form.");
       return;
     }
     try {
-      const next = withAddedDeadkeyPair(ir, info.baseStore, info.outputStore, newBase, newAccented);
+      const next = withAddedDeadkeyPair(ir, info.baseStore, info.outputStore, newStart, newAccented);
       commitAndRecord(commitDeadkeyEdit(ir, next), [
-        { kind: "add-pair", id, base: newBase, accented: newAccented },
+        { kind: "add-pair", id, base: newStart, accented: newAccented },
       ]);
-      setNewBase("");
+      setNewStart("");
       setNewAccented("");
     } catch (e) {
       setSectionError(e instanceof Error ? e.message : String(e));
@@ -741,8 +741,8 @@ export function DeadkeyDetailEditor({
             <div style={rowStyle}>
               <input
                 style={{ ...inputStyle, width: 48 }}
-                value={newBase}
-                onChange={(e) => setNewBase(e.target.value)}
+                value={newStart}
+                onChange={(e) => setNewStart(e.target.value)}
                 placeholder="a"
                 maxLength={2}
                 aria-label="Base character"
@@ -831,7 +831,7 @@ export function DeadkeyDetailEditor({
         <div style={metaStyle}>
           The id stays {id !== null ? `dk(${hex4(id)})` : "as-is"} — only the trigger key moves.
         </div>
-        <HostDisclosure hosts={retargetHosts} />
+        <BaseDisclosure hosts={retargetBases} />
       </div>
 
       {/* Delete */}

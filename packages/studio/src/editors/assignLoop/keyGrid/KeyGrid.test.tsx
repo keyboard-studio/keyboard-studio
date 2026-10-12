@@ -666,7 +666,7 @@ describe("KeyGrid — annotations, provenance, and findings surfaced (FR-020)", 
     const label = screen
       .getByTestId("key-grid-cell-phone:default:K1")
       .getAttribute("aria-label");
-    expect(label).toContain("auto-placed from base keyboard");
+    expect(label).toContain("auto-placed from starting keyboard");
   });
 
   it("does not mention provenance at all for a hand-set (or unset) key", () => {

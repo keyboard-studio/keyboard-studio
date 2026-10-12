@@ -151,16 +151,11 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *   5. il_target_script (select) — choose a script
  *   6. il_script_not_supported (terminal notice, if CJK/Ethi/Hang) — never
  *      reached by this helper, since it always picks the "other" script.
- *   7. il_author_name (text) — REQUIRED (validate() rejects blank); reached
- *      unconditionally for every supported script (il_target_script's
- *      `next` default-branches here — see il_target_script.ts). Unseeded in
- *      an unauthenticated e2e run (IdentityLiteAdapter's authorSeed comes
- *      from useGitHubAuth(), which returns no name/email for a guest), so
- *      this helper must type a value or the walk parks here forever.
- *   8. il_author_email (text) — optional (required: false; a private GitHub
- *      email must never block emission per spec 064).
- *   9. il_copyright_holder (text) — optional and TERMINAL (`next: null`);
- *      blank defaults to the author name (D1).
+ *
+ * (#1901: the author/copyright questions — il_author_name, il_author_email,
+ * il_copyright_holder — are no longer part of this flow. They form the
+ * post-track attribution step; see driveAttributionStep, which walks call
+ * after chooseTrackCopy / chooseAdaptTrack.)
  *
  * This helper detects presence rather than assuming the fixed sequence above,
  * since il_language_region is conditional and may not render at all:
@@ -172,8 +167,6 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *   - il_language_code is always rendered (unconditional `next`); advances
  *     past it leaving it blank
  *   - selects target script "other" (keeps routing generic, avoids CJK/Ethiopic/Hangul stub)
- *   - fills il_author_name (required) and advances past the optional
- *     il_author_email / il_copyright_holder leaving both blank
  *   - waits for the base-keyboard picker combobox to appear (phase boundary)
  */
 export async function driveIdentityLite(
@@ -193,19 +186,12 @@ export async function driveIdentityLite(
      * "the author's tag" from "no tag".
      */
     languageCode?: string;
-    /**
-     * Author name for il_author_name (spec 064 US1) — REQUIRED, unlike every
-     * other option here. OMIT to use the default; every existing walk relies
-     * on that default rather than passing this explicitly.
-     */
-    authorName?: string;
   },
 ): Promise<void> {
   const english = options?.english ?? "Test";
   const autonym = options?.autonym ?? "Test Autonym";
   const script = options?.script ?? "other";
   const languageCode = options?.languageCode;
-  const authorName = options?.authorName ?? "Test Author";
 
   // Q1: English name (autocomplete) — spec 036 starts here
   await fillComboboxFreeText(page, "#il_language_english", english);
@@ -245,31 +231,9 @@ export async function driveIdentityLite(
   await selectMenuOption(page, page.locator("#il_target_script"), script);
   await surveyAdvance(page).click();
 
-
-  // Q6: Author name (plain text field) — ALWAYS rendered for every supported
-  // script (il_target_script's default branch goes here unconditionally; only
-  // the gated CJK/Ethiopic/Hangul scripts skip straight to
-  // il_script_not_supported instead, which this helper never selects) AND
-  // REQUIRED (validate() rejects blank — see
-  // questions/reserve/author_display_name.ts, reused by il_author_name.ts).
-  // Unseeded here: IdentityLiteAdapter's authorSeed comes from
-  // useGitHubAuth(), which returns no name/email for an unauthenticated e2e
-  // run, so this field starts genuinely blank.
-  await page.waitForSelector("#il_author_name", { timeout: 15_000 });
-  await page.locator("#il_author_name").fill(authorName);
-  await surveyAdvance(page).click();
-
-  // Q7: Author email (plain text field) — always rendered, but optional
-  // (required: false; a private GitHub profile email must never block
-  // emission per spec 064). Left blank (private-email authors are a real,
-  // supported case per D7).
-  await page.waitForSelector("#il_author_email", { timeout: 15_000 });
-  await surveyAdvance(page).click();
-
-  // Q8: Copyright holder — optional, TERMINAL (`next: null`); left blank
-  // (D1 defaults it to the author name). This hands off to the layout step.
-  await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
-  await surveyAdvance(page).click();
+  // The identity flow ends here (#1901): a supported script completes the
+  // step and hands off to the layout step. The author/copyright questions
+  // are the post-track attribution step's (driveAttributionStep).
 
   // Community-layout step (spec 076 A4): sits between identity and the base
   // picker. Confirm the studio's suggested Windows layout (the default,
@@ -279,21 +243,21 @@ export async function driveIdentityLite(
 
   // Robustness check for the phase boundary: the layout step hands off
   // to the base keyboard picker. Wait on that landmark rather than trusting
-  // the question count above. BaseResolution.tsx renders its root with
+  // the question count above. StartResolution.tsx renders its root with
   // data-testid="base-picker" (the visible field inside is a "Search
   // keyboards" labeled input, not a role=combobox named "Base keyboard").
   await expect(page.getByTestId("base-picker")).toBeVisible({
     // Cold-start guard: the base picker enumerates the entire ../keyboards
     // clone from disk on first render, which can take well over 20s on a cold
     // dev server. This wait is the single cold-start margin for every walk
-    // spec (all pass through driveIdentityLite before pickBaseKeyboard), so it
+    // spec (all pass through driveIdentityLite before pickStartKeyboard), so it
     // stays at 90s rather than the 15s used for warm intra-survey transitions.
     timeout: 90_000,
   });
 }
 
 /**
- * Resolve the base keyboard via the BaseKeyboardPicker combobox.
+ * Resolve the base keyboard via the StartKeyboardPicker combobox.
  *
  * Two paths:
  *   - Fast: if the keyboard appears as a ranked suggestion card, click it directly.
@@ -302,7 +266,7 @@ export async function driveIdentityLite(
  * @param page Page instance
  * @param keyboardId The keyboard ID to select (e.g. "bj_cree_woods", "basic_kbdfr")
  */
-export async function pickBaseKeyboard(
+export async function pickStartKeyboard(
   page: Page,
   keyboardId: string,
 ): Promise<void> {
@@ -354,6 +318,58 @@ export async function chooseTrackCopy(page: Page): Promise<void> {
   const copyRadio = page.getByRole("radio", { name: /^Copy/i });
   await copyRadio.waitFor({ state: "visible", timeout: 15_000 });
   await copyRadio.check();
+  await surveyAdvance(page).click();
+}
+
+/**
+ * Drive the attribution step (#1901) — the author/copyright questions,
+ * asked AFTER the track choice (call after chooseTrackCopy /
+ * chooseAdaptTrack, before acceptProjectName / confirmPrefill):
+ *
+ *   1. il_author_name (text) — REQUIRED (validate() rejects blank). Unseeded
+ *      in an unauthenticated e2e run (the profile seed comes from
+ *      useGitHubAuth(), which returns no name for a guest), so this helper
+ *      types a value or the walk parks here forever. A value already in
+ *      the field (an asked record on re-entry, or a profile seed) is
+ *      confirmed as-is unless `authorName` is passed explicitly.
+ *   2. il_author_email (text) — optional (required: false; a private GitHub
+ *      email must never block emission per spec 064). Left blank unless
+ *      `authorEmail` is passed.
+ *   3. il_copyright_holder (text) — optional, terminal for the flow. On the
+ *      update track it arrives PRE-FILLED with the base keyboard's own
+ *      copyright (the 092 extraction pass seeded it at setup) and is kept
+ *      as-is unless `copyrightHolder` is passed; on the copy track it is
+ *      blank, and blank defaults to the author name (D1).
+ */
+export async function driveAttributionStep(
+  page: Page,
+  options?: {
+    authorName?: string;
+    authorEmail?: string;
+    copyrightHolder?: string;
+  },
+): Promise<void> {
+  const nameField = page.locator("#il_author_name");
+  await nameField.waitFor({ state: "visible", timeout: 15_000 });
+  if (options?.authorName !== undefined) {
+    await nameField.fill(options.authorName);
+  } else if ((await nameField.inputValue()) === "") {
+    await nameField.fill("Test Author");
+  }
+  await surveyAdvance(page).click();
+
+  const emailField = page.locator("#il_author_email");
+  await emailField.waitFor({ state: "visible", timeout: 15_000 });
+  if (options?.authorEmail !== undefined) {
+    await emailField.fill(options.authorEmail);
+  }
+  await surveyAdvance(page).click();
+
+  const holderField = page.locator("#il_copyright_holder");
+  await holderField.waitFor({ state: "visible", timeout: 15_000 });
+  if (options?.copyrightHolder !== undefined) {
+    await holderField.fill(options.copyrightHolder);
+  }
   await surveyAdvance(page).click();
 }
 
@@ -842,7 +858,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
   const continueButton = page.getByTestId("touch-continue");
   // A ui/SelectMenu like the target-script field above — its options are
   // portalled to document.body, so they go through selectMenuOption.
-  const hostKeySelect = page.getByRole("button", { name: "Host key for long-press" });
+  const baseKeySelect = page.getByRole("button", { name: "Host key for long-press" });
   const applyButton = page.getByRole("button", { name: /^Apply touch method for/ });
 
   for (let guard = 0; guard < 200; guard++) {
@@ -850,11 +866,11 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     if (!stillPresent) return;
 
     // canGoNext (gates continueButton) requires the character to already be
-    // configured; a fresh character always starts disabled (method/hostKey
+    // configured; a fresh character always starts disabled (method/baseKey
     // reset on every currentChar change), so a disabled continueButton means
     // this character still needs the default long-press method + Apply.
     if (await continueButton.isDisabled()) {
-      await selectMenuOption(page, hostKeySelect, "K_A");
+      await selectMenuOption(page, baseKeySelect, "K_A");
       await applyButton.click();
     }
     await continueButton.click();

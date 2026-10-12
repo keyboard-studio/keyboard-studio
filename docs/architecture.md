@@ -11,6 +11,10 @@
 > discipline in [CLAUDE.md](../CLAUDE.md). If a fact here contradicts its linked
 > home, the home wins — fix the link, don't fork the fact.
 >
+> **Vocabulary.** The keyboard terms in this document follow the
+> [keyboard vocabulary glossary](design-notes/keyboard-vocabulary-glossary.md)
+> (Keyman's terms: base keyboard, copied keyboard, starting point).
+>
 > **It is tracked.** [`utilities/spec-trace`](../utilities/spec-trace/) hashes
 > this file (as `docs/architecture.md`) alongside the spec sections and the
 > extracted feature specs, so architectural drift is visible, not silent.
@@ -54,13 +58,16 @@ one persistent working copy.
   [§8](../spec.md#8-data-flow) → [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
 - **Generic step host (v1.3 studio).** The studio renders every survey/editor
   step through one generic host — no per-step `switch` in the shell. A typed
-  step **manifest** (`{ id, component, layout, inputs, writes, flowRefs }`)
+  step **manifest** (`{ id, component, layout, inputs, writes }`)
   declares each step; `StepHost` resolves `manifest.find(activeStepId)`, renders
   the declared `component` in the chrome its `layout` selects, and runs a single
   centralized completion path (`applyStepCompletion → advance → session.advance`).
   Adding or re-laying-out a step is a manifest edit, not a shell edit; step
-  *order* is not stated in the manifest but derived from each step's
-  `provides`/`requires` (`steps/stepDependencies.ts`, spec 087). The three bespoke survey wrappers converged onto a single `FlowStepHost`
+  *order* is not stated in the manifest but derived: the wizard's screens are
+  derived from the decision modules' `provides`/`requires` and routing
+  (`decisions/deriveScreens.ts` over the registry's `decisionModules`, spec
+  091; the sort is spec 087's), and the manifest is arranged by the derived
+  screen order. The three bespoke survey wrappers converged onto a single `FlowStepHost`
   + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
   the extension mechanism for new flows; existing flows keep their
   `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
@@ -170,6 +177,20 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
   runs as an un-awaited follow-on task gated by the compile's `runId`. It never
   delays the preview and adds no timer. Its report reaches Layer C through
   `lintContextTolerance`.
+  The station first proposes the spec 086 normalization step: one context-only group in
+  front of the keyboard's entry point that rewrites the tail of the existing text into the
+  form the keyboard produces, then passes the keystroke on unchanged. It is derived without
+  simulation, cached per keyboard source (`normalizationStepCache.ts`), and replayed through
+  the same overlay. A refused step, or a keyboard the committed verification record marks
+  `regressed`, falls back to the spec 062 per-rule proposal. That fallback is temporary:
+  it retires when desktop engines and the paste premise are verified and no corpus keyboard
+  is `regressed` (criteria in
+  [the 086 engine contract](../specs/086-context-normalization-group/contracts/engine-normalization-step.md#062-per-rule-path-retirement-criteria)).
+  The step lives only in the projection replay; the working IR stays step-free, so the
+  debounced TS Layer A pass does not see it and only the compile and the WASM oracle do.
+  Desktop-engine verification and the paste premise (paste runs no keyboard rules; the
+  rewrite happens on the next keystroke) are not yet verified, and gate making the step
+  the default over 062.
 - **Async compute, synchronous write (spec 078, research D8).** A fix that must
   compile and simulate to be generated is computed asynchronously, outside any
   step. It is committed in two places. The working IR takes it through

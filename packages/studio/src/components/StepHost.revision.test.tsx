@@ -18,6 +18,7 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useStepNavStore } from "../stores/stepNavStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import type { ReducerDeps } from "../steps/reducer.ts";
 import type { Location } from "../lib/location.ts";
@@ -55,6 +56,20 @@ vi.mock("../steps/manifest.ts", async () => {
       { kind: "editor-step", id: "punctuation", title: "Punctuation", inputs: [], writes: [], component: PaneStep },
       { kind: "editor-step", id: "rules", title: "Rules", inputs: [], writes: [], component: FullStep, layout: "full" },
     ],
+    // Spec 091: the step layer reads the manifest's screen derivation too; the
+    // stub models it for its three steps, all on the spine.
+    derivedScreens: [
+      { id: "identity", kind: "custom", decisionIds: [], moduleIds: [], spine: true },
+      { id: "punctuation", kind: "custom", decisionIds: [], moduleIds: [], spine: true },
+      { id: "rules", kind: "custom", decisionIds: [], moduleIds: [], spine: true },
+    ],
+    screenTrails: new Map([
+      ["identity", { spine: true }],
+      ["punctuation", { spine: true }],
+      ["rules", { spine: true }],
+      ["package", { spine: true }],
+    ]),
+    screenGates: new Map(),
   };
 });
 
@@ -65,11 +80,11 @@ const deps: ReducerDeps = {
   lockDesktop: vi.fn(),
   setTouchLayoutJson: vi.fn(),
   clearStale: vi.fn(),
-  instantiateFromBase: vi.fn(),
+  instantiateFromStart: vi.fn(),
   instantiateFromExisting: vi.fn(),
   buildTouchLayoutJson: vi.fn(() => ({ json: null, warnings: [] })),
-  resolveBaseTouchJson: vi.fn(() => undefined),
-  instantiateFromBaseIfConfirmed: vi.fn(() => true),
+  resolveStartTouchJson: vi.fn(() => undefined),
+  instantiateFromStartIfConfirmed: vi.fn(() => true),
 };
 
 function arriveAt(stepId: "punctuation" | "rules", returnTo: Location): void {
@@ -96,6 +111,7 @@ afterEach(() => {
   useStepNavStore.getState().reset();
   useWorkingCopyStore.getState().reset();
   useDecisionLogStore.getState().reset();
+  useDecisionStore.getState().reset();
 });
 
 describe("full-layout step opened from Output", () => {
@@ -139,6 +155,20 @@ describe("full-layout step opened from Output", () => {
       useStepNavStore.getState().reset();
       useSurveySessionStore.getState().reset();
     }
+  });
+
+  it("Discard also restores the decisions a step wrote (spec 088 decision store)", () => {
+    seedInstantiatedWorkingCopy([]);
+    useDecisionStore.getState().record({ id: "marks-treatment", value: "before", provenance: "asked", step: "marks" });
+    arriveAt("rules", { route: "output" });
+    renderHostWithFooter("rules");
+
+    act(() => {
+      useDecisionStore.getState().record({ id: "marks-treatment", value: "after", provenance: "asked", step: "marks" });
+    });
+    fireEvent.click(screen.getByTestId("step-revision-discard"));
+
+    expect(useDecisionStore.getState().decisions["marks-treatment"]?.value).toBe("before");
   });
 
   it("Discard restores the arrival state, records nothing, and returns", () => {

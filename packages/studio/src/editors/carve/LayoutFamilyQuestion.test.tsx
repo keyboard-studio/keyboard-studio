@@ -11,12 +11,12 @@ import { LayoutFamilyQuestion } from "./LayoutFamilyQuestion.tsx";
 import {
   getLayoutFamilyAnswer,
   saveLayoutFamilyAnswer,
-  setLikelyHostDeps,
+  setLikelyBaseDeps,
 } from "../../lib/layoutFamily.ts";
 
 beforeEach(() => {
   useSurveyAnswerStore.getState().reset();
-  setLikelyHostDeps(undefined);
+  setLikelyBaseDeps(undefined);
 });
 
 afterEach(() => {
@@ -27,7 +27,7 @@ describe("LayoutFamilyQuestion", () => {
   it("renders the existing question's prompt and four options unchanged", () => {
     render(<LayoutFamilyQuestion />);
     expect(
-      screen.getByText("Which physical keyboard layout does your community use?"),
+      screen.getByText("Which base keyboard layout does your community use?"),
     ).toBeTruthy();
     expect(screen.getByRole("radio", { name: /QWERTY \(used in most English-speaking countries/ })).toBeTruthy();
     expect(screen.getByRole("radio", { name: /QWERTZ \(used in Germany/ })).toBeTruthy();
@@ -61,9 +61,9 @@ describe("LayoutFamilyQuestion", () => {
   });
 
   it("reads the stored answer first (override-deps seam)", () => {
-    setLikelyHostDeps({
-      likelyHostLayouts: () => [{ id: "x", label: "Should not appear" }],
-      layoutFamilyHosts: (answer) => [{ id: `lf-${answer}`, label: `Hosts for ${answer}` }],
+    setLikelyBaseDeps({
+      likelyBaseLayouts: () => [{ id: "x", label: "Should not appear" }],
+      layoutFamilyBases: (answer) => [{ id: `lf-${answer}`, label: `Hosts for ${answer}` }],
     });
     saveLayoutFamilyAnswer("qwertz");
     render(<LayoutFamilyQuestion bcp47="de" />);

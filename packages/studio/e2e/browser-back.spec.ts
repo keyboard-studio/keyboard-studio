@@ -27,14 +27,15 @@
 import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   seedReturningVisitor,
   switchTab,
 } from "./helpers/surveyFlow";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Test",
   english: "Test",
   targetScript: "Latn",
@@ -49,15 +50,17 @@ test.describe("browser Back mid-survey (F7)", () => {
   });
 
   test("physical Back button steps back one manifest step at a time", async ({ page }) => {
-    // Walk: identity -> choose_base -> track -> characters (adapt skips
-    // project_name — see steps/manifest.ts's track-routing docstring).
+    // Walk: identity -> choose_base -> track -> attribution (#1901) ->
+    // characters (adapt skips project_name — see steps/manifest.ts's
+    // track-routing docstring).
     await driveIdentityLite(page, {
       english: FIXTURE.english,
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
 
     // Now on "characters" (its "prefill" sub-stage renders first — see
     // CharactersStep.tsx). Which sub-stage of "characters" we land on doesn't
@@ -89,16 +92,22 @@ test.describe("browser Back mid-survey (F7)", () => {
     await page.goBack();
     await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 20_000 });
 
-    // One physical Back: characters -> track. The track radio choice
+    // One physical Back: characters -> attribution. The attribution
+    // step's first question reappears (with the asked author name
+    // restored).
+    await page.goBack();
+    await expect(page.locator("#il_author_name")).toBeVisible({ timeout: 15_000 });
+
+    // A second physical Back: attribution -> track. The track radio choice
     // reappears (its own onComplete re-fires chooseAdaptTrack forward again
     // below to confirm the walk is genuinely reversible, not just "some
     // earlier screen appeared").
     await page.goBack();
     await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 15_000 });
 
-    // A second physical Back: track -> choose_base. The base picker
+    // A third physical Back: track -> choose_base. The base picker
     // reappears — proves the browser's own history stack (not just the
-    // in-app "<- Back" dispatch) drives the wizard back two full manifest
+    // in-app "<- Back" dispatch) drives the wizard back three full manifest
     // steps in a row.
     await page.goBack();
     await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });

@@ -1,4 +1,4 @@
-// Per-question module: il_author_email (identity-lite, spec 064 US1)
+// Per-question module: il_author_email (attribution flow — spec 064 US1, moved post-track by #1901)
 //
 // See il_author_name.ts for why identity-lite uses its own ids rather than
 // reviving the demoted phase_a modules directly.
@@ -52,5 +52,14 @@ const mod: QuestionModule = {
   // Decision spike (km/decisions-spike).
   provides: ["author-email"],
   requires: ["author-name"],
+  // Spec 092 (T033): the stored author profile's email as a lookup
+  // default; absent when the profile has none (a private GitHub profile
+  // email must never block or be invented, spec 064 D7).
+  lookupDefault: (ctx) => {
+    const email = ctx.identity?.authorProfile?.email;
+    return email !== undefined && email !== null && email !== ""
+      ? { value: email, source: "identity" }
+      : undefined;
+  },
 };
 export default mod;

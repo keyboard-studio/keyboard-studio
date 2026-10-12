@@ -31,23 +31,23 @@ export interface DocsPreview {
 export function useDocsPreview(): DocsPreview {
   const helpDocs = useWorkingCopyStore((s) => s.helpDocs);
   const identity = useWorkingCopyStore((s) => s.identity);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const baseWelcomeHtmText = useWorkingCopyStore((s) => s.baseWelcomeHtmText);
-  const baseHelpPhpText = useWorkingCopyStore((s) => s.baseHelpPhpText);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
+  const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
   // spec 080 FR-006: the base README is inherited on an adaptation only; the
   // slice is null on Track 1 by construction, and the track guard keeps it so.
-  const baseReadmeMdText = useWorkingCopyStore((s) =>
-    s.instantiationMode === "adapt-existing" ? s.baseReadmeMdText : null,
+  const startReadmeMdText = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.startReadmeMdText : null,
   );
 
   return useMemo(() => {
-    const displayName = identity?.displayName ?? baseKeyboard?.displayName ?? "";
+    const displayName = identity?.displayName ?? startKeyboard?.displayName ?? "";
     // The base IR's own header.targets — a synchronous approximation of the
     // final projected .kmn's store(&TARGETS) (which projectWorkingCopyForOutput
     // reads instead, after carve/identity/rename have run). Good enough for a
     // live preview; not claimed byte-identical to the eventual output list.
-    const platforms = baseIr?.header.targets.map((t) => t.toLowerCase()) ?? [];
+    const platforms = startIr?.header.targets.map((t) => t.toLowerCase()) ?? [];
     const input: HelpDocsRenderInput = {
       answers: helpDocs,
       displayName,
@@ -55,10 +55,10 @@ export function useDocsPreview(): DocsPreview {
       platforms,
     };
     return {
-      readmeMd: renderReadmeMd(input, baseReadmeMdText),
+      readmeMd: renderReadmeMd(input, startReadmeMdText),
       readmeHtm: renderReadmeHtm(input),
-      welcomeHtm: renderWelcomeHtm(input, baseWelcomeHtmText),
-      helpPhp: renderHelpPhp(input, baseHelpPhpText, baseWelcomeHtmText),
+      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText),
+      helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
     };
-  }, [helpDocs, identity, baseKeyboard, baseIr, baseWelcomeHtmText, baseHelpPhpText, baseReadmeMdText]);
+  }, [helpDocs, identity, startKeyboard, startIr, startWelcomeHtmText, startHelpPhpText, startReadmeMdText]);
 }

@@ -51,7 +51,7 @@ import type { DiacriticBehavior, Scale, ScriptClass } from "./axes";
 import type { StrategyId } from "./strategy";
 import type { KeyBudget, KeyBudgetBand } from "./keyBudget";
 import type {
-  BaseContribution,
+  StartContribution,
   DecisionAgency,
   DecisionEntry,
   DecisionFileChange,
@@ -63,12 +63,13 @@ import type {
   DiffHunk,
   EditorActionSummary,
   EditorActionType,
+  JsonValue,
 } from "./decisionRecord";
-import { DECISION_RECORD_FORMAT } from "./decisionRecord";
+import { DECISION_RECORD_FORMAT, DECISION_SUMMARY_LIMIT } from "./decisionRecord";
 import type { HelpDocsAnswers } from "./help-docs";
 import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
-  BaseDocumentationProfile,
+  StartDocumentationProfile,
   ChartPreference,
   DocLintInput,
   DocMemberState,
@@ -740,9 +741,9 @@ export const DecisionImpactSchema = z.discriminatedUnion("state", [
 // string is a validation failure here, not a surprise downstream.
 const SURVEY_ANSWER_BASE = { kind: z.literal("survey-answer"), questionId: z.string().min(1) };
 
-export const BaseContributionSchema = z.object({
+export const StartContributionSchema = z.object({
   kind: z.literal("base-contribution"),
-  baseId: z.string().min(1),
+  startId: z.string().min(1),
   baseDisplayName: z.string().min(1),
   // Absent = could not be measured; `0` is reserved for a genuinely empty
   // starting layout (specs/055-legible-decision-trail data-model.md §3).
@@ -751,6 +752,22 @@ export const BaseContributionSchema = z.object({
   inheritedMetadata: z.array(z.object({ field: z.string(), value: z.string() })),
   instantiationMode: z.enum(["new-from-base", "adapt-existing"]),
 });
+
+// Any JSON value (spec 090 US5, D-090-48): a `decision` payload's `value` is
+// the providing module's own value type, and the record validates only that
+// it is JSON — never a per-module shape (see JsonValue in decisionRecord.ts).
+// Recursive via z.lazy; the explicit ZodType annotation is what keeps the
+// inferred type the contract's JsonValue rather than `unknown`.
+export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(JsonValueSchema),
+    z.record(z.string(), JsonValueSchema),
+  ]),
+);
 
 export const DecisionPayloadSchema = z.union([
   z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("char-list"), value: z.array(z.string()) }),
@@ -765,7 +782,16 @@ export const DecisionPayloadSchema = z.union([
     actionType: EditorActionTypeSchema,
     summary: EditorActionSummarySchema,
   }),
-  BaseContributionSchema,
+  StartContributionSchema,
+  z.object({
+    kind: z.literal("decision"),
+    decisionId: z.string().min(1),
+    value: JsonValueSchema,
+    // Bounded at the same literal the recording host truncates to
+    // (DECISION_SUMMARY_LIMIT in decisionRecord.ts): one clause, never a
+    // rendering of the value.
+    summary: z.string().min(1).max(DECISION_SUMMARY_LIMIT),
+  }),
 ]);
 
 export const DecisionEntrySchema = z.object({
@@ -802,6 +828,7 @@ export const HelpDocsAnswersSchema = z.object({
   projectHomeUrl: z.string().optional(),
   projectHelpUrl: z.string().optional(),
   docLanguage: z.enum(["english", "target", "bilingual"]).optional(),
+  docLanguageTags: z.array(z.string().min(1)).min(1).max(2).optional(),
   designRationale: z.string().optional(),
   fontGuidance: z.string().optional(),
   canonicalOrder: z.string().optional(),
@@ -839,7 +866,7 @@ export const DocMemberStateSchema = z.object({
   warnings: z.array(z.string()),
 });
 
-export const BaseDocumentationProfileSchema = z.object({
+export const StartDocumentationProfileSchema = z.object({
   level: z.enum(["none", "minimal", "full", "unknown"]),
   members: z.array(DocMemberIdSchema),
   welcomeConvention: z.enum(["folder", "flat", "absent"]),
@@ -882,7 +909,7 @@ export const DocLintInputSchema = z.object({
   // zod 4: `z.record` over an enum key is exhaustive; the contract is Partial.
   members: z.partialRecord(DocMemberIdSchema, z.string()),
   deletedFilenames: z.array(z.string()),
-  baseHistoryMdText: z.string().optional(),
+  startHistoryMdText: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -1093,9 +1120,10 @@ type _DecisionFileChangeGuard = Expect<
   AssignableTo<z.infer<typeof DecisionFileChangeSchema>, DecisionFileChange>
 >;
 type _DecisionImpactGuard = Expect<AssignableTo<z.infer<typeof DecisionImpactSchema>, DecisionImpact>>;
-type _BaseContributionGuard = Expect<
-  AssignableTo<z.infer<typeof BaseContributionSchema>, BaseContribution>
+type _StartContributionGuard = Expect<
+  AssignableTo<z.infer<typeof StartContributionSchema>, StartContribution>
 >;
+type _JsonValueGuard = Expect<AssignableTo<z.infer<typeof JsonValueSchema>, JsonValue>>;
 type _DecisionPayloadGuard = Expect<AssignableTo<z.infer<typeof DecisionPayloadSchema>, DecisionPayload>>;
 type _DecisionEntryGuard = Expect<AssignableTo<z.infer<typeof DecisionEntrySchema>, DecisionEntry>>;
 type _DecisionRecordGuard = Expect<AssignableTo<z.infer<typeof DecisionRecordSchema>, DecisionRecord>>;
@@ -1106,8 +1134,8 @@ type _HelpDocsAnswersGuard = Expect<
 type _DocMemberStateGuard = Expect<
   AssignableTo<z.infer<typeof DocMemberStateSchema>, DocMemberState>
 >;
-type _BaseDocumentationProfileGuard = Expect<
-  AssignableTo<z.infer<typeof BaseDocumentationProfileSchema>, BaseDocumentationProfile>
+type _StartDocumentationProfileGuard = Expect<
+  AssignableTo<z.infer<typeof StartDocumentationProfileSchema>, StartDocumentationProfile>
 >;
 type _HistoryEntryStateGuard = Expect<
   AssignableTo<z.infer<typeof HistoryEntryStateSchema>, HistoryEntryState>

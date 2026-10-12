@@ -21,7 +21,7 @@
  * rejections (a removed proposal is never re-proposed, FR-022) and from the
  * author's own picks (never restyled or re-attributed, FR-005). A character in
  * both sources appears once, in the CLDR group; the studio derives "also
- * produced by the base" at render time from `BasePunctuationCoverage`.
+ * produced by the base" at render time from `StartPunctuationCoverage`.
  *
  * Sibling of `convenienceChars.ts` (the letters family). Pure, browser-safe,
  * no I/O.
@@ -62,7 +62,7 @@ export const ASCII_PUNCTUATION_FLOOR: readonly string[] = Object.freeze([
 // Base coverage
 // ---------------------------------------------------------------------------
 
-export interface BasePunctuationCoverage {
+export interface StartPunctuationCoverage {
   /** NFC punctuation (`glyphCategory === "punctuation"`) the base IR statically produces. */
   produced: string[];
   /**
@@ -74,7 +74,7 @@ export interface BasePunctuationCoverage {
 }
 
 /** What punctuation the base keyboard produces, and whether that list is trustworthy. */
-export function basePunctuationCoverage(ir: KeyboardIR): BasePunctuationCoverage {
+export function startPunctuationCoverage(ir: KeyboardIR): StartPunctuationCoverage {
   return {
     produced: nfcUnique(producedGlyphs(ir)).filter((c) => glyphCategory(c) === "punctuation"),
     coverageComplete: !hasUnaccountedOpaqueFragment(ir),
@@ -91,8 +91,8 @@ export type CldrAbsentReason = "no-exemplars" | "empty-tier";
 export interface PunctuationProposalInput {
   /** `useSourcedExemplars(bcp47).inventory` — null when neither source covers the tag. */
   exemplars: SourcedInventory | null;
-  /** `basePunctuationCoverage(ir)`, or null when there is no working copy to read. */
-  baseCoverage: BasePunctuationCoverage | null;
+  /** `startPunctuationCoverage(ir)`, or null when there is no working copy to read. */
+  baseCoverage: StartPunctuationCoverage | null;
   /** NFC keys of proposals the author removed (`phaseBDraftStore.rejected`). */
   rejected: ReadonlySet<string>;
   /** NFC keys the author typed or picked themselves (provenance `"author"`). */

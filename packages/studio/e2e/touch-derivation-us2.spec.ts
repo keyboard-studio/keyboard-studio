@@ -41,7 +41,7 @@
 //     - the emitted platform key set is exactly ["tablet"], while bambara
 //       ships exactly ["phone"] — so the shipped platform is provably GONE,
 //       not augmented or carried forward (buildTouchLayoutJson.ts Case A:
-//       `const { touchLayout: _stripped, ...rest } = baseIr;` strips the
+//       `const { touchLayout: _stripped, ...rest } = startIr;` strips the
 //       shipped layout before scaffoldTouchLayout runs — R10 — specifically so
 //       a "reseed" never silently carries the base's own platforms forward),
 //     - the shipped-layout-only marker `font === "Tahoma"` (present on
@@ -85,8 +85,9 @@ import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   driveMechanismsGallery,
@@ -140,7 +141,7 @@ import {
 //     (unmodified) a/o/u/n keys.
 // ---------------------------------------------------------------------------
 
-const PIAROA_BASE_ID = "pid_piaroa";
+const PIAROA_START_ID = "pid_piaroa";
 
 /** N (>=1; two chosen for parity with touch-derivation-us1.spec.ts's
  *  convention) carve targets — each produced by exactly ONE rule
@@ -164,8 +165,8 @@ const PIAROA_SURVIVOR_CHAR = "ñ";
  *  deadkey default leaves Apply already enabled with zero field edits). */
 const PLACED_CHAR = "é";
 
-const PIAROA_KMN_ZIP_PATH = `source/${PIAROA_BASE_ID}.kmn`;
-const PIAROA_TOUCH_ZIP_PATH = `source/${PIAROA_BASE_ID}.keyman-touch-layout`;
+const PIAROA_KMN_ZIP_PATH = `source/${PIAROA_START_ID}.kmn`;
+const PIAROA_TOUCH_ZIP_PATH = `source/${PIAROA_START_ID}.keyman-touch-layout`;
 
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
@@ -184,10 +185,10 @@ const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 // seed-source step, diverging only in the explicit choice made there.
 // ---------------------------------------------------------------------------
 
-const BAMBARA_BASE_ID = "bambara";
+const BAMBARA_START_ID = "bambara";
 const BAMBARA_CARVED_CHARS = ["ɛ", "ŋ"] as const;
 const BAMBARA_SURVIVOR_CHAR = "ɔ";
-const BAMBARA_TOUCH_ZIP_PATH = `source/${BAMBARA_BASE_ID}.keyman-touch-layout`;
+const BAMBARA_TOUCH_ZIP_PATH = `source/${BAMBARA_START_ID}.keyman-touch-layout`;
 
 // ---------------------------------------------------------------------------
 // Page-object-lite helpers — the identity/base/track/prefill/build-list steps
@@ -201,7 +202,7 @@ const BAMBARA_TOUCH_ZIP_PATH = `source/${BAMBARA_BASE_ID}.keyman-touch-layout`;
 // ---------------------------------------------------------------------------
 
 /** Identity-lite (Phase A), parametrized by language identity. Latin script
- *  keeps routing through the ranked BaseResolution picker. Drops the stale
+ *  keeps routing through the ranked StartResolution picker. Drops the stale
  *  `code` fill (spec 036's il_language_code question is optional and skipped
  *  by driveIdentityLiteBase, same as touch-derivation-us1.spec.ts) — base
  *  selection below resolves by explicit id search, not by code-driven
@@ -216,7 +217,7 @@ async function driveIdentityLite(
     autonym: identity.autonym,
     script: identity.script,
   });
-  // Additional wait for BaseResolution to render its picker (spec 035 may take longer)
+  // Additional wait for StartResolution to render its picker (spec 035 may take longer)
   await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });
 }
 
@@ -413,8 +414,9 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await page.goto("/");
 
     await driveIdentityLite(page, { autonym: "Piaroa", code: "pid", script: "Latn" });
-    await pickBaseKeyboard(page, PIAROA_BASE_ID);
+    await pickStartKeyboard(page, PIAROA_START_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
 
     // Spec 057 FR-072: a mid-walk tab round trip, folded into an existing long
@@ -547,8 +549,9 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
     await page.goto("/");
 
     await driveIdentityLite(page, { autonym: "Bamanankan", code: "bm", script: "Latn" });
-    await pickBaseKeyboard(page, BAMBARA_BASE_ID);
+    await pickStartKeyboard(page, BAMBARA_START_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await addPlacedCharacterToInventory(page, PLACED_CHAR);
 
@@ -583,7 +586,7 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
     // returns exactly `["phone"]`). The reseed emits exactly one platform,
     // `tablet`. So the emitted key set alone proves the shipped layout was
     // DISCARDED rather than augmented or carried forward: had R10's strip
-    // (`const { touchLayout: _stripped, ...rest } = baseIr`) not run, the
+    // (`const { touchLayout: _stripped, ...rest } = startIr`) not run, the
     // shipped `phone` platform would still be here.
     expect(Object.keys(touchJson), "reseed must discard the shipped phone platform").toEqual([
       "tablet",

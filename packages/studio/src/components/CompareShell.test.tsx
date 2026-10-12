@@ -33,8 +33,8 @@ vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
   },
 }));
 
-vi.mock("./BaseKeyboardPicker.tsx", () => ({
-  BaseKeyboardPicker: ({ onChange }: { onChange: (kb: unknown) => void }) => (
+vi.mock("./StartKeyboardPicker.tsx", () => ({
+  StartKeyboardPicker: ({ onChange }: { onChange: (kb: unknown) => void }) => (
     <button data-testid="base-picker" onClick={() => onChange(basicKbdus)}>
       pick base
     </button>
@@ -52,7 +52,7 @@ vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
 const instantiateSpy = vi.fn();
 vi.mock("../lib/confirmRebase.ts", () => ({
   confirmRebaseIfEdited: () => true,
-  instantiateFromBaseIfConfirmed: (...a: unknown[]) => instantiateSpy(...a),
+  instantiateFromStartIfConfirmed: (...a: unknown[]) => instantiateSpy(...a),
   needsRebaseConfirm: () => false,
   confirmRebaseTo: () => true,
   REBASE_CONFIRM_MESSAGE: "",
@@ -62,7 +62,7 @@ import { CompareScreen } from "./CompareScreen.tsx";
 
 /** A working copy with recorded edits — the thing that must not be touched. */
 function seedWorkingCopy() {
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs: createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }]),
     ir: makeTestIR([]),
   });
@@ -71,7 +71,7 @@ function seedWorkingCopy() {
 function snapshotProject() {
   const s = useWorkingCopyStore.getState();
   return {
-    baseId: s.baseKeyboard?.id ?? null,
+    startId: s.startKeyboard?.id ?? null,
     identity: s.identity,
     instantiationMode: s.instantiationMode,
     phaseResultsCount: s.phaseResults.length,
@@ -104,7 +104,7 @@ describe("no write path exists (FR-021, FR-022, FR-025)", () => {
 
     expect(keyboardArtifactCalls.length).toBeGreaterThan(0);
     for (const args of keyboardArtifactCalls) {
-      // Signature: (baseKeyboard, scaffoldSpec, vfsTransform, onInstantiate).
+      // Signature: (startKeyboard, scaffoldSpec, vfsTransform, onInstantiate).
       // A non-null 4th argument is the rebase path, whatever it does.
       expect(args[3] ?? null).toBeNull();
     }
@@ -189,11 +189,11 @@ describe("what the tab IS for (FR-024)", () => {
   it("holds the selection in session view state, so it survives a tab switch (Q5)", () => {
     const { unmount } = render(<CompareScreen />);
     screen.getByTestId("base-picker").click();
-    expect(useViewStateStore.getState().compareSelection?.baseKeyboard.id).toBe(basicKbdus.id);
+    expect(useViewStateStore.getState().compareSelection?.startKeyboard.id).toBe(basicKbdus.id);
 
     // A route change unmounts the screen; the module-level view store spans it.
     unmount();
-    expect(useViewStateStore.getState().compareSelection?.baseKeyboard.id).toBe(basicKbdus.id);
+    expect(useViewStateStore.getState().compareSelection?.startKeyboard.id).toBe(basicKbdus.id);
   });
 
   it("keeps the selection out of every authoring store", () => {
@@ -202,7 +202,7 @@ describe("what the tab IS for (FR-024)", () => {
 
     // The foreign keyboard is loaded, but the project still has none.
     expect(useViewStateStore.getState().compareSelection).not.toBeNull();
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
     expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
   });
 });

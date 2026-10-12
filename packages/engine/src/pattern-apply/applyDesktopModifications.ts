@@ -6,7 +6,7 @@
  *
  * Two passes over the layout, run in the same chronological order as the
  * desktop decisions they replay (Phase C placements precede Phase D carve):
- *   1. Placements — for each {char, hostKey}, land the char on the mobile
+ *   1. Placements — for each {char, baseKey}, land the char on the mobile
  *      platform's ("phone", or "tablet" when no "phone" platform is present —
  *      see {@link resolveMobilePlatformIndex}) layer its case selects (see
  *      {@link touchLayerForChar} in touchLayer.ts: an uppercase char targets
@@ -21,7 +21,7 @@
  *      it becomes the corpus's own blank (`T_BLANK` + `sp` 10, see
  *      {@link BLANK_KEY_ID}) so row geometry stays stable (R9) without leaving
  *      a dead key that still draws as a live one.
- *      Running removals AFTER placements matters: if a hostKey is both the
+ *      Running removals AFTER placements matters: if a baseKey is both the
  *      target of a Phase C placement and later has its (now-superseded)
  *      character carved, the removal pass sees the key's CURRENT (placed)
  *      production — not its stale pre-placement one — so the key is
@@ -55,13 +55,13 @@ export interface DesktopModifications {
   /** Phase D carve removals — characters no key may produce after replay. */
   removals: readonly string[];
   /** Phase C individual letter placements. */
-  placements: readonly { char: string; hostKey: string }[];
+  placements: readonly { char: string; baseKey: string }[];
 }
 
 export interface ApplyDesktopModificationsResult {
   /** Updated layout (structurally shared with the seed where unchanged). */
   layout: TouchLayoutIR;
-  /** Diagnostic messages — e.g. a placement whose hostKey wasn't found. */
+  /** Diagnostic messages — e.g. a placement whose baseKey wasn't found. */
   warnings: string[];
 }
 
@@ -232,7 +232,7 @@ interface LayerWorkState {
 
 function applyPlacements(
   layout: TouchLayoutIR,
-  placements: readonly { char: string; hostKey: string }[],
+  placements: readonly { char: string; baseKey: string }[],
   warnings: string[],
   minter: NodeIdMinter,
 ): TouchLayoutIR {
@@ -306,21 +306,21 @@ function applyPlacements(
     return { state: resolveLayerState(DEFAULT_TOUCH_LAYER)!, layerId: DEFAULT_TOUCH_LAYER };
   }
 
-  function getWorkingKey(state: LayerWorkState, hostKey: string): TouchKeyIR | undefined {
-    const pos = state.keyIndex.get(hostKey);
+  function getWorkingKey(state: LayerWorkState, baseKey: string): TouchKeyIR | undefined {
+    const pos = state.keyIndex.get(baseKey);
     return pos ? state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] : undefined;
   }
 
-  function setWorkingKey(state: LayerWorkState, hostKey: string, updated: TouchKeyIR): void {
-    const pos = state.keyIndex.get(hostKey);
+  function setWorkingKey(state: LayerWorkState, baseKey: string, updated: TouchKeyIR): void {
+    const pos = state.keyIndex.get(baseKey);
     if (!pos) return;
     state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
   }
 
   // Sensible fallback position: append a new letter key onto the last row of
   // the target layer (or a fresh row if the layer is empty) so the character
-  // stays reachable even with no obvious host position (e.g. no hostKey, or
-  // hostKey absent from that layer).
+  // stays reachable even with no obvious host position (e.g. no baseKey, or
+  // baseKey absent from that layer).
   function placeFallback(state: LayerWorkState, char: string): void {
     const fallbackKey: TouchKeyIR = {
       nodeId: minter.mint("touchKey"),
@@ -341,15 +341,15 @@ function applyPlacements(
   }
 
   for (const rawPlacement of placements) {
-    const { hostKey } = rawPlacement;
+    const { baseKey } = rawPlacement;
     // Normalize once so `text` and `id` (charToUnicodeKeyId NFC-normalizes
     // internally) always agree, even for an NFD-form placement char — and so
     // touchLayerForChar sees a single precomposed code point for its case test.
     const char = rawPlacement.char.normalize("NFC");
     const { state, layerId } = resolveTargetLayer(char);
-    const existing = hostKey ? getWorkingKey(state, hostKey) : undefined;
+    const existing = baseKey ? getWorkingKey(state, baseKey) : undefined;
 
-    if (!hostKey) {
+    if (!baseKey) {
       warnings.push(
         `[desktop-modifications] placement for "${char}" has no hostKey — placed via fallback`,
       );
@@ -359,7 +359,7 @@ function applyPlacements(
 
     if (!existing) {
       warnings.push(
-        `[desktop-modifications] host key "${hostKey}" not found in ${phonePlatform.id} "${layerId}" layer — "${char}" placed via fallback`,
+        `[desktop-modifications] host key "${baseKey}" not found in ${phonePlatform.id} "${layerId}" layer — "${char}" placed via fallback`,
       );
       placeFallback(state, char);
       continue;
@@ -389,15 +389,15 @@ function applyPlacements(
     // not silently lost.
     if (existing.provenance === "hand-set") {
       warnings.push(
-        `[desktop-modifications] host key "${hostKey}" is hand-set — "${char}" placed via fallback instead of overwriting an author edit`,
+        `[desktop-modifications] host key "${baseKey}" is hand-set — "${char}" placed via fallback instead of overwriting an author edit`,
       );
       placeFallback(state, char);
       continue;
     }
 
-    const hostIsEmpty = existing.text === undefined && existing.output === undefined;
+    const baseIsEmpty = existing.text === undefined && existing.output === undefined;
 
-    if (hostIsEmpty) {
+    if (baseIsEmpty) {
       const { text: _t, output: _o, ...rest } = existing;
       const updated: TouchKeyIR = {
         ...rest,
@@ -405,7 +405,7 @@ function applyPlacements(
         text: char,
         provenance: "physical-suggested",
       };
-      setWorkingKey(state, hostKey, updated);
+      setWorkingKey(state, baseKey, updated);
       continue;
     }
 
@@ -426,7 +426,7 @@ function applyPlacements(
       sk: [...existingSk, newSkKey],
       provenance: "physical-suggested",
     };
-    setWorkingKey(state, hostKey, updated);
+    setWorkingKey(state, baseKey, updated);
   }
 
   // Reconstruct the layout with structural sharing: only the layers a

@@ -3,11 +3,11 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
 import type { MessageDescriptor } from "@lingui/core";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { Badge } from "../ui/index.ts";
 import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
-// spec 080 FR-008: one label/tone mapping shared with BaseResolution's cards.
+// spec 080 FR-008: one label/tone mapping shared with StartResolution's cards.
 import { buildDocLevelLabel, DOC_LEVEL_TONE } from "../lib/docLevelBadge.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
@@ -17,8 +17,8 @@ import { buildDocLevelLabel, DOC_LEVEL_TONE } from "../lib/docLevelBadge.ts";
 const TRY_HINTS: Record<string, { intro: MessageDescriptor; examples: string[] }> = {
   basic_kbdus: {
     intro: msg({
-      id: "metadata.tryHint.basicKbdus.intro",
-      message: "US-English layout — types the same as your physical keyboard.",
+      id: "metadata.tryHint.basicKbdus.baseKeyboardIntro",
+      message: "US-English layout — types the same as your base keyboard.",
     }),
     examples: ["a -> a", "Shift+a -> A", "1 -> 1"],
   },
@@ -53,17 +53,17 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
+export function MetadataCard({ kb }: { kb: StartKeyboard }) {
   const { t, i18n } = useLingui();
   const hint = TRY_HINTS[kb.id];
   // spec 080 FR-008: the classification committed to the working copy at base
-  // SELECTION (BaseResolution.tsx's confirm handler). Guarded against the
+  // SELECTION (StartResolution.tsx's confirm handler). Guarded against the
   // store's confirmed base — `kb` here can also be a not-yet-confirmed preview
   // (CompareScreen / PickerPane's "full" variant), and showing a stale
   // classification carried over from a PRIOR confirmed base would misattribute
   // it to whichever keyboard this card currently renders.
-  const baseDocProfile = useWorkingCopyStore((s) =>
-    s.baseKeyboard?.id === kb.id ? s.baseDocProfile : null,
+  const startDocProfile = useWorkingCopyStore((s) =>
+    s.startKeyboard?.id === kb.id ? s.startDocProfile : null,
   );
   return (
     <>
@@ -93,9 +93,9 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
           }}
         >
           <Trans id="metadata.selectedKeyboard.heading">Selected keyboard</Trans>
-          {baseDocProfile !== null && baseDocProfile.level !== "unknown" ? (
-            <Badge tone={DOC_LEVEL_TONE[baseDocProfile.level]} style={{ textTransform: "none", letterSpacing: "normal" }}>
-              {buildDocLevelLabel(baseDocProfile.level, i18n)}
+          {startDocProfile !== null && startDocProfile.level !== "unknown" ? (
+            <Badge tone={DOC_LEVEL_TONE[startDocProfile.level]} style={{ textTransform: "none", letterSpacing: "normal" }}>
+              {buildDocLevelLabel(startDocProfile.level, i18n)}
             </Badge>
           ) : null}
         </div>

@@ -6,7 +6,7 @@
 // with options_source. The autocomplete widget enforces selection from a list;
 // free-text shape-validation would be redundant and is not implied by the YAML.
 
-import type { QuestionModule, MutateContext } from "../../types.ts";
+import type { QuestionModule, ApplyContext, WorkingCopyPatch } from "../../types.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
@@ -55,24 +55,25 @@ function asLangSubtag(value: string | string[] | undefined): string {
  * result is `swa-Latn`. An empty/blank answer is a no-op (M5) — this question
  * is optional (`required: false`).
  */
-export function mutate(
+export function apply(
   value: string | string[] | undefined,
-  ctx: MutateContext,
-): Partial<KeyboardIR> {
+  ctx: ApplyContext,
+): WorkingCopyPatch {
   const lang = asLangSubtag(value);
   if (lang === "") return {};
+  if (ctx.ir === null) return {};
 
   const current = ctx.ir.header.bcp47[0];
   // Carry over the existing script/variant subtags (everything after the lang).
   const rest = current !== undefined && current.includes("-")
     ? current.slice(current.indexOf("-"))
     : "";
-  return { header: { bcp47: [`${lang}${rest}`] } as KeyboardIR["header"] };
+  return { ir: { header: { bcp47: [`${lang}${rest}`] } as KeyboardIR["header"] } };
 }
 
 const mod: QuestionModule = {
   definition,
-  mutate,
+  apply,
   fixtures,
   inputs: [],
   writes: [irPath("header", "bcp47")],

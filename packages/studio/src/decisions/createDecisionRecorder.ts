@@ -28,7 +28,7 @@
 // statement, so the multi-vs-single branch below is not optional plumbing.
 
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   DecisionImpact,
   DiscoveryAxisVector,
   KeyboardIR,
@@ -41,10 +41,12 @@ import { useDecisionLogStore } from "./decisionLogStore.ts";
 import { recordSurveyAnswers, type ProposalLookup } from "./recordSurveyAnswers.ts";
 import { withContextToleranceProposal } from "./contextToleranceProposal.ts";
 import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
+import { recordGalleryDecisions } from "./recordGalleryDecisions.ts";
+import type { Decision } from "./decisionTypes.ts";
 import {
-  recordBaseContribution,
+  recordStartContribution,
   type InstantiatedMode,
-} from "./recordBaseContribution.ts";
+} from "./recordStartContribution.ts";
 import type { SourceSnapshotter } from "./snapshotSource.ts";
 
 export interface DecisionRecorderDeps {
@@ -62,7 +64,7 @@ export interface DecisionRecorderDeps {
    */
   getMechanismAssignments: () => readonly MechanismAssignment[];
   /** The base IR the working copy was instantiated from, or `null`. */
-  getBaseIr: () => KeyboardIR | null;
+  getStartIr: () => KeyboardIR | null;
   /** Ids of the carved-away rule/store nodes, for the carve projection. */
   getDeletedNodeIds: () => ReadonlySet<string>;
   /** Ids of the carved-away store-slot items, for the carve projection. */
@@ -80,17 +82,17 @@ export interface DecisionRecorderDeps {
   getKeyboardId: () => string | null;
   /**
    * The chosen base keyboard, or `null` before instantiation — feeds
-   * `recordBaseContribution` at `choose_base` completion only (specs/055
+   * `recordStartContribution` at `choose_base` completion only (specs/055
    * FR-030..FR-035, research D-11).
    */
-  getBaseKeyboard: () => BaseKeyboard | null;
+  getStartKeyboard: () => StartKeyboard | null;
   /** Axes the studio has derived onto the working copy so far. */
   getIrAxes: () => Partial<DiscoveryAxisVector>;
   /** `null` before instantiation; one of the two literals once instantiated. */
   getInstantiationMode: () => InstantiatedMode | null;
   /**
    * Same map the carve gallery reads to build its rail nodes — see
-   * `RecordBaseContributionDeps.getRemovalCapabilities` (recordBaseContribution.ts)
+   * `RecordStartContributionDeps.getRemovalCapabilities` (recordStartContribution.ts)
    * for why a starting count must be read against this rather than defaulted.
    */
   getRemovalCapabilities: () => Map<string, RemovalCapability>;
@@ -115,6 +117,14 @@ export interface DecisionRecorderDeps {
    * (its final screen), or the step itself for a single-screen step.
    */
   resolveCompletionScreen?: (stepId: string) => string;
+  /**
+   * spec 090 US5: the gallery decisions a step settles (its `settles` list
+   * resolved against the live decision set), read at completion so each
+   * appends its one log entry (recordGalleryDecisions.ts). Optional — a
+   * recorder built without it (unit fixtures) records answers and editor
+   * steps exactly as before.
+   */
+  getStepDecisions?: (stepId: string) => readonly Decision[];
 }
 
 /** Records one screen's answers at its Next (spec 079 R-04). */
@@ -126,11 +136,24 @@ export type RecordQuestionAnswers = (
 
 /**
  * The recorder: callable as the reducer's `recordDecision` (step completion),
- * plus `recordQuestionAnswers` for every earlier Next inside a step.
+ * plus `recordQuestionAnswers` for every earlier Next inside a step, plus
+ * `recordStartContributionNow` for the post-instantiation baseline (below).
  */
 export interface DecisionRecorder {
   (event: { stepId: string; result: unknown }): void;
   recordQuestionAnswers: RecordQuestionAnswers;
+  /**
+   * Record the base-contribution baseline (specs/055 FR-030..FR-035) from
+   * the CURRENT working copy. Called by StudioShell's doCommit immediately
+   * AFTER instantiation — the only moment the baseline can be read: at
+   * `choose_base` completion time (when the callable above fires) the
+   * working copy does not exist yet, because instantiation waits for both
+   * setup decisions and runs in doCommit (spec 093 final pass, closing
+   * the 090 US5 residue: completing choose_base left no base-contribution
+   * entry). Returns the entry id, or null when no working copy is
+   * instantiated (the record is not papered over).
+   */
+  recordStartContributionNow: () => string | null;
 }
 
 /**
@@ -213,28 +236,18 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
     // recorded before it are untouched apart from the record-level id.
     log.setKeyboardId(deps.getKeyboardId());
 
-    // specs/055 FR-030..FR-035 (research D-11): the base baseline, recorded once
-    // at `choose_base` completion. This fires here — not from a new event — because
-    // `choose_base`'s instantiation runs inside `applyStepCompletion`, and StepHost
-    // calls `recordStepCompletion` (which reaches this callback) AFTER that, so the
-    // working copy already exists (Constitution Article IV: no new timer/event).
-    // `recordBaseContribution` itself writes no entry when the store shows no
-    // instantiated working copy yet — that null is not papered over here.
-    //
-    // This entry does not join `recordedIds` below: it is not a diff the
-    // snapshotter's boundary capture describes (there is no "before" to compare
-    // against — the working copy did not exist a moment ago), so it gets no
-    // `DecisionImpact` attached.
-    if (stepId === "choose_base") {
-      recordBaseContribution({
-        append: log.append,
-        getBaseKeyboard: deps.getBaseKeyboard,
-        getBaseIr: deps.getBaseIr,
-        getIrAxes: deps.getIrAxes,
-        getInstantiationMode: deps.getInstantiationMode,
-        getRemovalCapabilities: deps.getRemovalCapabilities,
-      });
-    }
+    // specs/055 FR-030..FR-035 (research D-11): the base baseline is NOT
+    // recorded here. It used to fire at `choose_base` completion on the
+    // assumption that instantiation ran inside applyStepCompletion before
+    // this callback — falsified on the live flow (090 US5): StepHost's
+    // handleComplete reaches this callback synchronously, while the actual
+    // instantiation runs later in StudioShell's doCommit (gated on BOTH
+    // setup decisions), so the fire read a not-yet-existent working copy
+    // and `recordStartContribution` returned null — completing choose_base
+    // left no base-contribution entry. The baseline now records from
+    // doCommit via `recordStartContributionNow` (attached below), the one
+    // moment the instantiated copy exists. (On a re-confirm the old fire
+    // was worse than null: it described the OUTGOING base.)
 
     // Answers already recorded at an earlier Next are identical revisits here
     // and append nothing, so completion is idempotent (spec 079 R-04).
@@ -255,21 +268,40 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
       getDeletionCounts: deps.getDeletionCounts,
       getDeletedIds: deps.getDeletedIds,
       getMechanismAssignments: deps.getMechanismAssignments,
-      getBaseIr: deps.getBaseIr,
+      getStartIr: deps.getStartIr,
       getDeletedNodeIds: deps.getDeletedNodeIds,
       getDeletedItemIds: deps.getDeletedItemIds,
       ...(deps.getCarveChars !== undefined ? { getCarveChars: deps.getCarveChars } : {}),
     });
 
+    // spec 090 US5 (research R6): the step's settled GALLERY decisions, read
+    // from the decision set — by completion the host/adapters have recorded
+    // them, and StepHost's recordAnswersAsDecisions has already run for this
+    // completion's answers, so the set read here is final for this boundary.
+    const galleryIds =
+      deps.getStepDecisions !== undefined
+        ? recordGalleryDecisions(stepId, {
+            append: log.append,
+            decisions: deps.getStepDecisions(stepId),
+          })
+        : [];
+
     // Every entry recorded at this boundary — a question step's answers, or an
     // editor step's single aggregated entry (never both: a step is one or the
-    // other). This is the boundary's full co-decision set, collected BEFORE the
-    // capture resolves so `sharedWith` can name every sibling once it lands.
+    // other), plus the step's gallery-decision entries, which can accompany
+    // either (a characters completion records its answers AND its inventory
+    // decision; a carve completion its editor entry AND its carved-layout
+    // decision). This is the boundary's full co-decision set, collected BEFORE
+    // the capture resolves so `sharedWith` can name every sibling once it lands.
     //
     // Advance the source baseline on EVERY completion, whether or not anything
     // was recorded. Skipping non-recording steps would make the next diff span
     // two boundaries and attribute another step's change to this one.
-    captureAndAttach(editorId !== null ? [editorId] : answerIds);
+    captureAndAttach([
+      ...answerIds,
+      ...(editorId !== null ? [editorId] : []),
+      ...galleryIds,
+    ]);
   }) as DecisionRecorder;
 
   recordDecision.recordQuestionAnswers = (stepId, screenId, answers) => {
@@ -280,6 +312,23 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
     const ids = appendAnswers(stepId, answers);
     deps.onScreenRecorded?.(stepId, screenId, ids, hash);
     captureAndAttach(ids);
+  };
+
+  recordDecision.recordStartContributionNow = () => {
+    const log = useDecisionLogStore.getState();
+    // FR-004: carry the identity onto the record as soon as there is one.
+    log.setKeyboardId(deps.getKeyboardId());
+    // The baseline gets no `DecisionImpact` attached (no captureAndAttach):
+    // it is not a diff the snapshotter's boundary capture describes —
+    // there is no "before" to compare against.
+    return recordStartContribution({
+      append: log.append,
+      getStartKeyboard: deps.getStartKeyboard,
+      getStartIr: deps.getStartIr,
+      getIrAxes: deps.getIrAxes,
+      getInstantiationMode: deps.getInstantiationMode,
+      getRemovalCapabilities: deps.getRemovalCapabilities,
+    });
   };
 
   return recordDecision;

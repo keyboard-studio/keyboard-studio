@@ -20,14 +20,14 @@ import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { fetchKeyboardSourceToVfs } from "./fetchKeyboardSourceToVfs.js";
 import type { FetchFn } from "./fetchKeyboardSourceToVfs.js";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
-/** Minimal BaseKeyboard for sil_euro_latin. */
-const euroLatinKb: BaseKeyboard = {
+/** Minimal StartKeyboard for sil_euro_latin. */
+const euroLatinKb: StartKeyboard = {
   id: "sil_euro_latin",
   path: "release/sil/sil_euro_latin",
   script: "Latn",
@@ -60,7 +60,7 @@ group(main) using keys
 const PROXY = "https://raw-proxy.example";
 
 /** Build a proxyBase URL prefix for the keyboard's source dir. */
-function sourceUrl(kb: BaseKeyboard, file: string): string {
+function sourceUrl(kb: StartKeyboard, file: string): string {
   return `${PROXY}/${kb.path}/source/${file}`;
 }
 
@@ -568,8 +568,8 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [kpsUrl]: ok(kps("welcome\\welcome.htm", ["welcome\\welcome.htm", "readme.htm"])),
       [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
     });
-    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
-    expect(result.baseWelcomeConvention).toBe("folder");
+    expect(result.startWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.startWelcomeConvention).toBe("folder");
     // The declared page satisfied the probe; the flat name was never asked for.
     expect(calls).not.toContain(sourceUrl(euroLatinKb, "welcome.htm"));
   });
@@ -578,9 +578,9 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
     const { result } = await run({
       [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
     });
-    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
-    expect(result.baseWelcomeConvention).toBe("folder");
-    expect(result.baseWelcomeImages).toBeUndefined();
+    expect(result.startWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.startWelcomeConvention).toBe("folder");
+    expect(result.startWelcomeImages).toBeUndefined();
   });
 
   it("falls back to the flat source/welcome.htm and reports the flat convention", async () => {
@@ -588,9 +588,9 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [kpsUrl]: ok(kps("welcome.htm", ["welcome.htm", "readme.htm"])),
       [sourceUrl(euroLatinKb, "welcome.htm")]: ok("<html>flat page</html>"),
     });
-    expect(result.baseWelcomeHtmText).toBe("<html>flat page</html>");
-    expect(result.baseWelcomeConvention).toBe("flat");
-    expect(result.baseWelcomeImages).toBeUndefined();
+    expect(result.startWelcomeHtmText).toBe("<html>flat page</html>");
+    expect(result.startWelcomeConvention).toBe("flat");
+    expect(result.startWelcomeImages).toBeUndefined();
   });
 
   it("folder WINS when both conventions exist, even though the .kps declares the flat name", async () => {
@@ -600,9 +600,9 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
       [sourceUrl(euroLatinKb, "welcome/chart.png")]: ok(PNG),
     });
-    expect(result.baseWelcomeConvention).toBe("folder");
-    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
-    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/chart.png"]);
+    expect(result.startWelcomeConvention).toBe("folder");
+    expect(result.startWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.startWelcomeImages?.map((i) => i.path)).toEqual(["welcome/chart.png"]);
   });
 
   it("degrades a declared page that 404s (ghost descriptor entry) to the next probe", async () => {
@@ -611,15 +611,15 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       // welcome/intro.htm is NOT served; the folder page is.
       [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
     });
-    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
-    expect(result.baseWelcomeConvention).toBe("folder");
+    expect(result.startWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.startWelcomeConvention).toBe("folder");
   });
 
   it("reports `absent` — and no page text — when nothing is served", async () => {
     const { result } = await run({});
-    expect(result.baseWelcomeHtmText).toBeUndefined();
-    expect(result.baseWelcomeConvention).toBe("absent");
-    expect(result.baseWelcomeImages).toBeUndefined();
+    expect(result.startWelcomeHtmText).toBeUndefined();
+    expect(result.startWelcomeConvention).toBe("absent");
+    expect(result.startWelcomeImages).toBeUndefined();
   });
 
   it("fetches every welcome\\ file the .kps lists as bytes, in .kps order, page excluded (FR-006)", async () => {
@@ -637,12 +637,12 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [sourceUrl(euroLatinKb, "welcome/desktop_default.png")]: ok(PNG),
       [sourceUrl(euroLatinKb, "welcome/phone_shift.png")]: ok(new Uint8Array([9, 9])),
     });
-    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual([
+    expect(result.startWelcomeImages?.map((i) => i.path)).toEqual([
       "welcome/desktop_default.png",
       "welcome/phone_shift.png",
     ]);
-    expect([...result.baseWelcomeImages![0]!.bytes]).toEqual([...PNG]);
-    expect(result.baseWelcomeImages![1]!.bytes).toBeInstanceOf(Uint8Array);
+    expect([...result.startWelcomeImages![0]!.bytes]).toEqual([...PNG]);
+    expect(result.startWelcomeImages![1]!.bytes).toBeInstanceOf(Uint8Array);
     // Fetch-don't-write: neither the page nor the images land in the VFS.
     expect(vfs.get("source/welcome/welcome.htm")).toBeUndefined();
     expect(vfs.get("source/welcome/desktop_default.png")).toBeUndefined();
@@ -655,7 +655,7 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
       [sourceUrl(euroLatinKb, "welcome/real.png")]: ok(PNG),
     });
-    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/real.png"]);
+    expect(result.startWelcomeImages?.map((i) => i.path)).toEqual(["welcome/real.png"]);
     expect(result.warnings.some((w) => w.includes("welcome image welcome/ghost.png") && w.includes("HTTP 404"))).toBe(
       true,
     );
@@ -671,7 +671,7 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [sourceUrl(euroLatinKb, "welcome/listed.png")]: ok(PNG),
       [sourceUrl(euroLatinKb, "welcome/mobile_default.png")]: ok(new Uint8Array([5, 5])),
     });
-    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/listed.png", "welcome/mobile_default.png"]);
+    expect(result.startWelcomeImages?.map((i) => i.path)).toEqual(["welcome/listed.png", "welcome/mobile_default.png"]);
     // The `..`-relative and remote references are never probed; the 404 is not a warning.
     expect(calls).not.toContain(`${PROXY}/${euroLatinKb.path}/sil_euro_latin.ico`);
     expect(calls.some((c) => c.includes("x.example"))).toBe(false);
@@ -692,7 +692,7 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       ),
       [sourceUrl(euroLatinKb, "welcome/ok.png")]: ok(PNG),
     });
-    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/ok.png"]);
+    expect(result.startWelcomeImages?.map((i) => i.path)).toEqual(["welcome/ok.png"]);
     expect(calls.filter((c) => c.includes(".."))).toEqual([]);
     expect(calls.filter((c) => c.includes("secret") || c.includes("passwd") || c.includes("x.png"))).toEqual([]);
   });
@@ -702,7 +702,7 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [kpsUrl]: ok(kps("welcome.htm", ["welcome.htm", "welcome\\stray.png"])),
       [sourceUrl(euroLatinKb, "welcome.htm")]: ok("<html>flat page</html>"),
     });
-    expect(result.baseWelcomeConvention).toBe("flat");
+    expect(result.startWelcomeConvention).toBe("flat");
     expect(calls).not.toContain(sourceUrl(euroLatinKb, "welcome/stray.png"));
   });
 
@@ -711,16 +711,16 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [rootUrl("README.md")]: ok("# EuroLatin\n\nBase readme.\n"),
       [rootUrl("HISTORY.md")]: ok("## 1.0 (2020-01-01)\n* Initial release.\n"),
     });
-    expect(result.baseReadmeMdText).toBe("# EuroLatin\n\nBase readme.\n");
-    expect(result.baseHistoryMdText).toBe("## 1.0 (2020-01-01)\n* Initial release.\n");
+    expect(result.startReadmeMdText).toBe("# EuroLatin\n\nBase readme.\n");
+    expect(result.startHistoryMdText).toBe("## 1.0 (2020-01-01)\n* Initial release.\n");
     expect(vfs.get("README.md")).toBeUndefined();
     expect(vfs.get("HISTORY.md")).toBeUndefined();
   });
 
   it("leaves README/HISTORY undefined and warning-free when the base has none", async () => {
     const { result } = await run({});
-    expect(result.baseReadmeMdText).toBeUndefined();
-    expect(result.baseHistoryMdText).toBeUndefined();
+    expect(result.startReadmeMdText).toBeUndefined();
+    expect(result.startHistoryMdText).toBeUndefined();
     expect(result.warnings.filter((w) => /README|HISTORY/.test(w))).toEqual([]);
   });
 });

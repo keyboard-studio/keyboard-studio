@@ -43,14 +43,9 @@ import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 const noopReducerDeps: ReducerDeps = {
-  lockDesktop: vi.fn(),
-  clearStale: vi.fn(),
-  setTouchLayoutJson: vi.fn(),
-  instantiateFromBase: vi.fn(),
+  instantiateFromStart: vi.fn(),
   instantiateFromExisting: vi.fn(),
-  buildTouchLayoutJson: () => ({ json: null, warnings: [] }),
-  resolveBaseTouchJson: () => undefined,
-  instantiateFromBaseIfConfirmed: () => false,
+  instantiateFromStartIfConfirmed: () => false,
 };
 
 async function mountAt(stepId: ActiveStepId) {

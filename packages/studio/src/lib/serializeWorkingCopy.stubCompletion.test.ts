@@ -5,7 +5,7 @@
 // into the VFS (it references compiled ../build/* artifacts) — and whether
 // the SCAFFOLDED artifact (which carries a generated .kps) ever replaces the
 // open-base VFS in the store is a compile-settle race the commit seam runs
-// only once per base id (StudioShell's instantiatedForBaseIdRef). The output
+// only once per base id (StudioShell's instantiatedForStartIdRef). The output
 // projection therefore completes the keyboard directory itself via the
 // scaffolder's generateStubs (only-fills-missing), so the downloaded zip is a
 // submittable keyboard directory regardless of which artifact won.
@@ -45,7 +45,7 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+      .instantiateFromStart(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
@@ -66,7 +66,7 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
     const keyboardId = basicKbdus.id;
     const vfs = makeFetchedVfs(keyboardId);
     vfs.set(`source/${keyboardId}.kps`, "<Package>real</Package>", false);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: makeTestIR([]) });
 
     const projected = await projectWorkingCopyForOutput();
     expect(readVfsText(projected!.vfs, `source/${keyboardId}.kps`)).toBe("<Package>real</Package>");
@@ -115,7 +115,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+      .instantiateFromStart(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
     useWorkingCopyStore.getState().setHelpDocs({
       description: "A keyboard for testing.",
       usageTips: [],
@@ -136,7 +136,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+      .instantiateFromStart(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
@@ -161,7 +161,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+      .instantiateFromStart(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
     useWorkingCopyStore.getState().setHelpDocs({ description: "A keyboard for testing.", usageTips: [] });
 
     const projected = await projectWorkingCopyForOutput();
@@ -188,7 +188,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+      .instantiateFromStart(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
     useWorkingCopyStore.getState().setHelpDocs({ description: "First answer.", usageTips: [] });
     await projectWorkingCopyForOutput();
 
@@ -207,7 +207,7 @@ describe("early production (Track 1, nothing answered yet)", () => {
   function instantiate() {
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(basicKbdus.id), ir: makeTestIR([]) });
+      .instantiateFromStart(basicKbdus, { vfs: makeFetchedVfs(basicKbdus.id), ir: makeTestIR([]) });
   }
 
   it("HISTORY.md is the stub under the keyboard's version, before any proposal decision", async () => {

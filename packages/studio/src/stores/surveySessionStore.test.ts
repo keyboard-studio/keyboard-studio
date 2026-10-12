@@ -63,45 +63,31 @@ describe("surveySessionStore", () => {
     const store = getStore();
     store.advance("choose_base");
     store.advance("track");
-    store.setSelectedTrack("copy");
-    store.setScaffoldSpec({ keyboardId: "test_kb", displayName: "Test Keyboard" });
+
 
     // Confirm non-initial state
     expect(getStore().activeStepId).toBe("track");
     expect(getStore().history.length).toBe(2);
-    expect(getStore().selectedTrack).toBe("copy");
-    expect(getStore().scaffoldSpec).toMatchObject({ keyboardId: "test_kb", displayName: "Test Keyboard" });
+
 
     getStore().reset();
 
     const s = getStore();
     expect(s.activeStepId).toBe("identity");
     expect(s.history).toEqual([]);
-    expect(s.identityResult).toBeNull();
-    expect(s.identityPhaseResult).toBeNull();
-    expect(s.surveyContext).toEqual({});
-    expect(s.selectedTrack).toBeNull();
-    expect(s.scaffoldSpec).toBeNull();
-    expect(s.localBase).toBeNull();
-    expect(s.baseConfirmed).toBe(false);
-  });
 
-  // identityPhaseResult round-trip — the history-pop resume payload
-  it("identityPhaseResult round-trips through set and is cleared by reset()", () => {
-    const phaseResult = {
-      phase: "A" as const,
-      answers: [
-        { questionId: "il_language_autonym", answerType: "text" as const, value: "Hausa" },
-        { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
-      ],
-    };
-
-    expect(getStore().identityPhaseResult).toBeNull();
-    getStore().setIdentityPhaseResult(phaseResult);
-    expect(getStore().identityPhaseResult).toEqual(phaseResult);
-
-    getStore().reset();
-    expect(getStore().identityPhaseResult).toBeNull();
+    expect(s.localStart).toBeNull();
+    expect(s.startConfirmed).toBe(false);
+    // Spec 089 T017: the identity/scaffold slots are gone from the session
+    // state entirely — they are decision-derived now.
+    expect("identityResult" in s).toBe(false);
+    expect("identityPhaseResult" in s).toBe(false);
+    expect("surveyContext" in s).toBe(false);
+    expect("scaffoldSpec" in s).toBe(false);
+    // Spec 088 FR-005: the track and touch-seed slots are likewise gone —
+    // they are decisions now (authoring-track / touch-seed-source).
+    expect("selectedTrack" in s).toBe(false);
+    expect("touchSeedSource" in s).toBe(false);
   });
 
   // hydrate() bulk-restores every value slot from a serialized draft
@@ -110,12 +96,8 @@ describe("surveySessionStore", () => {
     const snapshot = {
       activeStepId: "track" as const,
       history,
-      identityResult: null,
-      identityPhaseResult: null,
-      surveyContext: { targetScript: "Latn" } as never,
-      selectedTrack: "copy" as const,
-      scaffoldSpec: { keyboardId: "haus_latn", displayName: "Hausa" },
-      localBase: null,
+
+      localStart: null,
       charactersSubStage: "B" as const,
     };
 
@@ -124,8 +106,7 @@ describe("surveySessionStore", () => {
     const s = getStore();
     expect(s.activeStepId).toBe("track");
     expect(s.history).toEqual(["identity", "choose_base"]);
-    expect(s.selectedTrack).toBe("copy");
-    expect(s.scaffoldSpec).toEqual({ keyboardId: "haus_latn", displayName: "Hausa" });
+
     expect(s.charactersSubStage).toBe("B");
 
     // The restored history is a copy — advancing must not mutate the snapshot's array.
@@ -244,10 +225,10 @@ describe("surveySessionStore", () => {
     });
   });
 
-  // backToChooseBase — OutputScreen's "Change base keyboard" escape hatch
+  // backToChooseStart — OutputScreen's "Change starting keyboard" escape hatch
   // (spec 058). Re-basing was removed from the ship-it screen; this routes the
   // author back to the picker where the preview-before-commit gate lives.
-  describe("backToChooseBase", () => {
+  describe("backToChooseStart", () => {
     it("rewinds to the prefix walked BEFORE the picker, so Back from it lands where it did the first time", () => {
       const store = getStore();
       store.advance("choose_base");
@@ -255,7 +236,7 @@ describe("surveySessionStore", () => {
       store.advance("project_name");
       store.advance("characters");
 
-      getStore().backToChooseBase();
+      getStore().backToChooseStart();
 
       expect(getStore().activeStepId).toBe("choose_base");
       expect(getStore().history).toEqual(["identity"]);
@@ -273,7 +254,7 @@ describe("surveySessionStore", () => {
       store.advance("mechanisms");
       store.advance("touch");
 
-      getStore().backToChooseBase();
+      getStore().backToChooseStart();
 
       // The regression an advance("choose_base") would have caused: every step
       // the author just left still sitting on the stack, so Back walks FORWARD.
@@ -286,11 +267,11 @@ describe("surveySessionStore", () => {
       const store = getStore();
       store.advance("choose_base");
       store.advance("track");
-      store.setBaseConfirmed(true);
+      store.setStartConfirmed(true);
 
-      getStore().backToChooseBase();
+      getStore().backToChooseStart();
 
-      expect(getStore().baseConfirmed).toBe(false);
+      expect(getStore().startConfirmed).toBe(false);
     });
 
     it("drops a stale forward-only-gate entry rather than carrying it into the rewound stack", () => {
@@ -300,7 +281,7 @@ describe("surveySessionStore", () => {
       // A persisted-stale "help" entry (the class sanitizeHistory exists for).
       useSurveySessionStore.setState({ history: ["identity", "help", "choose_base", "mechanisms"] });
 
-      getStore().backToChooseBase();
+      getStore().backToChooseStart();
 
       expect(getStore().activeStepId).toBe("choose_base");
       expect(getStore().history).toEqual(["identity"]);
@@ -309,7 +290,7 @@ describe("surveySessionStore", () => {
 
     it("falls back to an empty (Back-safe) history when the picker was never walked", () => {
       // Fresh store: activeStepId = "identity", history = [].
-      getStore().backToChooseBase();
+      getStore().backToChooseStart();
 
       expect(getStore().activeStepId).toBe("choose_base");
       expect(getStore().history).toEqual([]);
@@ -321,45 +302,45 @@ describe("surveySessionStore", () => {
     });
   });
 
-  // baseConfirmed — the choose_base preview-before-commit gate
-  describe("baseConfirmed", () => {
+  // startConfirmed — the choose_base preview-before-commit gate
+  describe("startConfirmed", () => {
     it("defaults to false on a fresh store", () => {
-      expect(getStore().baseConfirmed).toBe(false);
+      expect(getStore().startConfirmed).toBe(false);
     });
 
     it("setBaseConfirmed toggles the flag independently of other slots", () => {
       const store = getStore();
-      store.setBaseConfirmed(true);
-      expect(getStore().baseConfirmed).toBe(true);
+      store.setStartConfirmed(true);
+      expect(getStore().startConfirmed).toBe(true);
 
-      store.setBaseConfirmed(false);
-      expect(getStore().baseConfirmed).toBe(false);
+      store.setStartConfirmed(false);
+      expect(getStore().startConfirmed).toBe(false);
     });
 
     it("reset() clears baseConfirmed back to false", () => {
       const store = getStore();
-      store.setBaseConfirmed(true);
-      expect(getStore().baseConfirmed).toBe(true);
+      store.setStartConfirmed(true);
+      expect(getStore().startConfirmed).toBe(true);
 
       store.reset();
-      expect(getStore().baseConfirmed).toBe(false);
+      expect(getStore().startConfirmed).toBe(false);
     });
 
     it("survives a snapshotTraversal -> applyTraversalSnapshot round trip", () => {
       const store = getStore();
-      store.setBaseConfirmed(true);
+      store.setStartConfirmed(true);
 
       const snapshot = snapshotTraversal();
-      expect(snapshot.baseConfirmed).toBe(true);
+      expect(snapshot.startConfirmed).toBe(true);
 
-      // Reset, then re-apply the captured snapshot — baseConfirmed must come
+      // Reset, then re-apply the captured snapshot — startConfirmed must come
       // back exactly as it was (a restored draft that already passed
       // choose_base must re-instantiate on restore, per the field's docstring).
       store.reset();
-      expect(getStore().baseConfirmed).toBe(false);
+      expect(getStore().startConfirmed).toBe(false);
 
       applyTraversalSnapshot(snapshot);
-      expect(getStore().baseConfirmed).toBe(true);
+      expect(getStore().startConfirmed).toBe(true);
     });
   });
 

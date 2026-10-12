@@ -28,15 +28,17 @@ events:
   - { stepId: identity, questionId: il_language_autonym, value: "Faʼ" }
   - { stepId: identity, questionId: il_language_code, value: "bfd" }
   - { stepId: identity, questionId: il_target_script, value: "Latn" }
-  - { stepId: identity, questionId: il_author_name, value: "Bafut Language Committee" }
-  - { stepId: identity, questionId: il_author_email, value: "bafut.keyboard@example.org" }
-  - { stepId: identity, questionId: il_copyright_holder, value: "" }
 
   # --- choose_base (Track 1: copy from basic_kbdus) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
 
   # --- track (track flow) ---
   - { stepId: track, questionId: track_choice, value: "copy" }
+
+  # --- attribution (attribution flow, #1901: asked after the track choice) ---
+  - { stepId: attribution, questionId: il_author_name, value: "Bafut Language Committee" }
+  - { stepId: attribution, questionId: il_author_email, value: "bafut.keyboard@example.org" }
+  - { stepId: attribution, questionId: il_copyright_holder, value: "" }
 
   # --- project_name (project_name flow, copy-track only) ---
   - { stepId: project_name, questionId: project_display_name, value: "Bafut" }

@@ -1,6 +1,6 @@
 // docLevelBadge — the ONE label + tone mapping for the base documentation
 // classification badge (spec 079 FR-008), shared by the choose-base
-// suggestion cards (editors/panels/BaseResolution.tsx) and the selected-base
+// suggestion cards (editors/panels/StartResolution.tsx) and the selected-base
 // MetadataCard (components/MetadataCard.tsx) so the two surfaces can never
 // disagree about the wording or colour of the same level.
 //
@@ -10,11 +10,11 @@
 
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
-import type { BaseDocLevel } from "@keyboard-studio/contracts";
+import type { StartDocLevel } from "@keyboard-studio/contracts";
 import { resolveMessage } from "./i18nResolve.ts";
 import type { BadgeTone } from "../ui/Badge.tsx";
 
-export type KnownDocLevel = Exclude<BaseDocLevel, "unknown">;
+export type KnownDocLevel = Exclude<StartDocLevel, "unknown">;
 
 export function buildDocLevelLabel(level: KnownDocLevel, i18n?: I18n): string {
   switch (level) {

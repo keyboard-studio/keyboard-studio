@@ -56,7 +56,7 @@ export function stageActionLabel(actionType: EditorActionType, i18n?: I18n): str
  * `Intl.ListFormat` rather than `join(", ")`: a hardcoded separator bakes an
  * English list convention into a string that has already been through the
  * catalog, with no seam a translator can reach — the same reason
- * `trail.entry.headline.baseContribution.joinTwo` exists for the two-item
+ * `trail.entry.headline.startContribution.joinTwo` exists for the two-item
  * case. Locale-correct for the conjunctions and separators other locales use
  * (e.g. Chinese "、", or an Oxford "and" before the last item in English).
  *

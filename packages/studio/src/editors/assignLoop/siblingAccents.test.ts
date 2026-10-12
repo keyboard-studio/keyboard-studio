@@ -23,7 +23,7 @@ describe("siblingAccentPlacements", () => {
     // ù is the accepted char (excluded); é belongs to base "e" (excluded).
     expect(lower).toEqual(["ú", "û", "ü"]);
     expect(upper).toEqual(["Ù", "Ú"]);
-    expect(placements.every((p) => p.hostKey === "K_U")).toBe(true);
+    expect(placements.every((p) => p.baseKey === "K_U")).toBe(true);
   });
 
   it("adds ONLY characters in the inventory — never Unicode 'extras'", () => {
@@ -45,7 +45,7 @@ describe("siblingAccentPlacements", () => {
 
   it("places an uppercase-only sibling on the shift layer", () => {
     const placements = siblingAccentPlacements("è", "K_E", ["è", "È"]);
-    expect(placements).toEqual([{ char: "È", hostKey: "K_E", layer: "shift" }]);
+    expect(placements).toEqual([{ char: "È", baseKey: "K_E", layer: "shift" }]);
   });
 
   it("places an NFD-form uppercase sibling on the shift layer, not the default layer (#1445)", () => {
@@ -61,7 +61,7 @@ describe("siblingAccentPlacements", () => {
     const nfdLowerAGrave = "a" + "\u0300";
     const placements = siblingAccentPlacements(nfdLowerAGrave, "K_A", [nfdLowerAGrave, nfdUpperAAcute]);
     expect(placements).toEqual([
-      { char: nfdUpperAAcute, hostKey: "K_A", layer: "shift" },
+      { char: nfdUpperAAcute, baseKey: "K_A", layer: "shift" },
     ]);
   });
 
@@ -87,7 +87,7 @@ describe("siblingAccentPlacements", () => {
     // accepted char (excluded). Ordered grave-before-diaeresis per
     // DIACRITIC_PRIORITY.
     expect(lower).toEqual(["ѝ", "ӥ"]);
-    expect(placements.every((p) => p.hostKey === "K_I")).toBe(true);
+    expect(placements.every((p) => p.baseKey === "K_I")).toBe(true);
   });
 
   it("returns [] when no inventory character shares the base", () => {

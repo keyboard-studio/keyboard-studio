@@ -20,7 +20,7 @@ const KMN = [
 ].join("\n");
 
 /** The scaffolder's output for a French base — what the copy track actually holds. */
-function frenchBaseDescriptor(id = "bm_sil"): string {
+function frenchStartDescriptor(id = "bm_sil"): string {
   return buildKpsContent(id, { displayName: "French AZERTY", languageTag: "fr" }, KMN, "1.0");
 }
 
@@ -44,7 +44,7 @@ function allLanguageLines(kps: string): string[] {
 
 describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)", () => {
   it("replaces the base's language TOTALLY, leaving only the author's", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     const result = applyIdentityToKps(
       vfs,
       "bm_sil",
@@ -60,7 +60,7 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
   });
 
   it("rewrites Info/Name, Info/Description and Keyboard/Name (FR-003)", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", languageTag: "bm" }, KMN);
 
     const kps = textAt(vfs, "source/bm_sil.kps");
@@ -72,7 +72,7 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
   });
 
   it("leaves Files, System, Options and Version untouched (contract §2)", () => {
-    const before = frenchBaseDescriptor();
+    const before = frenchStartDescriptor();
     const vfs = vfsWith("source/bm_sil.kps", before);
     applyIdentityToKps(
       vfs,
@@ -97,7 +97,7 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
   });
 
   it("preserves a URL attribute on Info/Name rather than dropping it", () => {
-    const withUrl = frenchBaseDescriptor().replace(
+    const withUrl = frenchStartDescriptor().replace(
       '<Name URL="">French AZERTY</Name>',
       '<Name URL="https://example.org/">French AZERTY</Name>',
     );
@@ -109,7 +109,7 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
   });
 
   it("declares the author's tag even when the descriptor had no Languages block", () => {
-    const noLanguages = frenchBaseDescriptor().replace(
+    const noLanguages = frenchStartDescriptor().replace(
       /\s*<Languages>[\s\S]*?<\/Languages>/,
       "",
     );
@@ -128,7 +128,7 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
   });
 
   it("expands a self-closing empty Languages element", () => {
-    const selfClosing = frenchBaseDescriptor().replace(
+    const selfClosing = frenchStartDescriptor().replace(
       /<Languages>[\s\S]*?<\/Languages>/,
       "<Languages/>",
     );
@@ -140,7 +140,7 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
   });
 
   it("is idempotent — a second application changes nothing", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     const identity = { displayName: "Bambara", languageTag: "bm-Latn", languageName: "Bambara" };
     applyIdentityToKps(vfs, "bm_sil", identity, KMN);
     const once = textAt(vfs, "source/bm_sil.kps");
@@ -154,7 +154,7 @@ describe("applyIdentityToKps — patching an existing descriptor (US1, SC-002)",
 // in place, which on the copy track is the base keyboard's (QC P1, FR-003).
 describe("applyIdentityToKps — a blank display name never leaves the base's standing", () => {
   it("falls back to the keyboard id rather than keeping the base's name", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     applyIdentityToKps(vfs, "bm_sil", { displayName: "", languageTag: "bm-Latn" }, KMN);
 
     const kps = textAt(vfs, "source/bm_sil.kps");
@@ -169,7 +169,7 @@ describe("applyIdentityToKps — a blank display name never leaves the base's st
   });
 
   it("treats a whitespace-only display name as blank", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     applyIdentityToKps(vfs, "bm_sil", { displayName: "   ", languageTag: "bm" }, KMN);
     expect(textAt(vfs, "source/bm_sil.kps")).not.toContain("French AZERTY");
   });
@@ -177,7 +177,7 @@ describe("applyIdentityToKps — a blank display name never leaves the base's st
   it("applies the SAME fallback on the patch and the generate path", () => {
     const identity = { displayName: "", languageTag: "bm-Latn", languageName: "Bambara" };
     // Patch path: an existing descriptor.
-    const patched = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const patched = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     applyIdentityToKps(patched, "bm_sil", identity, KMN);
     // Generate path: none present.
     const generated = createVirtualFS();
@@ -193,7 +193,7 @@ describe("applyIdentityToKps — a blank display name never leaves the base's st
 
 describe("applyIdentityToKps — <WebSite> on the patch path (spec 061 FR-012)", () => {
   it("inserts <WebSite> right after <Description> when none exists yet", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     applyIdentityToKps(
       vfs,
       "bm_sil",
@@ -244,7 +244,7 @@ describe("applyIdentityToKps — <WebSite> on the patch path (spec 061 FR-012)",
   });
 
   it("leaves the descriptor unchanged when there was never a <WebSite> and none is given", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", languageTag: "bm" }, KMN);
     expect(textAt(vfs, "source/bm_sil.kps")).not.toContain("WebSite");
   });
@@ -344,7 +344,7 @@ describe("applyIdentityToKps — failure names itself rather than throwing (FR-0
 
 /** The pre-080 scaffolder stub: today's generate output with the flat name in both places. */
 function flatWelcomeDescriptor(id = "bm_sil"): string {
-  return frenchBaseDescriptor(id).replace(/welcome\\welcome\.htm/g, "welcome.htm");
+  return frenchStartDescriptor(id).replace(/welcome\\welcome\.htm/g, "welcome.htm");
 }
 
 function fileNames(kps: string): string[] {
@@ -368,7 +368,7 @@ describe("applyIdentityToKps — welcome-path migration (spec 080 FR-002)", () =
   });
 
   it("rewrites a BLANK <WelcomeFile></WelcomeFile> too, so the shipped page is never orphaned", () => {
-    const blank = frenchBaseDescriptor().replace(
+    const blank = frenchStartDescriptor().replace(
       /<WelcomeFile>[^<]*<\/WelcomeFile>/,
       "<WelcomeFile></WelcomeFile>",
     );
@@ -381,7 +381,7 @@ describe("applyIdentityToKps — welcome-path migration (spec 080 FR-002)", () =
   });
 
   it("appends the welcome-folder files the projection ships, once each, and reports them", () => {
-    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const vfs = vfsWith("source/bm_sil.kps", frenchStartDescriptor());
     const result = applyIdentityToKps(
       vfs,
       "bm_sil",
@@ -406,7 +406,7 @@ describe("applyIdentityToKps — welcome-path migration (spec 080 FR-002)", () =
   });
 
   it("does not re-append a folder file the descriptor already lists (case-insensitive)", () => {
-    const listed = frenchBaseDescriptor().replace(
+    const listed = frenchStartDescriptor().replace(
       "  </Files>",
       "    <File>\n      <Name>welcome\\Chart.PNG</Name>\n      <FileType>.png</FileType>\n    </File>\n  </Files>",
     );
@@ -417,7 +417,7 @@ describe("applyIdentityToKps — welcome-path migration (spec 080 FR-002)", () =
   });
 
   it("is a byte-for-byte no-op with no warnings on an already-migrated descriptor (contract §2 still holds)", () => {
-    const before = frenchBaseDescriptor();
+    const before = frenchStartDescriptor();
     const vfs = vfsWith("source/bm_sil.kps", before);
     const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "French AZERTY", languageTag: "fr" }, KMN);
     const after = textAt(vfs, "source/bm_sil.kps");
@@ -427,7 +427,7 @@ describe("applyIdentityToKps — welcome-path migration (spec 080 FR-002)", () =
   });
 
   it("leaves a descriptor that lists no welcome page at all alone (no invented entry)", () => {
-    const noWelcome = frenchBaseDescriptor()
+    const noWelcome = frenchStartDescriptor()
       .replace(/    <File>\n      <Name>welcome\\welcome\.htm<\/Name>\n      <FileType>\.htm<\/FileType>\n    <\/File>\n/, "")
       .replace(/    <WelcomeFile>[^<]*<\/WelcomeFile>\n/, "");
     const vfs = vfsWith("source/bm_sil.kps", noWelcome);

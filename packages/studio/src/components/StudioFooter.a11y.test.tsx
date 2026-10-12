@@ -15,7 +15,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard } from "@keyboard-studio/contracts";
 import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -28,7 +28,7 @@ import { charToPositionToken } from "../lib/stepWalk.ts";
 import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
 import { StudioFooter } from "./StudioFooter.tsx";
 
-const BASE = makeBaseKeyboard({
+const BASE = makeStartKeyboard({
   id: "basic_kbdfr",
   path: "release/b/basic_kbdfr",
   script: "Latn",
@@ -47,7 +47,7 @@ function seedProject(): void {
   // reason, or fail depending on file order.
   useStepWalkStore.getState().reset();
 
-  useWorkingCopyStore.setState({ baseKeyboard: BASE });
+  useWorkingCopyStore.setState({ startKeyboard: BASE });
   useSurveySessionStore.setState({
     activeStepId: "characters",
     history: ["identity", "choose_base", "track"],
@@ -126,7 +126,7 @@ describe("StudioFooter — visibility gate (FR-040)", () => {
 
     const { container } = render(<StudioFooter />);
 
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
     expect(container.querySelector("footer")).not.toBeNull();
     expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
   });

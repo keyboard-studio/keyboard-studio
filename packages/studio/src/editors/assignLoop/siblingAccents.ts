@@ -23,12 +23,12 @@
 // the base-letter check tests General_Category L* (`\p{L}`, any script) rather
 // than the old `/^[a-z]$/` Latin-only regex. In practice this function is only
 // ever reached with a non-Latin base when a FUTURE caller derives a non-Latin
-// `hostKey` — today TouchGallery's own suggestion memo (the caller) still
-// gates `hostKey` derivation to `/^[a-zA-Z]$/` (a SEPARATE, legitimate
+// `baseKey` — today TouchGallery's own suggestion memo (the caller) still
+// gates `baseKey` derivation to `/^[a-zA-Z]$/` (a SEPARATE, legitimate
 // constraint: a physical longpress host key is a K_<LETTER> hardware key
 // label, which is inherently Latin on a standard keyboard — not the "is this
 // an accented letter" question this module answers), so a non-Latin base
-// still yields `[]` in practice via the caller's empty-hostKey early return,
+// still yields `[]` in practice via the caller's empty-baseKey early return,
 // not via this gate. Broadening here keeps this module's own semantics
 // consistent with the general `isDecomposableAccented` predicate rather than
 // re-deriving a narrower, redundant copy of it.
@@ -89,7 +89,7 @@ export type SiblingAccentLayer = "default" | "shift";
 
 export interface SiblingAccentPlacement {
   char: string;
-  hostKey: string;
+  baseKey: string;
   layer: SiblingAccentLayer;
 }
 
@@ -136,7 +136,7 @@ function markRank(mark: string): number {
  * `inventory` (the characters the author's language actually uses): every
  * accented letter in the inventory that shares `acceptedChar`'s base letter
  * (case-insensitively) other than `acceptedChar` itself. Lowercase siblings go
- * on `hostKey`'s default layer, uppercase siblings on its shift layer.
+ * on `baseKey`'s default layer, uppercase siblings on its shift layer.
  *
  * Returns `[]` when the base is not a single letter (any script — see the
  * module doc comment on the script-neutral gate) or when the inventory has no
@@ -148,7 +148,7 @@ function markRank(mark: string): number {
  */
 export function siblingAccentPlacements(
   acceptedChar: string,
-  hostKey: string,
+  baseKey: string,
   inventory: readonly string[] | ReadonlySet<string>,
 ): SiblingAccentPlacement[] {
   const baseLower = baseLetterOf(acceptedChar);
@@ -185,12 +185,12 @@ export function siblingAccentPlacements(
   return [
     ...lower.map((s): SiblingAccentPlacement => ({
       char: s.char,
-      hostKey,
+      baseKey,
       layer: "default",
     })),
     ...upper.map((s): SiblingAccentPlacement => ({
       char: s.char,
-      hostKey,
+      baseKey,
       layer: "shift",
     })),
   ];

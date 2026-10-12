@@ -7,11 +7,11 @@
 // classified none.
 
 import { describe, it, expect } from "vitest";
-import type { BaseDocumentationProfile } from "@keyboard-studio/contracts";
+import type { StartDocumentationProfile } from "@keyboard-studio/contracts";
 import mod, { definition, validate } from "./pf_welcome_paragraph.ts";
 import { prefill, requiredWhen, type AdaptiveDescriptionContext } from "../../../lib/adaptiveDescription.ts";
 
-const FULL_PROFILE: BaseDocumentationProfile = {
+const FULL_PROFILE: StartDocumentationProfile = {
   level: "full",
   members: ["welcome-htm", "help-php"],
   welcomeConvention: "folder",
@@ -19,7 +19,7 @@ const FULL_PROFILE: BaseDocumentationProfile = {
   welcomeImages: [],
 };
 
-const NONE_PROFILE: BaseDocumentationProfile = {
+const NONE_PROFILE: StartDocumentationProfile = {
   level: "none",
   members: [],
   welcomeConvention: "absent",
@@ -32,9 +32,9 @@ const WELCOME_HTML = `<html><body><h1>My Keyboard</h1><p>This keyboard lets you 
 function ctx(overrides: Partial<AdaptiveDescriptionContext>): AdaptiveDescriptionContext {
   return {
     instantiationMode: null,
-    baseDocProfile: null,
-    baseWelcomeHtmText: null,
-    baseHelpPhpText: null,
+    startDocProfile: null,
+    startWelcomeHtmText: null,
+    startHelpPhpText: null,
     ...overrides,
   };
 }
@@ -55,8 +55,8 @@ describe("pf_welcome_paragraph — prefill (spec 079 FR-009)", () => {
     const value = prefill(
       ctx({
         instantiationMode: "adapt-existing",
-        baseDocProfile: FULL_PROFILE,
-        baseWelcomeHtmText: WELCOME_HTML,
+        startDocProfile: FULL_PROFILE,
+        startWelcomeHtmText: WELCOME_HTML,
       }),
     );
     expect(value).toBe("This keyboard lets you type Bafut on any computer.");
@@ -66,9 +66,9 @@ describe("pf_welcome_paragraph — prefill (spec 079 FR-009)", () => {
     const value = prefill(
       ctx({
         instantiationMode: "adapt-existing",
-        baseDocProfile: FULL_PROFILE,
-        baseWelcomeHtmText: null,
-        baseHelpPhpText: WELCOME_HTML,
+        startDocProfile: FULL_PROFILE,
+        startWelcomeHtmText: null,
+        startHelpPhpText: WELCOME_HTML,
       }),
     );
     expect(value).toBe("This keyboard lets you type Bafut on any computer.");
@@ -78,8 +78,8 @@ describe("pf_welcome_paragraph — prefill (spec 079 FR-009)", () => {
     const value = prefill(
       ctx({
         instantiationMode: "new-from-base",
-        baseDocProfile: FULL_PROFILE,
-        baseWelcomeHtmText: WELCOME_HTML,
+        startDocProfile: FULL_PROFILE,
+        startWelcomeHtmText: WELCOME_HTML,
       }),
     );
     expect(value).toBeUndefined();
@@ -89,8 +89,8 @@ describe("pf_welcome_paragraph — prefill (spec 079 FR-009)", () => {
     const value = prefill(
       ctx({
         instantiationMode: null,
-        baseDocProfile: FULL_PROFILE,
-        baseWelcomeHtmText: WELCOME_HTML,
+        startDocProfile: FULL_PROFILE,
+        startWelcomeHtmText: WELCOME_HTML,
       }),
     );
     expect(value).toBeUndefined();
@@ -100,8 +100,8 @@ describe("pf_welcome_paragraph — prefill (spec 079 FR-009)", () => {
     const value = prefill(
       ctx({
         instantiationMode: "adapt-existing",
-        baseDocProfile: NONE_PROFILE,
-        baseWelcomeHtmText: null,
+        startDocProfile: NONE_PROFILE,
+        startWelcomeHtmText: null,
       }),
     );
     expect(value).toBeUndefined();
@@ -111,8 +111,8 @@ describe("pf_welcome_paragraph — prefill (spec 079 FR-009)", () => {
     const value = prefill(
       ctx({
         instantiationMode: "adapt-existing",
-        baseDocProfile: null,
-        baseWelcomeHtmText: WELCOME_HTML,
+        startDocProfile: null,
+        startWelcomeHtmText: WELCOME_HTML,
       }),
     );
     expect(value).toBeUndefined();
@@ -125,8 +125,8 @@ describe("pf_welcome_paragraph — requiredWhen (spec 079 FR-009)", () => {
       requiredWhen(
         ctx({
           instantiationMode: "adapt-existing",
-          baseDocProfile: FULL_PROFILE,
-          baseWelcomeHtmText: WELCOME_HTML,
+          startDocProfile: FULL_PROFILE,
+          startWelcomeHtmText: WELCOME_HTML,
         }),
       ),
     ).toBe(false);
@@ -137,8 +137,8 @@ describe("pf_welcome_paragraph — requiredWhen (spec 079 FR-009)", () => {
       requiredWhen(
         ctx({
           instantiationMode: "new-from-base",
-          baseDocProfile: FULL_PROFILE,
-          baseWelcomeHtmText: WELCOME_HTML,
+          startDocProfile: FULL_PROFILE,
+          startWelcomeHtmText: WELCOME_HTML,
         }),
       ),
     ).toBe(true);
@@ -153,7 +153,7 @@ describe("pf_welcome_paragraph — requiredWhen (spec 079 FR-009)", () => {
       requiredWhen(
         ctx({
           instantiationMode: "adapt-existing",
-          baseDocProfile: NONE_PROFILE,
+          startDocProfile: NONE_PROFILE,
         }),
       ),
     ).toBe(true);

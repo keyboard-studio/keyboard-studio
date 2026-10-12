@@ -15,7 +15,7 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
-import { extractScriptSubtag } from "../../packages/engine/src/base-browser/kps-parser.js";
+import { extractScriptSubtag } from "../../packages/engine/src/start-browser/kps-parser.js";
 import { readKpsPackage } from "./kps-reader.js";
 import { deriveScriptContext, undeterminedFallback } from "./measurement.js";
 import { computeAnalyzedCoverage } from "./outcome.js";

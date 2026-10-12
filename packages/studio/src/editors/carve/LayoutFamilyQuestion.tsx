@@ -13,7 +13,7 @@
 // "likely hosts" note below is the wiring made demonstrable (A1): it names
 // the host set the FR-023 resolution currently yields and where it came from,
 // so the author can see their answer take effect. T018's demonstration UI
-// builds on the same `useLikelyHostLayouts` hook.
+// builds on the same `useLikelyBaseLayouts` hook.
 
 import { useCallback } from "react";
 import { Trans } from "@lingui/react/macro";
@@ -23,19 +23,22 @@ import {
   isLayoutFamilyValue,
   saveLayoutFamilyAnswer,
   useLayoutFamilyAnswer,
-  useLikelyHostLayouts,
+  useLikelyBaseLayouts,
 } from "../../lib/layoutFamily.ts";
-import type { LikelyHostSource } from "../../lib/layoutFamily.ts";
+import type { LikelyBaseSource } from "../../lib/layoutFamily.ts";
 
 export function LayoutFamilyQuestion({ bcp47 }: { bcp47?: string | undefined }) {
   const answer = useLayoutFamilyAnswer();
-  const { hosts, source } = useLikelyHostLayouts(bcp47);
+  const { hosts, source } = useLikelyBaseLayouts(bcp47);
 
   const handleChange = useCallback((v: string | string[]) => {
     const next = Array.isArray(v) ? v[0] : v;
     saveLayoutFamilyAnswer(isLayoutFamilyValue(next) ? next : undefined);
   }, []);
 
+  // Named `hostList` deliberately: it is the Lingui placeholder name in the
+  // catalog strings below ({hostList}); renaming it would break the
+  // interpolation binding (#1810 keeps the placeholder name).
   const hostList = hosts.map((h) => h.label).join(", ");
 
   return (
@@ -45,13 +48,13 @@ export function LayoutFamilyQuestion({ bcp47 }: { bcp47?: string | undefined }) 
         data-testid="layout-family-likely-hosts"
         style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--app-text-muted)", lineHeight: 1.5 }}
       >
-        <LikelyHostsNote source={source} hostList={hostList} />
+        <LikelyBasesNote source={source} hostList={hostList} />
       </p>
     </section>
   );
 }
 
-function LikelyHostsNote({ source, hostList }: { source: LikelyHostSource; hostList: string }) {
+function LikelyBasesNote({ source, hostList }: { source: LikelyBaseSource; hostList: string }) {
   // Neutral metadata about the resolution — not per-disposition consequence
   // copy (T019). Each branch states where the set came from, honestly.
   if (source === "layout-family") {

@@ -95,7 +95,7 @@ describe("DocumentationFindingsSummary", () => {
     expect(screen.getByText("authored note")).toBeTruthy();
     const group = screen.getByTestId("doc-findings-summary-upstream-group");
     expect(
-      group.textContent?.includes("Inherited from the base keyboard"),
+      group.textContent?.includes("Inherited from the starting keyboard"),
     ).toBe(true);
     expect(group.textContent?.includes("inherited note")).toBe(true);
     expect(group.textContent?.includes("inherited hint")).toBe(true);

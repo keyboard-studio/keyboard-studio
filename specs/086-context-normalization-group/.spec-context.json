@@ -1,0 +1,1183 @@
+{
+  "workflow": "companion",
+  "specName": "Context normalization group",
+  "branch": "086-context-normalization-group",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-06T06:58:28.492Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-06T07:06:33.848Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-06T07:06:34.363Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-06T07:12:10.662Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-06T07:20:03.460Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:24:15.667Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:24:37.276Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:29:20.740Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:29:30.401Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:09.445Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:09.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:23.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:41.037Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:30:41.361Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:43:22.723Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:43:22.901Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.199Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.424Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.605Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:45:36.782Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:02.567Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:03.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:03.573Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:48:04.063Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T07:57:13.793Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T08:30:00.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T08:30:00.154Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.145Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.282Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.417Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.557Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.700Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:07:10.851Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:20:04.628Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:26.526Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:26.832Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.116Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.346Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.538Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.730Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:27.902Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.070Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.281Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.520Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.700Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T09:45:28.888Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T10:01:14.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T10:13:40.642Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:35.847Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:35.970Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.097Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.225Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.353Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.478Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.602Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.758Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:36.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:09:37.010Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:11:37.162Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:13:22.370Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:14:22.418Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:14:31.635Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:43:35.186Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:44:35.633Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-06T14:44:35.691Z"
+    }
+  ],
+  "unattended": true,
+  "currentTask": "T059",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "../keyboards at CI pin 435f82d6; pnpm install + pnpm build (prebuild incl.) exit 0 on Node 22.23.1"
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Created normalization-step/index.ts with generator version, group name and generated_cn_ store prefix constants",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added US_BASE_LAYOUT map and export",
+      "files": [
+        "packages/contracts/src/ir/usBaseLayout.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Wrote usBaseLayout.test.ts: 47 printable keys shifted/unshifted, spot checks, no non-printables",
+      "files": [
+        "packages/contracts/src/ir/usBaseLayout.test.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added normalization step contract types to toleranceReport.ts",
+      "files": [
+        "packages/contracts/src/toleranceReport.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Replaced US_TRIGGER_CHAR with US_BASE_LAYOUT lookup in deadkeys.ts",
+      "files": [
+        "packages/contracts/src/ir/deadkeys.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added storeSketch parser tests",
+      "files": [
+        "packages/engine/src/codec/parse-store-sketch.test.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added optional storeSketch?: StoreItem[] to RawKmnFragment (no zod mirror exists)",
+      "files": [
+        "packages/contracts/src/keyboard-ir.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Opaque store path fills storeSketch leniently (outs flattened, SMP chars, named deadkeys); codec tests 293 pass",
+      "files": [
+        "packages/engine/src/codec/parse.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "repertoire tests (char/index/outs, echo, producedOutput, touch ids, base fallback, postfix closure, depth cap, unresolved, order-independence)",
+      "files": [
+        "packages/contracts/src/ir/outputRepertoire.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "buildOutputRepertoire implemented and exported from contracts index",
+      "files": [
+        "packages/contracts/src/ir/outputRepertoire.ts packages/contracts/src/index.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "maps tests (produced form, no-map, ambiguous, conflict drop, NFC equality)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/maps.test.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "buildNormalizationMaps implemented per R3",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/maps.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "pack tests (shapes P0/T/H/P/P2, safety rejections, no if/bksp, greedy bound)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/pack.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "greedy safe-cover packer P0/T/H/P/P2 over generated_cn_* stores",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/pack.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "insert tests (G3, G4, G5, entryPoints.main entry, tail use rules, remove no-op)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/insert.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "index tests (G1 spies, G2, G6 refusals, G7 time-bound, examples<=5)",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.test.ts packages/engine/src/pattern-apply/normalization-step/../__fixtures__/normalization.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "apply/remove insertion from entryPoints.main",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/insert.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "proposeNormalizationStep/apply/remove/cacheKey in module index",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.ts packages/engine/src/pattern-apply/normalization-step/constants.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Re-exports confirmed in engine context-tolerance subpath; depcruise clean, normalization-step imports only codec + contracts",
+      "files": [
+        "packages/engine/src/context-tolerance/index.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Parity corpus test over the seven spike keyboards passes at corpus pin 435f82d6: 7/7 (SC-001..SC-004), 686 s",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/parity.corpus.test.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Gate green: quickstart s1/s2, pnpm typecheck, pnpm lint (depcruise clean); R10 counts already recorded, all bounds met",
+      "files": [
+        "specs/086-context-normalization-group/research.md"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "cache-key cases in engine index.test.ts",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.test.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "studio cache hit/stale/<1s tests",
+      "files": [
+        "packages/studio/src/lib/normalizationStepCache.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "normalizationStepCacheKey already present and re-exported from Phase 3; verified",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/index.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "contextNormalizationStep store field and snapshot read/write plus round-trip test",
+      "files": [
+        "packages/studio/src/lib/persistWorkingCopy.ts",
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/persistWorkingCopy.test.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "getOrProposeNormalizationStep memory/snapshot/generator cache",
+      "files": [
+        "packages/studio/src/lib/normalizationStepCache.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "opt-in KS_CORPUS_PERF generation-time p95 corpus test",
+      "files": [
+        "packages/engine/src/pattern-apply/normalization-step/generation-time.corpus.test.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Gate green: engine 4691 pass, studio 7937 pass, typecheck and lint clean"
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Overlay tests for the normalization-step batch: replay, removal, no stacking, reparsed removal",
+      "files": [
+        "packages/engine/src/pattern-apply/context-tolerance-overlay.step.test.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Projection test: accepted step projects as the begin entry with original rules unchanged",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.contextTolerance.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Analysis tests: step proposed, fallback with reason, no-alternates proposes nothing, regressed lookup forces fallback",
+      "files": [
+        "packages/studio/src/lib/contextToleranceAnalysis.test.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "NormalizationExamples tests: semantic ul of at most 5 rows, code-point-name accessible text",
+      "files": [
+        "packages/studio/src/survey/marks/NormalizationExamples.test.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Overlay batch kind normalization-step with replay/removal via apply/removeNormalizationStep; projection replays unchanged; removal now reads raw use(X) from reparsed text",
+      "files": [
+        "packages/engine/src/pattern-apply/context-tolerance-overlay.ts",
+        "packages/engine/src/pattern-apply/normalization-step/insert.ts",
+        "packages/engine/src/index.ts",
+        "packages/engine/src/context-tolerance/index.ts",
+        "packages/engine/src/facet-transform/migrations/normalization-step.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Analysis proposes the step from the cache on gap findings, falls back to 062 on refusal, optional verificationLookup defaulting to unknown",
+      "files": [
+        "packages/studio/src/lib/contextToleranceAnalysis.ts",
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Single-site step apply through the facet-transform gate writing the overlay batch; working IR left untouched",
+      "files": [
+        "packages/studio/src/lib/contextToleranceApply.ts",
+        "packages/studio/src/lib/contextToleranceApply.step.test.ts",
+        "packages/studio/src/survey/marks/contextToleranceProposal.ts",
+        "packages/studio/src/components/facet-transform/FacetTransformPanel.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Decision trail for a step is accept or decline only on unchanged question ids; trail tests added",
+      "files": [
+        "packages/studio/src/decisions/contextToleranceProposal.ts",
+        "packages/studio/src/decisions/contextToleranceTrail.test.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "NormalizationExamples component using the notice naming helper",
+      "files": [
+        "packages/studio/src/survey/marks/NormalizationExamples.tsx"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Station step branch with ICU intro, examples, disclosure, accept/decline, fallback reason line",
+      "files": [
+        "packages/studio/src/survey/marks/ContextToleranceStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Message ids added to en and fr catalogs through lingui extract",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Station tests for step intro, examples, accept, decline, prior view and fallback reason",
+      "files": [
+        "packages/studio/src/survey/marks/ContextToleranceStation.step.test.tsx"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Playwright CLI walk of quickstart 4 and 5: station intro Adds 9 rules, accept export begins with generated_context_normalize, reload snapshot cache hit, decline export byte-identical, opaque-output-store fallback via patched fixture",
+      "files": [
+        "C:/Temp/walk086.mjs"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Gate green: engine 4696 pass, studio 7958 pass, typecheck clean, lint 0 errors",
+      "files": [
+        "-"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "normalization-step.test.ts: record format, freshness, incremental carry-forward, refusal/regressed outcomes (31 harness tests green)",
+      "files": [
+        "utilities/nfd-tolerance-corpus/normalization-step.test.ts"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "measured spike seven (259 s) and 20 random keyboards (302 s); recorded timings and projection in research R8",
+      "files": [
+        "specs/086-context-normalization-group/research.md"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "simulable() opt-in allowCompileErrors plus errorDiagnosticCount; default 062 mode unchanged",
+      "files": [
+        "utilities/nfd-tolerance-corpus/analyze.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "normalization-step.ts: typed and pasted checks, diagnostics, sorted record writer, freshness, merge, 10-minute budget",
+      "files": [
+        "utilities/nfd-tolerance-corpus/normalization-step.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "cli --mode normalization-step with --jobs/--incremental/--check/--record/--budget-minutes; run.mjs drops HMR socket for parallel workers",
+      "files": [
+        "utilities/nfd-tolerance-corpus/cli.ts",
+        "utilities/nfd-tolerance-corpus/run.mjs"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "sil_yoruba8 and the seven spike keyboards all verified, typed.differ=0, pasted fail=0, diagnostics equal (yoruba 9/9)",
+      "files": [
+        "utilities/nfd-tolerance-corpus/normalization-step.ts"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "full record for 920 keyboards: 588 verified, 311 refused, 10 harness-error, 11 regressed (pasted-only); decision recorded in research R8",
+      "files": [
+        "docs/context-normalization-verification.json",
+        "specs/086-context-normalization-group/research.md"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "studio verificationLookup wired to slim regressed-id list generated at prebuild from the record",
+      "files": [
+        "scripts/codegen-normalization-regressed.mjs",
+        "packages/studio/src/lib/normalizationVerification.ts",
+        "packages/studio/src/lib/generated/normalizationRegressed.generated.json",
+        "package.json",
+        "docs/tooling.md",
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "ci.yml build job runs the normalization-step --check gate after the existing corpus gate",
+      "files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "removed duplicate nfd-tolerance-corpus Test step from ci.yml (isolated hunk)",
+      "files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Gate green: nfd-tolerance-corpus 31/31, --check 920 fresh, pnpm typecheck and lint exit 0",
+      "files": [
+        "none"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Added phonebook rows for el_dinka, el_pan_sahelian, fv_northern_tutchone, fv_tlingit, sil_tchad (others already present)",
+      "files": [
+        "docs/keyboard-index.md"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Documented --mode normalization-step and its flags in the harness README and tooling.md; added the step to architecture.md's context-tolerance paragraph and packages.md's engine entry",
+      "files": [
+        "utilities/nfd-tolerance-corpus/README.md",
+        "docs/tooling.md",
+        "docs/architecture.md",
+        "docs/packages.md"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Recorded the desktop-engine release gate and the static-diagnostic (R7) follow-ups in spec.md Open questions",
+      "files": [
+        "specs/086-context-normalization-group/spec.md"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Full gate green: pnpm typecheck, pnpm -r test (engine 4696 pass/3 opt-in skips, studio 7961 pass), pnpm lint; corpus parity + nfd harness suites pass at CI pin"
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "speckit-analyze: 0 critical, 21 findings; fixed time-bound refusal leaking into snapshot cache + regressed fallback message, reconciled 15 doc findings; SC-005 p95 left as concern",
+      "files": [
+        "packages/studio/src/lib/normalizationStepCache.ts",
+        "packages/studio/src/lib/normalizationStepCache.test.ts",
+        "packages/studio/src/lib/contextToleranceAnalysis.ts",
+        "packages/studio/src/survey/marks/ContextToleranceStation.tsx",
+        "packages/studio/src/locales/en/messages.json",
+        "specs/086-context-normalization-group/spec.md",
+        "specs/086-context-normalization-group/data-model.md",
+        "specs/086-context-normalization-group/plan.md",
+        "specs/086-context-normalization-group/research.md",
+        "specs/086-context-normalization-group/tasks.md",
+        "specs/086-context-normalization-group/contracts"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "typecheck",
+      "command": "pnpm typecheck",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 20.1,
+      "result": "utilities/oauth-backend typecheck: Done · packages/studio typecheck$ tsc --noEmit · packages/studio typecheck: Done"
+    },
+    {
+      "what": "lint",
+      "command": "pnpm lint",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 69.2,
+      "result": "> keyboard-studio@0.1.0 spec-number-lint C:\\Github\\keyboard-studio-086 · > node utilities/spec-number-lint/index.js · [OK] spec-number-lint: 82 spec folder(s), no number collisions"
+    },
+    {
+      "what": "normalization-step unit tests",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/ --exclude **/*.corpus.test.ts",
+      "result": "28 passed"
+    },
+    {
+      "what": "contracts ir tests",
+      "command": "pnpm --filter @keyboard-studio/contracts exec vitest run src/ir",
+      "result": "186 passed"
+    },
+    {
+      "what": "spike parity corpus (SC-001..SC-004)",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run normalization-step/parity.corpus",
+      "result": "7 passed, corpus at CI pin 435f82d6"
+    },
+    {
+      "what": "lint incl depcruise",
+      "command": "pnpm lint",
+      "result": "exit 0, 0 errors, no dependency violations"
+    },
+    {
+      "what": "engine suite",
+      "command": "pnpm --filter @keyboard-studio/engine test",
+      "result": "214 files passed, 1 skipped; 4691 tests passed"
+    },
+    {
+      "what": "studio suite",
+      "command": "pnpm --filter @keyboard-studio/studio test",
+      "result": "455 files, 7937 tests passed"
+    },
+    {
+      "what": "Playwright walk quickstart 4-5 (T042)",
+      "command": "C:/Temp/walk086.mjs",
+      "result": "sil_yoruba8 intro Adds 9 rules; accept gives begin Unicode > use(generated_context_normalize); reload cache hit; decline byte-identical; fallback reason shown on patched opaque-output-store input"
+    },
+    {
+      "what": "nfd-tolerance-corpus suite",
+      "command": "pnpm run test:nfd-tolerance-corpus",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 8.5,
+      "result": "      Tests  31 passed (31) ·    Start at  09:11:49 ·    Duration  7.67s (transform 2.16s, setup 0ms, import 5.37s, tests 6.93s, environment 0ms)"
+    },
+    {
+      "what": "normalization-step record fresh",
+      "command": "node utilities/nfd-tolerance-corpus/run.mjs --mode normalization-step --check",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 3.5,
+      "result": "[OK] 920 verification record(s) fresh (generator 1)"
+    },
+    {
+      "what": "studio touched tests",
+      "command": "pnpm --filter @keyboard-studio/studio exec vitest run src/lib/normalizationStepCache.test.ts src/lib/contextToleranceAnalysis.test.ts src/survey/marks/ContextToleranceStation.step.test.tsx",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 10.7,
+      "result": "   Duration  9.68s (transform 14.04s, setup 293ms, import 25.52s, tests 312ms, environment 1.32s) · [BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-086\\packages\\engine\\dist\\langtags\\generated\\index.js as it exceeds the max of 500KB. · [BABEL] Note: The code generator has deoptimised the styling of C:\\Github\\keyboard-studio-086\\packages\\contracts\\dist\\unicode\\unicodeData.generated.js as it exceeds the max of 500KB."
+    },
+    {
+      "what": "full gate before analyze fixes",
+      "command": "pnpm typecheck && pnpm -r test && pnpm lint",
+      "result": "all exit 0; engine 4696 pass / 3 skipped (opt-in KS_CORPUS_PERF p95 test), studio 7961 pass",
+      "warnings": [
+        "1 skipped engine file is the opt-in SC-005 perf test"
+      ]
+    },
+    {
+      "what": "corpus-gated tests at CI pin 435f82d6",
+      "command": "vitest run src/pattern-apply/normalization-step; pnpm run test:nfd-tolerance-corpus",
+      "result": "parity corpus pass; nfd harness 31/31 pass"
+    },
+    {
+      "what": "km-lead post-implement review (km-keyman, km-domain, km-frontend, km-qc, km-synthesis)",
+      "command": "one parallel review cycle, read-only",
+      "result": "no P0; all APPROVE WITH NOTES / PASS",
+      "warnings": [
+        "km-qc P1 issue numbers in persistWorkingCopy.ts are pre-existing, not added on this branch",
+        "km-synthesis P1 missing codegen --check downgraded: normalizationVerification.test.ts already asserts the generated list equals deriveRegressedList(record) in pnpm -r test",
+        "km-keyman P1 context literals not seeded downgraded: the repertoire closure seeds clusters reachable across keystrokes; corpus harness verifies typed parity"
+      ]
+    }
+  ],
+  "last_action": "all 59 tasks done, full gate green",
+  "decisions": [
+    {
+      "decision": "Cache lives in a separate normalizationStepCache.ts module; snapshot field typed StoredNormalizationStep and carried on the working-copy store",
+      "why": "unit-testable; reuses the existing contracts type",
+      "rejected": "Map inside contextToleranceAnalysis.ts"
+    },
+    {
+      "decision": "time-bound refusals are not cached",
+      "why": "they reflect the run budget, not the source",
+      "rejected": "caching every result"
+    },
+    {
+      "decision": "Step is applied via the overlay only; working IR untouched",
+      "why": "existing write seam forbids entryPoints changes; the projection is what ships",
+      "rejected": "mutating the working IR entry point"
+    },
+    {
+      "decision": "verification-regressed added as a studio-side fallback reason",
+      "why": "regressed lookup needs a user-facing reason line",
+      "rejected": "reusing an engine refusal reason"
+    },
+    {
+      "decision": "A keyboard that fails any pasted probe is recorded regressed even when typed output is identical, so the studio falls back to the 062 proposal",
+      "why": "conservative: a step that mishandles pasted clusters should not be offered as verified",
+      "rejected": "verified with pasted.fail > 0"
+    },
+    {
+      "decision": "Studio verificationLookup keys by keyboard id via a prebuild-generated regressed list",
+      "why": "importing docs/ JSON crosses the studio build boundary, and the working-copy source hash would rarely match the record",
+      "rejected": "lookup by source hash"
+    },
+    {
+      "decision": "A time-bound refusal returns stored: null so neither the memory map nor the working-copy snapshot caches it",
+      "why": "recorded decision: time-bound refusals are not cached; previous code persisted them through the snapshot",
+      "rejected": "filtering in the useKeyboardArtifact persist callback"
+    },
+    {
+      "decision": "Documented NFC-equal-only probes as nfcEqual (non-failing) in the harness contract rather than changing the harness",
+      "why": "matches the committed verification record; changing it would regenerate the record",
+      "rejected": "counting nfcEqual as fail"
+    },
+    {
+      "decision": "Review CONDITIONAL approve; no fix cycle",
+      "why": "no P0; remaining items are P1/P2 hardening",
+      "rejected": "blocking completion on P1 hardening"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "T028 opt-in perf run (KS_CORPUS_PERF=1) passed in the worker, but the p95 number was not captured",
+      "step": "implement"
+    },
+    {
+      "note": "Quickstart example row e+U+0323 then ] -> ẹ́ is not among the 5 examples the generator picks for sil_yoruba8 (picker prefers shortest alternates); picker left unchanged",
+      "step": "implement"
+    },
+    {
+      "note": "opaque-output-store fallback walked on a route-patched sil_yoruba8, not a purpose-built fixture; no corpus keyboard refuses that way",
+      "step": "implement"
+    },
+    {
+      "note": "Fixed a phase 1-4 bug: removeNormalizationStep could not restore the entry from a reparsed IR (use(main) kept as raw output)",
+      "step": "implement"
+    },
+    {
+      "note": "Six large keyboards (gandhari, taigi_telex, taigi_viet_telex, vietnam, vietnamese_telex, vietnamese_telex_legacy) hit the 10-minute budget and are harness-error, so they are unverified; simulate() rebuilds the VM per call. A cheaper simulate path is a follow-up",
+      "step": "implement"
+    },
+    {
+      "note": "data-model.md defines regressed as a typed difference; the harness also marks pasted-only failures regressed (11 Indic keyboards). The doc wording should be reconciled in Polish",
+      "step": "implement"
+    },
+    {
+      "note": "SC-005 p95 < 5 s is only checked by the opt-in KS_CORPUS_PERF test; no measured p95 recorded",
+      "step": "implement"
+    },
+    {
+      "note": "Studio verification lookup keys by keyboard id, so a Track 1 copy of a regressed keyboard under a new id is still offered the step (documented limitation)",
+      "step": "implement"
+    },
+    {
+      "note": "FR-021 reorder-group coexistence deferred: no task in 086 covers it",
+      "step": "implement"
+    },
+    {
+      "note": "Engine removal of the step writes an explicit entryPoints.main even when the original entry was implicit (insert.ts:41,66); apply/remove is not identity (km-keyman P1)",
+      "step": "implement"
+    },
+    {
+      "note": "Maps cover only NFC/NFD of each produced cluster; a non-canonical mark order the keyboard emits gets no other-order alternates, and ambiguous targets are recorded but not surfaced to the author (km-domain P1)",
+      "step": "implement"
+    },
+    {
+      "note": "No in-flight dedupe in getOrProposeNormalizationStep; overlapping analyses both generate (km-frontend P2). Station aria-label hard-coded in FacetTransformPanel; async proposal arrival not announced (P2)",
+      "step": "implement"
+    },
+    {
+      "note": "No store-count refusal for very large repertoires against kmcmplib limits (km-keyman P2)",
+      "step": "implement"
+    }
+  ],
+  "coverage": {
+    "FR-016": {
+      "tests": [
+        "packages/engine/src/pattern-apply/normalization-step/index.test.ts",
+        "packages/studio/src/lib/normalizationStepCache.test.ts",
+        "packages/studio/src/lib/persistWorkingCopy.test.ts"
+      ]
+    }
+  },
+  "step_summaries": {
+    "implement": {
+      "summary": "Spec 086 complete: normalization step proposed, cached, verified; analyze findings resolved"
+    }
+  },
+  "telemetryInstanceId": "b84634b9-c5ff-46b8-836f-34e7511ba1b0"
+}

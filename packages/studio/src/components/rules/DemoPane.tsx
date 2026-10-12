@@ -25,7 +25,8 @@ import type {
 } from "@keyboard-studio/contracts";
 import { useRulesDemoArtifactStore, type RulesDemoArtifact } from "../../stores/rulesDemoArtifactStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveIdentityResume } from "../../decisions/identitySelectors.ts";
 import { answerString } from "../../survey/answerString.ts";
 import {
   rulesBody,
@@ -63,15 +64,15 @@ import {
   ALLOW_BLOCK_QUESTION,
   ALLOW_RISK_COPY,
   BLOCK_RISK_COPY,
-  DEFAULT_HOST_LAYOUTS,
-  HOST_LAYOUTS_DEMO_NOTE,
-  LIKELY_HOSTS_NOTE,
-  hostLayoutById,
-  demoHostForReferenceHost,
-  resolveLikelyHosts,
-  type HostLayoutId,
+  DEFAULT_BASE_LAYOUTS,
+  BASE_LAYOUTS_DEMO_NOTE,
+  LIKELY_BASES_NOTE,
+  baseLayoutById,
+  demoBaseForReferenceBase,
+  resolveLikelyBases,
+  type BaseLayoutId,
   type LayoutFamilyAnswer,
-} from "./hostLayouts.ts";
+} from "./baseLayouts.ts";
 
 export interface DemoPaneProps {
   /** Injected simulate implementation (tests). Defaults to the lazy browser-safe engine. */
@@ -109,12 +110,14 @@ export function DemoPane(props: DemoPaneProps = {}) {
   //   4. BCP47 inference, then the five reference hosts.
   // Unknown values are ignored — never a crash, never a guess.
   const pickedLayout = usePickedWindowsLayout();
-  const pickedHost = useMemo(
-    () => (pickedLayout?.host !== undefined ? demoHostForReferenceHost(pickedLayout.host) : null),
+  const pickedBase = useMemo(
+    () => (pickedLayout?.host !== undefined ? demoBaseForReferenceBase(pickedLayout.host) : null),
     [pickedLayout],
   );
   const layoutStepFamily = useLayoutFamilyAnswer();
-  const identityPhaseResult = useSurveySessionStore((s) => s.identityPhaseResult);
+  // Spec 089: the identity phase result is rebuilt from the decision store.
+  const decisions = useDecisionStore((s) => s.decisions);
+  const identityPhaseResult = deriveIdentityResume(decisions);
   const layoutFamily = useMemo<LayoutFamilyAnswer | null>(() => {
     if (layoutStepFamily !== undefined) return layoutStepFamily;
     if (identityPhaseResult === null) return null;
@@ -130,21 +133,21 @@ export function DemoPane(props: DemoPaneProps = {}) {
   // reference hosts when nothing signals. Derived silently — no author question for what the data
   // can answer. "blocked" is appended as a demonstration mode. Manual
   // switching stays available via the selector.
-  const likelyHosts = useMemo(
-    () => resolveLikelyHosts({ pickedHost, layoutFamily, bcp47: bcp47Tags }),
-    [pickedHost, layoutFamily, bcp47Tags],
+  const likelyBases = useMemo(
+    () => resolveLikelyBases({ pickedBase, layoutFamily, bcp47: bcp47Tags }),
+    [pickedBase, layoutFamily, bcp47Tags],
   );
-  const orderedHosts = useMemo<HostLayoutId[]>(
-    () => [...likelyHosts, "blocked"],
-    [likelyHosts],
+  const orderedBases = useMemo<BaseLayoutId[]>(
+    () => [...likelyBases, "blocked"],
+    [likelyBases],
   );
-  const [hostLayout, setHostLayout] = useState<HostLayoutId>(() => likelyHosts[0] ?? DEFAULT_HOST_LAYOUTS[0]!);
+  const [baseLayout, setBaseLayout] = useState<BaseLayoutId>(() => likelyBases[0] ?? DEFAULT_BASE_LAYOUTS[0]!);
   // Re-seed the selection when the likely set changes (e.g. identity set
   // after the pane mounted), unless the author already picked by hand.
   const [handPicked, setHandPicked] = useState(false);
   useEffect(() => {
-    if (!handPicked) setHostLayout(likelyHosts[0] ?? DEFAULT_HOST_LAYOUTS[0]!);
-  }, [likelyHosts, handPicked]);
+    if (!handPicked) setBaseLayout(likelyBases[0] ?? DEFAULT_BASE_LAYOUTS[0]!);
+  }, [likelyBases, handPicked]);
 
   // --- Simulator engine (lazy, once per session; no debounce, no compile) ---
   const [simulate, setSimulate] = useState<DemoSimulate | null>(props.simulateImpl ?? null);
@@ -316,11 +319,11 @@ export function DemoPane(props: DemoPaneProps = {}) {
       keys: textToDemoKeys(text),
       result,
       resolveRule,
-      hostLayout,
+      baseLayout,
       patternTitle,
       familyNameFor,
     });
-  }, [result, text, resolveRule, hostLayout, patternTitle, familyNameFor]);
+  }, [result, text, resolveRule, baseLayout, patternTitle, familyNameFor]);
   const enrichmentPresent = result !== null && demoTraceHasFiredRules(result);
 
   const showTrace = artifactStatus === "ready" && rows.length > 0;
@@ -483,7 +486,7 @@ export function DemoPane(props: DemoPaneProps = {}) {
                       </td>
                       <td style={rulesTd}>{row.rendered === "" ? <em>—</em> : row.rendered}</td>
                       <td style={rulesTd}>{row.firedCaption ?? row.noRuleText}</td>
-                      <td style={rulesTd}>{row.hostConsequence ?? "—"}</td>
+                      <td style={rulesTd}>{row.baseConsequence ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -503,14 +506,14 @@ export function DemoPane(props: DemoPaneProps = {}) {
                 <select
                   data-testid="rules-demo-host-layout"
                   style={rulesInput}
-                  value={hostLayout}
+                  value={baseLayout}
                   onChange={(e) => {
-                    setHostLayout(e.target.value as HostLayoutId);
+                    setBaseLayout(e.target.value as BaseLayoutId);
                     setHandPicked(true);
                   }}
                 >
-                  {orderedHosts.map((id) => {
-                    const layout = hostLayoutById(id);
+                  {orderedBases.map((id) => {
+                    const layout = baseLayoutById(id);
                     return (
                       <option key={layout.id} value={layout.id} title={layout.blurb}>
                         {layout.label}
@@ -520,12 +523,12 @@ export function DemoPane(props: DemoPaneProps = {}) {
                 </select>
               </label>
             </p>
-            <p style={rulesNote}>{LIKELY_HOSTS_NOTE}</p>
+            <p style={rulesNote}>{LIKELY_BASES_NOTE}</p>
             <ul style={{ ...rulesNote, paddingLeft: 18 }}>
               <li>{ALLOW_RISK_COPY}</li>
               <li>{BLOCK_RISK_COPY}</li>
             </ul>
-            <p style={{ ...rulesNote, margin: 0 }}>{HOST_LAYOUTS_DEMO_NOTE}</p>
+            <p style={{ ...rulesNote, margin: 0 }}>{BASE_LAYOUTS_DEMO_NOTE}</p>
           </fieldset>
         </>
       )}

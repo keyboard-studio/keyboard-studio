@@ -2,7 +2,7 @@
 
 import type { PatternLibraryService } from "../patternLibrary";
 import type { Pattern } from "../pattern";
-import type { BaseKeyboard } from "../baseKeyboard";
+import type { StartKeyboard } from "../startKeyboard";
 import type { DiscoveryAxisVector } from "../axes";
 import type { PatternMatch } from "../patternMatch";
 import { toPatternMatch } from "../patternMatch";
@@ -30,7 +30,7 @@ export const mockPatternLibrary: PatternLibraryService = {
   },
 
   filterFor(
-    base: BaseKeyboard,
+    base: StartKeyboard,
     axes?: DiscoveryAxisVector
   ): Promise<PatternMatch[]> {
     // MOCK ONLY — not a faithful subset of §7.2. The real

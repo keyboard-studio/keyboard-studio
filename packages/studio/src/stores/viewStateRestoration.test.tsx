@@ -331,10 +331,10 @@ describe("Pane split, OSK mode and Compare selection survive a route change (FR-
 
   it("keeps a Compare selection in the store (Q5 — session-scoped, not durable)", () => {
     useViewStateStore.getState().setCompareSelection({
-      baseKeyboard: { id: "kb", displayName: "KB" } as never,
+      startKeyboard: { id: "kb", displayName: "KB" } as never,
       oskMode: "desktop",
     });
-    expect(useViewStateStore.getState().compareSelection?.baseKeyboard.id).toBe("kb");
+    expect(useViewStateStore.getState().compareSelection?.startKeyboard.id).toBe("kb");
   });
 });
 
@@ -352,7 +352,7 @@ describe("start-over clears every FR-050 slot together (FR-052)", () => {
     s.setOskMode("survey", "touch");
     s.setScrollTop("decision-trail", 500);
     s.setCompareSelection({
-      baseKeyboard: { id: "kb", displayName: "KB" } as never,
+      startKeyboard: { id: "kb", displayName: "KB" } as never,
       oskMode: "touch",
     });
 

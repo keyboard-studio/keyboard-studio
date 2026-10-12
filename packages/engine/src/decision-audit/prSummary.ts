@@ -137,13 +137,22 @@ function formatDecision(entry: DecisionEntry): string {
   }
 
   if (payload.kind === "base-contribution") {
-    // Written by recordBaseContribution.ts (specs/055-legible-decision-trail
+    // Written by recordStartContribution.ts (specs/055-legible-decision-trail
     // D-11) at `choose_base` completion. The clause names the base and nothing
     // else on purpose: the counts this payload also carries (starting keys,
     // derived axes, inherited metadata) are the DENOMINATOR the later rows'
     // own counts are read against, and restating them here would read as a
     // change this row caused. Not claimed as final wording for the surface.
-    return `Started from base \`${payload.baseId}\` ("${payload.baseDisplayName}")`;
+    return `Started from base \`${payload.startId}\` ("${payload.baseDisplayName}")`;
+  }
+
+  if (payload.kind === "decision") {
+    // spec 090 US5 (D-090-48): the recorded summary IS the clause — the
+    // recording host composed it from the decision's own label and value,
+    // and this surface has no per-module knowledge to compose a better one.
+    // Restating the decision id here would put an internal identifier in
+    // front of the reviewer for no gain.
+    return payload.summary;
   }
 
   const value = `"${formatValue(payload.value)}"`;

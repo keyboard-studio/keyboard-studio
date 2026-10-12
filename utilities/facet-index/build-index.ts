@@ -18,7 +18,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parse } from "../../packages/engine/src/codec/index.js";
-import { parseKps, extractScriptSubtag } from "../../packages/engine/src/base-browser/kps-parser.js";
+import { parseKps, extractScriptSubtag } from "../../packages/engine/src/start-browser/kps-parser.js";
 import { recognizePatterns } from "../../packages/engine/src/recognizer/index.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 

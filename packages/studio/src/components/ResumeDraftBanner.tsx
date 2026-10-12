@@ -24,8 +24,9 @@ import { BG_CARD, BORDER, TEXT_MAIN, TEXT_DIM, BLUE_ACTION, FONT } from "../surv
 const STEP_LABELS: Record<DraftMeta["activeStepId"], string> = {
   identity: "language identity",
   layout: "community keyboard layout",
-  choose_base: "choosing a base keyboard",
+  choose_base: "choosing a starting keyboard",
   track: "authoring track",
+  attribution: "author & copyright",
   project_name: "project name",
   characters: "characters",
   marks: "combining marks",

@@ -114,6 +114,34 @@ devDependency — so `run.mjs` boots through it rather than adding `vite-node` a
 just to get a loader. [vite.config.ts](vite.config.ts) holds the aliases and
 [vitest.config.ts](vitest.config.ts) extends it, so the CLI and the suite resolve identically.
 
+## Normalization-step mode (spec 086)
+
+`--mode normalization-step` verifies the [spec 086](../../specs/086-context-normalization-group/)
+normalization step instead of the 062 transform. For each keyboard it proposes the step,
+compiles the keyboard with and without it, and checks two things: typed output is
+byte-identical for every key sequence of up to two keys, and every pasted NFC or NFD
+alternate produces what the keyboard types. Compile diagnostics must not change.
+
+```
+node utilities/nfd-tolerance-corpus/run.mjs --mode normalization-step --keyboard sil_yoruba8
+node utilities/nfd-tolerance-corpus/run.mjs --mode normalization-step --jobs 8 --incremental
+node utilities/nfd-tolerance-corpus/run.mjs --mode normalization-step --check
+```
+
+| flag | meaning |
+| --- | --- |
+| `--jobs <n>` | verify `n` keyboards in parallel worker processes (default 1) |
+| `--incremental` | re-simulate only keyboards whose source hash or generator version changed; carry the rest byte-for-byte |
+| `--check` | exit 1 when any record is stale or missing; no simulation (CI runs this) |
+| `--record <path>` | verification record (default [docs/context-normalization-verification.json](../../docs/context-normalization-verification.json)) |
+| `--budget-minutes <n>` | per-keyboard time cap; a keyboard over it is recorded `harness-error` (default 10) |
+
+Each keyboard lands in one outcome: `verified`, `regressed` (a typed difference, a failed
+pasted probe, or changed compile diagnostics), `refused` (the generator declined, with its
+reason), or `harness-error` (unverified, with its cause). The record is committed, keyed by
+source hash, so a keyboard is simulated once per source change. The studio reads its
+`regressed` ids through a prebuild codegen and falls back to the 062 proposal for them.
+
 ## Report
 
 `--out` writes a `nfd-tolerance-corpus/1` JSON document: run metadata (corpus root and

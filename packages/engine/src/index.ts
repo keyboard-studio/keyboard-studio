@@ -8,8 +8,8 @@ export {
 } from "./validator/index.js";
 
 // Issue #20 — base-browser GitHub API client.
-export { createBaseBrowser } from "./base-browser/index.js";
-export type { BaseBrowserConfig } from "./base-browser/index.js";
+export { createStartBrowser } from "./start-browser/index.js";
+export type { StartBrowserConfig } from "./start-browser/index.js";
 
 // Issue #16 — WASM oracle public surface.
 export {
@@ -158,12 +158,18 @@ export type {
 export {
   applyContextToleranceOverlay,
   buildContextToleranceOverlay,
+  buildNormalizationStepOverlay,
+  isNormalizationStepBatch,
+  NORMALIZATION_STEP_SITE_ID,
+  overlayHasNormalizationStep,
   presentContextToleranceSites,
   removeContextToleranceOverlay,
 } from "./pattern-apply/context-tolerance-overlay.js";
 export type {
   ContextToleranceOverlay,
   ContextToleranceOverlayBatch,
+  ContextToleranceRulesBatch,
+  NormalizationStepBatch,
   ContextToleranceOverlayResult,
 } from "./pattern-apply/context-tolerance-overlay.js";
 
@@ -270,10 +276,10 @@ export type {
 
 // spec 080 FR-008/FR-009 — base documentation classification (research R4).
 export {
-  classifyBaseDocumentation,
+  classifyStartDocumentation,
   extractUsableBaseDescription,
-} from "./base-browser/index.js";
-export type { BaseBrowserServiceWithDocProfile } from "./base-browser/index.js";
+} from "./start-browser/index.js";
+export type { StartBrowserServiceWithDocProfile } from "./start-browser/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export {
@@ -413,11 +419,11 @@ export type {
 // stands in for base output when opaque fragments make it unknowable.
 export {
   ASCII_PUNCTUATION_FLOOR,
-  basePunctuationCoverage,
+  startPunctuationCoverage,
   buildPunctuationProposal,
 } from "./character-discovery/punctuationProposal.js";
 export type {
-  BasePunctuationCoverage,
+  StartPunctuationCoverage,
   CldrAbsentReason,
   PunctuationProposalInput,
   PunctuationProposal,
@@ -512,7 +518,7 @@ export {
 } from "./marks/promotion.js";
 export {
   computeMarkTreatmentPrefills,
-  detectBaseMarkMechanism,
+  detectStartMarkMechanism,
   unaffordableReasonFor,
   PRODUCTIVITY_SPREAD_THRESHOLD,
 } from "./marks/treatment-prefill.js";
@@ -520,7 +526,7 @@ export type {
   MarkTreatmentPrefill,
   MarkTreatmentPrefillOptions,
   KeyBudgetSignal,
-  BaseMarkMechanism,
+  StartMarkMechanism,
 } from "./marks/treatment-prefill.js";
 export {
   deriveMarksComputedAxes,
@@ -846,7 +852,7 @@ export {
   isMnemonicLayout,
   keyHasCapsHandling,
   buildShiftRuleLines,
-  buildBaseRuleLines,
+  buildStartRuleLines,
   buildCasePairRuleLines,
   planShiftAssignment,
   MODIFIER_EXCLUSIONS,
@@ -975,7 +981,7 @@ export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
 // First production caller: the studio's punctuation step (spec 075 FR-011)
 // shows the missing-side count of the chosen punctuation before Done.
 // `hasUnaccountedOpaqueFragment` is the shared "is the base's output fully
-// known?" predicate the delta and `basePunctuationCoverage` both derive from.
+// known?" predicate the delta and `startPunctuationCoverage` both derive from.
 export {
   computeInventoryDelta,
   hasUnaccountedOpaqueFragment,

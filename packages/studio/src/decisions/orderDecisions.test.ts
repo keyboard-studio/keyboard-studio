@@ -135,15 +135,15 @@ describe("gatedByFromNext", () => {
     }
   });
 
-  it("derives the default-branch gate for il_author_name (negation of earlier conditions)", () => {
-    const gate = gatedByFromNext(authorName.definition, modules);
-    expect(gate).toBeDefined();
-    for (const s of ["Latn", "other", undefined]) {
-      expect(gate!(withScript(s)), String(s)).toBe(true);
-    }
-    for (const s of ["Ethi", "Hani", "Hang"]) {
-      expect(gate!(withScript(s)), s).toBe(false);
-    }
+  // #1901: il_author_name has NO derived gate anymore. It used to be the
+  // default-branch target of il_target_script's `next` (the gate was the
+  // negation of the gated-script conditions); the author/copyright
+  // questions now head their own post-track flow, and the
+  // supported-script protection lives in the session terminal
+  // (steps/advance.ts routes a gated script to "unsupported"), not in a
+  // derived module gate.
+  it("derives no gate for il_author_name — it heads its own flow now (#1901)", () => {
+    expect(gatedByFromNext(authorName.definition, modules)).toBeUndefined();
   });
 
   it("returns undefined for a module with no conditional next", () => {

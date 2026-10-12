@@ -5,7 +5,7 @@
 // text and writes it back into the VFS so the compile step sees it.
 //
 // Two projection paths (refs #391):
-//   - TEXT-SPLICE (preferred): when `baseIr`'s node positions correspond
+//   - TEXT-SPLICE (preferred): when `startIr`'s node positions correspond
 //     exactly to the VFS's current `.kmn` text (see eligibility gate below),
 //     carveViaSplice deletes ONLY the exact source spans of the deleted nodes,
 //     leaving every surviving byte of the original file untouched — comments,
@@ -28,7 +28,7 @@
 //   - RawKmnFragment nodes: the raw fragment is dropped.
 //   - IRComment nodes: comments are not individually deleteable via carve.
 //
-// baseIr is never mutated.
+// startIr is never mutated.
 //
 // Safety gate: the set of deleted nodes must not remove the entry group — the
 // first non-readonly group that emit() picks for `begin Unicode > use(...)`.
@@ -36,7 +36,7 @@
 // fails, the carve step is skipped and a warning is returned; the VFS is left
 // unchanged. This gate applies identically on both paths.
 //
-// Fragment-bearing keyboards (baseIr.raw.length > 0) are fully supported on
+// Fragment-bearing keyboards (startIr.raw.length > 0) are fully supported on
 // the filter+re-emit path: emit() uses a position-faithful path that
 // interleaves stores, rules, and fragments in their original source order and
 // preserves ALL user stores (not just those referenced by typed rules).
@@ -52,7 +52,7 @@ import { deriveCarvedIr } from "./carvePipeline.js";
 /**
  * The T015 carve pipeline inputs for {@link applyCarveToVfs}. When present,
  * the full composed pipeline (suppression → slot removals → whole-node
- * filter, see carvePipeline.ts) runs on the PRE-carve `baseIr` and the
+ * filter, see carvePipeline.ts) runs on the PRE-carve `startIr` and the
  * result is serialized; text-splice is ineligible because the derived IR's
  * node positions no longer correspond to the VFS text.
  */
@@ -68,7 +68,7 @@ export interface CarvePipelineOpts {
 /**
  * Options bag for {@link applyCarveToVfs}.
  *
- * - `irRewritten` — set to `true` when `baseIr` has already been modified since
+ * - `irRewritten` — set to `true` when `startIr` has already been modified since
  *   it was parsed from the VFS's `.kmn` text: a preceding transform (e.g.
  *   `applyStoreSlotRemovals`) rewrote store contents, or the caller is the
  *   spec-014 mutate() seam handing in an already-filtered IR. One flag carries
@@ -79,7 +79,7 @@ export interface CarvePipelineOpts {
  *        correspond to the VFS text, so splicing it would delete the wrong lines).
  *   The entry-group safety gate still applies.
  * - `carvePipeline` — T015: run the shared carve pipeline
- *   (suppression → slot removals → filter) on the PRE-carve `baseIr` instead
+ *   (suppression → slot removals → filter) on the PRE-carve `startIr` instead
  *   of the plain deletion filter. The caller must pass the pre-removal IR
  *   and must NOT pre-apply slot removals (the T013 constraint: guard selector
  *   chars are read from the pre-removal stores). Implies `irRewritten`.
@@ -104,7 +104,7 @@ export interface ApplyCarveToVfsResult {
 }
 
 /**
- * Project carve deletions onto the VFS without mutating `baseIr`.
+ * Project carve deletions onto the VFS without mutating `startIr`.
  *
  * Reads the .kmn path (`source/<keyboardId>.kmn`) from the VFS and replaces
  * it with the carved text, then returns any warnings produced. Prefers
@@ -119,7 +119,7 @@ export interface ApplyCarveToVfsResult {
  *
  * @param vfs            In-memory virtual filesystem. Written in-place.
  * @param keyboardId     Keyboard identifier (determines the .kmn VFS path).
- * @param baseIr         Source-of-truth IR (never mutated).
+ * @param startIr         Source-of-truth IR (never mutated).
  * @param deletedNodeIds Set of nodeIds the author has marked for deletion.
  * @param opts           Optional settings; see {@link ApplyCarveToVfsOpts}.
  * @returns Warnings produced during projection (empty when all is well).
@@ -127,7 +127,7 @@ export interface ApplyCarveToVfsResult {
 export function applyCarveToVfs(
   vfs: VirtualFS,
   keyboardId: string,
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   opts?: ApplyCarveToVfsOpts,
 ): ApplyCarveToVfsResult {
@@ -153,7 +153,7 @@ export function applyCarveToVfs(
   // Safety gate: entry-group deletion guard.
   // emit() picks the first non-readonly group as the `begin Unicode > use(...)`
   // target. Deleting it would silently retarget the begin directive.
-  const entryGroup = baseIr.groups.find((g) => !g.readonly);
+  const entryGroup = startIr.groups.find((g) => !g.readonly);
   if (entryGroup !== undefined && deletedNodeIds.has(entryGroup.nodeId)) {
     warnings.push(
       `[carve-project] carve re-emit skipped: deletion set includes the entry group ` +
@@ -166,7 +166,7 @@ export function applyCarveToVfs(
 
   const kmnPath = `source/${keyboardId}.kmn`;
 
-  // Text-splice eligibility: baseIr's node positions correspond exactly to
+  // Text-splice eligibility: startIr's node positions correspond exactly to
   // the VFS's current .kmn text only when nothing has rewritten either since
   // the keyboard was parsed. `irRewritten` is the caller's declaration that
   // this precondition does NOT hold (see ApplyCarveToVfsOpts) — splicing the
@@ -177,9 +177,9 @@ export function applyCarveToVfs(
   if (pipeline !== undefined && pipelineEdit) {
     // T015: the shared carve pipeline already derived the carved IR
     // (suppression → slot removals → whole-node filter) from the pre-carve
-    // baseIr; serialize it directly. Text-splice is ineligible: the derived
+    // startIr; serialize it directly. Text-splice is ineligible: the derived
     // IR's node positions do not correspond to the VFS text.
-    const derived = deriveCarvedIr(baseIr, {
+    const derived = deriveCarvedIr(startIr, {
       deletedNodeIds,
       deletedItemIds: pipeline.deletedItemIds,
       dispositions: pipeline.dispositions,
@@ -198,7 +198,7 @@ export function applyCarveToVfs(
     const currentEntry = vfs.get(kmnPath);
     const currentText = typeof currentEntry?.content === "string" ? currentEntry.content : undefined;
     if (currentText !== undefined) {
-      const spliced = carveViaSplice(currentText, baseIr, deletedNodeIds);
+      const spliced = carveViaSplice(currentText, startIr, deletedNodeIds);
       if (spliced.ok) {
         emitted = spliced.text;
       } else {
@@ -211,11 +211,11 @@ export function applyCarveToVfs(
 
   if (emitted === undefined) {
     // Fallback: build a new IR that excludes deleted nodes. Shallow copy at
-    // each level so baseIr is never mutated (D3: immutable working-copy
+    // each level so startIr is never mutated (D3: immutable working-copy
     // layers). The deletion filter is the shared pure producer carveFilterIr,
     // so this VFS path and the spec-014 mutate() seam derive byte-identical
     // filtered IRs.
-    const filteredIr: KeyboardIR = carveFilterIr(baseIr, deletedNodeIds);
+    const filteredIr: KeyboardIR = carveFilterIr(startIr, deletedNodeIds);
     derivedIr = filteredIr;
     try {
       emitted = emit(filteredIr);
@@ -226,8 +226,8 @@ export function applyCarveToVfs(
     }
   }
 
-  // The re-emit serializes baseIr's header, whose sibling asset-path stores
-  // may predate a scaffold()/id-rename of the VFS files (Track 1: baseIr is
+  // The re-emit serializes startIr's header, whose sibling asset-path stores
+  // may predate a scaffold()/id-rename of the VFS files (Track 1: startIr is
   // captured at keyboard selection under the BASE id). Repoint any reference
   // whose file is missing to the keyboardId-named sibling that actually
   // exists — otherwise stripDanglingAssetStores removes the reference before

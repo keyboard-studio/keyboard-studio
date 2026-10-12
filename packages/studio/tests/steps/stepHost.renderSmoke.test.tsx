@@ -27,6 +27,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { screen, cleanup, act } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 import type { ActiveStepId } from "../../src/stores/surveySessionStore.ts";
 import type { ReducerDeps } from "../../src/steps/reducer.ts";
 
@@ -66,8 +67,8 @@ vi.mock("../../src/survey/invisibles/InvisiblesStep.tsx", () => ({
   InvisiblesStep: () => <div data-testid="stub-InvisiblesStep" />,
 }));
 
-vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: () => <div data-testid="stub-BaseResolution" />,
+vi.mock("../../src/editors/panels/StartResolution.tsx", () => ({
+  StartResolution: () => <div data-testid="stub-BaseResolution" />,
 }));
 
 // Mocks CarveGalleryV2 (v2, the live carve gallery) — v1's CarveGallery.tsx
@@ -84,8 +85,8 @@ vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stub-TouchGallery" />,
 }));
 
-vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
-  TouchSeedSourcePanel: () => <div data-testid="stub-TouchSeedSourcePanel" />,
+vi.mock("../../src/survey/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
+  TouchSeedSourceRenderer: () => <div data-testid="stub-TouchSeedSourcePanel" />,
 }));
 
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
@@ -125,8 +126,8 @@ vi.mock("../../src/lib/navigate.ts", () => ({
 }));
 
 vi.mock("../../src/lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: vi.fn(),
-  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
+  instantiateFromStartIfConfirmed: vi.fn(),
+  // StartResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
   // (F1 fix) before advancing; this suite's working copy starts uninstantiated
   // in every render, so mocking it to always allow preserves prior behavior.
   confirmRebaseTo: vi.fn(() => true),
@@ -154,18 +155,13 @@ import type { EditorStep } from "../../src/steps/types.ts";
 
 /** A no-op ReducerDeps suitable for smoke tests (chrome selection only). */
 const noopReducerDeps: ReducerDeps = {
-  lockDesktop: vi.fn(),
-  clearStale: vi.fn(),
-  setTouchLayoutJson: vi.fn(),
-  instantiateFromBase: vi.fn(),
+  instantiateFromStart: vi.fn(),
   instantiateFromExisting: vi.fn(),
-  buildTouchLayoutJson: () => ({ json: null, warnings: [] }),
-  resolveBaseTouchJson: () => undefined,
-  instantiateFromBaseIfConfirmed: () => false,
+  instantiateFromStartIfConfirmed: () => false,
 };
 
-// Fake base keyboard — satisfies the localBase guard in TrackStepFactoryComponent.
-const fakeBase: import("@keyboard-studio/contracts").BaseKeyboard = {
+// Fake base keyboard — satisfies the localStart guard in TrackStepFactoryComponent.
+const fakeStart: import("@keyboard-studio/contracts").StartKeyboard = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",
@@ -179,8 +175,8 @@ async function mountAt(stepId: ActiveStepId) {
   act(() => {
     useSurveySessionStore.setState({
       activeStepId: stepId,
-      // Seed localBase so TrackStepAdapter's null guard passes.
-      localBase: fakeBase,
+      // Seed localStart so TrackStepAdapter's null guard passes.
+      localStart: fakeStart,
     });
   });
   await act(async () => {
@@ -218,23 +214,16 @@ describe('StepHost terminal: "done"', () => {
 
 describe('StepHost terminal: "unsupported"', () => {
   beforeEach(() => {
-    // unsupported branch reads identityResult — seed it so the stub renders.
+    // The unsupported branch derives the identity result from the decision
+    // store (spec 089) — seed the identity decisions so the stub renders:
+    // target-script "Ethi" is UNSUPPORTED, so deriveIdentityResult reports
+    // supported: false with targetScriptRaw "Ethi".
     act(() => {
-      useSurveySessionStore.setState({
-        identityResult: {
-          autonym: "Test",
-          english: "Test",
-          languageSubtag: "te",
-          region: "",
-          targetScriptRaw: "Ethi",
-          bcp47: "te-Ethi",
-          supported: false,
-          prefill: { script: "Ethi", scriptClass: "abugida", routingGroup: "non-roman" },
-          // spec 064: a gated script terminates at il_script_not_supported, before
-          // the attribution questions — so there is nothing to attribute.
-          attribution: null,
-        },
-      });
+      const record = useDecisionStore.getState().record;
+      record({ id: "language-name", value: "Test", provenance: "asked" });
+      record({ id: "language-autonym", value: "Test", provenance: "asked" });
+      record({ id: "language-code", value: "te", provenance: "asked" });
+      record({ id: "target-script", value: "Ethi", provenance: "asked" });
     });
   });
 
@@ -263,13 +252,13 @@ const editorSteps = manifest.filter(
 //
 // The mapping is derived from the adapter/factory → child component chain:
 //   identityStep      → IdentityLiteAdapter              → IdentityLite stub
-//   chooseBaseStep    → BaseResolutionAdapter             → BaseResolution stub
+//   chooseStartStep    → StartResolutionAdapter             → StartResolution stub
 //   trackStep         → TrackStepFactoryComponent         → FlowStepHost stub (flow_id=track)
 //   projectNameStep   → ProjectNameStepFactoryComponent   → FlowStepHost stub (flow_id=project_name)
 //   charactersStep    → CharactersStep                    → stub-CharactersStep
 //   carveStep         → CarveAdapter                      → CarveGalleryV2 stub
 //   mechanismsStep    → AddPhysicalAdapter                → MechanismGallery stub
-//   touchSeedSourceStep → TouchSeedSourcePanel            → TouchSeedSourcePanel stub (layout:"full" — P0 fix, spec 035 R4b follow-up)
+//   touchSeedSourceStep → TouchSeedSourceHost → gallery module renderer (TouchSeedSourceRenderer, survey/touchSeedSource/ since spec 090 US1) → TouchSeedSourcePanel stub (layout:"full" — P0 fix, spec 035 R4b follow-up)
 //   touchStep         → AddTouchAdapter                   → TouchGallery stub
 //   helpStep          → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
 //   packageStep       → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)

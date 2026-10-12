@@ -29,7 +29,7 @@ import { navigateTo } from "./navigate.ts";
 
 /** Instantiate a working copy so `hasProject` is true. */
 function seedProject(): void {
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs: createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c\n", isBinary: false }]),
     ir: makeTestIR([]),
   });

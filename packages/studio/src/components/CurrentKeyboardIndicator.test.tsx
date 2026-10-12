@@ -13,7 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
-import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard } from "@keyboard-studio/contracts";
 import { CurrentKeyboardIndicator } from "./CurrentKeyboardIndicator.tsx";
 import { navigateTo } from "../lib/navigate.ts";
 import {
@@ -23,7 +23,7 @@ import {
   type ProjectIndexEntry,
 } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { makeScaffoldedIR } from "../test/irFixtures.ts";
 
 vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
@@ -44,9 +44,9 @@ const mockedResumeProject = vi.mocked(resumeProject);
 // ---------------------------------------------------------------------------
 
 /** Instantiates a real working copy as `projectKey`, so it becomes "the
- * current keyboard" until the next `instantiateFromBase` call. */
+ * current keyboard" until the next `instantiateFromStart` call. */
 function instantiateAsCurrent(projectKey: string, displayName: string): void {
-  const base = makeBaseKeyboard({
+  const base = makeStartKeyboard({
     id: projectKey,
     path: `release/${projectKey}`,
     script: "Latn",
@@ -56,7 +56,7 @@ function instantiateAsCurrent(projectKey: string, displayName: string): void {
   });
   useWorkingCopyStore
     .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
+    .instantiateFromStart(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
 }
 
 /**
@@ -101,6 +101,17 @@ afterEach(() => {
 // Visibility / label
 // ---------------------------------------------------------------------------
 
+/**
+ * Record the project decisions a completed project_name step records
+ * (spec 089: the scaffoldSpec the indicator reads is derived from these).
+ */
+function seedProjectDecisions(displayName: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "authoring-track", value: "copy", provenance: "asked" });
+  record({ id: "project-display-name", value: displayName, provenance: "asked" });
+  record({ id: "project-keyboard-id", value: "current-kbd", provenance: "asked" });
+}
+
 describe("CurrentKeyboardIndicator — visibility and label", () => {
   // The control is present for the WHOLE survey, including the Phase A
   // questions that run before a base keyboard exists — see the component's
@@ -132,9 +143,7 @@ describe("CurrentKeyboardIndicator — visibility and label", () => {
 
   it("prefers the project_name scaffoldSpec name over the base keyboard's name (FR-041)", () => {
     instantiateAsCurrent("current-kbd", "French");
-    useSurveySessionStore
-      .getState()
-      .setScaffoldSpec({ keyboardId: "current-kbd", displayName: "Bambara Latin" });
+    seedProjectDecisions("Bambara Latin");
     render(<CurrentKeyboardIndicator />);
     expect(screen.getByRole("button").textContent).toContain("Bambara Latin");
     expect(screen.getByRole("button").textContent).not.toContain("French");
@@ -146,9 +155,7 @@ describe("CurrentKeyboardIndicator — visibility and label", () => {
     expect(screen.getByRole("button").textContent).toContain("French");
 
     act(() => {
-      useSurveySessionStore
-        .getState()
-        .setScaffoldSpec({ keyboardId: "current-kbd", displayName: "Renamed" });
+      seedProjectDecisions("Renamed");
     });
 
     expect(screen.getByRole("button").textContent).toContain("Renamed");
@@ -230,7 +237,7 @@ describe("CurrentKeyboardIndicator — switching keyboards", () => {
     expect(mockedResumeProject).toHaveBeenCalledWith("other-kbd");
     expect(mockedNavigateTo).toHaveBeenCalledWith("survey");
     // The real apply happened — the working copy is now the OTHER project.
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("other-kbd");
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe("other-kbd");
   });
 
   it("selecting the already-current keyboard is a no-op", () => {
@@ -267,7 +274,7 @@ describe("CurrentKeyboardIndicator — switching keyboards", () => {
 
     expect(mockedResumeProject).toHaveBeenCalledWith("broken-kbd");
     expect(mockedNavigateTo).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("current-kbd");
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe("current-kbd");
   });
 
   // The defect this component's SelectMenu commitMode="onExplicitSelect" opt-in
@@ -296,7 +303,7 @@ describe("CurrentKeyboardIndicator — switching keyboards", () => {
     expect(mockedResumeProject).not.toHaveBeenCalled();
     expect(mockedNavigateTo).not.toHaveBeenCalled();
     // The working copy never moved off the current project either.
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("current-kbd");
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe("current-kbd");
   });
 
   it("Enter on a highlighted keyboard triggers exactly one resumeProject and one navigateTo call", () => {
@@ -316,6 +323,6 @@ describe("CurrentKeyboardIndicator — switching keyboards", () => {
     expect(mockedResumeProject).toHaveBeenCalledWith("other-kbd");
     expect(mockedNavigateTo).toHaveBeenCalledTimes(1);
     expect(mockedNavigateTo).toHaveBeenCalledWith("survey");
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("other-kbd");
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe("other-kbd");
   });
 });

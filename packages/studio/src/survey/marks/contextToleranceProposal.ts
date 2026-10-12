@@ -81,3 +81,47 @@ export function buildContextToleranceProposal(args: {
     namedLosses: [],
   };
 }
+
+/** The one site a normalization step offers (spec 086); mirrors the engine's constant. */
+export const NORMALIZATION_STEP_SITE = "normalization-step";
+
+/**
+ * The proposal for a normalization step: one all-or-nothing site, pre-accepted.
+ * The panel is mounted without per-site ticks for it, so the author's choice is
+ * the single confirm or decline.
+ */
+export function buildNormalizationStepProposal(args: {
+  ruleCount: number;
+  framing: string;
+  description: string;
+}): TransformProposal {
+  const { ruleCount, framing, description } = args;
+  return {
+    kind: "proposal",
+    transitionId: { facetId: CONTEXT_TOLERANCE_FACET, fromValue: "joined-only", toValue: "joined-or-separate" },
+    transformImpactClass: "ux-changing",
+    measurement: {
+      facetId: CONTEXT_TOLERANCE_FACET,
+      dominantValue: "joined-only",
+      confidenceClass: "confident",
+      consistency: 1,
+      exceptionSites: [],
+      evidenceSize: ruleCount,
+    },
+    affectedSites: [
+      {
+        siteId: NORMALIZATION_STEP_SITE,
+        causeTag: "gap-omission" as const,
+        defaultDisposition: "fix-offered" as const,
+        userDisposition: "accepted" as const,
+        framing,
+      },
+    ],
+    implications: [],
+    previewKind: "ux-description",
+    preview: { previewKind: "ux-description", uxDescription: description },
+    status: "proposed",
+    migrationRuleId: "context-tolerance",
+    namedLosses: [],
+  };
+}

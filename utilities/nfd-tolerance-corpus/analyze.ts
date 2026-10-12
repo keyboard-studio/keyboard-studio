@@ -182,8 +182,17 @@ export function runProbes(
  * enough: `simulate()` runs the `.js` (KeymanWeb) artifact, and a compile can
  * succeed having emitted only a `.kmx`.
  */
-export function simulable(result: CompileResult): boolean {
-  return result.success && result.artifacts.some((a) => a.filename.endsWith(".js"));
+export function simulable(result: CompileResult, options: { allowCompileErrors?: boolean } = {}): boolean {
+  const hasJs = result.artifacts.some((a) => a.filename.endsWith(".js"));
+  // Opt-in (the normalization-step mode): a build that reports compile errors
+  // but still emitted KeymanWeb JS is simulated anyway. The default 062 mode
+  // keeps requiring `success`.
+  return hasJs && (result.success || options.allowCompileErrors === true);
+}
+
+/** Number of error/fatal diagnostics a compile reported. */
+export function errorDiagnosticCount(result: CompileResult): number {
+  return result.diagnostics.filter((d) => d.severity === "error" || d.severity === "fatal").length;
 }
 
 /** Why a compile is unusable — kmc-kmn's own words where it has any. */

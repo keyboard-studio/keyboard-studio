@@ -1,6 +1,6 @@
 // Genealogical base-suggestion tier (spec 036 US2, T020). Composes the
 // Glottolog keyboard-base bridge on top of the existing script/language ranking
-// in suggestBase.ts: a base that matches the target SCRIPT and also supports a
+// in suggestStart.ts: a base that matches the target SCRIPT and also supports a
 // genealogically-close relative of the target LANGUAGE is promoted to a distinct
 // "genealogical" tier that slots between the language-match tiers and
 // `script-match`, carrying the closest relative (name + distance) for display.
@@ -8,23 +8,23 @@
 // The bridge is a pure function with injected deps (glottolog never imports
 // engine/studio, D8). Here we inject a langtags-backed `resolveLanguage` and the
 // base-browser phonebook. We consume only the bridge's genealogical tier and
-// merge it into the full `suggestBases` ranking — the existing script-match,
+// merge it into the full `suggestStarts` ranking — the existing script-match,
 // language-cross-script and US-QWERTY-fallback tiers are preserved, so this is
 // purely additive. (The bridge's own `script-fallback` tier is not injected: the
-// studio already produces those tiers via `suggestBases`.)
+// studio already produces those tiers via `suggestStarts`.)
 
-import type { BaseKeyboard, LanguageDefaults } from "@keyboard-studio/contracts";
-import { findKeyboardBaseCandidates } from "@keyboard-studio/glottolog/bridge";
+import type { StartKeyboard, LanguageDefaults } from "@keyboard-studio/contracts";
+import { findKeyboardStartCandidates } from "@keyboard-studio/glottolog/bridge";
 import { getLanguoid } from "@keyboard-studio/glottolog";
 import {
   byDisplayName,
   primarySubtag,
-  type BaseSuggestion,
+  type StartSuggestion,
   type SuggestReason,
   type SuggestTarget,
-} from "./suggestBase.ts";
+} from "./suggestStart.ts";
 
-/** The `suggestBases` reasons plus the Glottolog-derived genealogical tier. */
+/** The `suggestStarts` reasons plus the Glottolog-derived genealogical tier. */
 export type ResolvedReason = SuggestReason | "genealogical";
 
 /** The closest related language that promoted a base into the genealogical tier. */
@@ -41,7 +41,7 @@ export interface ClosestRelative {
 }
 
 export interface ResolvedSuggestion {
-  base: BaseKeyboard;
+  base: StartKeyboard;
   reason: ResolvedReason;
   /**
    * The related language that ranked this base — present only on `genealogical`
@@ -109,12 +109,12 @@ function bridgeTargetTag(target: SuggestTarget): string {
 
 export interface GenealogyDeps {
   resolveLanguage: ResolveLanguage;
-  /** Phonebook: base id → declared BCP47 tags (same shape suggestBases uses). */
+  /** Phonebook: base id → declared BCP47 tags (same shape suggestStarts uses). */
   languagesById: Readonly<Record<string, readonly string[]>>;
 }
 
 /**
- * Merge the Glottolog genealogical tier into an existing `suggestBases` ranking.
+ * Merge the Glottolog genealogical tier into an existing `suggestStarts` ranking.
  *
  * A `script-match` base that also supports a genealogically-close relative of the
  * target is promoted to `genealogical` and ranked ahead of the remaining pure
@@ -127,11 +127,11 @@ export interface GenealogyDeps {
  * it returns the input suggestions unchanged (no genealogical promotions).
  */
 export function applyGenealogicalTier(
-  suggestions: readonly BaseSuggestion[],
+  suggestions: readonly StartSuggestion[],
   target: SuggestTarget,
   deps: GenealogyDeps,
 ): ResolvedSuggestion[] {
-  const candidates = findKeyboardBaseCandidates(
+  const candidates = findKeyboardStartCandidates(
     { bcp47: bridgeTargetTag(target) },
     { resolveLanguage: deps.resolveLanguage, languagesById: deps.languagesById },
   );
@@ -139,7 +139,7 @@ export function applyGenealogicalTier(
   // Which bases the bridge places in the genealogical tier, plus each one's
   // closest relative (name + both-legs distance) for the UI and for ordering.
   const genealogicalIds = new Set<string>();
-  const relativeByBase = new Map<string, ClosestRelative>();
+  const relativeByStart = new Map<string, ClosestRelative>();
   for (const c of candidates) {
     if (c.tier !== "genealogical") continue;
     genealogicalIds.add(c.keyboardId);
@@ -147,13 +147,13 @@ export function applyGenealogicalTier(
       const { iso639p3, glottocode, distance } = c.closestRelative;
       // Glottolog languoid name for display; fall back to the ISO code.
       const name = getLanguoid(glottocode)?.name ?? iso639p3.toUpperCase();
-      relativeByBase.set(c.keyboardId, { name, iso639p3, distance });
+      relativeByStart.set(c.keyboardId, { name, iso639p3, distance });
     }
   }
 
   const resolved: ResolvedSuggestion[] = suggestions.map((s) => {
     if (s.reason === "script-match" && genealogicalIds.has(s.base.id)) {
-      const relative = relativeByBase.get(s.base.id);
+      const relative = relativeByStart.get(s.base.id);
       return {
         base: s.base,
         reason: "genealogical",

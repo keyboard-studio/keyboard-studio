@@ -16,8 +16,8 @@
 // checkout and is out of reach for a unit test.
 
 import { describe, expect, it, beforeEach } from "vitest";
-import { basePunctuationCoverage, glyphCategory, parseKmn, producedGlyphs } from "@keyboard-studio/engine";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
+import { startPunctuationCoverage, glyphCategory, parseKmn, producedGlyphs } from "@keyboard-studio/engine";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions } from "../../survey/useInventoryDraft.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
 const PARITY_KMN = [
@@ -46,18 +46,18 @@ function confirmedPunctuation(): Set<string> {
 }
 
 beforeEach(() => {
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 describe("SC-007 — emitted punctuation ⊆ confirmed punctuation inventory", () => {
   it("with zero interaction, every punctuation character the keyboard emits is in the confirmed inventory", () => {
     const { ir } = parseKmn(PARITY_KMN, "parity");
-    const coverage = basePunctuationCoverage(ir);
+    const coverage = startPunctuationCoverage(ir);
     expect(coverage.coverageComplete).toBe(true);
     expect([...coverage.produced].sort()).toEqual([",", ".", "!", "?"].sort());
 
     // What the punctuation step seeds on arrival for this base.
-    usePhaseBDraftStore.getState().seedProposals(coverage.produced, "base", "punctuation-base:parity");
+    inventoryOps("characters").seedProposals(coverage.produced, "base", "punctuation-base:parity");
 
     const confirmed = confirmedPunctuation();
     const difference = emittedPunctuation(ir).filter((c) => !confirmed.has(c));
@@ -68,10 +68,10 @@ describe("SC-007 — emitted punctuation ⊆ confirmed punctuation inventory", (
 
   it("names the character carve's always-keep rule re-admits after the author declined it (deferred carve-side concern)", () => {
     const { ir } = parseKmn(PARITY_KMN, "parity");
-    const coverage = basePunctuationCoverage(ir);
-    usePhaseBDraftStore.getState().seedProposals(coverage.produced, "base", "punctuation-base:parity");
-    usePhaseBDraftStore.getState().remove("?");
-    expect(usePhaseBDraftStore.getState().rejected).toEqual(["?"]);
+    const coverage = startPunctuationCoverage(ir);
+    inventoryOps("characters").seedProposals(coverage.produced, "base", "punctuation-base:parity");
+    inventoryOps("characters").remove("?");
+    expect(getCharacterInventoryValue().rejected).toEqual(["?"]);
 
     // The emitted keyboard is the working copy unchanged — carve's always-keep
     // rule never removes punctuation — so the declined mark is still typed.

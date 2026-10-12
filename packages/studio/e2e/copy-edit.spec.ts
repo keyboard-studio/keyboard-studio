@@ -30,8 +30,9 @@ import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseTrackCopy,
+  driveAttributionStep,
   chooseAdaptTrack,
   acceptProjectName,
   confirmPrefill,
@@ -56,7 +57,7 @@ import {
 const FIXTURE = {
   /** basic_kbdfr is a simple Latin keyboard; codec-clean and available in the
    *  local keyboard catalog served by the Vite dev server. */
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   /** Language name typed into identity-lite autonym field. */
   autonym: "Test",
   /** English name (seeded from autonym; we keep it the same). */
@@ -115,7 +116,7 @@ const FIXTURE = {
 
 interface ProvenScriptFixture {
   script: "Latn" | "Cyrl" | "Grek" | "Geor" | "Armn";
-  baseKeyboardId: string;
+  startKeyboardId: string;
   /** ISO 639 language subtag the base declares (drives base-suggestion ranking). */
   languageCode: string;
   /** BCP47 script subtag chosen at identity-lite (il_target_script). */
@@ -129,17 +130,17 @@ interface ProvenScriptFixture {
 }
 
 const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
-  { script: "Latn", baseKeyboardId: "basic_kbdfr",         languageCode: "fr",  targetScript: "Latn", charToAdd: "é" },
+  { script: "Latn", startKeyboardId: "basic_kbdfr",         languageCode: "fr",  targetScript: "Latn", charToAdd: "é" },
   {
-    script: "Cyrl", baseKeyboardId: "basic_kbdru", languageCode: "ru", targetScript: "Cyrl",
+    script: "Cyrl", startKeyboardId: "basic_kbdru", languageCode: "ru", targetScript: "Cyrl",
     charToAdd: "ә", charToCarve: "ё", placement: { key: "K_A", layers: ["RALT"] },
   },
-  { script: "Grek", baseKeyboardId: "basic_kbdhe",         languageCode: "el",  targetScript: "Grek", charToAdd: "ω" },
-  { script: "Geor", baseKeyboardId: "basic_kbdgeo",        languageCode: "ka",  targetScript: "Geor", charToAdd: "ქ" },
-  { script: "Armn", baseKeyboardId: "basic_kbdarme",       languageCode: "hy",  targetScript: "Armn", charToAdd: "ա" },
+  { script: "Grek", startKeyboardId: "basic_kbdhe",         languageCode: "el",  targetScript: "Grek", charToAdd: "ω" },
+  { script: "Geor", startKeyboardId: "basic_kbdgeo",        languageCode: "ka",  targetScript: "Geor", charToAdd: "ქ" },
+  { script: "Armn", startKeyboardId: "basic_kbdarme",       languageCode: "hy",  targetScript: "Armn", charToAdd: "ա" },
   // Bonus row (#1439) — see the header comment above for why this is here
   // alongside, not instead of, basic_kbdfr's Latn row.
-  { script: "Latn", baseKeyboardId: "sil_cameroon_azerty", languageCode: "agq", targetScript: "Latn", charToAdd: "ɨ" },
+  { script: "Latn", startKeyboardId: "sil_cameroon_azerty", languageCode: "agq", targetScript: "Latn", charToAdd: "ɨ" },
 ];
 
 /**
@@ -165,7 +166,7 @@ interface WalkFixture {
   english: string;
   languageCode: string;
   targetScript: string;
-  baseKeyboardId: string;
+  startKeyboardId: string;
   charToAdd: string;
   charToCarve?: string;
   placement?: MechanismPlacement;
@@ -178,7 +179,7 @@ function walkFixtureFor(f: ProvenScriptFixture): WalkFixture {
     english: `Test ${f.script}`,
     languageCode: f.languageCode,
     targetScript: f.targetScript,
-    baseKeyboardId: f.baseKeyboardId,
+    startKeyboardId: f.startKeyboardId,
     charToAdd: f.charToAdd,
     ...(f.charToCarve !== undefined ? { charToCarve: f.charToCarve } : {}),
     ...(f.placement !== undefined ? { placement: f.placement } : {}),
@@ -201,16 +202,16 @@ async function fillIdentityLite(page: Page, fx: WalkFixture = FIXTURE): Promise<
 }
 
 /**
- * Wrapper to call pickBaseKeyboard with copy-edit fixture values.
+ * Wrapper to call pickStartKeyboard with copy-edit fixture values.
  * Includes wait for base picker to appear (cold server can take 20s+).
  */
-async function pickBaseKeyboardCopyEdit(page: Page, fx: WalkFixture = FIXTURE): Promise<void> {
-  // Wait for base picker to appear. BaseResolution shows a bare "Loading base
+async function pickStartKeyboardCopyEdit(page: Page, fx: WalkFixture = FIXTURE): Promise<void> {
+  // Wait for base picker to appear. StartResolution shows a bare "Loading base
   // keyboards..." until listAll() resolves, and the first catalog load enumerates
   // the ENTIRE local ../keyboards clone from disk (hundreds of keyboards via the
   // dev Vite plugin) — which can take well over 20s on a cold dev server.
   await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
-  await pickBaseKeyboard(page, fx.baseKeyboardId);
+  await pickStartKeyboard(page, fx.startKeyboardId);
 }
 
 /**
@@ -351,8 +352,9 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the wizard.
     await fillIdentityLite(page);
-    await pickBaseKeyboardCopyEdit(page);
+    await pickStartKeyboardCopyEdit(page);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -404,8 +406,9 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     // the final (renamed) keyboard activated fine. basic_kbdfr has a web
     // target, so the preview loads a real compiled .js here.
     await fillIdentityLite(page);
-    await pickBaseKeyboardCopyEdit(page);
+    await pickStartKeyboardCopyEdit(page);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
 
@@ -421,8 +424,9 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   }) => {
     // Walk the full wizard and reach the Output screen.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -437,7 +441,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     // If the WASM compile produced fatal errors the stage stays "error" and the
     // button remains disabled — which would cause the expect() below to fail.
     //
-    // Scope note: usePreviewArtifact seeds baseKeyboard but leaves
+    // Scope note: usePreviewArtifact seeds startKeyboard but leaves
     // scaffoldSpec = null / pickerMode = "open", so useKeyboardArtifact runs in
     // open-base mode. This test therefore verifies that basic_kbdfr itself
     // compiles clean, NOT that the Track 1-scaffolded output compiles clean.
@@ -455,6 +459,17 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   test("emitted .kps declares the author's language and name; .kvks and welcome.htm are non-empty", async ({
     page,
   }) => {
+    // Timeout sized to the walk, not the 240s config default. This is the
+    // ~250-action full walk; on the contended CI runner every action costs
+    // 2–8s in actionability waits, and trace analysis (run 37632354160)
+    // showed progress linear in budget — ≈6 sequences recorded at a 240s
+    // cap, 14 at 480s, in healthy advancing state, never stuck. Measured
+    // end-to-end at 450s on spec 089's run (37679303677). The budget line
+    // was lost when this test was rewritten on a later branch and the walk
+    // died at the 240s default on the union run (37754110396); restored
+    // with its evidence. Tripwire: death AT 480s with the walk still
+    // advancing means the route grew — re-measure, don't re-raise.
+    test.setTimeout(480_000);
     // Walk the wizard and download. Unlike the other walks here this one supplies
     // the language code, so the identity-lite series composes a real BCP47 tag for
     // the package descriptor to declare (spec 059 FR-001) instead of leaving the
@@ -465,8 +480,9 @@ test.describe("Track 1 (copy-edit) E2E", () => {
       script: FIXTURE.targetScript,
       languageCode: FIXTURE.languageCode,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page);
@@ -559,8 +575,9 @@ test.describe("Track 1 (copy-edit) E2E", () => {
       script: FIXTURE.targetScript,
       languageCode: FIXTURE.languageCode,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await completePhaseB(page);
     await finishGalleryWork(page);
@@ -587,7 +604,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 // ---------------------------------------------------------------------------
 // spec 034 — proven-script walks (T010, T011) + publish paths (T016)
 //
-// Reuses the parameterized walk helpers above (fillIdentityLite / pickBaseKeyboard
+// Reuses the parameterized walk helpers above (fillIdentityLite / pickStartKeyboard
 // / completePhaseB now take a WalkFixture). The download button becoming enabled
 // IS the compile-clean signal: canDownload === (stage.kind === "ready" &&
 // isInstantiated), and stage.kind reaches "ready" only after a successful
@@ -597,8 +614,9 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 /** Walk identity → base → track(copy) → project-name → prefill → Phase B → Output tab. */
 async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
   await fillIdentityLite(page, fx);
-  await pickBaseKeyboardCopyEdit(page, fx);
+  await pickStartKeyboardCopyEdit(page, fx);
   await chooseTrackCopy(page);
+  await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
 
@@ -658,7 +676,7 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
   // --- T011: all five proven scripts (FR-011, SC-004), plus a bonus Cameroon
   // AZERTY Latn case (#1439), reach a downloadable ZIP.
   for (const fx of PROVEN_SCRIPT_BASES) {
-    test(`T011 [US1]: ${fx.script} (${fx.baseKeyboardId}) reaches a downloadable ZIP`, async ({
+    test(`T011 [US1]: ${fx.script} (${fx.startKeyboardId}) reaches a downloadable ZIP`, async ({
       page,
     }) => {
       const download = await walkToDownload(page, walkFixtureFor(fx));
@@ -748,8 +766,9 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // prefill -> Phase B), mirroring the proven walkToOutput helper up to
     // (not including) the Output-tab hop.
     await fillIdentityLite(page);
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseTrackCopy(page);
+    await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await completePhaseB(page); // "Done" advances the traversal to "carve".

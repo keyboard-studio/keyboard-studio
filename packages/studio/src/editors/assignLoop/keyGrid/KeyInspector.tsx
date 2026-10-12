@@ -764,12 +764,12 @@ export function KeyInspector({
               <span style={PANEL_HINT_STYLE} data-testid="key-inspector-provenance">
                 {selectedCell.provenance === "base-derived"
                   ? t({
-                      id: "editor.assignLoop.keyGrid.inspector.provenanceBaseDerived",
-                      message: "Auto-placed from your base keyboard.",
+                      id: "editor.assignLoop.keyGrid.inspector.provenanceStartingDerived",
+                      message: "Auto-placed from your starting keyboard.",
                     })
                   : t({
-                      id: "editor.assignLoop.keyGrid.inspector.provenancePhysicalSuggested",
-                      message: "Auto-suggested from the physical layout.",
+                      id: "editor.assignLoop.keyGrid.inspector.provenanceDesktopSuggested",
+                      message: "Auto-suggested from the desktop layout.",
                     })}
               </span>
             </>

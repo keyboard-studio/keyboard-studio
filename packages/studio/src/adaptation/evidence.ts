@@ -56,5 +56,5 @@ export interface AdaptationEvidence {
  */
 export interface AdaptationEvidenceProvider {
   /** Assemble the evidence bundle for a (target language, base keyboard) pair. */
-  evidenceFor(targetLanguage: string, baseId: string): AdaptationEvidence;
+  evidenceFor(targetLanguage: string, startId: string): AdaptationEvidence;
 }

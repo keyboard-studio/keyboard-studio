@@ -36,7 +36,7 @@ function result(
 describe("identity_lite flow order (English name first)", () => {
   const flow = loadFlowSourceDef(flowSources["identity_lite"]!);
 
-  it("orders the questions: english -> region -> autonym -> code -> script -> not-supported -> attribution", () => {
+  it("orders the questions: english -> region -> autonym -> code -> script -> not-supported (terminal)", () => {
     // Relative order via indexOf rather than a brittle full-order literal.
     // il_language_region (US3) is conditional, reached only when the picked
     // language is region-ambiguous.
@@ -47,11 +47,18 @@ describe("identity_lite flow order (English name first)", () => {
     expect(ids.indexOf("il_language_code")).toBeGreaterThan(ids.indexOf("il_language_autonym"));
     expect(ids.indexOf("il_target_script")).toBeGreaterThan(ids.indexOf("il_language_code"));
     expect(ids.indexOf("il_script_not_supported")).toBeGreaterThan(ids.indexOf("il_target_script"));
-    // spec 064 US1 — attribution capture, ordered name -> email -> holder. Anchored
-    // to il_target_script rather than to il_script_not_supported: these are reached
-    // from il_target_script's DEFAULT branch, while a gated script terminates at the
-    // not-supported notice and never arrives here.
-    expect(ids.indexOf("il_author_name")).toBeGreaterThan(ids.indexOf("il_target_script"));
+    // #1901: the author/copyright questions (spec 064 US1) no longer live in
+    // this flow — they form the post-track attribution flow, ordered
+    // name -> email -> holder there.
+    expect(ids.indexOf("il_author_name")).toBe(-1);
+    expect(ids.indexOf("il_author_email")).toBe(-1);
+    expect(ids.indexOf("il_copyright_holder")).toBe(-1);
+  });
+
+  it("the attribution flow orders name -> email -> holder (#1901)", () => {
+    const attribution = loadFlowSourceDef(flowSources["attribution"]!);
+    const ids = attribution.questions.map((q) => q.id);
+    expect(ids.indexOf("il_author_name")).toBeGreaterThanOrEqual(0);
     expect(ids.indexOf("il_author_email")).toBeGreaterThan(ids.indexOf("il_author_name"));
     expect(ids.indexOf("il_copyright_holder")).toBeGreaterThan(ids.indexOf("il_author_email"));
   });

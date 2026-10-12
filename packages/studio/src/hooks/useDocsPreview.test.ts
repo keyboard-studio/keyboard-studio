@@ -15,7 +15,7 @@ function instantiate() {
   const vfs = createVirtualFS([
     { path: `source/${basicKbdus.id}.kmn`, content: "c test\n", isBinary: false },
   ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: makeTestIR([]) });
 }
 
 describe("useDocsPreview", () => {

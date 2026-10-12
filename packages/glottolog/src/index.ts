@@ -17,7 +17,7 @@ export type {
   Languoid,
   RelatednessOptions,
   RelatednessResult,
-  KeyboardBaseCandidate,
+  KeyboardStartCandidate,
 } from "./types.js";
 
 export { getLanguoid, byIso639p3, ancestors } from "./catalog.js";

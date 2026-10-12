@@ -15,7 +15,7 @@ import {
   type DemoKey,
 } from "./demoSimulation.ts";
 import { firedRuleCaption, type FiredRuleResolver } from "./ruleNaming.ts";
-import { hostCharFor, hostLayoutById, type HostLayoutId } from "./hostLayouts.ts";
+import { baseLayoutCharFor, baseLayoutById, type BaseLayoutId } from "./baseLayouts.ts";
 
 export interface DemoTraceRow {
   index: number;
@@ -41,12 +41,12 @@ export interface DemoTraceRow {
   /** Graceful text for the no-firedRule case (FR-002: never a bare index). */
   noRuleText: string;
   /** What the selected host layout would emit for this physical key. */
-  hostChar: string | null;
+  baseLayoutChar: string | null;
   /**
    * Per-row host-consequence label for the blocking demonstration — set only
    * when the keystroke was swallowed. Null otherwise.
    */
-  hostConsequence: string | null;
+  baseConsequence: string | null;
 }
 
 export interface BuildDemoTraceRowsArgs {
@@ -58,7 +58,7 @@ export interface BuildDemoTraceRowsArgs {
    * working-copy IR and the compiled JS source.
    */
   resolveRule: FiredRuleResolver;
-  hostLayout: HostLayoutId;
+  baseLayout: BaseLayoutId;
   /** Synchronous pattern-title lookup (cached async resolution in the pane). */
   patternTitle?: (patternId: string) => string | undefined;
   /**
@@ -72,8 +72,8 @@ function vkeyLabelFor(key: DemoKey): string {
   return key.shift ? `Shift+${key.vkey}` : key.vkey;
 }
 
-export interface HostConsequenceInput {
-  hostLayout: HostLayoutId;
+export interface BaseConsequenceInput {
+  baseLayout: BaseLayoutId;
   /** Display label of the selected host layout, e.g. "US International". */
   layoutLabel: string;
   /** Physical key id for the no-table-entry fallback, e.g. "K_A". */
@@ -82,7 +82,7 @@ export interface HostConsequenceInput {
    * What the host layout emits for this key: a character, "" for a dead-key
    * position, or null when the demo table has no entry.
    */
-  hostChar: string | null;
+  baseLayoutChar: string | null;
 }
 
 /**
@@ -92,20 +92,20 @@ export interface HostConsequenceInput {
  * Block means predictable" framing. Exported so the copy-absence test can
  * exercise every branch directly.
  */
-export function hostConsequenceFor({
-  hostLayout,
+export function baseConsequenceFor({
+  baseLayout,
   layoutLabel,
   vkey,
-  hostChar,
-}: HostConsequenceInput): string {
-  if (hostLayout === "blocked") {
+  baseLayoutChar,
+}: BaseConsequenceInput): string {
+  if (baseLayout === "blocked") {
     return "Blocked here — the keyboard emitted nothing, and this host layout would emit nothing either.";
   }
-  if (hostChar === "") {
+  if (baseLayoutChar === "") {
     return `Blocked here — the keyboard emitted nothing; on ${layoutLabel} this key is a dead-key position — it waits for the next press.`;
   }
-  if (hostChar !== null) {
-    return `Blocked here — the keyboard emitted nothing; on ${layoutLabel} this key would have typed “${hostChar}”.`;
+  if (baseLayoutChar !== null) {
+    return `Blocked here — the keyboard emitted nothing; on ${layoutLabel} this key would have typed “${baseLayoutChar}”.`;
   }
   return `Blocked here — the keyboard emitted nothing. (No host-table entry for ${vkey} — the demo table is approximate.)`;
 }
@@ -115,9 +115,9 @@ export function hostConsequenceFor({
  * cover the overlap and never throw on a ragged result.
  */
 export function buildDemoTraceRows(args: BuildDemoTraceRowsArgs): DemoTraceRow[] {
-  const { keys, result, resolveRule, hostLayout, patternTitle, familyNameFor } = args;
+  const { keys, result, resolveRule, baseLayout, patternTitle, familyNameFor } = args;
   const enrichmentPresent = traceHasFiredRules(result.trace);
-  const layoutLabel = hostLayoutById(hostLayout).label;
+  const layoutLabel = baseLayoutById(baseLayout).label;
   const rows: DemoTraceRow[] = [];
   const count = Math.min(keys.length, result.trace.length);
   for (let i = 0; i < count; i++) {
@@ -139,11 +139,11 @@ export function buildDemoTraceRows(args: BuildDemoTraceRowsArgs): DemoTraceRow[]
     // Host fall-through preview: the static table, falling back to the typed
     // character itself for U_XXXX unicode-key events (a unicode key event
     // types that character on any host).
-    const hostChar =
-      hostCharFor(hostLayout, key.vkey, { shift: key.shift }) ??
+    const baseLayoutChar =
+      baseLayoutCharFor(baseLayout, key.vkey, { shift: key.shift }) ??
       (key.vkey.startsWith("U_") ? key.char : null);
-    const hostConsequence = swallowed
-      ? hostConsequenceFor({ hostLayout, layoutLabel, vkey: key.vkey, hostChar })
+    const baseConsequence = swallowed
+      ? baseConsequenceFor({ baseLayout, layoutLabel, vkey: key.vkey, baseLayoutChar })
       : null;
     rows.push({
       index: i,
@@ -156,8 +156,8 @@ export function buildDemoTraceRows(args: BuildDemoTraceRowsArgs): DemoTraceRow[]
       swallowed,
       firedCaption,
       noRuleText,
-      hostChar,
-      hostConsequence,
+      baseLayoutChar,
+      baseConsequence,
     });
   }
   return rows;

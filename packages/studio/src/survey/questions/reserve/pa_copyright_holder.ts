@@ -2,7 +2,7 @@
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 // maps_to: KeyboardIdentity.copyrightHolder
 
-import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
+import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
@@ -57,19 +57,19 @@ function asText(value: string | string[] | undefined): string {
  * Scoped to the declared `writes` path `header.copyright`. An empty answer
  * produces an empty patch (no-op), leaving the existing copyright untouched (M5).
  */
-export function mutate(
+export function apply(
   value: string | string[] | undefined,
-  _ctx: MutateContext,
-): Partial<KeyboardIR> {
+  _ctx: ApplyContext,
+): WorkingCopyPatch {
   const copyright = asText(value);
   if (copyright === "") return {};
-  return { header: { copyright } as KeyboardIR["header"] };
+  return { ir: { header: { copyright } as KeyboardIR["header"] } };
 }
 
 const mod: QuestionModule = {
   definition,
   validate,
-  mutate,
+  apply,
   fixtures,
   inputs: [],
   writes: [irPath("header", "copyright")],

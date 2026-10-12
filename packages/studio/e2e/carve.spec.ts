@@ -63,8 +63,9 @@ import { readFile } from "node:fs/promises";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   confirmMechanismsEmpty,
@@ -77,7 +78,7 @@ import {
 // Fixture constants
 // ---------------------------------------------------------------------------
 
-const BASE_KEYBOARD_ID = "bj_cree_woods";
+const START_KEYBOARD_ID = "bj_cree_woods";
 // Both producing rules for the target character (see the PORT NOTE above) —
 // discarding the character cascades to both at once.
 const TARGET_RULE_IDS = ["rule#18", "rule#20"];
@@ -88,7 +89,7 @@ const TARGET_CODEPOINT_LABEL = "U+14EC";
 // producers of U+14EC in this fixture — verified by grep, no store or other
 // rule references it) survives.
 const KEPT_ONLY_TOKEN = "U+14EC";
-const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
+const KMN_ZIP_PATH = `source/${START_KEYBOARD_ID}.kmn`;
 
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
@@ -160,8 +161,9 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       autonym: "Nehiyawewin",
       script: "other",
     });
-    await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+    await pickStartKeyboard(page, START_KEYBOARD_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 
@@ -332,8 +334,9 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       autonym: "Nehiyawewin",
       script: "other",
     });
-    await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+    await pickStartKeyboard(page, START_KEYBOARD_ID);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 

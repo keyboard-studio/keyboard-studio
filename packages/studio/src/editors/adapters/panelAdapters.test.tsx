@@ -1,4 +1,4 @@
-// Regression coverage for BaseResolutionAdapter's suggest-target wiring
+// Regression coverage for StartResolutionAdapter's suggest-target wiring
 // (refs #1021). The adapter must build SuggestTarget from
 // surveySessionStore.identityResult (written by IdentityLiteAdapter before
 // this step is reached), not from workingCopyStore.identity, which is null
@@ -13,21 +13,22 @@
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import {
   basicKbdus,
   silEuroLatin,
 } from "@keyboard-studio/contracts/fixtures";
 
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
-import { buildTargetBcp47 } from "../../survey/IdentityLite.tsx";
-import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import type { Decision } from "../../decisions/decisionTypes.ts";
+import { useStartPreviewStatusStore } from "../../stores/startPreviewStatusStore.ts";
+import { recordAnswersAsDecisions } from "../../steps/reducer.ts";
 
 // ---------------------------------------------------------------------------
-// jsdom does not implement scrollIntoView — BaseKeyboardPicker (rendered
-// inside BaseResolution) may call it; stub it out globally like the existing
-// BaseKeyboardPicker.test.tsx does.
+// jsdom does not implement scrollIntoView — StartKeyboardPicker (rendered
+// inside StartResolution) may call it; stub it out globally like the existing
+// StartKeyboardPicker.test.tsx does.
 // ---------------------------------------------------------------------------
 
 beforeAll(() => {
@@ -35,19 +36,19 @@ beforeAll(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Service mock — BaseResolution loads bases via getBaseBrowserService().
+// Service mock — StartResolution loads bases via getStartBrowserService().
 // vi.mock is hoisted, so it runs before the panelAdapters import below.
 // ---------------------------------------------------------------------------
 
-const BASES: BaseKeyboard[] = [basicKbdus, silEuroLatin];
+const BASES: StartKeyboard[] = [basicKbdus, silEuroLatin];
 
 vi.mock("../../lib/services.ts", () => ({
-  getBaseBrowserService: () => ({ listAll: () => Promise.resolve(BASES) }),
-  // spec 080 FR-008: BaseResolution's doc-profile hook calls this on every
+  getStartBrowserService: () => ({ listAll: () => Promise.resolve(BASES) }),
+  // spec 080 FR-008: StartResolution's doc-profile hook calls this on every
   // preview; default every base to "unknown" (no badge) — this file's
   // coverage is the preview/commit wiring, not the classification badge
-  // itself (see BaseResolution.test.tsx for that).
-  getBaseDocProfile: () =>
+  // itself (see StartResolution.test.tsx for that).
+  getStartDocProfile: () =>
     Promise.resolve({
       level: "unknown",
       members: [],
@@ -58,28 +59,26 @@ vi.mock("../../lib/services.ts", () => ({
   USE_REAL: false,
 }));
 
-import { BaseResolutionAdapter, IdentityLiteAdapter } from "./panelAdapters.tsx";
+import { StartResolutionAdapter, IdentityLiteAdapter } from "./panelAdapters.tsx";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-/** Full IdentityLiteResult shape (see survey/IdentityLite.tsx). */
-function makeIdentityResult(overrides: Partial<IdentityLiteResult>): IdentityLiteResult {
-  return {
-    autonym: "Hausa",
-    english: "Hausa",
-    languageSubtag: "ha",
-    targetScriptRaw: "Latn",
-    bcp47: "ha-Latn",
-    supported: true,
-    prefill: {
-      script: "Latn",
-      scriptClass: "alphabetic",
-      routingGroup: "qwerty-qwertz",
-    },
-    ...overrides,
-  };
+/**
+ * Seed the identity decisions the identity step's completion records
+ * (spec 089: StartResolutionAdapter reads deriveIdentityResult(decisions)
+ * in place of the deleted surveySessionStore.identityResult field).
+ * Defaults reproduce the old makeIdentityResult({}) fixture: Hausa/Latn.
+ */
+function seedIdentityDecisions(
+  overrides: { languageCode?: string; targetScript?: string } = {},
+): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: "Hausa", provenance: "asked" });
+  record({ id: "language-autonym", value: "Hausa", provenance: "asked" });
+  record({ id: "language-code", value: overrides.languageCode ?? "ha", provenance: "asked" });
+  record({ id: "target-script", value: overrides.targetScript ?? "Latn", provenance: "asked" });
 }
 
 afterEach(() => {
@@ -87,37 +86,24 @@ afterEach(() => {
   // Reset the preview-status store between tests — it is a module-level
   // singleton (Zustand), so a test that flips it to "ready" would otherwise
   // leak into the next test's initial render.
-  useBasePreviewStatusStore.setState({ status: "idle" });
+  useStartPreviewStatusStore.setState({ status: "idle" });
 });
 
-describe("BaseResolutionAdapter — suggest target sourced from surveySessionStore", () => {
-  it("declared-language identityResult surfaces the language-match badge", async () => {
-    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+describe("BaseResolutionAdapter — suggest target derived from the decision store (spec 089)", () => {
+  it("declared-language identity decisions surface the language-match badge", async () => {
+    seedIdentityDecisions();
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Already supports your language")).toBeDefined();
     });
   });
 
-  it("identityResult === null falls back to script-only target without crashing", async () => {
-    useSurveySessionStore.getState().setIdentityResult(null);
+  it("no identity decisions falls back to script-only target without crashing", async () => {
+    // No decisions recorded — deriveIdentityResult returns null.
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
-
-    await waitFor(() => {
-      expect(screen.getByText("Matches your script")).toBeDefined();
-    });
-    expect(screen.queryByText("Already supports your language")).toBeNull();
-  });
-
-  it("identityResult.bcp47 === '' falls back to script-only target without crashing", async () => {
-    useSurveySessionStore.getState().setIdentityResult(
-      makeIdentityResult({ bcp47: "" }),
-    );
-
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -125,15 +111,23 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
     expect(screen.queryByText("Already supports your language")).toBeNull();
   });
 
-  it("prefill.script === '' falls back to 'Latn' so script matching still works", async () => {
-    useSurveySessionStore.getState().setIdentityResult(
-      makeIdentityResult({
-        bcp47: "",
-        prefill: { script: "", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-      }),
-    );
+  it("empty language-code decision (bcp47 === '') falls back to script-only target without crashing", async () => {
+    seedIdentityDecisions({ languageCode: "" });
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("Matches your script")).toBeDefined();
+    });
+    expect(screen.queryByText("Already supports your language")).toBeNull();
+  });
+
+  it("empty target-script decision falls back to 'Latn' so script matching still works", async () => {
+    // deriveIdentityResult: an empty recorded script composes to
+    // prefill.script "" — the adapter's `|| "Latn"` fallback covers it.
+    seedIdentityDecisions({ languageCode: "", targetScript: "" });
+
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -143,59 +137,64 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
 });
 
 // ---------------------------------------------------------------------------
-// BaseResolutionAdapter — preview-before-commit split.
+// StartResolutionAdapter — preview-before-commit split (gallery-hosted since
+// spec 090 T013: the adapter is the host wrapper; the renderer is
+// survey/chooseStart/StartKeyboardRenderer.tsx).
 //
 // Preview (every suggestion-card / search-result click) must write
-// setLocalBase WITHOUT calling onComplete (the wizard does not advance, the
-// working copy is not instantiated). Commit (the "Choose this keyboard"
-// button) must set baseConfirmed=true BEFORE calling onComplete (R7 ordering
-// — StudioShell's single-instantiation effect gates on baseConfirmed).
+// setLocalStart WITHOUT calling onComplete and WITHOUT recording any
+// decision (the wizard does not advance, the working copy is not
+// instantiated). Commit (the "Choose this keyboard" button) must record
+// the `base-keyboard` decision BEFORE calling onComplete (R7 ordering —
+// StudioShell's single-instantiation effect arms off the recorded
+// decision; the session startConfirmed flag is no longer written at all).
 // ---------------------------------------------------------------------------
 
 describe("BaseResolutionAdapter — preview vs commit", () => {
   it("previewing a suggestion card writes setLocalBase and does NOT call onComplete", async () => {
-    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+    seedIdentityDecisions();
     const onComplete = vi.fn();
 
-    render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
 
     const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     fireEvent.click(card);
 
     await waitFor(() => {
-      expect(useSurveySessionStore.getState().localBase?.id).toBe("sil_euro_latin");
+      expect(useSurveySessionStore.getState().localStart?.id).toBe("sil_euro_latin");
     });
     expect(onComplete).not.toHaveBeenCalled();
-    // A fresh preview re-arms the commit gate — baseConfirmed stays false.
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
-    // basePreviewStatusStore stays at its default "idle" (nothing in this
+    // A preview is not a decision — nothing is recorded.
+    expect(useDecisionStore.getState().decisions["base-keyboard"]).toBeUndefined();
+    // startPreviewStatusStore stays at its default "idle" (nothing in this
     // unit test publishes to it), so the confirm button stays disabled too —
     // a preview alone can never reach the commit path.
     expect((screen.getByTestId("base-confirm") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("committing after a preview sets baseConfirmed BEFORE calling onComplete (R7 ordering)", async () => {
-    useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
+  it("committing after a preview records the base-keyboard decision BEFORE calling onComplete (R7 ordering)", async () => {
+    seedIdentityDecisions();
 
-    // Spy on setBaseConfirmed via the store's setState escape hatch, wrapping
-    // the real action so both the spy AND the actual mutation fire — same
-    // pattern as the golden-walk oracle in tests/steps/stepHost.goldenWalk.test.tsx.
-    const originalSetBaseConfirmed = useSurveySessionStore.getState().setBaseConfirmed;
-    const setBaseConfirmedSpy = vi.fn((v: boolean) => originalSetBaseConfirmed(v));
-    useSurveySessionStore.setState({ setBaseConfirmed: setBaseConfirmedSpy });
+    // Spy on the decision store's record via the setState escape hatch,
+    // wrapping the real action so both the spy AND the actual mutation
+    // fire — same pattern as the golden-walk oracle in
+    // tests/steps/stepHost.goldenWalk.test.tsx.
+    const originalRecord = useDecisionStore.getState().record;
+    const recordSpy = vi.fn((d: Decision) => originalRecord(d));
+    useDecisionStore.setState({ record: recordSpy });
 
     const onComplete = vi.fn();
-    render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
 
     const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     fireEvent.click(card);
 
     // Follow-up fix on PR #1174: the confirm button is now gated on
-    // previewStatus === "ready" (read from basePreviewStatusStore). This unit
+    // previewStatus === "ready" (read from startPreviewStatusStore). This unit
     // test has no StudioShell/SurveyView mounted to publish that status from
     // the real compile pipeline, so drive it directly — mirroring what a
     // settled preview compile would publish.
-    useBasePreviewStatusStore.getState().setStatus("ready");
+    useStartPreviewStatusStore.getState().setStatus("ready");
 
     const confirm = await waitFor(() => {
       const btn = screen.getByTestId("base-confirm") as HTMLButtonElement;
@@ -208,22 +207,30 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     expect(onComplete).toHaveBeenCalledWith({
       base: expect.objectContaining({ id: "sil_euro_latin" }),
     });
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(true);
 
-    // setBaseConfirmed is called twice: (false) on preview, (true) on commit.
-    expect(setBaseConfirmedSpy.mock.calls.map((args) => args[0])).toEqual([false, true]);
+    // Exactly one decision is recorded — the commit's — carrying the
+    // previewed base's catalog identity with asked provenance.
+    expect(recordSpy).toHaveBeenCalledTimes(1);
+    expect(recordSpy.mock.calls[0]![0]).toMatchObject({
+      id: "base-keyboard",
+      value: { id: "sil_euro_latin" },
+      provenance: "asked",
+      step: "choose_base",
+    });
+    expect(useDecisionStore.getState().decisions["base-keyboard"]).toBeDefined();
+    // The retired session flag is untouched by the whole flow.
+    expect(useSurveySessionStore.getState().startConfirmed).toBe(false);
 
-    // Call-order assertion: the COMMIT's setBaseConfirmed(true) call fires
-    // strictly before onComplete (R7 — "writes before advance").
-    const commitCallIdx = setBaseConfirmedSpy.mock.calls.findIndex((args) => args[0] === true);
-    const commitCallOrder = setBaseConfirmedSpy.mock.invocationCallOrder[commitCallIdx];
+    // Call-order assertion: the record fires strictly before onComplete
+    // (R7 — "writes before advance").
+    const recordOrder = recordSpy.mock.invocationCallOrder[0];
     const onCompleteOrder = onComplete.mock.invocationCallOrder[0];
-    expect(commitCallOrder).toBeLessThan(onCompleteOrder!);
+    expect(recordOrder).toBeLessThan(onCompleteOrder!);
   });
 });
 
 // ---------------------------------------------------------------------------
-// IdentityLiteAdapter — history-pop resume wiring (identityPhaseResult)
+// IdentityLiteAdapter — history-pop resume wiring (decision-derived, spec 089)
 // ---------------------------------------------------------------------------
 
 /** A completed identity-lite phase result, as the flow would produce it. */
@@ -234,17 +241,22 @@ const IDENTITY_PHASE_RESULT = {
     { questionId: "il_language_english", answerType: "text" as const, value: "Hausa" },
     { questionId: "il_language_code", answerType: "text" as const, value: "ha" },
     { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
-    // spec 064 US1: identity-lite continues into attribution, so a genuinely
-    // COMPLETED result includes these. Without them, resume correctly lands on
-    // the first unanswered attribution question rather than the flow's end.
-    { questionId: "il_author_name", answerType: "text" as const, value: "Alice Example" },
-    { questionId: "il_author_email", answerType: "text" as const, value: "alice@example.org" },
-    { questionId: "il_copyright_holder", answerType: "text" as const, value: "Hausa Language Committee" },
+    // #1901: a genuinely COMPLETED identity result ends here — the
+    // author/copyright answers (spec 064 US1) are the attribution step's
+    // completion now, recorded under that step, not this one.
   ],
 };
 
-describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
-  it("first visit (no stored phase result) starts the flow at question 1", () => {
+/** Record the completed identity run the way StepHost does at completion. */
+function seedCompletedIdentityDecisions(): void {
+  recordAnswersAsDecisions(IDENTITY_PHASE_RESULT, "identity", {
+    writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
+    readDecisionSet: () => useDecisionStore.getState().decisions,
+  });
+}
+
+describe("IdentityLiteAdapter — resume from recorded decisions (spec 089)", () => {
+  it("first visit (no decisions recorded) starts the flow at question 1", () => {
     render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
     // il_language_english (English-name picker) is the first question in the
     // reordered flow (spec 030 FR-009).
@@ -253,49 +265,51 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
     ).toBeDefined();
   });
 
-  it("re-entry with a stored phase result resumes on the flow's last question", () => {
-    useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
+  it("re-entry with decisions recorded resumes on the flow's last question", () => {
+    seedCompletedIdentityDecisions();
 
     render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
 
-    // spec 064 US1: the flow's last question is now the copyright holder.
-    expect(screen.getByText("Who holds the copyright, if not you?")).toBeDefined();
+    // #1901: the flow's last question is the target script again.
+    expect(screen.getByText("Which script will THIS keyboard type?")).toBeDefined();
     expect(
       screen.queryByText("What is your language called in your own language?"),
     ).toBeNull();
   });
 
-  it("completion writes identityResult, surveyContext, AND identityPhaseResult before onComplete", () => {
-    useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
-    // R7 ordering: SNAPSHOT the store from inside the callback, but ASSERT
-    // outside it.
-    //
-    // An expect() that throws in here surfaces as an uncaught React error and
-    // does NOT fail the test — verified by mutation: removing the author_contact
-    // write made this assertion throw while the suite still reported all green.
-    // Capturing and asserting afterwards is what actually gates.
-    let atCompletion: ReturnType<typeof useSurveySessionStore.getState> | null = null;
-    const onComplete = vi.fn((_result: unknown) => {
-      atCompletion = { ...useSurveySessionStore.getState() };
-    });
+  it("T018 round trip: decisions recorded at completion rebuild the resume payload field-for-field", () => {
+    seedCompletedIdentityDecisions();
+
+    render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
+
+    // The resumed flow shows the last question (target script) with its
+    // recorded answer restored — Finish is available directly.
+    expect(screen.getByText("Which script will THIS keyboard type?")).toBeDefined();
+    const advance = screen.getByTestId("survey-advance") as HTMLButtonElement;
+    expect(advance.disabled).toBe(false);
+  });
+
+  it("completion writes NOTHING to any store — it forwards the result untouched (spec 089)", () => {
+    seedCompletedIdentityDecisions();
+    const onComplete = vi.fn();
 
     render(<IdentityLiteAdapter onComplete={onComplete} />, { withStepNav: true });
     // Resumed on the last question with its answer restored — Finish directly.
     fireEvent.click(screen.getByTestId("survey-advance"));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
-    expect(atCompletion, "store was not snapshotted — onComplete never ran").not.toBeNull();
-    const s = atCompletion!;
-    // Every write below must have landed BEFORE onComplete fired.
-    // Through the composer: this assertion is about the WRITE having landed
-    // before onComplete, and `Latn` is Hausa's default script, so the tag's own
-    // spelling belongs to the composer's tests, not this one.
-    expect(s.identityResult?.bcp47).toBe(buildTargetBcp47("ha", "Latn"));
-    expect(s.surveyContext.language_name).toBe("Hausa");
-    // 4 -> 7: spec 064 US1 appends the three attribution answers.
-    expect(s.identityPhaseResult?.answers.length).toBe(7);
-    // spec 064 FR-016: publishing the contact here is what activates the Phase F
-    // pf_contact_info pre-fill.
-    expect(s.surveyContext.author_contact).toBe("alice@example.org");
+    // The forwarded value is the phase result StepHost consumes (recordPhase +
+    // recordAnswersAsDecisions + applyDecisionEffects run there).
+    const forwarded = onComplete.mock.calls[0]![0] as { phase: string; answers: unknown[] };
+    expect(forwarded.phase).toBe("A");
+    // The four identity answers — the attribution trio is the attribution
+    // step's own completion (#1901), not appended here.
+    expect(forwarded.answers.length).toBe(4);
+    // And the session store carries no identity residue from the adapter:
+    // the fields it used to write no longer exist at all (T017).
+    const session = useSurveySessionStore.getState();
+    expect("identityResult" in session).toBe(false);
+    expect("surveyContext" in session).toBe(false);
+    expect("identityPhaseResult" in session).toBe(false);
   });
 });

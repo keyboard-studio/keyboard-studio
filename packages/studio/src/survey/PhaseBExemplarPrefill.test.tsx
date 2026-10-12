@@ -2,7 +2,7 @@
 //
 // Covers the discovery-method offer, the Continue branching, the heading swap,
 // the page-2 fill affordances, and the proposed-vs-authored chip affordance.
-// The store mechanics behind them live in ../stores/phaseBDraftStore.test.ts.
+// The draft mechanics behind them live in ./phaseBDraftOps.test.ts.
 //
 // Both services calls are mocked: the exemplar inventory is driven per test so
 // the offer's presence, absence and content are all exercised deterministically.
@@ -12,10 +12,7 @@ import { screen, fireEvent, cleanup, waitFor, act } from "@testing-library/react
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB } from "./PhaseB.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import {
-  usePhaseBDraftStore,
-  resetPhaseBDraftDecisions,
-} from "../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions } from "../survey/useInventoryDraft.ts";
 import type { SourcedInventory } from "../lib/services.ts";
 
 const { getSourcedExemplars, lookupGate } = vi.hoisted(() => {
@@ -104,13 +101,13 @@ beforeEach(() => {
   lookupGate.promise = null;
   getSourcedExemplars.set(null);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 afterEach(() => {
   cleanup();
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  resetPhaseBDraftDecisions();
+  resetInventoryDecisions();
 });
 
 // ---------------------------------------------------------------------------
@@ -188,7 +185,7 @@ describe("discovery-method offer (obligation P2, FR-016)", () => {
 
   it("does not pre-select the offer once it has been declined (FR-016a)", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
-    usePhaseBDraftStore.getState().declineExemplarMethod();
+    inventoryOps("characters").declineExemplarMethod();
     renderPhaseB();
     const radio = await exemplarRadio();
     expect(radio).not.toBeNull();
@@ -214,7 +211,7 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("phase-b-done")).toBeTruthy();
     });
-    const s = usePhaseBDraftStore.getState();
+    const s = getCharacterInventoryValue();
     expect(s.chars).toContain("ŋ");
     expect(s.provenance["ŋ"]).toBe("cldr");
     // Uppercase counterparts came along, and nothing is duplicated.
@@ -227,7 +224,7 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
     renderPhaseB();
     await exemplarRadio();
     // Offer rendered, nothing chosen yet.
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 
   it("declining lands on an EMPTY page 2 and records the decline", async () => {
@@ -240,8 +237,8 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
     await waitFor(() => {
       expect(screen.getByTestId("phase-b-done")).toBeTruthy();
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
   });
 
   it("does not record a decline when no offer was available", async () => {
@@ -250,7 +247,7 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
     await exemplarRadio();
     fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 });
 
@@ -286,7 +283,7 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     await exemplarRadio();
     fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
-    usePhaseBDraftStore.getState().add("ŋ");
+    inventoryOps("characters").add("ŋ");
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
         "Add your whole alphabet",
@@ -312,7 +309,7 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     await exemplarRadio();
     fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
 
     const group = screen.getByRole("group", { name: "Step navigation" });
     const doneBtn = screen.getByTestId("phase-b-done");
@@ -356,9 +353,9 @@ describe("page-2 fill affordances (obligation P1b, FR-016b)", () => {
     fireEvent.click(screen.getByTestId("exemplar-apply-confirm"));
 
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().chars).toContain("ŋ");
+      expect(getCharacterInventoryValue().chars).toContain("ŋ");
     });
-    expect(usePhaseBDraftStore.getState().provenance["ŋ"]).toBe("cldr");
+    expect(getCharacterInventoryValue().provenance["ŋ"]).toBe("cldr");
   });
 
   it("hides the apply route once the proposal has already been applied", async () => {
@@ -392,7 +389,7 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
 
   it("marks proposed chips distinctly from authored ones", async () => {
     await acceptAndReachPage2(inventory(["ŋ"]));
-    usePhaseBDraftStore.getState().add("q");
+    inventoryOps("characters").add("q");
     await waitFor(() => {
       expect(screen.getAllByTestId("authored-char-chip").length).toBeGreaterThan(0);
     });
@@ -414,7 +411,7 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
     const chip = screen.getAllByTestId("proposed-char-chip")[0] as HTMLElement;
     expect(chip.getAttribute("title")).toContain("please check");
     // Confidence drives wording only — the character is still there.
-    expect(usePhaseBDraftStore.getState().chars).toContain("ŋ");
+    expect(getCharacterInventoryValue().chars).toContain("ŋ");
   });
 
   it("names the sources in a legend rather than relying on the outline alone", async () => {
@@ -429,7 +426,7 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
     await exemplarRadio();
     fireEvent.click(screen.getByTestId("phase-b-intro-next"));
     await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
-    usePhaseBDraftStore.getState().add("q");
+    inventoryOps("characters").add("q");
     await waitFor(() => {
       expect(screen.getAllByTestId("authored-char-chip").length).toBeGreaterThan(0);
     });
@@ -443,9 +440,9 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
       .find((el) => el.textContent?.includes("ŋ")) as HTMLElement;
     fireEvent.click(chip);
     await waitFor(() => {
-      expect(usePhaseBDraftStore.getState().chars).not.toContain("ŋ");
+      expect(getCharacterInventoryValue().chars).not.toContain("ŋ");
     });
-    expect(usePhaseBDraftStore.getState().rejected).toContain("ŋ");
+    expect(getCharacterInventoryValue().rejected).toContain("ŋ");
   });
 });
 
@@ -490,7 +487,7 @@ describe("loanword letters section", () => {
       "ʼ (U+02BC)",
     ]);
     for (const chip of chips) expect(chip.getAttribute("aria-pressed")).toBe("false");
-    const chars = usePhaseBDraftStore.getState().chars;
+    const chars = getCharacterInventoryValue().chars;
     for (const ch of ["c", "p", "q", "v", "x", "ʼ"]) expect(chars).not.toContain(ch);
     expect(chars).toContain("h");
   });
@@ -516,7 +513,7 @@ describe("loanword letters section", () => {
 
   it("draws the breakdown chips and the loanword chips in the selected glyph font", async () => {
     getSourcedExemplars.set(bafutInventory());
-    usePhaseBDraftStore.getState().setSelectedFont("charis-sil");
+    inventoryOps("characters").setSelectedFont("charis-sil");
     renderPhaseB();
     await acceptExemplarsAndContinue();
 
@@ -538,7 +535,7 @@ describe("loanword letters section", () => {
     const chip = await screen.findByRole("button", { name: "c C (U+0063)" });
     fireEvent.click(chip);
     expect(chip.getAttribute("aria-pressed")).toBe("true");
-    const state = usePhaseBDraftStore.getState();
+    const state = getCharacterInventoryValue();
     expect(state.loanwordChars).toEqual(["c", "C"]);
     // Beside the alphabet, never in it.
     expect(state.chars).not.toContain("c");
@@ -546,8 +543,8 @@ describe("loanword letters section", () => {
 
     fireEvent.click(chip);
     expect(chip.getAttribute("aria-pressed")).toBe("false");
-    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().rejected).not.toContain("c");
+    expect(getCharacterInventoryValue().loanwordChars).toEqual([]);
+    expect(getCharacterInventoryValue().rejected).not.toContain("c");
   });
 
   it("adds every loanword letter and its case pair with one click, then offers to remove them all", async () => {
@@ -557,10 +554,10 @@ describe("loanword letters section", () => {
 
     const toggleAll = await screen.findByTestId("alphabet-loanwords-toggle-all");
     expect(toggleAll.textContent).toBe("Add all loanword letters");
-    const charsBefore = [...usePhaseBDraftStore.getState().chars];
+    const charsBefore = [...getCharacterInventoryValue().chars];
     fireEvent.click(toggleAll);
 
-    const { loanwordChars, chars } = usePhaseBDraftStore.getState();
+    const { loanwordChars, chars } = getCharacterInventoryValue();
     expect([...loanwordChars].sort()).toEqual(["C", "P", "Q", "V", "X", "c", "p", "q", "v", "x", "ʼ"].sort());
     // The alphabet is untouched, and h (already a main-tier letter) is not a loanword.
     expect(chars).toEqual(charsBefore);
@@ -572,8 +569,8 @@ describe("loanword letters section", () => {
     expect(toggleAll.textContent).toBe("Remove all loanword letters");
 
     fireEvent.click(toggleAll);
-    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
-    expect(usePhaseBDraftStore.getState().chars).toEqual(charsBefore);
+    expect(getCharacterInventoryValue().loanwordChars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual(charsBefore);
     expect(toggleAll.textContent).toBe("Add all loanword letters");
   });
 
@@ -585,7 +582,7 @@ describe("loanword letters section", () => {
     fireEvent.click(await screen.findByRole("button", { name: "q Q (U+0071)" }));
     fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
 
-    const { loanwordChars } = usePhaseBDraftStore.getState();
+    const { loanwordChars } = getCharacterInventoryValue();
     for (const ch of ["c", "p", "q", "Q", "v", "x", "ʼ"]) expect(loanwordChars).toContain(ch);
     expect(new Set(loanwordChars).size).toBe(loanwordChars.length);
   });
@@ -595,11 +592,11 @@ describe("loanword letters section", () => {
     renderPhaseB();
     await acceptExemplarsAndContinue();
 
-    usePhaseBDraftStore.getState().add("q");
+    inventoryOps("characters").add("q");
     const chip = await screen.findByRole("button", { name: "q Q (U+0071)" });
     await waitFor(() => expect(chip.getAttribute("aria-pressed")).toBe("true"));
     fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
-    expect(usePhaseBDraftStore.getState().loanwordChars).not.toContain("q");
+    expect(getCharacterInventoryValue().loanwordChars).not.toContain("q");
   });
 
   it("Done records loanword letters in the inventory, never in the alphabet", async () => {
@@ -712,8 +709,8 @@ describe("BuildListView auto-seed (defaults-first)", () => {
   it("seeds the exemplar set once when it opens empty, undeclined, with an inventory", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderBuildList();
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("ŋ"));
-    const s = usePhaseBDraftStore.getState();
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("ŋ"));
+    const s = getCharacterInventoryValue();
     expect(s.provenance["ŋ"]).toBe("cldr");
     expect(s.exemplarMethodDeclined).toBe(false);
   });
@@ -721,35 +718,35 @@ describe("BuildListView auto-seed (defaults-first)", () => {
   it("seeds only once per mount: a character the author then removes is not re-proposed", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderBuildList();
-    await waitFor(() => expect(usePhaseBDraftStore.getState().chars).toContain("ŋ"));
-    act(() => usePhaseBDraftStore.getState().remove("ŋ"));
+    await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("ŋ"));
+    act(() => inventoryOps("characters").remove("ŋ"));
     // Give any (incorrect) re-seeding effect a chance to run.
     await act(async () => {
       await Promise.resolve();
     });
-    expect(usePhaseBDraftStore.getState().chars).not.toContain("ŋ");
+    expect(getCharacterInventoryValue().chars).not.toContain("ŋ");
   });
 
   it("does not seed when the exemplar method was declined", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
-    usePhaseBDraftStore.getState().declineExemplarMethod();
+    inventoryOps("characters").declineExemplarMethod();
     renderBuildList();
     await waitFor(() => expect(screen.getByTestId("phase-b-heading")).toBeTruthy());
     await act(async () => {
       await Promise.resolve();
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 
   it("does not seed when the alphabet already has characters", async () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
-    usePhaseBDraftStore.getState().add("q");
+    inventoryOps("characters").add("q");
     renderBuildList();
     await waitFor(() => expect(screen.getByTestId("phase-b-heading")).toBeTruthy());
     await act(async () => {
       await Promise.resolve();
     });
-    const chars = usePhaseBDraftStore.getState().chars;
+    const chars = getCharacterInventoryValue().chars;
     expect(chars).toContain("q");
     expect(chars).not.toContain("ŋ");
   });
@@ -761,6 +758,6 @@ describe("BuildListView auto-seed (defaults-first)", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(getCharacterInventoryValue().chars).toEqual([]);
   });
 });

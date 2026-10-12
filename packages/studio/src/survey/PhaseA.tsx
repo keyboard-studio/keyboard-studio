@@ -26,7 +26,7 @@ import {
   loadLangtags,
   regionNameFor,
 } from "../lib/langtagsDefaults.ts";
-import { primarySubtag } from "../lib/suggestBase.ts";
+import { primarySubtag } from "../lib/suggestStart.ts";
 import { answerString } from "./answerString.ts";
 
 // Shared caption descriptor for every langtags-derived seed (spec 030

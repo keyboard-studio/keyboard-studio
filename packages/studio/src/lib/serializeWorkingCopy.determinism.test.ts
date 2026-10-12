@@ -54,20 +54,20 @@ function seedAdaptTrack() {
   useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs: fetchedVfs(basicKbdus.id), ir });
   const wc = useWorkingCopyStore.getState();
   wc.setIdentity({ keyboardId: basicKbdus.id, displayName: "Bambara", bcp47: "bm-Latn", languageName: "Bambara" });
-  wc.setBaseWelcomeConvention("folder");
-  wc.setBaseWelcomeHtmText('<html><body><p>Base prose.</p><img src="desktop_default.png"></body></html>');
-  wc.setBaseWelcomeImages(BASE_IMAGES);
-  wc.setBaseHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
+  wc.setStartWelcomeConvention("folder");
+  wc.setStartWelcomeHtmText('<html><body><p>Base prose.</p><img src="desktop_default.png"></body></html>');
+  wc.setStartWelcomeImages(BASE_IMAGES);
+  wc.setStartHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
   wc.setHelpDocs({ description: "Author prose.", usageTips: ["Tip one.", "Tip two."], credits: "Someone." });
 }
 
 function seedCopyTrack() {
   const ir = makeTestIR([]);
   ir.header.version = "1.0";
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: fetchedVfs(basicKbdus.id), ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: fetchedVfs(basicKbdus.id), ir });
   const wc = useWorkingCopyStore.getState();
-  wc.setBaseWelcomeImages(BASE_IMAGES);
-  wc.setBaseWelcomeConvention("folder");
+  wc.setStartWelcomeImages(BASE_IMAGES);
+  wc.setStartWelcomeConvention("folder");
   wc.setHelpDocs({ description: "Author prose.", usageTips: [] });
 }
 
@@ -183,7 +183,7 @@ describe("SC-004 — later-phase members", () => {
   it("a net-new keyboard (no base images) charts by default, byte-identically", async () => {
     const ir = makeTestIR([]);
     ir.header.version = "1.0";
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: fetchedVfs(basicKbdus.id), ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: fetchedVfs(basicKbdus.id), ir });
     const first = await produce();
     const second = await produce();
     expectIdentical(first, second);

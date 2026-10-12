@@ -25,7 +25,7 @@ export const definition = {
   type: "radio" as const,
   required: true,
   options: [
-    { value: "keep", label: "Keep the base's input strategies" },
+    { value: "keep", label: "Keep the starting keyboard's input strategies" },
     { value: "propose", label: "Let the studio re-propose from scratch" },
     { value: "discard", label: "Discard them" },
   ],
@@ -47,9 +47,9 @@ export function validate(value: string | string[] | undefined): ValidationResult
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
-    { value: "keep", note: "inherit the base fingerprint wholesale" },
+    { value: "keep", note: "inherit the starting keyboard's fingerprint wholesale" },
     { value: "propose", note: "re-derive strategies" },
-    { value: "discard", note: "drop the base strategies" },
+    { value: "discard", note: "drop the starting keyboard's strategies" },
   ],
   invalid: [
     { value: "", expectedCode: "required" },

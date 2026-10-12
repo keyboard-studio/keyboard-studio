@@ -2,7 +2,7 @@
 //
 // Coverage:
 //   1. Initial state: all slots null/empty.
-//   2. instantiateFromBase (Track 1): sets base slots + seeds IR, resets identity +
+//   2. instantiateFromStart (Track 1): sets base slots + seeds IR, resets identity +
 //      edit layers + phaseResults, sets instantiationMode = "new-from-base".
 //   3. instantiateFromExisting (Track 2): sets base slots + seeds IR, preserves
 //      identity from loaded keyboard, sets instantiationMode = "adapt-existing".
@@ -19,20 +19,19 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
+import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { defaultFillAxes, selectStrategy, deriveFacets, parseKmn } from "@keyboard-studio/engine";
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   DiscoveryAxisVector,
   IRGroup,
   IRStore,
   KeyboardIR,
   RemovalCapability,
-  SurveyAnswer,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
 import type { SourcedInventory } from "@keyboard-studio/engine";
@@ -51,9 +50,9 @@ describe("workingCopyStore — initial state", () => {
 
   it("base slots start null", () => {
     const s = useWorkingCopyStore.getState();
-    expect(s.baseKeyboard).toBeNull();
-    expect(s.baseVfs).toBeNull();
-    expect(s.baseIr).toBeNull();
+    expect(s.startKeyboard).toBeNull();
+    expect(s.startVfs).toBeNull();
+    expect(s.startIr).toBeNull();
     expect(s.identity).toBeNull();
   });
 
@@ -79,14 +78,14 @@ describe("workingCopyStore — initial state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// instantiateFromBase — Track 1
+// instantiateFromStart — Track 1
 // ---------------------------------------------------------------------------
 
 describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
   it("sets instantiationMode to new-from-base", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
   });
 
@@ -95,14 +94,14 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
       { path: "source/test.kmn", content: "c hello\n", isBinary: false },
     ]);
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     const s = useWorkingCopyStore.getState();
-    expect(s.baseKeyboard).toBe(basicKbdus);
-    expect(s.baseVfs).toBe(vfs);
-    // baseIr/ir are `ir` with base-keyboard facets baked in (spec 048
+    expect(s.startKeyboard).toBe(basicKbdus);
+    expect(s.startVfs).toBe(vfs);
+    // startIr/ir are `ir` with base-keyboard facets baked in (spec 048
     // FR-001), so they are equal but not the same reference.
-    expect(s.baseIr).toEqual(deriveFacets(ir));
+    expect(s.startIr).toEqual(deriveFacets(ir));
     // carve IR seeded from base IR
     expect(s.ir).toEqual(deriveFacets(ir));
   });
@@ -114,7 +113,7 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
 
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     expect(useWorkingCopyStore.getState().identity).toBeNull();
   });
@@ -128,7 +127,7 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
 
     const newVfs = createVirtualFS();
     const newIr = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: newVfs, ir: newIr });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: newVfs, ir: newIr });
 
     const s = useWorkingCopyStore.getState();
     expect(s.deletedNodeIds.size).toBe(0);
@@ -141,12 +140,12 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
   // must wipe pre-recorded phaseResults). Split into two precise assertions:
   // a truly fresh session (no pre-recorded phaseResults) stays empty here, and
   // the late-instantiate-preserves-progress case is covered in the
-  // "instantiateFromBase idempotence" describe block below (see "preserves
+  // "instantiateFromStart idempotence" describe block below (see "preserves
   // phaseResults recorded BEFORE the first (late) instantiate call").
   it("a truly fresh session (no prior phaseResults) stays empty after instantiateFromBase", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
     expect(useWorkingCopyStore.getState().session.axes).toEqual({});
@@ -158,7 +157,7 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
 
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
   });
@@ -166,13 +165,13 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
   it("isInstantiated returns true after instantiateFromBase", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().isInstantiated()).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// instantiateFromBase — idempotence (same base id)
+// instantiateFromStart — idempotence (same base id)
 // ---------------------------------------------------------------------------
 
 describe("workingCopyStore — instantiateFromBase idempotence", () => {
@@ -180,7 +179,7 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     // First call — instantiates normally.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     // Record some phase progress.
     const phaseA: SurveyPhaseResult = {
@@ -192,7 +191,7 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
 
     // Second call with the SAME base id — must NOT clear phaseResults.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
     expect(useWorkingCopyStore.getState().phaseResults[0]?.phase).toBe("A");
   });
@@ -200,7 +199,7 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
   it("re-instantiates (clears phaseResults) when called with a DIFFERENT base keyboard id", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     // Record phase progress.
     const phaseA: SurveyPhaseResult = {
@@ -212,48 +211,48 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
 
     // A different base keyboard has a different id.
-    const differentBase = { ...basicKbdus, id: "different_keyboard_id" };
-    useWorkingCopyStore.getState().instantiateFromBase(differentBase, { vfs, ir });
+    const differentStart = { ...basicKbdus, id: "different_keyboard_id" };
+    useWorkingCopyStore.getState().instantiateFromStart(differentStart, { vfs, ir });
 
     // phaseResults must have been cleared.
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("different_keyboard_id");
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe("different_keyboard_id");
   });
 
   // Regression: the async compile pipeline (WASM kmcmplib oracle) that produces
   // vfs/ir/removalCapabilities is decoupled from the survey flow and can settle
   // LATE — after Phase A/B has already recorded phaseResults against the
-  // pending base selection. On that FIRST instantiate call, baseKeyboard is
-  // still null, so a guard keyed only on "baseKeyboard.id already matches"
+  // pending base selection. On that FIRST instantiate call, startKeyboard is
+  // still null, so a guard keyed only on "startKeyboard.id already matches"
   // never triggers. This reproduces that exact ordering: record phaseResults
-  // BEFORE the one-and-only instantiateFromBase call lands.
+  // BEFORE the one-and-only instantiateFromStart call lands.
   it("preserves phaseResults recorded BEFORE the first (late) instantiate call for the same base", () => {
     const phaseA: SurveyPhaseResult = {
       phase: "A",
       answers: [],
       computedAxes: { scriptClass: "alphabetic" },
     };
-    // Survey records progress while baseKeyboard is still null (compile has
+    // Survey records progress while startKeyboard is still null (compile has
     // not settled yet) — mirrors Phase A/B completing before onInstantiate fires.
     useWorkingCopyStore.getState().recordPhase(phaseA);
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
 
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     // The late-settling compile now fires the FIRST instantiate for this base.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     // phaseResults recorded before instantiation must survive.
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
     expect(useWorkingCopyStore.getState().phaseResults[0]?.phase).toBe("A");
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(basicKbdus.id);
   });
 
   // Regression (km-triage pre-merge item): the case-1 no-op guard
   // must key on id AND mode, not id alone. A SAME-id call arriving while the
   // store is in a DIFFERENT mode (e.g. the working copy was instantiated via
-  // Track 2 for this keyboard, and Track 1's instantiateFromBase then fires
+  // Track 2 for this keyboard, and Track 1's instantiateFromStart then fires
   // for the same id via the independent Preview/Output picker pipeline — see
   // usePreviewArtifact.ts / confirmRebase.ts) is a genuine track switch, not a
   // redundant re-fire, and must re-instantiate (mode flips, identity resets
@@ -275,9 +274,9 @@ describe("workingCopyStore — instantiateFromBase idempotence", () => {
     useWorkingCopyStore.getState().recordPhase(phaseA);
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
 
-    // Same keyboard id, but instantiateFromBase (Track 1) fires — a track
+    // Same keyboard id, but instantiateFromStart (Track 1) fires — a track
     // switch, not a redundant re-fire. Must NOT no-op.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
     // Track 1 resets identity to null (fresh copy, no overlay until Phase A).
@@ -308,11 +307,11 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
     useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
 
     const s = useWorkingCopyStore.getState();
-    expect(s.baseKeyboard).toBe(basicKbdus);
-    expect(s.baseVfs).toBe(vfs);
-    // baseIr/ir are `ir` with base-keyboard facets baked in (spec 048
+    expect(s.startKeyboard).toBe(basicKbdus);
+    expect(s.startVfs).toBe(vfs);
+    // startIr/ir are `ir` with base-keyboard facets baked in (spec 048
     // FR-001), so they are equal but not the same reference.
-    expect(s.baseIr).toEqual(deriveFacets(ir));
+    expect(s.startIr).toEqual(deriveFacets(ir));
     expect(s.ir).toEqual(deriveFacets(ir));
   });
 
@@ -363,7 +362,7 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
   // (WASM kmcmplib oracle) that produces vfs/ir/removalCapabilities is
   // decoupled from the survey flow and can settle LATE, after Phase A/B has
   // already recorded phaseResults against the pending base selection. At the
-  // point recordPhase ran here, baseKeyboard was still null (compile not yet
+  // point recordPhase ran here, startKeyboard was still null (compile not yet
   // settled) — indistinguishable from a fresh session — so this is the FIRST
   // instantiate for this base, not a redundant one, and must preserve the
   // survey progress recorded while the compile was in flight rather than
@@ -377,7 +376,7 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
     };
     useWorkingCopyStore.getState().recordPhase(phaseA);
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(1);
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
 
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
@@ -398,7 +397,7 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
 
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
 
     useWorkingCopyStore.getState().reset();
@@ -450,11 +449,11 @@ describe("workingCopyStore — instantiateFromExisting idempotence and base swit
     useWorkingCopyStore.getState().instantiateFromExisting(differentKeyboard, { vfs, ir });
 
     expect(useWorkingCopyStore.getState().phaseResults).toHaveLength(0);
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe("different_keyboard_id");
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe("different_keyboard_id");
   });
 
   // Regression (km-triage pre-merge item) — Track 2 mirror of the
-  // instantiateFromBase track-switch test above. A SAME-id call arriving while
+  // instantiateFromStart track-switch test above. A SAME-id call arriving while
   // the store is in a DIFFERENT mode (working copy instantiated via Track 1
   // for this keyboard, then instantiateFromExisting fires for the same id) is
   // a genuine track switch and must re-instantiate (mode flips, identity now
@@ -463,7 +462,7 @@ describe("workingCopyStore — instantiateFromExisting idempotence and base swit
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     // Instantiate via Track 1 first — mode is "new-from-base", identity null.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
     expect(useWorkingCopyStore.getState().identity).toBeNull();
 
@@ -539,7 +538,7 @@ describe("workingCopyStore — reset", () => {
   it("reset clears instantiationMode", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().instantiationMode).toBe("new-from-base");
 
     useWorkingCopyStore.getState().reset();
@@ -559,14 +558,14 @@ describe("workingCopyStore — reset", () => {
   it("reset clears baseKeyboard, baseVfs, baseIr, and identity", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().setIdentity({ bcp47: "ha-Latn" });
 
     useWorkingCopyStore.getState().reset();
     const s = useWorkingCopyStore.getState();
-    expect(s.baseKeyboard).toBeNull();
-    expect(s.baseVfs).toBeNull();
-    expect(s.baseIr).toBeNull();
+    expect(s.startKeyboard).toBeNull();
+    expect(s.startVfs).toBeNull();
+    expect(s.startIr).toBeNull();
     expect(s.identity).toBeNull();
   });
 
@@ -617,7 +616,7 @@ describe("workingCopyStore — reset", () => {
   it("isInstantiated returns false after reset (from instantiateFromBase)", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().isInstantiated()).toBe(true);
     useWorkingCopyStore.getState().reset();
     expect(useWorkingCopyStore.getState().isInstantiated()).toBe(false);
@@ -683,133 +682,65 @@ describe("workingCopyStore — survey state consistency", () => {
   it("reset() clears all survey AND base slots", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().lockDesktop();
     useWorkingCopyStore.getState().reset();
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 D-4/R-08: per-step phase answers (phaseAnswersByStep sidecar).
-// recordPhase(result, { stepId }) replaces only ITS OWN step's slice of a
-// phase's answers, never the whole phase — and the phase's derived `answers`
-// is the concatenation of every step's slice in manifest order, "legacy"
-// first.
+// spec 090 T063: the per-step answer sidecar (spec 079 D-4) is deleted and
+// recordPhase no longer carries answers — settled answers live only in the
+// decision store (088). The phase slot keeps the results' non-answer fields,
+// shallow-merged per phase.
 // ---------------------------------------------------------------------------
 
-describe("workingCopyStore — recordPhase per-step answers (phaseAnswersByStep)", () => {
-  it("recording invisibles then convenience into phase C keeps invisibles' answers — a later step's record does not clobber an earlier one's", () => {
-    const invisiblesAnswers: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "zwj" },
-    ];
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: invisiblesAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "invisibles" },
-    );
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    expect(phaseC?.answers).toEqual([...invisiblesAnswers, ...convenienceAnswers]);
-  });
-
-  it("a step re-recording replaces only its OWN list — fewer answers on the re-record leaves no stale ones behind", () => {
+describe("workingCopyStore — recordPhase after the answer sidecar's deletion (T063)", () => {
+  it("stores no answers: a recorded result's answers never reach the phase slot", () => {
     useWorkingCopyStore.getState().recordPhase(
       {
         phase: "C",
-        answers: [
-          { questionId: "invisiblesQ1", answerType: "text", value: "a" },
-          { questionId: "invisiblesQ2", answerType: "text", value: "b" },
-        ],
+        answers: [{ questionId: "invisiblesQ1", answerType: "text", value: "zwj" }],
       } as unknown as SurveyPhaseResult,
       { stepId: "invisibles" },
     );
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    // invisibles re-records with FEWER answers than before (the walk changed).
-    const shrunkInvisibles: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "a-changed" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: shrunkInvisibles } as unknown as SurveyPhaseResult,
-      { stepId: "invisibles" },
-    );
-
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    // No stale "invisiblesQ2" left over from the first record — invisibles'
-    // slice was REPLACED, not merged, and convenience's slice is untouched.
-    expect(phaseC?.answers).toEqual([...shrunkInvisibles, ...convenienceAnswers]);
+    expect(phaseC?.answers).toEqual([]);
+    expect(
+      "phaseAnswersByStep" in useWorkingCopyStore.getState(),
+    ).toBe(false);
   });
 
-  it("derived phaseResults[C].answers is the concatenation in manifest order with 'legacy' first, when a step records without a stepId", () => {
-    const legacyAnswers: SurveyAnswer[] = [
-      { questionId: "legacyQ", answerType: "text", value: "pre-079" },
-    ];
-    // No stepId at all -> owner "legacy".
+  it("two steps recording into one phase keep both steps' non-answer fields (shallow merge)", () => {
     useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: legacyAnswers } as unknown as SurveyPhaseResult,
-    );
-
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
-      { stepId: "convenience" },
-    );
-
-    const invisiblesAnswers: SurveyAnswer[] = [
-      { questionId: "invisiblesQ1", answerType: "text", value: "zwj" },
-    ];
-    // invisibles comes BEFORE convenience in STEP_ORDER — recorded last here to
-    // prove the derived order is manifest order, not recording order.
-    useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: invisiblesAnswers } as unknown as SurveyPhaseResult,
+      { phase: "C", answers: [], selectedPatternIds: ["p1"] } as unknown as SurveyPhaseResult,
       { stepId: "invisibles" },
     );
-
-    const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    expect(phaseC?.answers).toEqual([...legacyAnswers, ...invisiblesAnswers, ...convenienceAnswers]);
-  });
-
-  it("a snapshot without phaseAnswersByStep (e.g. restored pre-079) is adopted as 'legacy', and a subsequent stepId-recording appends alongside it rather than discarding it", () => {
-    const priorAnswers: SurveyAnswer[] = [
-      { questionId: "priorQ", answerType: "text", value: "from-before-079" },
-    ];
-    // Mirrors a restored snapshot: phaseResults holds real prior answers, but
-    // the sidecar is empty (as prepareWorkingCopySnapshot/applyWorkingCopySnapshot
-    // leaves it for a pre-079 draft with no phaseAnswersByStep field).
-    useWorkingCopyStore.setState({
-      phaseResults: [{ phase: "C", answers: priorAnswers } as unknown as SurveyPhaseResult],
-      phaseAnswersByStep: {},
-    });
-
-    const convenienceAnswers: SurveyAnswer[] = [
-      { questionId: "convenienceQ1", answerType: "text", value: "caps-lock" },
-    ];
     useWorkingCopyStore.getState().recordPhase(
-      { phase: "C", answers: convenienceAnswers } as unknown as SurveyPhaseResult,
+      { phase: "C", answers: [], computedAxes: { scriptClass: "alphabetic" } } as unknown as SurveyPhaseResult,
       { stepId: "convenience" },
     );
-
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
-    // The pre-existing answers survive (adopted as "legacy", which sorts
-    // first) and the new step's answers are appended, not lost.
-    expect(phaseC?.answers).toEqual([...priorAnswers, ...convenienceAnswers]);
+    expect(phaseC?.selectedPatternIds).toEqual(["p1"]);
+    expect(phaseC?.computedAxes).toEqual({ scriptClass: "alphabetic" });
+  });
+
+  it("a re-recorded phase replaces its own fields and still carries no answers", () => {
+    useWorkingCopyStore.getState().recordPhase(
+      { phase: "A", answers: [], identity: { keyboardId: "first" } } as unknown as SurveyPhaseResult,
+    );
+    useWorkingCopyStore.getState().recordPhase(
+      {
+        phase: "A",
+        answers: [{ questionId: "q", answerType: "text", value: "v" }],
+        identity: { keyboardId: "second" },
+      } as unknown as SurveyPhaseResult,
+    );
+    const phaseA = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "A");
+    expect(phaseA?.identity?.keyboardId).toBe("second");
+    expect(phaseA?.answers).toEqual([]);
   });
 });
 
@@ -832,7 +763,7 @@ describe("workingCopyStore — removalCapabilities slot", () => {
       ["rule#1", "removable:simple"],
       ["store#dkt", "removable:slot-fill"],
     ]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir, removalCapabilities: caps });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir, removalCapabilities: caps });
     const s = useWorkingCopyStore.getState();
     expect(s.removalCapabilities).toBe(caps);
     expect(s.removalCapabilities.get("rule#1")).toBe("removable:simple");
@@ -841,7 +772,7 @@ describe("workingCopyStore — removalCapabilities slot", () => {
   it("instantiateFromBase defaults to empty Map when removalCapabilities not provided", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     expect(useWorkingCopyStore.getState().removalCapabilities.size).toBe(0);
   });
 
@@ -856,7 +787,7 @@ describe("workingCopyStore — removalCapabilities slot", () => {
   });
 
   it("instantiateFromExisting defaults to empty Map when removalCapabilities not provided (Track 2)", () => {
-    // Mirror of the Track 1 (instantiateFromBase) default-empty test.
+    // Mirror of the Track 1 (instantiateFromStart) default-empty test.
     // When the import path can't classify (e.g. parse failure), the working copy
     // must still initialise cleanly with an empty map rather than crashing.
     const vfs = createVirtualFS();
@@ -869,13 +800,13 @@ describe("workingCopyStore — removalCapabilities slot", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     const caps = new Map<string, RemovalCapability>([["rule#1", "removable:simple"]]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir, removalCapabilities: caps });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir, removalCapabilities: caps });
 
     // Simulate a carve edit that calls setIR with a mutated IR.
     const newIr = makeTestIR([]);
     useWorkingCopyStore.getState().setIR(newIr);
 
-    // removalCapabilities must survive — it derives from baseIr, not carve IR.
+    // removalCapabilities must survive — it derives from startIr, not carve IR.
     expect(useWorkingCopyStore.getState().removalCapabilities.get("rule#1")).toBe("removable:simple");
   });
 
@@ -883,7 +814,7 @@ describe("workingCopyStore — removalCapabilities slot", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     const caps = new Map<string, RemovalCapability>([["rule#1", "removable:simple"]]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir, removalCapabilities: caps });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir, removalCapabilities: caps });
 
     useWorkingCopyStore.getState().deleteItem("rule#1");
 
@@ -894,7 +825,7 @@ describe("workingCopyStore — removalCapabilities slot", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     const caps = new Map<string, RemovalCapability>([["rule#1", "removable:simple"]]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir, removalCapabilities: caps });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir, removalCapabilities: caps });
     expect(useWorkingCopyStore.getState().removalCapabilities.size).toBe(1);
 
     useWorkingCopyStore.getState().reset();
@@ -905,10 +836,10 @@ describe("workingCopyStore — removalCapabilities slot", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
     const caps = new Map<string, RemovalCapability>([["rule#1", "removable:simple"]]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir, removalCapabilities: caps });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir, removalCapabilities: caps });
 
     // Second call with same base id — idempotence guard fires, no overwrite.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     // Capabilities from the first call must still be intact.
     expect(useWorkingCopyStore.getState().removalCapabilities.get("rule#1")).toBe("removable:simple");
   });
@@ -1148,7 +1079,7 @@ describe("workingCopyStore — keyEditOverlay", () => {
   it("instantiateFromBase clears keyEditOverlay on a genuine base switch", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().commitKeyEdit({
       address: "phone:default:K_A",
       kind: "suppress",
@@ -1158,8 +1089,8 @@ describe("workingCopyStore — keyEditOverlay", () => {
     expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(1);
 
     // A different base id forces the genuine-switch path (resolveInstantiationCase).
-    const otherBase = { ...basicKbdus, id: "some_other_base" };
-    useWorkingCopyStore.getState().instantiateFromBase(otherBase, { vfs, ir });
+    const otherStart = { ...basicKbdus, id: "some_other_base" };
+    useWorkingCopyStore.getState().instantiateFromStart(otherStart, { vfs, ir });
     expect(useWorkingCopyStore.getState().keyEditOverlay).toEqual({ ops: [] });
   });
 
@@ -1397,7 +1328,7 @@ describe("workingCopyStore — T078 mode-toggle regression suite (SC-011, FR-036
       ],
       suggestionResolvedChars: ["ñ", "á"],
       bulkAccentGroups: [
-        { id: "a:K_A", hostKey: "K_A", baseChar: "a", members: ["a", "á"] },
+        { id: "a:K_A", baseKey: "K_A", baseChar: "a", members: ["a", "á"] },
       ],
     });
     useWorkingCopyStore.getState().commitKeyEdit({
@@ -1560,9 +1491,9 @@ describe("workingCopyStore — T078 mode-toggle regression suite (SC-011, FR-036
 // Regression for the Phase-5 MAJOR bug: the mutate-seam write path routed
 // incremental IR patches (US1 mutate-apply, US2 touch re-propagation, US2
 // touch promotion) through setIR, which RESETS deletedNodeIds/deletedItemIds/
-// undoStack. Those writes fire AFTER the carve step, so enabling
-// VITE_KM_MUTATE_SEAM=1 silently WIPED the live carve-deletion overlay that the
-// OSK preview and shipped output project from baseIr + the overlay. The fix
+// undoStack. Those writes fire AFTER the carve step, so enabling the
+// mutate seam (then flag-gated) silently WIPED the live carve-deletion overlay that the
+// OSK preview and shipped output project from startIr + the overlay. The fix
 // routes those writes through setWorkingIR, which updates `ir` ONLY.
 // ---------------------------------------------------------------------------
 
@@ -1860,7 +1791,7 @@ describe("workingCopyStore — cascadeRestore", () => {
 
 /** A base IR carrying the unconditional postfix sequence-replace shape:
  *  `any(equalD) + "=" > index(equalU,1)` — the guard-free §7.5 IPA shape. */
-function postfixBaseIr(): KeyboardIR {
+function postfixStartIr(): KeyboardIR {
   const group: IRGroup = {
     nodeId: "group#main",
     name: "main",
@@ -1887,7 +1818,7 @@ function postfixBaseIr(): KeyboardIR {
 describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #926)", () => {
   it("instantiateFromExisting seeds markInputOrder='postfix' onto irAxes/session.axes from a postfix base", () => {
     const vfs = createVirtualFS([]);
-    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixStartIr() });
     const s = useWorkingCopyStore.getState();
     expect(s.irAxes.markInputOrder).toBe("postfix");
     expect(s.session.axes.markInputOrder).toBe("postfix");
@@ -1895,7 +1826,7 @@ describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #92
 
   it("instantiateFromBase also seeds it (base-derived, symmetric across tracks)", () => {
     const vfs = createVirtualFS([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: postfixBaseIr() });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: postfixStartIr() });
     expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBe("postfix");
   });
 
@@ -1910,7 +1841,7 @@ describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #92
     // MechanismGallery folds into the vector it feeds through defaultFillAxes
     // -> selectStrategy. This asserts that end-to-end from session.axes.
     const vfs = createVirtualFS([]);
-    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixStartIr() });
     const seeded = useWorkingCopyStore.getState().session.axes as Partial<DiscoveryAxisVector>;
     // Simulate the rest of an elicited alphabetic/strong vector (scale+scriptClass
     // are required inputs to the prior) with the import-seeded postfix present.
@@ -1930,12 +1861,12 @@ describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #92
   it("never overwrites an already-present markInputOrder (guard: base seeding defers to a prior value)", () => {
     // irAxes recorded before the (late) first instantiate — e.g. a future
     // survey-elicited A3a — must win over base-derived seeding. Case-2
-    // carry-forward preserves irAxes into instantiation, so seedIrAxesFromBaseIr
+    // carry-forward preserves irAxes into instantiation, so seedIrAxesFromStartIr
     // sees markInputOrder already set and leaves it alone, even though the
     // postfix base would otherwise seed "postfix".
     useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "prefix" });
     const vfs = createVirtualFS([]);
-    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixStartIr() });
     expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBe("prefix");
   });
 });
@@ -2068,12 +1999,12 @@ describe("workingCopyStore — sequenceFlaggedChars", () => {
 
   it("instantiateFromBase clears sequenceFlaggedChars on a genuine base switch", () => {
     const vfs = createVirtualFS([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: makeTestIR([]) });
     useWorkingCopyStore.getState().flagCharForSequence("á");
     expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
 
     const otherKeyboard = { ...basicKbdus, id: "other_keyboard_id" };
-    useWorkingCopyStore.getState().instantiateFromBase(otherKeyboard, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().instantiateFromStart(otherKeyboard, { vfs, ir: makeTestIR([]) });
     expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
   });
 });
@@ -2082,7 +2013,7 @@ describe("workingCopyStore — sequenceFlaggedChars", () => {
 // Per-working-copy Phase B proposal decisions (spec 044 FR-016a)
 //
 // `rejected` and `exemplarMethodDeclined` deliberately survive
-// phaseBDraftStore's own reset() — that runs on every entry to the build-list
+// the inventory draft's own reset() — that runs on every entry to the build-list
 // screen, and clearing them there would re-propose characters the author just
 // removed. They are per-WORKING-COPY, so the two instantiate entry points
 // clear them instead. Without that wiring the decisions were effectively
@@ -2100,29 +2031,29 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
   };
 
   afterEach(() => {
-    resetPhaseBDraftDecisions();
+    resetInventoryDecisions();
   });
 
   /** Seed a proposal, reject one of its characters, and decline the offer. */
   function declineAndReject(): void {
-    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
-    usePhaseBDraftStore.getState().remove("ɔ");
-    usePhaseBDraftStore.getState().declineExemplarMethod();
-    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    inventoryOps("characters").seedFromProposal(BM_INVENTORY, "bm");
+    inventoryOps("characters").remove("ɔ");
+    inventoryOps("characters").declineExemplarMethod();
+    expect(getCharacterInventoryValue().rejected).toContain("ɔ");
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
   }
 
   it("instantiateFromBase clears them for a new working copy", () => {
     const vfs = createVirtualFS();
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: makeTestIR([]) });
     declineAndReject();
 
     // Keyboard B, started in the same browser session.
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
-    useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().instantiateFromStart(keyboardB, { vfs, ir: makeTestIR([]) });
 
-    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    expect(getCharacterInventoryValue().rejected).toEqual([]);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 
   it("instantiateFromExisting clears them for a new working copy", () => {
@@ -2133,36 +2064,36 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
     useWorkingCopyStore.getState().instantiateFromExisting(keyboardB, { vfs, ir: makeTestIR([]) });
 
-    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+    expect(getCharacterInventoryValue().rejected).toEqual([]);
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 
   it("a character rejected on keyboard A is proposed normally on keyboard B", () => {
     const vfs = createVirtualFS();
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: makeTestIR([]) });
     declineAndReject();
 
     const keyboardB = { ...basicKbdus, id: "keyboard_b" };
-    useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().instantiateFromStart(keyboardB, { vfs, ir: makeTestIR([]) });
     // Entering B's build-list screen: the per-visit reset, then a fresh seed.
-    usePhaseBDraftStore.getState().reset();
-    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
+    resetInventoryDraft();
+    inventoryOps("characters").seedFromProposal(BM_INVENTORY, "bm");
 
-    expect(usePhaseBDraftStore.getState().chars).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().provenance["ɔ"]).toBe("cldr");
+    expect(getCharacterInventoryValue().chars).toContain("ɔ");
+    expect(getCharacterInventoryValue().provenance["ɔ"]).toBe("cldr");
   });
 
   it("a redundant re-fire of the SAME instantiate does not discard a live decision", () => {
     const vfs = createVirtualFS();
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     declineAndReject();
 
     // Case 1 of resolveInstantiationCase: same id AND same mode -> full no-op.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
-    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
-    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+    expect(getCharacterInventoryValue().rejected).toContain("ɔ");
+    expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
   });
 });
 
@@ -2347,8 +2278,8 @@ describe("workingCopyStore — carve overlay mutators never mutate the IR in pla
 
 describe("workingCopyStore — contextToleranceWriteBack persistence (spec 062 T019)", () => {
   function instantiate(): void {
-    useWorkingCopyStore.getState().instantiateFromBase(
-      { id: "kbd", displayName: "Kbd", languages: [] } as unknown as BaseKeyboard,
+    useWorkingCopyStore.getState().instantiateFromStart(
+      { id: "kbd", displayName: "Kbd", languages: [] } as unknown as StartKeyboard,
       { vfs: createVirtualFS([]), ir: makeTestIR([]) },
     );
   }

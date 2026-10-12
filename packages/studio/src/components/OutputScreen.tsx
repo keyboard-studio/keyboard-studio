@@ -3,7 +3,7 @@
 // Left pane: shared PickerPane. Which variant depends on whether a working
 // copy exists (spec 058):
 //   - instantiated (the normal end-of-flow arrival) -> "shipping": read-only
-//     base provenance + a "Change base keyboard" control that routes back to
+//     base provenance + a "Change starting keyboard" control that routes back to
 //     the survey's choose_base step, plus TrackOneIdentityPanel and KmnEditor.
 //     No mode toggle, no picker — nothing on the ship-it screen can re-base
 //     the working copy in place. See PickerPane.tsx's variant notes.
@@ -56,7 +56,7 @@ import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { OutputSectionList } from "./OutputSectionList.tsx";
 import { TestBuildPanel } from "./TestBuildPanel.tsx";
 import { PublishHandover } from "./PublishHandover.tsx";
-import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
+import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
 import { TrackOneIdentityPanel } from "../editors/panels/TrackOneIdentityPanel.tsx";
@@ -119,7 +119,7 @@ export function OutputScreen() {
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
 
   const {
-    baseKeyboard,
+    startKeyboard,
     canDownload,
     downloading,
     downloadError,
@@ -134,7 +134,7 @@ export function OutputScreen() {
     // spec 064: the two attribution hard-blocks and the D5 escape hatch.
     attributionMissing,
     licenseUnparseable,
-    resolveBaseHolder,
+    resolveStartHolder,
   } = artifact;
 
   // Identity prefill for the Option B submit form. Read from whichever auth
@@ -216,15 +216,15 @@ export function OutputScreen() {
   // predicate — do not fork a second notion of "has a working copy".
   const instantiated = useWorkingCopyStore((s) => s.isInstantiated());
 
-  // "Change base keyboard" — relocates re-basing to the survey's choose_base
+  // "Change starting keyboard" — relocates re-basing to the survey's choose_base
   // step rather than mutating the working copy from the ship-it screen. A BACK
-  // action (see backToChooseBase's docstring for why an advance() would corrupt
+  // action (see backToChooseStart's docstring for why an advance() would corrupt
   // the history stack), and it deliberately mutates nothing itself: the rebase
   // question is answered at the destination by the existing confirmRebaseTo
   // gate, which also no-ops when the author re-picks the same base.
-  const sessionBackToChooseBase = useSurveySessionStore((s) => s.backToChooseBase);
-  const handleChangeBase = () => {
-    sessionBackToChooseBase();
+  const sessionBackToChooseStart = useSurveySessionStore((s) => s.backToChooseStart);
+  const handleChangeStart = () => {
+    sessionBackToChooseStart();
     navigateTo("survey");
   };
 
@@ -250,7 +250,7 @@ export function OutputScreen() {
   // here, it announced the BASE id ("Download keyboard us as zip") while the file
   // that landed was "dagbanli-<version>.zip" — WCAG 2.2 AA 2.5.3 / 4.1.2. Do not
   // reintroduce a second derivation of this id; extend the shared helper.
-  const downloadKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
+  const downloadKeyboardId = resolveOutputKeyboardId(identity, startKeyboard);
   // spec 094 C6: one ordered blocker list feeds the download aria-labels, the
   // action flags and the PR panel's reason, so they cannot disagree.
   const gateInput = {
@@ -258,7 +258,7 @@ export function OutputScreen() {
     coverageBlocked,
     licenseUnparseable: licenseUnparseable !== null,
     attributionMissing,
-    stageReady: artifact.stage.kind === "ready" && baseKeyboard !== null,
+    stageReady: artifact.stage.kind === "ready" && startKeyboard !== null,
   };
   const outputGate = outputBlockers(gateInput);
   const firstBlocker = outputGate.blockers[0];
@@ -309,25 +309,25 @@ export function OutputScreen() {
           <button
             type="button"
             data-testid="output-change-base"
-            onClick={handleChangeBase}
+            onClick={handleChangeStart}
             // The left pane owns this treatment even though the slot content is
             // authored here — see PANE_SECONDARY_BUTTON in previewOutputLayout.
             style={{ ...PANE_SECONDARY_BUTTON, alignSelf: "flex-start" }}
           >
-            <Trans id="output.changeBase.label">Change base keyboard</Trans>
+            <Trans id="output.changeStarting.label">Change starting keyboard</Trans>
           </button>
         }
         narrow={narrow}
         leftPct={leftPct}
         dividerWidth={DIVIDER_WIDTH}
         pickerSlot={
-          <BaseKeyboardPicker
-            value={artifact.baseKeyboard}
-            onChange={artifact.handleBaseKeyboardChange}
+          <StartKeyboardPicker
+            value={artifact.startKeyboard}
+            onChange={artifact.handleStartKeyboardChange}
           />
         }
         scaffoldFormSlot={
-          artifact.pickerMode === "scaffold" && artifact.baseKeyboard !== null ? (
+          artifact.pickerMode === "scaffold" && artifact.startKeyboard !== null ? (
             <ScaffoldForm onSubmit={(spec) => { artifact.setScaffoldSpec(spec); }} />
           ) : null
         }
@@ -398,7 +398,7 @@ export function OutputScreen() {
             <Trans id="output.heading">Output</Trans>
           </h2>
         )}
-        {baseKeyboard !== null && (
+        {startKeyboard !== null && (
           <>
             {/* spec 094 FR-001: revise any completed section and come back. */}
             <OutputSectionList />
@@ -622,8 +622,8 @@ export function OutputScreen() {
               >
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
                   {"[ERROR] "}
-                  <Trans id="output.status.licenseUnreadable.title">
-                    The base keyboard&apos;s copyright notice could not be read
+                  <Trans id="output.status.startingLicenseUnreadable.title">
+                    The starting keyboard&apos;s copyright notice could not be read
                   </Trans>
                 </div>
                 <div style={{ marginBottom: 6 }}>
@@ -642,14 +642,14 @@ export function OutputScreen() {
                   onSubmit={(e) => {
                     e.preventDefault();
                     const input = e.currentTarget.elements.namedItem(
-                      "baseHolder",
+                      "startHolder",
                     ) as HTMLInputElement | null;
-                    if (input !== null) resolveBaseHolder(input.value);
+                    if (input !== null) resolveStartHolder(input.value);
                   }}
                   style={{ display: "flex", gap: 6, alignItems: "center" }}
                 >
                   <input
-                    name="baseHolder"
+                    name="startHolder"
                     type="text"
                     aria-label={t({
                       id: "output.status.licenseUnreadable.holderLabel",
@@ -759,10 +759,10 @@ export function OutputScreen() {
                 style={{ fontSize: 12, color: "var(--app-warning-text)", marginTop: 4 }}
               >
                 {"[WARN] "}
-                <Trans id="output.identity.warn">
-                  Your keyboard id is still set to the base keyboard&rsquo;s
+                <Trans id="output.identity.copiedWarn">
+                  Your keyboard id is still set to the copied keyboard&rsquo;s
                   id. Downloading now will name the .zip and its internal
-                  file paths after the base id. Set your own keyboard name
+                  file paths after the copied keyboard&rsquo;s id. Set your own keyboard name
                   and id before downloading or submitting to the community
                   repository.
                 </Trans>{" "}

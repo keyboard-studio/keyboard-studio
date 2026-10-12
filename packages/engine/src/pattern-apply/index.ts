@@ -85,7 +85,7 @@ export {
   isMnemonicLayout,
   keyHasCapsHandling,
   buildShiftRuleLines,
-  buildBaseRuleLines,
+  buildStartRuleLines,
   buildCasePairRuleLines,
   planShiftAssignment,
 } from "./shiftRules.js";

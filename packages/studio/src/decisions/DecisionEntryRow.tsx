@@ -34,13 +34,31 @@
 //
 // The `data-testid` values here are the contract (trail-ui.contract.md §2);
 // renaming one breaks tests.
+//
+// Decisions-page enrichment (docs/decisions-page-audit.md): a meta line under
+// the headline states provenance in words and the recorded time for EVERY
+// kind (before, provenance reached the author only as a survey headline's
+// verb, a `decision` entry's not at all, and `recordedAt` was rendered
+// nowhere); the expanded region leads with a detail block — what the entry
+// RECORDED — above the impact's what-it-CHANGED: a decision's module label
+// and stored value (decisionValueText.ts), a survey answer's overridden
+// offer, an editor step's affected-item sample, a base contribution's
+// instantiation mode. Superseded entries link to their replacement (and a
+// replacing entry back to what it replaced) through the view's reveal
+// callback. All new testids are additive; none above was renamed.
 
 import { useMemo, useState } from "react";
 import type { DecisionEntry, DecisionImpact, EditorActionType } from "@keyboard-studio/contracts";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import { headlineFor, type HeadlineDimension, type QuestionName } from "./headline.ts";
-import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
+import {
+  formatAnswerValue,
+  headlineFor,
+  type HeadlineDimension,
+  type QuestionName,
+} from "./headline.ts";
+import { createLookupDecisionLabel, createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
+import { decisionValueLines, type DecisionValueLine } from "./decisionValueText.ts";
 import { formatClauseList, stageActionLabel, dimensionLabel as dimensionLabelText } from "./stageText.ts";
 import { DiffHunkList } from "../ui/DiffHunkList.tsx";
 import { useEntryImpact } from "./useEntryImpact.ts";
@@ -128,6 +146,25 @@ export interface DecisionEntryRowProps {
    * absence still leaves the jump control fully working, just un-gated.
    */
   resolveCtx?: ResolveContext;
+  /**
+   * The `entryId` of the entry that replaced this one, when this entry is
+   * superseded. Arrives as DATA from the view (which holds the whole
+   * record) for the same reason `resolveCtx` does: a row is handed one
+   * entry at a time (FR-021), so which entry replaced it is not something
+   * the row can know on its own. Absent when nothing replaced this entry.
+   */
+  replacementEntryId?: string;
+  /**
+   * Ask the view to reveal another entry — un-hide it if it is a collapsed
+   * superseded entry, expand its stage, and scroll to it. The row owns no
+   * such state (the superseded toggle and the stage collapse set are the
+   * view's), so revealing is a request, not something the row performs.
+   * Absent (fixture-driven renders), the supersede links simply do not
+   * render; the "Replaced by a later decision" marker still does.
+   */
+  onRevealEntry?: (entryId: string) => void;
+  /** True briefly after the view reveals this row — renders a highlight outline. */
+  highlighted?: boolean;
 }
 
 const rowStyle: React.CSSProperties = {
@@ -149,6 +186,22 @@ const expandButtonStyle: React.CSSProperties = {
 };
 
 const noticeStyle: React.CSSProperties = { margin: 0, color: TEXT_DIM };
+
+const metaStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: 8,
+  flexWrap: "wrap",
+  marginTop: 2,
+  fontSize: 11,
+  color: TEXT_DIM,
+};
+
+const detailLabelStyle: React.CSSProperties = {
+  margin: "0 0 2px",
+  fontWeight: 600,
+  color: "var(--app-text)",
+};
 
 /**
  * Stand-in resolver for when no async resolver was supplied.
@@ -184,6 +237,9 @@ export function DecisionEntryRow({
   resolveImpact,
   resolveImpactAsync,
   resolveCtx,
+  replacementEntryId,
+  onRevealEntry,
+  highlighted = false,
 }: DecisionEntryRowProps) {
   const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
@@ -191,6 +247,7 @@ export function DecisionEntryRow({
   // The production `lookupQuestionLabel` (specs/055 contracts/headline-spec.contract.md
   // §1) — resolved once per locale rather than reconstructed on every render.
   const lookupQuestionLabel = useMemo(() => createLookupQuestionLabel(i18n), [i18n]);
+  const lookupDecisionLabel = useMemo(() => createLookupDecisionLabel(i18n), [i18n]);
   const spec = headlineFor(entry, { lookupQuestionLabel });
 
   // ---------------------------------------------------------------------------
@@ -259,11 +316,128 @@ export function DecisionEntryRow({
   // calling the same stage two different things (SC-007).
   const stageLabel = (stage: EditorActionType): string => stageActionLabel(stage, i18n);
 
+  // ---------------------------------------------------------------------------
+  // Meta line (decisions-page enrichment): provenance in words + the recorded
+  // time, visible on the COLLAPSED row for every payload kind.
+  //
+  // Before this line, provenance reached the author only as the survey
+  // headline's verb ("Chose" / "Accepted suggested" / "Carried") — a `decision`
+  // entry's provenance was rendered nowhere at all, so an extracted value and
+  // a hand-set one were indistinguishable on the one surface whose subject is
+  // provenance — and `recordedAt` was carried by every entry and rendered by
+  // no surface. Both facts are read straight off the entry: stating them
+  // computes nothing, so the collapsed row stays as cheap as FR-010 requires.
+  const provenanceText = (): string => {
+    const provenance = entry.provenance;
+    switch (provenance.agency) {
+      case "hand-set":
+        return t({ id: "trail.entry.meta.provenance.handSet", message: "Your own choice" });
+      case "base-derived":
+        return t({
+          id: "trail.entry.meta.provenance.fromStarting",
+          message: "Carried from the starting keyboard",
+        });
+      case "tool-proposed": {
+        if (provenance.source !== undefined) {
+          // `source` is author-facing content here exactly as it is in the
+          // acceptedSuggested headline (the identifier guard's exemption).
+          const source = provenance.source;
+          return t({
+            id: "trail.entry.meta.provenance.suggestedFrom",
+            message: `Suggested by the tool, from ${source}`,
+          });
+        }
+        return t({
+          id: "trail.entry.meta.provenance.suggested",
+          message: "Suggested by the tool",
+        });
+      }
+      default: {
+        const _exhaustive: never = provenance.agency;
+        return String(_exhaustive);
+      }
+    }
+  };
+
+  const recordedText = (): string => {
+    const when = i18n.date(new Date(entry.recordedAt), {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    return t({ id: "trail.entry.meta.recorded", message: `Recorded ${when}` });
+  };
+
+  // A `decision` entry's module label, resolved live through the decision
+  // lookup (lookupQuestionLabel.ts's bridge over the registry's
+  // decisionIndex) rather than read out of the summary string — the summary
+  // was composed at record time, in the recording locale, and falls back
+  // to the raw decisionId when the module does not resolve; the FR-014
+  // prose fallback below never does.
+  const decisionLabel = (decisionId: string): string => {
+    const label = lookupDecisionLabel(decisionId);
+    return label !== undefined
+      ? label
+      : t({
+          id: "trail.entry.detail.decisionUnknown",
+          message: "a decision this build no longer has",
+        });
+  };
+
+  // One line of a decision value's outline (decisionValueText.ts) as text.
+  // The framing words are the catalogue's; the content lines are the value's
+  // own (see that module's header for what may and may not appear in them).
+  const valueLineText = (line: DecisionValueLine): string => {
+    switch (line.kind) {
+      case "text":
+        return line.text;
+      case "empty": {
+        if (line.label !== undefined) {
+          const label = line.label;
+          const detail = t({ id: "trail.entry.detail.value.none", message: "none" });
+          return t({
+            id: "trail.entry.detail.value.labelled",
+            message: `${label}: ${detail}`,
+          });
+        }
+        return t({
+          id: "trail.entry.detail.value.empty",
+          message: "Nothing was recorded for this decision.",
+        });
+      }
+      case "count": {
+        const { count } = line;
+        const detail = t({
+          id: "trail.entry.detail.value.count",
+          message: plural(count, { one: "# item", other: "# items" }),
+        });
+        if (line.label !== undefined) {
+          const label = line.label;
+          return t({
+            id: "trail.entry.detail.value.labelled",
+            message: `${label}: ${detail}`,
+          });
+        }
+        return detail;
+      }
+      case "more": {
+        const count = line.count;
+        return t({
+          id: "trail.entry.detail.value.more",
+          message: `… and ${count} more`,
+        });
+      }
+      default: {
+        const _exhaustive: never = line;
+        return String(_exhaustive);
+      }
+    }
+  };
+
   // Shared with the stage roll-ups and Output's section list (stageText.ts).
   const dimensionLabel = (dimension: HeadlineDimension): string => dimensionLabelText(dimension, i18n);
 
   // A derived-axis id, as author-facing prose (FR-008). The ids are the
-  // `DiscoveryAxisVector` keys `recordBaseContribution.ts` reads off the
+  // `DiscoveryAxisVector` keys `recordStartContribution.ts` reads off the
   // working copy; an id this build does not name still degrades to prose,
   // never the raw code and never blank (FR-014).
   const axisLabel = (axisId: string): string => {
@@ -315,7 +489,7 @@ export function DecisionEntryRow({
   };
 
   // A metadata field code, as author-facing prose (FR-008). The codes are
-  // the `inheritedMetadataOf` keys `recordBaseContribution.ts` writes; an
+  // the `inheritedMetadataOf` keys `recordStartContribution.ts` writes; an
   // unknown code degrades the same way as an unknown axis id (FR-014).
   const fieldLabel = (field: string): string => {
     switch (field) {
@@ -410,13 +584,18 @@ export function DecisionEntryRow({
       id: "trail.entry.headline.acceptedSuggested",
       message: `Accepted suggested ${value} for ${question}, from ${source}`,
     });
-  } else if (spec.id === "fromBase") {
+  } else if (spec.id === "fromStart") {
     const value = spec.value;
     const question = questionText(spec.question);
     headline = t({
-      id: "trail.entry.headline.fromBase",
-      message: `Carried ${value} for ${question} from the base keyboard`,
+      id: "trail.entry.headline.fromStarting",
+      message: `Carried ${value} for ${question} from the starting keyboard`,
     });
+  } else if (spec.id === "galleryDecision") {
+    // spec 090 US5: the recording host's summary, verbatim — author-facing
+    // content composed at record time (the identifier guard's payload.value
+    // exemption), not a code to resolve through the catalogue.
+    headline = spec.summary;
   } else if (spec.id === "editorStep") {
     // At least one dimension is present and non-zero (FR-011) — the composed
     // sentence names only what happened, never a row of zeros.
@@ -439,7 +618,7 @@ export function DecisionEntryRow({
       id: "trail.entry.headline.editorStep.noChange",
       message: `${stage} (changed nothing)`,
     });
-  } else if (spec.id === "baseContribution") {
+  } else if (spec.id === "startContribution") {
     // FR-030/FR-031: names the base and, per FR-011's "only what happened"
     // rule, states only the counts the variant actually carries — a count
     // T021 OMITTED (never a fabricated zero) contributes no clause at all.
@@ -484,14 +663,14 @@ export function DecisionEntryRow({
       spec.inheritedFieldCount !== undefined
     ) {
       // All three present: the exact sentence the contract names
-      // (trail.entry.headline.baseContribution), rendered verbatim rather
+      // (trail.entry.headline.startContribution), rendered verbatim rather
       // than re-composed from the clauses above.
       const startingKeyCount = spec.startingKeyCount;
       const derivedAxisCount = spec.derivedAxisCount;
       const inheritedFieldCount = spec.inheritedFieldCount;
       headline = t({
-        id: "trail.entry.headline.baseContribution",
-        message: `Chose ${baseName} as the base keyboard — started with ${plural(startingKeyCount, { one: "# key", other: "# keys" })}, deriving ${plural(derivedAxisCount, { one: "# property", other: "# properties" })} and inheriting ${plural(inheritedFieldCount, { one: "# detail", other: "# details" })} from it`,
+        id: "trail.entry.headline.startingContribution",
+        message: `Chose ${baseName} as the starting keyboard — started with ${plural(startingKeyCount, { one: "# key", other: "# keys" })}, deriving ${plural(derivedAxisCount, { one: "# property", other: "# properties" })} and inheriting ${plural(inheritedFieldCount, { one: "# detail", other: "# details" })} from it`,
       });
     } else if (
       startingClause === undefined &&
@@ -501,8 +680,8 @@ export function DecisionEntryRow({
       // No count was present at all — the base itself is still named; never
       // a blank line and never a sentence with nothing in it.
       headline = t({
-        id: "trail.entry.headline.baseContribution.base",
-        message: `Chose ${baseName} as the base keyboard`,
+        id: "trail.entry.headline.startingContribution.simple",
+        message: `Chose ${baseName} as the starting keyboard`,
       });
     } else {
       // One or two of the three present. Named rather than indexed so the
@@ -520,8 +699,8 @@ export function DecisionEntryRow({
         detail = startingClause ?? derivedClause ?? inheritedClause ?? "";
       }
       headline = t({
-        id: "trail.entry.headline.baseContribution.withDetail",
-        message: `Chose ${baseName} as the base keyboard — ${detail}`,
+        id: "trail.entry.headline.startingContribution.withDetail",
+        message: `Chose ${baseName} as the starting keyboard — ${detail}`,
       });
     }
   } else {
@@ -534,6 +713,86 @@ export function DecisionEntryRow({
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Expanded detail (decisions-page enrichment): what the entry RECORDED,
+  // rendered above what it CHANGED (the impact below). Rendered only while
+  // expanded, like the impact — the collapsed row carries the headline and
+  // the meta line, and mounting computes none of this into the DOM.
+  //
+  // Per kind, this surfaces the record fields the audit found carried but
+  // unshown (docs/decisions-page-audit.md):
+  //   decision       -> the module label, resolved live, and the stored
+  //                     value's outline — the recorder's design always
+  //                     intended the value to ride in the payload "for
+  //                     anyone who expands the entry"; this is that reader.
+  //   survey-answer  -> the offer the author overrode, when the record kept
+  //                     one (`provenance.proposed`, spec 078): what the tool
+  //                     suggested, and how many sites the suggestion named.
+  //   editor-action  -> the bounded sample of affected identifiers the
+  //                     summary keeps, with the truncation stated when the
+  //                     sample is only the first few.
+  // A kind with nothing extra to state gets `null`, never an empty block.
+  let detailBlock: React.ReactNode | null = null;
+  if (entry.payload.kind === "decision") {
+    const payload = entry.payload;
+    detailBlock = (
+      <div data-testid="decision-entry-detail" style={{ marginBottom: 4 }}>
+        <p style={detailLabelStyle}>{decisionLabel(payload.decisionId)}</p>
+        {decisionValueLines(payload.value).map((line, index) => (
+          <p key={index} style={noticeStyle}>
+            {valueLineText(line)}
+          </p>
+        ))}
+      </div>
+    );
+  } else if (entry.payload.kind === "survey-answer" && entry.provenance.proposed !== undefined) {
+    const proposed = entry.provenance.proposed;
+    const offered = formatAnswerValue(proposed.value);
+    const siteCount = proposed.siteIds?.length ?? 0;
+    detailBlock = (
+      <div data-testid="decision-entry-detail" style={{ marginBottom: 4 }}>
+        <p style={noticeStyle}>
+          {t({
+            id: "trail.entry.detail.proposedNote",
+            message: `The tool suggested ${offered}, and a different value was chosen.`,
+          })}
+        </p>
+        {siteCount > 0 && (
+          <p style={noticeStyle}>
+            {t({
+              id: "trail.entry.detail.proposedSites",
+              message: plural(siteCount, {
+                one: "The suggestion named # site.",
+                other: "The suggestion named # sites.",
+              }),
+            })}
+          </p>
+        )}
+      </div>
+    );
+  } else if (entry.payload.kind === "editor-action" && entry.payload.summary.sample.length > 0) {
+    const summary = entry.payload.summary;
+    const items = formatClauseList(summary.sample, i18n);
+    detailBlock = (
+      <div data-testid="decision-entry-detail" style={{ marginBottom: 4 }}>
+        <p style={noticeStyle}>
+          {t({
+            id: "trail.entry.detail.editorSample",
+            message: `Affected items include: ${items}`,
+          })}
+        </p>
+        {summary.sampleTruncated && (
+          <p style={noticeStyle}>
+            {t({
+              id: "trail.entry.detail.editorSampleTruncated",
+              message: "Only the first few are shown.",
+            })}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   // A base-contribution entry has no single source change to isolate against
   // — it names what the base itself is (FR-030/FR-031), not a diff — so its
   // expanded region lists the base's own derived axes / inherited metadata,
@@ -541,12 +800,12 @@ export function DecisionEntryRow({
   // `resolveImpact` (which has nothing to diff here). `null` when this entry
   // is not a base-contribution at all, so the existing four-state impact
   // rendering below is untouched for every other kind (T030's scope).
-  const isBaseContribution = entry.payload.kind === "base-contribution";
-  let baseContributionDetail: React.ReactNode | null = null;
-  if (isBaseContribution) {
+  const isStartContribution = entry.payload.kind === "base-contribution";
+  let startContributionDetail: React.ReactNode | null = null;
+  if (isStartContribution) {
     const payload = entry.payload;
     if (payload.kind !== "base-contribution") {
-      // Unreachable by construction — `isBaseContribution` is this same
+      // Unreachable by construction — `isStartContribution` is this same
       // check — but keeps the block below narrowed without an assertion.
       throw new Error("unreachable: isBaseContribution without a base-contribution payload");
     }
@@ -560,48 +819,72 @@ export function DecisionEntryRow({
     const hasDerived = payload.derivedAxes.length > 0;
     const hasInherited = payload.inheritedMetadata.length > 0;
 
-    baseContributionDetail =
-      !hasDerived && !hasInherited ? (
-        <p style={noticeStyle}>
-          {t({
-            id: "trail.entry.impact.baseContribution.empty",
-            message: "Nothing else was derived or inherited from this base.",
-          })}
-        </p>
-      ) : (
-        <>
-          {hasDerived && (
-            <p style={noticeStyle}>
-              {t({
-                id: "trail.entry.impact.baseContribution.derived",
-                message: `Properties derived from the base: ${derivedList}`,
-              })}
-            </p>
-          )}
-          {hasInherited && (
-            <p style={noticeStyle}>
-              {t({
-                id: "trail.entry.impact.baseContribution.inherited",
-                message: `Details inherited from the base: ${inheritedList}`,
-              })}
-            </p>
-          )}
-        </>
-      );
+    // The instantiation mode — copied-from vs updated-existing — is carried
+    // on the payload and, before the enrichment, rendered nowhere, though
+    // it changes what every clause below means (decisions-page audit). One
+    // arm per literal the contracts type allows; anything else (a record
+    // from a build with a third mode) renders no line rather than a wrong
+    // one.
+    const modeText =
+      payload.instantiationMode === "new-from-base"
+        ? t({
+            id: "trail.entry.detail.startingMode.newFromBase",
+            message: "Started as a new keyboard copied from this starting point.",
+          })
+        : payload.instantiationMode === "adapt-existing"
+          ? t({
+              id: "trail.entry.detail.startingMode.adaptExisting",
+              message: "Updated the existing keyboard from this starting point.",
+            })
+          : null;
+    const modeLine = modeText !== null ? <p style={noticeStyle}>{modeText}</p> : null;
+
+    startContributionDetail = (
+      <>
+        {modeLine}
+        {!hasDerived && !hasInherited ? (
+          <p style={noticeStyle}>
+            {t({
+              id: "trail.entry.impact.startingContribution.empty",
+              message: "Nothing else was derived or inherited from this starting keyboard.",
+            })}
+          </p>
+        ) : (
+          <>
+            {hasDerived && (
+              <p style={noticeStyle}>
+                {t({
+                  id: "trail.entry.impact.startingContribution.derived",
+                  message: `Properties derived from the starting keyboard: ${derivedList}`,
+                })}
+              </p>
+            )}
+            {hasInherited && (
+              <p style={noticeStyle}>
+                {t({
+                  id: "trail.entry.impact.startingContribution.inherited",
+                  message: `Details inherited from the starting keyboard: ${inheritedList}`,
+                })}
+              </p>
+            )}
+          </>
+        )}
+      </>
+    );
   }
 
   // Resolved lazily, and only while expanded. Deliberately NOT memoised across
   // collapse/expand: the working copy may have moved on, and a re-derived
   // counterfactual should reflect the IR as it is now rather than as it was the
   // first time this row happened to be opened. Never called for a
-  // base-contribution entry — see `baseContributionDetail` above.
+  // base-contribution entry — see `startContributionDetail` above.
   //
   // `useEntryImpact` must be called unconditionally (hooks rule), so the gating
   // lives in its arguments: with `expanded` false, or with no async resolver, it
   // runs nothing. When an async resolver IS supplied it owns resolution entirely,
   // including the synchronous stored-capture case — routing that through the sync
   // resolver as well would ask the same question twice.
-  const asyncEnabled = resolveImpactAsync !== undefined && !isBaseContribution;
+  const asyncEnabled = resolveImpactAsync !== undefined && !isStartContribution;
   const asyncResolution = useEntryImpact(
     entry,
     expanded && asyncEnabled,
@@ -609,7 +892,7 @@ export function DecisionEntryRow({
   );
   const impact = asyncEnabled
     ? asyncResolution.impact
-    : expanded && !isBaseContribution
+    : expanded && !isStartContribution
       ? resolveImpact(entry)
       : null;
   const impactPending = asyncEnabled && asyncResolution.pending;
@@ -623,8 +906,13 @@ export function DecisionEntryRow({
 
   return (
     <li
-      style={rowStyle}
+      style={
+        highlighted
+          ? { ...rowStyle, outline: `2px solid ${ACCENT}`, outlineOffset: -2 }
+          : rowStyle
+      }
       hidden={hidden}
+      id={`decision-entry-${entry.entryId}`}
       data-testid="decision-entry"
       data-entry-id={entry.entryId}
     >
@@ -677,10 +965,51 @@ export function DecisionEntryRow({
         </button>
       </div>
 
+      {/* Meta line: provenance in words + when this was recorded, for every
+          kind (see provenanceText above). The supersede links live here too:
+          each names the OTHER entry and asks the view to reveal it — the
+          badge in the headline row above still carries the bare fact, per
+          the contract testid it has always had. */}
+      <div data-testid="decision-entry-meta" style={metaStyle}>
+        <span>{provenanceText()}</span>
+        <span aria-hidden="true">·</span>
+        <span>{recordedText()}</span>
+        {superseded && replacementEntryId !== undefined && onRevealEntry !== undefined && (
+          <button
+            type="button"
+            data-testid="decision-entry-show-replacement"
+            style={expandButtonStyle}
+            onClick={() => onRevealEntry(replacementEntryId)}
+          >
+            {t({
+              id: "trail.entry.supersede.showReplacement",
+              message: "Show the decision that replaced this one",
+            })}
+          </button>
+        )}
+        {entry.supersedes !== null && onRevealEntry !== undefined && (
+          <button
+            type="button"
+            data-testid="decision-entry-show-replaced"
+            style={expandButtonStyle}
+            onClick={() => {
+              const replacedId = entry.supersedes;
+              if (replacedId !== null) onRevealEntry(replacedId);
+            }}
+          >
+            {t({
+              id: "trail.entry.supersede.showReplaced",
+              message: "Show the earlier decision this replaced",
+            })}
+          </button>
+        )}
+      </div>
+
       {expanded && (
         <div data-testid="decision-entry-impact" id={impactRegionId} style={{ marginTop: 4 }}>
-          {baseContributionDetail !== null ? (
-            baseContributionDetail
+          {detailBlock}
+          {startContributionDetail !== null ? (
+            startContributionDetail
           ) : impactPending ? (
             // The one transient state. Only ever reached for an entry whose effect
             // has to be re-derived by projecting (spec 059); a stored capture
@@ -748,9 +1077,9 @@ export function DecisionEntryRow({
             // the trailing branch below would tell them the opposite.
             <p style={noticeStyle}>
               {t({
-                id: "trail.entry.impact.unavailable.noWorkingCopyYet",
+                id: "trail.entry.impact.unavailable.chooseStarting",
                 message:
-                  "This decision was made before a keyboard existed to change, so its effect cannot be shown yet. Choose a base keyboard and it will appear here.",
+                  "This decision was made before a keyboard existed to change, so its effect cannot be shown yet. Choose a starting keyboard and it will appear here.",
               })}
             </p>
           ) : (

@@ -15,18 +15,18 @@
 //      dropUnbackedBitmapStore -> stripDanglingAssetStores -> parseKmn ->
 //      recognizePatterns -> parseTouchLayout -> classifyRemovalCapabilities
 //      chain useKeyboardArtifact runs before it fires onInstantiate, then
-//      workingCopyStore.instantiateFromBase.
+//      workingCopyStore.instantiateFromStart.
 //   2. Carve one character — irToCharacterView resolves its contributors and
 //      workingCopyStore.cascadeDelete records them, as CarveGalleryV2's
 //      toggleCell does.
 //   3. One desktop assignment — an S-02 deadkey (Latin) / S-08 RAlt placement
 //      (Cyrillic) in the exact MechanismAssignment shape MechanismGallery
 //      records, via workingCopyStore.recordAssignments; then the mechanisms
-//      step completes through the real reducer (lockDesktop).
+//      step completes through the re-homed completion effects (lockDesktop).
 //   4. One touch assignment — a longpress in TouchGallery's
-//      buildTouchMechanismRef shape, completed through the real reducer's touch
-//      step with the same deps StudioShell injects (R11 emission matrix +
-//      buildTouchLayoutJson + setTouchLayoutJson) and the mods
+//      buildTouchMechanismRef shape, completed through the re-homed touch
+//      completion effects (R11 emission matrix + buildTouchLayoutJson +
+//      setTouchLayoutJson, lib/assignLoopCompletion.ts) and the mods
 //      AddTouchAdapter derives.
 //   5. Output — buildSourceZipForDownload (the real download path:
 //      projectWorkingCopyForOutput -> projectWorkingCopyVfs -> compile ->
@@ -40,9 +40,10 @@
 // non-vacuity guard: a projection that silently dropped every edit would
 // otherwise compile clean and pass.
 //
-// Runs under both VITE_KM_MUTATE_SEAM states — the seam routes carve and the
-// add gallery through mutate() inside projectWorkingCopyVfs, so each state is
-// a distinct emit path that must produce a compilable keyboard.
+// The seam routes carve and the add gallery through mutate() inside
+// projectWorkingCopyVfs — unconditionally since spec 089 T021 deleted the
+// flag (this oracle used to run under both flag states; there is one emit
+// path now, and it must produce a compilable keyboard).
 //
 // Fixtures: tests/fixtures/walkBases/ is a minimal copy of the two bases from
 // the keyboard-studio/keyboards corpus (MIT, SIL International; LICENSE.md
@@ -57,7 +58,7 @@ import { unzipSync } from "fflate";
 import {
   buildProducedSet,
   createVirtualFS,
-  type BaseKeyboard,
+  type StartKeyboard,
   type KeyboardIR,
   type MechanismAssignment,
   type TouchAssignment,
@@ -78,19 +79,15 @@ import {
 import { useWorkingCopyStore, bindManifest } from "../../src/stores/workingCopyStore.ts";
 import { manifest } from "../../src/steps/manifest.ts";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
+import { getDecisionSnapshot, selectTouchSeedSource } from "../../src/stores/decisionStore.ts";
 import { irToCharacterView } from "../../src/lib/irToCharacterView.ts";
 import { deriveDesktopModifications } from "../../src/lib/deriveDesktopModifications.ts";
-import { buildTouchLayoutJson } from "../../src/lib/buildTouchLayoutJson.ts";
-import { resolveBaseTouchJson } from "../../src/lib/resolveBaseTouchJson.ts";
 import { findTouchLayoutPath } from "../../src/lib/findTouchLayoutPath.ts";
-import { resolveTouchSeedSource, shouldEmitTouchLayout } from "../../src/lib/touchEmission.ts";
 import { buildSourceZipForDownload } from "../../src/lib/buildOutputBundle.ts";
 import {
-  applyStepCompletion,
-  MECHANISMS_STEP_ID,
-  TOUCH_STEP_ID,
-  type ReducerDeps,
-} from "../../src/steps/reducer.ts";
+  applyPhysicalCompletionEffects,
+  applyTouchCompletionEffects,
+} from "../../src/lib/assignLoopCompletion.ts";
 import { PATTERN_DEADKEY, PATTERN_RALT } from "../../src/editors/assignLoop/patternIds.ts";
 
 // ---------------------------------------------------------------------------
@@ -133,9 +130,9 @@ function readText(vfs: VirtualFS, path: string): string | undefined {
 /**
  * Instantiate the working copy exactly as the studio's open-base run does
  * (useKeyboardArtifact's fetch branch, then its parse branch, then
- * onInstantiate -> instantiateFromBase).
+ * onInstantiate -> instantiateFromStart).
  */
-async function instantiateLikeStudio(base: BaseKeyboard): Promise<void> {
+async function instantiateLikeStudio(base: StartKeyboard): Promise<void> {
   const vfs = createVirtualFS();
   await fetchKeyboardSourceToVfs(base, vfs, { proxyBase: PROXY, fetchImpl: fixtureFetch });
 
@@ -156,7 +153,7 @@ async function instantiateLikeStudio(base: BaseKeyboard): Promise<void> {
   }
   const removalCapabilities = classifyRemovalCapabilities(ir);
 
-  useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir, removalCapabilities });
+  useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir, removalCapabilities });
 }
 
 /** CarveGalleryV2.toggleCell for one character. Returns the ids it cascaded. */
@@ -171,58 +168,23 @@ function carveCharacter(ch: string): string[] {
   return [...ruleNodeIds, ...storeSlotIds];
 }
 
-/** The reducer deps StudioShell injects, limited to what these steps touch. */
-function studioReducerDeps(): ReducerDeps {
-  const wc = () => useWorkingCopyStore.getState();
-  return {
-    lockDesktop: () => wc().lockDesktop(),
-    clearStale: (id) => wc().clearStale(id),
-    setTouchLayoutJson: (json) => wc().setTouchLayoutJson(json),
-    instantiateFromBase: (b, o) => wc().instantiateFromBase(b, o),
-    instantiateFromExisting: (b, o) => wc().instantiateFromExisting(b, o),
-    // Mirrors StudioShell's wrapper: resolve the seed source, apply the R11
-    // emission matrix, then call the real buildTouchLayoutJson.
-    buildTouchLayoutJson: (baseIrArg, assignments, opts) => {
-      const seedSource = resolveTouchSeedSource(opts.seedSource, opts.baseTouchJson !== undefined);
-      if (!shouldEmitTouchLayout(seedSource, opts.mods, assignments.length > 0)) {
-        return { json: null, warnings: [] };
-      }
-      return buildTouchLayoutJson(baseIrArg, assignments, {
-        ...(seedSource !== "reseed-from-desktop" && opts.baseTouchJson !== undefined
-          ? { baseTouchJson: opts.baseTouchJson }
-          : {}),
-        mods: opts.mods,
-        seedSource,
-      });
-    },
-    resolveBaseTouchJson: (v) => resolveBaseTouchJson(v),
-    instantiateFromBaseIfConfirmed: () => {
-      throw new Error("not used by this oracle");
-    },
-    getWorkingIR: () => wc().ir,
-    setWorkingIR: (next) => wc().setWorkingIR(next),
-    getStaleSteps: () => wc().staleSteps,
-  };
-}
 
-/** AddTouchAdapter.handleComplete -> the reducer's touch step. */
+/** AddTouchAdapter.handleComplete -> the touch completion effects (spec 090
+ * T042: R2 re-homed from the reducer to lib/assignLoopCompletion.ts, whose
+ * build wrapper is StudioShell's former deps wrapper verbatim). */
 function completeTouchStep(assignments: TouchAssignment[]): void {
   const s = useWorkingCopyStore.getState();
   const mods =
-    s.baseIr === null
+    s.startIr === null
       ? { removals: [], placements: [] }
-      : deriveDesktopModifications(s.baseIr, s.deletedNodeIds, s.deletedItemIds, s.phaseResults);
-  applyStepCompletion(
-    TOUCH_STEP_ID,
-    {
-      assignments,
-      baseIr: s.baseIr,
-      baseVfs: s.baseVfs,
-      mods,
-      seedSource: useSurveySessionStore.getState().touchSeedSource,
-    },
-    studioReducerDeps(),
-  );
+      : deriveDesktopModifications(s.startIr, s.deletedNodeIds, s.deletedItemIds, s.phaseResults);
+  applyTouchCompletionEffects({
+    assignments,
+    startIr: s.startIr,
+    startVfs: s.startVfs,
+    mods,
+    seedSource: selectTouchSeedSource(getDecisionSnapshot()),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +193,7 @@ function completeTouchStep(assignments: TouchAssignment[]): void {
 
 interface WalkCase {
   label: string;
-  base: BaseKeyboard;
+  base: StartKeyboard;
   /** Author-chosen identity (the walk always names the keyboard). */
   identity: { keyboardId: string; displayName: string; bcp47: string };
   /** A character the base produces that the author discards. */
@@ -239,10 +201,10 @@ interface WalkCase {
   /** A character the base does NOT produce, placed on the desktop. */
   newChar: string;
   desktopAssignment: MechanismAssignment;
-  touchHostKey: string;
+  touchBaseKey: string;
 }
 
-function baseKeyboard(id: string, script: string, displayName: string): BaseKeyboard {
+function startKeyboard(id: string, script: string, displayName: string): StartKeyboard {
   return {
     id,
     path: `release/basic/${id}`,
@@ -250,13 +212,13 @@ function baseKeyboard(id: string, script: string, displayName: string): BaseKeyb
     targets: ["windows", "macosx", "linux", "web", "mobile", "tablet"],
     displayName,
     version: "1.0",
-  } as BaseKeyboard;
+  } as StartKeyboard;
 }
 
 const CASES: WalkCase[] = [
   {
     label: "Latin — basic_kbdus",
-    base: baseKeyboard("basic_kbdus", "Latn", "US Basic"),
+    base: startKeyboard("basic_kbdus", "Latn", "US Basic"),
     identity: { keyboardId: "oracle_walk_latn", displayName: "Oracle Walk Latin", bcp47: "en" },
     carve: "~",
     newChar: "é",
@@ -281,11 +243,11 @@ const CASES: WalkCase[] = [
       ],
       source: "user",
     },
-    touchHostKey: "K_E",
+    touchBaseKey: "K_E",
   },
   {
     label: "Cyrillic — basic_kbdru",
-    base: baseKeyboard("basic_kbdru", "Cyrl", "Russian Basic"),
+    base: startKeyboard("basic_kbdru", "Cyrl", "Russian Basic"),
     identity: { keyboardId: "oracle_walk_cyrl", displayName: "Oracle Walk Cyrillic", bcp47: "kk-Cyrl" },
     carve: "ё",
     newChar: "ә",
@@ -303,7 +265,7 @@ const CASES: WalkCase[] = [
       ],
       source: "user",
     },
-    touchHostKey: "K_F",
+    touchBaseKey: "K_F",
   },
 ];
 
@@ -359,16 +321,15 @@ describe("MVP walk compile oracle — the blocking-diagnostic filter is not vacu
   });
 });
 
-for (const seamOn of [false, true]) {
-  describe(`MVP walk compile oracle — mutate seam ${seamOn ? "ON" : "OFF"}`, () => {
+{
+  describe("MVP walk compile oracle — mutate seam (single path, spec 089)", () => {
     for (const c of CASES) {
       it(`${c.label}: carve + desktop + touch edits emit a keyboard that compiles and carries the edits`, async () => {
-        vi.stubEnv("VITE_KM_MUTATE_SEAM", seamOn ? "1" : "");
 
         // --- 1. instantiate -------------------------------------------------
         await instantiateLikeStudio(c.base);
-        const baseIr = useWorkingCopyStore.getState().baseIr!;
-        const baseProduced = buildProducedSet(baseIr);
+        const startIr = useWorkingCopyStore.getState().startIr!;
+        const baseProduced = buildProducedSet(startIr);
         // Preconditions that keep the edits meaningful.
         expect(baseProduced.has(c.carve), `base must produce the carved "${c.carve}"`).toBe(true);
         expect(baseProduced.has(c.newChar), `base must NOT already produce "${c.newChar}"`).toBe(false);
@@ -380,7 +341,9 @@ for (const seamOn of [false, true]) {
 
         // --- 3. desktop assignment + mechanisms completion ------------------
         useWorkingCopyStore.getState().recordAssignments([c.desktopAssignment]);
-        applyStepCompletion(MECHANISMS_STEP_ID, undefined, studioReducerDeps());
+        // Spec 090 T041: R1 re-homed from the reducer — this is the exact
+        // effects call AddPhysicalAdapter fires on completion (D-090-38).
+        applyPhysicalCompletionEffects();
         expect(useWorkingCopyStore.getState().desktopLocked).toBe(true);
 
         // --- 4. touch assignment + touch completion -------------------------
@@ -391,7 +354,7 @@ for (const seamOn of [false, true]) {
           mechanisms: [
             {
               patternId: "longpress_alternates",
-              slotValues: { hostKey: c.touchHostKey, char: c.newChar, layer: "default" },
+              slotValues: { hostKey: c.touchBaseKey, char: c.newChar, layer: "default" },
             },
           ],
           source: "user",

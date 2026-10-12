@@ -7,7 +7,7 @@
 // module carries the same shape as its live counterpart il_language_english for
 // consistency; no runtime resolver is wired for it.
 
-import type { QuestionModule, ValidationResult, MutateContext } from "../../types.ts";
+import type { QuestionModule, ValidationResult, ApplyContext, WorkingCopyPatch } from "../../types.ts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 import { irPath } from "@keyboard-studio/contracts";
@@ -63,19 +63,19 @@ function asText(value: string | string[] | undefined): string {
  * Scoped to the declared `writes` path `header.name`. An empty answer produces
  * an empty patch (no-op), leaving the existing name untouched (M5).
  */
-export function mutate(
+export function apply(
   value: string | string[] | undefined,
-  _ctx: MutateContext,
-): Partial<KeyboardIR> {
+  _ctx: ApplyContext,
+): WorkingCopyPatch {
   const name = asText(value);
   if (name === "") return {};
-  return { header: { name } as KeyboardIR["header"] };
+  return { ir: { header: { name } as KeyboardIR["header"] } };
 }
 
 const mod: QuestionModule = {
   definition,
   validate,
-  mutate,
+  apply,
   fixtures,
   inputs: [],
   writes: [irPath("header", "name")],

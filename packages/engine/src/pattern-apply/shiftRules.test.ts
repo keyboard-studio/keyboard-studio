@@ -5,7 +5,7 @@ import {
   isMnemonicLayout,
   keyHasCapsHandling,
   buildShiftRuleLines,
-  buildBaseRuleLines,
+  buildStartRuleLines,
   buildCasePairRuleLines,
   planShiftAssignment,
 } from "./shiftRules.js";
@@ -127,18 +127,18 @@ describe("buildShiftRuleLines", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildBaseRuleLines
+// buildStartRuleLines
 // ---------------------------------------------------------------------------
 
-describe("buildBaseRuleLines", () => {
+describe("buildStartRuleLines", () => {
   it("emits a single bare line when there is no CAPS handling", () => {
-    expect(buildBaseRuleLines("K_A", "θ", { capsHandling: false })).toEqual([
+    expect(buildStartRuleLines("K_A", "θ", { capsHandling: false })).toEqual([
       "+ [K_A] > U+03B8",
     ]);
   });
 
   it("emits the NCAPS+CAPS pair (same output both states) when CAPS handling is present", () => {
-    expect(buildBaseRuleLines("K_A", "θ", { capsHandling: true })).toEqual([
+    expect(buildStartRuleLines("K_A", "θ", { capsHandling: true })).toEqual([
       "+ [NCAPS K_A] > U+03B8",
       "+ [CAPS K_A] > U+03B8",
     ]);

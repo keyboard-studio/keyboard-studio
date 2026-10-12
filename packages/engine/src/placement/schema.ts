@@ -56,9 +56,9 @@ const AggregatedEntrySchema = z.object({
 });
 
 // Touch (longpress) placement priors — placement-priors v2. Mirrors
-// contracts' TouchPlacementEntry/TouchPlacementHost; a SEPARATE vocabulary
+// contracts' TouchPlacementEntry/TouchPlacementBase; a SEPARATE vocabulary
 // from PlacementMechanism, never merged into it (see placementMap.ts).
-const TouchPlacementHostSchema = z.object({
+const TouchPlacementBaseSchema = z.object({
   vkey: z.string(),
   layerClass: z.enum(["default", "shift", "other"]),
   priorCount: z.number(),
@@ -66,7 +66,7 @@ const TouchPlacementHostSchema = z.object({
 
 const TouchPlacementEntrySchema = z.object({
   codepoint: z.string(),
-  hosts: z.array(TouchPlacementHostSchema),
+  hosts: z.array(TouchPlacementBaseSchema),
 });
 
 export const PlacementPriorsJSONSchema = z.object({

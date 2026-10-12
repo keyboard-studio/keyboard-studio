@@ -7,7 +7,7 @@
 //
 // NOTE (architecture, honest): the working IR is not itself emitted into
 // the preview/download artifacts — projectWorkingCopyVfs projects from
-// baseIr + overlays/assignments. Lifecycle edits land in the working copy
+// startIr + overlays/assignments. Lifecycle edits land in the working copy
 // (the current mutation API's contract); making them reach the compiled
 // artifact is Phase 4's projection seam. This surface does not pretend
 // otherwise.
@@ -69,7 +69,7 @@ export interface DeadkeySurfaceProps {
 
 export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
   const ir = useWorkingCopyStore((s) => s.ir);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
   const setWorkingIR = useWorkingCopyStore((s) => s.setWorkingIR);
   const [mode, setMode] = useState<Mode>({ tab: "inventory" });
   const { t } = useLingui();
@@ -93,7 +93,7 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
     },
   });
 
-  const workingIr: KeyboardIR | null = ir ?? baseIr ?? null;
+  const workingIr: KeyboardIR | null = ir ?? startIr ?? null;
 
   const onCommitIr = useCallback(
     (nextIr: KeyboardIR) => {
@@ -133,7 +133,7 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
       <FullStepPage testId="deadkey-step">
         {heading}
         <div style={emptyStyle}>
-          Choose a base keyboard first — deadkeys are defined against the working copy.
+          Choose a starting keyboard first — deadkeys are defined against the working copy.
         </div>
       </FullStepPage>
     );

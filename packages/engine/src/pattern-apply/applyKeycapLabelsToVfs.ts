@@ -155,7 +155,7 @@ export function applyKeycapLabelsToVfs(
   // De-duplicate targets that collapse to the same (vkey, kvksLayer, char) —
   // cheap guard against redundant writes if rule-line parsing ever produces
   // overlapping entries (e.g. a base-only line alongside an NCAPS base line
-  // with identical output, which buildBaseRuleLines never actually emits
+  // with identical output, which buildStartRuleLines never actually emits
   // together, but the guard costs nothing).
   const seen = new Set<string>();
   const dedupedTargets = targets.filter((t) => {

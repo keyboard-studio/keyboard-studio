@@ -1,7 +1,7 @@
 import type {
   CharacterDiscoveryService,
   InventoryChar,
-  BaseKeyboard,
+  StartKeyboard,
   LinguistInventory,
 } from "@keyboard-studio/contracts";
 import { makeLinguistInventory, parseUPlusNotation } from "@keyboard-studio/contracts";
@@ -365,7 +365,7 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
    */
   async harvestFromText(
     sample: string,
-    _base: BaseKeyboard
+    _base: StartKeyboard
   ): Promise<InventoryChar[]> {
     // Normalize to NFC at entry: NFD input (common on macOS, e.g. "é" = U+0065
     // U+0301) would otherwise yield NFD inventory chars from Intl.Segmenter.
@@ -390,7 +390,7 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
     });
 
     return entries.map(([ch, count]) => {
-      // TODO(#141-followup): ASCII proxy — replace with actual base-keyboard output-set lookup when BCP47 is wired onto BaseKeyboard
+      // TODO(#141-followup): ASCII proxy — replace with actual base-keyboard output-set lookup when BCP47 is wired onto StartKeyboard
       const inBaseOutput = (ch.codePointAt(0) ?? 0) <= 0x7e;
       const item: InventoryChar = {
         char: ch,
@@ -403,7 +403,7 @@ export class CharacterDiscoveryServiceImpl implements CharacterDiscoveryService 
   }
 
   async pickerCandidates(
-    base: BaseKeyboard,
+    base: StartKeyboard,
     bcp47?: string
   ): Promise<InventoryChar[]> {
     let candidates: string[] | null = null;

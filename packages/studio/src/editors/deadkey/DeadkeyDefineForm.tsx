@@ -34,8 +34,8 @@ import { commitDeadkeyResult, hex4 } from "./deadkeyWrite.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { DeadkeyOperation } from "../../lib/deadkeyOps.ts";
 import { DeadkeyConflictDialog, type DeadkeyConflictChoice } from "./DeadkeyConflictDialog.tsx";
-import { HostDisclosure } from "./HostDisclosure.tsx";
-import { referenceHosts } from "../../lib/referenceHosts/index.ts";
+import { BaseDisclosure } from "./BaseDisclosure.tsx";
+import { referenceBases } from "../../lib/referenceBases/index.ts";
 
 const fieldStyle: CSSProperties = {
   margin: "0 0 14px",
@@ -215,7 +215,7 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
 
   const hosts = useMemo(
     () =>
-      referenceHosts({
+      referenceBases({
         key: resolvedVkey ?? triggerLabel,
         modifiers: [],
       }),
@@ -428,7 +428,7 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
         </div>
       </div>
 
-      <HostDisclosure hosts={hosts} />
+      <BaseDisclosure hosts={hosts} />
 
       <div style={questionStyle}>
         <p style={questionTextStyle}>Do your typists expect a character on this key?</p>

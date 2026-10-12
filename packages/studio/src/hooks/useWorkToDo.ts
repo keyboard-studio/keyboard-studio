@@ -32,14 +32,18 @@ import { deriveCharacterFlags } from "../survey/characterFlags.ts";
 import { derivePunctuationFlags } from "../survey/punctuation/punctuationFlags.ts";
 import { useSourcedExemplars } from "../survey/useSourcedExemplars.ts";
 import { punctuationKey } from "../steps/evidence.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import {
+  getCharacterInventoryValue,
+} from "../survey/useInventoryDraft.ts";
+import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
 import { selectWorkToDo, type WorkItem, type NotAskedGateInput, type FlaggedAnswerInput } from "../steps/workToDo.ts";
 import type { StepId } from "../steps/answerTypes.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { lowercaseBaseView } from "../survey/charNormUtils.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useDecisionStore, getDecisionSnapshot } from "../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { useAccountedForGate } from "./useAccountedForGate.ts";
 import { useCarveNeededSet } from "./useCarveNeededSet.ts";
 import { deriveCarveNeededSet } from "@keyboard-studio/engine";
@@ -50,17 +54,21 @@ const EMPTY_LAST_RECORDED = {};
 /** This step's work-to-do, live. Re-derives on every relevant store change. */
 export function useWorkToDo(): Record<StepId, WorkItem[]> {
   const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
   const ir = useWorkingCopyStore((s) => s.ir);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
-  const bcp47 = useSurveySessionStore((s) => s.surveyContext.bcp47_tag);
+  const bcp47 = useDecisionStore((s) => deriveSurveyContext(s.decisions).bcp47_tag);
   const marksStepAnswers = useSurveyAnswerStore((s) => s.steps.marks);
   const charactersStepAnswers = useSurveyAnswerStore((s) => s.steps.characters);
-  const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
+  const alphabetEvidenceKey = useDecisionStore(
+    (s) =>
+      (s.decisions["character-inventory"]?.value as CharacterInventoryValue | undefined)
+        ?.alphabetEvidenceKey,
+  );
   const punctuationInventoryAnswer = useSurveyAnswerStore(
     (s) => s.steps.punctuation?.answers["punctuation.inventory"],
   );
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const { inventory: punctuationInventory } = useSourcedExemplars(bcp47);
   const convenienceStatus = useSurveyAnswerStore((s) => s.steps.convenience?.status);
   const accounted = useAccountedForGate();
@@ -68,14 +76,14 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
 
   const marksFlagged = useMemo<readonly FlaggedAnswerInput[]>(() => {
     if (alphabet === undefined || alphabet.marks.length === 0) return [];
-    const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
+    const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
     const isCasedBase = casingValue === "cased" || casingValue === "mixed";
     // Same case-symmetric grouping and proposal the step renders from (parity, spec 079 US3).
     const fold = buildAttestationFold(isCasedBase, bcp47);
     const classes = groupMarkClasses(alphabet, fold);
     const proposals = proposeAttachments(alphabet, classes, fold);
     const attachmentBases = isCasedBase ? lowercaseBaseView(alphabet.bases, bcp47) : alphabet.bases;
-    const keyBudget = baseIr != null ? measureKeyBudget(baseIr) : null;
+    const keyBudget = startIr != null ? measureKeyBudget(startIr) : null;
     // spec 079 US3 parity fix: reconcile against the SAME saved answers
     // `MarksSeriesStep.tsx` itself renders from (`reconciledAttachmentChecked`,
     // marksViews.ts) — not the raw proposal default, which disagreed with the
@@ -89,7 +97,7 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
       ? expandCaseCounterpartAttachments(alphabet, defaultAttachments, bcp47)
       : defaultAttachments;
     const treatmentPrefills = computeMarkTreatmentPrefills(alphabet, classes, proposals, {
-      baseIr,
+      startIr,
       keyBudget,
       attachments: expandedAttachments,
       ...fold,
@@ -108,7 +116,7 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
       savedAnswers: marksStepAnswers?.answers ?? EMPTY_ANSWERS,
       lastRecorded: marksStepAnswers?.lastRecorded ?? EMPTY_LAST_RECORDED,
     });
-  }, [alphabet, baseIr, bcp47, marksStepAnswers]);
+  }, [alphabet, startIr, bcp47, marksStepAnswers]);
 
   const charactersFlagged = useMemo<readonly FlaggedAnswerInput[]>(
     () => deriveCharacterFlags(charactersStepAnswers?.answers ?? EMPTY_ANSWERS, alphabetEvidenceKey ?? ""),
@@ -116,8 +124,8 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
   );
 
   const punctuationFlagged = useMemo<readonly FlaggedAnswerInput[]>(
-    () => derivePunctuationFlags(punctuationInventoryAnswer, punctuationKey(punctuationInventory?.resolvedTag, baseKeyboard?.id)),
-    [punctuationInventoryAnswer, punctuationInventory, baseKeyboard],
+    () => derivePunctuationFlags(punctuationInventoryAnswer, punctuationKey(punctuationInventory?.resolvedTag, startKeyboard?.id)),
+    [punctuationInventoryAnswer, punctuationInventory, startKeyboard],
   );
 
   // TODO(079-US3): invisibles/convenience never have a `reproposed` answer to
@@ -202,30 +210,29 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
  */
 export function readWorkToDo(): Record<StepId, WorkItem[]> {
   const workingCopy = useWorkingCopyStore.getState();
-  const surveySession = useSurveySessionStore.getState();
   const surveyAnswers = useSurveyAnswerStore.getState();
 
   const alphabet = workingCopy.session.alphabet;
-  const baseIr = workingCopy.baseIr;
-  const bcp47 = surveySession.surveyContext.bcp47_tag;
+  const startIr = workingCopy.startIr;
+  const bcp47 = deriveSurveyContext(getDecisionSnapshot()).bcp47_tag;
   const marksStepAnswers = surveyAnswers.steps.marks;
 
   let marksFlagged: readonly FlaggedAnswerInput[] = [];
   if (alphabet !== undefined && alphabet.marks.length > 0) {
-    const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
+    const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
     const isCasedBase = casingValue === "cased" || casingValue === "mixed";
     // Same case-symmetric grouping and proposal the step renders from (parity, spec 079 US3).
     const fold = buildAttestationFold(isCasedBase, bcp47);
     const classes = groupMarkClasses(alphabet, fold);
     const proposals = proposeAttachments(alphabet, classes, fold);
     const attachmentBases = isCasedBase ? lowercaseBaseView(alphabet.bases, bcp47) : alphabet.bases;
-    const keyBudget = baseIr != null ? measureKeyBudget(baseIr) : null;
+    const keyBudget = startIr != null ? measureKeyBudget(startIr) : null;
     const reconciled = reconciledAttachmentChecked(alphabet, proposals, marksStepAnswers?.answers ?? EMPTY_ANSWERS);
     const expandedAttachments = isCasedBase
       ? expandCaseCounterpartAttachments(alphabet, reconciled, bcp47)
       : reconciled;
     const treatmentPrefills = computeMarkTreatmentPrefills(alphabet, classes, proposals, {
-      baseIr,
+      startIr,
       keyBudget,
       attachments: expandedAttachments,
       ...fold,
@@ -248,7 +255,7 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
 
   const charactersFlagged = deriveCharacterFlags(
     surveyAnswers.steps.characters?.answers ?? EMPTY_ANSWERS,
-    usePhaseBDraftStore.getState().alphabetEvidenceKey ?? "",
+    getCharacterInventoryValue().alphabetEvidenceKey ?? "",
   );
 
   const notAsked: Record<StepId, NotAskedGateInput> = {};

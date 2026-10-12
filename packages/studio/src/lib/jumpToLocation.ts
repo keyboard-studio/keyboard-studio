@@ -14,7 +14,7 @@
 import { formatLocation, locationsEqual, type Location } from "./location.ts";
 import { navigateTo } from "./navigate.ts";
 import { resolveLocation, type ResolveContext, type UnreachableReason } from "./resolveLocation.ts";
-import { manifest } from "../steps/manifest.ts";
+import { manifest, screenGates } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import {
   applyTraversalSnapshot,
@@ -25,6 +25,7 @@ import {
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { decisionsWithoutTouchSeed, getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { stepPositionIds } from "./stepWalk.ts";
 
 export interface JumpOptions {
@@ -150,9 +151,13 @@ export function consumePendingWelcomeLocation(): Location | null {
 export function liveResolveContext(): ResolveContext {
   return {
     manifest,
+    // Spec 091 T015: the derived screen gates resolveLocation reads.
+    screenGates,
     questionRegistry,
     traversal: snapshotTraversal(),
-    hasProject: useWorkingCopyStore.getState().baseKeyboard !== null,
+    // Spec 088 C-3.2: the gate view over the decision store, seed omitted.
+    decisions: decisionsWithoutTouchSeed(getDecisionSnapshot()),
+    hasProject: useWorkingCopyStore.getState().startKeyboard !== null,
     // Within-step stops for the stages whose walks are not flow questions
     // (a gallery's characters). Without this a footer dot naming a character
     // would resolve `question-not-in-build` and refuse itself — see

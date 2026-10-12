@@ -95,8 +95,8 @@ vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
   }),
 }));
 
-vi.mock("./BaseKeyboardPicker.tsx", () => ({
-  BaseKeyboardPicker: ({ onChange }: { onChange: (kb: unknown) => void }) => (
+vi.mock("./StartKeyboardPicker.tsx", () => ({
+  StartKeyboardPicker: ({ onChange }: { onChange: (kb: unknown) => void }) => (
     <button
       data-testid="base-picker"
       onClick={() => onChange(basicKbdus)}
@@ -128,7 +128,7 @@ vi.mock("./OskModeToggle.tsx", () => ({
 
 vi.mock("../lib/confirmRebase.ts", () => ({
   confirmRebaseIfEdited: () => true,
-  instantiateFromBaseIfConfirmed: vi.fn(),
+  instantiateFromStartIfConfirmed: vi.fn(),
 }));
 
 vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
@@ -168,7 +168,7 @@ function renderOutputScreen() {
 }
 
 // Note for the seeded OutputScreen tests: seeding is by itself enough to give
-// the screen a base. `usePreviewArtifact` lazy-inits its `baseKeyboard` from
+// the screen a base. `usePreviewArtifact` lazy-inits its `startKeyboard` from
 // this store, and since spec 058 an instantiated working copy puts the left
 // pane in its "shipping" variant, which has NO picker to click (re-basing
 // from the ship-it screen was the defect that change removed). So the seeded
@@ -479,9 +479,9 @@ describe("OutputScreen — projection warnings", () => {
 // ---------------------------------------------------------------------------
 
 // Helper: render OutputScreen with a base in place, so the identity-warn banner
-// (inside {baseKeyboard !== null}) renders. seedInstantiatedWorkingCopy(undefined, { attributed: true }) both
+// (inside {startKeyboard !== null}) renders. seedInstantiatedWorkingCopy(undefined, { attributed: true }) both
 // supplies that base (lazy-init from the store — see its docstring) and keeps
-// identity = null via instantiateFromBase's idempotence guard, which is what
+// identity = null via instantiateFromStart's idempotence guard, which is what
 // makes showIdentityWarn true.
 function renderOutputWithBasePicked() {
   seedInstantiatedWorkingCopy(undefined, { attributed: true });
@@ -490,7 +490,7 @@ function renderOutputWithBasePicked() {
 
 function getIdentityStatusRegion() {
   const regions = screen.getAllByRole("status");
-  const el = regions.find((e) => e.textContent?.includes("base id"));
+  const el = regions.find((e) => e.textContent?.includes("copied keyboard"));
   expect(el).toBeTruthy();
   return el!;
 }
@@ -596,7 +596,7 @@ describe("OutputScreen — attribution gate", () => {
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs,
       ir: makeTestIR([]),
     });
@@ -687,14 +687,14 @@ describe("OutputScreen — unreadable base copyright notice (D5)", () => {
     });
     fireEvent.click(screen.getByTestId("resolve-base-holder"));
     // Trimmed, so the emitted notice carries a clean holder name.
-    expect(useWorkingCopyStore.getState().baseHolderOverride).toBe("Original Author");
+    expect(useWorkingCopyStore.getState().startHolderOverride).toBe("Original Author");
   });
 
   it("ignores a blank submission rather than clearing the block", () => {
     seedWithUnreadableLicense();
     render(<OutputScreen />);
     fireEvent.click(screen.getByTestId("resolve-base-holder"));
-    expect(useWorkingCopyStore.getState().baseHolderOverride).toBeNull();
+    expect(useWorkingCopyStore.getState().startHolderOverride).toBeNull();
     expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
   });
 

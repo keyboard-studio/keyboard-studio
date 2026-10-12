@@ -56,7 +56,7 @@ export function textBaseline(entries: readonly VirtualFSEntry[]): Map<string, st
  * this heading shape — is left untouched and still surfaces as a hunk.
  *
  * (The `.kps` `<Version>` bump needs no equivalent treatment: it is derived
- * deterministically from `baseIr.header.version`, not from wall-clock or
+ * deterministically from `startIr.header.version`, not from wall-clock or
  * randomness, so it is already stable across projections within a session and
  * across a midnight boundary alike — 055 research D-09. The same holds for the
  * package descriptor's identity fields, which are a pure function of the identity

@@ -4,10 +4,10 @@
 // (demo pane + download alike) by merging its member rule nodeIds into the
 // projection's deletion set inside `useWorkingCopyTransform`. Pure: families
 // are recomputed from the working IR's rules via kmAssist's `groupRules`;
-// rule nodeIds are stable across the baseIr/working-IR seeding (both are
+// rule nodeIds are stable across the startIr/working-IR seeding (both are
 // seeded from the same IR object), so member ids computed here match the
-// rules the baseIr projection filters. Ids for rules that exist only in the
-// working IR (pack-installed additions) are harmless — the baseIr projection
+// rules the startIr projection filters. Ids for rules that exist only in the
+// working IR (pack-installed additions) are harmless — the startIr projection
 // simply finds no match for them.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";

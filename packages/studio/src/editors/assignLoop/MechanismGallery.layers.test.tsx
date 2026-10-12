@@ -37,7 +37,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -67,7 +67,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["Ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -107,7 +107,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWithModifiersInUse("K_W", ["SHIFT"]);
     seedInventory(["Ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -139,7 +139,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWithModifiersInUse("K_W", ["CAPS"]);
     seedInventory(["Ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -169,7 +169,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWithModifiersInUse("K_W", ["LALT"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -194,7 +194,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWithModifiersInUse("K_W", ["RALT"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -221,7 +221,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy({ mnemonic: true });
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -242,7 +242,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWithModifiersInUse("K_W", ["LALT"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -266,7 +266,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -291,7 +291,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -311,7 +311,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -349,7 +349,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -389,10 +389,10 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
     const ir = makeTestIR([group], []);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: seedVfs, ir });
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -415,7 +415,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -432,7 +432,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -458,16 +458,16 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
   });
 
   it("falls back to the default modifier pool (no crash) when workingIr is null but a base keyboard is selected", async () => {
-    // No instantiateWorkingCopy() call — store.ir and store.baseIr both stay
+    // No instantiateWorkingCopy() call — store.ir and store.startIr both stay
     // null, so MechanismGallery's workingIr resolves to null even though
-    // selectedBaseKeyboard is set. collectModifierTokensInUse must not be
+    // selectedStartKeyboard is set. collectModifierTokensInUse must not be
     // called on a null IR; the pool must fall back to the documented
     // defaults (SHIFT/CTRL/ALT/CAPS — no RALT/LALT/LCTRL/RCTRL since nothing
     // is "in use" and neither family has surfaced its chiral options yet,
     // NCAPS is never offered) rather than crashing.
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -520,7 +520,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     const options = await firstLayerOptionValues();
@@ -531,7 +531,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     instantiateWithModifiersInUse("K_W", ["RALT"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     const options = await firstLayerOptionValues();
@@ -542,7 +542,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     instantiateWithModifiersInUse("K_W", ["LALT"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     const options = await firstLayerOptionValues();
@@ -553,7 +553,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     instantiateWithModifiersInUse("K_W", ["RCTRL"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     const options = await firstLayerOptionValues();
@@ -566,7 +566,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     instantiateWithModifiersInUse("K_W", ["LCTRL"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     const options = await firstLayerOptionValues();
@@ -579,7 +579,7 @@ describe("MechanismGallery — computeModifierPool gating", () => {
     instantiateWithModifiersInUse("K_W", ["ALT"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     const options = await firstLayerOptionValues();
@@ -599,7 +599,7 @@ describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (meth
     instantiateWithModifiersInUse("K_W", ["RALT"]);
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -620,7 +620,7 @@ describe("MechanismGallery — covered-chip badge text for RAlt/Shift+RAlt (meth
     instantiateWithModifiersInUse("K_W", ["RALT"]);
     seedInventory(["Ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -648,7 +648,7 @@ describe("MechanismGallery — physical-key type-to-select in an open key picker
   it("pressing M while the Assign-to-a-key picker is open selects K_M and Apply uses it", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -674,7 +674,7 @@ describe("MechanismGallery — physical-key type-to-select in an open key picker
   it("a modifier-held keydown (Ctrl+M) is ignored — does not select K_M", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -692,7 +692,7 @@ describe("MechanismGallery — physical-key type-to-select in an open key picker
   it("a modifier-held keydown (Alt+M) is ignored — does not select K_M", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -710,7 +710,7 @@ describe("MechanismGallery — physical-key type-to-select in an open key picker
   it("a modifier-held keydown (Meta+M) is ignored — does not select K_M", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -735,7 +735,7 @@ describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
     instantiateWorkingCopy({ caps: true });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -760,7 +760,7 @@ describe("MechanismGallery — CAPS-aware base-layer swap (P0)", () => {
     instantiateWorkingCopy({ caps: true });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -804,7 +804,7 @@ describe("MechanismGallery — bare-SHIFT layer combo is CAPS-aware (spec §10 C
     instantiateWorkingCopy();
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -833,7 +833,7 @@ describe("MechanismGallery — bare-SHIFT layer combo is CAPS-aware (spec §10 C
     instantiateWorkingCopy({ caps: true });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));

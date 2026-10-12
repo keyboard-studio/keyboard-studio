@@ -8,14 +8,14 @@
 // Architecture contract:
 //   - State lives HERE. The adapter hooks are selectors, not independent stores.
 //   - `reset()` clears every slot including base + identity + instantiationMode.
-//   - `instantiateFromBase()` is the explicit Track-1 entry point (spec §8 v1.3.0);
+//   - `instantiateFromStart()` is the explicit Track-1 entry point (spec §8 v1.3.0);
 //     it sets base slots, seeds the carve IR, resets identity and all edit layers,
 //     and records instantiationMode = "new-from-base".
 //   - `instantiateFromExisting()` is the Track-2 entry point; it preserves the
 //     loaded keyboard's identity and sets instantiationMode = "adapt-existing".
 //   - Both instantiate entry points also clear the per-working-copy Phase B
 //     proposal decisions (resetPhaseBDraftDecisions, spec 044 FR-016a), which
-//     deliberately survive phaseBDraftStore's own per-visit reset().
+//     deliberately survive the inventory draft's own per-visit reset.
 //   - `setIdentity()` overlays a post-instantiation identity patch.
 //   - No host-disk writes. VirtualFS lives as a React-state reference.
 //   - Worker boundary upheld: WASM is not imported here.
@@ -24,7 +24,7 @@ import { create } from "zustand";
 import type {
   Attribution,
   AxisFill,
-  BaseKeyboard,
+  StartKeyboard,
   CarveDisposition,
   CarveDispositionProvenance,
   CarveDispositionValue,
@@ -32,13 +32,16 @@ import type {
   KeyboardIR,
   LintFinding,
   RemovalCapability,
+  NormalizationRefusalReason,
+  NormalizationStep,
+  StoredNormalizationStep,
   ToleranceReport,
   VirtualFS,
   WelcomeConvention,
   WelcomeFolderImage,
   HistoryEntryState,
   ChartPreference,
-  BaseDocumentationProfile,
+  StartDocumentationProfile,
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
@@ -60,18 +63,55 @@ import {
   type DiscoveryAxisVector,
   type MarkInputOrder,
   type MechanismAssignment,
-  type SurveyAnswer,
   type SurveyPhaseResult,
   type SurveySession,
   type TouchAssignment,
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
-import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
+import { useDecisionStore } from "./decisionStore.ts";
+import {
+  emptyCharacterInventoryValue,
+  emptyInventoryDecisionValue,
+  resetDraftDecisions,
+  type CharacterInventoryValue,
+} from "../survey/phaseBDraftOps.ts";
 import { useGuardIntentStore } from "./guardIntentStore.ts";
+
+/**
+ * Clear the Phase B proposal decisions (spec 044 FR-016a) at
+ * instantiation. Was `resetPhaseBDraftDecisions` on the retired facade
+ * (spec 090 T025); implemented here over leaf modules only — the
+ * decision store and the pure ops — because workingCopyStore sits
+ * UNDER the gallery host deps in the import graph (an import of the
+ * inventory hook would close the old facade cycle in a new shape).
+ * Behaviour parity with the decide-path version: both inventory
+ * modules' applies are no-ops, and the character transform touches
+ * only sticky fields (never `chars`), so no punctuation-projection
+ * maintenance is owed; records keep their existing provenance, and a
+ * character record is materialized from the empty value when none
+ * exists yet, exactly as the decide path materialized it.
+ */
+function resetPhaseBDraftDecisions(): void {
+  const store = useDecisionStore.getState();
+  const char = store.decisions["character-inventory"];
+  if (char !== undefined) {
+    store.record({ ...char, value: resetDraftDecisions(char.value as CharacterInventoryValue) });
+  } else {
+    store.record({
+      id: "character-inventory",
+      value: resetDraftDecisions(emptyCharacterInventoryValue()),
+      provenance: "asked",
+    });
+  }
+  const inv = store.decisions["invisibles-inventory"];
+  if (inv !== undefined) {
+    store.record({ ...inv, value: emptyInventoryDecisionValue() });
+  }
+}
 import type { Step } from "../steps/types.ts";
-import { STEP_ORDER } from "../steps/stepOrder.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 import { promoteKeyAtAddressToHandSet } from "../editors/assignLoop/touchBehavior.ts";
+import type { IdentityPatch } from "./identityPatch.ts";
 
 /**
  * One sibling-accent bulk group: the batch of accented siblings the longpress
@@ -80,10 +120,10 @@ import { promoteKeyAtAddressToHandSet } from "../editors/assignLoop/touchBehavio
  * for the batch (and delete it as a unit) that survives unmount/remount.
  */
 export interface BulkAccentGroup {
-  /** Stable id for this group (`${baseChar}:${hostKey}`). */
+  /** Stable id for this group (`${baseChar}:${baseKey}`). */
   id: string;
   /** The Keyman vkey the siblings were placed on (e.g. `K_U`). */
-  hostKey: string;
+  baseKey: string;
   /** The accepted character whose acceptance triggered the batch. */
   baseChar: string;
   /** The sibling characters this batch actually placed (both cases). */
@@ -110,7 +150,7 @@ let _manifest: readonly Step[] = [];
  * its downstream dependents from staleSteps (since the closure is recomputed from the
  * remaining roots, not from the prior closure).
  *
- * Reset on reset() / instantiateFromBase() / instantiateFromExisting().
+ * Reset on reset() / instantiateFromStart() / instantiateFromExisting().
  */
 let _reopenedRoots: Set<string> = new Set();
 
@@ -245,6 +285,14 @@ export type ContextToleranceState =
       fixableRuleIds: string[];
       siteKeys: Record<string, string>;
       fingerprint: string;
+      /**
+       * The proposed normalization step (spec 086). When present it is the
+       * proposal: `fixableRuleIds` is the single site `normalization-step`
+       * and `proposal` carries no variants.
+       */
+      normalizationStep?: NormalizationStep;
+      /** Why the step was not offered and the 062 variants were proposed instead (FR-019). */
+      fallbackReason?: NormalizationRefusalReason | "verification-regressed";
     }
   | { status: "failed"; runId: number; reason: string };
 
@@ -330,40 +378,9 @@ export function bulkDispositionDefault(
     : { disposition: "block", provenance: "bulk-default" };
 }
 
-// ---------------------------------------------------------------------------
-// Identity patch — lightweight overlay for the "identity" phase result.
-// Typed as a partial record so Phase 2 can add fields without a schema bump.
-// ---------------------------------------------------------------------------
-
-export type IdentityPatch = Partial<{
-  /** BCP47 tag for the new keyboard (e.g. "ha-Latn"). */
-  bcp47: string;
-  /** Human-readable display name for the new keyboard. */
-  displayName: string;
-  /**
-   * The language's name in English, as the author confirmed it (spec 059 FR-002).
-   *
-   * Display text for the package descriptor's `<Language>` element and nothing
-   * else — the codec does not serialize a language name, so this never reaches
-   * the `.kmn`. Blank or absent lets the BCP47 tag stand in as its own display
-   * text, which is what the descriptor writer did for every tag before 057.
-   */
-  languageName: string;
-  /**
-   * New keyboard identifier chosen by the author (Track 1 only).
-   *
-   * Must satisfy validateKeyboardId (§10 Layer A check #1: 1-255 chars,
-   * no spaces / parens / brackets / commas). When set, the projection's id
-   * rename pass (projectWorkingCopyVfs step 4) renames every
-   * source/<baseId>.{kmn,kps,kvks,keyman-touch-layout,ico,css,htm,js} sibling
-   * to source/<keyboardId>.*, rewrites the .kmn's path-bearing stores
-   * (&KMW_EMBEDCSS, &KMW_HELPFILE, &VISUALKEYBOARD, &LAYOUTFILE, &BITMAP),
-   * and rewrites `.kmw-keyboard-<baseId>` selectors in *.css and the
-   * <ID> / <kbdname> references in *.kps and *.kvks. The downloaded zip
-   * filename uses this id.
-   */
-  keyboardId: string;
-}>;
+// Identity patch lives in a leaf module (see identityPatch.ts); re-exported
+// here so existing importers keep resolving.
+export type { IdentityPatch } from "./identityPatch.ts";
 
 // ---------------------------------------------------------------------------
 // State interface
@@ -373,18 +390,18 @@ export interface WorkingCopyState {
   // -- Instantiation mode (spec §8 v1.3.0) ------------------------------------
   /**
    * Which authoring track created this working copy.
-   * Null until instantiateFromBase or instantiateFromExisting is called.
+   * Null until instantiateFromStart or instantiateFromExisting is called.
    * See InstantiationMode for full semantics.
    */
   instantiationMode: InstantiationMode;
 
-  // -- Canonical base slots (set by instantiateFromBase / instantiateFromExisting) --
+  // -- Canonical base slots (set by instantiateFromStart / instantiateFromExisting) --
   /** The keyboard the author chose as their adaptation base. Null until instantiation. */
-  baseKeyboard: BaseKeyboard | null;
+  startKeyboard: StartKeyboard | null;
   /** VFS snapshot of the fetched base keyboard source. Null until instantiation. */
-  baseVfs: VirtualFS | null;
+  startVfs: VirtualFS | null;
   /** IR parsed from the base keyboard source. Null until instantiation. */
-  baseIr: KeyboardIR | null;
+  startIr: KeyboardIR | null;
 
   // -- Identity patch (set by setIdentity) -------------------------------------
   /**
@@ -418,7 +435,7 @@ export interface WorkingCopyState {
    * (spec 064 D5) — an unfilled template, or a year with no holder.
    *
    * Blocks download: emitting a LICENSE.md whose only holder is the current user
-   * would strip a real notice. Cleared by supplying `baseHolderOverride`.
+   * would strip a real notice. Cleared by supplying `startHolderOverride`.
    */
   licenseUnparseable: { reason: string; line: string } | null;
 
@@ -429,7 +446,7 @@ export interface WorkingCopyState {
    * Passed to the scaffolder on the next run, where it becomes the inherited
    * holder — so the remedy PRESERVES the notice rather than dropping it.
    */
-  baseHolderOverride: string | null;
+  startHolderOverride: string | null;
 
   /**
    * The base keyboard's `LICENSE.md` VERBATIM, or null when it has none
@@ -444,7 +461,7 @@ export interface WorkingCopyState {
    * Raw text, not the parsed holders: `resolveInheritedHolders` in the engine is
    * the one parser, shared by both emission paths.
    */
-  baseLicenseText: string | null;
+  startLicenseText: string | null;
 
   // -- Help docs (spec 061) -----------------------------------------------------
   /**
@@ -463,31 +480,31 @@ export interface WorkingCopyState {
    * verbatim, or null when it has none (spec 061 FR-013), or on Track 1
    * (nothing to merge with).
    *
-   * Same fetch-don't-write contract as {@link baseLicenseText}: the loader
+   * Same fetch-don't-write contract as {@link startLicenseText}: the loader
    * deliberately never writes this into the VFS, so the output-projection
    * merge step needs it here to preserve the original body below new answers.
    */
-  baseWelcomeHtmText: string | null;
+  startWelcomeHtmText: string | null;
 
   /**
    * The base keyboard's own `source/help/<id>.php`, verbatim, or null. Same
-   * fetch-don't-write contract as {@link baseWelcomeHtmText}.
+   * fetch-don't-write contract as {@link startWelcomeHtmText}.
    */
-  baseHelpPhpText: string | null;
+  startHelpPhpText: string | null;
 
   // -- Base documentation bundle (spec 079 US2) --------------------------------
   /**
    * The base keyboard's own `README.md`, verbatim, or null when it has none
    * or on Track 1 (a copy inherits no base prose, FR-007). Fetch-don't-write
-   * like {@link baseLicenseText}.
+   * like {@link startLicenseText}.
    */
-  baseReadmeMdText: string | null;
+  startReadmeMdText: string | null;
   /**
    * The base keyboard's own `HISTORY.md`, verbatim, or null. Same contract as
-   * {@link baseReadmeMdText}; the adapt track's rendered HISTORY preserves
+   * {@link startReadmeMdText}; the adapt track's rendered HISTORY preserves
    * these entries below the new one (criterion 3.4).
    */
-  baseHistoryMdText: string | null;
+  startHistoryMdText: string | null;
   /**
    * The base's `source/welcome/` image files (spec 079 FR-006), or null when
    * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
@@ -495,24 +512,24 @@ export interface WorkingCopyState {
    * The projection writes each beside the rendered welcome page and lists it
    * in the descriptor; nothing else reads the bytes.
    */
-  baseWelcomeImages: WelcomeFolderImage[] | null;
+  startWelcomeImages: WelcomeFolderImage[] | null;
   /**
    * Which welcome-page convention the base used (`folder` / `flat` / `absent`),
    * or null before instantiation. Metadata for the documentation checklist;
    * output always uses the folder convention regardless (FR-002).
    */
-  baseWelcomeConvention: WelcomeConvention | null;
+  startWelcomeConvention: WelcomeConvention | null;
   /**
    * True when the base's welcome images were carried at instantiation but
    * could NOT be kept across a reload — they exceeded the draft's image size
    * budget (persistWorkingCopy `BASE_WELCOME_IMAGES_BUDGET_BYTES`), so the
-   * resumed working copy has {@link baseWelcomeImages} `null` while the base
+   * resumed working copy has {@link startWelcomeImages} `null` while the base
    * really does ship images. The projection names this in its warnings and the
    * documentation checklist reports it, so the loss is visible rather than
-   * silently absorbed. Cleared by the next `setBaseWelcomeImages` (re-opening
+   * silently absorbed. Cleared by the next `setStartWelcomeImages` (re-opening
    * the base re-fetches them).
    */
-  baseWelcomeImagesDropped: boolean;
+  startWelcomeImagesDropped: boolean;
 
   // -- Documentation decisions (spec 079 US3/US5/US6) --------------------------
   /**
@@ -537,7 +554,7 @@ export interface WorkingCopyState {
    * before a base is chosen or while the profile is still unknown. Drives the
    * adaptive description question (FR-009). Persisted.
    */
-  baseDocProfile: BaseDocumentationProfile | null;
+  startDocProfile: StartDocumentationProfile | null;
   /**
    * The Layer C documentation findings the BASE's own files carried at
    * instantiation (spec 079 FR-020, research R8) — the baseline the studio's
@@ -550,7 +567,7 @@ export interface WorkingCopyState {
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
    * Carve working IR — the in-progress keyboard IR being edited in the carve
-   * gallery. May diverge from baseIr once carve deletions / restores apply.
+   * gallery. May diverge from startIr once carve deletions / restores apply.
    * Null until the compile step sets it.
    */
   ir: KeyboardIR | null;
@@ -596,7 +613,7 @@ export interface WorkingCopyState {
    * NFC-normalized characters carved via the carve gallery (issue #1809,
    * ruling §1: ONE aggregated carved set R, one nomination pass). The
    * projection (`projectWorkingCopyVfs` / `buildCarvePatch`) runs
-   * `collectTaintedContributors(baseIr, carveChars)` once and unions the
+   * `collectTaintedContributors(startIr, carveChars)` once and unions the
    * result with the incremental `deletedItemIds` union, because the
    * per-character union is not equivalent to the aggregated pass for
    * whole-rule "no rows left" deletion and fully-tainted literal outputs.
@@ -666,15 +683,6 @@ export interface WorkingCopyState {
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
   phaseResults: SurveyPhaseResult[];
-  /**
-   * Who owns which answers inside each phase slot (spec 079 D-4, R-08). Several
-   * steps record into phase C; each step's list lives under its own id, and
-   * `phaseResults[p].answers` is DERIVED as their concatenation in manifest
-   * order (`"legacy"` first). A step re-recording replaces only its own list,
-   * so Convenience letters can no longer erase what Invisible characters
-   * recorded. Studio-only: the contracts `SurveyPhaseResult` is untouched.
-   */
-  phaseAnswersByStep: PhaseAnswersByStep;
   /**
    * IR-derived axis baseline, set before Phase A from the recognized patterns.
    * Updating this re-derives the session.
@@ -803,6 +811,12 @@ export interface WorkingCopyState {
   contextTolerance: ContextToleranceState;
   /** See {@link AppliedContextTolerance}. `null` when no fix is applied. */
   contextToleranceOverlay: AppliedContextTolerance | null;
+  /**
+   * Authoring cache of the generated normalization step (spec 086 FR-016),
+   * keyed by source content + generator version. Persisted with the working
+   * copy; only reused when its `cacheKey` equals the current source's key.
+   */
+  contextNormalizationStep: StoredNormalizationStep | null;
 
   // -- Default-fill provenance slice (#890) --------------------------------------
   /**
@@ -845,7 +859,7 @@ export interface WorkingCopyState {
    * TouchGallery `hand-set` promotion (US2). Those writes happen AFTER the carve
    * step and must preserve the live overlay that the OSK preview
    * (`useWorkingCopyTransform`) and the shipped output (`serializeWorkingCopy` /
-   * `projectWorkingCopyForOutput`, which project from baseIr + the overlay)
+   * `projectWorkingCopyForOutput`, which project from startIr + the overlay)
    * consume. Routing them through {@link setIR} silently wipes those deletions.
    */
   setWorkingIR: (ir: KeyboardIR) => void;
@@ -1158,8 +1172,8 @@ export interface WorkingCopyState {
   /**
    * Track 1 — copy a base, NEW identity (spec §8 v1.3.0).
    *
-   * Sets baseKeyboard, baseVfs, baseIr, and seeds the carve working IR from
-   * baseIr. Resets identity to `opts.identitySeed`, or to null without one (a
+   * Sets startKeyboard, startVfs, startIr, and seeds the carve working IR from
+   * startIr. Resets identity to `opts.identitySeed`, or to null without one (a
    * fresh copy has no author-chosen name or id until Phase A completes; the seed
    * carries only what the identity step already knows — the language). Clears
    * all edit layers (deletedNodeIds,
@@ -1172,8 +1186,8 @@ export interface WorkingCopyState {
    * re-instantiates unconditionally; the caller is responsible for confirming
    * with the user via `confirmRebaseIfEdited` before calling in that case.
    */
-  instantiateFromBase: (
-    base: BaseKeyboard,
+  instantiateFromStart: (
+    base: StartKeyboard,
     opts: {
       vfs: VirtualFS;
       ir: KeyboardIR;
@@ -1192,8 +1206,8 @@ export interface WorkingCopyState {
   /**
    * Track 2 — adapt an existing keyboard, identity PRESERVED (spec §8 v1.3.0).
    *
-   * Sets baseKeyboard, baseVfs, baseIr, and seeds the carve working IR from
-   * baseIr. Preserves identity from the loaded keyboard (id, name, BCP47 are
+   * Sets startKeyboard, startVfs, startIr, and seeds the carve working IR from
+   * startIr. Preserves identity from the loaded keyboard (id, name, BCP47 are
    * set from `keyboard.displayName` / `keyboard.id` rather than reset).
    * Clears edit layers so the adapt session starts clean.
    * Sets instantiationMode = "adapt-existing".
@@ -1203,33 +1217,24 @@ export interface WorkingCopyState {
    * TODO(track2-ui): wire to the import/source-picker path when that UX lands.
    */
   instantiateFromExisting: (
-    keyboard: BaseKeyboard,
+    keyboard: StartKeyboard,
     opts: {
       vfs: VirtualFS;
       ir: KeyboardIR;
       removalCapabilities?: Map<string, RemovalCapability>;
+      /**
+       * The author's identity-language overlay (the identity step's composed
+       * tag + English name, from `identitySeedFromSession`), spread over the
+       * preserved identity. Without it the adapt copy keeps the BASE's first
+       * language tag and no language name, so the package descriptor falls
+       * back to the raw tag as the `<Language>` display text and every
+       * `identity.bcp47` reader works on the base's language instead of the
+       * author's. The seed never carries `keyboardId` — the preserved id
+       * always wins.
+       */
+      identitySeed?: IdentityPatch;
     },
   ) => void;
-
-  /**
-   * Record the author's copy/adapt answer on the working copy that already
-   * exists (spec 094 quickstart finding).
-   *
-   * The base is confirmed — and the working copy instantiated — at
-   * `choose_base`, before the track step asks copy or adapt, so it is always
-   * instantiated `new-from-base`. Re-instantiating at the track step is not
-   * an option: same id with a different mode is a genuine switch to
-   * `resolveInstantiationCase` and clears the survey results already recorded.
-   * Nothing has been edited yet at that point (the track step comes straight
-   * after `choose_base`), so the working copy's content is the same for both
-   * tracks; only the mode and the identity differ. This sets them in place:
-   *   - "adapt": `adapt-existing`, keeping the keyboard's own id and name (as
-   *     instantiateFromExisting does) and the language the author chose;
-   *   - "copy": `new-from-base`, dropping an id and name an earlier adapt
-   *     answer took from the keyboard, so project_name sets the new ones.
-   * A no-op before instantiation or when the mode already matches.
-   */
-  adoptTrack: (track: "copy" | "adapt") => void;
 
   /**
    * Apply an identity patch (language name, BCP47 tag, display name) over
@@ -1246,10 +1251,10 @@ export interface WorkingCopyState {
   setLicenseUnparseable: (v: { reason: string; line: string } | null) => void;
 
   /** Record the author-supplied original holder — spec 064 D5 escape hatch. */
-  setBaseHolderOverride: (holder: string | null) => void;
+  setStartHolderOverride: (holder: string | null) => void;
 
   /** Retain the base's verbatim LICENSE.md so both emission paths can read it. */
-  setBaseLicenseText: (text: string | null) => void;
+  setStartLicenseText: (text: string | null) => void;
 
   /**
    * Record (or clear) the author's Phase F help-docs answers (spec 061).
@@ -1259,22 +1264,22 @@ export interface WorkingCopyState {
   setHelpDocs: (helpDocs: HelpDocsAnswers | null) => void;
 
   /** Retain the base's verbatim welcome.htm so the output merge can read it. */
-  setBaseWelcomeHtmText: (text: string | null) => void;
+  setStartWelcomeHtmText: (text: string | null) => void;
 
   /** Retain the base's verbatim help/<id>.php so the output merge can read it. */
-  setBaseHelpPhpText: (text: string | null) => void;
+  setStartHelpPhpText: (text: string | null) => void;
 
   /** Retain the base's verbatim README.md (spec 079 FR-006). */
-  setBaseReadmeMdText: (text: string | null) => void;
+  setStartReadmeMdText: (text: string | null) => void;
 
   /** Retain the base's verbatim HISTORY.md (spec 079 FR-006 / criterion 3.4). */
-  setBaseHistoryMdText: (text: string | null) => void;
+  setStartHistoryMdText: (text: string | null) => void;
 
   /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */
-  setBaseWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
+  setStartWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
 
   /** Record which welcome-page convention the base used (spec 079 data-model §6). */
-  setBaseWelcomeConvention: (convention: WelcomeConvention | null) => void;
+  setStartWelcomeConvention: (convention: WelcomeConvention | null) => void;
 
   /** Record the HISTORY proposal's state (spec 079 FR-011). Whole-value replace. */
   setHistoryEntryState: (state: HistoryEntryState | null) => void;
@@ -1283,14 +1288,14 @@ export interface WorkingCopyState {
   setChartPreference: (preference: ChartPreference | null) => void;
 
   /** Record the selected base's documentation profile (spec 079 FR-008). */
-  setBaseDocProfile: (profile: BaseDocumentationProfile | null) => void;
+  setStartDocProfile: (profile: StartDocumentationProfile | null) => void;
 
   /** Record the base's own documentation findings at instantiation (spec 079 FR-020). */
   setBaselineDocFindings: (findings: LintFinding[] | null) => void;
 
   /**
-   * Returns true once instantiateFromBase or instantiateFromExisting has been
-   * called (i.e. baseKeyboard is non-null). Callers that need the full triple
+   * Returns true once instantiateFromStart or instantiateFromExisting has been
+   * called (i.e. startKeyboard is non-null). Callers that need the full triple
    * (base + VFS + IR) should check all three slots directly.
    */
   isInstantiated: () => boolean;
@@ -1346,6 +1351,9 @@ export interface WorkingCopyState {
   /** Record (or clear, with `null`) the applied context-tolerance fix (spec 078). */
   setContextToleranceOverlay: (next: AppliedContextTolerance | null) => void;
 
+  /** Store (or clear, with `null`) the cached normalization step (spec 086). */
+  setContextNormalizationStep: (next: StoredNormalizationStep | null) => void;
+
   // -- Default-fill provenance actions (#890) ----------------------------------
 
   /**
@@ -1383,7 +1391,7 @@ function remerge(
  * supplied A3a=postfix to the live pipeline and rule 3a stayed unreachable in
  * production (#926). Never overwrites a value already present on `preservedIrAxes`.
  */
-function seedIrAxesFromBaseIr(
+function seedIrAxesFromStartIr(
   ir: KeyboardIR,
   preservedIrAxes: Partial<DiscoveryAxisVector>,
 ): Partial<DiscoveryAxisVector> {
@@ -1404,39 +1412,39 @@ function seedIrAxesFromBaseIr(
 }
 
 /**
- * Shared three-case resolution for instantiateFromBase / instantiateFromExisting.
+ * Shared three-case resolution for instantiateFromStart / instantiateFromExisting.
  *
  * Three cases, in order:
  *
- * 1. Redundant re-fire, SAME id AND SAME mode (current.baseKeyboard !== null,
+ * 1. Redundant re-fire, SAME id AND SAME mode (current.startKeyboard !== null,
  *    matches incomingId, AND current.instantiationMode === mode) — FULL
  *    early-return no-op (shouldNoop = true). Preserves EVERYTHING
  *    (removalCapabilities, deletedNodeIds, undoStack, carve overlays,
  *    phaseResults) exactly as they stood. This guards against setScaffoldSpec()
  *    triggering a second compile whose onInstantiate would otherwise re-apply
  *    this call's (possibly different/default) removalCapabilities and reset
- *    the carve overlay for no reason — see StudioShell's instantiatedForBaseIdRef
+ *    the carve overlay for no reason — see StudioShell's instantiatedForStartIdRef
  *    comment. The mode conjunct matters because a SAME-id call can also arrive
  *    from a genuine Track switch: e.g. the working copy was instantiated via
  *    the OTHER track for keyboard X, and the user then independently
  *    re-selects keyboard X via a different entry point (e.g. the
  *    Preview/Output screen's own base picker — usePreviewArtifact runs its own
- *    decoupled pipeline, outside the main survey's instantiatedForBaseIdRef gate — see
- *    confirmRebase.ts / instantiateFromBaseIfConfirmed), which fires the
+ *    decoupled pipeline, outside the main survey's instantiatedForStartIdRef gate — see
+ *    confirmRebase.ts / instantiateFromStartIfConfirmed), which fires the
  *    action for the same id but the OTHER mode. An id-only guard would wrongly
  *    no-op and strand the working copy in the old track/identity mode instead
  *    of honouring the user's explicit re-instantiation.
- * 2. First instantiate (current.baseKeyboard === null) — the caller proceeds
+ * 2. First instantiate (current.startKeyboard === null) — the caller proceeds
  *    with its full set(...), but PRESERVES any phaseResults/irAxes already
  *    recorded. Root cause: onInstantiate fires from an async WASM compile
  *    pipeline decoupled from the survey flow (see useKeyboardArtifact.ts) and
  *    can settle LATE — after Phase A/B has already recorded phaseResults
- *    against the pending base selection. A guard keyed only on "baseKeyboard.id
- *    already matches" can never catch this, because baseKeyboard is still null
+ *    against the pending base selection. A guard keyed only on "startKeyboard.id
+ *    already matches" can never catch this, because startKeyboard is still null
  *    at this point. On a truly fresh session phaseResults/irAxes are already
  *    empty, so preserving is a no-op there. This case is untouched by the mode
- *    conjunct above — it only applies when baseKeyboard is already non-null.
- * 3. Genuine base SWITCH OR same-id track switch (current.baseKeyboard !==
+ *    conjunct above — it only applies when startKeyboard is already non-null.
+ * 3. Genuine base SWITCH OR same-id track switch (current.startKeyboard !==
  *    null and either the id differs, or the id matches but the mode doesn't)
  *    — the caller does a full reset, including clearing phaseResults/irAxes,
  *    exactly as before. A same-id track switch is treated the same as a base
@@ -1449,7 +1457,7 @@ function resolveInstantiationCase(
   // mirroring remerge's narrow-parameter convention immediately above.
   current: Pick<
     WorkingCopyState,
-    "baseKeyboard" | "instantiationMode" | "phaseResults" | "irAxes"
+    "startKeyboard" | "instantiationMode" | "phaseResults" | "irAxes"
   >,
   incomingId: string,
   mode: Exclude<InstantiationMode, null>,
@@ -1459,8 +1467,8 @@ function resolveInstantiationCase(
   preservedIrAxes: Partial<DiscoveryAxisVector>;
 } {
   if (
-    current.baseKeyboard !== null &&
-    current.baseKeyboard.id === incomingId &&
+    current.startKeyboard !== null &&
+    current.startKeyboard.id === incomingId &&
     current.instantiationMode === mode
   ) {
     // shouldNoop === true: callers early-return, so preserved* are unused here.
@@ -1471,7 +1479,7 @@ function resolveInstantiationCase(
       preservedIrAxes: current.irAxes,
     };
   }
-  const isGenuineSwitch = current.baseKeyboard !== null;
+  const isGenuineSwitch = current.startKeyboard !== null;
   const preservedPhaseResults = isGenuineSwitch ? [] : current.phaseResults;
   const preservedIrAxes = isGenuineSwitch ? {} : current.irAxes;
   return { shouldNoop: false, preservedPhaseResults, preservedIrAxes };
@@ -1482,62 +1490,6 @@ function resolveInstantiationCase(
 // ---------------------------------------------------------------------------
 
 const INITIAL_SURVEY = remerge({}, []);
-
-// ---------------------------------------------------------------------------
-// Per-step phase answers (spec 079 D-4, R-08)
-// ---------------------------------------------------------------------------
-
-/** Answers recorded into each phase, keyed by the step that recorded them. */
-export type PhaseAnswersByStep = Record<string, Record<string, SurveyAnswer[]>>;
-
-/** Owner id for answers whose recording step is unknown (pre-079 data, no stepId). */
-export const LEGACY_ANSWER_OWNER = "legacy";
-
-/** Owner order: `"legacy"` first, then manifest order, then anything unknown. */
-function ownerRank(owner: string): number {
-  if (owner === LEGACY_ANSWER_OWNER) return -1;
-  const i = STEP_ORDER.indexOf(owner);
-  return i === -1 ? STEP_ORDER.length : i;
-}
-
-/** The phase entry's `answers`: every owner's list concatenated in owner order. */
-export function concatPhaseAnswers(
-  owners: Record<string, SurveyAnswer[]>,
-): SurveyAnswer[] {
-  return Object.keys(owners)
-    .sort((a, b) => ownerRank(a) - ownerRank(b))
-    .flatMap((owner) => owners[owner] ?? []);
-}
-
-function sameAnswerList(
-  a: readonly SurveyAnswer[],
-  b: readonly SurveyAnswer[],
-): boolean {
-  return a === b || JSON.stringify(a) === JSON.stringify(b);
-}
-
-/**
- * The owner map for `phase`, trusted only while it still describes the stored
- * answers. Anything that replaced `phaseResults` wholesale (a reset, a genuine
- * re-instantiation, a restored pre-079 snapshot) leaves the sidecar out of step;
- * the stored answers are then adopted under `"legacy"` rather than invented.
- */
-function ownersOf(
-  sidecar: PhaseAnswersByStep,
-  stored: SurveyPhaseResult | undefined,
-  phase: string,
-): Record<string, SurveyAnswer[]> {
-  const storedAnswers = stored?.answers ?? [];
-  const owners = sidecar[phase];
-  if (
-    owners !== undefined &&
-    sameAnswerList(concatPhaseAnswers(owners), storedAnswers)
-  )
-    return owners;
-  return storedAnswers.length > 0
-    ? { [LEGACY_ANSWER_OWNER]: storedAnswers }
-    : {};
-}
 
 /**
  * The store's data fields only — actions excluded. This is the single source of
@@ -1585,31 +1537,31 @@ export type WorkingCopyData = Omit<
   | "reset"
   | "flagCharForSequence"
   | "unflagCharForSequence"
-  | "instantiateFromBase"
+  | "instantiateFromStart"
   | "instantiateFromExisting"
-  | "adoptTrack"
   | "setIdentity"
   | "isInstantiated"
   | "setAttribution"
   | "setLicenseUnparseable"
-  | "setBaseHolderOverride"
-  | "setBaseLicenseText"
+  | "setStartHolderOverride"
+  | "setStartLicenseText"
   | "setHelpDocs"
-  | "setBaseWelcomeHtmText"
-  | "setBaseHelpPhpText"
-  | "setBaseReadmeMdText"
-  | "setBaseHistoryMdText"
-  | "setBaseWelcomeImages"
-  | "setBaseWelcomeConvention"
+  | "setStartWelcomeHtmText"
+  | "setStartHelpPhpText"
+  | "setStartReadmeMdText"
+  | "setStartHistoryMdText"
+  | "setStartWelcomeImages"
+  | "setStartWelcomeConvention"
   | "setHistoryEntryState"
   | "setChartPreference"
-  | "setBaseDocProfile"
+  | "setStartDocProfile"
   | "setBaselineDocFindings"
   | "markStale"
   | "clearStale"
   | "setValidatorFindings"
   | "setContextTolerance"
   | "setContextToleranceOverlay"
+  | "setContextNormalizationStep"
   | "setAxisFills"
   | "commitKeyEdit"
   | "undoKeyEdit"
@@ -1622,25 +1574,25 @@ const INITIAL_STATE: WorkingCopyData = {
   // instantiation mode
   instantiationMode: null,
   // base slots
-  baseKeyboard: null,
-  baseVfs: null,
-  baseIr: null,
+  startKeyboard: null,
+  startVfs: null,
+  startIr: null,
   identity: null,
   attribution: null,
   licenseUnparseable: null,
-  baseHolderOverride: null,
-  baseLicenseText: null,
+  startHolderOverride: null,
+  startLicenseText: null,
   helpDocs: null,
-  baseWelcomeHtmText: null,
-  baseHelpPhpText: null,
-  baseReadmeMdText: null,
-  baseHistoryMdText: null,
-  baseWelcomeImages: null,
-  baseWelcomeConvention: null,
-  baseWelcomeImagesDropped: false,
+  startWelcomeHtmText: null,
+  startHelpPhpText: null,
+  startReadmeMdText: null,
+  startHistoryMdText: null,
+  startWelcomeImages: null,
+  startWelcomeConvention: null,
+  startWelcomeImagesDropped: false,
   historyEntryState: null,
   chartPreference: null,
-  baseDocProfile: null,
+  startDocProfile: null,
   baselineDocFindings: null,
   // carve IR slots
   ir: null,
@@ -1658,7 +1610,6 @@ const INITIAL_STATE: WorkingCopyData = {
   carveTouchKeepInert: [],
   // survey slots
   ...INITIAL_SURVEY,
-  phaseAnswersByStep: {},
   desktopLocked: false,
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
@@ -1676,6 +1627,7 @@ const INITIAL_STATE: WorkingCopyData = {
   // context tolerance slice (spec 078) — no analysis yet
   contextTolerance: { status: "idle" },
   contextToleranceOverlay: null,
+  contextNormalizationStep: null,
   // default-fill provenance slice (#890) — default empty (no pre-fill run yet)
   axisFills: [],
 };
@@ -1720,10 +1672,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   commitFacetTransform: (nextIr, producedSetChanged) =>
     set((s) => {
       if (!producedSetChanged) return { ir: nextIr };
-      // Drop the cached IR-derived axis so seedIrAxesFromBaseIr re-derives it
+      // Drop the cached IR-derived axis so seedIrAxesFromStartIr re-derives it
       // from the new IR; survey-derived axes (phaseResults) are re-merged as-is.
       const { markInputOrder: _drop, ...preserved } = s.irAxes;
-      const reseeded = seedIrAxesFromBaseIr(nextIr, preserved);
+      const reseeded = seedIrAxesFromStartIr(nextIr, preserved);
       return { ir: nextIr, ...remerge(reseeded, s.phaseResults) };
     }),
 
@@ -2075,31 +2027,25 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // -- surveyResultsStore actions --------------------------------------------
 
   recordPhase: (result, opts) => {
+    // spec 090 T063: the phase slot no longer carries answers. The per-step
+    // answer-ownership sidecar (spec 079 D-4) retired with the gallery
+    // migrations — every settled answer now lives in the decision store
+    // (088) and nowhere else, so the slot keeps only the result's non-answer
+    // fields, shallow-merged over the phase's previous entry. `opts.stepId`
+    // is accepted for caller compatibility and no longer used.
+    void opts;
     const prev = get().phaseResults;
     const idx = prev.findIndex((p) => p.phase === result.phase);
-    // spec 079 D-4: the recording step replaces only ITS answers in the slot;
-    // every other field keeps the shallow-merge semantics documented above.
-    const owner = opts?.stepId ?? LEGACY_ANSWER_OWNER;
-    const owners = {
-      ...ownersOf(get().phaseAnswersByStep, prev[idx], result.phase),
-      [owner]: result.answers,
-    };
     const merged: SurveyPhaseResult = {
       ...(idx === -1 ? {} : prev[idx]),
       ...result,
-      answers: concatPhaseAnswers(owners),
+      answers: [],
     };
     const next =
       idx === -1
         ? [...prev, merged]
         : prev.map((p, i) => (i === idx ? merged : p));
-    set({
-      ...remerge(get().irAxes, next),
-      phaseAnswersByStep: {
-        ...get().phaseAnswersByStep,
-        [result.phase]: owners,
-      },
-    });
+    set({ ...remerge(get().irAxes, next) });
   },
 
   recordAssignments: (assignments) => {
@@ -2294,7 +2240,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // -- Instantiation actions (spec §8 v1.3.0) ----------------------------------
 
-  instantiateFromBase: (
+  instantiateFromStart: (
     base,
     { vfs, ir, removalCapabilities, identitySeed },
   ) => {
@@ -2309,7 +2255,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
 
     // Bake the base keyboard's facets (spec 048 FR-001) — casing, for now —
-    // onto the working-copy IR before it is seeded onto both `baseIr` and
+    // onto the working-copy IR before it is seeded onto both `startIr` and
     // `ir` below, so every downstream step can read it via one accessor with
     // no offline-artifact access. Track 2 (instantiateFromExisting) does the
     // identical derivation so both tracks populate facets the same way.
@@ -2318,8 +2264,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Phase B proposal decisions are per-working-copy (spec 044 FR-016a), not
-    // per-session: they survive phaseBDraftStore.reset() (which runs on every
-    // entry to the build-list screen) and are cleared HERE instead. Without
+    // per-session: they survive the inventory draft's reset() (which runs on
+    // every entry to the build-list screen) and are cleared HERE instead. Without
     // this, declining the exemplar offer — or removing a proposed character —
     // on one keyboard would silently carry into the next one started in the
     // same browser session. Placed after the shouldNoop guard so a redundant
@@ -2334,9 +2280,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       chartPreference: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
       baselineDocFindings: null,
-      baseKeyboard: base,
-      baseVfs: vfs,
-      baseIr: ir,
+      startKeyboard: base,
+      startVfs: vfs,
+      startIr: ir,
       // Reset identity to the caller's seed (the identity step's language), or
       // to no overlay at all until Phase A completes.
       identity: identitySeed ?? null,
@@ -2353,7 +2299,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // still in flight. irAxes re-derives from the new IR after recognition
       // runs when there is nothing to preserve.
       ...remerge(
-        seedIrAxesFromBaseIr(ir, preservedIrAxes),
+        seedIrAxesFromStartIr(ir, preservedIrAxes),
         preservedPhaseResults,
       ),
       desktopLocked: false,
@@ -2381,33 +2327,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     });
   },
 
-  adoptTrack: (track) => {
-    const { instantiationMode, baseKeyboard, identity } = get();
-    if (instantiationMode === null || baseKeyboard === null) return;
-    if (track === "adapt") {
-      if (instantiationMode === "adapt-existing") return;
-      set({
-        instantiationMode: "adapt-existing",
-        identity: {
-          ...identity,
-          keyboardId: baseKeyboard.id,
-          displayName: baseKeyboard.displayName,
-          bcp47: identity?.bcp47 || (baseKeyboard.languages?.[0] ?? ""),
-        },
-      });
-      return;
-    }
-    if (instantiationMode === "new-from-base") return;
-    const { keyboardId: _id, displayName: _name, ...rest } = identity ?? {};
-    set({
-      instantiationMode: "new-from-base",
-      identity: Object.keys(rest).length > 0 ? rest : null,
-    });
-  },
-
-  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities }) => {
+  instantiateFromExisting: (keyboard, { vfs, ir, removalCapabilities, identitySeed }) => {
     // Three-case resolution (redundant re-fire / first instantiate / genuine
-    // switch) is shared with instantiateFromBase — see
+    // switch) is shared with instantiateFromStart — see
     // resolveInstantiationCase for the full explanation.
     const current = get();
     const { shouldNoop, preservedPhaseResults, preservedIrAxes } =
@@ -2417,25 +2339,25 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
 
     // Bake the loaded keyboard's facets (spec 048 FR-001) onto the working-copy
-    // IR — the identical derivation instantiateFromBase applies, so both
+    // IR — the identical derivation instantiateFromStart applies, so both
     // tracks populate facets the same way (spec 048 Edge Case).
     ir = deriveFacets(ir);
 
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Per-working-copy Phase B proposal decisions — see the identical call in
-    // instantiateFromBase above for why this cannot live in
-    // phaseBDraftStore.reset().
+    // instantiateFromStart above for why this cannot live in the inventory
+    // draft's reset().
     resetPhaseBDraftDecisions();
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({
       instantiationMode: "adapt-existing",
-      // See instantiateFromBase: documentation decisions are per working copy.
+      // See instantiateFromStart: documentation decisions are per working copy.
       historyEntryState: null,
       chartPreference: null,
       baselineDocFindings: null,
-      baseKeyboard: keyboard,
-      baseVfs: vfs,
-      baseIr: ir,
+      startKeyboard: keyboard,
+      startVfs: vfs,
+      startIr: ir,
       // Preserve identity from the loaded keyboard's metadata.
       // keyboardId is required: downstream consumers (serializeWorkingCopy zip
       // filename, MechanismGallery scaffoldSpec, lint identity checks) read
@@ -2445,6 +2367,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         keyboardId: keyboard.id,
         bcp47: keyboard.languages?.[0] ?? "",
         displayName: keyboard.displayName,
+        // The author's identity-language overlay (composed tag + English
+        // name) wins over the base's preserved fields — the adapt track's
+        // author has already told the identity step what language this
+        // keyboard is FOR; the base's own first tag is only the fallback
+        // when no seed was composed. The seed never carries `keyboardId`,
+        // so the preserved id above is never overridden.
+        ...(identitySeed ?? {}),
       },
       // Seed the carve working IR from the existing keyboard's IR.
       ir,
@@ -2458,7 +2387,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // forward any phaseResults/irAxes recorded while this instantiate was
       // still in flight.
       ...remerge(
-        seedIrAxesFromBaseIr(ir, preservedIrAxes),
+        seedIrAxesFromStartIr(ir, preservedIrAxes),
         preservedPhaseResults,
       ),
       desktopLocked: false,
@@ -2489,32 +2418,32 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   setLicenseUnparseable: (v) => set({ licenseUnparseable: v }),
 
-  setBaseHolderOverride: (holder) => set({ baseHolderOverride: holder }),
+  setStartHolderOverride: (holder) => set({ startHolderOverride: holder }),
 
-  setBaseLicenseText: (text) => set({ baseLicenseText: text }),
+  setStartLicenseText: (text) => set({ startLicenseText: text }),
 
   setHelpDocs: (helpDocs) => set({ helpDocs }),
 
-  setBaseWelcomeHtmText: (text) => set({ baseWelcomeHtmText: text }),
+  setStartWelcomeHtmText: (text) => set({ startWelcomeHtmText: text }),
 
-  setBaseHelpPhpText: (text) => set({ baseHelpPhpText: text }),
+  setStartHelpPhpText: (text) => set({ startHelpPhpText: text }),
 
-  setBaseReadmeMdText: (text) => set({ baseReadmeMdText: text }),
+  setStartReadmeMdText: (text) => set({ startReadmeMdText: text }),
 
-  setBaseHistoryMdText: (text) => set({ baseHistoryMdText: text }),
+  setStartHistoryMdText: (text) => set({ startHistoryMdText: text }),
 
   // A fresh carry supersedes any earlier "dropped on reload" state.
-  setBaseWelcomeImages: (images) =>
-    set({ baseWelcomeImages: images, baseWelcomeImagesDropped: false }),
+  setStartWelcomeImages: (images) =>
+    set({ startWelcomeImages: images, startWelcomeImagesDropped: false }),
 
-  setBaseWelcomeConvention: (convention) =>
-    set({ baseWelcomeConvention: convention }),
+  setStartWelcomeConvention: (convention) =>
+    set({ startWelcomeConvention: convention }),
 
   setHistoryEntryState: (state) => set({ historyEntryState: state }),
 
   setChartPreference: (preference) => set({ chartPreference: preference }),
 
-  setBaseDocProfile: (profile) => set({ baseDocProfile: profile }),
+  setStartDocProfile: (profile) => set({ startDocProfile: profile }),
 
   setBaselineDocFindings: (findings) =>
     set((s) =>
@@ -2523,7 +2452,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         : { baselineDocFindings: findings },
     ),
 
-  isInstantiated: () => get().baseKeyboard !== null,
+  isInstantiated: () => get().startKeyboard !== null,
 
   // -- Staleness actions (US3, T040) -------------------------------------------
 
@@ -2576,6 +2505,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         ? s
         : { contextToleranceOverlay: next },
     ),
+
+  setContextNormalizationStep: (next) =>
+    set((s) => (s.contextNormalizationStep === next ? s : { contextNormalizationStep: next })),
 
   // -- Default-fill provenance actions (#890) ----------------------------------
 

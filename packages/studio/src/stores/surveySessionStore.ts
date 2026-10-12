@@ -4,7 +4,7 @@
 // the walked-history stack for back navigation, and the five value slots set
 // across wizard steps. Also holds the characters step's internal substage
 // (CharactersSubStage, spec 027 Stage 4) so it survives component remounts.
-// Does NOT hold pipeline state (instantiatedForBaseIdRef, oskMode) — those remain
+// Does NOT hold pipeline state (instantiatedForStartIdRef, oskMode) — those remain
 // component-local per spec §4.
 //
 // Architecture contract:
@@ -30,7 +30,7 @@
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
 import { create } from "zustand";
-import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 // Imported directly from TYPE-ONLY LEAF modules (identityLiteResult.ts /
 // types.ts), NOT from the survey/index.ts barrel — that barrel re-exports
 // PhaseB.tsx at runtime, and PhaseB.tsx now imports this store at runtime too
@@ -43,17 +43,13 @@ import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts
 // lib/stepWalk.ts), and IdentityLite.tsx renders SurveyRunner, so importing the
 // component module here would close the loop even for a type. That extracted
 // leaf has no runtime dependencies at all.
-import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
-import type { SurveyContext, Track } from "../survey/types.ts";
-import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
-// Runtime import of the sibling store (one-directional: workingCopyStore.ts
-// does NOT import this module, so this does not create a circular dependency
-// per depcruise's no-circular rule). Used only inside setTouchSeedSource to
-// clear the stale touchDraft when the seed source actually changes (spec 035
-// R12) — the getState() escape-hatch idiom already used elsewhere in this
-// file (see the trailing comment) for cross-store reads/writes.
-import { useWorkingCopyStore } from "./workingCopyStore.ts";
+// Spec 088: this store no longer imports workingCopyStore — its only use
+// was the deleted setTouchSeedSource's touch-draft side effect, which moved
+// to the decision writer's call sites (research D-06). Spec 089: the identity
+// result/context/scaffold types are likewise gone with the fields they typed
+// — those values are derived from the decision store (T017).
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
+import { resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
 
 // ---------------------------------------------------------------------------
 // CharactersSubStage — internal substage for the characters manifest step.
@@ -99,6 +95,7 @@ export type ActiveStepId =
   | "layout"
   | "choose_base"
   | "track"
+  | "attribution"
   | "project_name"
   | "characters"
   | "carve"
@@ -296,42 +293,25 @@ export interface SurveySessionState {
    */
   marksMigrationNeeded: boolean;
 
-  /** Identity-lite output from the identity step. Null until the step completes. */
-  identityResult: IdentityLiteResult | null;
+  // Spec 089 FR-005/T017: identityResult, identityPhaseResult, surveyContext,
+  // and scaffoldSpec are NO LONGER session fields — they are derived from the
+  // decision store (decisions/identitySelectors.ts: deriveIdentityResult,
+  // deriveIdentityResume, deriveSurveyContext, deriveScaffoldSpec).
 
-  /**
-   * Raw phase result of the completed identity-lite flow (the answers that
-   * produced identityResult). Persisted so a history pop back onto the identity
-   * step resumes the flow at its last question with answers restored, rather
-   * than replaying from question 1. Null until the identity step completes.
-   */
-  identityPhaseResult: SurveyPhaseResult | null;
-
-  /**
-   * Derived from identityResult via contextFromIdentity. Stored (not re-derived)
-   * to match today's useState semantics. Empty object until identity completes.
-   */
-  surveyContext: SurveyContext;
-
-  /** "copy" | "adapt" chosen at the track step. Null until that step completes. */
-  selectedTrack: Track | null;
-
-  /**
-   * Track-1 project metadata set at the project_name step.
-   * Null for Track 2 (adapt uses the base's existing id/name).
-   */
-  scaffoldSpec: ScaffoldSpec | null;
+  // Spec 088 FR-005: the authoring track is NOT stored here any more — it
+  // is the `authoring-track` decision in stores/decisionStore.ts, read via
+  // its `selectTrack` selector.
 
   /**
    * Local base selection that drives the compile pipeline immediately on pick.
-   * Separate from workingCopyStore.baseKeyboard — set as soon as BaseResolution
+   * Separate from workingCopyStore.startKeyboard — set as soon as StartResolution
    * resolves, before the compile cycle completes. Null until first base selection.
    */
-  localBase: BaseKeyboard | null;
+  localStart: StartKeyboard | null;
 
   /**
    * Preview-before-commit gate for the "Choose a starting keyboard" step.
-   * `localBase` now drives a LIVE PREVIEW as soon as the author clicks a
+   * `localStart` now drives a LIVE PREVIEW as soon as the author clicks a
    * search result or suggestion card, without instantiating the working
    * copy or advancing the wizard (so several bases can be tried). This flag
    * is set true only when the author clicks the explicit "Choose this
@@ -342,7 +322,7 @@ export interface SurveySessionState {
    * restored draft is intentional — a draft that already passed choose_base
    * must re-instantiate on restore exactly as it does today.
    */
-  baseConfirmed: boolean;
+  startConfirmed: boolean;
 
   /**
    * Internal substage for the characters manifest step (spec 027 Stage 4).
@@ -352,16 +332,11 @@ export interface SurveySessionState {
    */
   charactersSubStage: CharactersSubStage;
 
-  /**
-   * The author's choice at the touch_seed_source fork (spec 035 FR-006).
-   * Null means no choice recorded yet — advance() routes into the chooser
-   * step whenever this is null (fork memory, R12). Cleared back to null on a
-   * genuine base re-instantiation (see reducer.ts CHOOSE_BASE_STEP_ID case,
-   * which injects setTouchSeedSource as a ReducerDep so workingCopyStore does
-   * not need to import this store — avoids a circular dependency since
-   * setTouchSeedSource itself reaches into workingCopyStore to clear touchDraft).
-   */
-  touchSeedSource: TouchSeedSource | null;
+  // Spec 088 FR-005: the touch-seed choice is NOT stored here any more —
+  // it is the `touch-seed-source` decision in stores/decisionStore.ts, read
+  // via its `selectTouchSeedSource` selector. Its touch-draft side effect
+  // (research D-06) lives at the decision's writer call sites.
+
 
   /**
    * The author's choice at the Phase B IntroChooser (spec character-map pane
@@ -416,7 +391,7 @@ export interface SurveySessionState {
    * first character" affordance (spec 035 R12 re-entry path). The generic
    * `popHistory` follows the walked-history stack, which lands on
    * "mechanisms" whenever the seed-source fork was SKIPPED this pass (a
-   * recorded, non-stale `touchSeedSource` routes advance() straight from
+   * recorded, non-stale touch-seed choice routes advance() straight from
    * "mechanisms" to "touch" — R12 fork memory) — that would make the choice
    * unreachable after the first pass (violates US2-AS4). This action always
    * resurfaces the "touch_seed_source" chooser instead:
@@ -485,13 +460,13 @@ export interface SurveySessionState {
    * through and nothing at-or-after the picker survives. Sanitizes first, for
    * the same persisted-stale-"help" reason as the primitives above.
    *
-   * Also clears `baseConfirmed`. That flag arms StudioShell's
+   * Also clears `startConfirmed`. That flag arms StudioShell's
    * single-instantiation effect (see StudioShell.tsx — the effect commits as
    * soon as a compile settles for the confirmed base). Landing on the picker
    * with it still true would let the very next pipeline settle instantiate
    * WITHOUT the author clicking "Choose this keyboard" — re-basing, and
    * discarding edits, on the strength of a stale confirmation from the base
-   * they are trying to move away from. BaseResolutionAdapter's onPreview also
+   * they are trying to move away from. StartResolutionAdapter's onPreview also
    * clears it, but that only fires if the author previews first, which is not
    * guaranteed to happen before the effect runs.
    *
@@ -499,7 +474,7 @@ export interface SurveySessionState {
    * stack (a hydrated draft that never walked it): empty is Back-safe
    * (popHistory guards it) and can never resurface a stale forward entry.
    */
-  backToChooseBase: () => void;
+  backToChooseStart: () => void;
 
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
@@ -511,38 +486,15 @@ export interface SurveySessionState {
    */
   hydrate: (snapshot: SurveySessionSnapshot) => void;
 
-  /** Plain setter — identity-lite output. */
-  setIdentityResult: (r: IdentityLiteResult | null) => void;
-
-  /** Plain setter — raw identity-lite phase result (history-pop resume). */
-  setIdentityPhaseResult: (r: SurveyPhaseResult | null) => void;
-
-  /** Plain setter — survey context derived from identity. */
-  setSurveyContext: (c: SurveyContext) => void;
-
-  /** Plain setter — chosen track. */
-  setSelectedTrack: (t: Track | null) => void;
-
-  /** Plain setter — Track-1 scaffold spec. */
-  setScaffoldSpec: (s: ScaffoldSpec | null) => void;
-
   /** Plain setter — local base driving the compile pipeline. */
-  setLocalBase: (b: BaseKeyboard | null) => void;
+  setLocalStart: (b: StartKeyboard | null) => void;
 
   /** Plain setter — the choose_base preview-before-commit gate. */
-  setBaseConfirmed: (v: boolean) => void;
+  setStartConfirmed: (v: boolean) => void;
 
   /** Plain setter — characters step internal substage (spec 027 Stage 4). */
   setCharactersSubStage: (s: CharactersSubStage) => void;
 
-  /**
-   * Setter — the touch_seed_source fork choice (spec 035 R12).
-   * Setting a value DIFFERENT from the current one clears the working-copy
-   * `touchDraft` (its `charTouch` entries reference host keys of the other
-   * seed and would half-apply — see workingCopyStore.touchDraft docstring).
-   * A no-op re-set of the same value does not clear the draft.
-   */
-  setTouchSeedSource: (s: TouchSeedSource | null) => void;
 
   /** Plain setter — the Phase B IntroChooser discovery-method choice. */
   setDiscoveryMethod: (m: DiscoveryMethod | null) => void;
@@ -557,7 +509,7 @@ export interface SurveySessionState {
    * deferred" from "never looked at". Lives HERE (not workingCopyStore, not a
    * new module-scoped Set) because:
    *   (a) it is per-authoring-session traversal state, not keyboard content —
-   *       the same category as activeStepId/history/touchSeedSource above,
+   *       the same category as activeStepId/history above,
    *       never the working copy's own data;
    *   (b) this store already has a serialize/restore seam
    *       (snapshotTraversal/applyTraversalSnapshot, driven by
@@ -600,7 +552,8 @@ export interface SurveySessionState {
 // for — no silent omission from the durable draft.
 //
 // DEVIATION 1 (spec 034 US3 task brief): the data-model.md TraversalSnapshot
-// field list predates spec 035, which added `touchSeedSource` to this store.
+// field list predates spec 035, which added the touch-seed choice to this store
+// (a session field until spec 088 moved it to the decision store).
 // It is included here — a reload mid-touch that lost the seed-source fork
 // choice would silently re-ask a question the author already answered, or
 // worse, mis-resolve the R11/R12 default. `TraversalSnapshot` is exactly this
@@ -610,10 +563,9 @@ export interface SurveySessionState {
 type SurveySessionData = Omit<
   SurveySessionState,
   | "advance" | "popHistory" | "jumpToStep" | "backToTouchSeedSource"
-  | "backToUnfinishedGallery" | "backToChooseBase" | "reset" | "hydrate"
-  | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
-  | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
-  | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
+  | "backToUnfinishedGallery" | "backToChooseStart" | "reset" | "hydrate"
+  | "setLocalStart" | "setCharactersSubStage"
+  | "setStartConfirmed" | "setDiscoveryMethod"
   | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
 
@@ -646,15 +598,10 @@ const INITIAL_STATE = {
   visited: ["identity"] as readonly ActiveStepId[],
   lastNavigation: "advance" as const,
   marksMigrationNeeded: false,
-  identityResult: null,
-  identityPhaseResult: null,
-  surveyContext: {} as SurveyContext,
-  selectedTrack: null,
-  scaffoldSpec: null,
-  localBase: null,
-  baseConfirmed: false,
+
+  localStart: null,
+  startConfirmed: false,
   charactersSubStage: "prefill" as CharactersSubStage,
-  touchSeedSource: null as TouchSeedSource | null,
   discoveryMethod: null as DiscoveryMethod | null,
   markedForLaterDesktop: [] as readonly string[],
   markedForLaterTouch: [] as readonly string[],
@@ -790,8 +737,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
     }),
 
   // See the interface docstring above for why this is a Back (not an advance),
-  // why it truncates rather than pops, and why it must clear baseConfirmed.
-  backToChooseBase: () =>
+  // why it truncates rather than pops, and why it must clear startConfirmed.
+  backToChooseStart: () =>
     set((s) => {
       const sanitized = sanitizeHistory(s.activeStepId, s.history);
       const pickerIndex = sanitized.indexOf("choose_base");
@@ -799,7 +746,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
         activeStepId: "choose_base" as ActiveStepId,
         history: pickerIndex === -1 ? ([] as readonly ActiveStepId[]) : sanitized.slice(0, pickerIndex),
         lastNavigation: "pop" as const,
-        baseConfirmed: false,
+        startConfirmed: false,
       };
     }),
 
@@ -834,26 +781,11 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
 
-  setIdentityResult: (r) => set({ identityResult: r }),
-  setIdentityPhaseResult: (r) => set({ identityPhaseResult: r }),
-  setSurveyContext: (c) => set({ surveyContext: c }),
-  setSelectedTrack: (t) => set({ selectedTrack: t }),
-  setScaffoldSpec: (s) => set({ scaffoldSpec: s }),
-  setLocalBase: (b) => set({ localBase: b }),
-  setBaseConfirmed: (v) => set({ baseConfirmed: v }),
+
+  setLocalStart: (b) => set({ localStart: b }),
+  setStartConfirmed: (v) => set({ startConfirmed: v }),
   setCharactersSubStage: (s) => set({ charactersSubStage: s }),
 
-  setTouchSeedSource: (s) =>
-    set((state) => {
-      // A genuine change of seed source invalidates any in-progress touch
-      // draft — its charTouch entries reference host keys of the OTHER seed
-      // and would half-apply with warnings (R12). A no-op re-set (same value,
-      // including null -> null) leaves the draft untouched.
-      if (s !== state.touchSeedSource) {
-        useWorkingCopyStore.getState().setTouchDraft(null);
-      }
-      return { touchSeedSource: s };
-    }),
 
   setDiscoveryMethod: (m) => set({ discoveryMethod: m }),
 
@@ -873,8 +805,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads
-// inside memoised callbacks (e.g. onInstantiate reads selectedTrack this way).
-// No extra export needed — zustand attaches getState() to the hook directly.
+// inside memoised callbacks. No extra export needed — zustand attaches
+// getState() to the hook directly.
 
 // ---------------------------------------------------------------------------
 // TraversalSnapshot serialize/restore (T017, spec 034 US3)
@@ -898,15 +830,10 @@ export function snapshotTraversal(): TraversalSnapshot {
     visited: s.visited,
     lastNavigation: s.lastNavigation,
     marksMigrationNeeded: s.marksMigrationNeeded,
-    identityResult: s.identityResult,
-    identityPhaseResult: s.identityPhaseResult,
-    surveyContext: s.surveyContext,
-    selectedTrack: s.selectedTrack,
-    scaffoldSpec: s.scaffoldSpec,
-    localBase: s.localBase,
-    baseConfirmed: s.baseConfirmed,
+
+    localStart: s.localStart,
+    startConfirmed: s.startConfirmed,
     charactersSubStage: s.charactersSubStage,
-    touchSeedSource: s.touchSeedSource,
     discoveryMethod: s.discoveryMethod,
     markedForLaterDesktop: s.markedForLaterDesktop,
     markedForLaterTouch: s.markedForLaterTouch,
@@ -973,11 +900,30 @@ export function expectedBackTarget(
  * repair step for that case. See the STEP_ORDER/sanitizeHistory doc comment.
  */
 export function applyTraversalSnapshot(snapshot: TraversalSnapshot): void {
-  useSurveySessionStore.setState({
+  // Spec 091 T015: a draft persisted before the derived screens maps its
+  // stored step ids through the frozen legacy map (decisions/
+  // legacyStepIds.ts), so the active step, history and visited land on
+  // the screens that now hold those steps' decisions. Current ids map to
+  // themselves, so a current draft is untouched.
+  const activeStepId = resolveLegacyStepId(snapshot.activeStepId) as ActiveStepId;
+  const history = snapshot.history.map(
+    (id) => resolveLegacyStepId(id) as ActiveStepId,
+  );
+  const mapped: TraversalSnapshot = {
     ...snapshot,
-    history: sanitizeHistory(snapshot.activeStepId, snapshot.history),
+    activeStepId,
+    history,
+    ...(snapshot.visited !== undefined && {
+      visited: snapshot.visited.map(
+        (id) => resolveLegacyStepId(id) as ActiveStepId,
+      ),
+    }),
+  };
+  useSurveySessionStore.setState({
+    ...mapped,
+    history: sanitizeHistory(activeStepId, history),
     // Same back-fill as `hydrate` — this is the OTHER restore seam, and a
     // draft written before the slot existed reaches the store through either.
-    visited: normalizeVisited(snapshot),
+    visited: normalizeVisited(mapped),
   });
 }

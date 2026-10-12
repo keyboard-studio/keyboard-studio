@@ -37,7 +37,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     instantiateWorkingCopy();
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -69,7 +69,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     instantiateWorkingCopy();
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -92,7 +92,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     instantiateWorkingCopy();
     seedInventory(["ا"]); // Arabic alef — caseless (\p{Lo}), no case counterpart
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -106,7 +106,7 @@ describe("MechanismGallery — case-pair companion proposal", () => {
     instantiateWorkingCopy({ mnemonic: true });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -137,7 +137,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     instantiateWorkingCopy({ caps: true });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     // 1. Apply the base swap on the CAPS-handling key K_Q — raises the
@@ -209,7 +209,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     instantiateWorkingCopy({ caps: true });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -234,7 +234,7 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
     instantiateWorkingCopy({ caps: true });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -272,11 +272,11 @@ describe("MechanismGallery — companion proposal identity tracking (P1/P2 regre
 describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
   it("proposes İ (U+0130) for 'i' under the 'tr' identity bcp47 tag", async () => {
     instantiateWorkingCopy();
-    // instantiateFromBase resets identity to null — set it explicitly.
+    // instantiateFromStart resets identity to null — set it explicitly.
     useWorkingCopyStore.getState().setIdentity({ bcp47: "tr" });
     seedInventory(["i"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -303,7 +303,7 @@ describe("MechanismGallery — companion proposal bcp47 plumbing", () => {
     useWorkingCopyStore.getState().setIdentity({ bcp47: "not a tag!!" });
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -328,7 +328,7 @@ describe("MechanismGallery — shared case-pair affordance (spec 074)", () => {
     instantiateWorkingCopy();
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -348,7 +348,7 @@ describe("MechanismGallery — shared case-pair affordance (spec 074)", () => {
     instantiateWorkingCopy();
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     // 1. First swap on K_Q — raises a proposal for K_Q.
@@ -402,7 +402,7 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     // "á" defaults to the pre-enabled deadkey method (§3c).
@@ -415,7 +415,7 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
@@ -453,7 +453,7 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
@@ -472,7 +472,7 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 074 US2)", () 
     // Arabic alef with hamza below — caseless, so no confident capital.
     seedInventory(["إ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
@@ -485,7 +485,7 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly.
@@ -544,7 +544,7 @@ describe("MechanismGallery — S-03 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     await applySequence("a", "s");
@@ -556,7 +556,7 @@ describe("MechanismGallery — S-03 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     await applySequence("a", "s");
@@ -589,7 +589,7 @@ describe("MechanismGallery — S-03 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["ŋ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     await applySequence("ng", "y");
@@ -602,7 +602,7 @@ describe("MechanismGallery — S-03 parallel-combo proposal (spec 074 US2)", () 
     instantiateWorkingCopy();
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     await applySequence("a", "s");
@@ -651,7 +651,7 @@ describe("MechanismGallery — 'counterpart already placed' suppression (spec 07
     ]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -697,7 +697,7 @@ describe("MechanismGallery — 'counterpart already placed' suppression (spec 07
     ]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     // "á" defaults to the pre-enabled deadkey method (§3c) on K_COLON.
@@ -731,7 +731,7 @@ describe("MechanismGallery — 'counterpart already placed' suppression (spec 07
     ]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     fireEvent.click(screen.getByText(/Type a sequence/i));

@@ -25,15 +25,16 @@
 //   time:
 //     - `pickerMode` is per-screen local state that re-initializes to "open"
 //       on every mount, so on Output the toggle could never report how the
-//       working copy was actually created (it showed "Open base" even for a
+//       working copy was actually created (it showed "Open starting keyboard" even for a
 //       Track 1 scaffold) — a mode INPUT sitting where an author reads a state
 //       DISPLAY.
-//     - selecting a different base re-instantiates and discards carve
-//       deletions plus recorded survey phases, behind nothing but a native
-//       window.confirm. That is a start-over action; it does not belong on the
-//       screen whose job is to emit. `changeBaseSlot` relocates it to the
-//       survey's choose_base step, where the preview-before-commit gate and
-//       confirmRebaseTo already live.
+//     - selecting a different base re-instantiates the working copy under
+//       the new base, behind nothing but a native window.confirm. That is a
+//       consequential action (spec 093 T017: the decision set is retained
+//       and recalculated against the new base — but the copy is rebuilt);
+//       it does not belong on the screen whose job is to emit.
+//       `changeBaseSlot` relocates it to the survey's choose_base step,
+//       where the preview-before-commit gate and confirmRebaseTo already live.
 //   The base is shown instead as read-only provenance.
 //
 // Both variants render `identityPanelSlot` and `kmnEditorSlot` at the SAME
@@ -45,7 +46,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { PreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { MetadataCard } from "./MetadataCard.tsx";
 import { BG_CARD, BLUE_ACTION, CARD_BORDER, FONT_MONO, TEXT_MAIN } from "../ui/theme.ts";
@@ -95,7 +96,7 @@ function modeToggleStyle(pressed: boolean): CSSProperties {
  * each value is programmatically associated with its own term rather than
  * relying on visual adjacency (docs/accessibility.md).
  */
-function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
+function StartProvenance({ kb }: { kb: StartKeyboard }) {
   // Keyed by the FIELD, not by the value: two of these coincide readily in real
   // data (a base whose displayName is its id, or a single-script base named for
   // its script), and a duplicate React key silently drops a row from the list.
@@ -107,7 +108,7 @@ function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
     },
     {
       field: "id",
-      label: <Trans id="picker.shipping.provenance.id">Base ID</Trans>,
+      label: <Trans id="picker.shipping.provenance.startingId">Starting keyboard ID</Trans>,
       value: kb.id,
     },
     {
@@ -165,7 +166,7 @@ export function PickerPane({
   narrow = false,
 }: PickerPaneProps) {
   const { t } = useLingui();
-  const { baseKeyboard, pickerMode, handlePickerModeChange } = artifact;
+  const { startKeyboard, pickerMode, handlePickerModeChange } = artifact;
   const shipping = variant === "shipping";
 
   const sectionLabel = shipping
@@ -187,7 +188,7 @@ export function PickerPane({
             aria-pressed={pickerMode === "open"}
             style={modeToggleStyle(pickerMode === "open")}
           >
-            <Trans id="picker.modeToggle.open">Open base</Trans>
+            <Trans id="picker.modeToggle.openStarting">Open starting keyboard</Trans>
           </button>
           <button
             type="button"
@@ -195,7 +196,7 @@ export function PickerPane({
             aria-pressed={pickerMode === "scaffold"}
             style={modeToggleStyle(pickerMode === "scaffold")}
           >
-            <Trans id="picker.modeToggle.scaffold">New from base</Trans>
+            <Trans id="picker.modeToggle.scaffoldFromStarting">New from a starting keyboard</Trans>
           </button>
         </div>
       )}
@@ -203,9 +204,9 @@ export function PickerPane({
       {/* Base: an editable picker in the full variant, read-only provenance
           (plus the route-back escape hatch) in the shipping variant. */}
       {shipping ? (
-        baseKeyboard !== null ? (
+        startKeyboard !== null ? (
           <>
-            <BaseProvenance kb={baseKeyboard} />
+            <StartProvenance kb={startKeyboard} />
             {changeBaseSlot}
           </>
         ) : null
@@ -219,8 +220,8 @@ export function PickerPane({
 
       {kmnEditorSlot}
 
-      {baseKeyboard !== null && !shipping && pickerMode === "open" ? (
-        <MetadataCard kb={baseKeyboard} />
+      {startKeyboard !== null && !shipping && pickerMode === "open" ? (
+        <MetadataCard kb={startKeyboard} />
       ) : null}
     </>
   );
@@ -282,8 +283,8 @@ export function PickerPane({
             Check the details below, then download or submit your keyboard from the right.
           </Trans>
         ) : (
-          <Trans id="picker.intro">
-            Pick a base keyboard to start; the right pane shows the compiled result.
+          <Trans id="picker.startingIntro">
+            Pick a starting keyboard; the right pane shows the compiled result.
           </Trans>
         )}
       </p>

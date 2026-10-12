@@ -65,7 +65,7 @@ export function isSingleCodepoint(s: string): boolean {
  * with the NCAPS (caps-lock-off) modifier, so accept NCAPS-only alongside
  * bare rules; reject SHIFT/CAPS/AltGr layers.
  *
- * Shared by hasNonUSBase, detectBaseLayoutFamily, and hasInvertedNumberRow's
+ * Shared by hasNonUSBase, detectStartLayoutFamily, and hasInvertedNumberRow's
  * base-map read.
  */
 export const isBaseLayer = (_vkey: string, modifiers: string[]): boolean =>
@@ -133,7 +133,7 @@ export function isMnemonicKeyboard(ir: KeyboardIR): boolean {
  */
 export function hasNonUSBase(ir: KeyboardIR, threshold = 3): boolean {
   // Only look at the unshifted base row (NCAPS-only or bare; rejects
-  // SHIFT/CAPS/AltGr layers). Mirrors detectBaseLayoutFamily.
+  // SHIFT/CAPS/AltGr layers). Mirrors detectStartLayoutFamily.
   const map = collectVkeyChars(ir, isBaseLayer);
   let deviations = 0;
   for (const [vkey, char] of map) {
@@ -159,7 +159,7 @@ export function hasNonUSBase(ir: KeyboardIR, threshold = 3): boolean {
  * The FIRST occurrence per vkey wins: once a vkey has been recorded, later
  * matching rules for the same vkey are ignored, so the result has at most
  * one entry per vkey regardless of how many qualifying rules target it.
- * For detectBaseLayoutFamily (and hasInvertedNumberRow) this reproduces the
+ * For detectStartLayoutFamily (and hasInvertedNumberRow) this reproduces the
  * clobber-avoidance behaviour of their original inline map-building, where
  * only one value per key position is ever meaningful. For hasNonUSBase this
  * is more than incidental clobber-avoidance: because deviations are tallied
@@ -209,7 +209,7 @@ export function collectVkeyChars(
  *
  * @see spec.md §7.6 (bucketing by base-layout family; AZERTY-derived detection)
  */
-export function detectBaseLayoutFamily(
+export function detectStartLayoutFamily(
   ir: KeyboardIR,
 ): "QWERTY" | "AZERTY" | "QWERTZ" | "other" {
   // Unshifted base layer only (see isBaseLayer).

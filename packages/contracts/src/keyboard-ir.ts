@@ -438,6 +438,13 @@ export interface RawKmnFragment {
    */
   reason: string;
   /**
+   * Lenient best-effort item list for an opaque *store* fragment (outs() flattened,
+   * SMP literals as char items, named deadkeys as deadkey items). Read-only
+   * sketch for analysis; emit ignores it and uses `sourceText`. Absent when
+   * nothing resolves or the fragment is not a store.
+   */
+  storeSketch?: StoreItem[];
+  /**
    * 1-based source line number from the original .kmn file, set by the parser.
    * Used by the position-faithful emit path to interleave fragments with rules
    * and stores in their original source order when `ir.raw.length > 0`.

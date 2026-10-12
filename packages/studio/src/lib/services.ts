@@ -1,12 +1,12 @@
 // Service container. Config flag: VITE_USE_REAL_ENGINE (default: true).
 // Set VITE_USE_REAL_ENGINE=false in .env.local to force mocks (test/CI only).
-// Note: mockBaseBrowser / mockOutputService / mockScaffolder imports here are
+// Note: mockStartBrowser / mockOutputService / mockScaffolder imports here are
 // intentional — services.ts is the designated service boundary. Vite
 // tree-shakes them in real builds. Do NOT add mocks imports elsewhere in
 // packages/studio/src/.
 import type {
-  BaseBrowserService,
-  BaseDocumentationProfile,
+  StartBrowserService,
+  StartDocumentationProfile,
   CharacterDiscoveryService,
   OutputService,
   Pattern,
@@ -29,16 +29,30 @@ import type {
   KmpBuildArtifacts,
 } from "@keyboard-studio/engine";
 import { charactersInTier } from "@keyboard-studio/engine";
-import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockPatternByIdSync, mockScaffolder } from "@keyboard-studio/contracts/mocks";
+import { mockStartBrowser, mockOutputService, mockPatternLibrary, mockPatternByIdSync, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
-import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
+import { localStartBrowser, LOCAL_PROXY_BASE } from "./localStartBrowser.ts";
 import {
   getPatternLibraryService as getBrowserPatternLibraryService,
   getPatternByIdSync as getBrowserPatternByIdSync,
 } from "./browserPatternLibrary.ts";
 import { importOrReload } from "../crash/staleChunk.ts";
 
-export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
+// The env read goes through a try/catch, the same Node-safety idiom as
+// lib/envFlag.ts: outside a Vite context (a bare Node import of this
+// module's graph by tooling that never calls the services) `import.meta.env`
+// is undefined and the bare property access throws at module load. The
+// flag's default is "real unless explicitly 'false'", so an unreadable env
+// keeps the default.
+function readUseRealEngine(): boolean {
+  try {
+    return import.meta.env.VITE_USE_REAL_ENGINE !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export const USE_REAL = readUseRealEngine();
 
 // Single lazy-import seam for the engine barrel. Every accessor below routes
 // through it so (a) there is one `import()` expression for Vite to key the
@@ -56,45 +70,45 @@ function importEngine(): Promise<EngineModule> {
 // Re-export the proxy base for callers that need it (e.g. scaffolder).
 export { LOCAL_PROXY_BASE };
 
-// BaseBrowserService: backed by the build-time/dev-server catalog at
+// StartBrowserService: backed by the build-time/dev-server catalog at
 // /local-kbd-api/list. In dev the localKeyboards Vite plugin serves it from
 // the sibling keymanapp/keyboards clone; in production the build-keyboards-index
 // script materialises dist/local-kbd-api/list at deploy time. Both feed the
-// same localBaseBrowser implementation, so this stays synchronous and never
+// same localStartBrowser implementation, so this stays synchronous and never
 // touches the GitHub API at runtime.
-export function getBaseBrowserService(): BaseBrowserService {
-  return USE_REAL ? localBaseBrowser : mockBaseBrowser;
+export function getStartBrowserService(): StartBrowserService {
+  return USE_REAL ? localStartBrowser : mockStartBrowser;
 }
 
-// getBaseDocProfile: spec 080 FR-008's base-documentation classifier (research
-// R4). Neither `localBaseBrowser` (dev proxy of the static /local-kbd-api/list
-// catalog) nor `mockBaseBrowser` implement the classifier — it needs a live
+// getStartDocProfile: spec 080 FR-008's base-documentation classifier (research
+// R4). Neither `localStartBrowser` (dev proxy of the static /local-kbd-api/list
+// catalog) nor `mockStartBrowser` implement the classifier — it needs a live
 // `.kps` + welcome-page probe fetch, which the catalog snapshot does not carry
 // (classifying the WHOLE gallery is explicitly out of scope; see
-// BaseBrowserServiceWithDocProfile's doc comment in the engine). This accessor
-// therefore does not route through getBaseBrowserService(): it lazily builds a
-// SEPARATE `createBaseBrowser()` instance (same lazy-import + cache pattern as
+// StartBrowserServiceWithDocProfile's doc comment in the engine). This accessor
+// therefore does not route through getStartBrowserService(): it lazily builds a
+// SEPARATE `createStartBrowser()` instance (same lazy-import + cache pattern as
 // every other engine accessor above) whose own per-base-id memoization
 // (research R4) makes a repeated call for the same id free. When USE_REAL is
-// false, resolves to the same "unknown" shape createBaseBrowser() itself
+// false, resolves to the same "unknown" shape createStartBrowser() itself
 // returns for an unclassifiable base — deterministic, no network, matching
 // this module's other test-mode contracts.
-const UNKNOWN_DOC_PROFILE: BaseDocumentationProfile = {
+const UNKNOWN_DOC_PROFILE: StartDocumentationProfile = {
   level: "unknown",
   members: [],
   welcomeConvention: "absent",
   hasUsableDescription: false,
   welcomeImages: [],
 };
-type DocProfileBrowser = { getDocProfile: (baseId: string) => Promise<BaseDocumentationProfile> };
+type DocProfileBrowser = { getDocProfile: (startId: string) => Promise<StartDocumentationProfile> };
 let docProfileBrowserCache: DocProfileBrowser | null = null;
-export async function getBaseDocProfile(baseId: string): Promise<BaseDocumentationProfile> {
+export async function getStartDocProfile(startId: string): Promise<StartDocumentationProfile> {
   if (!USE_REAL) return UNKNOWN_DOC_PROFILE;
   if (docProfileBrowserCache === null) {
-    const { createBaseBrowser } = await importEngine();
-    docProfileBrowserCache = createBaseBrowser();
+    const { createStartBrowser } = await importEngine();
+    docProfileBrowserCache = createStartBrowser();
   }
-  return docProfileBrowserCache.getDocProfile(baseId);
+  return docProfileBrowserCache.getDocProfile(startId);
 }
 
 // ScaffolderService: when USE_REAL is false returns the mock scaffolder so
@@ -284,13 +298,13 @@ export function getManagedPRProxyEndpoint(): string {
 // critical path by warmExemplarSource() below.
 type SuggestEngineFn = (opts: {
   bcp47: string;
-  baseIr: KeyboardIR;
+  startIr: KeyboardIR;
   languageName?: string;
 }) => Promise<MissingCharSuggestions | null>;
 let suggestEngineCache: SuggestEngineFn | null = null;
 export async function suggestMissingChars(
   bcp47: string,
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   languageName?: string,
 ): Promise<MissingCharSuggestions | null> {
   if (!USE_REAL) return null;
@@ -301,7 +315,7 @@ export async function suggestMissingChars(
   const fn = suggestEngineCache;
   return fn({
     bcp47,
-    baseIr,
+    startIr,
     ...(languageName !== undefined ? { languageName } : {}),
   });
 }
@@ -350,14 +364,14 @@ export type { MissingCharSuggestions };
 // locked signature and resolves once the engine export lands.
 let characterMapEngineCache:
   | ((
-      baseIr: KeyboardIR | null,
+      startIr: KeyboardIR | null,
       bcp47?: string,
       languageName?: string,
       opts?: { baseScripts?: readonly string[] },
     ) => Promise<CharacterMapGroup[]>)
   | null = null;
 export async function characterMapGroups(
-  baseIr: KeyboardIR | null,
+  startIr: KeyboardIR | null,
   bcp47?: string,
   languageName?: string,
   baseScripts?: readonly string[],
@@ -367,7 +381,7 @@ export async function characterMapGroups(
     const { buildCharacterMap } = await importEngine();
     characterMapEngineCache = buildCharacterMap;
   }
-  return characterMapEngineCache(baseIr, bcp47, languageName, {
+  return characterMapEngineCache(startIr, bcp47, languageName, {
     ...(baseScripts !== undefined ? { baseScripts } : {}),
   });
 }

@@ -55,9 +55,9 @@
 // belong to whichever test can see the tree in question.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard } from "@keyboard-studio/contracts";
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   DecisionEntry,
   KeyboardIR,
   MechanismAssignment,
@@ -82,7 +82,7 @@ import {
 // Fixtures — a small but real keyboard, deliberately more than one file
 // ---------------------------------------------------------------------------
 
-const BASE_ID = "test_base";
+const START_ID = "test_base";
 const NEW_ID = "hausa_std";
 
 const KMN = [
@@ -105,7 +105,7 @@ const KPS = [
   "  <Keyboards>",
   "    <Keyboard>",
   "      <Name>Test Base</Name>",
-  `      <ID>${BASE_ID}</ID>`,
+  `      <ID>${START_ID}</ID>`,
   "      <Version>1.0</Version>",
   "    </Keyboard>",
   "  </Keyboards>",
@@ -116,12 +116,12 @@ const KPS = [
 const KVKS = [
   '<?xml version="1.0" encoding="utf-8"?>',
   "<visualkeyboard>",
-  `  <header><kbdname>${BASE_ID}</kbdname></header>`,
+  `  <header><kbdname>${START_ID}</kbdname></header>`,
   "</visualkeyboard>",
   "",
 ].join("\n");
 
-const CSS = [`.kmw-keyboard-${BASE_ID} .kmw-key { color: #000; }`, ""].join("\n");
+const CSS = [`.kmw-keyboard-${START_ID} .kmw-key { color: #000; }`, ""].join("\n");
 
 /** A pre-existing release heading. Its date stamp must survive untouched. */
 const HISTORY_EXISTING = ["## 1.0 (2020-01-01)", "* Initial release.", ""].join("\n");
@@ -140,7 +140,7 @@ const ICON_BYTES = new Uint8Array([0, 0, 1, 0, 1, 0, 16, 16, 255, 254, 7]);
  * fixture means every projection step runs on the shape it was written for.
  */
 function makeIr(): KeyboardIR {
-  const parsed = parseKmn(KMN, `${BASE_ID}.kmn`);
+  const parsed = parseKmn(KMN, `${START_ID}.kmn`);
   return parsed.ir;
 }
 
@@ -156,21 +156,21 @@ function kbRuleNodeId(ir: KeyboardIR): string {
 }
 
 /** A FRESH VFS per run — the two runs must never share a mutable fixture. */
-function makeBaseVfs(): VirtualFS {
+function makeStartVfs(): VirtualFS {
   return createVirtualFS([
-    { path: `source/${BASE_ID}.kmn`, content: KMN, isBinary: false },
-    { path: `source/${BASE_ID}.kps`, content: KPS, isBinary: false },
-    { path: `source/${BASE_ID}.kvks`, content: KVKS, isBinary: false },
-    { path: `source/${BASE_ID}.css`, content: CSS, isBinary: false },
-    { path: `source/${BASE_ID}.ico`, content: ICON_BYTES, isBinary: true },
+    { path: `source/${START_ID}.kmn`, content: KMN, isBinary: false },
+    { path: `source/${START_ID}.kps`, content: KPS, isBinary: false },
+    { path: `source/${START_ID}.kvks`, content: KVKS, isBinary: false },
+    { path: `source/${START_ID}.css`, content: CSS, isBinary: false },
+    { path: `source/${START_ID}.ico`, content: ICON_BYTES, isBinary: true },
     { path: "HISTORY.md", content: HISTORY_EXISTING, isBinary: false },
     { path: "README.md", content: README, isBinary: false },
   ]);
 }
 
-const BASE: BaseKeyboard = makeBaseKeyboard({
-  id: BASE_ID,
-  path: `release/t/${BASE_ID}`,
+const BASE: StartKeyboard = makeStartKeyboard({
+  id: START_ID,
+  path: `release/t/${START_ID}`,
   script: "Latn",
   targets: ["windows", "web"],
   displayName: "Test Base",
@@ -258,7 +258,7 @@ const SESSION: ReadonlyArray<{ stepId: string; result: unknown; act: () => void 
       // must absorb that, and must absorb it only for the comparison.
       vi.setSystemTime(DAY_TWO);
       // A real carve: the [K_B] rule leaves the projected .kmn.
-      const ir = useWorkingCopyStore.getState().baseIr;
+      const ir = useWorkingCopyStore.getState().startIr;
       if (ir === null) throw new Error("no working copy to carve");
       useWorkingCopyStore.getState().deleteNode(kbRuleNodeId(ir));
     },
@@ -306,14 +306,14 @@ function realRecorder(): ReducerDeps["recordDecision"] {
     },
     getMechanismAssignments: () =>
       selectDesktopAssignments(useWorkingCopyStore.getState().phaseResults),
-    getBaseIr: () => useWorkingCopyStore.getState().baseIr,
+    getStartIr: () => useWorkingCopyStore.getState().startIr,
     getDeletedNodeIds: () => useWorkingCopyStore.getState().deletedNodeIds,
     getDeletedItemIds: () => useWorkingCopyStore.getState().deletedItemIds,
     getKeyboardId: () => {
       const wc = useWorkingCopyStore.getState();
-      return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
+      return wc.identity?.keyboardId ?? wc.startKeyboard?.id ?? null;
     },
-    getBaseKeyboard: () => useWorkingCopyStore.getState().baseKeyboard,
+    getStartKeyboard: () => useWorkingCopyStore.getState().startKeyboard,
     getIrAxes: () => useWorkingCopyStore.getState().irAxes,
     getInstantiationMode: () => useWorkingCopyStore.getState().instantiationMode,
     getRemovalCapabilities: () => useWorkingCopyStore.getState().removalCapabilities,
@@ -356,7 +356,7 @@ interface RunResult {
   /** The packaged zip, path -> bytes. */
   zip: Record<string, Uint8Array>;
   /** The store's base VFS as it stood when the run ended. */
-  baseVfs: Map<string, { content: string | Uint8Array; isBinary: boolean }>;
+  startVfs: Map<string, { content: string | Uint8Array; isBinary: boolean }>;
   /** The mutated working-copy state at the end of the run. */
   workingCopy: unknown;
   /** The decision entries this run produced (empty for the control run). */
@@ -383,7 +383,7 @@ async function runSession(recordDecision: ReducerDeps["recordDecision"]): Promis
   // exists for.
   useWorkingCopyStore
     .getState()
-    .instantiateFromExisting(BASE, { vfs: makeBaseVfs(), ir: makeIr() });
+    .instantiateFromExisting(BASE, { vfs: makeStartVfs(), ir: makeIr() });
 
   // `recordDecision` OMITTED entirely in the control run — not passed as
   // undefined, not stubbed. That is the shape of a build without the feature.
@@ -407,13 +407,13 @@ async function runSession(recordDecision: ReducerDeps["recordDecision"]): Promis
   const serialized = await serializeWorkingCopy();
   if (serialized === null) throw new Error("serialization produced nothing");
 
-  const storeBaseVfs = useWorkingCopyStore.getState().baseVfs;
-  if (storeBaseVfs === null) throw new Error("working copy lost its base VFS");
+  const storeStartVfs = useWorkingCopyStore.getState().startVfs;
+  if (storeStartVfs === null) throw new Error("working copy lost its base VFS");
 
   return {
     vfs: entrySnapshot(projected.vfs),
     zip: unzipSync(serialized.bytes),
-    baseVfs: entrySnapshot(storeBaseVfs),
+    startVfs: entrySnapshot(storeStartVfs),
     workingCopy: workingCopySnapshot(),
     entries: [...useDecisionLogStore.getState().record.entries],
   };
@@ -516,14 +516,14 @@ describe("FR-007 / SC-008 — the projected keyboard does not depend on recordin
 
 describe("FR-007 — the widened capture writes to nothing it reads", () => {
   it("leaves the store's base VFS exactly as instantiated", async () => {
-    const { baseVfs } = await runSession(realRecorder());
+    const { startVfs } = await runSession(realRecorder());
 
     // The projection clones; the capture reads the clone. Neither may reach back
     // into the base the working copy was instantiated from.
-    const pristine = entrySnapshot(makeBaseVfs());
-    expect([...baseVfs.keys()].sort()).toEqual([...pristine.keys()].sort());
+    const pristine = entrySnapshot(makeStartVfs());
+    expect([...startVfs.keys()].sort()).toEqual([...pristine.keys()].sort());
     for (const [path, entry] of pristine) {
-      expectSameBytes(baseVfs.get(path), entry, path);
+      expectSameBytes(startVfs.get(path), entry, path);
     }
   });
 

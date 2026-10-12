@@ -6,9 +6,9 @@
 
 import { describe, it, expect } from "vitest";
 import { DOC_MEMBER_IDS, type DocMemberId, type DocMemberState } from "./doc-members";
-import { makeBaseKeyboard, type BaseKeyboard } from "./baseKeyboard";
+import { makeStartKeyboard, type StartKeyboard } from "./startKeyboard";
 import {
-  BaseDocumentationProfileSchema,
+  StartDocumentationProfileSchema,
   ChartPreferenceSchema,
   DocLintInputSchema,
   DocMemberIdSchema,
@@ -59,7 +59,7 @@ describe("DocMemberStateSchema", () => {
   });
 });
 
-describe("BaseDocumentationProfileSchema", () => {
+describe("StartDocumentationProfileSchema", () => {
   it("round-trips a folder-convention full profile and rejects a bad level", () => {
     const valid = {
       level: "full",
@@ -68,16 +68,16 @@ describe("BaseDocumentationProfileSchema", () => {
       welcomeImages: ["welcome/desktop_layout_default.png"],
       hasUsableDescription: true,
     };
-    const ok = BaseDocumentationProfileSchema.safeParse(valid);
+    const ok = StartDocumentationProfileSchema.safeParse(valid);
     expect(ok.success).toBe(true);
     if (ok.success) expect(ok.data).toEqual(valid);
-    expect(BaseDocumentationProfileSchema.safeParse({ ...valid, level: "partial" }).success).toBe(false);
+    expect(StartDocumentationProfileSchema.safeParse({ ...valid, level: "partial" }).success).toBe(false);
   });
 });
 
 describe("BaseKeyboard.docProfile (spec 080 T033 — additive carrier field)", () => {
   it("is absent by default and construction is unaffected", () => {
-    const base = makeBaseKeyboard({
+    const base = makeStartKeyboard({
       id: "basic_kbdus",
       path: "release/b/basic_kbdus",
       script: "Latn",
@@ -97,10 +97,10 @@ describe("BaseKeyboard.docProfile (spec 080 T033 — additive carrier field)", (
       welcomeImages: [],
       hasUsableDescription: false,
     };
-    expect(BaseDocumentationProfileSchema.safeParse(profile).success).toBe(true);
+    expect(StartDocumentationProfileSchema.safeParse(profile).success).toBe(true);
 
-    const base: BaseKeyboard = {
-      ...makeBaseKeyboard({
+    const base: StartKeyboard = {
+      ...makeStartKeyboard({
         id: "basic_kbdus",
         path: "release/b/basic_kbdus",
         script: "Latn",
@@ -150,7 +150,7 @@ describe("DocLintInputSchema", () => {
       copyrightHolders: { license: "SIL Global", kmn: "SIL Global" },
       members: { "history-md": "## 1.0 (2026-09-10)\n* Initial release.\n" },
       deletedFilenames: [],
-      baseHistoryMdText: "## 0.9 (2025-01-01)\n* Base release.\n",
+      startHistoryMdText: "## 0.9 (2025-01-01)\n* Base release.\n",
     };
     const ok = DocLintInputSchema.safeParse(valid);
     expect(ok.success).toBe(true);

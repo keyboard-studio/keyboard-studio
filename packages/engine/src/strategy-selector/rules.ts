@@ -15,7 +15,7 @@
 // A3a=postfix is base-derived detection (detectMarkInputOrderFromImport,
 // import-mark-order.ts), which finds the unconditional postfix sequence-replace
 // shape in a base's KeyboardIR. The studio wires it into the live pipeline: at
-// instantiation (either track) seedIrAxesFromBaseIr (studio workingCopyStore.ts)
+// instantiation (either track) seedIrAxesFromStartIr (studio workingCopyStore.ts)
 // runs the detector on the base IR and seeds markInputOrder="postfix" onto
 // irAxes, from where it flows through defaultFillAxes into selectStrategy — so
 // rule 3a fires live for such a base. Caveat: `if(…)`-guarded rules are opaque

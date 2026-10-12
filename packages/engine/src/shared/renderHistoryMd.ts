@@ -96,10 +96,10 @@ export function splitHistoryPreamble(text: string): { preamble: string; rest: st
  * the base's own entries (criterion 3.4 cumulative; title stays on top).
  * Separators are exactly one blank line between blocks.
  */
-function withBaseText(entryText: string, baseHistoryText: string | null): string {
-  if (baseHistoryText === null || baseHistoryText === "") return entryText;
+function withStartText(entryText: string, startHistoryText: string | null): string {
+  if (startHistoryText === null || startHistoryText === "") return entryText;
 
-  const { preamble, rest } = splitHistoryPreamble(baseHistoryText);
+  const { preamble, rest } = splitHistoryPreamble(startHistoryText);
   const entry = entryText.endsWith("\n") ? entryText : `${entryText}\n`;
 
   if (preamble === "" && rest === "") {
@@ -107,7 +107,7 @@ function withBaseText(entryText: string, baseHistoryText: string | null): string
   }
   if (preamble === "") {
     // No title — new entry on top, base entries below (legacy behaviour).
-    return `${entry}\n${rest === "" ? baseHistoryText : rest}`;
+    return `${entry}\n${rest === "" ? startHistoryText : rest}`;
   }
 
   const preambleBlock = preamble.endsWith("\n") ? preamble : `${preamble}\n`;
@@ -125,7 +125,7 @@ export interface RenderHistoryMdOptions {
   /** Set when this production is a Track 2 adaptation; drives the injected attribution bullet. */
   adaptedFrom: { id: string; version: string } | null;
   /** The base's own HISTORY.md text (Track 2), preserved below the new entry (after any preamble). `null` when there is none. */
-  baseHistoryText: string | null;
+  startHistoryText: string | null;
 }
 
 /**
@@ -150,7 +150,7 @@ export function renderHistoryMd(
   entry: HistoryEntryState | null,
   opts: RenderHistoryMdOptions,
 ): string {
-  const { version, dateIso, adaptedFrom, baseHistoryText } = opts;
+  const { version, dateIso, adaptedFrom, startHistoryText } = opts;
   const decided = entry !== null && (entry.status === "confirmed" || entry.status === "edited");
 
   if (!decided) {
@@ -158,7 +158,7 @@ export function renderHistoryMd(
       adaptedFrom !== null
         ? [adaptedFromBullet(adaptedFrom.id, adaptedFrom.version)]
         : [HISTORY_INITIAL_RELEASE_BULLET];
-    return withBaseText(renderEntry(version, dateIso, bullets), baseHistoryText);
+    return withStartText(renderEntry(version, dateIso, bullets), startHistoryText);
   }
 
   const authoredBullets = entry.editedBullets ?? entry.proposal.bullets;
@@ -168,5 +168,5 @@ export function renderHistoryMd(
       ? [attribution, ...authoredBullets]
       : authoredBullets;
 
-  return withBaseText(renderEntry(version, entry.proposal.dateIso, bullets), baseHistoryText);
+  return withStartText(renderEntry(version, entry.proposal.dateIso, bullets), startHistoryText);
 }

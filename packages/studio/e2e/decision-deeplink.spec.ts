@@ -39,16 +39,17 @@
 import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   chooseTrackCopy,
+  driveAttributionStep,
   seedReturningVisitor,
   switchTab,
 } from "./helpers/surveyFlow";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Test Autonym",
   english: "Test",
   targetScript: "other",
@@ -87,12 +88,13 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
 
-    // Past "track" now (adapt-track skips project_name straight to
-    // characters — steps/manifest.ts's track-routing docstring), so the
-    // prefill summary is the phase boundary landmark.
+    // Past "track" now (adapt-track skips project_name; the fork leaves
+    // from attribution since #1901 — steps/manifest.ts's track-routing
+    // docstring), so the prefill summary is the phase boundary landmark.
     await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 30_000 });
 
     // ---- Open Decisions and find the early "track" answer ------------------

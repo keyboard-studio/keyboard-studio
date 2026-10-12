@@ -1,4 +1,4 @@
-// Form for creating a new keyboard from a base — Phase A "New from base" mode.
+// Form for creating a new keyboard from a base — Phase A "New from a starting keyboard" mode.
 // Validates keyboardId live via validateKeyboardId from @keyboard-studio/contracts.
 
 import { useState } from "react";

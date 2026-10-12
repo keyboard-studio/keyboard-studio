@@ -5,16 +5,16 @@
 // so the OSK preview and the downloaded artifact are guaranteed equivalent.
 //
 // Steps:
-//   1. Read the working-copy store (baseVfs, baseIr, keyboardId, deletedNodeIds,
+//   1. Read the working-copy store (startVfs, startIr, keyboardId, deletedNodeIds,
 //      assignments, identity).
 //   2. Resolve assignments via the browser pattern library (async getById).
-//   3. Clone baseVfs (createVirtualFS) so the original is never mutated.
+//   3. Clone startVfs (createVirtualFS) so the original is never mutated.
 //   4. Call projectWorkingCopyVfs (pure, in-place) on the clone.
 //   5. Pass the projected VFS to toZip (via getToZip service accessor).
 //   6. Return { bytes, warnings, keyboardId } so the caller can surface warnings.
 //
 // Entry point for OutputScreen's download and any other download / output
-// trigger. If the working copy is not instantiated (baseVfs === null),
+// trigger. If the working copy is not instantiated (startVfs === null),
 // serializeWorkingCopy returns null so the caller can show a "nothing to download"
 // state.
 
@@ -24,7 +24,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
-import { deriveRuleAdditions } from "./ruleAdditions.ts";
+import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import {
@@ -95,7 +95,7 @@ export interface SerializeWorkingCopyResult {
  * guaranteed equivalent.
  */
 export interface ProjectWorkingCopyForOutputResult {
-  /** The projected (cloned) VirtualFS — never the store's original baseVfs. */
+  /** The projected (cloned) VirtualFS — never the store's original startVfs. */
   vfs: VirtualFS;
   /** Author-chosen keyboard id (identity.keyboardId) or the base id (filename / branch). */
   keyboardId: string;
@@ -220,7 +220,7 @@ function labelTestBuild(
  * "nothing to download" message or disable the submit button.
  *
  * All assignments are resolved via the browser pattern library (async). The
- * function never writes to disk — it clones baseVfs and projects onto the clone.
+ * function never writes to disk — it clones startVfs and projects onto the clone.
  *
  * Projection order matches {@link projectWorkingCopyVfs} exactly:
  *   0. Touch layout (Phase E touchLayoutJson → .keyman-touch-layout)
@@ -243,28 +243,28 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
+  const { startVfs, startIr, startKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
 
   // Not-instantiated guard.
-  if (baseVfs === null || baseIr === null || baseKeyboard === null) {
+  if (startVfs === null || startIr === null || startKeyboard === null) {
     return null;
   }
 
   // Carve / assignments / identity run against the base id (VFS paths are
-  // still source/<baseId>.kmn at that point). When identity.keyboardId is set
+  // still source/<startId>.kmn at that point). When identity.keyboardId is set
   // and differs, projectWorkingCopyVfs's final rename step rewrites the .kmn
-  // path stores, renames source/<baseId>.* → source/<newId>.*, and rewrites
-  // `.kmw-keyboard-<baseId>` selectors in *.css plus <ID> / <kbdname>
+  // path stores, renames source/<startId>.* → source/<newId>.*, and rewrites
+  // `.kmw-keyboard-<startId>` selectors in *.css plus <ID> / <kbdname>
   // references in *.kps and *.kvks.
-  const keyboardId = baseKeyboard.id;
-  const outputKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
+  const keyboardId = startKeyboard.id;
+  const outputKeyboardId = resolveOutputKeyboardId(identity, startKeyboard);
 
-  // Keyboard release version for the `<id>-<version>.zip` filename. baseIr.header.version
+  // Keyboard release version for the `<id>-<version>.zip` filename. startIr.header.version
   // carries &KEYBOARDVERSION on import (codec/parse prefers it over &VERSION) and the
   // scaffolder's keyboard release version on a fresh base. Fall back to "1.0" if absent —
   // never the &VERSION file-format version (e.g. "14.0").
   // Declared `let` so the adapt path can reassign to the bumped version.
-  const rawVersion = baseIr.header.version?.trim() || "1.0";
+  const rawVersion = startIr.header.version?.trim() || "1.0";
   let version = rawVersion.replace(/[^\w.\-]/g, "_");
 
   // 2. Collect physical assignments from phaseResults (mirrors useWorkingCopyTransform).
@@ -295,12 +295,12 @@ export async function projectWorkingCopyForOutput(
     );
   }
 
-  // 4. Clone baseVfs so the original is not mutated (projectWorkingCopyVfs is in-place).
+  // 4. Clone startVfs so the original is not mutated (projectWorkingCopyVfs is in-place).
   //    Shallow-entry clone is safe because the projection helpers replace whole
   //    entries via vfs.set() rather than mutating an entry's content buffer in place
   //    (VirtualFS.set contract). If a future projection step writes into an entry's
   //    Uint8Array directly, deep-copy the binary entries here.
-  const clonedVfs = createVirtualFS(baseVfs.entries());
+  const clonedVfs = createVirtualFS(startVfs.entries());
 
   // 4a. Track 2 (adapt-existing) output-only staging: bump version and prepend
   //     HISTORY.md entry. This block must NOT run on the OSK preview path — it is
@@ -332,7 +332,7 @@ export async function projectWorkingCopyForOutput(
   // NEVER null on the output path. `projectWorkingCopyVfs` step 3.6 — the single
   // descriptor writer — is gated on `identity !== null`, and Track 1 sets
   // `identity: null` at instantiation ("no overlay until Phase A completes",
-  // workingCopyStore instantiateFromBase). A Track 1 author who has not yet
+  // workingCopyStore instantiateFromStart). A Track 1 author who has not yet
   // named the keyboard therefore got NO `source/<id>.kps` at all, which is fine
   // for a zip that Keyman Developer would regenerate but fatal for the `.kmp`:
   // the package compiler has no descriptor to read, so the primary download
@@ -350,7 +350,7 @@ export async function projectWorkingCopyForOutput(
   // The base-name fallback is for the DESCRIPTOR only, not the `.kmn` &NAME
   // store. `projectWorkingCopyVfs` step 3 treats the display name as an EDIT:
   // it rewrites `store(&NAME)` only when the effective display name DIFFERS from
-  // the base's (`baseIr.header.name`). When they match — including this no-
+  // the base's (`startIr.header.name`). When they match — including this no-
   // identity fallback, which passes the base's own name straight back — the name
   // store is left byte-identical to the base. So handing the base name through
   // here does not disturb the `.kmn`; it only gives the descriptor writer a
@@ -368,7 +368,7 @@ export async function projectWorkingCopyForOutput(
     ...(identity.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
     ...(identity.languageName !== undefined ? { languageName: identity.languageName } : {}),
     ...(websiteUrl !== undefined ? { websiteUrl } : {}),
-  } : { displayName: baseKeyboard.displayName, ...(websiteUrl !== undefined ? { websiteUrl } : {}) };
+  } : { displayName: startKeyboard.displayName, ...(websiteUrl !== undefined ? { websiteUrl } : {}) };
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
   // The release version HISTORY.md's top entry is headed with (spec 079
@@ -479,8 +479,8 @@ export async function projectWorkingCopyForOutput(
   // Their bare names feed the descriptor's `<Files>` list (step 3.6, below)
   // and the fresh page's "Keyboard Layout" section (step 5c). Loader order is
   // kept: it is the base's own `.kps` order, and it is deterministic (SC-004).
-  const carriedImages = carriedWelcomeImages(baseWelcomeImages);
-  const carriedImageNames = welcomeFolderFileNames(baseWelcomeImages);
+  const carriedImages = carriedWelcomeImages(startWelcomeImages);
+  const carriedImageNames = welcomeFolderFileNames(startWelcomeImages);
 
   // spec 079 FR-013..FR-015: one deterministic layout chart per (platform,
   // layer), generated from the MODEL (never the on-screen preview) unless the
@@ -493,9 +493,9 @@ export async function projectWorkingCopyForOutput(
   const chartsWanted = effectiveChartPreference(chartPreference, baseShipsImages) === "regenerate" || !baseShipsImages;
   const charts = chartsWanted
     ? buildLayoutCharts({
-        displayName: identity?.displayName ?? baseKeyboard.displayName,
+        displayName: identity?.displayName ?? startKeyboard.displayName,
         kvksXml: readVfsText(clonedVfs, `source/${keyboardId}.kvks`) ?? null,
-        ir: workingIr ?? baseIr,
+        ir: workingIr ?? startIr,
         touchLayoutJson,
         reservedNames: carriedImageNames,
         warnings: docWarnings,
@@ -509,7 +509,7 @@ export async function projectWorkingCopyForOutput(
     vfs: clonedVfs,
     keyboardId,
     targetKeyboardId: outputKeyboardId,
-    baseIr,
+    startIr,
     deletedNodeIds,
     deletedItemIds,
     carveChars,
@@ -525,13 +525,13 @@ export async function projectWorkingCopyForOutput(
     // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
     // fallback above sets identityForProjection.displayName to this same value,
     // so they compare equal and the base's &NAME store is left byte-identical.
-    baseDisplayName: baseKeyboard.displayName,
+    baseDisplayName: startKeyboard.displayName,
     // spec 078: the same applied context-tolerance fix the preview replays.
     contextToleranceOverlay: contextToleranceOverlay?.overlay ?? null,
     // spec 082: the same rules-step additions the preview projects — the
     // download must contain exactly what the OSK compiled (pack install,
     // guard synthesis, Narrow).
-    ruleAdditions: deriveRuleAdditions(workingIr, baseIr),
+    ruleAdditions: deriveRuleAdditions(workingIr, startIr),
   });
 
   // The projector's own report of what id the VFS actually ended up under is
@@ -552,7 +552,7 @@ export async function projectWorkingCopyForOutput(
   //     and whether the SCAFFOLDED artifact (which does carry a generated .kps)
   //     ever replaces the open-base VFS in the store is a compile-settle race
   //     the commit seam intentionally runs only once per base id
-  //     (StudioShell's instantiatedForBaseIdRef). A downloaded keyboard must
+  //     (StudioShell's instantiatedForStartIdRef). A downloaded keyboard must
   //     be a submittable directory regardless of which artifact won (spec §12),
   //     so complete it here. generateStubs only fills MISSING entries — every
   //     fetched or projected file is left untouched. Scoped to new-from-base:
@@ -566,14 +566,14 @@ export async function projectWorkingCopyForOutput(
     // copy, resolved by the SAME engine helper scaffold() uses — one D4/D5 policy,
     // not two.
     const { inherited } = resolveInheritedHolders(
-      baseLicenseText ?? undefined,
-      baseHolderOverride ?? undefined,
+      startLicenseText ?? undefined,
+      startHolderOverride ?? undefined,
     );
     generateStubs(
       clonedVfs,
       resolvedKeyboardId,
-      identity?.displayName ?? baseKeyboard.displayName,
-      identity?.bcp47 !== undefined ? [identity.bcp47] : (baseKeyboard.languages ?? []),
+      identity?.displayName ?? startKeyboard.displayName,
+      identity?.bcp47 !== undefined ? [identity.bcp47] : (startKeyboard.languages ?? []),
       version,
       attribution ?? undefined,
       // emitYear: defaulted to the current year. D2 records when the work is
@@ -591,17 +591,17 @@ export async function projectWorkingCopyForOutput(
   //     modes because they all call this one function (research D-03).
   //     Platforms come from the PROJECTED .kmn's own store(&TARGETS), the same
   //     regex the package descriptor already runs (FR-008) — never re-derived
-  //     from BaseKeyboard, which can disagree with what this build actually emits.
+  //     from StartKeyboard, which can disagree with what this build actually emits.
   const projectedKmnText = readVfsText(clonedVfs, `source/${resolvedKeyboardId}.kmn`) ?? "";
   const docsInput: HelpDocsRenderInput = {
     answers: helpDocs,
-    displayName: identity?.displayName ?? baseKeyboard.displayName,
+    displayName: identity?.displayName ?? startKeyboard.displayName,
     ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
     platforms: parseTargetTokens(projectedKmnText),
   };
   // FR-006: an adaptation inherits the base's README description; a copy never
   // does (FR-007) — the slice is null on Track 1 and the track guard keeps it so.
-  clonedVfs.set("README.md", renderReadmeMd(docsInput, isAdaptation ? baseReadmeMdText : null), false);
+  clonedVfs.set("README.md", renderReadmeMd(docsInput, isAdaptation ? startReadmeMdText : null), false);
   clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);
   // spec 079 FR-002: the welcome page lives at the folder-convention path and
   // NOWHERE else — the flat `source/welcome.htm` is never written. A stale flat
@@ -611,7 +611,7 @@ export async function projectWorkingCopyForOutput(
   clonedVfs.delete(FLAT_WELCOME_PATH);
   clonedVfs.set(
     WELCOME_PAGE_PATH,
-    renderWelcomeHtm(docsInput, baseWelcomeHtmText, welcomeFolderFiles),
+    renderWelcomeHtm(docsInput, startWelcomeHtmText, welcomeFolderFiles),
     false,
   );
   // FR-006: every carried base image, beside the page under its own name.
@@ -622,7 +622,7 @@ export async function projectWorkingCopyForOutput(
   for (const chart of charts) {
     clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
   }
-  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText, baseWelcomeHtmText), false);
+  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, startHelpPhpText, startWelcomeHtmText), false);
 
   // spec 079 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
   // production from the author's proposal decision — a confirmed or edited
@@ -640,7 +640,7 @@ export async function projectWorkingCopyForOutput(
       version: historyVersion,
       dateIso,
       adaptedFrom: isAdaptation ? { id: keyboardId, version: rawVersion } : null,
-      baseHistoryText: isAdaptation ? (baseHistoryMdText ?? existingHistoryMd) : null,
+      startHistoryText: isAdaptation ? (startHistoryMdText ?? existingHistoryMd) : null,
     }),
     false,
   );
@@ -649,7 +649,7 @@ export async function projectWorkingCopyForOutput(
   // ship (unlisted in its `.kps`, or 404 at fetch). Named, not swallowed — the
   // checklist annotates the welcome row and the author can supply them.
   const missingInheritedImages =
-    baseWelcomeHtmText !== null ? missingInheritedImageRefs(baseWelcomeHtmText, welcomeFolderFiles) : [];
+    startWelcomeHtmText !== null ? missingInheritedImageRefs(startWelcomeHtmText, welcomeFolderFiles) : [];
   if (missingInheritedImages.length > 0) {
     docWarnings.push(
       `[docs] the base welcome page references images that were not carried: ${missingInheritedImages.join(", ")}`,
@@ -658,7 +658,7 @@ export async function projectWorkingCopyForOutput(
   // The images were carried once but did not survive a reload (over the
   // draft's size budget). Named so the author knows this production ships
   // without them and that re-opening the base brings them back.
-  if (baseWelcomeImagesDropped) {
+  if (startWelcomeImagesDropped) {
     docWarnings.push(
       "[docs] the base's welcome images were too large to keep in the saved draft and are not in this production; re-open the base to carry them again",
     );
@@ -702,7 +702,7 @@ export async function projectWorkingCopyForOutput(
   //
   //    No internal-path mismatch warning is emitted when identity.keyboardId
   //    differs from the base id: projectWorkingCopyVfs's targetKeyboardId rename
-  //    pass (run in step 5 above) now rewrites source/<baseId>.* → source/<newId>.*
+  //    pass (run in step 5 above) now rewrites source/<startId>.* → source/<newId>.*
   //    and the in-file id references, so the output is internally consistent.
   const warnings = [...adaptWarnings, ...projectionWarnings, ...docWarnings];
 
@@ -712,7 +712,7 @@ export async function projectWorkingCopyForOutput(
   return {
     vfs: clonedVfs,
     keyboardId: resolvedKeyboardId,
-    displayName: identity?.displayName ?? baseKeyboard.displayName,
+    displayName: identity?.displayName ?? startKeyboard.displayName,
     version,
     warnings,
     missingInheritedImages,

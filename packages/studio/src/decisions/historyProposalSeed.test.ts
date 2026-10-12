@@ -3,7 +3,7 @@
 // Coverage:
 //   1. Empty record -> the all-empty seed.
 //   2. base-contribution, instantiationMode "adapt-existing" -> base set from
-//      baseId + the "version" inheritedMetadata field.
+//      startId + the "version" inheritedMetadata field.
 //   3. base-contribution, instantiationMode "new-from-base" (Track 1 copy) ->
 //      base stays null.
 //   4. No base-contribution entry at all (net-new) -> base stays null.
@@ -62,13 +62,13 @@ function surveyAnswer(
   return { kind: "survey-answer", questionId, answerType, value: [...value] };
 }
 
-function baseContribution(
+function startContribution(
   instantiationMode: "new-from-base" | "adapt-existing",
-  overrides: { baseId?: string; version?: string } = {},
+  overrides: { startId?: string; version?: string } = {},
 ): DecisionPayload {
   return {
     kind: "base-contribution",
-    baseId: overrides.baseId ?? "basic_kbdfr",
+    startId: overrides.startId ?? "basic_kbdfr",
     baseDisplayName: "Basic (French)",
     derivedAxes: [],
     inheritedMetadata: [
@@ -114,14 +114,14 @@ describe("buildHistoryProposalSeed", () => {
 
   it("sets base from an adapt-existing base-contribution (id + version)", () => {
     const rec = record([
-      entry("choose_base", baseContribution("adapt-existing", { baseId: "basic_kbdfr", version: "1.3" }), BASE_DERIVED),
+      entry("choose_base", startContribution("adapt-existing", { startId: "basic_kbdfr", version: "1.3" }), BASE_DERIVED),
     ]);
     expect(buildHistoryProposalSeed(rec).base).toEqual({ id: "basic_kbdfr", version: "1.3" });
   });
 
   it("leaves base null for a new-from-base (Track 1 copy) base-contribution", () => {
     const rec = record([
-      entry("choose_base", baseContribution("new-from-base"), BASE_DERIVED),
+      entry("choose_base", startContribution("new-from-base"), BASE_DERIVED),
     ]);
     expect(buildHistoryProposalSeed(rec).base).toBeNull();
   });
@@ -184,7 +184,7 @@ describe("buildHistoryProposalSeed", () => {
   it("reads the live decisionLogStore when no record is supplied", () => {
     useDecisionLogStore.getState().append({
       stepId: "choose_base",
-      payload: baseContribution("adapt-existing", { baseId: "basic_kbdus", version: "2.0" }),
+      payload: startContribution("adapt-existing", { startId: "basic_kbdus", version: "2.0" }),
       provenance: BASE_DERIVED,
     });
     expect(buildHistoryProposalSeed().base).toEqual({ id: "basic_kbdus", version: "2.0" });

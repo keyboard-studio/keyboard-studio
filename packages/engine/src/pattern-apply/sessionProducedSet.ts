@@ -5,7 +5,7 @@
  *
  * Bug context (shaped bug — diacritic-implementability): `useInventoryDiff`
  * and `MechanismGallery`'s `baseProducedSet` both used to call
- * `buildProducedSet(baseIr, ...)` directly — i.e. against the PRISTINE base
+ * `buildProducedSet(startIr, ...)` directly — i.e. against the PRISTINE base
  * keyboard only, never against what THIS session has already assigned. A
  * precomposed character (e.g. "ӝ" U+04DD = "ж" U+0436 + combining diaeresis
  * U+0308) that becomes composable only because its combining-mark component
@@ -35,7 +35,7 @@
  *      wrongly counted as directly produced here either.
  *
  * When `assignments` contains no physical entries, this is equivalent to
- * (and cheaper than) `buildProducedSet(baseIr, { excludeBackspaceCorrections:
+ * (and cheaper than) `buildProducedSet(startIr, { excludeBackspaceCorrections:
  * true })` directly — the round trip through applyAssignments/parse is
  * skipped entirely.
  *
@@ -44,7 +44,7 @@
  * `applyAssignments` itself only ever processes `modality === "physical"`
  * entries, so both are excluded structurally, not by a second ad-hoc filter.
  *
- * Pure: no store reads, no I/O, no mutation of `baseIr`. Callers are
+ * Pure: no store reads, no I/O, no mutation of `startIr`. Callers are
  * responsible for memoizing on a stable assignment signature (per decision
  * D3, this must not introduce a second debounce timer — it rides the same
  * memoized-on-assignments cycle the rest of the gallery already uses).
@@ -69,24 +69,24 @@ import { emit } from "../codec/emit.js";
 import { applyAssignments } from "./applyAssignments.js";
 
 export function buildSessionProducedSet(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   assignments: ReadonlyArray<MechanismAssignment>,
   getPattern: (id: string) => Pattern | undefined,
 ): Set<string> {
   const physical = assignments.filter((a) => a.modality === "physical");
   if (physical.length === 0) {
-    return buildProducedSet(baseIr, { excludeBackspaceCorrections: true });
+    return buildProducedSet(startIr, { excludeBackspaceCorrections: true });
   }
 
   try {
-    const baseKmn = emit(baseIr);
+    const baseKmn = emit(startIr);
     const { kmn: previewKmn } = applyAssignments(physical, getPattern, baseKmn);
-    const previewIr = parse(previewKmn, baseIr.header.keyboardId).ir;
+    const previewIr = parse(previewKmn, startIr.header.keyboardId).ir;
     return buildProducedSet(previewIr, { excludeBackspaceCorrections: true });
   } catch (err) {
     devLog.warn(
       `[buildSessionProducedSet] session preview round-trip failed (${String(err)}); falling back to base-only produced set`,
     );
-    return buildProducedSet(baseIr, { excludeBackspaceCorrections: true });
+    return buildProducedSet(startIr, { excludeBackspaceCorrections: true });
   }
 }

@@ -5,7 +5,7 @@
  * rather than forking a second one — see that fixture's own module doc ("do not
  * fork it; add cases here"). It already contains:
  *
- *   - `T_0021` (`TOUCH_JOIN_IDS.longpressHost`): text "!", two `sk[]` longpresses
+ *   - `T_0021` (`TOUCH_JOIN_IDS.longpressBase`): text "!", two `sk[]` longpresses
  *     (`U_00A1` "¡", `U_203D` "‽") and a flick (`n` -> `U_2049` "⁉") —
  *     the exact Cameroon shape FR-060 names ("suppressing T_0021 silently
  *     discards the U_00A1 (¡) longpress beneath it").
@@ -89,7 +89,7 @@ describe("enumerateKeyLinkedOutputs", () => {
     const op: KeyEditOperation = {
       kind: "suppress",
       seq: 1,
-      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressHost),
+      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase),
       spClass: 10,
       sentinelId: "T_SPACER",
     };
@@ -110,7 +110,7 @@ describe("enumerateKeyLinkedOutputs", () => {
     const op: KeyEditOperation = {
       kind: "removeSubKey",
       seq: 1,
-      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressHost),
+      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase),
       sub: { kind: "sk", id: "U_00A1" },
     };
 
@@ -120,7 +120,7 @@ describe("enumerateKeyLinkedOutputs", () => {
     expect(outputs[0]?.producedChar).toBe("¡");
     expect(outputs[0]?.kind).toBe("longpress");
     expect(outputs[0]?.address).toBe(
-      touchSubKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressHost, "sk", "U_00A1"),
+      touchSubKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase, "sk", "U_00A1"),
     );
   });
 
@@ -129,7 +129,7 @@ describe("enumerateKeyLinkedOutputs", () => {
     const op: KeyEditOperation = {
       kind: "removeSubKey",
       seq: 1,
-      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressHost),
+      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase),
       sub: { kind: "flick", id: "n" },
     };
 
@@ -140,7 +140,7 @@ describe("enumerateKeyLinkedOutputs", () => {
     expect(outputs[0]?.kind).toBe("flick");
     expect(outputs[0]?.direction).toBe("n");
     expect(outputs[0]?.address).toBe(
-      touchFlickAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressHost, "n"),
+      touchFlickAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase, "n"),
     );
   });
 
@@ -210,7 +210,7 @@ describe("analyzeKeyEditCollateral", () => {
     const op: KeyEditOperation = {
       kind: "suppress",
       seq: 1,
-      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressHost),
+      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase),
       spClass: 10,
       sentinelId: "T_SPACER",
     };

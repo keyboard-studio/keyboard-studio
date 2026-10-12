@@ -3,7 +3,7 @@
 // Coverage goals:
 //   1. onInstantiate fires exactly once on a full fetch→compile run.
 //   2. onInstantiate is NOT fired when recompile() is called (isFullRun=false).
-//   3. onInstantiate is NOT called when baseKeyboard is null (idle path).
+//   3. onInstantiate is NOT called when startKeyboard is null (idle path).
 //   4. onInstantiate receives the base keyboard and a non-null IR on a full run.
 //   5. (slice 4) When parseKmn throws but compile succeeds, the hook reaches
 //      the "ready" stage (preview not blanked), parsedIr passed to onInstantiate
@@ -24,7 +24,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { mixedDiagnosticsResult } from "@keyboard-studio/contracts/fixtures";
 import type { OnInstantiateCallback, VfsTransform } from "./useKeyboardArtifact";
@@ -46,7 +46,7 @@ const mockEngine = {
     Promise.resolve(mixedDiagnosticsResult),
   ),
   fetchKeyboardSourceToVfs: vi.fn(
-    (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+    (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
       // Seed a .kmn file so findKmnPath and parseKmn work in the hook.
       vfs.set("source/test_kb.kmn", "c test\n", false);
       return Promise.resolve({});
@@ -91,7 +91,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => ({
 // Fixture
 // ---------------------------------------------------------------------------
 
-const baseKb: BaseKeyboard = {
+const baseKb: StartKeyboard = {
   id: "test_kb",
   path: "release/t/test_kb",
   script: "Latn",
@@ -182,7 +182,7 @@ describe("useKeyboardArtifact — onInstantiate timing", () => {
     // IR so downstream touch authoring edits a COPY of the existing layout
     // (scaffoldTouchLayout Case B) rather than regenerating a default (Case A).
     mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
-      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+      (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
         vfs.set("source/test_kb.kmn", "c test\n", false);
         vfs.set(
           "source/test_kb.keyman-touch-layout",
@@ -440,7 +440,7 @@ describe("useKeyboardArtifact — open-base unbacked &BITMAP guard (regression g
 
   it("drops &BITMAP from the working copy when its icon never arrived", async () => {
     mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
-      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+      (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
         // No source/test_kb.ico entry — the icon fetch "failed" (optional sibling).
         vfs.set("source/test_kb.kmn", kmnWithBitmap, false);
         return Promise.resolve({});
@@ -471,7 +471,7 @@ describe("useKeyboardArtifact — open-base unbacked &BITMAP guard (regression g
 
   it("keeps &BITMAP when its icon is present in the VFS", async () => {
     mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
-      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+      (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
         vfs.set("source/test_kb.kmn", kmnWithBitmap, false);
         vfs.set("source/test_kb.ico", new Uint8Array([0, 0, 1, 0]), true);
         return Promise.resolve({});
@@ -502,7 +502,7 @@ describe("useKeyboardArtifact — open-base unbacked &BITMAP guard (regression g
 // ---------------------------------------------------------------------------
 // Regression guard: Track 1 (no scaffoldSpec) identity-rename compile.
 //
-// projectWorkingCopyVfs's Step 4 id-rename pass renames source/<baseId>.kmn to
+// projectWorkingCopyVfs's Step 4 id-rename pass renames source/<startId>.kmn to
 // source/<targetId>.kmn inside the VFS when the author changes the keyboard id
 // with no scaffoldSpec present. Before this fix, runCompile always compiled
 // scaffoldSpec?.keyboardId ?? kb.id — the stale base id — so compile() looked
@@ -602,7 +602,7 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (Track 1 id r
 // vfsTransform prop reference changes after the initial fetch — e.g. an
 // identity-rename edit while already on the ready stage). This is a distinct
 // code path from the initial-run capture above: it restores the clean
-// baseVfsRef snapshot, re-invokes the transform, and recompiles WITHOUT a
+// startVfsRef snapshot, re-invokes the transform, and recompiles WITHOUT a
 // re-fetch. effectiveKeyboardIdRef must be re-derived correctly on every
 // reapply, including when the transform throws.
 // ---------------------------------------------------------------------------
@@ -676,7 +676,7 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effe
     expect(mockEngine.compile).toHaveBeenLastCalledWith(expect.anything(), "renamed_kb");
 
     // Revert: a later transform run reports no effectiveKeyboardId. The
-    // baseVfsRef snapshot restore means this transform sees the ORIGINAL
+    // startVfsRef snapshot restore means this transform sees the ORIGINAL
     // (un-renamed) VFS again, matching what the author reverting the id
     // field actually does in the real transform.
     mockEngine.compile.mockClear();
@@ -770,5 +770,95 @@ describe("isOskStylesheetPath", () => {
   ])("%s -> %s", async (path, expected) => {
     const { isOskStylesheetPath } = await import("./useKeyboardArtifact");
     expect(isOskStylesheetPath(path)).toBe(expected);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression guard: a rejected engine load must not be cached for the session.
+//
+// engineReadyPromise memoizes the engine load+init so concurrent run() calls
+// share one attempt. It originally kept the promise even after it rejected,
+// so every later run() — the Retry button included — re-awaited the SAME
+// rejected promise and landed on error/vfs without ever re-attempting the
+// load. A transient failure (a chunk fetch or WASM init that would succeed
+// seconds later) therefore stranded the preview for the whole session.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — engine load failure is not cached (regression)", () => {
+  it("a rejected engine load surfaces error/vfs, and Retry re-attempts the load and recovers", async () => {
+    // First load attempt fails at init() — the cached load+init promise
+    // rejects, as it also does when the dynamic import itself fails
+    // (loadEngine() collapses that to the same rejection path).
+    mockEngine.init.mockRejectedValueOnce(
+      new Error("wasm init transient failure"),
+    );
+
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The failed attempt still surfaces on the error stage, with the
+    // original failure visible (not masked, not a spinner).
+    expect(result.current.stage.kind).toBe("error");
+    if (result.current.stage.kind === "error") {
+      expect(result.current.stage.step).toBe("vfs");
+      expect(result.current.stage.message).toContain(
+        "wasm init transient failure",
+      );
+    }
+    expect(mockEngine.init).toHaveBeenCalledTimes(1);
+
+    // Retry must start a FRESH load attempt — init runs a second time — and
+    // with the load now succeeding the run proceeds to "ready" in the same
+    // session, no page reload involved.
+    await act(async () => {
+      result.current.retry();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockEngine.init).toHaveBeenCalledTimes(2);
+    expect(result.current.stage.kind).toBe("ready");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression guard: an onInstantiate throw must not wedge the artifact stage.
+//
+// runCompile() invoked onInstantiate with no containment, on the far side of
+// setStage("compiling") and before setStage("ready"). A throw escaped through
+// run()'s awaited call into the effect's `void run(...)`, surfacing only as an
+// unhandled rejection while the stage stayed "compiling" forever — the
+// preview appeared to stop compiling, silently. The throw must instead land
+// on the same error surface compile failures use.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — onInstantiate throw settles on the error stage (regression)", () => {
+  it("an onInstantiate throw lands on error/compile instead of wedging at compiling", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>(() => {
+      throw new Error("instantiate boom: working-copy store rejected the IR");
+    });
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, onInstantiate),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onInstantiate).toHaveBeenCalledTimes(1);
+    expect(result.current.stage.kind).toBe("error");
+    if (result.current.stage.kind === "error") {
+      expect(result.current.stage.step).toBe("compile");
+      expect(result.current.stage.message).toContain("instantiate boom");
+    }
   });
 });

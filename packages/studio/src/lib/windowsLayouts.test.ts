@@ -8,9 +8,9 @@ import {
   proposeWindowsLayout,
   searchWindowsLayouts,
   windowsLayoutById,
-  windowsLayoutForHost,
+  windowsLayoutForBase,
 } from "./windowsLayouts.ts";
-import { REFERENCE_HOST_IDS } from "./referenceHostLayouts.ts";
+import { REFERENCE_BASE_IDS } from "./referenceBaseLayouts.ts";
 
 describe("catalog", () => {
   it("lists every basic_kbd keyboard with a unique id", () => {
@@ -19,14 +19,14 @@ describe("catalog", () => {
   });
 
   it("maps each of the five reference hosts to exactly one layout", () => {
-    for (const host of REFERENCE_HOST_IDS) {
+    for (const host of REFERENCE_BASE_IDS) {
       expect(WINDOWS_LAYOUTS.filter((l) => l.host === host)).toHaveLength(1);
     }
-    expect(windowsLayoutForHost("us")?.id).toBe("basic_kbdus");
-    expect(windowsLayoutForHost("us-intl")?.id).toBe("basic_kbdusx");
-    expect(windowsLayoutForHost("azerty")?.id).toBe("basic_kbdfr");
-    expect(windowsLayoutForHost("qwertz")?.id).toBe("basic_kbdgr");
-    expect(windowsLayoutForHost("uk")?.id).toBe("basic_kbduk");
+    expect(windowsLayoutForBase("us")?.id).toBe("basic_kbdus");
+    expect(windowsLayoutForBase("us-intl")?.id).toBe("basic_kbdusx");
+    expect(windowsLayoutForBase("azerty")?.id).toBe("basic_kbdfr");
+    expect(windowsLayoutForBase("qwertz")?.id).toBe("basic_kbdgr");
+    expect(windowsLayoutForBase("uk")?.id).toBe("basic_kbduk");
   });
 
   it("derives sensible families", () => {

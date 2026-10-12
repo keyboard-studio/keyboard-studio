@@ -212,8 +212,8 @@ export function CharacterMapGroupSection({
               // alone) so screen-reader users get the same signal.
               const baseOutputHint = isBaseOutput
                 ? t({
-                    id: "survey.characterMapPane.cell.fromBase",
-                    message: " — from your base keyboard",
+                    id: "survey.characterMapPane.cell.fromStarting",
+                    message: " — from your starting keyboard",
                   })
                 : "";
               // One catalog sentence per action, both variables interpolated

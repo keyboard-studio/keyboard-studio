@@ -13,7 +13,7 @@ function makeIR(bcp47: string[] = [], groups: IRGroup[] = []): KeyboardIR {
 }
 
 /** A minimal group/rule producing the given literal char output — used to
- * give a fixture IR a non-empty producedGlyphs() set for usedByBase tests. */
+ * give a fixture IR a non-empty producedGlyphs() set for usedByStart tests. */
 function makeProducingGroup(chars: readonly string[]): IRGroup {
   return irGroup({
     nodeId: "group#produces",
@@ -567,7 +567,7 @@ describe("buildCharacterMap", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // usedByBase (studio's "blocks my keyboard uses" filter)
+  // usedByStart (studio's "blocks my keyboard uses" filter)
   // ---------------------------------------------------------------------------
 
   it("tags groups containing a produced char usedByBase: true, groups with none usedByBase: false", async () => {
@@ -583,24 +583,24 @@ describe("buildCharacterMap", () => {
     const latinExtendedA = groups.find(
       (g) => g.tier === "block" && g.block === "Latin Extended-A" && g.script === "Latn",
     );
-    expect(latinExtendedA?.usedByBase).toBe(true);
+    expect(latinExtendedA?.usedByStart).toBe(true);
 
     const digits = groups.find((g) => g.tier === "digits" && g.script === "Common");
-    expect(digits?.usedByBase).toBe(true);
+    expect(digits?.usedByStart).toBe(true);
 
     const latinExtendedAdditional = groups.find(
       (g) => g.tier === "block" && g.block === "Latin Extended Additional" && g.script === "Latn",
     );
-    expect(latinExtendedAdditional?.usedByBase).toBe(false);
+    expect(latinExtendedAdditional?.usedByStart).toBe(false);
 
     const punctuation = groups.find((g) => g.tier === "punctuation" && g.script === "Common");
-    expect(punctuation?.usedByBase).toBe(false);
+    expect(punctuation?.usedByStart).toBe(false);
   });
 
   it("tags every group usedByBase: false when baseIr is null", async () => {
     const groups = await buildCharacterMap(null, "xx-Latn", undefined, { loader: async () => null });
     expect(groups.length).toBeGreaterThan(0);
-    expect(groups.every((g) => g.usedByBase === false)).toBe(true);
+    expect(groups.every((g) => g.usedByStart === false)).toBe(true);
   });
 
   it("degrades to name: undefined (no throw) for a codepoint absent from the name table", async () => {

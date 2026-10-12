@@ -24,8 +24,9 @@
 import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   seedReturningVisitor,
   switchTab,
@@ -34,7 +35,7 @@ import {
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Test Autonym",
   english: "Test",
   targetScript: "other",
@@ -96,8 +97,9 @@ test.describe("tab round trip preserves the author's position (spec 057 US1)", (
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
 
     const prefillConfirm = page.getByTestId("prefill-confirm");
     await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });
@@ -144,6 +146,7 @@ test.describe("tab round trip preserves the author's position (spec 057 US1)", (
 
     // Forward again, so the alphabet half of the test starts from characters.
     await chooseAdaptTrack(page);
+    await driveAttributionStep(page);
     await expect(prefillConfirm).toBeVisible({ timeout: 20_000 });
 
     // ---- The Phase B draft alphabet survives a round trip (D-4) ------------

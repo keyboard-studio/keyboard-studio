@@ -17,7 +17,7 @@ import { deriveConfirmedInventory, makeConfirmedAlphabet } from "./confirmedAlph
  * `KeyboardIR` + `VirtualFS` pair instantiated at keyboard selection and
  * mutated by every subsequent step. Two entry tracks reach the shared spine:
  *
- * - Track 1 (`instantiateFromBase`): copy a base keyboard + reset identity.
+ * - Track 1 (`instantiateFromStart`): copy a base keyboard + reset identity.
  *   Enters the §8 hybrid survey flow.
  * - Track 2 (`instantiateFromExisting`): load an existing keyboard, preserve
  *   identity. Enters via source-picker; skips identity-lite.

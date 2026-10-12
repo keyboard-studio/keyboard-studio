@@ -44,7 +44,7 @@ function seedAdaptTrack(version: string) {
   const wc = useWorkingCopyStore.getState();
   wc.setIdentity({ keyboardId: basicKbdus.id, displayName: "Bambara", bcp47: "bm-Latn", languageName: "Bambara" });
   wc.setAttribution({ authorName: "Alice Example", copyrightHolder: "Alice Example" });
-  wc.setBaseHistoryMdText(`## ${version} (2020-01-01)\n* Initial release.\n`);
+  wc.setStartHistoryMdText(`## ${version} (2020-01-01)\n* Initial release.\n`);
   wc.setHelpDocs({ description: "Author prose.", usageTips: [] });
 }
 
@@ -52,7 +52,7 @@ function seedCopyTrack(version: string) {
   // Parsed from the .kmn text, as an import is, so the IR carries the
   // &KEYBOARDVERSION store the projection rewrites.
   const { ir } = parseKmn(kmnText(version), basicKbdus.id);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: fetchedVfs(basicKbdus.id, version), ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: fetchedVfs(basicKbdus.id, version), ir });
   const wc = useWorkingCopyStore.getState();
   wc.setIdentity({ keyboardId: "bambara_test", displayName: "Bambara", bcp47: "bm-Latn", languageName: "Bambara" });
   wc.setAttribution({ authorName: "Alice Example", copyrightHolder: "Alice Example" });

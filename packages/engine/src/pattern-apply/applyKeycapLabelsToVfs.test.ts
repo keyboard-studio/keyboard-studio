@@ -46,7 +46,7 @@ import type {
 
 /** Builds a bare-vkey S-01 rule line whose RHS decodes back to `target`,
  * matching how the studio always builds these two values in lockstep
- * (shiftRules.ts's buildBaseRuleLines uses the same char for both). */
+ * (shiftRules.ts's buildStartRuleLines uses the same char for both). */
 function makeS01Assignment(target: string, vkey: string): MechanismAssignment {
   const cp = (target.codePointAt(0) ?? 0x41).toString(16).toUpperCase().padStart(4, "0");
   return {

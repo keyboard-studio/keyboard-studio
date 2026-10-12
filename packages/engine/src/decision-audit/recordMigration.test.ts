@@ -171,7 +171,7 @@ describe("normalizeDecisionRecord — v1 fixture (SC-011)", () => {
   });
 });
 
-describe("normalizeDecisionRecord — v2 identity", () => {
+describe("normalizeDecisionRecord — v2 stage (spec 090 US5: tag only)", () => {
   const V2_RECORD: DecisionRecord = {
     format: DECISION_RECORD_FORMAT,
     version: 2,
@@ -209,18 +209,101 @@ describe("normalizeDecisionRecord — v2 identity", () => {
     truncated: null,
   };
 
-  it("passes a version-2 record through unchanged, by reference", () => {
-    expect(normalizeDecisionRecord(V2_RECORD)).toBe(V2_RECORD);
+  it("advances a version-2 record's tag to current, entries untouched", () => {
+    // The v2 -> v3 stage transforms NOTHING (the v3 delta is a purely
+    // additive payload kind a v2 record cannot contain) — but the returned
+    // record still takes the current tag, for the same reason the v1 stage
+    // does: what normalize hands back is current-shaped, and a caller that
+    // stores it must not re-run an older stage over it on the next read.
+    const normalized = normalizeDecisionRecord(V2_RECORD);
+    expect(normalized.version).toBe(DECISION_RECORD_VERSION);
+    expect(normalized.entries).toEqual(V2_RECORD.entries);
+    expect(normalized.entries[0]).toBe(V2_RECORD.entries[0]);
   });
 
-  it("does not strip a v2 record's genuinely-measured absent counts", () => {
-    // v2's `EditorActionSummary` already permits omitting a count that a
-    // producer genuinely did not measure (unrelated to this migration) — the
-    // identity pass-through must not disturb that either.
+  it("does not strip a v2 record's genuinely-measured counts", () => {
+    // The failure this stage exists to avoid: the v1 transforms (unmeasured
+    // counts to absent) running over a v2 record would strip counts v2
+    // genuinely measured — including a measured `keysRemoved: 0` — and
+    // fabricate absence (FR-005a, one stage up).
     const normalized = normalizeDecisionRecord(V2_RECORD);
     const entry = normalized.entries[0]!;
     if (entry.payload.kind !== "editor-action") throw new Error("expected editor-action");
+    expect(entry.payload.summary.keysRemoved).toBe(0);
     expect(entry.payload.summary.keysAdded).toBe(12);
     expect("mechanismsAssigned" in entry.payload.summary).toBe(false);
+  });
+
+  it("passes a current-version record through unchanged, by reference", () => {
+    const current: DecisionRecord = { ...V2_RECORD, version: DECISION_RECORD_VERSION };
+    expect(normalizeDecisionRecord(current)).toBe(current);
+  });
+});
+
+describe("normalizeDecisionRecord — #1810 contribution-field rename (unstaged)", () => {
+  // A record written by the build BEFORE the #1810 identifier rename, at the
+  // CURRENT record version: its base-contribution payload carries the legacy
+  // `baseId` field. The rename stage must lift it to `startId` at any
+  // version, or DecisionEntrySchema would drop the entry on read.
+  const legacyContribution = {
+    entryId: "e-contribution",
+    stepId: "choose_base",
+    payload: {
+      kind: "base-contribution",
+      baseId: "sil_cameroon_qwerty",
+      baseDisplayName: "Cameroon QWERTY",
+      startingKeyCount: 47,
+      derivedAxes: ["markInputOrder"],
+      inheritedMetadata: [{ field: "copyright", value: "(c) SIL" }],
+      instantiationMode: "new-from-base",
+    },
+    provenance: { agency: "extracted" },
+    recordedAt: 1_700_000_000_000,
+    supersedes: null,
+    impact: null,
+  } as unknown as PreMigrationDecisionRecord["entries"][number];
+
+  it("lifts a legacy baseId to startId at the current record version", () => {
+    const record: PreMigrationDecisionRecord = {
+      format: DECISION_RECORD_FORMAT,
+      version: DECISION_RECORD_VERSION,
+      keyboardId: "sil_bambara",
+      entries: [legacyContribution],
+      truncated: false,
+    };
+    const normalized = normalizeDecisionRecord(record);
+    const payload = normalized.entries[0]!.payload;
+    if (payload.kind !== "base-contribution") throw new Error("expected base-contribution");
+    expect(payload.startId).toBe("sil_cameroon_qwerty");
+    // Wire names that deliberately did NOT rename:
+    expect(payload.kind).toBe("base-contribution");
+    expect(payload.baseDisplayName).toBe("Cameroon QWERTY");
+    expect("baseId" in payload).toBe(false);
+    // The rest of the payload survives intact.
+    expect(payload.startingKeyCount).toBe(47);
+    expect(payload.derivedAxes).toEqual(["markInputOrder"]);
+  });
+
+  it("leaves a current-shape contribution payload untouched", () => {
+    const current = {
+      ...legacyContribution,
+      payload: {
+        kind: "base-contribution",
+        startId: "sil_cameroon_qwerty",
+        baseDisplayName: "Cameroon QWERTY",
+        derivedAxes: [],
+        inheritedMetadata: [],
+        instantiationMode: "new-from-base",
+      },
+    } as unknown as PreMigrationDecisionRecord["entries"][number];
+    const record: PreMigrationDecisionRecord = {
+      format: DECISION_RECORD_FORMAT,
+      version: DECISION_RECORD_VERSION,
+      keyboardId: "sil_bambara",
+      entries: [current],
+      truncated: false,
+    };
+    const normalized = normalizeDecisionRecord(record);
+    expect(normalized).toBe(record);
   });
 });

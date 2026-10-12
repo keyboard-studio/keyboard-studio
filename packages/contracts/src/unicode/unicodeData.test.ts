@@ -120,7 +120,7 @@ describe("range-encoding invariants", () => {
     expect(RUNS.length).toBeGreaterThan(0);
     let prevEnd = -1;
     for (const run of RUNS) {
-      const [start, end, catIdx, ccc, nameKind, nameBase] = run;
+      const [start, end, catIdx, ccc, nameKind, nameStart] = run;
       expect(start).toBeLessThanOrEqual(end);
       expect(start).toBeGreaterThan(prevEnd);
       expect(end).toBeLessThanOrEqual(0x10ffff);
@@ -130,10 +130,10 @@ describe("range-encoding invariants", () => {
       expect(ccc).toBeLessThanOrEqual(255);
       expect(Object.values(NAME_KIND)).toContain(nameKind);
       if (nameKind === NAME_KIND.STORED) {
-        expect(nameBase).toBeGreaterThanOrEqual(0);
-        expect(nameBase).toBeLessThan(NAME_OFFSETS.length);
+        expect(nameStart).toBeGreaterThanOrEqual(0);
+        expect(nameStart).toBeLessThan(NAME_OFFSETS.length);
       } else {
-        expect(nameBase).toBe(-1);
+        expect(nameStart).toBe(-1);
       }
       prevEnd = end;
     }

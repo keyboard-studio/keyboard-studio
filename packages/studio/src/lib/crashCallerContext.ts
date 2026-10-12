@@ -20,7 +20,7 @@
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { getCharacterInventoryValue } from "../survey/useInventoryDraft.ts";
 import type { CrashContext, DecisionTailEntry } from "../crash/types.ts";
 
 /** How many of the most-recent decision entries travel with a report. */
@@ -93,7 +93,7 @@ export function collectCrashContext(): CrashContext {
   }
 
   try {
-    const draft = usePhaseBDraftStore.getState();
+    const draft = getCharacterInventoryValue();
     const exemplarCount = draft.chars.length;
     if (Number.isFinite(exemplarCount)) context.exemplarCount = exemplarCount;
   } catch {

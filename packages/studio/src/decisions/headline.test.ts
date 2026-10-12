@@ -90,7 +90,7 @@ describe("headlineOf — the three agency literals over one value", () => {
   it("reports a base-derived value as carried from the base", () => {
     const spec = headlineOf(answer, { agency: "base-derived", source: "base" }, deps);
     expect(spec).toEqual({
-      id: "fromBase",
+      id: "fromStart",
       question: { known: true, label: "Target script" },
       value: "Latn",
     });

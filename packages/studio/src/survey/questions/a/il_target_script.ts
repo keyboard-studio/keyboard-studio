@@ -43,10 +43,14 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'Ethi' or value == 'Hani' or value == 'Hang'", goto: "il_script_not_supported" },
-    // spec 064 US1: a supported script continues into attribution capture.
-    // Gated scripts take the branch above and terminate — an author who cannot
-    // make a keyboard is never asked who holds its copyright.
-    { default: true as const, goto: "il_author_name" },
+    // #1901: NO default branch — a supported script ENDS the identity
+    // flow here. Attribution capture (il_author_name → …) used to be this
+    // edge's target (spec 064 US1); the author/copyright questions now
+    // live in the post-track `attribution` flow, because what they
+    // propose depends on the track. A gated script still terminates on
+    // the notice above — an author who cannot make a keyboard is never
+    // asked who holds its copyright (the session's "unsupported"
+    // terminal enforces the same fact one layer up).
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 
@@ -93,7 +97,7 @@ export const fixtures: QuestionModule["fixtures"] = {
 // composed tag the descriptor declares.
 // Decision spike (km/decisions-spike): base-keyboard probe AND the single
 // system answering "what script did the base decide" (spec 087 Q2 — the
-// adaptation catalog reads posture via extractBaseScriptPosture below). Reads the script from the catalog entry — the codec leaves the
+// adaptation catalog reads posture via extractStartScriptPosture below). Reads the script from the catalog entry — the codec leaves the
 // IR header's bcp47 empty on real catalog imports, so the catalog is
 // primary and the IR header is a fallback. Only ISO 15924 script codes
 // this question offers are extractable — "romanization-Latn", "fonipa",
@@ -123,7 +127,7 @@ export function extractTargetScript(ctx: ExtractContext): string | undefined {
  * provenance of the target-script decision: the one place a script
  * distribution becomes "single-script" or "mixed".
  */
-export interface BaseScriptPosture {
+export interface StartScriptPosture {
   posture: "single-script" | "mixed";
   /** Largest-share script subtag ("" when the distribution is empty). */
   dominantScript: string;
@@ -137,10 +141,10 @@ export interface BaseScriptPosture {
  * The sole implementation of that policy: a dominant share at or above
  * `singleScriptThreshold` is single-script, anything below is mixed. Pure.
  */
-export function extractBaseScriptPosture(
+export function extractStartScriptPosture(
   distribution: Record<string, number>,
   singleScriptThreshold: number,
-): BaseScriptPosture {
+): StartScriptPosture {
   let dominantScript = "";
   let dominantShare = 0;
   for (const [script, share] of Object.entries(distribution)) {
@@ -164,5 +168,11 @@ const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes
   provides: ["target-script"],
   requires: ["language-code"],
   extract: extractTargetScript,
+  // Spec 092 (T033): the resolved langtags entry's script (already mapped
+  // to a target-script option value at resolution time) as a lookup default.
+  lookupDefault: (ctx) => {
+    const script = ctx.identity?.targetScript;
+    return script !== undefined && script !== "" ? { value: script, source: "langtags" } : undefined;
+  },
 };
 export default mod;

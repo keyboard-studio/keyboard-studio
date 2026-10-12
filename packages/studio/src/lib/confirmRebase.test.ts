@@ -1,7 +1,7 @@
 // confirmRebase — unit tests for the F1 same-base-aware rebase guard.
 //
 // Exercises hasUnsavedEdits, needsRebaseConfirm, confirmRebaseTo, and
-// instantiateFromBaseIfConfirmed({ skipConfirm }) against the REAL
+// instantiateFromStartIfConfirmed({ skipConfirm }) against the REAL
 // workingCopyStore singleton (unmocked — same idiom as
 // hooks/usePreviewArtifact.reinstantiate.test.ts): not-instantiated,
 // same-base-id, different-id-no-edits, different-id-with-edits (Cancel/OK),
@@ -16,19 +16,19 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, silEuroLatin } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import {
   hasUnsavedEdits,
   identitySeedFromSession,
   needsRebaseConfirm,
   confirmRebaseTo,
-  instantiateFromBaseIfConfirmed,
+  instantiateFromStartIfConfirmed,
+  instantiateFromExistingWithIdentitySeed,
   REBASE_CONFIRM_MESSAGE,
 } from "./confirmRebase.ts";
 
 function instantiate(base = basicKbdus) {
-  useWorkingCopyStore.getState().instantiateFromBase(base, {
+  useWorkingCopyStore.getState().instantiateFromStart(base, {
     vfs: createVirtualFS([]),
     ir: makeTestIR([]),
   });
@@ -128,21 +128,21 @@ describe("confirmRebaseTo", () => {
   });
 });
 
-describe("instantiateFromBaseIfConfirmed", () => {
+describe("instantiateFromStartIfConfirmed", () => {
   it("returns false and never touches the store when ir/vfs are null (mock-engine path)", () => {
     const confirmSpy = vi.spyOn(window, "confirm");
-    const result = instantiateFromBaseIfConfirmed(basicKbdus, { vfs: null, ir: null });
+    const result = instantiateFromStartIfConfirmed(basicKbdus, { vfs: null, ir: null });
     expect(result).toBe(false);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
   });
 
   it("proceeds without a confirm dialog when there are no edits", () => {
     const confirmSpy = vi.spyOn(window, "confirm");
-    const result = instantiateFromBaseIfConfirmed(basicKbdus, payload);
+    const result = instantiateFromStartIfConfirmed(basicKbdus, payload);
     expect(result).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(basicKbdus.id);
   });
 
   it("Cancel on the confirm dialog aborts — instantiate is never called", () => {
@@ -150,11 +150,11 @@ describe("instantiateFromBaseIfConfirmed", () => {
     recordAnEdit();
     vi.spyOn(window, "confirm").mockReturnValue(false);
 
-    const result = instantiateFromBaseIfConfirmed(silEuroLatin, payload);
+    const result = instantiateFromStartIfConfirmed(silEuroLatin, payload);
 
     expect(result).toBe(false);
     // Store untouched — still the ORIGINAL base, edits preserved.
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(basicKbdus.id);
     expect(useWorkingCopyStore.getState().phaseResults.length).toBeGreaterThan(0);
   });
 
@@ -163,10 +163,10 @@ describe("instantiateFromBaseIfConfirmed", () => {
     recordAnEdit();
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
-    const result = instantiateFromBaseIfConfirmed(silEuroLatin, payload);
+    const result = instantiateFromStartIfConfirmed(silEuroLatin, payload);
 
     expect(result).toBe(true);
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(silEuroLatin.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(silEuroLatin.id);
   });
 
   it("skipConfirm bypasses the dialog even with edits recorded", () => {
@@ -174,11 +174,11 @@ describe("instantiateFromBaseIfConfirmed", () => {
     recordAnEdit();
     const confirmSpy = vi.spyOn(window, "confirm");
 
-    const result = instantiateFromBaseIfConfirmed(silEuroLatin, payload, { skipConfirm: true });
+    const result = instantiateFromStartIfConfirmed(silEuroLatin, payload, { skipConfirm: true });
 
     expect(result).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(silEuroLatin.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(silEuroLatin.id);
   });
 });
 
@@ -186,72 +186,122 @@ describe("instantiateFromBaseIfConfirmed", () => {
 // Identity seed — the identity step's language reaches a new Track 1 copy
 // ---------------------------------------------------------------------------
 
-/** The identity-lite answers for a language, as the identity step records them. */
-function identityResult(bcp47: string, english: string): IdentityLiteResult {
-  return {
-    autonym: english,
-    english,
-    languageSubtag: bcp47.split("-")[0] ?? "",
-    region: "",
-    targetScriptRaw: "Latn",
-    bcp47,
-    supported: true,
-  } as IdentityLiteResult;
+/**
+ * Record the identity decisions for a language, as the identity step's
+ * completion records them (spec 089: identitySeedFromSession derives the
+ * identity result from these). The derived composed tag is "bfd-Latn" —
+ * the tag the real identity step composes from these answers; the old
+ * hand-written fixture stored "bfd" verbatim, which no real run produced.
+ */
+function seedIdentityDecisions(bcp47: string, english: string): void {
+  const record = useDecisionStore.getState().record;
+  record({ id: "language-name", value: english, provenance: "asked" });
+  record({ id: "language-autonym", value: english, provenance: "asked" });
+  record({ id: "language-code", value: bcp47.split("-")[0] ?? "", provenance: "asked" });
+  record({ id: "target-script", value: "Latn", provenance: "asked" });
+}
+
+function clearIdentityDecisions(): void {
+  useDecisionStore.getState().reset();
 }
 
 describe("identitySeedFromSession", () => {
   afterEach(() => {
-    useSurveySessionStore.getState().setIdentityResult(null);
+    clearIdentityDecisions();
   });
 
   it("carries the composed tag, the English name, and the base's own display name", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     expect(identitySeedFromSession(basicKbdus)).toEqual({
       displayName: basicKbdus.displayName,
-      bcp47: "bfd",
+      bcp47: "bfd-Latn",
       languageName: "Bafut",
     });
   });
 
   it("seeds no keyboard id: choosing one is the author's act", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     expect(identitySeedFromSession(basicKbdus)).not.toHaveProperty("keyboardId");
   });
 
   it("is undefined when the identity step recorded no tag", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("", "Test"));
+    seedIdentityDecisions("", "Test");
     expect(identitySeedFromSession(basicKbdus)).toBeUndefined();
-    useSurveySessionStore.getState().setIdentityResult(null);
+    clearIdentityDecisions();
     expect(identitySeedFromSession(basicKbdus)).toBeUndefined();
   });
 });
 
 describe("instantiateFromBaseIfConfirmed — identity seed", () => {
   afterEach(() => {
-    useSurveySessionStore.getState().setIdentityResult(null);
+    clearIdentityDecisions();
   });
 
   it("starts the working copy with the identity step's language", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     useWorkingCopyStore.getState().reset();
-    expect(instantiateFromBaseIfConfirmed(basicKbdus, payload)).toBe(true);
+    expect(instantiateFromStartIfConfirmed(basicKbdus, payload)).toBe(true);
     expect(useWorkingCopyStore.getState().identity).toEqual({
       displayName: basicKbdus.displayName,
-      bcp47: "bfd",
+      bcp47: "bfd-Latn",
       languageName: "Bafut",
     });
   });
 
   it("keeps identity null when there is no language to seed", () => {
     useWorkingCopyStore.getState().reset();
-    expect(instantiateFromBaseIfConfirmed(basicKbdus, payload)).toBe(true);
+    expect(instantiateFromStartIfConfirmed(basicKbdus, payload)).toBe(true);
     expect(useWorkingCopyStore.getState().identity).toBeNull();
   });
 
   it("does not count the seed as an edit, so a base switch needs no confirm", () => {
-    useSurveySessionStore.getState().setIdentityResult(identityResult("bfd", "Bafut"));
+    seedIdentityDecisions("bfd", "Bafut");
     useWorkingCopyStore.getState().reset();
-    instantiateFromBaseIfConfirmed(basicKbdus, payload);
+    instantiateFromStartIfConfirmed(basicKbdus, payload);
     expect(hasUnsavedEdits()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Identity seed — the adapt track (Track 2) gets the same seed
+//
+// Regression pin for the union-tree copy-edit failure (adapt track emitted
+// `<Language ID="fr">fr</Language>`): the setup-decision gate made adapt
+// instantiation wait for the recorded track, so it always lands in
+// instantiateFromExisting — which composed identity from the base alone
+// (first tag, no language name) and no later writer repaired it. The
+// seeded wrapper is the live composition for that dep.
+// ---------------------------------------------------------------------------
+
+describe("instantiateFromExistingWithIdentitySeed — identity seed", () => {
+  afterEach(() => {
+    clearIdentityDecisions();
+  });
+
+  it("overlays the author's composed tag and English name on the preserved identity", () => {
+    seedIdentityDecisions("bfd", "Bafut");
+    useWorkingCopyStore.getState().reset();
+    instantiateFromExistingWithIdentitySeed(basicKbdus, payload);
+    expect(useWorkingCopyStore.getState().identity).toEqual({
+      // Preserved from the base: the id is the base's own (the seed carries
+      // none — choosing a new id is the author's act).
+      keyboardId: basicKbdus.id,
+      displayName: basicKbdus.displayName,
+      // Overlaid from the seed: NOT the base's first language tag ("en").
+      bcp47: "bfd-Latn",
+      languageName: "Bafut",
+    });
+  });
+
+  it("keeps the base's preserved identity untouched when there is no seed", () => {
+    useWorkingCopyStore.getState().reset();
+    instantiateFromExistingWithIdentitySeed(basicKbdus, payload);
+    const identity = useWorkingCopyStore.getState().identity;
+    expect(identity).toEqual({
+      keyboardId: basicKbdus.id,
+      bcp47: basicKbdus.languages?.[0] ?? "",
+      displayName: basicKbdus.displayName,
+    });
+    expect(identity).not.toHaveProperty("languageName");
   });
 });

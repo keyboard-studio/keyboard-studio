@@ -50,6 +50,7 @@ const JOURNEYS: readonly JourneyCase[] = [
       "identity",
       "choose_base",
       "track",
+      "attribution",
       "project_name",
       "characters",
       "carve",

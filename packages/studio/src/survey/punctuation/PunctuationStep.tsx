@@ -8,7 +8,8 @@
 // sourced suggestions to tick, a type-in box, and the right-pane character
 // map (StudioShell's SurveyView swaps it in via this step's
 // rightPane:"character-map", scope "punctuation"). All three toggle the SAME
-// shared phaseBDraftStore draft the alphabet screen used, so punctuation
+// shared Phase B/C draft the alphabet screen used (since spec 090 the
+// character-inventory decision value — see ../useInventoryDraft.ts), so punctuation
 // captured during Phase B arrives here pre-selected and map picks land in
 // the same draft (its derived `punctuation` category is this page's list).
 //
@@ -47,16 +48,22 @@ import { plural } from "@lingui/core/macro";
 import type { InventoryChar, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import {
-  basePunctuationCoverage,
+  startPunctuationCoverage,
   buildPunctuationProposal,
   computeInventoryDelta,
   glyphCategory,
 } from "@keyboard-studio/engine";
-import type { EditorStepProps } from "../../steps/types.ts";
+import type { DecisionRendererProps } from "../../decisions/decisionTypes.ts";
+import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { usePhaseBDraftStore, type DraftProvenance } from "../../stores/phaseBDraftStore.ts";
+import {
+  getCharacterInventoryValue,
+  useInventoryDraft,
+} from "../useInventoryDraft.ts";
+import type { DraftProvenance, InventoryDecisionValue } from "../phaseBDraftOps.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { punctuationKey } from "../../steps/evidence.ts";
 import { derivePunctuationFlags } from "./punctuationFlags.ts";
@@ -128,7 +135,7 @@ function isExemplarProvenance(p: DraftProvenance | undefined): boolean {
 }
 
 /** The base-derived provenances — what the base group is made of. */
-function isBaseProvenance(p: DraftProvenance | undefined): boolean {
+function isStartProvenance(p: DraftProvenance | undefined): boolean {
   return p === "base" || p === "ascii-floor";
 }
 
@@ -193,8 +200,8 @@ function ChosenChip({ char, isProposed, alsoBase = false, onRemove }: ChosenChip
       aria-label={
         alsoBase
           ? t({
-              id: "survey.punctuation.removeAlsoBaseAriaLabel",
-              message: `Remove ${{ char }} (${{ cp: title }}) — also produced by the base keyboard`,
+              id: "survey.punctuation.removeAlsoStartingAriaLabel",
+              message: `Remove ${{ char }} (${{ cp: title }}) — also produced by the starting keyboard`,
             })
           : t({
               id: "survey.punctuation.removeAriaLabel",
@@ -211,7 +218,7 @@ function ChosenChip({ char, isProposed, alsoBase = false, onRemove }: ChosenChip
       <span style={chipCodepoint()}>{base}</span>
       {alsoBase && (
         <span style={{ fontSize: 9, color: TEXT_DIM }} aria-hidden="true">
-          <Trans id="survey.punctuation.alsoBaseBadge">base</Trans>
+          <Trans id="survey.punctuation.alsoStartingBadge">starting</Trans>
         </span>
       )}
       <span style={chipIndicator(ERROR_RED)}>x</span>
@@ -226,23 +233,27 @@ const groupCaption = { margin: "0 0 8px 0", fontSize: 11, color: TEXT_DIM } as c
 // PunctuationStep
 // ---------------------------------------------------------------------------
 
-const PunctuationStep: ComponentType<EditorStepProps> = (
-  { onComplete, onBack }: EditorStepProps,
-) => {
+const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValue>> = () => {
+  const { onComplete, onBack } = useGalleryStepContext();
   const { t, i18n } = useLingui();
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 
-  const chars = usePhaseBDraftStore((s) => s.chars);
-  const punctuation = usePhaseBDraftStore((s) => s.punctuation);
-  const provenance = usePhaseBDraftStore((s) => s.provenance);
-  const rejected = usePhaseBDraftStore((s) => s.rejected);
-  const addChar = usePhaseBDraftStore((s) => s.add);
-  const addProposed = usePhaseBDraftStore((s) => s.addProposed);
-  const removeChar = usePhaseBDraftStore((s) => s.remove);
-  const seedProposals = usePhaseBDraftStore((s) => s.seedProposals);
-  const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
+  // The shared Phase B/C draft, as decision values (spec 090 T022): reads
+  // subscribe to the character-inventory record; edits are the bound ops,
+  // recorded through the gallery host under this step's attribution.
+  const draft = useInventoryDraft(PUNCTUATION_STEP_ID);
+  const chars = draft.chars;
+  const punctuation = draft.punctuation;
+  const provenance = draft.provenance;
+  const rejected = draft.rejected;
+  const addChar = draft.ops.add;
+  const addProposed = draft.ops.addProposed;
+  const removeChar = draft.ops.remove;
+  const seedProposals = draft.ops.seedProposals;
+  const acceptInvisible = draft.ops.acceptInvisible;
 
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const confirmedForKey = useSurveyAnswerStore(
@@ -260,11 +271,11 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   // then nothing is proposed from the base; the ASCII floor is a fallback for a
   // base whose output is UNKNOWABLE (opaque fragments), not for a missing one.
   const ir = useWorkingCopyStore((s) => s.ir);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-  const baseCoverage = useMemo(() => (ir === null ? null : basePunctuationCoverage(ir)), [ir]);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const baseCoverage = useMemo(() => (ir === null ? null : startPunctuationCoverage(ir)), [ir]);
   const baseCoverageIncomplete = baseCoverage === null || !baseCoverage.coverageComplete;
 
-  const evidenceKey = punctuationKey(inventory?.resolvedTag, baseKeyboard?.id);
+  const evidenceKey = punctuationKey(inventory?.resolvedTag, startKeyboard?.id);
 
   // FR-023: a phase-C confirmedInventory already on the session means the
   // author confirmed this step (possibly before proposals existed). Their
@@ -344,19 +355,22 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   // (FR-007..FR-009): the builder substitutes the ASCII floor when the base's
   // output is not fully known, and the provenance says which it was.
   //
-  // The rejection ledger and the author's picks are read from the store WHEN
-  // the effect fires rather than subscribed to: subscribing would re-run this
-  // on every provenance change (including the CLDR seed's own writes) for no
-  // purpose, since the seed key makes every re-run a no-op anyway.
+  // The rejection ledger and the author's picks are read from the decision
+  // record WHEN the effect fires rather than subscribed to: subscribing would
+  // re-run this on every provenance change (including the CLDR seed's own
+  // writes) for no purpose, since the seed key makes every re-run a no-op
+  // anyway.
   useEffect(() => {
     if (loading || baseCoverage === null) return;
-    const seedKey = "punctuation-base:" + (baseKeyboard?.id ?? "working-copy");
-    const draft = usePhaseBDraftStore.getState();
+    const seedKey = "punctuation-base:" + (startKeyboard?.id ?? "working-copy");
+    const currentDraft = getCharacterInventoryValue();
     const proposal = buildPunctuationProposal({
       exemplars: inventory,
       baseCoverage,
-      rejected: new Set(draft.rejected),
-      authorChosen: new Set(Object.keys(draft.provenance).filter((c) => draft.provenance[c] === "author")),
+      rejected: new Set(currentDraft.rejected),
+      authorChosen: new Set(
+        Object.keys(currentDraft.provenance).filter((c) => currentDraft.provenance[c] === "author"),
+      ),
     });
     // This page collects Unicode PUNCTUATION only, so the floor's nine symbol
     // members ($ + < = > ^ ` | ~) are not proposed here: they would land in
@@ -368,7 +382,7 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
       proposal.baseCoverageIncomplete ? "ascii-floor" : "base",
       seedKey,
     );
-  }, [loading, baseCoverage, baseKeyboard, inventory, alreadyConfirmed, seedProposals]);
+  }, [loading, baseCoverage, startKeyboard, inventory, alreadyConfirmed, seedProposals]);
 
   // FR-011: how many of the chosen marks the base cannot type yet — the
   // missing side of the inventory delta, visible before Done. This is
@@ -402,12 +416,12 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   // the single-valued provenance; an authored character is one the author
   // typed or picked (or re-ticked after removing — see `tick`).
   const cldrChosen = punctuation.filter((c) => isExemplarProvenance(provenance[c]));
-  const baseChosen = punctuation.filter((c) => isBaseProvenance(provenance[c]));
+  const startChosen = punctuation.filter((c) => isStartProvenance(provenance[c]));
   const otherChosen = punctuation.filter(
-    (c) => !isExemplarProvenance(provenance[c]) && !isBaseProvenance(provenance[c]),
+    (c) => !isExemplarProvenance(provenance[c]) && !isStartProvenance(provenance[c]),
   );
-  const producedByBase = (c: string): boolean => baseCoverage?.produced.includes(c) === true;
-  const baseName = baseKeyboard?.displayName ?? baseKeyboard?.id ?? null;
+  const producedByStart = (c: string): boolean => baseCoverage?.produced.includes(c) === true;
+  const baseName = startKeyboard?.displayName ?? startKeyboard?.id ?? null;
   const cldrSourceLabel = (
     inventory?.source ?? (cldrChosen[0] !== undefined ? provenance[cldrChosen[0]] : undefined) ?? "cldr"
   ).toUpperCase();
@@ -719,11 +733,11 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         {missingCount !== null && (
           <p data-testid="punctuation-missing-count" style={groupCaption}>
             {t({
-              id: "survey.punctuation.missingCount",
+              id: "survey.punctuation.startingMissingCount",
               message: plural(missingCount, {
-                0: "Every chosen mark is already on the base keyboard.",
-                one: "# of these is not on the base keyboard yet and will need a key.",
-                other: "# of these are not on the base keyboard yet and will need a key.",
+                0: "Every chosen mark is already on the starting keyboard.",
+                one: "# of these is not on the starting keyboard yet and will need a key.",
+                other: "# of these are not on the starting keyboard yet and will need a key.",
               }),
             })}
           </p>
@@ -758,47 +772,47 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
                       key={c}
                       char={c}
                       isProposed
-                      alsoBase={producedByBase(c)}
+                      alsoBase={producedByStart(c)}
                       onRemove={removeChar}
                     />
                   ))}
                 </div>
               </div>
             )}
-            {baseChosen.length > 0 && (
+            {startChosen.length > 0 && (
               <div
                 data-testid="base-punctuation-group"
                 role="group"
                 aria-label={t({
-                  id: "survey.punctuation.baseGroup.ariaLabel",
-                  message: "Proposed punctuation from the base keyboard — click to remove",
+                  id: "survey.punctuation.startingGroup.ariaLabel",
+                  message: "Proposed punctuation from the starting keyboard — click to remove",
                 })}
               >
                 <p style={groupCaption}>
                   {baseCoverageIncomplete ? (
-                    <Trans id="survey.punctuation.baseGroup.incompleteCaption">
-                      The full set of punctuation your base keyboard types is not fully
-                      known (part of the base is opaque to the studio), so only basic
+                    <Trans id="survey.punctuation.startingGroup.incompleteCaption">
+                      The full set of punctuation your starting keyboard types is not fully
+                      known (part of it is opaque to the studio), so only basic
                       ASCII punctuation is proposed here — click a mark to remove it.
                     </Trans>
                   ) : baseName !== null ? (
-                    <Trans id="survey.punctuation.baseGroup.caption">
-                      Already typed by your base keyboard ({baseName}) — proposed for
+                    <Trans id="survey.punctuation.startingGroup.caption">
+                      Already typed by your starting keyboard ({baseName}) — proposed for
                       you to keep; click a mark to remove it.
                     </Trans>
                   ) : (
-                    <Trans id="survey.punctuation.baseGroup.captionNoName">
-                      Already typed by your base keyboard — proposed for you to keep;
+                    <Trans id="survey.punctuation.startingGroup.captionNoName">
+                      Already typed by your starting keyboard — proposed for you to keep;
                       click a mark to remove it.
                     </Trans>
                   )}{" "}
-                  <Trans id="survey.punctuation.baseGroup.carveNote">
-                    Removing a mark here declares it unsupported, but the base layout
+                  <Trans id="survey.punctuation.startingGroup.carveNote">
+                    Removing a mark here declares it unsupported, but the starting keyboard
                     still types it until the discard step's punctuation rule changes.
                   </Trans>
                 </p>
                 <div style={chipRow}>
-                  {baseChosen.map((c) => (
+                  {startChosen.map((c) => (
                     <ChosenChip key={c} char={c} isProposed onRemove={removeChar} />
                   ))}
                 </div>
@@ -812,7 +826,7 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
                   message: "Chosen punctuation — click to remove",
                 })}
               >
-                {(cldrChosen.length > 0 || baseChosen.length > 0) && (
+                {(cldrChosen.length > 0 || startChosen.length > 0) && (
                   <p style={groupCaption}>
                     <Trans id="survey.punctuation.authoredGroup.caption">
                       Added by you — click a mark to remove it.

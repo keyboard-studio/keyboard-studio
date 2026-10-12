@@ -1,0 +1,340 @@
+// see spec.md §8 step 1 — StartBrowserService implementation (GitHub API client)
+
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import {
+  makeStartKeyboard,
+  type StartBrowserService,
+  type StartDocumentationProfile,
+  type StartKeyboard,
+  type KeymanPlatformTarget,
+} from "@keyboard-studio/contracts";
+import {
+  fetchRecursiveTree,
+  fetchTree,
+  fetchRawText,
+  type FetchFn,
+  type GitTree,
+  type GitTreeItem,
+  type GithubClientOptions,
+} from "./github-api.js";
+import { classifyStartDocumentation } from "./classifyStartDocumentation.js";
+import { kpsRefToPosix, parseKps, parseKpsFiles } from "./kps-parser.js";
+import { offlineKbdus } from "./offline-bundle.js";
+import { dedupeKpsPathsById, matchKeyboardScopePath } from "./corpus-scope.js";
+
+const OWNER = "keyboard-studio";
+const REPO = "keyboards";
+const REF = "master";
+const RAW_BASE = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${REF}`;
+
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+export interface StartBrowserConfig {
+  /** GitHub personal access token — raises rate limit from 60 to 5000 req/hr. */
+  token?: string;
+  /** Override the fetch implementation; defaults to the global fetch (Node 20+ / browser). */
+  fetch?: FetchFn;
+}
+
+/**
+ * A {@link StartBrowserService} extended with the spec 080 documentation
+ * classifier (FR-008, research R4). Not folded into the locked
+ * `StartBrowserService` contract — additive engine-side surface only.
+ */
+export interface StartBrowserServiceWithDocProfile extends StartBrowserService {
+  /**
+   * Classify `startId`'s documentation completeness (spec 080 FR-008), from
+   * its already-fetched `.kps` manifest plus one welcome-page probe fetch.
+   * Computed lazily for the focused/selected base only — never for the whole
+   * gallery — and cached per base id, so a repeated call for the same id
+   * does not refetch. Resolves to a `level: "unknown"` profile when the base
+   * is not found (never fetched/parsed) or the welcome probe fails outright
+   * (network error, as opposed to an ordinary 404).
+   */
+  getDocProfile(startId: string): Promise<StartDocumentationProfile>;
+}
+
+const UNKNOWN_DOC_PROFILE: StartDocumentationProfile = {
+  level: "unknown",
+  members: [],
+  welcomeConvention: "absent",
+  welcomeImages: [],
+  hasUsableDescription: false,
+};
+
+interface CacheEntry {
+  sha: string;
+  keyboards: StartKeyboard[];
+  expiry: number;
+}
+
+/** The base's raw `.kps` text plus the folder it (and its source siblings) live under, kept for the doc-profile welcome probe (spec 080 R4) — the base's metadata fetch already paid for this text once. */
+interface KpsCacheEntry {
+  kpsText: string;
+  keyboardRoot: string;
+}
+
+const FOLDER_WELCOME_PAGE = "welcome/welcome.htm";
+const FLAT_WELCOME_PAGE = "welcome.htm";
+
+/**
+ * Which welcome-page path to probe for `kpsFiles`, mirroring the loader's
+ * folder-wins-over-flat priority (`fetchKeyboardSourceToVfs.ts`'s
+ * `resolveStartWelcome`) without needing the loader's full three-step
+ * descriptor-name resolution — `classifyStartDocumentation` only needs ONE
+ * page's text to decide stub-vs-usable. `null` when neither is listed.
+ */
+function welcomeProbePath(kpsFiles: ReturnType<typeof parseKpsFiles>): string | null {
+  let folder = false;
+  let flat = false;
+  for (const { name } of kpsFiles) {
+    const rel = kpsRefToPosix(name).toLowerCase();
+    if (rel === FOLDER_WELCOME_PAGE) folder = true;
+    else if (rel === FLAT_WELCOME_PAGE) flat = true;
+  }
+  if (folder) return FOLDER_WELCOME_PAGE;
+  if (flat) return FLAT_WELCOME_PAGE;
+  return null;
+}
+
+/**
+ * Resolve the full `release/` blob listing, with the commit-tree SHA for cache
+ * keying. The fast path is the single recursive Trees fetch. If GitHub reports
+ * that tree `truncated` (exceeds the 100k-entry / 7 MB limit), we do NOT return
+ * the partial list silently (#449): we warn and reassemble the listing
+ * incrementally — one bounded recursive fetch per `release/` subfolder — so a
+ * large tree no longer depends on a single recursive fetch.
+ */
+async function collectReleaseTreeItems(
+  clientOpts: GithubClientOptions
+): Promise<{ items: GitTreeItem[]; sha: string }> {
+  const tree = await fetchRecursiveTree(OWNER, REPO, REF, clientOpts);
+  if (!tree.truncated) {
+    return { items: tree.tree, sha: tree.sha };
+  }
+  devLog.warn(
+    "[base-browser] keymanapp/keyboards exceeded GitHub's recursive-tree limit " +
+      "(100k entries / 7 MB); falling back to an incremental per-subfolder listing" +
+      (clientOpts.token === undefined
+        ? ". Provide a GitHub token to raise rate limits and ensure a complete listing."
+        : ".")
+  );
+  const items = await collectReleaseItemsIncrementally(clientOpts);
+  // Keep the commit-tree SHA from the recursive call for cache keying — it
+  // still identifies the ref state even though that tree came back truncated.
+  return { items, sha: tree.sha };
+}
+
+/**
+ * Walk `release/` one level at a time: list its immediate subfolders
+ * (`release/<group>/`) via non-recursive tree reads, then recursively fetch
+ * each subfolder's (bounded) subtree. Subtree entry paths are relative to the
+ * subfolder root, so they are re-prefixed to full `release/<group>/…` paths.
+ * Per-subfolder failures are warned and skipped rather than aborting the whole listing.
+ */
+async function collectReleaseItemsIncrementally(
+  clientOpts: GithubClientOptions
+): Promise<GitTreeItem[]> {
+  const root = await fetchTree(OWNER, REPO, REF, clientOpts);
+  const releaseEntry = root.tree.find(
+    (t) => t.type === "tree" && t.path === "release"
+  );
+  if (releaseEntry === undefined) return [];
+
+  const release = await fetchTree(OWNER, REPO, releaseEntry.sha, clientOpts);
+  const groups = release.tree.filter((t) => t.type === "tree");
+
+  const perGroup = await Promise.all(
+    groups.map(async (group): Promise<GitTreeItem[]> => {
+      let sub: GitTree;
+      try {
+        sub = await fetchTree(OWNER, REPO, group.sha, clientOpts, true);
+      } catch (err) {
+        devLog.warn(
+          "[base-browser] failed to list release/" +
+            group.path +
+            "/; skipping (its keyboards will be missing from the gallery): " +
+            (err instanceof Error ? err.message : String(err))
+        );
+        return [];
+      }
+      return sub.tree.map((item) => ({
+        ...item,
+        path: `release/${group.path}/${item.path}`,
+      }));
+    })
+  );
+  return perGroup.flat();
+}
+
+/**
+ * Create a live {@link StartBrowserService} that reads the
+ * `keymanapp/keyboards/release/` tree via the GitHub REST API.
+ *
+ * Results are cached in-memory for {@link CACHE_TTL_MS} (10 min), keyed by
+ * the ref SHA returned by the Trees API so stale data is never served after
+ * a push.  Falls back to the offline US-English bundle on any network or
+ * API error.
+ *
+ * @see spec.md §8 step 1
+ */
+export function createStartBrowser(
+  config: StartBrowserConfig = {}
+): StartBrowserServiceWithDocProfile {
+  // fetch is available globally in Node 20+ (engines requirement) and browsers.
+  // The dom lib isn't in this package's tsconfig; cast through unknown.
+  const fetchFn: FetchFn =
+    config.fetch ??
+    ((url, init) =>
+      (globalThis as unknown as { fetch: FetchFn }).fetch(url, init));
+
+  let cache: CacheEntry | null = null;
+  // Per-base .kps text, kept from the metadata fetch above so the doc-profile
+  // welcome probe (getDocProfile) does not refetch it (research R4).
+  const kpsCache = new Map<string, KpsCacheEntry>();
+  // Per-base computed profile — getDocProfile is lazy (focused base only)
+  // and memoized, never precomputed for the whole gallery.
+  const docProfileCache = new Map<string, StartDocumentationProfile>();
+
+  async function loadAll(): Promise<StartKeyboard[]> {
+    const now = Date.now();
+    if (cache !== null && cache.expiry > now) {
+      return cache.keyboards;
+    }
+
+    const clientOpts: GithubClientOptions = {
+      ...(config.token !== undefined ? { token: config.token } : {}),
+      fetch: fetchFn,
+    };
+
+    let items: GitTreeItem[];
+    let treeSha: string;
+    try {
+      const collected = await collectReleaseTreeItems(clientOpts);
+      items = collected.items;
+      treeSha = collected.sha;
+    } catch {
+      return [offlineKbdus];
+    }
+
+    // Dedupe transitional-duplicate ids (present under both the
+    // source/ and legacy flat-root layouts at once) to a single kps path per
+    // id, preferring source/, BEFORE fetching+parsing so a duplicate isn't
+    // even fetched twice.
+    const kpsPaths = dedupeKpsPathsById(
+      items.filter((item) => item.type === "blob").map((item) => item.path)
+    );
+
+    const keyboards: StartKeyboard[] = [];
+
+    await Promise.all(
+      kpsPaths.map(async (kpsPath) => {
+        const id = matchKeyboardScopePath(kpsPath)?.id;
+        if (id === undefined) return;
+        // The folder holding the .kps. For the Keyman 17+ "source/" layout this
+        // is `release/<vendor>/<id>/source`; for the legacy flat-root layout it
+        // is `release/<vendor>/<id>`.
+        const folderPath = kpsPath.slice(0, kpsPath.lastIndexOf("/"));
+        // StartKeyboard.path is the keyboard ROOT (contract: e.g.
+        // "release/b/basic_kbdus"). The loader appends "/source/" itself, so the
+        // trailing "/source" segment must be stripped here — otherwise the loader
+        // fetches ".../source/source/<id>.kmn" (404) and the base is silently
+        // dropped to a stub-only scaffold.
+        const keyboardRoot = folderPath.endsWith("/source")
+          ? folderPath.slice(0, -"/source".length)
+          : folderPath;
+        try {
+          const xml = await fetchRawText(`${RAW_BASE}/${kpsPath}`, clientOpts);
+          const meta = parseKps(xml);
+          kpsCache.set(id, { kpsText: xml, keyboardRoot });
+          keyboards.push(
+            makeStartKeyboard({
+              id,
+              path: keyboardRoot,
+              displayName: meta.displayName || id,
+              version: meta.version,
+              script: meta.script,
+              targets: meta.targets,
+              // View-source link points at the folder that actually holds the
+              // source files (the source/ subfolder under the modern layout).
+              sourceUrl: `https://github.com/${OWNER}/${REPO}/tree/${REF}/${folderPath}`,
+              ...(meta.languages.length > 0 ? { languages: meta.languages } : {}),
+            })
+          );
+        } catch {
+          // Skip this keyboard on fetch or parse failure
+        }
+      })
+    );
+
+    // Guarantee the offline US-English fallback is always present
+    if (!keyboards.some((kb) => kb.id === offlineKbdus.id)) {
+      keyboards.push(offlineKbdus);
+    }
+
+    keyboards.sort((a, b) => a.id.localeCompare(b.id));
+
+    cache = { sha: treeSha, keyboards, expiry: now + CACHE_TTL_MS };
+    return keyboards;
+  }
+
+  return {
+    listAll: loadAll,
+
+    async search(
+      query: string,
+      opts?: { script?: string; target?: KeymanPlatformTarget }
+    ): Promise<StartKeyboard[]> {
+      const all = await loadAll();
+      const q = query.toLowerCase();
+      const results = all.filter((kb) => {
+        const matchesQuery =
+          q === "" ||
+          kb.id.toLowerCase().includes(q) ||
+          kb.displayName.toLowerCase().includes(q);
+        const matchesScript =
+          opts?.script === undefined || kb.script === opts.script;
+        const matchesTarget =
+          opts?.target === undefined || kb.targets.includes(opts.target);
+        return matchesQuery && matchesScript && matchesTarget;
+      });
+      return results.sort((a, b) => a.id.localeCompare(b.id));
+    },
+
+    async getById(id: string): Promise<StartKeyboard | undefined> {
+      const all = await loadAll();
+      return all.find((kb) => kb.id === id);
+    },
+
+    async getDocProfile(startId: string): Promise<StartDocumentationProfile> {
+      const cached = docProfileCache.get(startId);
+      if (cached !== undefined) return cached;
+
+      await loadAll(); // ensures kpsCache is populated for this session's tree
+      const entry = kpsCache.get(startId);
+      if (entry === undefined) {
+        docProfileCache.set(startId, UNKNOWN_DOC_PROFILE);
+        return UNKNOWN_DOC_PROFILE;
+      }
+
+      const kpsFiles = parseKpsFiles(entry.kpsText);
+      const probePath = welcomeProbePath(kpsFiles);
+
+      let welcomeText: string | null = null;
+      if (probePath !== null) {
+        try {
+          const res = await fetchFn(`${RAW_BASE}/${entry.keyboardRoot}/source/${probePath}`);
+          if (res.ok) welcomeText = await res.text();
+        } catch {
+          // Network failure on the probe itself — degrade the whole profile
+          // to unknown rather than misreporting the base as undocumented.
+          return UNKNOWN_DOC_PROFILE;
+        }
+      }
+
+      const profile = classifyStartDocumentation(kpsFiles, welcomeText, null);
+      docProfileCache.set(startId, profile);
+      return profile;
+    },
+  };
+}

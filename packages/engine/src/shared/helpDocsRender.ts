@@ -135,6 +135,15 @@ function renderDocBodyHtml(answers: HelpDocsAnswers | null, description: string)
   return parts.join("\n");
 }
 
+/**
+ * The `lang` for authored prose (FR-006 as amended in the spec 061
+ * AS-BUILT): the first language the author said the help is written in,
+ * else the keyboard's own primary language.
+ */
+function proseLang(answers: HelpDocsAnswers | null, primaryBcp47: string | undefined): string | undefined {
+  return nonBlank(answers?.docLanguageTags?.[0]) ?? primaryBcp47;
+}
+
 /** Set (or insert) the `<html lang="...">` attribute (FR-006). No-op when `lang` is absent/blank. */
 function setHtmlLang(htmlText: string, lang: string | undefined): string {
   const value = nonBlank(lang);
@@ -149,7 +158,7 @@ function setHtmlLang(htmlText: string, lang: string | undefined): string {
   return htmlText.replace(/<html\b/i, `<html lang="${escaped}"`);
 }
 
-/** Insert `addition` just before `</body>` when present, else append below (shared by {@link mergeWithBase} and the FR-006/T051 image-only append path). */
+/** Insert `addition` just before `</body>` when present, else append below (shared by {@link mergeWithStart} and the FR-006/T051 image-only append path). */
 function insertBeforeClosingBody(html: string, addition: string): string {
   const closingBodyIdx = html.toLowerCase().lastIndexOf("</body>");
   if (closingBodyIdx === -1) {
@@ -164,7 +173,7 @@ function insertBeforeClosingBody(html: string, addition: string): string {
  * interleaving into the original prose (research D-05). Inserted just before
  * `</body>` when present, so the base's own document structure survives.
  */
-function mergeWithBase(baseText: string, newBodyHtml: string): string {
+function mergeWithStart(baseText: string, newBodyHtml: string): string {
   const addition = `${MERGE_BOUNDARY_COMMENT}\n<h2>${escapeHtml(MERGE_BOUNDARY_HEADING)}</h2>\n${newBodyHtml}`;
   return insertBeforeClosingBody(baseText, addition);
 }
@@ -309,7 +318,7 @@ function buildReadmeBody(input: HelpDocsRenderInput, description: string): strin
  * `README.md` — package-listing description, links, and supported platforms.
  * No version/copyright (FR-007).
  *
- * @param baseReadmeMdText spec 080 FR-006: a fetched base's own `README.md`,
+ * @param startReadmeMdText spec 080 FR-006: a fetched base's own `README.md`,
  *   inherited even before the author has answered anything. `null` keeps
  *   the FR-002 fallback shape (the bare `# title` stub, plus the Supported
  *   Platforms section whenever projected `&TARGETS` are known). Non-null: no
@@ -319,14 +328,14 @@ function buildReadmeBody(input: HelpDocsRenderInput, description: string): strin
  */
 export function renderReadmeMd(
   input: HelpDocsRenderInput,
-  baseReadmeMdText: string | null = null,
+  startReadmeMdText: string | null = null,
 ): string {
   const { displayName } = input;
   const description = input.answers !== null ? nonBlank(input.answers.description) : undefined;
 
-  if (baseReadmeMdText !== null) {
-    if (description === undefined) return withOneTrailingNewline(baseReadmeMdText);
-    return `${baseReadmeMdText.replace(/\s+$/, "")}\n\n${buildReadmeBody(input, description)}\n`;
+  if (startReadmeMdText !== null) {
+    if (description === undefined) return withOneTrailingNewline(startReadmeMdText);
+    return `${startReadmeMdText.replace(/\s+$/, "")}\n\n${buildReadmeBody(input, description)}\n`;
   }
 
   if (description === undefined) {
@@ -366,23 +375,23 @@ export function renderReadmeHtm(input: HelpDocsRenderInput): string {
  */
 export function renderWelcomeHtm(
   input: HelpDocsRenderInput,
-  baseWelcomeHtmText: string | null,
+  startWelcomeHtmText: string | null,
   welcomeImageFiles: readonly string[] = [],
 ): string {
   const { answers, displayName, primaryBcp47 } = input;
   const description = answers !== null ? nonBlank(answers.description) : undefined;
   const unlistedFiles =
-    baseWelcomeHtmText !== null
-      ? filesNotReferencedIn(welcomeImageFiles, baseWelcomeHtmText)
+    startWelcomeHtmText !== null
+      ? filesNotReferencedIn(welcomeImageFiles, startWelcomeHtmText)
       : welcomeImageFiles;
   const layoutSection = renderWelcomeLayoutSection(unlistedFiles);
 
   if (description === undefined) {
-    if (baseWelcomeHtmText !== null) {
+    if (startWelcomeHtmText !== null) {
       // FR-006: inherit the base page even before anything is authored —
       // never the tool placeholder once a base welcome page exists.
-      if (layoutSection === "") return baseWelcomeHtmText;
-      return insertBeforeClosingBody(baseWelcomeHtmText, layoutSection);
+      if (layoutSection === "") return startWelcomeHtmText;
+      return insertBeforeClosingBody(startWelcomeHtmText, layoutSection);
     }
     // FR-002 fallback — byte-identical to today's placeholder when there are
     // no images to reference. With images (a Track 1 copy of an illustrated
@@ -395,10 +404,10 @@ export function renderWelcomeHtm(
   const bodyHtml = renderDocBodyHtml(answers, description);
   const bodyWithLayout = layoutSection === "" ? bodyHtml : `${bodyHtml}\n${layoutSection}`;
   const doc =
-    baseWelcomeHtmText !== null
-      ? mergeWithBase(baseWelcomeHtmText, bodyWithLayout)
-      : buildFreshHtmlDoc(bodyWithLayout, primaryBcp47);
-  return setHtmlLang(doc, primaryBcp47);
+    startWelcomeHtmText !== null
+      ? mergeWithStart(startWelcomeHtmText, bodyWithLayout)
+      : buildFreshHtmlDoc(bodyWithLayout, proseLang(answers, primaryBcp47));
+  return setHtmlLang(doc, proseLang(answers, primaryBcp47));
 }
 
 /**
@@ -437,7 +446,7 @@ function helpFragmentFromWelcome(welcomeHtml: string): string {
  * already carry an `<html>` element; a fresh help page has no `<html>` to
  * annotate.
  *
- * @param baseWelcomeHtmText the base's own welcome page, for a base that ships
+ * @param startWelcomeHtmText the base's own welcome page, for a base that ships
  *   one but no help page of its own. The help page is then derived from the
  *   welcome page {@link renderWelcomeHtm} renders from it, so the two carry the
  *   same body (criterion 11.9) instead of an inherited welcome page beside the
@@ -445,19 +454,19 @@ function helpFragmentFromWelcome(welcomeHtml: string): string {
  */
 export function renderHelpPhp(
   input: HelpDocsRenderInput,
-  baseHelpPhpText: string | null,
-  baseWelcomeHtmText: string | null = null,
+  startHelpPhpText: string | null,
+  startWelcomeHtmText: string | null = null,
 ): string {
   const { answers, displayName, primaryBcp47 } = input;
-  if (baseHelpPhpText === null && baseWelcomeHtmText !== null) {
+  if (startHelpPhpText === null && startWelcomeHtmText !== null) {
     return `${helpSiteHeader(displayName)}${helpFragmentFromWelcome(
-      renderWelcomeHtm(input, baseWelcomeHtmText),
+      renderWelcomeHtm(input, startWelcomeHtmText),
     )}`;
   }
   const description = answers !== null ? nonBlank(answers.description) : undefined;
   if (description === undefined) {
     // FR-006: inherit the base help page even before anything is authored.
-    if (baseHelpPhpText !== null) return baseHelpPhpText;
+    if (startHelpPhpText !== null) return startHelpPhpText;
     // FR-002 fallback — byte-identical to the scaffolder stub: standard header
     // + the bare placeholder comment (spec 080 US1-3: an early production's
     // help page still renders on the help site).
@@ -465,11 +474,11 @@ export function renderHelpPhp(
   }
 
   const bodyHtml = renderDocBodyHtml(answers, description);
-  if (baseHelpPhpText !== null) {
+  if (startHelpPhpText !== null) {
     // Inherited page may already be a full document (older bases) or a
     // header-plus-fragment (criteria-compliant). setHtmlLang is a no-op when
     // there is no `<html>` tag.
-    return setHtmlLang(mergeWithBase(baseHelpPhpText, bodyHtml), primaryBcp47);
+    return setHtmlLang(mergeWithStart(startHelpPhpText, bodyHtml), proseLang(answers, primaryBcp47));
   }
   // Fresh page: header + body fragment only — never nest a document inside
   // the site's `header.php` chrome (criterion 11.4).

@@ -223,15 +223,15 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
       </div>
 
       <p style={{ fontSize: 11.5, color: COLORS.gray.textVeryDim, margin: "16px 0 0", fontFamily: SANS }}>
-        <Trans id="dashboard.strategyTree.postfixNote">
+        <Trans id="dashboard.strategyTree.postfixStartingNote">
           Note: rule 3a (postfix-preference intercept → {"S-03"}, shown above between rules 3 and 4) is
-          implemented in <code style={{ fontFamily: MONO }}>{"selectStrategy()"}</code>. When a base is
+          implemented in <code style={{ fontFamily: MONO }}>{"selectStrategy()"}</code>. When a starting point is
           instantiated (either track), its IR is scanned for the unconditional postfix
           sequence-replace shape and{" "}
           <code style={{ fontFamily: MONO }}>{'markInputOrder="postfix"'}</code> is seeded onto{" "}
           <code style={{ fontFamily: MONO }}>{"irAxes"}</code>{" "}
           (<code style={{ fontFamily: MONO }}>{'source: "import-derived"'}</code> below), so rule
-          3a now fires live for such a base — though{" "}
+          3a now fires live for such a starting point — though{" "}
           <code style={{ fontFamily: MONO }}>{"if()"}</code>-guarded rules are still opaque, so no shipping{" "}
           <code style={{ fontFamily: MONO }}>{"sil_ipa"}</code> rule reaches it yet. No survey phase elicits
           it end-to-end yet — that half remains deferred.
@@ -272,10 +272,10 @@ function DefaultFillProvenance({ axisFills }: { axisFills: AxisFill[] | undefine
         <Trans id="dashboard.strategyTree.prefilledAxes.heading">Pre-filled axes (not survey-elicited)</Trans>
       </h3>
       <p style={{ fontSize: 11.5, color: COLORS.gray.textDim, margin: "0 0 8px", fontFamily: SANS }}>
-        <Trans id="dashboard.strategyTree.prefilledAxes.description">
+        <Trans id="dashboard.strategyTree.prefilledAxes.startingDescription">
           These phase-gated axes were not elicited by the survey. Each was supplied either by the §7.2
           script-class prior (the unmarked/off-state value, never rule-triggering) or derived from
-          structural evidence in the base keyboard (which <em>can</em> be rule-triggering, e.g.{" "}
+          structural evidence in the starting keyboard (which <em>can</em> be rule-triggering, e.g.{" "}
           <code style={{ fontFamily: MONO, color: COLORS.gray.textMuted }}>
             {'markInputOrder="postfix"'}
           </code>{" "}

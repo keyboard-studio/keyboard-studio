@@ -62,18 +62,28 @@ export interface HeadlineDimension {
 export type HeadlineSpec =
   | { id: "chose"; question: QuestionName; value: string }
   | { id: "acceptedSuggested"; question: QuestionName; value: string; source: string }
-  | { id: "fromBase"; question: QuestionName; value: string }
+  | { id: "fromStart"; question: QuestionName; value: string }
   | { id: "editorStep"; stage: EditorActionType; dimensions: readonly HeadlineDimension[] }
   | { id: "editorStepNoChange"; stage: EditorActionType }
   | { id: "editorStepUnmeasured"; stage: EditorActionType }
   | {
-      id: "baseContribution";
-      /** Author-facing base name (contract §2) — never `baseId`, the internal identifier. */
+      id: "galleryDecision";
+      /**
+       * The recording host's own account of the decision (spec 090 US5),
+       * carried on the payload — rendered verbatim, because no headline
+       * rule here could compose a truer one without per-module knowledge
+       * of what the value means.
+       */
+      summary: string;
+    }
+  | {
+      id: "startContribution";
+      /** Author-facing base name (contract §2) — never `startId`, the internal identifier. */
       baseName: string;
       /**
        * Omitted (not `0`) when the working copy's starting inventory could not
        * be measured — a genuinely empty base is a real `0` and IS mentioned
-       * (recordBaseContribution.ts's absence convention).
+       * (recordStartContribution.ts's absence convention).
        */
       startingKeyCount?: number;
       /**
@@ -165,8 +175,16 @@ export function headlineOf(
     return { id: "editorStepUnmeasured", stage: payload.actionType };
   }
 
+  if (payload.kind === "decision") {
+    // spec 090 US5 (D-090-48): the summary the recording host composed is
+    // the headline. It is author-facing content produced inside the studio
+    // at record time (the same standing `payload.value` has), never a code
+    // this module would have to resolve through the catalogue.
+    return { id: "galleryDecision", summary: payload.summary };
+  }
+
   if (payload.kind === "base-contribution") {
-    // baseName carries the author-facing display name; `payload.baseId` (the
+    // baseName carries the author-facing display name; `payload.startId` (the
     // internal identifier) never rides along in any variant field (FR-008).
     //
     // The two derived counts are lengths of the payload's own code lists
@@ -183,7 +201,7 @@ export function headlineOf(
     const inheritedFieldCount = payload.inheritedMetadata.length;
 
     return {
-      id: "baseContribution",
+      id: "startContribution",
       baseName: payload.baseDisplayName,
       ...(payload.startingKeyCount !== undefined
         ? { startingKeyCount: payload.startingKeyCount }
@@ -208,7 +226,7 @@ export function headlineOf(
         source: provenance.source ?? "the tool",
       };
     case "base-derived":
-      return { id: "fromBase", question, value };
+      return { id: "fromStart", question, value };
     case "hand-set":
       return { id: "chose", question, value };
     default: {

@@ -7,13 +7,13 @@ function group(
   tier: CharacterMapGroup["tier"],
   script: string,
   chars: string[],
-  usedByBase = false,
+  usedByStart = false,
 ): CharacterMapGroup {
   return {
     block,
     tier,
     script,
-    usedByBase,
+    usedByStart,
     cells: chars.map((char) => ({ char, isCombiningMark: false })),
   };
 }
@@ -77,7 +77,7 @@ describe("mergeBlocksAcrossTiers", () => {
       group("Latin Extended-B", "main", "Latn", ["ǎ"], false),
       group("Latin Extended-B", "block", "Latn", ["ƀ"], true),
     ]);
-    expect(merged[0]!.usedByBase).toBe(true);
+    expect(merged[0]!.usedByStart).toBe(true);
   });
 
   it("orders blocks ascending within a script, scripts in engine-emitted order", () => {

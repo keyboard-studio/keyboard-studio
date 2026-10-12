@@ -31,15 +31,32 @@ export {
   buildContextToleranceOutputDiffPreview,
   createContextToleranceMigrationRule,
 } from '../facet-transform/migrations/context-tolerance.js';
+export { createNormalizationStepMigrationRule } from '../facet-transform/migrations/normalization-step.js';
 export { toleranceFingerprint, toleranceSiteKeys } from '../pattern-apply/tolerance-fingerprint.js';
 export {
   applyContextToleranceOverlay,
   buildContextToleranceOverlay,
+  buildNormalizationStepOverlay,
+  isNormalizationStepBatch,
+  NORMALIZATION_STEP_SITE_ID,
+  overlayHasNormalizationStep,
   presentContextToleranceSites,
   removeContextToleranceOverlay,
   type ContextToleranceOverlay,
   type ContextToleranceOverlayBatch,
 } from '../pattern-apply/context-tolerance-overlay.js';
+export {
+  applyNormalizationStep,
+  normalizationStepCacheKey,
+  NORMALIZATION_GROUP,
+  NORMALIZATION_STEP_GENERATOR_VERSION,
+  proposeNormalizationStep,
+  removeNormalizationStep,
+  type NormalizationMap,
+  type NormalizationRefusalReason,
+  type NormalizationStep,
+  type NormalizationStepResult,
+} from '../pattern-apply/normalization-step/index.js';
 export { loadCharNames } from '../character-discovery/charNames.js';
 /** For `applyFacetTransform`'s injected behavioural verification. */
 export { simulate } from '../simulator/index.js';

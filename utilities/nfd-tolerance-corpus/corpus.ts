@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import {
   dedupeKpsPathsById,
   matchKeyboardScopePath,
-} from "../../packages/engine/src/base-browser/corpus-scope.js";
+} from "../../packages/engine/src/start-browser/corpus-scope.js";
 
 import type { KmnInput } from "./analyze.js";
 

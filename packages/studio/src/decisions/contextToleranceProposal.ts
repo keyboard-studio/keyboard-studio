@@ -7,15 +7,25 @@
 // the proposal is read off the result being recorded rather than off any
 // store. Accepting everything therefore records `tool-proposed` / `analysis`;
 // a partial or declined outcome records `hand-set` with the offer attached.
+//
+// A normalization step (spec 086) is one all-or-nothing site, so its
+// `proposedSiteIds` is `["normalization-step"]` and the outcome is only ever
+// accept (`["normalization-step"]`) or decline (`[]`), never partial. The
+// question ids are unchanged, so no branching is needed here.
 
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { ProposalLookup } from "./recordSurveyAnswers.ts";
+import {
+  CONTEXT_TOLERANCE_QUESTION_ID,
+  CONTEXT_TOLERANCE_SITES_QUESTION_ID,
+  SITE_ID_SEPARATOR,
+} from "./contextToleranceIds.ts";
 
-export const CONTEXT_TOLERANCE_QUESTION_ID = "marks.context_tolerance";
-export const CONTEXT_TOLERANCE_SITES_QUESTION_ID = "marks.context_tolerance.sites";
-
-/** Separator for the `.sites` answer's accepted rule ids. */
-export const SITE_ID_SEPARATOR = ",";
+export {
+  CONTEXT_TOLERANCE_QUESTION_ID,
+  CONTEXT_TOLERANCE_SITES_QUESTION_ID,
+  SITE_ID_SEPARATOR,
+} from "./contextToleranceIds.ts";
 
 /**
  * Wrap `fallback` so the two context-tolerance question ids resolve against

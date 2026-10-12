@@ -20,6 +20,7 @@ import { join } from "node:path";
 import {
   driveIdentityLite,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   seedReturningVisitor,
@@ -216,7 +217,7 @@ declare global {
 // Base-picker interactions (preview vs confirm kept separate on purpose)
 // ---------------------------------------------------------------------------
 
-async function previewBase(page: Page, id: string, h: Harness): Promise<void> {
+async function previewStart(page: Page, id: string, h: Harness): Promise<void> {
   const card = page.getByTestId(`base-card-${id}`);
   if (await card.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await card.click();
@@ -232,7 +233,7 @@ async function previewBase(page: Page, id: string, h: Harness): Promise<void> {
   h.note(`preview compile settled for ${id} (confirm enabled)`);
 }
 
-async function confirmBase(page: Page, h: Harness): Promise<void> {
+async function confirmStart(page: Page, h: Harness): Promise<void> {
   await page.getByTestId("base-confirm").click();
   h.note("clicked base-confirm (Choose this keyboard)");
 }
@@ -241,7 +242,7 @@ async function confirmBase(page: Page, h: Harness): Promise<void> {
  * Walk back to the base picker using whatever back affordance is visible,
  * recording each hop. Falls back to browser back if no in-app back is found.
  */
-async function backToBasePicker(page: Page, h: Harness): Promise<boolean> {
+async function backToStartPicker(page: Page, h: Harness): Promise<boolean> {
   for (let i = 0; i < 20; i++) {
     if (await page.getByTestId("base-picker").isVisible({ timeout: 800 }).catch(() => false)) {
       h.note(`reached base picker after ${i} back hops`);
@@ -294,15 +295,16 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   h.note("identity-lite complete; at base picker");
   if (level === "L1-identity-done") return;
 
-  await previewBase(page, BASE_A, h);
+  await previewStart(page, BASE_A, h);
   if (level === "L2-base-previewed") return;
 
-  await confirmBase(page, h);
+  await confirmStart(page, h);
   await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 30_000 });
   h.note("base confirmed; at track step");
   if (level === "L3-base-confirmed") return;
 
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
   await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 30_000 });
   h.note("track chosen (adapt); at prefill confirmation");
   if (level === "L4-track-chosen") return;
@@ -367,15 +369,15 @@ async function probeBrowserBack(page: Page, h: Harness): Promise<void> {
 
 async function probeSwitchBase(page: Page, h: Harness, action: DialogAction): Promise<void> {
   await h.dump(page, "before-switch");
-  const reached = await backToBasePicker(page, h);
+  const reached = await backToStartPicker(page, h);
   await h.dump(page, "at-base-picker");
   if (!reached) return;
 
-  await previewBase(page, BASE_B, h);
+  await previewStart(page, BASE_B, h);
   await h.dump(page, "previewed-different-base");
 
   h.setDialogAction(action);
-  await confirmBase(page, h);
+  await confirmStart(page, h);
   await page.waitForTimeout(2_500);
   await h.dump(page, `after-confirm-dialog-${action}`);
 

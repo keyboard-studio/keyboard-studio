@@ -125,7 +125,7 @@ export function setMockStage(s: Stage) {
 }
 
 export const useKeyboardArtifact = (
-  _baseKeyboard: unknown,
+  _startKeyboard: unknown,
   _scaffoldSpec: unknown,
   vfsTransform: ((vfs: VirtualFS, keyboardId: string) => { warnings: string[] }) | null | undefined,
 ): { stage: Stage; retry: Mock; recompile: Mock } => {

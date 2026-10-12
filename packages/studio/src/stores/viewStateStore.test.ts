@@ -104,7 +104,7 @@ describe("reset (FR-052)", () => {
     s.setOskMode("survey", "tablet");
     s.setScrollTop("trail-list", 300);
     s.setCompareSelection({
-      baseKeyboard: { id: "kb", displayName: "KB" } as never,
+      startKeyboard: { id: "kb", displayName: "KB" } as never,
       oskMode: "touch",
     });
 

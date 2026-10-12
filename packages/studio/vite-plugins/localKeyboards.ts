@@ -3,7 +3,7 @@
 //
 // Two endpoints:
 //   GET /local-kbd-api/list
-//     -> JSON BaseKeyboard[]; one entry per <vendor>/<id> directory that
+//     -> JSON StartKeyboard[]; one entry per <vendor>/<id> directory that
 //        contains source/<id>.kmn.
 //   /local-kbd-proxy/<release-tree-path>
 //     -> serves the file at <repoRoot>/<release-tree-path>.
@@ -17,7 +17,7 @@ import type { Plugin } from "vite";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import {
   loadFacetScripts,
   resolveKeyboardScript,
@@ -92,7 +92,7 @@ function parseKmnMetadata(kmnPath: string): { name: string; version: string } {
 function scan(
   keyboardsRepoRoot: string,
   facetIndexPath: string,
-): BaseKeyboard[] {
+): StartKeyboard[] {
   const releaseDir = path.join(keyboardsRepoRoot, "release");
   if (!fs.existsSync(releaseDir)) return [];
   const facetScripts = loadFacetScripts(facetIndexPath);
@@ -103,7 +103,7 @@ function scan(
         "falling back to .kps declared-tag script derivation",
     );
   }
-  const out: BaseKeyboard[] = [];
+  const out: StartKeyboard[] = [];
   for (const vendor of fs.readdirSync(releaseDir)) {
     const vendorDir = path.join(releaseDir, vendor);
     let stat: fs.Stats;
@@ -131,7 +131,7 @@ function scan(
       const meta = parseKmnMetadata(kmnPath);
       const kpsPath = path.join(kbDir, "source", `${id}.kps`);
       const languages = parseKpsLanguages(kpsPath);
-      const entry: BaseKeyboard = {
+      const entry: StartKeyboard = {
         id,
         path: `release/${vendor}/${id}`,
         script: resolveKeyboardScript(id, languages, facetScripts),
@@ -149,7 +149,7 @@ function scan(
 }
 
 export function localKeyboardsPlugin(opts: LocalKeyboardsOptions): Plugin {
-  let catalogCache: BaseKeyboard[] | null = null;
+  let catalogCache: StartKeyboard[] | null = null;
   return {
     name: "local-keyboards",
     configureServer(server) {

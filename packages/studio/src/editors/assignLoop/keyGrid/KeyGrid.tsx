@@ -538,9 +538,9 @@ export function KeyGrid({
   const provenanceMessage =
     provenance === "derived-from-base"
       ? t({
-          id: "editor.assignLoop.keyGrid.provenanceDerivedFromBase",
+          id: "editor.assignLoop.keyGrid.provenanceDerivedFromDesktop",
           message:
-            "This layout was generated automatically from your keyboard's physical layout.",
+            "This layout was generated automatically from your keyboard's desktop layout.",
         })
       : provenance === "imported-existing"
         ? t({

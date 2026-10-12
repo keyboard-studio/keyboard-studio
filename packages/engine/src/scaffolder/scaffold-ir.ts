@@ -119,14 +119,14 @@ function getSystemStoreString(ir: KeyboardIR, name: string): string | null {
  * &BITMAP is handled conditionally: its current basename may or may not match
  * the base id (e.g. `sil_akebu.ico` does match; `Cameroon.ico` in
  * sil_cameroon_qwerty does not). `renameFilesInVfs` only renames the icon
- * when its filename is `<baseId>.ico`, so we mirror that here — rewrite the
- * store only when the basename equals baseKeyboardId. Otherwise the file
+ * when its filename is `<startId>.ico`, so we mirror that here — rewrite the
+ * store only when the basename equals startKeyboardId. Otherwise the file
  * wasn't renamed and the store still points at a valid filename.
  */
 function rewriteSiblingPathStores(
   ir: KeyboardIR,
   keyboardId: string,
-  baseKeyboardId: string,
+  startKeyboardId: string,
 ): void {
   // Stores rewritten unconditionally whenever present (siblingAssetStores.ts).
   const PATH_STORES = unconditionalScaffoldRenameStores();
@@ -149,7 +149,7 @@ function rewriteSiblingPathStores(
     if (
       trimmed.includes(".") &&
       !/[\\/]/.test(trimmed) &&
-      trimmed.slice(0, trimmed.indexOf(".")) === baseKeyboardId
+      trimmed.slice(0, trimmed.indexOf(".")) === startKeyboardId
     ) {
       const extension = trimmed.slice(trimmed.indexOf("."));
       setSystemStore(ir, name, `${keyboardId}${extension}`);
@@ -182,8 +182,8 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   const bcp47 = identity.bcp47 ?? [];
 
   // Capture the base id before mutating header — needed to mirror
-  // renameFilesInVfs's <baseId>-named icon rename in &BITMAP.
-  const baseKeyboardId = ir.header.keyboardId;
+  // renameFilesInVfs's <startId>-named icon rename in &BITMAP.
+  const startKeyboardId = ir.header.keyboardId;
 
   ir.header.keyboardId = identity.keyboardId;
   ir.header.name = displayName;
@@ -195,7 +195,7 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   setSystemStore(ir, "COPYRIGHT", kmnStringEscape(copyright));
   setSystemStore(ir, "VERSION", fileFormatVersion);
   setSystemStore(ir, "KEYBOARDVERSION", keyboardVersion);
-  rewriteSiblingPathStores(ir, identity.keyboardId, baseKeyboardId);
+  rewriteSiblingPathStores(ir, identity.keyboardId, startKeyboardId);
 }
 
 function ruleHasModifier(rule: IRRule, modifier: string): boolean {

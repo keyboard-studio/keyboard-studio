@@ -128,10 +128,10 @@ describe("helpDocsRender — spec 080 FR-003 standard help-site header (US1)", (
   });
 
   it("an inherited help page keeps its own header and never gets a second one (US1-2)", () => {
-    const baseHelp =
+    const startHelp =
       "<?php\n  $pagename = 'French Basic Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Base prose.</p></body></html>";
     const input = baseInput({ displayName: "Hausa Basic", answers: answersWith() });
-    const help = renderHelpPhp(input, baseHelp);
+    const help = renderHelpPhp(input, startHelp);
     expect(help.startsWith("<?php\n  $pagename = 'French Basic Keyboard Help';")).toBe(true);
     expect(help.match(/\$pagename =/g)).toHaveLength(1);
     expect(help).not.toContain("Hausa Basic Keyboard Help");
@@ -268,6 +268,36 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
     expect(help).not.toMatch(/<\/html>/i);
   });
 
+  it("tags the page with the language the help is written in, not the keyboard's (FR-006 as amended)", () => {
+    // sil_cameroon_azerty-style: a Cameroonian keyboard whose help is English + French.
+    const bilingual = baseInput({
+      answers: answersWith({ docLanguageTags: ["en", "fr"] }),
+      primaryBcp47: "bum",
+    });
+    expect(renderWelcomeHtm(bilingual, null)).toContain('<html lang="en">');
+    expect(renderWelcomeHtm(bilingual, null)).not.toContain('lang="bum"');
+
+    // winchus-style: help entirely in Spanish, a national language.
+    const spanish = baseInput({ answers: answersWith({ docLanguageTags: ["es"] }), primaryBcp47: "cbi" });
+    expect(renderWelcomeHtm(spanish, null)).toContain('<html lang="es">');
+
+    // No language given: falls back to the keyboard's own tag, as before.
+    const unstated = baseInput({ answers: answersWith(), primaryBcp47: "bum" });
+    expect(renderWelcomeHtm(unstated, null)).toContain('<html lang="bum">');
+  });
+
+  it("retags an inherited base page and its help.php with the written language", () => {
+    const englishStart = '<html lang="en"><body><h1>Hello</h1></body></html>';
+    const input = baseInput({
+      answers: answersWith({ description: "Nouveau contenu.", docLanguageTags: ["fr", "en"] }),
+      primaryBcp47: "bum",
+    });
+    const welcome = renderWelcomeHtm(input, englishStart);
+    expect(welcome).toContain('<html lang="fr">');
+    expect(welcome.match(/lang=/g)).toHaveLength(1);
+    expect(renderHelpPhp(input, englishStart)).toContain('<html lang="fr">');
+  });
+
   it("never embeds a version number or copyright year (FR-007)", () => {
     const input = baseInput({ answers: answersWith() });
     for (const rendered of [renderReadmeMd(input), renderReadmeHtm(input), renderWelcomeHtm(input, null), renderHelpPhp(input, null)]) {
@@ -288,11 +318,11 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
 });
 
 describe("helpDocsRender — FR-013 merge with a fetched base", () => {
-  const baseWelcome = "<html><body><h1>Hand-authored</h1><p>Original prose stays.</p></body></html>";
+  const startWelcome = "<html><body><h1>Hand-authored</h1><p>Original prose stays.</p></body></html>";
 
   it("preserves the base body verbatim and appends new content below a clear boundary", () => {
     const input = baseInput({ answers: answersWith({ description: "New answer content." }) });
-    const rendered = renderWelcomeHtm(input, baseWelcome);
+    const rendered = renderWelcomeHtm(input, startWelcome);
 
     expect(rendered).toContain("<h1>Hand-authored</h1><p>Original prose stays.</p>");
     expect(rendered).toContain("<!-- Keyboard Studio additions -->");
@@ -305,18 +335,18 @@ describe("helpDocsRender — FR-013 merge with a fetched base", () => {
   });
 
   it("inherits the base verbatim rather than merging when the author has no description yet (spec 080 FR-006)", () => {
-    const rendered = renderWelcomeHtm(baseInput(), baseWelcome);
-    expect(rendered).toBe(baseWelcome);
+    const rendered = renderWelcomeHtm(baseInput(), startWelcome);
+    expect(rendered).toBe(startWelcome);
     expect(rendered).toContain("Hand-authored");
   });
 
   it("overwrites the base's own <html lang> rather than duplicating or leaving it stale", () => {
-    const frenchBase = '<html lang="fr"><body><h1>Bonjour</h1></body></html>';
+    const frenchStart = '<html lang="fr"><body><h1>Bonjour</h1></body></html>';
     const input = baseInput({
       answers: answersWith({ description: "New answer content." }),
       primaryBcp47: "pid",
     });
-    const rendered = renderWelcomeHtm(input, frenchBase);
+    const rendered = renderWelcomeHtm(input, frenchStart);
 
     expect(rendered).toContain('<html lang="pid">');
     expect(rendered).not.toContain('lang="fr"');
@@ -324,9 +354,9 @@ describe("helpDocsRender — FR-013 merge with a fetched base", () => {
   });
 
   it("appends below the base when it has no </body> anchor at all", () => {
-    const malformedBase = "<html><h1>Hand-authored</h1>"; // no closing tags
+    const malformedStart = "<html><h1>Hand-authored</h1>"; // no closing tags
     const input = baseInput({ answers: answersWith({ description: "New answer content." }) });
-    const rendered = renderWelcomeHtm(input, malformedBase);
+    const rendered = renderWelcomeHtm(input, malformedStart);
 
     expect(rendered).toContain("<h1>Hand-authored</h1>");
     expect(rendered).toContain("<!-- Keyboard Studio additions -->");
@@ -525,9 +555,9 @@ describe("helpDocsRender — spec 080 FR-006 base inheritance before anything is
   });
 
   it("renderHelpPhp returns the base help page verbatim when nothing has been authored yet", () => {
-    const baseHelp =
+    const startHelp =
       "<?php\n  $pagename = 'French Basic Keyboard Help';\n?>\n<html><body><p>Base.</p></body></html>";
-    expect(renderHelpPhp(baseInput(), baseHelp)).toBe(baseHelp);
+    expect(renderHelpPhp(baseInput(), startHelp)).toBe(startHelp);
   });
 
   it("renderReadmeMd returns the base README verbatim (one trailing newline) when nothing has been authored yet", () => {
@@ -552,12 +582,12 @@ describe("helpDocsRender — spec 080 FR-006 base inheritance before anything is
   });
 
   it("renderHelpPhp derives the help page from the base welcome page when the base ships no help page", () => {
-    const baseWelcome =
+    const startWelcome =
       '<!DOCTYPE html>\n<html lang="en">\n<head>\n<title>Base Help</title>\n<link rel="stylesheet" href="kb.css" />\n' +
       "<style>p { color: red; }</style>\n</head>\n<body>\n" +
       '<p>Base body.</p>\n<a href="qwerty-uk.htm">UK</a> <a href="qwerty-uk.htm#fr">FR</a> ' +
       '<a href="https://example.org/page.htm">ext</a>\n</body>\n</html>';
-    const rendered = renderHelpPhp(baseInput(), null, baseWelcome);
+    const rendered = renderHelpPhp(baseInput(), null, startWelcome);
     expect(rendered.startsWith(helpSiteHeader("Piaroa"))).toBe(true);
     const fragment = rendered.slice(helpSiteHeader("Piaroa").length);
     expect(fragment).toContain("<p>Base body.</p>");
@@ -572,15 +602,15 @@ describe("helpDocsRender — spec 080 FR-006 base inheritance before anything is
 
   it("renderHelpPhp derives from the merged welcome page once a description is answered", () => {
     const input = baseInput({ answers: answersWith({ description: "New description." }) });
-    const baseWelcome = "<html><body><p>Base body.</p></body></html>";
-    const fragment = renderHelpPhp(input, null, baseWelcome).slice(helpSiteHeader("Piaroa").length);
+    const startWelcome = "<html><body><p>Base body.</p></body></html>";
+    const fragment = renderHelpPhp(input, null, startWelcome).slice(helpSiteHeader("Piaroa").length);
     expect(fragment).toContain("<p>Base body.</p>");
     expect(fragment).toContain("New description.");
   });
 
   it("renderHelpPhp prefers the base's own help page over deriving one", () => {
-    const baseHelp = "<?php\n  $pagename = 'X Keyboard Help';\n?>\n<p>Own help.</p>";
-    expect(renderHelpPhp(baseInput(), baseHelp, "<html><body>w</body></html>")).toBe(baseHelp);
+    const startHelp = "<?php\n  $pagename = 'X Keyboard Help';\n?>\n<p>Own help.</p>";
+    expect(renderHelpPhp(baseInput(), startHelp, "<html><body>w</body></html>")).toBe(startHelp);
   });
 
   it("keeps today's byte-identical behaviour when no base text is supplied", () => {

@@ -355,7 +355,7 @@ describe("applyDesktopModificationsToRawJson — placements", () => {
     const json = makePhoneOnlyJson([{ id: "K_X" }]); // no text/output
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "ñ", hostKey: "K_X" }],
+      placements: [{ char: "ñ", baseKey: "K_X" }],
     });
     expect(warnings).toHaveLength(0);
     const parsed = JSON.parse(out) as { phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> } };
@@ -369,7 +369,7 @@ describe("applyDesktopModificationsToRawJson — placements", () => {
     const json = makePhoneOnlyJson([{ id: "K_A", text: "a" }]);
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "á", hostKey: "K_A" }],
+      placements: [{ char: "á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
     const parsed = JSON.parse(out) as { phone: { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string; sk?: Array<{ text?: string }> }> }> }> } };
@@ -383,7 +383,7 @@ describe("applyDesktopModificationsToRawJson — placements", () => {
     const json = makePhoneOnlyJson([{ id: "K_A", text: "a" }]);
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "ñ", hostKey: "K_NONEXISTENT" }],
+      placements: [{ char: "ñ", baseKey: "K_NONEXISTENT" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/K_NONEXISTENT/);
@@ -398,7 +398,7 @@ describe("applyDesktopModificationsToRawJson — placements", () => {
     const json = makePhoneOnlyJson([{ id: "K_X" }]); // no text/output
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: nfdChar, hostKey: "K_X" }],
+      placements: [{ char: nfdChar, baseKey: "K_X" }],
     });
     expect(warnings).toHaveLength(0);
     const parsed = JSON.parse(out) as { phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> } };
@@ -421,7 +421,7 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     );
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }], // "Á" = "A" with acute (upper)
+      placements: [{ char: "Á", baseKey: "K_A" }], // "Á" = "A" with acute (upper)
     });
     expect(warnings).toHaveLength(0);
 
@@ -449,7 +449,7 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     );
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
 
@@ -476,7 +476,7 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     );
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
 
@@ -501,7 +501,7 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     );
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(0);
 
@@ -521,7 +521,7 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     );
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "á", hostKey: "K_A" }], // "á" = "a" with acute (lower)
+      placements: [{ char: "á", baseKey: "K_A" }], // "á" = "a" with acute (lower)
     });
     expect(warnings).toHaveLength(0);
 
@@ -544,7 +544,7 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     const json = makePhoneNoShiftJson([{ id: "K_A", text: "a" }]); // no shift layer at all
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/shift/);
@@ -570,8 +570,8 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
       placements: [
-        { char: "á", hostKey: "K_A" },
-        { char: "Á", hostKey: "K_A" },
+        { char: "á", baseKey: "K_A" },
+        { char: "Á", baseKey: "K_A" },
       ],
     });
     expect(warnings).toHaveLength(0);
@@ -606,7 +606,7 @@ describe("applyDesktopModificationsToRawJson — placements target the case-deri
     );
     const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
       removals: [],
-      placements: [{ char: "Á", hostKey: "K_A" }],
+      placements: [{ char: "Á", baseKey: "K_A" }],
     });
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/not found/);
@@ -640,7 +640,7 @@ describe("applyDesktopModificationsToRawJson — no provenance fields in wire ou
     const json = makePhoneOnlyJson([{ id: "K_A", text: "a" }, { id: "K_X" }]);
     const { json: out } = applyDesktopModificationsToRawJson(json, {
       removals: ["a"],
-      placements: [{ char: "ñ", hostKey: "K_X" }, { char: "ő", hostKey: "K_MISSING" }],
+      placements: [{ char: "ñ", baseKey: "K_X" }, { char: "ő", baseKey: "K_MISSING" }],
     });
     expect(out).not.toContain("provenance");
   });
@@ -656,7 +656,7 @@ describe("applyDesktopModificationsToRawJson — no mutation of input", () => {
     const snapshot = JSON.parse(json) as object;
     applyDesktopModificationsToRawJson(json, {
       removals: ["a"],
-      placements: [{ char: "ñ", hostKey: "K_A" }],
+      placements: [{ char: "ñ", baseKey: "K_A" }],
     });
     expect(JSON.parse(json)).toEqual(snapshot);
   });

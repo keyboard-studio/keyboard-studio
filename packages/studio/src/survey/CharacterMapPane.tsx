@@ -8,10 +8,10 @@
 //
 // Clicking a cell toggles it into the SAME accumulating alphabet the center
 // pane's BuildListView builds (CharChipEditor type-in), via the shared
-// stores/phaseBDraftStore.ts — both panes read/write one list.
+// character-inventory decision value — both panes read/write one list.
 //
 // Data source: buildCharacterMap (engine, a parallel-track character-discovery
-// deliverable) via lib/services.ts's characterMapGroups wrapper. baseIr comes
+// deliverable) via lib/services.ts's characterMapGroups wrapper. startIr comes
 // from workingCopyStore; bcp47/languageName come from the same
 // surveySessionStore.surveyContext PhaseB itself reads (context.bcp47_tag /
 // context.language_name) — no new plumbing invented for this pane.
@@ -32,8 +32,9 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { buildProducedSet, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
+import { peekLastPick, useInventoryDraft } from "./useInventoryDraft.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { casePairOf, isFoldedUppercase, isFormatChar } from "./charNormUtils.ts";
 import { isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
@@ -96,7 +97,7 @@ interface CharacterMapPaneProps {
   //                   screen). DEFAULT.
   //   "punctuation" — punctuation only (the punctuation step between marks
   //                   and convenience).
-  // Both scopes toggle the SAME shared phaseBDraftStore draft.
+  // Both scopes toggle the SAME shared inventory draft.
   scope?: "alphabet" | "punctuation";
 }
 
@@ -105,24 +106,26 @@ export function CharacterMapPane({
   scope = "alphabet",
 }: CharacterMapPaneProps = {}) {
   const { t } = useLingui();
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-  const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const decisions = useDecisionStore((s) => s.decisions);
+  const surveyContext = deriveSurveyContext(decisions);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 
-  const alphabetChars = usePhaseBDraftStore((s) => s.chars);
-  const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
-  const addChar = usePhaseBDraftStore((s) => s.add);
-  const removeChar = usePhaseBDraftStore((s) => s.remove);
-  const removeLoanword = usePhaseBDraftStore((s) => s.removeLoanword);
+  const draft = useInventoryDraft(scope === "punctuation" ? "punctuation" : "characters");
+  const alphabetChars = draft.chars;
+  const loanwordChars = draft.loanwordChars;
+  const addChar = draft.ops.add;
+  const removeChar = draft.ops.remove;
+  const removeLoanword = draft.ops.removeLoanword;
   // What the map shows as selected: the alphabet plus the loanword letters the
   // author added beside it. Both are characters the keyboard will type.
   const chars = useMemo(
     () => (loanwordChars.length === 0 ? alphabetChars : [...alphabetChars, ...loanwordChars]),
     [alphabetChars, loanwordChars],
   );
-  const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
+  const acceptInvisible = draft.ops.acceptInvisible;
   const glyphFontStack = useGlyphFontStack();
   const isGlyphSupported = useFontSupportChecker(glyphFontStack);
 
@@ -161,11 +164,11 @@ export function CharacterMapPane({
   const closeCharInfo = charInfo.close;
 
   // No base IR / no BCP47 yet — short-circuit BEFORE the fetch, mirroring
-  // SuggestionPanel's own `!bcp47 || baseIr === null` guard (PhaseB.tsx). Without
+  // SuggestionPanel's own `!bcp47 || startIr === null` guard (PhaseB.tsx). Without
   // this, characterMapGroups(...) was called unconditionally and always showed
   // the generic "No characters available" empty state instead of a message that
   // tells the author WHY (and what to do instead).
-  const noBaseOrLanguage = baseIr === null || !bcp47;
+  const noBaseOrLanguage = startIr === null || !bcp47;
   const displayName =
     languageName ?? bcp47 ?? t({ id: "survey.characterMapPane.genericLanguage", message: "this language" });
 
@@ -174,16 +177,16 @@ export function CharacterMapPane({
   // "lif-Deva" -> "Deva"). Forwarded to buildCharacterMap's opts.baseScripts
   // so the base keyboard's script(s) are enumerated alongside the target
   // script — this only drives WHICH groups are built, not the "blocks my
-  // keyboard uses" filter below (that filter narrows by usedByBase instead).
+  // keyboard uses" filter below (that filter narrows by usedByStart instead).
   const baseScripts = useMemo<string[]>(() => {
     const set = new Set<string>();
-    if (baseKeyboard?.script) set.add(baseKeyboard.script);
-    for (const tag of baseKeyboard?.languages ?? []) {
+    if (startKeyboard?.script) set.add(startKeyboard.script);
+    for (const tag of startKeyboard?.languages ?? []) {
       const script = scriptSubtagOf(tag);
       if (script !== undefined) set.add(script);
     }
     return [...set];
-  }, [baseKeyboard]);
+  }, [startKeyboard]);
 
   // Fetch the character map whenever the base IR, base keyboard, or language
   // identity changes.
@@ -203,7 +206,7 @@ export function CharacterMapPane({
     }
     let cancelled = false;
     setLoadState({ status: "loading" });
-    characterMapGroups(baseIr, bcp47, languageName, baseScripts)
+    characterMapGroups(startIr, bcp47, languageName, baseScripts)
       .then((groups) => {
         if (!cancelled) setLoadState({ status: "done", groups });
       })
@@ -213,15 +216,15 @@ export function CharacterMapPane({
     return () => {
       cancelled = true;
     };
-  }, [noBaseOrLanguage, baseIr, bcp47, languageName, baseKeyboard, baseScripts, searchFiltersPopover.reset, closeCharInfo]);
+  }, [noBaseOrLanguage, startIr, bcp47, languageName, startKeyboard, baseScripts, searchFiltersPopover.reset, closeCharInfo]);
 
   // Whether the loaded groups actually carry a known produced set — the
-  // engine only sets `usedByBase: true` on any group when it had a baseIr to
+  // engine only sets `usedByStart: true` on any group when it had a startIr to
   // derive producedGlyphs() from (see buildCharacterMap). Without at least
-  // one usedByBase group the "blocks my keyboard uses" filter is meaningless,
+  // one usedByStart group the "blocks my keyboard uses" filter is meaningless,
   // so it stays hidden and every group shows regardless of `blocksOnly`.
   const hasKnownBlocks = useMemo(
-    () => loadState.status === "done" && loadState.groups.some((g) => g.usedByBase),
+    () => loadState.status === "done" && loadState.groups.some((g) => g.usedByStart),
     [loadState],
   );
 
@@ -230,8 +233,8 @@ export function CharacterMapPane({
   // a "your base already types this" affordance. Browser-safe, memoized on the
   // base IR (no I/O). Empty set when there is no base IR.
   const baseProduced = useMemo<Set<string>>(
-    () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
-    [baseIr],
+    () => (startIr !== null ? buildProducedSet(startIr) : new Set<string>()),
+    [startIr],
   );
 
 
@@ -241,8 +244,8 @@ export function CharacterMapPane({
   // surface a character from a currently-hidden block. Only when there's no
   // query does the checkbox narrow the grid — and only when we actually know
   // which blocks the base keyboard uses (hasKnownBlocks). A block already
-  // represented in the author's accumulating alphabet (`chars`, from
-  // phaseBDraftStore) is also allowed even if the base doesn't produce it —
+  // represented in the author's accumulating alphabet (`chars`, from the
+  // character-inventory value) is also allowed even if the base doesn't produce it —
   // this is the auto-unhide mechanism: adding a character from a hidden block
   // (via search, or the raw code point field) unhides that block, even while
   // the checkbox stays checked.
@@ -290,7 +293,7 @@ export function CharacterMapPane({
     }
     if (blocksOnly && hasKnownBlocks) {
       return cased.filter(
-        (g) => g.usedByBase || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
+        (g) => g.usedByStart || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
       );
     }
     return cased;
@@ -301,7 +304,7 @@ export function CharacterMapPane({
   // Marks; the announcement narrates that three-way update so the pick itself
   // is the teaching moment — no interrupting question.
   function describeContribution(char: string): string {
-    const lastPick = usePhaseBDraftStore.getState().lastPick;
+    const lastPick = peekLastPick();
     if (lastPick === null || lastPick.grapheme !== char.normalize("NFC")) return "";
     const parts: string[] = [];
     if (lastPick.addedBases.length > 0) {
@@ -536,8 +539,8 @@ export function CharacterMapPane({
       </p>
       {baseProduced.size > 0 && (
         <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
-          <Trans id="survey.characterMapPane.baseOutputLegend">
-            Characters with a dashed outline are on your base keyboard. They are not in
+          <Trans id="survey.characterMapPane.startingOutputLegend">
+            Characters with a dashed outline are on your starting keyboard. They are not in
             your alphabet until you add them.
           </Trans>
         </p>

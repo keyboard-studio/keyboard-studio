@@ -210,27 +210,19 @@ describe("flow-parity: identity_lite — routing shape", () => {
     expect(Array.isArray(q?.next)).toBe(true);
   });
 
-  // spec 064 US1: the supported path must reach attribution, and the gated path
-  // must NOT — an author who cannot make a keyboard is never asked who owns it.
-  it("il_target_script's default branch continues into attribution", () => {
+  // #1901: the supported path ENDS the identity flow here — the
+  // author/copyright questions are the post-track attribution flow's
+  // (next describe). The gated path terminates on the notice; an author
+  // who cannot make a keyboard is never asked who owns it (the session's
+  // "unsupported" terminal enforces it one layer up).
+  it("il_target_script has no default branch — a supported script terminates the flow (#1901)", () => {
     const q = modular.questions.find((q) => q.id === "il_target_script");
     const rules = q?.next as Array<{ condition?: string; goto?: string | null; default?: unknown }>;
-    const fallthrough = rules.find((r) => r.default === true);
-    expect(fallthrough?.goto).toBe("il_author_name");
-  });
-
-  it("attribution chains to a terminal copyright-holder question", () => {
-    const byId = new Map(modular.questions.map((q) => [q.id, q]));
-    expect(byId.get("il_author_name")?.next).toBe("il_author_email");
-    expect(byId.get("il_author_email")?.next).toBe("il_copyright_holder");
-    expect(byId.get("il_copyright_holder")?.next).toBeNull();
-  });
-
-  it("only the author NAME is required — holder defaults to it, email may be private", () => {
-    const byId = new Map(modular.questions.map((q) => [q.id, q]));
-    expect(byId.get("il_author_name")?.required).toBe(true);
-    expect(byId.get("il_author_email")?.required).toBe(false);
-    expect(byId.get("il_copyright_holder")?.required).toBe(false);
+    expect(rules.find((r) => r.default === true)).toBeUndefined();
+    const byId = new Map(modular.questions.map((x) => [x.id, x]));
+    expect(byId.get("il_author_name")).toBeUndefined();
+    expect(byId.get("il_author_email")).toBeUndefined();
+    expect(byId.get("il_copyright_holder")).toBeUndefined();
   });
 
   it("il_script_not_supported is a terminal notice question", () => {
@@ -254,6 +246,37 @@ describe("flow-parity: identity_lite — routing shape", () => {
     const q = modular.questions.find((x) => x.id === "il_target_script");
     expect(Array.isArray(q?.options)).toBe(true);
     expect((q?.options ?? []).length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attribution — the post-track author/copyright flow (#1901; spec 064 US1's
+// questions, re-homed from identity_lite above)
+// ---------------------------------------------------------------------------
+
+describe("flow-parity: attribution — routing shape", () => {
+  const modular = loadDerivedFlowDef(
+    "attribution",
+    "G",
+    flowModules.attribution,
+  );
+
+  it("flow_id is attribution", () => {
+    expect(modular.flow_id).toBe("attribution");
+  });
+
+  it("attribution chains to a terminal copyright-holder question", () => {
+    const byId = new Map(modular.questions.map((q) => [q.id, q]));
+    expect(byId.get("il_author_name")?.next).toBe("il_author_email");
+    expect(byId.get("il_author_email")?.next).toBe("il_copyright_holder");
+    expect(byId.get("il_copyright_holder")?.next).toBeNull();
+  });
+
+  it("only the author NAME is required — holder defaults to it, email may be private", () => {
+    const byId = new Map(modular.questions.map((q) => [q.id, q]));
+    expect(byId.get("il_author_name")?.required).toBe(true);
+    expect(byId.get("il_author_email")?.required).toBe(false);
+    expect(byId.get("il_copyright_holder")?.required).toBe(false);
   });
 });
 

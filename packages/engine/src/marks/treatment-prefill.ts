@@ -30,16 +30,16 @@ import type { MarkClass } from "./mark-classes.js";
 import { attestedBasesOf, attestedLetterCount } from "./mark-classes.js";
 import type { AttachmentProposal } from "./attachment-proposals.js";
 import type {
-  BaseMarkMechanism,
+  StartMarkMechanism,
   MarkTreatment,
   MarkTreatmentPrefill,
 } from "./treatment.js";
 import { promotableCharacters } from "./promotion.js";
 
-// `MarkTreatmentPrefill` and `BaseMarkMechanism` are declared in treatment.ts —
+// `MarkTreatmentPrefill` and `StartMarkMechanism` are declared in treatment.ts —
 // see the JSDoc there for why. Re-exported so this module stays the single
 // import site for everything prefill-related.
-export type { BaseMarkMechanism, MarkTreatmentPrefill };
+export type { StartMarkMechanism, MarkTreatmentPrefill };
 
 /** Attested-base spread at or above this suggests the mark earns its own key. */
 export const PRODUCTIVITY_SPREAD_THRESHOLD = 3;
@@ -50,7 +50,7 @@ export const PRODUCTIVITY_SPREAD_THRESHOLD = 3;
  * deadkey-resolved or direct), or only whole precomposed letters? Returns null
  * when the IR shows no mark-bearing output at all.
  */
-export function detectBaseMarkMechanism(ir: KeyboardIR): BaseMarkMechanism | null {
+export function detectStartMarkMechanism(ir: KeyboardIR): StartMarkMechanism | null {
   let sawPrecomposed = false;
   for (const group of ir.groups) {
     for (const rule of group.rules) {
@@ -70,7 +70,7 @@ export function detectBaseMarkMechanism(ir: KeyboardIR): BaseMarkMechanism | nul
  * The structural slice of `@keyboard-studio/contracts`' `KeyBudget` this module
  * consumes, so the prefill depends on the *number* rather than on how the
  * measurement is made. Callers pass the canonical determination itself —
- * `measureKeyBudget(baseIr)`, which satisfies this shape.
+ * `measureKeyBudget(startIr)`, which satisfies this shape.
  */
 export interface KeyBudgetSignal {
   spareKeys: number;
@@ -78,7 +78,7 @@ export interface KeyBudgetSignal {
 
 export interface MarkTreatmentPrefillOptions {
   /** The keyboard this one derives from (null on a from-scratch track). */
-  baseIr?: KeyboardIR | null;
+  startIr?: KeyboardIR | null;
   /**
    * The measured key budget, or `null` when it could not be measured (an empty
    * or opaque-only base — `measureKeyBudget` returns `null` there rather than
@@ -121,7 +121,7 @@ export function computeMarkTreatmentPrefills(
 ): MarkTreatmentPrefill[] {
   const fold = { caseFold: opts.caseFold === true, ...(opts.bcp47 !== undefined ? { bcp47: opts.bcp47 } : {}) };
   const attested = attestedBasesOf(alphabet, fold);
-  const baseMechanism = opts.baseIr != null ? detectBaseMarkMechanism(opts.baseIr) : null;
+  const baseMechanism = opts.startIr != null ? detectStartMarkMechanism(opts.startIr) : null;
   const spareKeys = opts.keyBudget?.spareKeys ?? null;
   const attachments = opts.attachments;
 

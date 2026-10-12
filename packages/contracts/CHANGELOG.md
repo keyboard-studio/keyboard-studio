@@ -4,6 +4,28 @@ All notable changes to the `@keyboard-studio/contracts` package are documented
 here. The package follows [0ver](https://0ver.org/) semantics while pre-1.0: a
 breaking change bumps the **minor** version.
 
+## [0.19.0] — 2026-10-06
+
+### Additive contract change (0ver minor bump, non-breaking)
+
+Surface added for the spec 086 normalization step. Nothing is removed or renamed
+for existing consumers.
+
+- `OutputRepertoire` and `NormalizationStep` types (`toleranceReport.ts`), exported
+  from the package entry.
+- `buildOutputRepertoire(ir, options?: { shouldStop })` (`ir/outputRepertoire.ts`):
+  the static set of character clusters a keyboard can produce. Pure and
+  browser-safe. `shouldStop` is polled during the closure so a caller can enforce a
+  time budget.
+- `RawKmnFragment` (`keyboard-ir.ts`) gains an **optional** `storeSketch?: StoreItem[]`,
+  next to the optional `producedOutput` from 0.15.0. Emit ignores it; `sourceText`
+  stays the round-trip source of truth. Absent field = prior behaviour.
+- `US_BASE_LAYOUT` now lives in `ir/usBaseLayout.ts`. It is still exported from the
+  package entry, so imports from `@keyboard-studio/contracts` are unaffected; only
+  a deep import of the old module path would break.
+
+(Versions 0.16.0 through 0.18.0 shipped without CHANGELOG entries; see git history.)
+
 ## [0.15.0] — 2026-07-02
 
 ### Additive contract change (0ver minor bump, non-breaking)

@@ -95,10 +95,10 @@ export function DocumentationChecklist() {
   const { t } = useLingui();
   const [open, setOpen] = useState(true);
   const states = useDocMemberStates();
-  const baseWelcomeImages = useWorkingCopyStore((s) => s.baseWelcomeImages);
+  const startWelcomeImages = useWorkingCopyStore((s) => s.startWelcomeImages);
   const chartPreference = useWorkingCopyStore((s) => s.chartPreference);
   const setChartPreference = useWorkingCopyStore((s) => s.setChartPreference);
-  const baseShipsImages = carriedWelcomeImages(baseWelcomeImages).length > 0;
+  const baseShipsImages = carriedWelcomeImages(startWelcomeImages).length > 0;
   const effectivePreference: ChartPreference = effectiveChartPreference(chartPreference, baseShipsImages);
 
   const memberName = (member: DocMemberId): string => {
@@ -244,7 +244,7 @@ export function DocumentationChecklist() {
                       checked={effectivePreference === "keep-base-images"}
                       onChange={() => setChartPreference("keep-base-images")}
                     />
-                    <Trans id="output.docs.charts.keepBaseImages">Keep base images</Trans>
+                    <Trans id="output.docs.charts.keepStartingImages">Keep starting keyboard images</Trans>
                   </label>
                   <label style={{ display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
                     <input

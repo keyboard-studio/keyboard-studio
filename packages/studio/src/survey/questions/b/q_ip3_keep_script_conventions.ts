@@ -16,13 +16,13 @@ export const definition = {
   prompt:
     "Your starting keyboard's residual rules carry script conventions (ordering, normalization). Keep them, re-propose, or discard?",
   help_text:
-    "These are the base's habits the studio could not classify confidently. " +
+    "These are the starting keyboard's habits the studio could not classify confidently. " +
     "There is no default here — record what you want and the studio applies it " +
     "to every convention proposal at once.",
   type: "radio" as const,
   required: true,
   options: [
-    { value: "keep", label: "Keep the base's script conventions" },
+    { value: "keep", label: "Keep the starting keyboard's script conventions" },
     { value: "propose", label: "Let the studio re-propose" },
     { value: "discard", label: "Discard them" },
   ],
@@ -44,9 +44,9 @@ export function validate(value: string | string[] | undefined): ValidationResult
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
-    { value: "keep", note: "inherit the base conventions" },
+    { value: "keep", note: "inherit the starting keyboard's conventions" },
     { value: "propose", note: "re-derive conventions" },
-    { value: "discard", note: "drop the base conventions" },
+    { value: "discard", note: "drop the starting keyboard's conventions" },
   ],
   invalid: [
     { value: "", expectedCode: "required" },

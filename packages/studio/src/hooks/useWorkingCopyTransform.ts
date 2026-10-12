@@ -14,7 +14,7 @@
 //      the OSK preview reflects the touch layout the author built. Omitted when
 //      touchLayoutJson is null (no Phase E edits yet).
 //   1. Carve deletions — re-emit the filtered IR into the VFS .kmn, replacing
-//      the fetched source. baseIr is never mutated; a filtered copy is used.
+//      the fetched source. startIr is never mutated; a filtered copy is used.
 //   1.7/1.7b. Key edit overlay (spec 063) — applyKeyEditsToVfs splices the
 //      committed KeyEditOperation[] overlay onto .keyman-touch-layout (layout
 //      half), and a `rename` op's vkey-binding fix-up is re-emitted into the
@@ -82,7 +82,7 @@ import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.t
 import {
   deriveRuleAdditions,
   ruleAdditionsKey as ruleAdditionsMemoKey,
-} from "../lib/ruleAdditions.ts";
+} from "../survey/rules/ruleAdditions.ts";
 
 /** Stable empty default for `liveLayoutOverride.keyEditOps` when the option
  * (or the whole override) is omitted — avoids allocating a fresh empty array
@@ -104,13 +104,13 @@ export interface UseWorkingCopyTransformOptions {
    */
   patternMap?: Map<string, Pattern> | null;
   /**
-   * The id of the BaseKeyboard the returned transform is about to be plugged
-   * into (i.e. the `baseKeyboard` argument passed to the SAME
+   * The id of the StartKeyboard the returned transform is about to be plugged
+   * into (i.e. the `startKeyboard` argument passed to the SAME
    * `useKeyboardArtifact` call this transform feeds). Bug F4: preview-before-
-   * commit (StudioShell's `localBase`, usePreviewArtifact's own picker state)
+   * commit (StudioShell's `localStart`, usePreviewArtifact's own picker state)
    * lets the author preview a DIFFERENT base than the one already committed
    * to `workingCopyStore` — e.g. commit base A, carve some of it, then preview
-   * candidate base B before deciding whether to switch. `baseIr` /
+   * candidate base B before deciding whether to switch. `startIr` /
    * `deletedNodeIds` / `deletedItemIds` below are keyed to A's IR node ids;
    * projecting them onto B's freshly-fetched VFS is not merely stale, it is
    * incoherent (B's IR has no relation to A's node ids), and left the
@@ -119,7 +119,7 @@ export interface UseWorkingCopyTransformOptions {
    * mismatch every time — the only escape was "Start over").
    *
    * When provided (non-undefined) and it does not match the store's own
-   * `baseKeyboard.id`, the returned transform is `null` — the candidate
+   * `startKeyboard.id`, the returned transform is `null` — the candidate
    * base compiles cleanly with NO carve/assignment/identity overlay, exactly
    * like previewing it for the very first time. The store's carve state for
    * the committed base is untouched (not cleared), so re-previewing that SAME
@@ -143,14 +143,14 @@ export interface UseWorkingCopyTransformOptions {
    *     `null` unconditionally (there is nothing to match). Callers with a
    *     candidate-base picker MUST initialize that picker state
    *     *synchronously* from the store (e.g. `useState(() =>
-   *     store.baseKeyboard?.id ?? null)`, not a lazy post-mount effect) —
+   *     store.startKeyboard?.id ?? null)`, not a lazy post-mount effect) —
    *     `null` suppresses the overlay, so a lazily-initialized picker renders
    *     one frame of the (incorrect) ungated preview before its effect runs
    *     and flips the gate on, i.e. a visible ungated→gated preview flash.
-   *   - **string**: gate on equality with the store's `baseKeyboard.id`;
+   *   - **string**: gate on equality with the store's `startKeyboard.id`;
    *     mismatch → `null`, match → the normal overlaid transform.
    */
-  previewedBaseId?: string | null;
+  previewedStartId?: string | null;
 
   /**
    * Live-layout override (spec 063) — the touch key editor's IN-PROGRESS
@@ -205,7 +205,7 @@ export interface UseWorkingCopyTransformOptions {
  * pure helper used by {@link serializeWorkingCopy} — so the OSK preview and
  * the downloaded artifact are guaranteed equivalent for the same working-copy state.
  *
- * Returns `null` when the working copy is not yet instantiated (no baseIr
+ * Returns `null` when the working copy is not yet instantiated (no startIr
  * means carve cannot run) — callers should pass `null` directly to
  * `useKeyboardArtifact`'s `vfsTransform` parameter in that case.
  */
@@ -214,33 +214,33 @@ export function useWorkingCopyTransform(
 ): VfsTransform | null {
   const patternMap = opts?.patternMap ?? null;
   // undefined (the default) means "no gating" — see the option's doc comment.
-  const previewedBaseId = opts?.previewedBaseId;
+  const previewedStartId = opts?.previewedStartId;
   // undefined (the default) means "no live-layout override" — falls back to
   // the store's own touchLayoutJson field and an empty key-edit overlay. See
   // the option's doc comment (UseWorkingCopyTransformOptions.liveLayoutOverride).
   const liveLayoutOverride = opts?.liveLayoutOverride;
 
-  // P1 fix (bug F4 footgun): omitting previewedBaseId is legitimate for
+  // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
   // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
   // way for a FUTURE call site with its own candidate-base picker to
   // reintroduce F4. Warn once per hook instance (mount), dev-only, only when
-  // a transform is actually being built (not while baseIr is still null) —
+  // a transform is actually being built (not while startIr is still null) —
   // see the gate check below where this ref is consulted.
   const omittedWarnedRef = useRef(false);
 
   // Layer values — read individually so the memo only fires when they change.
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
   // The base id the store's carve/identity layers actually belong to. Compared
-  // against previewedBaseId below (F4 fix) so a candidate-base preview never
+  // against previewedStartId below (F4 fix) so a candidate-base preview never
   // receives another base's carve overlay.
-  const storeBaseKeyboardId = useWorkingCopyStore(
-    (s) => s.baseKeyboard?.id ?? null,
+  const storeStartKeyboardId = useWorkingCopyStore(
+    (s) => s.startKeyboard?.id ?? null,
   );
   // The base keyboard's own display name — the anchor for projectWorkingCopyVfs
   // step 3's "is the display name an EDIT?" test, so the OSK preview and the zip
   // agree about when `store(&NAME)` is rewritten.
-  const storeBaseDisplayName = useWorkingCopyStore(
-    (s) => s.baseKeyboard?.displayName ?? null,
+  const storeStartDisplayName = useWorkingCopyStore(
+    (s) => s.startKeyboard?.displayName ?? null,
   );
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
@@ -350,8 +350,8 @@ export function useWorkingCopyTransform(
   // installing a pack or synthesizing/narrowing a guard changes the key,
   // which re-runs the transform and recompiles the preview — no new timer.
   const derivedRuleAdditions = useMemo(
-    () => (baseIr === null ? null : deriveRuleAdditions(workingIr, baseIr)),
-    [workingIr, baseIr],
+    () => (startIr === null ? null : deriveRuleAdditions(workingIr, startIr)),
+    [workingIr, startIr],
   );
   const ruleAdditionsKey = useMemo(
     () =>
@@ -414,7 +414,7 @@ export function useWorkingCopyTransform(
 
   // Identity display name + Track-1 rename id + bcp47.
   // identityKeyboardId triggers projectWorkingCopyVfs step 4 (rewrites
-  // `.kmw-keyboard-<baseId>` selectors and renames siblings) when it differs
+  // `.kmw-keyboard-<startId>` selectors and renames siblings) when it differs
   // from the keyboardId the transform is invoked with.
   // identityBcp47 is forwarded so resetIdentity inside step 4 stamps the
   // chosen language tag onto the .kmn instead of falling back to the base's.
@@ -426,16 +426,16 @@ export function useWorkingCopyTransform(
   const identityLanguageName = identity?.languageName ?? null;
 
   return useMemo<VfsTransform | null>(() => {
-    // No baseIr → carve step cannot run. The transform is not usable yet.
-    if (baseIr === null) return null;
+    // No startIr → carve step cannot run. The transform is not usable yet.
+    if (startIr === null) return null;
 
     // P1 fix (bug F4 footgun): a transform is genuinely about to be built —
-    // warn (once per mount, dev-only) if the caller omitted previewedBaseId
+    // warn (once per mount, dev-only) if the caller omitted previewedStartId
     // rather than explicitly opting into "no gating". This is advisory, not
     // enforced: MechanismGallery/TouchGallery's omission is correct and will
     // warn once too, which is an acceptable, non-spammy cost for catching a
     // future candidate-base-picker call site that forgets the option.
-    if (previewedBaseId === undefined && !omittedWarnedRef.current) {
+    if (previewedStartId === undefined && !omittedWarnedRef.current) {
       omittedWarnedRef.current = true;
       devLog.warn(
         "[useWorkingCopyTransform] previewedBaseId was omitted. If this call site can preview a candidate base " +
@@ -445,14 +445,14 @@ export function useWorkingCopyTransform(
       );
     }
 
-    // F4 fix: the store's carve/identity layers belong to storeBaseKeyboardId.
+    // F4 fix: the store's carve/identity layers belong to storeStartKeyboardId.
     // When the caller tells us which base its OWN pipeline is about to compile
-    // (previewedBaseId) and that differs from the base the layers belong to,
+    // (previewedStartId) and that differs from the base the layers belong to,
     // the overlay does not apply — return null rather than project one base's
     // node ids onto a different base's freshly-fetched VFS.
     if (
-      previewedBaseId !== undefined &&
-      previewedBaseId !== storeBaseKeyboardId
+      previewedStartId !== undefined &&
+      previewedStartId !== storeStartKeyboardId
     ) {
       return null;
     }
@@ -517,7 +517,7 @@ export function useWorkingCopyTransform(
         vfs,
         keyboardId,
         ...(targetKeyboardId ? { targetKeyboardId } : {}),
-        baseIr,
+        startIr,
         deletedNodeIds,
         deletedItemIds: effectiveDeletedItemIds,
         carveChars,
@@ -534,10 +534,10 @@ export function useWorkingCopyTransform(
         getPattern: (id) => patternMap?.get(id),
         identity: identityArg,
         ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
-        ...(storeBaseDisplayName !== null ? { baseDisplayName: storeBaseDisplayName } : {}),
+        ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
         contextToleranceOverlay,
         // spec 082: project the rules step's working-IR additions (pack
-        // install, guard synthesis, Narrow). Null only while baseIr is null,
+        // install, guard synthesis, Narrow). Null only while startIr is null,
         // which already returned null above — the conditional spread keeps
         // TS's narrowing honest.
         ...(derivedRuleAdditions !== null ? { ruleAdditions: derivedRuleAdditions } : {}),
@@ -550,10 +550,10 @@ export function useWorkingCopyTransform(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    baseIr,
-    previewedBaseId,
-    storeBaseKeyboardId,
-    storeBaseDisplayName,
+    startIr,
+    previewedStartId,
+    storeStartKeyboardId,
+    storeStartDisplayName,
     deletedKey,
     disabledKey,
     ruleAdditionsKey,

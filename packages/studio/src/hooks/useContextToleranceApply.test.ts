@@ -27,6 +27,9 @@ import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
 import { CONTEXT_TOLERANCE_WRITES } from "../steps/contextToleranceWrites.ts";
 import { applyMutatePatch, MutatePatchContainmentError } from "../steps/mutateApply.ts";
 import { useWorkingCopyStore, type ContextToleranceState } from "../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { recordMarksTreatmentValue } from "../survey/marks/marksValue.ts";
+import type { MarksContextToleranceDecision } from "@keyboard-studio/contracts";
 import { useContextToleranceApply } from "./useContextToleranceApply.ts";
 
 afterEach(cleanup);
@@ -50,8 +53,13 @@ const KMN = [
 
 type Ready = Extract<ContextToleranceState, { status: "ready" }>;
 
+// These cases cover the per-rule variants (spec 062/078). Spec 086 proposes the
+// normalization step first, so a verification record reporting `regressed`
+// forces the variants fallback here.
+const FORCE_VARIANTS = { verificationLookup: () => "regressed" as const };
+
 async function analyse(ir: KeyboardIR): Promise<Ready> {
-  const result = await analyseContextTolerance(ir, () => true);
+  const result = await analyseContextTolerance(ir, () => true, null, FORCE_VARIANTS);
   if (result === null) throw new Error("analysis was superseded");
   return { status: "ready", runId: 1, ...result };
 }
@@ -93,7 +101,7 @@ describe("applyContextToleranceDecision — real engine (spec 078)", () => {
       fingerprint: analysis.fingerprint,
       acceptedSiteIds: siteKeys,
       overlay: outcome.overlay,
-    });
+    }, FORCE_VARIANTS);
     expect(again?.fingerprint).toBe(analysis.fingerprint);
     expect(Object.values(again?.classification ?? {})).toContain("made-tolerant");
   }, 60_000);
@@ -195,15 +203,17 @@ describe("the working-IR write goes through the mutate seam", () => {
   });
 });
 
+/** Seed the tolerance decision the hook reads (spec 090 T023: the marks-treatment decision value). */
+function seedToleranceDecision(decision: MarksContextToleranceDecision): void {
+  useDecisionStore.getState().reset();
+  recordMarksTreatmentValue({ answers: {}, completion: null, contextTolerance: decision });
+}
+
 describe("useContextToleranceApply — idempotence (FR-008)", () => {
   it("does nothing when the applied overlay already matches the decision", () => {
     const store = useWorkingCopyStore.getState();
     store.reset();
-    store.recordPhase({
-      phase: "C",
-      answers: [],
-      marksContextTolerance: { decision: "accept", acceptedSiteIds: ["k1"], proposedSiteIds: ["k1"], fingerprint: "f1" },
-    });
+    seedToleranceDecision({ decision: "accept", acceptedSiteIds: ["k1"], proposedSiteIds: ["k1"], fingerprint: "f1" });
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
     const before = useWorkingCopyStore.getState().contextToleranceOverlay;
 
@@ -215,11 +225,7 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
   it("a decline removes an applied fix", () => {
     const store = useWorkingCopyStore.getState();
     store.reset();
-    store.recordPhase({
-      phase: "C",
-      answers: [],
-      marksContextTolerance: { decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" },
-    });
+    seedToleranceDecision({ decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" });
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
     renderHook(() => useContextToleranceApply(true));
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBeNull();
@@ -228,13 +234,31 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
   it("with the flag off it touches nothing", () => {
     const store = useWorkingCopyStore.getState();
     store.reset();
-    store.recordPhase({
-      phase: "C",
-      answers: [],
-      marksContextTolerance: { decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" },
-    });
+    seedToleranceDecision({ decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" });
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
     renderHook(() => useContextToleranceApply(false));
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).not.toBeNull();
+  });
+
+  it("drops an applied overlay once the analysis fingerprint no longer matches (key edits)", () => {
+    const store = useWorkingCopyStore.getState();
+    store.reset();
+    seedToleranceDecision({ decision: "accept", acceptedSiteIds: ["k1"], proposedSiteIds: ["k1"], fingerprint: "f1" });
+    store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
+    store.setContextTolerance({
+      status: "ready",
+      runId: 2,
+      report: { findings: [], notAnalysedCount: 0 },
+      findings: [],
+      classification: {},
+      proposal: { ir: parseKmn(KMN, "x").ir, variants: [], disclosures: {} },
+      analysedIr: parseKmn(KMN, "x").ir,
+      fixableRuleIds: ["r1"],
+      siteKeys: { r1: "k1" },
+      fingerprint: "f2-after-edit",
+    });
+    const { result } = renderHook(() => useContextToleranceApply(true));
+    expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBeNull();
+    expect(result.current?.staleRuleIds).toEqual(["k1"]);
   });
 });

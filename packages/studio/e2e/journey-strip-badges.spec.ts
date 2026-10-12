@@ -14,8 +14,9 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   drivePunctuationStep,
@@ -29,7 +30,7 @@ import {
 } from "./helpers/surveyFlow";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Journey Strip Test",
   english: "Journey Strip Test English",
   targetScript: "other",
@@ -50,8 +51,9 @@ async function startToCharacters(page: Page): Promise<void> {
     autonym: FIXTURE.autonym,
     script: FIXTURE.targetScript,
   });
-  await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+  await pickStartKeyboard(page, FIXTURE.startKeyboardId);
   await chooseAdaptTrack(page);
+  await driveAttributionStep(page);
   await confirmPrefill(page);
 }
 

@@ -8,13 +8,13 @@
 // loadLangtags(); it is first in this file and asserts the precondition.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard } from "@keyboard-studio/contracts";
 import { getLoadedLangtags, loadLangtags } from "../lib/langtagsDefaults.ts";
 import { extractLanguageName } from "../survey/questions/a/il_language_english.ts";
 import { buildExtractContext } from "./extractContext.ts";
 
 function catalogWith(languages: string[]) {
-  return makeBaseKeyboard({
+  return makeStartKeyboard({
     id: "test_kbd",
     script: "Latn",
     path: "release/t/test_kbd",

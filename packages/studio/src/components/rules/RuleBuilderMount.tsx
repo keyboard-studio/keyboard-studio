@@ -33,7 +33,7 @@ function downloadBundle(json: string): void {
 
 export function RuleBuilderMount() {
   const ir = useWorkingCopyStore((s) => s.ir);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const bundleFamilyId = useRulesStepUiStore((s) => s.bundleFamilyId);
   const BuilderPanel = getRuleBuilderPanel();
 
@@ -68,7 +68,7 @@ export function RuleBuilderMount() {
       ? allRules
       : allRules.filter((r) => familyOfRule(families, r.nodeId)?.id === bundleFamilyId);
 
-  const scriptKey = baseKeyboard?.script;
+  const scriptKey = startKeyboard?.script;
 
   return (
     <div data-testid="rules-builder-mount">
@@ -77,8 +77,8 @@ export function RuleBuilderMount() {
         selectedRules={selectedRules}
         families={families}
         keyboardMeta={{
-          id: baseKeyboard?.id ?? ir.header.keyboardId,
-          name: baseKeyboard?.displayName ?? ir.header.name,
+          id: startKeyboard?.id ?? ir.header.keyboardId,
+          name: startKeyboard?.displayName ?? ir.header.name,
           copyright: ir.header.copyright,
           // The IR header carries no license field; the panel shows it in
           // Details — empty is honest, not guessed.

@@ -250,11 +250,11 @@ describe("applyDeadkeyOpsToVfs", () => {
 describe("projectWorkingCopyVfs step 1.8 (deadkey overlay wiring)", () => {
   function project(deadkeyOps: DeadkeyOperation[]): { vfs: VirtualFS; warnings: string[] } {
     const vfs = makeVfs();
-    const baseIr = parseKmn(BASE_KMN, KEYBOARD_ID).ir;
+    const startIr = parseKmn(BASE_KMN, KEYBOARD_ID).ir;
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: KEYBOARD_ID,
-      baseIr,
+      startIr,
       deletedNodeIds: new Set<string>(),
       deletedItemIds: new Set<string>(),
       deletedTouchKeyIds: new Set<string>(),

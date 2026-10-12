@@ -47,7 +47,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
       version: "1.0",
       dateIso: "2026-06-18",
       adaptedFrom: null,
-      baseHistoryText: null,
+      startHistoryText: null,
     });
     expect(rendered).toBe(`## 1.0 (2026-06-18)\n* Initial release.\n`);
   });
@@ -61,14 +61,14 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: { id: "basic_kbdus", version: "1.0" },
-      baseHistoryText: null,
+      startHistoryText: null,
     });
     expect(rendered).toBe(expected);
   });
 
   it("null entry, Track 2 (pre-existing base HISTORY): byte-identical to stageAdaptHistory", () => {
-    const baseHistory = "## 1.0 (2025-01-01)\n* Initial release.\n";
-    const vfs = createVirtualFS([{ path: "HISTORY.md", content: baseHistory, isBinary: false }]);
+    const startHistory = "## 1.0 (2025-01-01)\n* Initial release.\n";
+    const vfs = createVirtualFS([{ path: "HISTORY.md", content: startHistory, isBinary: false }]);
     stageAdaptHistory(vfs, "my_kbd", "basic_kbdus", "1.0", "1.1", "2026-06-18");
     const expected = vfs.get("HISTORY.md")!.content as string;
 
@@ -76,7 +76,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: { id: "basic_kbdus", version: "1.0" },
-      baseHistoryText: baseHistory,
+      startHistoryText: startHistory,
     });
     expect(rendered).toBe(expected);
   });
@@ -87,7 +87,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
       proposal: { version: "1.0", dateIso: "2026-06-18", bullets: ["Initial release."] },
       editedBullets: null,
     };
-    const opts = { version: "1.0", dateIso: "2026-06-18", adaptedFrom: null, baseHistoryText: null };
+    const opts = { version: "1.0", dateIso: "2026-06-18", adaptedFrom: null, startHistoryText: null };
     expect(renderHistoryMd(entry, opts)).toBe(renderHistoryMd(null, opts));
   });
 
@@ -97,7 +97,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
       proposal: { version: "1.0", dateIso: "2026-06-18", bullets: ["Added 2 characters: a, b"] },
       editedBullets: null,
     };
-    const opts = { version: "1.0", dateIso: "2026-06-18", adaptedFrom: null, baseHistoryText: null };
+    const opts = { version: "1.0", dateIso: "2026-06-18", adaptedFrom: null, startHistoryText: null };
     expect(renderHistoryMd(entry, opts)).toBe(renderHistoryMd(null, opts));
   });
 });
@@ -109,7 +109,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
       version: "1.1",
       dateIso: "2099-01-01", // must be ignored in favor of entry.proposal.dateIso
       adaptedFrom: null,
-      baseHistoryText: null,
+      startHistoryText: null,
     });
     expect(rendered).toBe(`## 1.1 (2026-06-18)\n* Added 2 characters: é, è\n`);
   });
@@ -123,19 +123,19 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: null,
-      baseHistoryText: null,
+      startHistoryText: null,
     });
     expect(rendered).toBe(`## 1.1 (2026-06-18)\n* Added accented vowels for French.\n`);
   });
 
   it("preserves base text verbatim below the entry, separated by exactly one blank line", () => {
     const entry = confirmedEntry(["Added 2 characters: é, è"]);
-    const baseHistoryText = "## 1.0 (2025-01-01)\n* Initial release.\n";
+    const startHistoryText = "## 1.0 (2025-01-01)\n* Initial release.\n";
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: null,
-      baseHistoryText,
+      startHistoryText,
     });
     expect(rendered).toBe(
       `## 1.1 (2026-06-18)\n* Added 2 characters: é, è\n\n## 1.0 (2025-01-01)\n* Initial release.\n`,
@@ -144,12 +144,12 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
 
   it("inserts the new entry AFTER a preamble title in the base text", () => {
     const entry = confirmedEntry(["Added shift layer."]);
-    const baseHistoryText = "# Change History\n\n## 1.0 (2025-01-01)\n* Initial release.\n";
+    const startHistoryText = "# Change History\n\n## 1.0 (2025-01-01)\n* Initial release.\n";
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: null,
-      baseHistoryText,
+      startHistoryText,
     });
     expect(rendered).toBe(
       "# Change History\n\n## 1.1 (2026-06-18)\n* Added shift layer.\n\n## 1.0 (2025-01-01)\n* Initial release.\n",
@@ -158,13 +158,13 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
 
   it("keeps a leading Change History title above the new ATX entry (preamble-aware insert)", () => {
     const entry = confirmedEntry(["Adapted from basic_kbdfr v1.3 via keyboard-studio."]);
-    const baseHistoryText =
+    const startHistoryText =
       "# French Basic Change History\n\n1.0 (2020-01-01)\n---------------\n* Initial release.\n";
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: null,
-      baseHistoryText,
+      startHistoryText,
     });
     expect(rendered).toBe(
       `# French Basic Change History\n\n## 1.1 (2026-06-18)\n* Adapted from basic_kbdfr v1.3 via keyboard-studio.\n\n1.0 (2020-01-01)\n---------------\n* Initial release.\n`,
@@ -180,7 +180,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: { id: "basic_kbdfr", version: "1.3" },
-      baseHistoryText: null,
+      startHistoryText: null,
     });
     expect(rendered).toBe(
       `## 1.1 (2026-06-18)\n* Adapted from basic_kbdfr v1.3 via keyboard-studio.\n* Reworked the layout for touch.\n`,
@@ -199,7 +199,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
       version: "1.1",
       dateIso: "2026-06-18",
       adaptedFrom: { id: "basic_kbdfr", version: "1.3" },
-      baseHistoryText: null,
+      startHistoryText: null,
     });
     expect(rendered).toBe(
       `## 1.1 (2026-06-18)\n* Adapted from basic_kbdfr v1.3 via keyboard-studio.\n* Reworked the layout for touch.\n`,
@@ -217,7 +217,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
       version: "1.2",
       dateIso: "2099-01-01",
       adaptedFrom: null,
-      baseHistoryText: null,
+      startHistoryText: null,
     });
     expect(rendered).toBe(
       `## 1.2 (2026-06-18)\n* Added the acute and grave accented vowels.\n`,

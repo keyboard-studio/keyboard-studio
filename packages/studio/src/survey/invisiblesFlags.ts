@@ -2,8 +2,8 @@
 // to flag (spec 079 US3 T079/T080).
 //
 // `InvisiblesStep.tsx` does not use `surveyAnswerStore` at all: each
-// candidate's yes/no decision lives directly in `phaseBDraftStore`'s sticky
-// `invisibleDecisions` map (keyed `U+XXXX`), written immediately on toggle —
+// candidate's yes/no decision lives directly in the invisibles-inventory
+// decision value's sticky decisions (keyed `U+XXXX`), written immediately on toggle —
 // there is no draft/confirm split and no per-answer `evidenceKey` to
 // reconcile against a "current" one (`steps/evidence.ts`'s `invisiblesKey` is
 // declared but not consulted by this step's render path).

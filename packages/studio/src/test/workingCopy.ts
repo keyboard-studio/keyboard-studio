@@ -25,7 +25,7 @@ export function seedInstantiatedWorkingCopy(
   { attributed = false }: { attributed?: boolean } = {},
 ): void {
   const store = useWorkingCopyStore.getState();
-  store.instantiateFromBase(basicKbdus, { vfs: stubKmnVfs("basic_kbdus", "c test\n"), ir: makeTestIR([]) });
+  store.instantiateFromStart(basicKbdus, { vfs: stubKmnVfs("basic_kbdus", "c test\n"), ir: makeTestIR([]) });
   if (attributed) {
     store.setAttribution({ authorName: "Alice Example", copyrightHolder: "Alice Example" });
   }

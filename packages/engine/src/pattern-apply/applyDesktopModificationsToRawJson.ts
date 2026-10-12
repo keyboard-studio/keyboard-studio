@@ -20,7 +20,7 @@
  *     "shift", everything else targets "default"): as the host key's own
  *     production when the host is empty, or as an sk[] longpress alternate
  *     when the host already produces something else. Absent/not-found
- *     hostKey: warn and place via a sensible fallback (appended to the last
+ *     baseKey: warn and place via a sensible fallback (appended to the last
  *     row of the target layer) so the char stays reachable. A
  *     "shift"-targeted placement falls back to "default" (with a warning)
  *     when the phone platform has no shift layer.
@@ -30,7 +30,7 @@
  *     blank (`T_BLANK` + `sp` 10, see `BLANK_KEY_ID` in
  *     touch-mechanism-shared.ts; text/output cleared) so row geometry/widths
  *     stay stable (R9). Matching is canonical (NFC) —
- *     {@link keyMatchesRemovalSet}. Running removals last means a hostKey
+ *     {@link keyMatchesRemovalSet}. Running removals last means a baseKey
  *     that was both placed onto and later (re-)carved is evaluated by its
  *     current post-placement production, not a stale one placements could
  *     no longer find by id.
@@ -70,7 +70,7 @@ type RawTouchLayout = Record<string, unknown>;
 export interface ApplyDesktopModificationsToRawJsonResult {
   /** Updated .keyman-touch-layout JSON string, ready to inject into VFS. */
   json: string;
-  /** Diagnostic messages — e.g. a placement whose hostKey wasn't found. */
+  /** Diagnostic messages — e.g. a placement whose baseKey wasn't found. */
   warnings: string[];
 }
 
@@ -93,7 +93,7 @@ export function applyDesktopModificationsToRawJson(
 
   // Placements run BEFORE removals — same chronological order as the desktop
   // decisions they replay (Phase C precedes Phase D). This matters: if a
-  // hostKey is both a Phase C placement target and later has its
+  // baseKey is both a Phase C placement target and later has its
   // (now-superseded) character carved, the removal pass must see the key's
   // CURRENT (placed) production, not evaluate a stale pre-placement one that
   // placements — indexed by the seed's original key id — could no longer find.
@@ -172,7 +172,7 @@ interface LayerWorkState {
 
 function applyPlacementsToRawLayout(
   layout: RawTouchLayout,
-  placements: readonly { char: string; hostKey: string }[],
+  placements: readonly { char: string; baseKey: string }[],
   warnings: string[],
 ): void {
   if (placements.length === 0) return;
@@ -253,14 +253,14 @@ function applyPlacementsToRawLayout(
   }
 
   for (const rawPlacement of placements) {
-    const { hostKey } = rawPlacement;
+    const { baseKey } = rawPlacement;
     // Normalize once so `text` and `id` (charToUnicodeKeyId NFC-normalizes
     // internally) always agree, even for an NFD-form placement char — and so
     // touchLayerForChar sees a single precomposed code point for its case test.
     const char = rawPlacement.char.normalize("NFC");
     const { state, layerId } = resolveTargetLayer(char);
 
-    if (!hostKey) {
+    if (!baseKey) {
       warnings.push(
         `[desktop-modifications-raw] placement for "${char}" has no hostKey — placed via fallback`,
       );
@@ -268,10 +268,10 @@ function applyPlacementsToRawLayout(
       continue;
     }
 
-    const key = state.keyMap.get(hostKey);
+    const key = state.keyMap.get(baseKey);
     if (!key) {
       warnings.push(
-        `[desktop-modifications-raw] host key "${hostKey}" not found in phone "${layerId}" layer — "${char}" placed via fallback`,
+        `[desktop-modifications-raw] host key "${baseKey}" not found in phone "${layerId}" layer — "${char}" placed via fallback`,
       );
       placeFallback(state, char);
       continue;
@@ -286,8 +286,8 @@ function applyPlacementsToRawLayout(
     // the empty-host branch below still owns that case.
     if (isTouchKeyPrimaryProduction(key, char)) continue;
 
-    const hostIsEmpty = key.text === undefined && key.output === undefined;
-    if (hostIsEmpty) {
+    const baseIsEmpty = key.text === undefined && key.output === undefined;
+    if (baseIsEmpty) {
       key.id = charToUnicodeKeyId(char);
       key.text = char;
       delete key.output;

@@ -58,7 +58,7 @@ const TABLET_ONLY_JSON = JSON.stringify({
 // Helper: build a longpress TouchAssignment for a host key + char.
 // ---------------------------------------------------------------------------
 
-function longpress(hostKey: string, char: string): TouchAssignment {
+function longpress(baseKey: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
@@ -66,7 +66,7 @@ function longpress(hostKey: string, char: string): TouchAssignment {
     mechanisms: [
       {
         patternId: "longpress_alternates",
-        slotValues: { hostKey, char },
+        slotValues: { hostKey: baseKey, char },
       },
     ],
     source: "user",
@@ -175,7 +175,7 @@ describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
     it("removes the carved char everywhere (primary text AND sk entry on another platform) and reflects a placement", () => {
       const result = buildTouchLayoutJson(makeMinimalIR(), [], {
         baseTouchJson: SHIPPED_WITH_CARVE_CANDIDATE,
-        mods: { removals: ["á"], placements: [{ char: "é", hostKey: "K_S" }] },
+        mods: { removals: ["á"], placements: [{ char: "é", baseKey: "K_S" }] },
         seedSource: "import-adapt",
       });
       expect(result.json).not.toBeNull();
@@ -282,7 +282,7 @@ describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
     function buildMultiPlatform() {
       return buildTouchLayoutJson(makeMinimalIR(), [], {
         baseTouchJson: MULTI_PLATFORM_JSON,
-        mods: { removals: ["á", "à", "î"], placements: [{ char: "é", hostKey: "K_S" }] },
+        mods: { removals: ["á", "à", "î"], placements: [{ char: "é", baseKey: "K_S" }] },
         seedSource: "import-adapt",
       });
     }
@@ -441,8 +441,8 @@ describe("buildTouchLayoutJson — Case A (router → IR path, undefined)", () =
       nodeIds: [],
     };
 
-    const baseIr = makeMinimalIR({ touchLayout: existingTouchLayout });
-    const result = buildTouchLayoutJson(baseIr, [], opts({ seedSource: "reseed-from-desktop" }));
+    const startIr = makeMinimalIR({ touchLayout: existingTouchLayout });
+    const result = buildTouchLayoutJson(startIr, [], opts({ seedSource: "reseed-from-desktop" }));
 
     expect(result.json).not.toBeNull();
     const parsed = JSON.parse(result.json!) as Record<string, unknown>;
@@ -501,8 +501,8 @@ describe("buildTouchLayoutJson — Case A (router → IR path, undefined)", () =
       nodeIds: [],
     };
 
-    const baseIr = makeMinimalIR({ touchLayout: existingTouchLayout });
-    const result = buildTouchLayoutJson(baseIr, [], opts({ seedSource: "reseed-from-desktop" }));
+    const startIr = makeMinimalIR({ touchLayout: existingTouchLayout });
+    const result = buildTouchLayoutJson(startIr, [], opts({ seedSource: "reseed-from-desktop" }));
 
     expect(result.json).not.toBeNull();
 
@@ -534,7 +534,7 @@ describe("buildTouchLayoutJson — Case A reseed replay (mods.placements land on
     // (no stores/groups on makeMinimalIR), so a placement on K_A is the
     // host-present branch of applyDesktopModifications: it lands in sk[].
     const result = buildTouchLayoutJson(makeMinimalIR(), [], {
-      mods: { removals: [], placements: [{ char: "á", hostKey: "K_A" }] },
+      mods: { removals: [], placements: [{ char: "á", baseKey: "K_A" }] },
       seedSource: "reseed-from-desktop",
     });
 

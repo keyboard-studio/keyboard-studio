@@ -43,26 +43,22 @@ describe("il_target_script — options and routing", () => {
     expect(conditional?.condition).toContain("Hang");
   });
 
-  it("has a default (fallthrough) branch", () => {
+  // #1901: there is NO default (fallthrough) branch anymore — a supported
+  // script ENDS the identity flow at this question. (Spec 064 US1 used to
+  // default-branch into attribution capture; the author/copyright
+  // questions moved to the post-track attribution flow, because what they
+  // propose depends on the track.) The gated path still terminates on the
+  // notice (see the branch above).
+  it("has no default branch — a supported script terminates the flow (#1901)", () => {
     const rules = definition.next as Array<{
       condition?: string;
       goto: string | null;
       default?: unknown;
     }>;
     const fallthrough = rules.find((r) => "default" in r);
-    expect(fallthrough?.condition).toBeUndefined();
-  });
-
-  // spec 064 US1: the supported path is no longer terminal — it continues into
-  // attribution capture. The GATED path still terminates (see the branch above).
-  it("default branch continues to attribution capture", () => {
-    const rules = definition.next as Array<{
-      condition?: string;
-      goto: string | null;
-      default?: unknown;
-    }>;
-    const fallthrough = rules.find((r) => "default" in r);
-    expect(fallthrough?.goto).toBe("il_author_name");
+    expect(fallthrough).toBeUndefined();
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.goto).toBe("il_script_not_supported");
   });
 });
 

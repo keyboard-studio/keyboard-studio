@@ -165,7 +165,7 @@ export interface LinguistInventory {
 /**
  * Input shape for {@link makeLinguistInventory}. Mirrors {@link LinguistInventory}
  * with the genuinely optional fields omittable, matching the `XInit` convention
- * (see {@link BaseKeyboardInit}, {@link KeyboardProvenanceInit}).
+ * (see {@link StartKeyboardInit}, {@link KeyboardProvenanceInit}).
  */
 export type LinguistInventoryInit = {
   language: string;

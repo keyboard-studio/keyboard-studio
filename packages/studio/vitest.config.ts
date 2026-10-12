@@ -25,7 +25,16 @@ export default defineConfig({
     // Playwright specs under e2e/ use the @playwright/test runner — exclude
     // them from vitest discovery so the default *.spec.ts glob doesn't pull
     // them in and fail with "describe is not defined".
-    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+    // Corpus-sweep suites are likewise excluded (km/ci-fast-gates,
+    // 2026-10-11): they run under vitest.corpus.config.ts in the build
+    // job's path-gated "corpus sweeps" step — same files, same
+    // assertions, only their trigger changed.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "e2e/**",
+      "src/**/*.corpus.test.{ts,tsx}",
+    ],
     // Include both colocated src tests and the mirror tests/ tree (FR-009).
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     // The first dynamic import of a test module that vi.mock()s

@@ -17,7 +17,19 @@ import { render } from "../test/renderWithI18n.tsx";
 import { StepHost } from "./StepHost.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import {
+  liveEntryForSlot,
+  slotKeyOf,
+  useDecisionLogStore,
+} from "../decisions/decisionLogStore.ts";
+import {
+  useDecisionStore,
+  getDecisionSnapshot,
+  applyDecisionSnapshot,
+  peekDecision,
+} from "../stores/decisionStore.ts";
+import { useSurveyAnswerStore, peekStepAnswers, applySurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
+import { rehydrateAnswersFromDecisions } from "../lib/draftPersistence.ts";
 import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionRecorder.ts";
 import type { SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import type { ReducerDeps } from "../steps/reducer.ts";
@@ -48,7 +60,15 @@ function TrivialStep({ onBack }: EditorStepProps): React.ReactElement {
 // file, so anything it closes over must be built through vi.hoisted rather
 // than an ordinary top-level const/function (vitest docs: "no top level
 // variables inside").
-const { MARKS_RESULT, INVISIBLES_RESULT, makeFixedResultStep } = vi.hoisted(() => {
+const { MARKS_RESULT, INVISIBLES_RESULT, IDENTITY_RESULT, SECOND_COPYRIGHT_RESULT, makeFixedResultStep } = vi.hoisted(() => {
+  /** Spec 088 T012: an identity-shaped survey completion (registry questions). */
+  const identityResult = {
+    phase: "A" as const,
+    answers: [
+      { questionId: "il_language_code", answerType: "text" as const, value: "fr" },
+      { questionId: "il_copyright_holder", answerType: "text" as const, value: "Fixture Author" },
+    ],
+  };
   /**
    * A fixed `SurveyPhaseResult` payload, for a "revisit a finished step,
    * complete again with no change" test (spec 079 T028) — the SAME payload
@@ -58,6 +78,14 @@ const { MARKS_RESULT, INVISIBLES_RESULT, makeFixedResultStep } = vi.hoisted(() =
   const marksResult = {
     phase: "C" as const,
     answers: [{ questionId: "marks.station.attachment", answerType: "select" as const, value: "confirmed" }],
+  };
+
+  /** Spec 088 T034: il_copyright_holder answered again, from another step. */
+  const secondCopyrightResult = {
+    phase: "A" as const,
+    answers: [
+      { questionId: "il_copyright_holder", answerType: "text" as const, value: "Second Author" },
+    ],
   };
 
   const invisiblesResult = {
@@ -96,7 +124,13 @@ const { MARKS_RESULT, INVISIBLES_RESULT, makeFixedResultStep } = vi.hoisted(() =
     };
   }
 
-  return { MARKS_RESULT: marksResult, INVISIBLES_RESULT: invisiblesResult, makeFixedResultStep: makeStep };
+  return {
+    MARKS_RESULT: marksResult,
+    INVISIBLES_RESULT: invisiblesResult,
+    IDENTITY_RESULT: identityResult,
+    SECOND_COPYRIGHT_RESULT: secondCopyrightResult,
+    makeFixedResultStep: makeStep,
+  };
 });
 
 vi.mock("../steps/manifest.ts", () => ({
@@ -107,7 +141,7 @@ vi.mock("../steps/manifest.ts", () => ({
       title: "Identity",
       inputs: [],
       writes: [],
-      component: TrivialStep,
+      component: makeFixedResultStep(IDENTITY_RESULT),
     },
     {
       kind: "editor-step",
@@ -133,18 +167,49 @@ vi.mock("../steps/manifest.ts", () => ({
       writes: [],
       component: makeFixedResultStep(INVISIBLES_RESULT),
     },
+    {
+      // Spec 088 T034: in this test registry, il_copyright_holder ALSO lives
+      // on project_name — the "question moved steps" arrangement SC-005
+      // is about. Production places it on identity only.
+      kind: "editor-step",
+      id: "project_name",
+      title: "Project name",
+      inputs: [],
+      writes: [],
+      component: makeFixedResultStep(SECOND_COPYRIGHT_RESULT),
+    },
   ],
+  // Spec 091 T008/T016: steps/stepOrder.ts re-publishes the manifest's
+  // derivation (derivedScreens/screenTrails), and steps/advance.ts reads
+  // the gates from this module — the stub models them for its five steps,
+  // mirroring the real trails (project_name is the gated side trail).
+  derivedScreens: [
+    { id: "identity", kind: "question", group: "identity", decisionIds: ["language-name", "language-region", "language-autonym", "language-code", "target-script", "author-name", "author-email", "copyright-holder"], moduleIds: [], spine: true },
+    { id: "choose_base", kind: "custom", decisionIds: ["base-keyboard"], moduleIds: [], spine: true },
+    { id: "marks", kind: "custom", decisionIds: ["marks-treatment"], moduleIds: [], spine: true },
+    { id: "invisibles", kind: "custom", decisionIds: ["invisibles-inventory"], moduleIds: [], spine: true },
+    { id: "project_name", kind: "question", group: "project_name", decisionIds: ["project-display-name", "project-keyboard-id"], moduleIds: [], spine: false, joinTarget: "characters" },
+  ],
+  screenTrails: new Map([
+    ["identity", { spine: true }],
+    ["choose_base", { spine: true }],
+    ["marks", { spine: true }],
+    ["invisibles", { spine: true }],
+    ["project_name", { spine: false, joinTarget: "characters" }],
+    ["package", { spine: true }],
+  ]),
+  screenGates: new Map(),
 }));
 
 const fakeReducerDeps: ReducerDeps = {
   lockDesktop: vi.fn(),
   setTouchLayoutJson: vi.fn(),
   clearStale: vi.fn(),
-  instantiateFromBase: vi.fn(),
+  instantiateFromStart: vi.fn(),
   instantiateFromExisting: vi.fn(),
   buildTouchLayoutJson: vi.fn(() => ({ json: null, warnings: [] })),
-  resolveBaseTouchJson: vi.fn(() => undefined),
-  instantiateFromBaseIfConfirmed: vi.fn(() => true),
+  resolveStartTouchJson: vi.fn(() => undefined),
+  instantiateFromStartIfConfirmed: vi.fn(() => true),
 };
 
 /** A snapshotter that captures nothing (mirrors reducer.decisionRecording.test.ts's inertSnapshotter). */
@@ -169,6 +234,21 @@ function reducerDepsWithRealRecorder(): ReducerDeps {
       getWorkingCopyState: () => useWorkingCopyStore.getState(),
       snapshotter: inertSnapshotter(),
     }),
+  };
+}
+
+/**
+ * `fakeReducerDeps` plus the REAL decision store wiring — the same four
+ * lambdas StudioShell injects (spec 088 T012/T014), pointed at the real
+ * stores.
+ */
+function reducerDepsWithDecisionStore(): ReducerDeps {
+  return {
+    ...fakeReducerDeps,
+    writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
+    readDecisionSet: () => getDecisionSnapshot(),
+    getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
+    getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
   };
 }
 
@@ -238,7 +318,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
     const entriesAfterFirstComplete = useDecisionLogStore.getState().record.entries.length;
     expect(entriesAfterFirstComplete).toBeGreaterThan(0);
-    const irAfterFirstComplete = useWorkingCopyStore.getState().baseIr;
+    const irAfterFirstComplete = useWorkingCopyStore.getState().startIr;
     first.unmount();
 
     // Revisit: land back on "marks" (a finished step) the way an ordinary
@@ -252,7 +332,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
 
     expect(useDecisionLogStore.getState().record.entries.length).toBe(entriesAfterFirstComplete);
-    expect(useWorkingCopyStore.getState().baseIr).toBe(irAfterFirstComplete);
+    expect(useWorkingCopyStore.getState().startIr).toBe(irAfterFirstComplete);
   });
 
   it("a finished single-screen step (invisibles): re-completing with the identical answers appends no new decision entry", () => {
@@ -267,7 +347,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
     const entriesAfterFirstComplete = useDecisionLogStore.getState().record.entries.length;
     expect(entriesAfterFirstComplete).toBeGreaterThan(0);
-    const irAfterFirstComplete = useWorkingCopyStore.getState().baseIr;
+    const irAfterFirstComplete = useWorkingCopyStore.getState().startIr;
     first.unmount();
 
     act(() => {
@@ -279,7 +359,7 @@ describe("StepHost — revisiting a finished step and completing with no change 
     });
 
     expect(useDecisionLogStore.getState().record.entries.length).toBe(entriesAfterFirstComplete);
-    expect(useWorkingCopyStore.getState().baseIr).toBe(irAfterFirstComplete);
+    expect(useWorkingCopyStore.getState().startIr).toBe(irAfterFirstComplete);
   });
 });
 
@@ -296,9 +376,9 @@ describe("StepHost — choose_base revisit keeps the instantiated base (spec 079
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
-    const baseKeyboardBefore = useWorkingCopyStore.getState().baseKeyboard;
-    const baseIrBefore = useWorkingCopyStore.getState().baseIr;
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    const startKeyboardBefore = useWorkingCopyStore.getState().startKeyboard;
+    const startIrBefore = useWorkingCopyStore.getState().startIr;
 
     act(() => {
       useSurveySessionStore.getState().advance("choose_base");
@@ -309,7 +389,136 @@ describe("StepHost — choose_base revisit keeps the instantiated base (spec 079
 
     render(<StepHost reducerDeps={fakeReducerDeps} onStartOver={() => {}} />);
     expect(screen.getByTestId("step-marker")).toBeTruthy();
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBe(baseKeyboardBefore);
-    expect(useWorkingCopyStore.getState().baseIr).toBe(baseIrBefore);
+    expect(useWorkingCopyStore.getState().startKeyboard).toBe(startKeyboardBefore);
+    expect(useWorkingCopyStore.getState().startIr).toBe(startIrBefore);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 088 T012 (US1 / SC-001, store-level through the real StepHost): an
+// identity completion writes decision records; a reload (draft slices
+// re-applied into fresh stores) restores the answers FROM the decisions,
+// with value and provenance intact.
+// ---------------------------------------------------------------------------
+
+describe("StepHost — decision records survive a reload (spec 088 T012)", () => {
+  it("identity completion writes records; re-applying the draft slices restores answers from decisions", () => {
+    useDecisionStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    // The runner's saved answers at completion time (no proposals → asked).
+    const save = useSurveyAnswerStore.getState().saveAnswer;
+    save("identity", "il_language_code", {
+      value: "fr", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_language_code",
+    });
+    save("identity", "il_copyright_holder", {
+      value: "Fixture Author", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_copyright_holder",
+    });
+
+    const deps = reducerDepsWithDecisionStore();
+    act(() => {
+      useSurveySessionStore.getState().advance("identity");
+    });
+    render(<StepHost reducerDeps={deps} onStartOver={() => {}} />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+
+    const snapshot = getDecisionSnapshot();
+    expect(snapshot["language-code"]).toMatchObject({ value: "fr", provenance: "asked", step: "identity" });
+    expect(snapshot["copyright-holder"]).toMatchObject({ value: "Fixture Author", provenance: "asked", step: "identity" });
+
+    // Reload: fresh stores, draft slices re-applied the way
+    // applyEnvelopeToStores does it (decisions slice + rehydrated answers).
+    useDecisionStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    applyDecisionSnapshot(snapshot);
+    applySurveyAnswerSnapshot(
+      rehydrateAnswersFromDecisions(getDecisionSnapshot(), { steps: {}, recordedScreenOf: {} }, 1234),
+    );
+
+    expect(getDecisionSnapshot()["language-code"]).toMatchObject({ value: "fr", provenance: "asked" });
+    const restored = peekStepAnswers("identity")?.answers;
+    expect(restored?.["il_language_code"]?.value).toBe("fr");
+    expect(restored?.["il_copyright_holder"]?.value).toBe("Fixture Author");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 088 US4 — SC-005: a question that moves steps keeps ONE decision.
+// The test manifest above places il_copyright_holder on identity AND on
+// project_name (production: identity only). Answering it in both places,
+// through the real StepHost, must leave a single copyright-holder record
+// and a single trail chain (T031's decision-keyed slots), across a reload.
+// ---------------------------------------------------------------------------
+
+describe("spec 088 SC-005 — moved question, one decision", () => {
+  it("answering il_copyright_holder in two steps yields one record and one trail chain, surviving reload", () => {
+    useDecisionStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    useDecisionLogStore.getState().reset();
+    const save = useSurveyAnswerStore.getState().saveAnswer;
+    save("identity", "il_language_code", {
+      value: "fr", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_language_code",
+    });
+    save("identity", "il_copyright_holder", {
+      value: "Fixture Author", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_copyright_holder",
+    });
+    save("project_name", "il_copyright_holder", {
+      value: "Second Author", answerType: "text", origin: "confirmed", stage: "confirmed",
+      evidenceKey: null, screenId: "il_copyright_holder",
+    });
+
+    const deps: ReducerDeps = {
+      ...reducerDepsWithDecisionStore(),
+      recordDecision: reducerDepsWithRealRecorder().recordDecision,
+    };
+    act(() => {
+      useSurveySessionStore.getState().advance("identity");
+    });
+    render(<StepHost reducerDeps={deps} onStartOver={() => {}} />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+    expect(peekDecision("copyright-holder")).toMatchObject({ value: "Fixture Author", step: "identity" });
+
+    // The question "moves": project_name now asks it, with a new answer.
+    act(() => {
+      useSurveySessionStore.getState().advance("project_name");
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+
+    // One decision record, holding the latest answer and its step.
+    expect(peekDecision("copyright-holder")).toMatchObject({ value: "Second Author", step: "project_name" });
+
+    // The trail shows both entries under the one decision — the second
+    // supersedes the first even though the steps differ (C-5).
+    const allEntries = useDecisionLogStore.getState().record.entries;
+    const entries = allEntries.filter(
+      (e) => e.payload.kind === "survey-answer" && e.payload.questionId === "il_copyright_holder",
+    );
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ stepId: "identity" });
+    expect(entries[1]).toMatchObject({ stepId: "project_name", supersedes: entries[0]!.entryId });
+    expect(
+      liveEntryForSlot(allEntries, slotKeyOf("identity", entries[0]!.payload))?.entryId,
+    ).toBe(entries[1]!.entryId);
+
+    // Reload: the current record survives the move, and the answer
+    // rehydrates under the step that asked it last.
+    const snapshot = getDecisionSnapshot();
+    useDecisionStore.getState().reset();
+    useSurveyAnswerStore.getState().reset();
+    applyDecisionSnapshot(snapshot);
+    applySurveyAnswerSnapshot(
+      rehydrateAnswersFromDecisions(getDecisionSnapshot(), { steps: {}, recordedScreenOf: {} }, 1234),
+    );
+    expect(getDecisionSnapshot()["copyright-holder"]).toMatchObject({ value: "Second Author" });
+    expect(peekStepAnswers("project_name")?.answers["il_copyright_holder"]?.value).toBe("Second Author");
   });
 });

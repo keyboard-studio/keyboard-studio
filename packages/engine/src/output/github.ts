@@ -240,15 +240,15 @@ export async function publishPR(
     importAttribution !== undefined && importAttribution.length > 0
       ? `${prBody}\n\n${importAttribution}`
       : prBody;
-  const forkBase = `${API_BASE}/repos/${forkOwner}/${UPSTREAM_REPO}`;
-  const upstreamBase = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
+  const forkStart = `${API_BASE}/repos/${forkOwner}/${UPSTREAM_REPO}`;
+  const upstreamStart = `${API_BASE}/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}`;
 
   // ------------------------------------------------------------------
   // 1. Ensure the fork exists under forkOwner
   // ------------------------------------------------------------------
   report("fork-check");
   const forkCheckRes = await fetchOrNetworkError("Fork check failed", () =>
-    ghFetch(forkBase, token, fetchFn)
+    ghFetch(forkStart, token, fetchFn)
   );
 
   if (!forkCheckRes.ok) {
@@ -263,7 +263,7 @@ export async function publishPR(
     // 404 — fork doesn't exist yet; create it
     report("fork-create");
     const createRes = await fetchOrNetworkError("Fork creation failed", () =>
-      ghFetch(`${upstreamBase}/forks`, token, fetchFn, "POST", {})
+      ghFetch(`${upstreamStart}/forks`, token, fetchFn, "POST", {})
     );
     if (!createRes.ok) {
       const ae2 = authError(createRes);
@@ -280,7 +280,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   report("master-ref");
   const masterRefRes = await fetchOrNetworkError("Could not read fork master ref", () =>
-    ghFetch(`${forkBase}/git/ref/heads/master`, token, fetchFn)
+    ghFetch(`${forkStart}/git/ref/heads/master`, token, fetchFn)
   );
   if (!masterRefRes.ok) {
     throw {
@@ -296,7 +296,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   report("parent-commit");
   const parentCommitRes = await fetchOrNetworkError("Could not read parent commit", () =>
-    ghFetch(`${forkBase}/git/commits/${masterCommitSha}`, token, fetchFn)
+    ghFetch(`${forkStart}/git/commits/${masterCommitSha}`, token, fetchFn)
   );
   if (!parentCommitRes.ok) {
     throw {
@@ -327,7 +327,7 @@ export async function publishPR(
   const binaryTree = await Promise.all(
     binaryEntries.map(async (e) => {
       const blobRes = await fetchOrNetworkError("Blob creation failed", () =>
-        ghFetch(`${forkBase}/git/blobs`, token, fetchFn, "POST", {
+        ghFetch(`${forkStart}/git/blobs`, token, fetchFn, "POST", {
           content: bytesToBase64(e.content as Uint8Array),
           encoding: "base64",
         })
@@ -352,7 +352,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   report("tree");
   const newTreeRes = await fetchOrNetworkError("Tree creation failed", () =>
-    ghFetch(`${forkBase}/git/trees`, token, fetchFn, "POST", {
+    ghFetch(`${forkStart}/git/trees`, token, fetchFn, "POST", {
       base_tree: baseTreeSha,
       tree: treeEntries,
     })
@@ -373,7 +373,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   report("commit");
   const newCommitRes = await fetchOrNetworkError("Commit creation failed", () =>
-    ghFetch(`${forkBase}/git/commits`, token, fetchFn, "POST", {
+    ghFetch(`${forkStart}/git/commits`, token, fetchFn, "POST", {
       message: commitMessage,
       tree: newTreeSha,
       parents: [masterCommitSha],
@@ -395,7 +395,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   report("branch");
   const branchRes = await fetchOrNetworkError("Branch creation failed", () =>
-    ghFetch(`${forkBase}/git/refs`, token, fetchFn, "POST", {
+    ghFetch(`${forkStart}/git/refs`, token, fetchFn, "POST", {
       ref: `refs/heads/${branchName}`,
       sha: newCommitSha,
     })
@@ -420,7 +420,7 @@ export async function publishPR(
   // ------------------------------------------------------------------
   report("pr-open");
   const prRes = await fetchOrNetworkError("PR creation failed", () =>
-    ghFetch(`${upstreamBase}/pulls`, token, fetchFn, "POST", {
+    ghFetch(`${upstreamStart}/pulls`, token, fetchFn, "POST", {
       title: prTitle,
       body: fullPrBody,
       head: `${forkOwner}:${branchName}`,

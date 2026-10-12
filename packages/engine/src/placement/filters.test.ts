@@ -3,7 +3,7 @@ import {
   isMnemonicKeyboard,
   hasNonUSBase,
   dedupCapsNcaps,
-  detectBaseLayoutFamily,
+  detectStartLayoutFamily,
   hasInvertedNumberRow,
   isStandardKey,
 } from "./filters.js";
@@ -261,25 +261,25 @@ describe("dedupCapsNcaps", () => {
 });
 
 // ---------------------------------------------------------------------------
-// detectBaseLayoutFamily
+// detectStartLayoutFamily
 // ---------------------------------------------------------------------------
 
-describe("detectBaseLayoutFamily", () => {
+describe("detectStartLayoutFamily", () => {
   // Bare-modifier base rows (q/a/z at their physical key positions).
   const bareQwerty = "+ [K_Q] > 'q'\n+ [K_A] > 'a'\n+ [K_Z] > 'z'";
   const bareAzerty = "+ [K_Q] > 'a'\n+ [K_A] > 'q'\n+ [K_Z] > 'w'";
   const bareQwertz = "+ [K_Q] > 'q'\n+ [K_A] > 'a'\n+ [K_Z] > 'y'";
 
   it("detects QWERTY from a bare-modifier base row", () => {
-    expect(detectBaseLayoutFamily(parse(makeUnicodeKmn(bareQwerty), "k").ir)).toBe("QWERTY");
+    expect(detectStartLayoutFamily(parse(makeUnicodeKmn(bareQwerty), "k").ir)).toBe("QWERTY");
   });
 
   it("detects AZERTY from a bare-modifier base row", () => {
-    expect(detectBaseLayoutFamily(parse(makeUnicodeKmn(bareAzerty), "k").ir)).toBe("AZERTY");
+    expect(detectStartLayoutFamily(parse(makeUnicodeKmn(bareAzerty), "k").ir)).toBe("AZERTY");
   });
 
   it("detects QWERTZ from a bare-modifier base row", () => {
-    expect(detectBaseLayoutFamily(parse(makeUnicodeKmn(bareQwertz), "k").ir)).toBe("QWERTZ");
+    expect(detectStartLayoutFamily(parse(makeUnicodeKmn(bareQwertz), "k").ir)).toBe("QWERTZ");
   });
 
   it("detects AZERTY when the base row is encoded with the NCAPS modifier (regression: #384)", () => {
@@ -295,22 +295,22 @@ describe("detectBaseLayoutFamily", () => {
       "+ [NCAPS K_Z] > 'w'",
       "+ [CAPS K_Z] > 'W'",
     ].join("\n");
-    expect(detectBaseLayoutFamily(parse(makeUnicodeKmn(ncapsAzerty), "k").ir)).toBe("AZERTY");
+    expect(detectStartLayoutFamily(parse(makeUnicodeKmn(ncapsAzerty), "k").ir)).toBe("AZERTY");
   });
 
   it("ignores SHIFT/CAPS rows so an all-uppercase shifted layer is not misread", () => {
     // Only shifted/caps rows present -> no unshifted base row -> undetermined.
     const onlyShifted = "+ [SHIFT K_Q] > 'Q'\n+ [CAPS K_A] > 'A'\n+ [SHIFT K_Z] > 'Z'";
-    expect(detectBaseLayoutFamily(parse(makeUnicodeKmn(onlyShifted), "k").ir)).toBe("other");
+    expect(detectStartLayoutFamily(parse(makeUnicodeKmn(onlyShifted), "k").ir)).toBe("other");
   });
 
   it("returns 'other' for an unrecognised base row", () => {
-    expect(detectBaseLayoutFamily(parse(makeUnicodeKmn("+ [K_Q] > 'x'"), "k").ir)).toBe("other");
+    expect(detectStartLayoutFamily(parse(makeUnicodeKmn("+ [K_Q] > 'x'"), "k").ir)).toBe("other");
   });
 });
 
 // ---------------------------------------------------------------------------
-// detectBaseLayoutFamily — real corpus (Belgian AZERTY base)
+// detectStartLayoutFamily — real corpus (Belgian AZERTY base)
 // ---------------------------------------------------------------------------
 
 describe("detectBaseLayoutFamily against the real basic_kbdbe AZERTY base", () => {
@@ -323,7 +323,7 @@ describe("detectBaseLayoutFamily against the real basic_kbdbe AZERTY base", () =
 
   it.skipIf(!available)("classifies basic_kbdbe as AZERTY (not QWERTY/QWERTZ)", () => {
     const { ir } = parse(readFileSync(KMN_PATH, "utf-8"), "basic_kbdbe");
-    expect(detectBaseLayoutFamily(ir)).toBe("AZERTY");
+    expect(detectStartLayoutFamily(ir)).toBe("AZERTY");
   });
 });
 
@@ -385,7 +385,7 @@ describe("hasInvertedNumberRow", () => {
       "+ [NCAPS SHIFT K_5] > '5'",
     ].join("\n");
     const { ir } = parse(makeUnicodeKmn(rules), "kb-inverted-other-letters");
-    expect(detectBaseLayoutFamily(ir)).toBe("AZERTY");
+    expect(detectStartLayoutFamily(ir)).toBe("AZERTY");
   });
 
   it("returns false for a QWERTY/QWERTZ-style digit row (base already the digit)", () => {
@@ -460,7 +460,7 @@ describe("hasInvertedNumberRow", () => {
 
   it("a letter-row-AZERTY keyboard still returns AZERTY via the primary letter check (regression)", () => {
     const bareAzerty = "+ [K_Q] > 'a'\n+ [K_A] > 'q'\n+ [K_Z] > 'w'";
-    expect(detectBaseLayoutFamily(parse(makeUnicodeKmn(bareAzerty), "k").ir)).toBe("AZERTY");
+    expect(detectStartLayoutFamily(parse(makeUnicodeKmn(bareAzerty), "k").ir)).toBe("AZERTY");
   });
 });
 

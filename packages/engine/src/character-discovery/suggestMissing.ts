@@ -330,7 +330,7 @@ async function resolveExemplars(
  * characters for the locale.
  *
  * @param args.bcp47        - BCP47 tag of the target language (e.g. "yo", "fr-CM").
- * @param args.baseIr       - Parsed KeyboardIR of the base keyboard being adapted.
+ * @param args.startIr       - Parsed KeyboardIR of the base keyboard being adapted.
  * @param args.loader       - Optional. Omit for the offline index (the authoring
  *                            path); pass a CldrFullLoader for live CLDR refresh
  *                            or test injection.
@@ -338,11 +338,11 @@ async function resolveExemplars(
  */
 export async function suggestMissingCharacters(args: {
   bcp47: string;
-  baseIr: KeyboardIR;
+  startIr: KeyboardIR;
   loader?: CldrFullLoader;
   languageName?: string;
 }): Promise<MissingCharSuggestions | null> {
-  const { bcp47, baseIr, loader, languageName } = args;
+  const { bcp47, startIr, loader, languageName } = args;
 
   const exemplars = await resolveExemplars(bcp47, loader);
   if (exemplars === null) return null;
@@ -358,7 +358,7 @@ export async function suggestMissingCharacters(args: {
   const auxCandidates = letterFilter(exemplars.auxiliarySpecials);
 
   // --- Build the keyboard's produced set (NFC, deadkey-aware) ---
-  const produced = buildProducedSet(baseIr);
+  const produced = buildProducedSet(startIr);
 
   // --- Determine Turkic case-fold suppression ---
   // Suppression applies ONLY for Latin-script Turkic locales.

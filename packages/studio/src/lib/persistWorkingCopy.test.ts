@@ -15,6 +15,8 @@ import {
   snapshotWorkingCopyData,
   prepareWorkingCopySnapshot,
   BASE_WELCOME_IMAGES_BUDGET_BYTES,
+  NORMALIZATION_STEP_PERSIST_BUDGET_CHARS,
+  serializeNormalizationStep,
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
 import { DRAFT_VERSION } from "./draftPersistence.ts";
@@ -62,9 +64,9 @@ describe("persistWorkingCopy", () => {
 
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseKeyboard: { id: "test_keyboard", displayName: "Test Keyboard", languages: ["en"] } as import("@keyboard-studio/contracts").BaseKeyboard,
-      baseVfs: vfs,
-      baseIr: ir,
+      startKeyboard: { id: "test_keyboard", displayName: "Test Keyboard", languages: ["en"] } as import("@keyboard-studio/contracts").StartKeyboard,
+      startVfs: vfs,
+      startIr: ir,
       ir,
       identity: { keyboardId: "test_keyboard", bcp47: "en", displayName: "Test Keyboard" },
       deletedNodeIds: new Set(["node-1", "node-2"]),
@@ -91,7 +93,7 @@ describe("persistWorkingCopy", () => {
 
     const s = useWorkingCopyStore.getState();
     expect(s.instantiationMode).toBe("new-from-base");
-    expect(s.baseVfs?.get("source/test.kmn")?.content).toBe(
+    expect(s.startVfs?.get("source/test.kmn")?.content).toBe(
       "c Test keyboard\nstore(&NAME) 'Test'\n",
     );
     expect(s.deletedNodeIds.has("node-1")).toBe(true);
@@ -120,9 +122,9 @@ describe("persistWorkingCopy", () => {
 
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-      baseVfs: vfs,
-      baseIr: ir,
+      startKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+      startVfs: vfs,
+      startIr: ir,
       ir,
       identity: null,
       deletedNodeIds: new Set(),
@@ -145,7 +147,7 @@ describe("persistWorkingCopy", () => {
     expect(result).toBe(true);
 
     const s = useWorkingCopyStore.getState();
-    const rehydratedEntry = s.baseVfs?.get("source/test.ico");
+    const rehydratedEntry = s.startVfs?.get("source/test.ico");
     expect(rehydratedEntry).toBeDefined();
     expect(rehydratedEntry?.isBinary).toBe(true);
 
@@ -163,13 +165,13 @@ describe("persistWorkingCopy", () => {
     // Since sessionStorage was already cleared by rehydrate, we snapshot again and inspect.
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseVfs: vfs,
+      startVfs: vfs,
       ir,
     });
     snapshotWorkingCopyToSession();
     const raw = sessionStorage.getItem("ks.working-copy.draft")!;
-    const parsed = JSON.parse(raw) as { baseVfsEntries: Array<{ path: string; content: unknown; isBinary: boolean }> };
-    const icoEntry = parsed.baseVfsEntries.find((e) => e.path === "source/test.ico");
+    const parsed = JSON.parse(raw) as { startVfsEntries: Array<{ path: string; content: unknown; isBinary: boolean }> };
+    const icoEntry = parsed.startVfsEntries.find((e) => e.path === "source/test.ico");
     expect(icoEntry).toBeDefined();
     // content must be a string (Base64), not an object (corrupt Uint8Array serialization).
     expect(typeof icoEntry?.content).toBe("string");
@@ -197,9 +199,9 @@ describe("persistWorkingCopy", () => {
 
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-      baseVfs: vfs,
-      baseIr: ir,
+      startKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+      startVfs: vfs,
+      startIr: ir,
       ir,
       identity: null,
       deletedNodeIds: new Set(),
@@ -218,16 +220,16 @@ describe("persistWorkingCopy", () => {
     // The stored form must be Base64, not a sparse integer-keyed object.
     const raw = sessionStorage.getItem("ks.working-copy.draft")!;
     const parsed = JSON.parse(raw) as {
-      baseVfsEntries: Array<{ path: string; content: unknown; isBinary: boolean }>;
+      startVfsEntries: Array<{ path: string; content: unknown; isBinary: boolean }>;
     };
-    const stored = parsed.baseVfsEntries.find((e) => e.path === "source/test.ico");
+    const stored = parsed.startVfsEntries.find((e) => e.path === "source/test.ico");
     expect(typeof stored?.content).toBe("string");
     expect(stored?.isBinary).toBe(true);
 
     useWorkingCopyStore.getState().reset();
     expect(rehydrateWorkingCopyFromSession()).toBe(true);
 
-    const rehydrated = useWorkingCopyStore.getState().baseVfs?.get("source/test.ico");
+    const rehydrated = useWorkingCopyStore.getState().startVfs?.get("source/test.ico");
     expect(rehydrated?.content).toBeInstanceOf(Uint8Array);
     expect(Array.from(rehydrated!.content as Uint8Array)).toEqual(Array.from(fakeIco));
   });
@@ -237,10 +239,10 @@ describe("persistWorkingCopy", () => {
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
-      baseVfs: vfs,
+      startVfs: vfs,
       ir,
-      baseKeyboard: null,
-      baseIr: null,
+      startKeyboard: null,
+      startIr: null,
       identity: null,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
@@ -302,12 +304,12 @@ describe("persistWorkingCopy", () => {
 
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseVfs: vfs,
-      // At instantiation baseIr === ir (both seeded from the base). removalCapabilities
-      // derives from baseIr, so it must be set for the rehydrated map to populate.
-      baseIr: irWithRemovable,
+      startVfs: vfs,
+      // At instantiation startIr === ir (both seeded from the base). removalCapabilities
+      // derives from startIr, so it must be set for the rehydrated map to populate.
+      startIr: irWithRemovable,
       ir: irWithRemovable,
-      baseKeyboard: null,
+      startKeyboard: null,
       identity: null,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
@@ -347,10 +349,10 @@ describe("persistWorkingCopy", () => {
   it("derives removalCapabilities from baseIr, not the carve working ir", () => {
     // Regression: the store invariant is that removalCapabilities is computed
     // once at instantiation from the BASE IR and never recomputed on carve
-    // edits. So rehydration must derive it from snapshot.baseIr — deriving from
+    // edits. So rehydration must derive it from snapshot.startIr — deriving from
     // the carve working `ir` would diverge the moment `ir` is mutated before a
-    // redirect. Here baseIr holds the removable rule and `ir` is stripped of it;
-    // a map derived from `ir` would be empty, from `baseIr` it is populated.
+    // redirect. Here startIr holds the removable rule and `ir` is stripped of it;
+    // a map derived from `ir` would be empty, from `startIr` it is populated.
     const removableRule = {
       nodeId: "rule-s01-1",
       context: [{ kind: "vkey" as const, vkey: "K_A", modifiers: [] }],
@@ -364,16 +366,16 @@ describe("persistWorkingCopy", () => {
         ],
       });
 
-    const baseIr = makeIr([removableRule]); // base retains the removable rule
+    const startIr = makeIr([removableRule]); // base retains the removable rule
     const carveIr = makeIr([]); // carve working IR has had it removed
 
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseVfs: vfs,
-      baseIr,
+      startVfs: vfs,
+      startIr,
       ir: carveIr,
-      baseKeyboard: null,
+      startKeyboard: null,
       identity: null,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
@@ -393,7 +395,7 @@ describe("persistWorkingCopy", () => {
     expect(result).toBe(true);
 
     const s = useWorkingCopyStore.getState();
-    // Derived from baseIr → the removable rule is present. (From carveIr it
+    // Derived from startIr → the removable rule is present. (From carveIr it
     // would be empty, since carveIr's group has no rules.)
     expect(s.removalCapabilities.get("rule-s01-1")).toBe("removable:simple");
   });
@@ -404,10 +406,10 @@ describe("persistWorkingCopy", () => {
 
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseVfs: vfs,
+      startVfs: vfs,
       ir,
-      baseKeyboard: null,
-      baseIr: null,
+      startKeyboard: null,
+      startIr: null,
       identity: null,
       deletedNodeIds: new Set(["a", "b", "c"]),
       deletedItemIds: new Set(["x#0", "y#1"]),
@@ -444,7 +446,7 @@ describe("persistWorkingCopy", () => {
   // The base VFS is set once at instantiation and never mutated in place, so
   // its Base64 serialization is invariant for the life of a working copy. The
   // durable-draft autosave calls snapshotWorkingCopyData on every ~500ms
-  // debounced change, so the base-VFS serialization is memoized on the baseVfs
+  // debounced change, so the base-VFS serialization is memoized on the startVfs
   // OBJECT REFERENCE: reused while the same working copy is active, recomputed
   // when a new instantiation replaces the reference.
   // -------------------------------------------------------------------------
@@ -462,9 +464,9 @@ describe("persistWorkingCopy", () => {
 
       useWorkingCopyStore.setState({
         instantiationMode: "new-from-base",
-        baseKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        baseVfs: vfs,
-        baseIr: ir,
+        startKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+        startVfs: vfs,
+        startIr: ir,
         ir,
         identity: null,
         deletedNodeIds: new Set(),
@@ -501,8 +503,8 @@ describe("persistWorkingCopy", () => {
     });
 
     it("snapshotWorkingCopyData serializes the Set as a plain string[]", () => {
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
         { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0063");
@@ -512,13 +514,45 @@ describe("persistWorkingCopy", () => {
       expect(snapshot.deletedTouchKeyIds).toEqual(["phone:default:U_0063"]);
     });
 
+    it("spec 090 T063: a snapshot still carrying the retired answer sidecar has it dropped on restore and never re-saved", () => {
+      const ir = makeScaffoldedIR();
+      const staleSnapshot = {
+        instantiationMode: "new-from-base",
+        startKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        startVfsEntries: [],
+        startIr: ir,
+        identity: null,
+        ir,
+        deletedNodeIds: [],
+        deletedItemIds: [],
+        deletedTouchKeyIds: [],
+        undoStack: [],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        sequenceFlaggedChars: [],
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+        staleSteps: [],
+        validatorFindings: [],
+        axisFills: [],
+        phaseAnswersByStep: { C: { legacy: [] } },
+      } as unknown as WorkingCopySnapshot;
+
+      const patch = prepareWorkingCopySnapshot(staleSnapshot);
+      expect("phaseAnswersByStep" in patch).toBe(false);
+      // And a fresh snapshot of the store never writes the field at all.
+      expect("phaseAnswersByStep" in snapshotWorkingCopyData()).toBe(false);
+    });
+
     it("prepareWorkingCopySnapshot tolerates a pre-existing snapshot missing the field", () => {
       const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
-        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
-        baseVfsEntries: [],
-        baseIr: ir,
+        startKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        startVfsEntries: [],
+        startIr: ir,
         identity: null,
         ir,
         deletedNodeIds: [],
@@ -543,26 +577,123 @@ describe("persistWorkingCopy", () => {
     });
   });
 
+  describe("#1810 identifier rename — legacy snapshot keys", () => {
+    it("restores a pre-rename snapshot whose starting-point fields use the old base* keys", () => {
+      const ir = makeScaffoldedIR();
+      // Shape a build from before the rename wrote: same DRAFT_VERSION, old
+      // key names (baseKeyboard / baseIr / baseVfsEntries / base* doc fields).
+      const preRenameSnapshot = {
+        instantiationMode: "new-from-base",
+        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        baseVfsEntries: [],
+        baseIr: ir,
+        baseWelcomeHtmText: "welcome",
+        baseLicenseText: "license",
+        identity: null,
+        ir,
+        deletedNodeIds: [],
+        deletedItemIds: [],
+        deletedTouchKeyIds: [],
+        undoStack: [],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        sequenceFlaggedChars: [],
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+        staleSteps: [],
+        validatorFindings: [],
+        axisFills: [],
+      } as unknown as WorkingCopySnapshot;
+
+      const patch = prepareWorkingCopySnapshot(preRenameSnapshot);
+      expect(patch.startKeyboard).toEqual({ id: "kbd", displayName: "Kbd", languages: [] });
+      expect(patch.startIr).toBe(ir);
+      expect(patch.startVfs).toBeDefined();
+      expect(patch.startWelcomeHtmText).toBe("welcome");
+      expect(patch.startLicenseText).toBe("license");
+    });
+  });
+
   // -------------------------------------------------------------------------
   // keyEditOverlay / touchEditorMode — spec 063 T058.
   //
   // Both fields join WorkingCopySnapshot as OPTIONAL with a tolerant fallback
   // read in prepareWorkingCopySnapshot, per data-model.md §9 / R10.3: DRAFT_VERSION
-  // stays 1 (VR-1 discards a version-mismatched draft rather than migrating it,
-  // so a bump would throw away every author's in-progress keyboard).
+  // stays at its current value (VR-1 discards a version-mismatched draft rather
+  // than migrating it, so a bump would throw away every author's in-progress keyboard).
   // -------------------------------------------------------------------------
+
+  describe("contextNormalizationStep persistence (spec 086)", () => {
+    it("round-trips the cached step through sessionStorage without a DRAFT_VERSION bump", () => {
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+        { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
+      );
+      const stored = { cacheKey: "abc|1", result: { kind: "refused", reason: "no-alternates" } } as const;
+      useWorkingCopyStore.getState().setContextNormalizationStep(stored);
+      expect(snapshotWorkingCopyData().contextNormalizationStep).toEqual(stored);
+
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().contextNormalizationStep).toEqual(stored);
+      expect(DRAFT_VERSION).toBe(2);
+    });
+  });
+
+  describe("contextNormalizationStep size policy", () => {
+    const step = (ruleCount: number, maps: number) =>
+      ({
+        cacheKey: "abc|1",
+        result: {
+          kind: "step",
+          cacheKey: "abc|1",
+          step: { groupName: "generated_context_normalize", originalEntry: "main", stores: [], rules: [], ruleCount, examples: [] },
+          maps: Array.from({ length: maps }, (_, i) => ({ from: `f${i}`, to: `t${i}` })),
+        },
+      }) as unknown as NonNullable<Parameters<typeof serializeNormalizationStep>[0]>;
+
+    it("drops maps when persisting, and leaves the store entry untouched", () => {
+      const full = step(3, 50);
+      const out = serializeNormalizationStep(full);
+      expect(out?.result.kind === "step" ? out.result.maps : null).toEqual([]);
+      expect(out?.result.kind === "step" ? out.result.step.ruleCount : null).toBe(3);
+      expect(full.result.kind === "step" ? full.result.maps.length : 0).toBe(50);
+    });
+
+    it("drops a step over the size budget instead of risking the whole draft write", () => {
+      const huge = step(1, 0);
+      if (huge.result.kind !== "step") throw new Error("fixture");
+      huge.result.step.examples = [{ pasted: "x".repeat(NORMALIZATION_STEP_PERSIST_BUDGET_CHARS), result: "y" }];
+      expect(serializeNormalizationStep(huge)).toBeNull();
+    });
+
+    it("loads an old draft that persisted maps", () => {
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+        { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
+      );
+      const old = step(2, 5);
+      useWorkingCopyStore.getState().setContextNormalizationStep(old);
+      const snap = JSON.parse(JSON.stringify(snapshotWorkingCopyData())) as WorkingCopySnapshot;
+      snap.contextNormalizationStep = old;
+      expect(prepareWorkingCopySnapshot(snap)).toBeTruthy();
+    });
+  });
 
   describe("keyEditOverlay / touchEditorMode persistence (T058)", () => {
     it("DRAFT_VERSION stays 1 — these fields are additive, not a version bump", () => {
-      expect(DRAFT_VERSION).toBe(1);
+      expect(DRAFT_VERSION).toBe(2); // spec 088 FR-007
     });
 
     it("round-trip through sessionStorage snapshot/rehydrate", () => {
       const ir = makeScaffoldedIR();
       const vfs = createVirtualFS([]);
 
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
         { vfs, ir },
       );
       useWorkingCopyStore.getState().commitKeyEdit({
@@ -586,8 +717,8 @@ describe("persistWorkingCopy", () => {
     });
 
     it("snapshotWorkingCopyData serializes both fields as plain JSON-safe data", () => {
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
         { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       useWorkingCopyStore.getState().commitKeyEdit({
@@ -608,9 +739,9 @@ describe("persistWorkingCopy", () => {
       const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
-        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
-        baseVfsEntries: [],
-        baseIr: ir,
+        startKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        startVfsEntries: [],
+        startIr: ir,
         identity: null,
         ir,
         deletedNodeIds: [],
@@ -642,9 +773,9 @@ describe("persistWorkingCopy", () => {
       const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
-        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
-        baseVfsEntries: [],
-        baseIr: ir,
+        startKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        startVfsEntries: [],
+        startIr: ir,
         identity: null,
         ir,
         deletedNodeIds: [],
@@ -678,20 +809,20 @@ describe("persistWorkingCopy", () => {
 
   describe("base-VFS serialization cache (efficiency)", () => {
     const ir = makeScaffoldedIR();
-    const base = { id: "cache_kbd", displayName: "Cache Test", languages: ["en"] } as import("@keyboard-studio/contracts").BaseKeyboard;
+    const base = { id: "cache_kbd", displayName: "Cache Test", languages: ["en"] } as import("@keyboard-studio/contracts").StartKeyboard;
 
     it("reuses the SAME baseVfsEntries array across calls while baseVfs is unchanged (no re-serialization)", () => {
       const vfs = createVirtualFS([
         { path: "source/a.kmn", content: "c a\n", isBinary: false },
         { path: "source/icon.ico", content: new Uint8Array([1, 2, 3, 4]), isBinary: true },
       ]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir });
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir });
 
-      const first = snapshotWorkingCopyData().baseVfsEntries;
-      // A store mutation that does NOT touch baseVfs (e.g. a validator write)
+      const first = snapshotWorkingCopyData().startVfsEntries;
+      // A store mutation that does NOT touch startVfs (e.g. a validator write)
       // still triggers an autosave; the base-VFS serialization must be reused.
       useWorkingCopyStore.setState({ desktopLocked: true });
-      const second = snapshotWorkingCopyData().baseVfsEntries;
+      const second = snapshotWorkingCopyData().startVfsEntries;
 
       // Referential identity proves the cached array was returned, not rebuilt.
       expect(second).toBe(first);
@@ -700,17 +831,17 @@ describe("persistWorkingCopy", () => {
 
     it("recomputes baseVfsEntries when a new instantiation replaces the baseVfs reference", () => {
       const vfs1 = createVirtualFS([{ path: "source/a.kmn", content: "c a\n", isBinary: false }]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: vfs1, ir });
-      const first = snapshotWorkingCopyData().baseVfsEntries;
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs: vfs1, ir });
+      const first = snapshotWorkingCopyData().startVfsEntries;
 
-      // A fresh instantiation installs a NEW baseVfs object — cache must miss.
+      // A fresh instantiation installs a NEW startVfs object — cache must miss.
       const vfs2 = createVirtualFS([
         { path: "source/a.kmn", content: "c a\n", isBinary: false },
         { path: "source/b.kmn", content: "c b\n", isBinary: false },
       ]);
       useWorkingCopyStore.getState().reset();
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: vfs2, ir });
-      const second = snapshotWorkingCopyData().baseVfsEntries;
+      useWorkingCopyStore.getState().instantiateFromStart(base, { vfs: vfs2, ir });
+      const second = snapshotWorkingCopyData().startVfsEntries;
 
       expect(second).not.toBe(first);
       expect(first).toHaveLength(1);
@@ -727,91 +858,91 @@ describe("persistWorkingCopy", () => {
     ];
 
     function instantiate() {
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
         { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       const wc = useWorkingCopyStore.getState();
-      wc.setBaseReadmeMdText("# Base\n");
-      wc.setBaseHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
-      wc.setBaseWelcomeConvention("folder");
-      wc.setBaseWelcomeImages(IMAGES);
+      wc.setStartReadmeMdText("# Base\n");
+      wc.setStartHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
+      wc.setStartWelcomeConvention("folder");
+      wc.setStartWelcomeImages(IMAGES);
     }
 
     it("round-trips all four slices through sessionStorage snapshot/rehydrate, images byte-exact", () => {
       instantiate();
       snapshotWorkingCopyToSession();
       useWorkingCopyStore.getState().reset();
-      expect(useWorkingCopyStore.getState().baseWelcomeImages).toBeNull();
+      expect(useWorkingCopyStore.getState().startWelcomeImages).toBeNull();
 
       expect(rehydrateWorkingCopyFromSession()).toBe(true);
       const s = useWorkingCopyStore.getState();
-      expect(s.baseReadmeMdText).toBe("# Base\n");
-      expect(s.baseHistoryMdText).toBe("## 1.0 (2020-01-01)\n* Initial release.\n");
-      expect(s.baseWelcomeConvention).toBe("folder");
-      expect(s.baseWelcomeImages?.map((i) => i.path)).toEqual(IMAGES.map((i) => i.path));
+      expect(s.startReadmeMdText).toBe("# Base\n");
+      expect(s.startHistoryMdText).toBe("## 1.0 (2020-01-01)\n* Initial release.\n");
+      expect(s.startWelcomeConvention).toBe("folder");
+      expect(s.startWelcomeImages?.map((i) => i.path)).toEqual(IMAGES.map((i) => i.path));
       for (let i = 0; i < IMAGES.length; i++) {
-        expect(s.baseWelcomeImages![i]!.bytes).toBeInstanceOf(Uint8Array);
-        expect([...s.baseWelcomeImages![i]!.bytes]).toEqual([...IMAGES[i]!.bytes]);
+        expect(s.startWelcomeImages![i]!.bytes).toBeInstanceOf(Uint8Array);
+        expect([...s.startWelcomeImages![i]!.bytes]).toEqual([...IMAGES[i]!.bytes]);
       }
     });
 
     it("serializes the images as Base64 records, never as sparse JSON objects", () => {
       instantiate();
       const snapshot = snapshotWorkingCopyData();
-      expect(snapshot.baseWelcomeImages).toHaveLength(2);
-      expect(snapshot.baseWelcomeImages![0]).toEqual({
+      expect(snapshot.startWelcomeImages).toHaveLength(2);
+      expect(snapshot.startWelcomeImages![0]).toEqual({
         path: "welcome/desktop_default.png",
         content: btoa(String.fromCharCode(...IMAGES[0]!.bytes)),
         isBinary: true,
       });
       // The whole snapshot survives JSON, which is what the storage layers do to it.
       const revived = JSON.parse(JSON.stringify(snapshot)) as WorkingCopySnapshot;
-      expect(prepareWorkingCopySnapshot(revived).baseWelcomeImages?.[1]?.bytes).toEqual(new Uint8Array([1, 2, 3]));
+      expect(prepareWorkingCopySnapshot(revived).startWelcomeImages?.[1]?.bytes).toEqual(new Uint8Array([1, 2, 3]));
     });
 
     it("omits the images from the snapshot when they exceed the size budget, restoring as null (draft survives)", () => {
       instantiate();
       useWorkingCopyStore
         .getState()
-        .setBaseWelcomeImages([{ path: "welcome/huge.png", bytes: new Uint8Array(BASE_WELCOME_IMAGES_BUDGET_BYTES + 1) }]);
+        .setStartWelcomeImages([{ path: "welcome/huge.png", bytes: new Uint8Array(BASE_WELCOME_IMAGES_BUDGET_BYTES + 1) }]);
       const snapshot = snapshotWorkingCopyData();
-      expect(snapshot.baseWelcomeImages).toBeUndefined();
+      expect(snapshot.startWelcomeImages).toBeUndefined();
       // ...and the omission is RECORDED, not silent: the restored store knows
       // the base ships images it no longer holds.
-      expect(snapshot.baseWelcomeImagesDropped).toBe(true);
+      expect(snapshot.startWelcomeImagesDropped).toBe(true);
       const prepared = prepareWorkingCopySnapshot(snapshot);
-      expect(prepared.baseWelcomeImages).toBeNull();
-      expect(prepared.baseWelcomeImagesDropped).toBe(true);
+      expect(prepared.startWelcomeImages).toBeNull();
+      expect(prepared.startWelcomeImagesDropped).toBe(true);
       // The plain slices are unaffected by the image budget.
-      expect(prepared.baseWelcomeConvention).toBe("folder");
+      expect(prepared.startWelcomeConvention).toBe("folder");
     });
 
     it("does not flag a drop when the images fit, and a fresh carry clears an earlier drop", () => {
       instantiate();
-      expect(snapshotWorkingCopyData().baseWelcomeImagesDropped).toBe(false);
-      useWorkingCopyStore.setState({ baseWelcomeImages: null, baseWelcomeImagesDropped: true });
-      expect(snapshotWorkingCopyData().baseWelcomeImagesDropped).toBe(true);
-      useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
-      expect(useWorkingCopyStore.getState().baseWelcomeImagesDropped).toBe(false);
+      expect(snapshotWorkingCopyData().startWelcomeImagesDropped).toBe(false);
+      useWorkingCopyStore.setState({ startWelcomeImages: null, startWelcomeImagesDropped: true });
+      expect(snapshotWorkingCopyData().startWelcomeImagesDropped).toBe(true);
+      useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
+      expect(useWorkingCopyStore.getState().startWelcomeImagesDropped).toBe(false);
     });
 
     it("tolerates a pre-080 snapshot with none of the four fields, restoring the store defaults", () => {
       instantiate();
       const snapshot = snapshotWorkingCopyData();
       const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
-      delete legacy.baseReadmeMdText;
-      delete legacy.baseHistoryMdText;
-      delete legacy.baseWelcomeConvention;
-      delete legacy.baseWelcomeImages;
-      delete legacy.baseWelcomeImagesDropped;
+      delete legacy.startReadmeMdText;
+      delete legacy.startHistoryMdText;
+      delete legacy.startWelcomeConvention;
+      delete legacy.startWelcomeImages;
+      delete legacy.startWelcomeImagesDropped;
 
       const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
-      expect(prepared.baseReadmeMdText).toBeNull();
-      expect(prepared.baseHistoryMdText).toBeNull();
-      expect(prepared.baseWelcomeConvention).toBeNull();
-      expect(prepared.baseWelcomeImages).toBeNull();
-      expect(prepared.baseWelcomeImagesDropped).toBe(false);
+      expect(prepared.startReadmeMdText).toBeNull();
+      expect(prepared.startHistoryMdText).toBeNull();
+      expect(prepared.startWelcomeConvention).toBeNull();
+      expect(prepared.startWelcomeImages).toBeNull();
+      expect(prepared.startWelcomeImagesDropped).toBe(false);
     });
   });
 
@@ -825,8 +956,8 @@ describe("persistWorkingCopy", () => {
     };
 
     function instantiate() {
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
         { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
     }
@@ -859,8 +990,8 @@ describe("persistWorkingCopy", () => {
       instantiate();
       useWorkingCopyStore.getState().setHistoryEntryState(ENTRY);
       useWorkingCopyStore.getState().setChartPreference("keep-base-images");
-      useWorkingCopyStore.getState().instantiateFromBase(
-        { id: "other", displayName: "Other", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "other", displayName: "Other", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
         { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();

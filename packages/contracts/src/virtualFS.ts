@@ -18,7 +18,7 @@ export interface VirtualFSEntry {
  *
  * **Working-copy spine (spec §8 + §12 v1.3.0).** The `VirtualFS` is one half
  * of the session's persistent working copy (the other half is the `KeyboardIR`).
- * It is instantiated at keyboard selection — via Track 1 `instantiateFromBase`
+ * It is instantiated at keyboard selection — via Track 1 `instantiateFromStart`
  * (new keyboard, identity reset) or Track 2 `instantiateFromExisting` (adapt
  * existing keyboard, identity preserved) — and is mutated by every subsequent
  * authoring step. It is NOT written to disk during authoring; serialization

@@ -26,10 +26,10 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "./stores/phaseBDraftStore.ts";
+import { resetInventoryDraft } from "./survey/useInventoryDraft.ts";
 import { markVisited } from "./lib/firstVisit.ts";
 import { makeScaffoldedIR } from "./test/draftSeeds.ts";
 
@@ -41,11 +41,15 @@ import { makeScaffoldedIR } from "./test/draftSeeds.ts";
 
 vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
 vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+// CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
+// the barrel), so the shallow stubs must be registered for the files too.
+vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./editors/panels/StartResolution.tsx", () => import("./test/studioShellMocks/StartResolution.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
-vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
-  import("./test/studioShellMocks/TouchSeedSourcePanel.tsx"),
+vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
+  import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
 vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
@@ -129,8 +133,8 @@ const REMOTE_PROJECT_ID = "cloud_resume_project";
  * stores are reset to a pristine boot state before the test proceeds.
  */
 function buildRemoteEnvelope(): DurableDraft {
-  const base = { id: REMOTE_PROJECT_ID, displayName: "Cloud Resume Test", languages: ["en"] } as unknown as BaseKeyboard;
-  useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
+  const base = { id: REMOTE_PROJECT_ID, displayName: "Cloud Resume Test", languages: ["en"] } as unknown as StartKeyboard;
+  useWorkingCopyStore.getState().instantiateFromStart(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
 
   saveDraft(REMOTE_PROJECT_ID);
   const stored = localStorage.getItem(draftKey(REMOTE_PROJECT_ID));
@@ -141,7 +145,7 @@ function buildRemoteEnvelope(): DurableDraft {
   localStorage.clear();
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
+  resetInventoryDraft();
 
   return envelope;
 }
@@ -208,7 +212,7 @@ describe("StudioShell — cloud-resume banner Resume/Discard (km-triage PR #1642
     // not a mock assertion.
     const wc = useWorkingCopyStore.getState();
     expect(wc.instantiationMode).toBe("new-from-base");
-    expect(wc.baseKeyboard?.id).toBe(REMOTE_PROJECT_ID);
+    expect(wc.startKeyboard?.id).toBe(REMOTE_PROJECT_ID);
     // handleResumeDraft first pins the active pointer to the draftId it
     // FETCHED with (the reserved pending slot, since nothing was locally
     // active), but its own `promotePendingAutosave()` call (F6 fix) then

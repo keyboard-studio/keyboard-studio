@@ -53,9 +53,9 @@ import { SurveyView } from "../StudioShell.tsx";
  */
 async function arriveInTheWizard(): Promise<void> {
   const base =
-    useWorkingCopyStore.getState().baseKeyboard ?? useSurveySessionStore.getState().localBase;
+    useWorkingCopyStore.getState().startKeyboard ?? useSurveySessionStore.getState().localStart;
   await act(async () => {
-    render(<SurveyView baseKeyboard={base} />);
+    render(<SurveyView startKeyboard={base} />);
   });
 }
 
@@ -67,7 +67,7 @@ async function leaveAndReturn(): Promise<void> {
 
 /** A walked session sitting on Phase F, with a real working copy. */
 function seedWalkedSession(): void {
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs: createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c\n", isBinary: false }]),
     ir: makeTestIR([]),
   });

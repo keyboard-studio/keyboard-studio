@@ -9,14 +9,14 @@
 // runtime code. flowStepOptions.tsx's phaseFOptions reads these with live
 // working-copy context.
 
-import type { BaseDocumentationProfile } from "@keyboard-studio/contracts";
+import type { StartDocumentationProfile } from "@keyboard-studio/contracts";
 import { extractUsableBaseDescription } from "@keyboard-studio/engine";
 
 export interface AdaptiveDescriptionContext {
   instantiationMode: "new-from-base" | "adapt-existing" | null;
-  baseDocProfile: BaseDocumentationProfile | null;
-  baseWelcomeHtmText: string | null;
-  baseHelpPhpText: string | null;
+  startDocProfile: StartDocumentationProfile | null;
+  startWelcomeHtmText: string | null;
+  startHelpPhpText: string | null;
 }
 
 /**
@@ -28,8 +28,8 @@ export interface AdaptiveDescriptionContext {
  */
 export function prefill(ctx: AdaptiveDescriptionContext): string | undefined {
   if (ctx.instantiationMode !== "adapt-existing") return undefined;
-  if (ctx.baseDocProfile === null || !ctx.baseDocProfile.hasUsableDescription) return undefined;
-  return extractUsableBaseDescription(ctx.baseWelcomeHtmText, ctx.baseHelpPhpText) ?? undefined;
+  if (ctx.startDocProfile === null || !ctx.startDocProfile.hasUsableDescription) return undefined;
+  return extractUsableBaseDescription(ctx.startWelcomeHtmText, ctx.startHelpPhpText) ?? undefined;
 }
 
 /**

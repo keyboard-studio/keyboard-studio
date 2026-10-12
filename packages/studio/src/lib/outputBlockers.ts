@@ -85,21 +85,21 @@ const COVERAGE: OutputBlocker = {
   }),
 };
 
-// spec 064 D5 before D6: an unreadable base notice is the more specific
+// spec 064 D5 before D6: an unreadable starting-keyboard notice is the more specific
 // problem, and its banner is the one carrying the control that fixes it.
 const LICENSE: OutputBlocker = {
   kind: "license",
   downloadAria: msg({
-    id: "output.download.aria.licenseUnreadable",
+    id: "output.download.aria.startingLicenseUnreadable",
     // Names the field the author is being sent to ("Original copyright
     // holder" in the banner) rather than paraphrasing it, so the
     // announcement and the control it points at use the same words.
     message:
-      "Download unavailable — the base keyboard's original copyright holder could not be read. Confirm it in the banner below.",
+      "Download unavailable — the starting keyboard's original copyright holder could not be read. Confirm it in the banner below.",
   }),
   reason: msg({
-    id: "output.submit.outputBlockedReason.licenseUnreadable",
-    message: "the base keyboard's original copyright holder could not be read — confirm it in the banner above",
+    id: "output.submit.outputBlockedReason.startingLicenseUnreadable",
+    message: "the starting keyboard's original copyright holder could not be read — confirm it in the banner above",
   }),
 };
 

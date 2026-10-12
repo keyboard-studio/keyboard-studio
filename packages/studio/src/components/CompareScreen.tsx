@@ -26,7 +26,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { useCompareArtifact } from "../hooks/useCompareArtifact.ts";
-import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
+import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { OskModeToggle } from "./OskModeToggle.tsx";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { MetadataCard } from "./MetadataCard.tsx";
@@ -98,13 +98,13 @@ export function CompareScreen() {
           </Trans>
         </p>
 
-        <BaseKeyboardPicker
-          value={artifact.baseKeyboard}
-          onChange={artifact.setBaseKeyboard}
+        <StartKeyboardPicker
+          value={artifact.startKeyboard}
+          onChange={artifact.setStartKeyboard}
           label={t({ id: "compare.picker.fieldLabel", message: "Keyboard to compare" })}
         />
 
-        {artifact.baseKeyboard !== null && <MetadataCard kb={artifact.baseKeyboard} />}
+        {artifact.startKeyboard !== null && <MetadataCard kb={artifact.startKeyboard} />}
 
         {artifact.stage.kind === "ready" && <KmnSourceView vfs={artifact.stage.vfs} />}
       </section>
@@ -139,18 +139,18 @@ export function CompareScreen() {
           }}
         >
           <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
-            {artifact.baseKeyboard?.displayName ??
+            {artifact.startKeyboard?.displayName ??
               t({ id: "compare.empty.title", message: "No keyboard loaded" })}
           </h2>
           <OskModeToggle value={artifact.oskMode} onChange={artifact.setOskMode} />
         </div>
         <OSKFrame
-          baseKeyboard={artifact.baseKeyboard}
+          startKeyboard={artifact.startKeyboard}
           oskMode={artifact.oskMode}
           stage={artifact.stage}
           retry={artifact.retry}
         />
-        {artifact.baseKeyboard !== null && (
+        {artifact.startKeyboard !== null && (
           <DiagnosticsPanel diagnostics={artifact.diagnostics} />
         )}
       </section>

@@ -37,7 +37,7 @@ import type { CasePairProposal } from "./casePairCompanion.ts";
  * Keycap-convention display label for a proposal's physical key (vkey or
  * touch host key) — lowercase unshifted glyph, boxed by the caller as a
  * `<KeyCap>` where the surface is JSX, or embedded plain in an aria-label.
- * A proposal's `vkey`/`hostKey` is always a real key here (never an
+ * A proposal's `vkey`/`baseKey` is always a real key here (never an
  * already-resolved glyph), so the shared `keyLabelOrRaw` applies directly
  * with no `K_`-prefix guard. See lib/keyLabel.ts for the convention this
  * disambiguates (a bare uppercase "Q" reads as the capital character, not
@@ -107,7 +107,7 @@ export function CasePairProposalBanner({
         proposal.mechanism === "touch"
           ? t({
               id: "editor.assignLoop.companion.confirmAriaLabel.touch",
-              message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of the ${keyNameFor(proposal.hostKey)} key`,
+              message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of the ${keyNameFor(proposal.baseKey)} key`,
             })
           : proposal.mechanism === "ralt-layer"
             ? t({
@@ -163,7 +163,7 @@ function confirmTargetLabel(proposal: CasePairProposal): string {
     case "physical":
       return `the ${keyNameFor(proposal.vkey)} key`;
     case "touch":
-      return `the ${keyNameFor(proposal.hostKey)} key`;
+      return `the ${keyNameFor(proposal.baseKey)} key`;
     case "combo": {
       const comboKey =
         proposal.combo.kind === "deadkey"

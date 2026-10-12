@@ -9,7 +9,7 @@ export const definition = {
     "Here are the characters we found in your text. Do you want to continue with this list?",
   help_text:
     "We extracted every distinct character from what you pasted. Characters " +
-    "your base keyboard already produces are shown greyed out -- you do not " +
+    "your starting keyboard already produces are shown greyed out -- you do not " +
     "need to add those. Tick any you want to keep, untick any that crept in " +
     "by mistake, and add any that are missing. When you are happy, click " +
     "Continue. You can also answer the step-by-step questions afterward to " +

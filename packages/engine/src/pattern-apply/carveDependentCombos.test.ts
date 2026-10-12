@@ -20,7 +20,7 @@
 //               cross-paired producer and dropped `æ` from the carved set, so
 //               `applyCarveKeycapRemovalsToVfs` never blanked the keycap.
 //   * reseed  — `deriveDesktopModifications` (studio) diffs
-//               `buildProducedSet(baseIr)` against the carve-projected IR; `æ`
+//               `buildProducedSet(startIr)` against the carve-projected IR; `æ`
 //               was in both, so it never entered `mods.removals`.
 //
 // Nominating the slot fixes both at once, which is why this test asserts

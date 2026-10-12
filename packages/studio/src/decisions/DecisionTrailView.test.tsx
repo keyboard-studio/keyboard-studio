@@ -133,9 +133,9 @@ describe("FR-013 — the headline distinguishes provenance for the same value", 
     expect(accepted!.textContent).toContain("langtags");
   });
 
-  it("names the base for a base-derived value", () => {
+  it("names the starting keyboard for a base-derived value", () => {
     renderTrail(recordOf([answerEntry("d1", { provenance: { agency: "base-derived", source: "base" } })]));
-    expect(screen.getByTestId("decision-entry-headline").textContent).toMatch(/base/i);
+    expect(screen.getByTestId("decision-entry-headline").textContent).toMatch(/starting keyboard/i);
   });
 
   it("shows an editor step's counts", () => {
@@ -267,7 +267,7 @@ function baseEntry(entryId: string, startingKeyCount: number): DecisionEntry {
     stepId: "choose_base",
     payload: {
       kind: "base-contribution",
-      baseId: "basic_kbdfr",
+      startId: "basic_kbdfr",
       baseDisplayName: "French",
       startingKeyCount,
       derivedAxes: [],
@@ -408,7 +408,7 @@ describe("FR-023 — a stage's one-line account, available without expanding", (
   //
   // Fix: `trail.stage.rollUp.composed` now carries a single, genuinely GENERIC
   // meaning — "{stage} ({detail})" — mirroring
-  // `trail.entry.headline.baseContribution.withDetail`'s established pattern.
+  // `trail.entry.headline.startContribution.withDetail`'s established pattern.
   // Each branch pre-formats its own already-pluralized clause (via its own
   // distinct id) before handing it to `detail`, so one id can honestly serve
   // all three without merging distinct meanings.
@@ -600,7 +600,7 @@ describe("stage-toggle accessible name (trail a11y review P1)", () => {
       screen.getByRole("button", { name: "Hide decisions for Keyboard identity" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Hide decisions for Choosing a base keyboard" }),
+      screen.getByRole("button", { name: "Hide decisions for Choosing a starting keyboard" }),
     ).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Hide decisions for Edited the character gallery" }),
@@ -700,5 +700,68 @@ describe("FR-068 — not-asked steps read as 'passed — {reason}'", () => {
     expect(screen.queryByTestId("decision-stage-not-asked-only")).toBeNull();
     const group = groupFor("convenience");
     expect(within(group).getByTestId("decision-stage-not-asked").textContent).toMatch(/passed —/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Decisions-page enrichment: the supersede links actually GO somewhere.
+// Before, "Replaced by a later decision" was a dead-end marker and a hidden
+// superseded entry could only be reached by the global toggle. Revealing
+// un-hides the target, expands its stage if needed, and scrolls to it.
+// ---------------------------------------------------------------------------
+
+describe("enrichment — supersede reveal", () => {
+  const scrolledTo: (string | null)[] = [];
+
+  function stubScrollIntoView() {
+    scrolledTo.length = 0;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolledTo.push(this.getAttribute("data-entry-id"));
+    };
+  }
+
+  const rowFor = (entryId: string): HTMLElement =>
+    screen
+      .getAllByTestId("decision-entry")
+      .find((r) => r.getAttribute("data-entry-id") === entryId)!;
+
+  it("a live entry's show-replaced link un-hides the superseded entry and scrolls to it", () => {
+    stubScrollIntoView();
+    renderTrail(recordOf([answerEntry("d1"), answerEntry("d2", { supersedes: "d1" })]));
+    expect(rowFor("d1").hasAttribute("hidden")).toBe(true);
+
+    fireEvent.click(within(rowFor("d2")).getByTestId("decision-entry-show-replaced"));
+
+    expect(rowFor("d1").hasAttribute("hidden")).toBe(false);
+    expect(scrolledTo).toContain("d1");
+  });
+
+  it("a superseded entry's show-replacement link scrolls to its replacement", () => {
+    stubScrollIntoView();
+    renderTrail(recordOf([answerEntry("d1"), answerEntry("d2", { supersedes: "d1" })]));
+    fireEvent.click(screen.getByTestId("decision-superseded-toggle"));
+
+    fireEvent.click(within(rowFor("d1")).getByTestId("decision-entry-show-replacement"));
+
+    expect(scrolledTo).toContain("d2");
+  });
+
+  it("revealing an entry in a collapsed stage expands that stage", () => {
+    stubScrollIntoView();
+    renderTrail(
+      recordOf([
+        answerEntry("d1"),
+        answerEntry("d2", { stepId: "characters", supersedes: "d1" }),
+      ]),
+    );
+    // Collapse the identity stage: d1 leaves the DOM entirely (a collapsed
+    // stage renders no entries), so only a reveal can bring it back.
+    fireEvent.click(within(groupFor("identity")).getByTestId("decision-stage-toggle"));
+    expect(within(groupFor("identity")).queryAllByTestId("decision-entry")).toHaveLength(0);
+
+    fireEvent.click(within(rowFor("d2")).getByTestId("decision-entry-show-replaced"));
+
+    expect(within(groupFor("identity")).queryAllByTestId("decision-entry")).toHaveLength(1);
+    expect(scrolledTo).toContain("d1");
   });
 });

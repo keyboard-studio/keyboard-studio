@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard } from "@keyboard-studio/contracts";
 import type { FlowQuestion, QuestionModule } from "../survey/types.ts";
 import type { DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { orderDecisions, filterGated } from "./orderDecisions.ts";
@@ -84,7 +84,7 @@ const SPARSE_IR = makeFixtureIR({ keyboardId: "mystery_keyboard", name: "Mystery
 
 // Catalog metadata for the full fixture (the real import pipeline pairs the
 // codec IR with the catalog entry; the demo models that via decisionFlow).
-const FULL_CATALOG = makeBaseKeyboard({
+const FULL_CATALOG = makeStartKeyboard({
   id: "sil_cameroon_qwerty",
   script: "Latn",
   path: "release/sil/sil_cameroon_qwerty",
