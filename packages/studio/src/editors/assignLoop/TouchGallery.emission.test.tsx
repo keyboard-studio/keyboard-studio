@@ -199,7 +199,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     seedStore({ withInventory: ["ä"] });
 
     buildTouchLayoutJsonSpy.mockImplementation(
-      (_baseIr: unknown, assignments: Array<{ target: string; mechanisms: Array<{ patternId: string }> }>) => ({
+      (_startIr: unknown, assignments: Array<{ target: string; mechanisms: Array<{ patternId: string }> }>) => ({
         json: JSON.stringify({ _mock: true, assignments }),
         warnings: [],
       }),
@@ -225,9 +225,9 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     await act(async () => { fireEvent.click(longpressOption!); });
 
     // Set a host key.
-    const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect).not.toBeNull();
-    await changeSelectMenu(hostKeySelect!, "K_A");
+    const baseKeySelect = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect).not.toBeNull();
+    await changeSelectMenu(baseKeySelect!, "K_A");
 
     // Click Apply — button text is "Apply method".
     const applyBtns = screen.queryAllByRole("button");
@@ -253,7 +253,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
 
     let callCount = 0;
     buildTouchLayoutJsonSpy.mockImplementation(
-      (_baseIr: unknown, assignments: unknown[]) => ({
+      (_startIr: unknown, assignments: unknown[]) => ({
         json: JSON.stringify({ defectA: true, n: ++callCount, assignments }),
         warnings: [],
       }),
@@ -279,9 +279,9 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     expect(longpressOption).not.toBeNull();
     await act(async () => { fireEvent.click(longpressOption!); });
 
-    const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect).not.toBeNull();
-    await changeSelectMenu(hostKeySelect!, "K_A");
+    const baseKeySelect = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect).not.toBeNull();
+    await changeSelectMenu(baseKeySelect!, "K_A");
 
     const applyBtns2 = screen.queryAllByRole("button");
     const applyBtn = applyBtns2.find((b) => b.textContent?.trim() === "Apply method") ?? null;
@@ -308,7 +308,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
 describe("TouchGallery — R11 emission: mods non-empty emits even with zero configured chars", () => {
   it("injects the derived touch layout when desktop mods are non-empty, before any Phase E edit is made", async () => {
     // A Phase C simple_swap assignment for "x" derives a non-empty
-    // mods.placements entry (deriveDesktopModifications extracts hostKey
+    // mods.placements entry (deriveDesktopModifications extracts baseKey
     // K_X) — seedWithDesktopAssignment also pins seedSource "import-adapt".
     const swapAssignment: MechanismAssignment = {
       scope: "individual",
@@ -353,7 +353,7 @@ describe("TouchGallery — R11 emission: mods non-empty emits even with zero con
 // Seed-source-aware detection (T015) + R11 injection from a SHIPPED layout
 // (T017) — every other fixture in this file ships NO base .keyman-touch-layout
 // (see seedStore's comment), so none of them can prove detection reads the
-// shipped layout rather than an unconditional scaffoldTouchLayout(baseIr)
+// shipped layout rather than an unconditional scaffoldTouchLayout(startIr)
 // walk. This suite ships a real touch-layout file in the base VFS.
 // ---------------------------------------------------------------------------
 
@@ -380,7 +380,7 @@ function seedWithShippedTouchLayout(opts: {
     { path: "source/basic_kbdus.keyman-touch-layout", content: shippedLayoutJson, isBinary: false },
   ]);
   const ir = makeTestIR([]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],
@@ -414,7 +414,7 @@ describe("TouchGallery — seed-source-aware detection reads the shipped layout 
     };
     // "€" is planted only in the shipped phone layout — it is not part of a
     // fresh QWERTY scaffold and is not a decomposable-accented letter, so a
-    // pre-T015 unconditional scaffoldTouchLayout(baseIr) walk would report it
+    // pre-T015 unconditional scaffoldTouchLayout(startIr) walk would report it
     // as undetected (suggestion "none") instead of "already".
     seedWithShippedTouchLayout({ shippedChar: "€", desktopAssignment: swapAssignment });
 
@@ -483,7 +483,7 @@ describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on 
       { path: "source/basic_kbdus.keyman-touch-layout", content: "{ not json", isBinary: false },
     ]);
     const ir = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
       answers: [],

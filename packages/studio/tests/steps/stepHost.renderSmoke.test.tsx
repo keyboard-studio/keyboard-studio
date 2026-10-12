@@ -67,8 +67,8 @@ vi.mock("../../src/survey/invisibles/InvisiblesStep.tsx", () => ({
   InvisiblesStep: () => <div data-testid="stub-InvisiblesStep" />,
 }));
 
-vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: () => <div data-testid="stub-BaseResolution" />,
+vi.mock("../../src/editors/panels/StartResolution.tsx", () => ({
+  StartResolution: () => <div data-testid="stub-BaseResolution" />,
 }));
 
 // Mocks CarveGalleryV2 (v2, the live carve gallery) — v1's CarveGallery.tsx
@@ -126,8 +126,8 @@ vi.mock("../../src/lib/navigate.ts", () => ({
 }));
 
 vi.mock("../../src/lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: vi.fn(),
-  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
+  instantiateFromStartIfConfirmed: vi.fn(),
+  // StartResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
   // (F1 fix) before advancing; this suite's working copy starts uninstantiated
   // in every render, so mocking it to always allow preserves prior behavior.
   confirmRebaseTo: vi.fn(() => true),
@@ -155,13 +155,13 @@ import type { EditorStep } from "../../src/steps/types.ts";
 
 /** A no-op ReducerDeps suitable for smoke tests (chrome selection only). */
 const noopReducerDeps: ReducerDeps = {
-  instantiateFromBase: vi.fn(),
+  instantiateFromStart: vi.fn(),
   instantiateFromExisting: vi.fn(),
-  instantiateFromBaseIfConfirmed: () => false,
+  instantiateFromStartIfConfirmed: () => false,
 };
 
-// Fake base keyboard — satisfies the localBase guard in TrackStepFactoryComponent.
-const fakeBase: import("@keyboard-studio/contracts").BaseKeyboard = {
+// Fake base keyboard — satisfies the localStart guard in TrackStepFactoryComponent.
+const fakeStart: import("@keyboard-studio/contracts").StartKeyboard = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",
@@ -175,8 +175,8 @@ async function mountAt(stepId: ActiveStepId) {
   act(() => {
     useSurveySessionStore.setState({
       activeStepId: stepId,
-      // Seed localBase so TrackStepAdapter's null guard passes.
-      localBase: fakeBase,
+      // Seed localStart so TrackStepAdapter's null guard passes.
+      localStart: fakeStart,
     });
   });
   await act(async () => {
@@ -252,7 +252,7 @@ const editorSteps = manifest.filter(
 //
 // The mapping is derived from the adapter/factory → child component chain:
 //   identityStep      → IdentityLiteAdapter              → IdentityLite stub
-//   chooseBaseStep    → BaseResolutionAdapter             → BaseResolution stub
+//   chooseStartStep    → StartResolutionAdapter             → StartResolution stub
 //   trackStep         → TrackStepFactoryComponent         → FlowStepHost stub (flow_id=track)
 //   projectNameStep   → ProjectNameStepFactoryComponent   → FlowStepHost stub (flow_id=project_name)
 //   charactersStep    → CharactersStep                    → stub-CharactersStep

@@ -28,7 +28,7 @@ import { DocumentationFindingsSummary } from "./components/DocumentationFindings
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   DecisionEntry,
   Pattern,
   VirtualFS,
@@ -42,7 +42,7 @@ import {
 } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import {
-  instantiateFromBaseIfConfirmed,
+  instantiateFromStartIfConfirmed,
   instantiateFromExistingWithIdentitySeed,
 } from "./lib/confirmRebase.ts";
 import {
@@ -137,7 +137,7 @@ import {
   serverMetaToDraftMeta,
 } from "./lib/serverDraftStore.ts";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
-import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import { useStartPreviewStatusStore, type StartPreviewStatus } from "./stores/startPreviewStatusStore.ts";
 import {
   useRulesDemoArtifactStore,
   makeIdleRulesDemoArtifact,
@@ -290,7 +290,7 @@ function useRoute(): RouteId {
 //   re-captures the artifact into pendingArtifactRef; the commit effect's
 //   doCommit (below) would then run the choose_base side effect
 //   (applyStepCompletion("choose_base", ...)) a second time for the SAME base.
-//   An `instantiatedForBaseIdRef` (id-aware, not a plain boolean) prevents
+//   An `instantiatedForStartIdRef` (id-aware, not a plain boolean) prevents
 //   that repeat from running more than once per base id, while still allowing
 //   a confirm for a genuinely DIFFERENT base id later in the same session to
 //   re-run the side effect — see docs/design-notes/switch-base-popup-behavior-log.md
@@ -332,21 +332,21 @@ interface SurveyViewProps {
    * Null before the first base selection completes its compile cycle.
    * Passed to the OSK preview in the right pane.
    */
-  baseKeyboard: BaseKeyboard | null;
+  startKeyboard: StartKeyboard | null;
 }
 
-export function SurveyView({ baseKeyboard }: SurveyViewProps) {
+export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   // Traversal state — sourced from surveySessionStore (spec 026 Stage 3).
   // StepHost reads activeStepId directly; SurveyView only needs scaffoldSpec
-  // (for the compile pipeline) and localBase (for the OSK right pane).
+  // (for the compile pipeline) and localStart (for the OSK right pane).
   // ---------------------------------------------------------------------------
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   // Spec 089 FR-005: scaffoldSpec + surveyContext are derived from the
   // decision store, not held as session fields.
   const decisions = useDecisionStore((s) => s.decisions);
   const scaffoldSpec = deriveScaffoldSpec(decisions);
-  const localBase = useSurveySessionStore((s) => s.localBase);
+  const localStart = useSurveySessionStore((s) => s.localStart);
   const surveyContext = deriveSurveyContext(decisions);
 
   // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList /
@@ -359,7 +359,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
-  const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+  const setLocalStart = useSurveySessionStore((s) => s.setLocalStart);
   // Injected into reducerDeps (spec 035 R12, re-homed by spec 088 T026) so
   // reducer.ts can clear the touch_seed_source fork choice on a genuine base
   // re-instantiation without steps/ importing stores/ directly. The choice
@@ -558,17 +558,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     onChange: (pct) => setPaneSplitPct("survey", pct),
   });
 
-  // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
-  // localBase lives in the session store; we update it when the working-copy's baseKeyboard
+  // Sync localStart when the prop changes (e.g. after a start-over that sets a new base).
+  // localStart lives in the session store; we update it when the working-copy's startKeyboard
   // prop changes so the wizard stays in sync with the pipeline-settled base.
   useEffect(() => {
-    setLocalBase(baseKeyboard);
-  }, [baseKeyboard, setLocalBase]);
+    setLocalStart(startKeyboard);
+  }, [startKeyboard, setLocalStart]);
 
   // Working-copy store actions needed by SurveyView (not delegated to StepHost).
   const resetSurvey = useWorkingCopyStore((s) => s.reset);
-  const instantiateFromBase = useWorkingCopyStore((s) => s.instantiateFromBase);
-  const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
+  const instantiateFromStart = useWorkingCopyStore((s) => s.instantiateFromStart);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const setValidatorFindings = useWorkingCopyStore(
     (s) => s.setValidatorFindings,
   );
@@ -585,12 +585,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // is now id-aware: it records WHICH base id doCommit has already committed,
   // so a second settle for that SAME id (P1) is still a no-op, but a confirm
   // for a DIFFERENT id (F1, after the synchronous rebase-confirm gate in
-  // BaseResolutionAdapter.onConfirm has already run) proceeds and re-runs
+  // StartResolutionAdapter.onConfirm has already run) proceeds and re-runs
   // doCommit's body. Null before any commit; reset to null on start-over; set
   // to the restored base's id on résumé (see handleResumeDraft) so a résumé
   // over an already-instantiated copy does not re-trigger doCommit either.
   // ---------------------------------------------------------------------------
-  const instantiatedForBaseIdRef = useRef<string | null>(null);
+  const instantiatedForStartIdRef = useRef<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Preview-before-commit (choose_base step): the compile pipeline may settle
@@ -599,10 +599,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // artifact here; the actual instantiation (`doCommit`) is deferred until
   // the `base-keyboard` decision is recorded, via the effect that follows
   // `onInstantiate`.
-  // Cleared alongside `instantiatedForBaseIdRef` on start-over.
+  // Cleared alongside `instantiatedForStartIdRef` on start-over.
   // ---------------------------------------------------------------------------
   const pendingArtifactRef = useRef<{
-    base: BaseKeyboard;
+    base: StartKeyboard;
     vfs: VirtualFS;
     ir: KeyboardIR | null;
     removalCapabilities: Map<string, RemovalCapability>;
@@ -636,7 +636,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // Guarded on `autosaveTeardownRef.current === null` so StrictMode's
   // double-invoked mount effect (no cleanup is returned; the ref itself is the
-  // idempotency guard, mirroring `instantiatedForBaseIdRef`'s pattern in this
+  // idempotency guard, mirroring `instantiatedForStartIdRef`'s pattern in this
   // same file) never installs two overlapping subscriptions. `doCommit`'s
   // existing teardown-then-reinstall (`autosaveTeardownRef.current?.()`) is
   // what PROMOTES this pending subscription to the real one the moment the
@@ -671,7 +671,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // Both follow from re-running a COMMIT to restore a copy that is already
   // committed. So the restore path now does what the résumé path has always
-  // done (see `handleResumeDraft`): pre-seed `instantiatedForBaseIdRef` with
+  // done (see `handleResumeDraft`): pre-seed `instantiatedForStartIdRef` with
   // the restored base id, which makes doCommit's own guard early-return, and
   // install the real-project autosave here directly. A genuine base switch
   // later is unaffected — a DIFFERENT id still passes the guard (F1).
@@ -695,8 +695,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       useWorkingCopyStore.getState(),
     );
     if (restoredProjectKey !== null) {
-      instantiatedForBaseIdRef.current =
-        useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+      instantiatedForStartIdRef.current =
+        useWorkingCopyStore.getState().startKeyboard?.id ?? null;
       autosaveTeardownRef.current = installDraftAutosave(restoredProjectKey);
       return;
     }
@@ -713,7 +713,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
    * it can be called from both `doCommit` (a genuine base confirm) and
    * `handleResumeDraft` (a résumé via the OTHER draft engine's banner — see
    * that handler's own call site below for why it needs this too: résumé
-   * pre-seeds `instantiatedForBaseIdRef` specifically so `doCommit` never
+   * pre-seeds `instantiatedForStartIdRef` specifically so `doCommit` never
    * fires for the restored base, so nothing else would ever promote the
    * pending subscription away from `PENDING_PROJECT_KEY` for that
    * path without this). No-ops when no real project key is derivable yet
@@ -827,25 +827,25 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // no static imports from stores/ or lib/ (boundary compliance).
   //
   // The wrapper lambdas delegate to stable module-level imports
-  // (instantiateFromBaseIfConfirmed) that are not React state,
+  // (instantiateFromStartIfConfirmed) that are not React state,
   // so they are intentionally omitted from the dependency array.
   // ---------------------------------------------------------------------------
   const reducerDeps: ReducerDeps = useMemo(
     () => ({
-      instantiateFromBase,
+      instantiateFromStart,
       // Track 2 (adapt): the seeded wrapper, not the raw store action — the
       // adapt instantiation must carry the author's identity-language seed
       // (composed tag + English name) or the emitted descriptor falls back
       // to the base's raw tag as the <Language> display text. Module-level
-      // import, like instantiateFromBaseIfConfirmed below.
+      // import, like instantiateFromStartIfConfirmed below.
       instantiateFromExisting: (base, opts) =>
         instantiateFromExistingWithIdentitySeed(base, opts),
       clearTouchSeedChoice,
       // Spec 035 R11: the emission-matrix wrapper that used to live here
       // (as the buildTouchLayoutJson dep) moved verbatim into
       // lib/assignLoopCompletion.ts at spec 090 T042 with the R2 build.
-      instantiateFromBaseIfConfirmed: (base, opts, options) =>
-        instantiateFromBaseIfConfirmed(base, opts, options),
+      instantiateFromStartIfConfirmed: (base, opts, options) =>
+        instantiateFromStartIfConfirmed(base, opts, options),
       // spec-014 mutate seam (T014): read/write the working-copy carve IR for
       // the reducer's path-scoped mutate() apply. Read via getState() (stable,
       // no re-render churn); write via the OVERLAY-PRESERVING setWorkingIR action.
@@ -889,11 +889,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       getDecisions: () => getDecisionSnapshot(),
       getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
       getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
-      getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id,
+      getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
     }),
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [
-      instantiateFromBase,
+      instantiateFromStart,
       clearTouchSeedChoice,
       recordDecision,
     ],
@@ -915,20 +915,20 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // than directly
   // from the compile-pipeline callback. Dispatches
   // applyStepCompletion("choose_base", ...), which routes Track 2 →
-  // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
+  // instantiateFromExisting, Track 1/default → instantiateFromStartIfConfirmed.
   //
-  // instantiatedForBaseIdRef gates this to fire at most once PER BASE ID: a
+  // instantiatedForStartIdRef gates this to fire at most once PER BASE ID: a
   // second compile settle for the SAME base (setScaffoldSpec's re-compile, or
   // a second confirm click on an unchanged base) is a no-op (P1 fix); a
   // confirm for a DIFFERENT base id proceeds and re-runs the body below (F1
   // fix). The rebase-confirm question itself is NOT asked here — by the time
-  // this runs, BaseResolutionAdapter.onConfirm has already resolved it
+  // this runs, StartResolutionAdapter.onConfirm has already resolved it
   // synchronously (confirmRebaseTo); the `skipRebaseConfirm: true` passed to
   // applyStepCompletion below tells the reducer not to ask a second time.
   // ---------------------------------------------------------------------------
   const doCommit = useCallback(
     (
-      base: BaseKeyboard,
+      base: StartKeyboard,
       {
         vfs,
         ir,
@@ -939,8 +939,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         removalCapabilities: Map<string, RemovalCapability>;
       },
     ) => {
-      if (instantiatedForBaseIdRef.current === base.id) return;
-      instantiatedForBaseIdRef.current = base.id;
+      if (instantiatedForStartIdRef.current === base.id) return;
+      instantiatedForStartIdRef.current = base.id;
 
       // Spec 093 T017 (owner ruling (b)): a genuine base switch is RETAIN
       // + RECALCULATE — the decision set is carried over the new base,
@@ -948,15 +948,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // below replaces it: after applyStepCompletion the store names
       // only the new base, and the recalculation at the end of this
       // callback keys on there having BEEN a different base.
-      const outgoingBaseId =
-        useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
-      const isBaseSwitch = outgoingBaseId !== null && outgoingBaseId !== base.id;
+      const outgoingStartId =
+        useWorkingCopyStore.getState().startKeyboard?.id ?? null;
+      const isStartSwitch = outgoingStartId !== null && outgoingStartId !== base.id;
 
       // REBASE draft migration (F1's last seam): a genuine base switch mid-
       // session leaves the working copy STILL INSTANTIATED under another
       // project key at the moment of this new commit (start-over resets the
       // stores before the next pick, a résumé pre-seeds
-      // `instantiatedForBaseIdRef` so doCommit never fires, and a fresh boot
+      // `instantiatedForStartIdRef` so doCommit never fires, and a fresh boot
       // has nothing instantiated — so this really is rebase-specific). On
       // that path the record under the OLD key belongs to the project the
       // author switched AWAY from (its decisions are retained in the set
@@ -1030,14 +1030,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // entry in the log. doCommit fires once per base id, so each
       // instantiation — first commit or genuine switch — records exactly
       // one baseline, describing its own base.
-      recordDecision.recordBaseContributionNow();
+      recordDecision.recordStartContributionNow();
 
       // T023: install the durable-draft autosave now that the working copy is
       // instantiated. `deriveProjectKeyFromWorkingCopy` reads the JUST-WRITTEN
       // store state via getState() (identity.keyboardId falls back to
-      // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
+      // startKeyboard.id — see draftPersistence.ts) so this resolves immediately
       // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
-      // F1 fix: `instantiatedForBaseIdRef` above only guards against a REPEAT
+      // F1 fix: `instantiatedForStartIdRef` above only guards against a REPEAT
       // commit for the SAME base id — a genuine base switch (a different id)
       // reaches this point with a real prior autosave subscription still
       // live, so `autosaveTeardownRef.current` is NO LONGER always null here;
@@ -1060,7 +1060,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // Spec 092 (FR-001, contracts/live-extraction.md): the live
       // extraction pass runs HERE — synchronously, once, immediately after
       // the setup decision's apply above has instantiated the working copy
-      // (the store's baseIr/baseKeyboard slots are now populated) and the
+      // (the store's startIr/startKeyboard slots are now populated) and the
       // track is known. It seeds unanswered decisions from the starting
       // point and offers extracted values beside existing answers. A
       // throwing extract aborts the pass with nothing written (the pass
@@ -1086,7 +1086,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // before the recalculation visits the full set. A first commit
       // (no outgoing base) skips it — there is nothing retained to
       // recalculate, and the incremental path carries the commit.
-      if (isBaseSwitch) {
+      if (isStartSwitch) {
         try {
           recalculateForStartingPointChangeFromStores();
         } catch (err) {
@@ -1127,11 +1127,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Subscribed so the effect below re-checks whenever the author confirms
   // a base: since spec 090 T013 the arming signal is the recorded
-  // `base-keyboard` decision (the session `baseConfirmed` flag is retired
+  // `base-keyboard` decision (the session `startConfirmed` flag is retired
   // as the trigger; the renderer records the decision synchronously in
   // the confirm click, after the F1 rebase gate — the same moment the
   // flag used to flip).
-  const baseKeyboardDecision = useDecisionStore((s) => s.decisions["base-keyboard"]);
+  const startKeyboardDecision = useDecisionStore((s) => s.decisions["base-keyboard"]);
 
   // Spec 092 FR-004 (the setup decision): instantiation waits for BOTH of
   // the setup decision's inputs — the `base-keyboard` decision above and
@@ -1174,25 +1174,25 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Working-copy transform — projects carve + assignments + identity into the OSK.
   // surveyPatternMap is empty until Phase C completes; null patternMap → skip assignments.
   //
-  // previewedBaseId: localBase.id — bug F4. `localBase` drives the compile
+  // previewedStartId: localStart.id — bug F4. `localStart` drives the compile
   // pipeline below (preview-before-commit) and can differ from the store's
-  // already-instantiated `baseKeyboard` when the author previews a candidate
+  // already-instantiated `startKeyboard` when the author previews a candidate
   // replacement base without having confirmed the switch yet. Passing it lets
   // useWorkingCopyTransform suppress the carve/identity overlay for a
   // candidate base it doesn't belong to, instead of projecting the committed
   // base's carve deletions onto the candidate's freshly-fetched VFS.
   const workingCopyTransform = useWorkingCopyTransform({
     patternMap: surveyPatternMap.size > 0 ? surveyPatternMap : null,
-    previewedBaseId: localBase?.id ?? null,
+    previewedStartId: localStart?.id ?? null,
   });
 
-  // Use localBase (immediately updated on selection) to drive the pipeline.
+  // Use localStart (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
   // spec 078: only this main-walk preview runs the context-tolerance analysis,
   // and only behind the flag; every other useKeyboardArtifact caller is unchanged.
   const contextToleranceEnabled = isContextToleranceEnabled();
   const { stage: artifactStage, retry } = useKeyboardArtifact(
-    localBase,
+    localStart,
     scaffoldSpec,
     workingCopyTransform,
     onInstantiate,
@@ -1217,7 +1217,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // Runs `doCommit` once ALL are true (the third is spec 092 FR-004's
   // setup-decision gate):
   //   - the author has confirmed a base — the recorded `base-keyboard`
-  //     decision (spec 090 T013; recorded by BaseKeyboardRenderer's confirm
+  //     decision (spec 090 T013; recorded by StartKeyboardRenderer's confirm
   //     through the gallery host, which has already synchronously resolved
   //     any rebase-confirm question via confirmRebaseTo BEFORE recording —
   //     F1 fix)
@@ -1225,14 +1225,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
   // "At most once" is now per-base-id, not per-mount: `doCommit` itself
-  // early-returns via `instantiatedForBaseIdRef` when the settled artifact's
+  // early-returns via `instantiatedForStartIdRef` when the settled artifact's
   // base id has already been committed (P1's repeat-settle case), but
   // proceeds — and re-instantiates — for a genuinely different confirmed base
   // id (F1). This effect's own job is unchanged: hand `doCommit` whatever
   // settled artifact matches the currently confirmed base, whenever that
   // becomes true, in either order.
   //
-  // Confirm is gated on `previewStatus === "ready"` in BaseResolution's commit
+  // Confirm is gated on `previewStatus === "ready"` in StartResolution's commit
   // button, so in practice the decision is only recorded once the pipeline
   // has already settled — the ref is already populated by the time this
   // effect sees the decision. The `artifactStage`-triggered re-run (waiting
@@ -1243,7 +1243,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // an UNCONFIRMED base from instantiating — previewing never records.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    const decisionValue = baseKeyboardDecision?.value as { id?: unknown } | undefined;
+    const decisionValue = startKeyboardDecision?.value as { id?: unknown } | undefined;
     const decisionId = typeof decisionValue?.id === "string" ? decisionValue.id : undefined;
     if (decisionId === undefined) return;
     // Spec 092 FR-004: the setup decision requires the authoring track as
@@ -1253,7 +1253,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // still null — the G7 hazard) to the track's completion.
     if (authoringTrackDecision === undefined) return;
     const art = pendingArtifactRef.current;
-    const lb = useSurveySessionStore.getState().localBase;
+    const lb = useSurveySessionStore.getState().localStart;
     if (art && lb && art.base.id === lb.id && lb.id === decisionId) {
       doCommit(art.base, {
         vfs: art.vfs,
@@ -1268,16 +1268,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // above) — omitted from deps to mirror the existing escape-hatch
     // convention in this file (e.g. the reducerDeps memo above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseKeyboardDecision, authoringTrackDecision, artifactStage]);
+  }, [startKeyboardDecision, authoringTrackDecision, artifactStage]);
 
   // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {
-    if (!baseVfs) return null;
-    const path = findKmnPath(baseVfs);
+    if (!startVfs) return null;
+    const path = findKmnPath(startVfs);
     if (!path) return null;
-    const raw = baseVfs.get(path)?.content ?? null;
+    const raw = startVfs.get(path)?.content ?? null;
     return typeof raw === "string" ? raw : null;
-  }, [baseVfs]);
+  }, [startVfs]);
   const { findings: validatorFindingsOnly } = useValidator(kmnSource);
   // spec 080 FR-019 (research R7): the Layer C documentation checks ride the
   // SAME findings array — a memoised synchronous hook, no second timer (D3) —
@@ -1341,7 +1341,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // ---------------------------------------------------------------------------
   // Start over — reset session store first (clears all traversal slots + history),
   // then reset the working-copy store and local component state.
-  // Ordering: session.reset() before instantiatedForBaseIdRef.current = null so
+  // Ordering: session.reset() before instantiatedForStartIdRef.current = null so
   // the guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
   function handleStartOver() {
@@ -1358,7 +1358,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
     sessionReset();
     resetSurvey();
-    instantiatedForBaseIdRef.current = null;
+    instantiatedForStartIdRef.current = null;
     // Spec 053: start-over is an explicit "throw it away", and that includes the
     // decision trail — carrying the abandoned keyboard's decisions into the next
     // one would attribute them to a keyboard that never made them. The source
@@ -1398,7 +1398,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     autosaveTeardownRef.current = installDraftAutosave(PENDING_PROJECT_KEY);
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
-    // sessionReset() also clears baseConfirmed back to false via INITIAL_STATE.
+    // sessionReset() also clears startConfirmed back to false via INITIAL_STATE.
     // Discard any saved draft — start-over is an explicit "throw it away". The
     // local record + index row were already removed by discardActiveDraft()
     // above (captured `startOverProjectKey` before it cleared the pointer);
@@ -1437,13 +1437,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // Resume: fetch the full envelope from the server and apply it, then mark
   // the working copy as already instantiated FOR THE RESTORED BASE so the
-  // compile pipeline's onInstantiate does not re-run instantiateFromBase over
+  // compile pipeline's onInstantiate does not re-run instantiateFromStart over
   // the restored copy (which would pop the rebase-confirm dialog / risk
   // discarding restored survey answers — F1/F2). Reads the restored base id
   // back from the just-patched workingCopyStore rather than hardcoding
   // `true`, so a LATER genuine switch to a DIFFERENT base (in the same
   // session, after resume) still re-instantiates normally (F1 fix — see
-  // instantiatedForBaseIdRef).
+  // instantiatedForStartIdRef).
   // Discard: drop the server-side draft and continue fresh.
   // ---------------------------------------------------------------------------
   function handleResumeDraft() {
@@ -1459,11 +1459,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     const draftId = resolveActiveProjectKey() ?? PENDING_PROJECT_KEY;
     void loadServerDraftContent(accessToken, draftId).then((draft) => {
       if (draft !== null && applyRemoteDraft(draft)) {
-        instantiatedForBaseIdRef.current =
-          useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+        instantiatedForStartIdRef.current =
+          useWorkingCopyStore.getState().startKeyboard?.id ?? null;
         setActiveProjectKey(draftId);
         // F6 fix: promote the pending durable-draft autosave to this
-        // now-restored real project — instantiatedForBaseIdRef above is set
+        // now-restored real project — instantiatedForStartIdRef above is set
         // specifically so doCommit never fires for this base, so nothing else
         // would ever perform this promotion for a résumé via this banner
         // otherwise.
@@ -1504,15 +1504,15 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   };
 
   // ---------------------------------------------------------------------------
-  // basePreviewStatusStore value — a coarse projection of `artifactStage` (see
-  // stores/basePreviewStatusStore.ts for the BasePreviewStatus union).
-  // Published to the store below so BaseResolutionAdapter (reached through
+  // startPreviewStatusStore value — a coarse projection of `artifactStage` (see
+  // stores/startPreviewStatusStore.ts for the StartPreviewStatus union).
+  // Published to the store below so StartResolutionAdapter (reached through
   // StepHost while activeStepId === "choose_base") can read the live preview
   // status without importing useKeyboardArtifact directly, and without a
   // prop-drilling chain through StepHost's generic EditorStepProps.
   // ---------------------------------------------------------------------------
-  const previewStatus: BasePreviewStatus = useMemo(() => {
-    if (localBase === null) return "idle";
+  const previewStatus: StartPreviewStatus = useMemo(() => {
+    if (localStart === null) return "idle";
     switch (artifactStage.kind) {
       case "fetching":
       case "vfs-loading":
@@ -1525,19 +1525,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       default:
         return "idle";
     }
-  }, [localBase, artifactStage.kind]);
+  }, [localStart, artifactStage.kind]);
 
-  const setBasePreviewStatus = useBasePreviewStatusStore((s) => s.setStatus);
+  const setStartPreviewStatus = useStartPreviewStatusStore((s) => s.setStatus);
   useEffect(() => {
-    setBasePreviewStatus(previewStatus);
-  }, [previewStatus, setBasePreviewStatus]);
+    setStartPreviewStatus(previewStatus);
+  }, [previewStatus, setStartPreviewStatus]);
 
   // ---------------------------------------------------------------------------
   // rulesDemoArtifactStore projection — the Track A demo pane's view of the
   // compile artifact (spec 082, FR-001/FR-004).
   //
   // A pure projection of `artifactStage`, same store-bridge pattern as
-  // basePreviewStatusStore above: the rules step cannot prop-drill through
+  // startPreviewStatusStore above: the rules step cannot prop-drill through
   // StepHost's generic EditorStepProps, and it MUST NOT mount its own
   // useKeyboardArtifact (that would be a second compile cycle) or its own
   // debounce timer (SC-006 forbids it). The DemoPane is a pure READER:
@@ -1582,7 +1582,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // The host handles done/unsupported terminals and the unknown-id error panel.
   // SurveyView retains: resizable panes, OSK right pane, validator, oskMode,
-  // pattern-map effect, instantiatedForBaseIdRef, onInstantiate (FR-009).
+  // pattern-map effect, instantiatedForStartIdRef, onInstantiate (FR-009).
   // ---------------------------------------------------------------------------
 
   const stepHost = (
@@ -1627,7 +1627,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // (OSK or character map) opens in a sheet, and only when there is
   // something to show — no base keyboard yet and no character map means no
   // trigger at all.
-  const hasPreviewContent = showCharacterMap || localBase !== null;
+  const hasPreviewContent = showCharacterMap || localStart !== null;
   // The sheet never reopens by itself: when its content goes away (a step
   // without a preview), forget that it was open.
   if (previewSheetOpen && (!isNarrow || !hasPreviewContent)) {
@@ -1635,7 +1635,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }
   const previewPane = (
     <SurveyPreviewPane
-      localBase={localBase}
+      localStart={localStart}
       oskMode={oskMode}
       onOskModeChange={setOskMode}
       stage={artifactStage}
@@ -1817,7 +1817,7 @@ export function StudioShell() {
   const isNarrow = useIsNarrow();
   const { t } = useLingui();
 
-  const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const selectedStartKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
 
   // P0 fix (silent autosave loss after an in-place keyboard switch): keys
   // `SurveyView` below so a genuine project switch via the shared
@@ -1999,7 +1999,7 @@ export function StudioShell() {
     () => ({
       ...impactDeps,
       project: projectWorkingCopyForOutput,
-      hasWorkingCopy: () => useWorkingCopyStore.getState().baseVfs !== null,
+      hasWorkingCopy: () => useWorkingCopyStore.getState().startVfs !== null,
       getRecord: () => useDecisionLogStore.getState().record,
     }),
     [impactDeps],
@@ -2057,7 +2057,7 @@ export function StudioShell() {
       content = (
         <SurveyView
           key={projectSwitchGeneration}
-          baseKeyboard={selectedBaseKeyboard}
+          startKeyboard={selectedStartKeyboard}
         />
       );
       break;

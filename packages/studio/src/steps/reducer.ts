@@ -9,7 +9,7 @@
 //   R2 — RETIRED (spec 090 T042): the touch-layout build re-homed to
 //          lib/assignLoopCompletion.ts (applyTouchCompletionEffects).
 //   R3 — copy/adapt instantiation: routes Track 2 → instantiateFromExisting,
-//          Track 1/default → instantiateFromBaseIfConfirmed at the "choose_base"
+//          Track 1/default → instantiateFromStartIfConfirmed at the "choose_base"
 //          step (today: onInstantiate in StudioShell.tsx:240-253).
 //   R5 — unknown step id is a no-op (no side effect for most question-steps).
 //
@@ -24,7 +24,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { IRPath, KeyboardIR, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
+import type { StartKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
 import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
@@ -41,9 +41,9 @@ import type { SavedAnswer } from "./answerTypes.ts";
 export {
   MECHANISMS_STEP_ID,
   TOUCH_STEP_ID,
-  CHOOSE_BASE_STEP_ID,
+  CHOOSE_START_STEP_ID,
 } from "./stepIds.ts";
-import { CHOOSE_BASE_STEP_ID } from "./stepIds.ts";
+import { CHOOSE_START_STEP_ID } from "./stepIds.ts";
 
 // ---------------------------------------------------------------------------
 // Instantiation result — passed to the reducer when choose_base completes.
@@ -51,7 +51,7 @@ import { CHOOSE_BASE_STEP_ID } from "./stepIds.ts";
 // ---------------------------------------------------------------------------
 
 export interface InstantiateResult {
-  base: BaseKeyboard;
+  base: StartKeyboard;
   vfs: VirtualFS | null;
   ir: KeyboardIR | null;
   removalCapabilities?: Map<string, RemovalCapability>;
@@ -59,11 +59,11 @@ export interface InstantiateResult {
   track: string | null;
   /**
    * F1 fix: set by StudioShell's doCommit when the caller has ALREADY
-   * resolved the rebase-confirm question synchronously (BaseResolutionAdapter
+   * resolved the rebase-confirm question synchronously (StartResolutionAdapter
    * .onConfirm's confirmRebaseTo call — see editors/adapters/panelAdapters.tsx)
    * before this step-completion result was even produced. When true, the
    * Track 1/default branch below passes `{ skipConfirm: true }` through to
-   * `instantiateFromBaseIfConfirmed` so the SAME confirm dialog does not fire
+   * `instantiateFromStartIfConfirmed` so the SAME confirm dialog does not fire
    * a second time for one user click. Absent/false preserves the original
    * behavior (the dep runs its own confirmRebaseIfEdited check) for callers
    * with no upstream synchronous confirm of their own.
@@ -83,13 +83,13 @@ export interface ReducerDeps {
   // (lockDesktop retired at spec 090 T041, setTouchLayoutJson + clearStale
   // at T042: R1/R2 re-homed to lib/assignLoopCompletion.ts — D-090-38.)
   /** Track 1 instantiation — copy from base, new identity. */
-  instantiateFromBase: (
-    base: BaseKeyboard,
+  instantiateFromStart: (
+    base: StartKeyboard,
     opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
   ) => void;
   /** Track 2 instantiation — adapt existing keyboard, identity preserved. */
   instantiateFromExisting: (
-    base: BaseKeyboard,
+    base: StartKeyboard,
     opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
   ) => void;
   /**
@@ -104,7 +104,7 @@ export interface ReducerDeps {
   clearTouchSeedChoice?: () => void;
 
   // --- Lib helpers ---
-  // (buildTouchLayoutJson + resolveBaseTouchJson retired at spec 090
+  // (buildTouchLayoutJson + resolveStartTouchJson retired at spec 090
   // T042: the R2 build now composes them directly in
   // lib/assignLoopCompletion.ts — D-090-38.)
 
@@ -116,8 +116,8 @@ export interface ReducerDeps {
    * (F1 fix — see InstantiateResult.skipRebaseConfirm above) skip the dep's
    * own internal confirm, so the same dialog cannot fire twice for one click.
    */
-  instantiateFromBaseIfConfirmed: (
-    base: BaseKeyboard,
+  instantiateFromStartIfConfirmed: (
+    base: StartKeyboard,
     opts: { vfs: VirtualFS | null; ir: KeyboardIR | null; removalCapabilities?: Map<string, RemovalCapability> },
     options?: { skipConfirm?: boolean },
   ) => boolean;
@@ -201,7 +201,7 @@ export interface ReducerDeps {
   /** Read one saved answer (for its pre-fill proposal, research D-05). */
   getSavedAnswer?: (stepId: string, questionId: string) => SavedAnswer | undefined;
   /** The starting-point keyboard's id, named as an extracted record's `source`. */
-  getBaseKeyboardId?: () => string | undefined;
+  getStartKeyboardId?: () => string | undefined;
 
   // --- derived rebuild (spec 093 T009) ---
   /**
@@ -254,7 +254,7 @@ export function applyStepCompletion(
     // stale-clear effects re-homed to lib/assignLoopCompletion.ts,
     // fired by the adapter and by journey-runner's replay — D-090-38.)
 
-    case CHOOSE_BASE_STEP_ID: {
+    case CHOOSE_START_STEP_ID: {
       const payload = result as Partial<InstantiateResult> | undefined;
       // Guard: result must carry a base keyboard. Without it, instantiation
       // cannot proceed. Checking `payload` itself first (not just
@@ -300,7 +300,7 @@ export function applyStepCompletion(
         deps.clearTouchSeedChoice?.();
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
-        // instantiateFromBaseIfConfirmed no-ops (returns false) on a redundant
+        // instantiateFromStartIfConfirmed no-ops (returns false) on a redundant
         // re-fire or a user-cancelled rebase confirm — only clear the fork
         // choice when instantiation actually proceeded.
         //
@@ -310,8 +310,8 @@ export function applyStepCompletion(
         // to the pre-fix signature for every caller that never sets the flag
         // (all existing reducer.test.ts fixtures), so this change is additive.
         const instantiated = payload.skipRebaseConfirm
-          ? deps.instantiateFromBaseIfConfirmed(base, opts, { skipConfirm: true })
-          : deps.instantiateFromBaseIfConfirmed(base, opts);
+          ? deps.instantiateFromStartIfConfirmed(base, opts, { skipConfirm: true })
+          : deps.instantiateFromStartIfConfirmed(base, opts);
         if (instantiated) {
           deps.clearTouchSeedChoice?.();
         }
@@ -392,7 +392,7 @@ export function recordAnswersAsDecisions(
     const mod = questionRegistry[answer.questionId];
     if (mod === undefined || mod.provides === undefined || mod.provides.length === 0) continue;
     const saved = deps.getSavedAnswer?.(stepId, answer.questionId);
-    const mapped = answerProvenance(answer.value, saved?.proposal, deps.getBaseKeyboardId?.());
+    const mapped = answerProvenance(answer.value, saved?.proposal, deps.getStartKeyboardId?.());
     let inputs: Decision["inputs"];
     if (mod.requires !== undefined && mod.requires.length > 0) {
       const snapshot: NonNullable<Decision["inputs"]> = {};

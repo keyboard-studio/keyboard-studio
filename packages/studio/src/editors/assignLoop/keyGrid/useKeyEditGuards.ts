@@ -126,7 +126,7 @@
 //     That prediction agrees with the gate only so long as BOTH are given the
 //     same `ruleIndex`. That is a caller obligation this hook cannot enforce,
 //     and it was got wrong once already: the gate ran `touchCoverage` with a
-//     `baseIr`-scoped index while this hook was handed the mutable-`ir` one, so
+//     `startIr`-scoped index while this hook was handed the mutable-`ir` one, so
 //     a character produced by a freshly synthesized touch rule was credited
 //     here and refused there — the gate-time surprise US5 AS3 exists to remove,
 //     reintroduced through the back door. TouchGallery now threads one

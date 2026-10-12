@@ -39,7 +39,7 @@
 import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   chooseTrackCopy,
   driveAttributionStep,
@@ -49,7 +49,7 @@ import {
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Test Autonym",
   english: "Test",
   targetScript: "other",
@@ -88,7 +88,7 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
 

@@ -13,7 +13,7 @@ import { groupMarkClasses } from "./mark-classes.js";
 import { proposeAttachments } from "./attachment-proposals.js";
 import {
   computeMarkTreatmentPrefills,
-  detectBaseMarkMechanism,
+  detectStartMarkMechanism,
   PRODUCTIVITY_SPREAD_THRESHOLD,
 } from "./treatment-prefill.js";
 import { makeMarkTreatmentAnswer, type MarkTreatmentAnswer } from "./treatment.js";
@@ -144,7 +144,7 @@ describe("detectBaseMarkMechanism (sibling to detectMarkInputOrderFromImport)", 
         ],
       },
     ]);
-    expect(detectBaseMarkMechanism(ir)).toBe("combining-keystroke");
+    expect(detectStartMarkMechanism(ir)).toBe("combining-keystroke");
   });
 
   it("detects precomposed when only ready-made accented output exists", () => {
@@ -163,7 +163,7 @@ describe("detectBaseMarkMechanism (sibling to detectMarkInputOrderFromImport)", 
         ],
       },
     ]);
-    expect(detectBaseMarkMechanism(ir)).toBe("precomposed");
+    expect(detectStartMarkMechanism(ir)).toBe("precomposed");
   });
 
   it("returns null when no mark-bearing output exists", () => {
@@ -182,7 +182,7 @@ describe("detectBaseMarkMechanism (sibling to detectMarkInputOrderFromImport)", 
         ],
       },
     ]);
-    expect(detectBaseMarkMechanism(ir)).toBeNull();
+    expect(detectStartMarkMechanism(ir)).toBeNull();
   });
 });
 

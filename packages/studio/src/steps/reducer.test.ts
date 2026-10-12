@@ -10,7 +10,7 @@
 //        the reducer's no-op at that step, and the behaviour coverage
 //        (Case-A/Case-B + error→null graceful degradation) lives in
 //        lib/assignLoopCompletion.test.ts.
-//   R3 — copy/adapt routes Track 2 → instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
+//   R3 — copy/adapt routes Track 2 → instantiateFromExisting, Track 1/default → instantiateFromStartIfConfirmed.
 //   R4 — editor purity: no editor component calls the reducer (enforced by review; here we
 //         test that the reducer is standalone and not called from the adapter files).
 //   R5 — unknown step id is a no-op.
@@ -27,11 +27,11 @@ import {
   applyStepCompletion,
   MECHANISMS_STEP_ID,
   TOUCH_STEP_ID,
-  CHOOSE_BASE_STEP_ID,
+  CHOOSE_START_STEP_ID,
   type ReducerDeps,
   type InstantiateResult,
 } from "./reducer.ts";
-import type { BaseKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import type { StartKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { repropagate as mockRepropagate } from "./repropagate.ts";
@@ -45,14 +45,14 @@ vi.mock("./repropagate.ts", () => ({ repropagate: vi.fn() }));
 // fields the reducer actually reads need to be realistic.)
 // ---------------------------------------------------------------------------
 
-function makeBaseKeyboard(id = "base_kbd"): BaseKeyboard {
+function makeStartKeyboard(id = "base_kbd"): StartKeyboard {
   return {
     id,
     displayName: "Test Base",
     languages: [],
     path: `release/t/${id}`,
     bcp47: "en",
-  } as BaseKeyboard;
+  } as StartKeyboard;
 }
 
 function makeKeyboardIR(): KeyboardIR {
@@ -70,9 +70,9 @@ function makeVirtualFS(): VirtualFS {
 
 function makeDepsMock(): ReducerDeps {
   return {
-    instantiateFromBase: vi.fn(),
+    instantiateFromStart: vi.fn(),
     instantiateFromExisting: vi.fn(),
-    instantiateFromBaseIfConfirmed: vi.fn().mockReturnValue(true),
+    instantiateFromStartIfConfirmed: vi.fn().mockReturnValue(true),
   };
 }
 
@@ -90,8 +90,8 @@ describe("R1 — retired at spec 090 T041: the reducer is a no-op at the mechani
   it("calls no dep at the mechanisms step (lock + repropagate live in lib/assignLoopCompletion.ts)", () => {
     applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBase).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStartIfConfirmed).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStart).not.toHaveBeenCalled();
     expect(mockRepropagate).not.toHaveBeenCalled();
   });
 });
@@ -109,10 +109,10 @@ describe("R1 — retired at spec 090 T041: the reducer is a no-op at the mechani
 describe("R2 — retired at spec 090 T042: the reducer is a no-op at the touch step", () => {
   it("calls no dep at the touch step", () => {
     const deps = makeDepsMock();
-    applyStepCompletion(TOUCH_STEP_ID, { assignments: [], baseIr: null, baseVfs: null }, deps);
+    applyStepCompletion(TOUCH_STEP_ID, { assignments: [], startIr: null, startVfs: null }, deps);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBase).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStartIfConfirmed).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStart).not.toHaveBeenCalled();
   });
 });
 
@@ -120,7 +120,7 @@ describe("R2 — retired at spec 090 T042: the reducer is a no-op at the touch s
 
 describe("R3 — copy/adapt instantiation routing at choose_base", () => {
   let deps: ReducerDeps;
-  const base = makeBaseKeyboard();
+  const base = makeStartKeyboard();
   const ir = makeKeyboardIR();
   const vfs = makeVirtualFS();
 
@@ -128,29 +128,29 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
 
   it("Track 2 ('adapt'): calls instantiateFromExisting, not instantiateFromBaseIfConfirmed", () => {
     const result: InstantiateResult = { base, ir, vfs, track: "adapt" };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
     expect(deps.instantiateFromExisting).toHaveBeenCalledTimes(1);
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStartIfConfirmed).not.toHaveBeenCalled();
   });
 
   it("Track 2: passes base, vfs, ir to instantiateFromExisting", () => {
     const result: InstantiateResult = { base, ir, vfs, track: "adapt" };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
     expect(deps.instantiateFromExisting).toHaveBeenCalledWith(base, { vfs, ir });
   });
 
   it("Track 2: passes removalCapabilities when provided", () => {
     const removalCapabilities = new Map() as InstantiateResult["removalCapabilities"];
     const result: InstantiateResult = { base, ir, vfs, track: "adapt", removalCapabilities };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
     expect(deps.instantiateFromExisting).toHaveBeenCalledWith(base, { vfs, ir, removalCapabilities });
   });
 
   it("Track 2: skips instantiation when ir is null (mock-engine path only)", () => {
     const result: InstantiateResult = { base, ir: null, vfs: null, track: "adapt" };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStartIfConfirmed).not.toHaveBeenCalled();
   });
 
   // spec 034 T005 / TI-2: the null-ir adapt path is a mock-only artifact and is
@@ -161,7 +161,7 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const result: InstantiateResult = { base, ir: null, vfs: null, track: "adapt" };
-      applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
+      applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
       expect(spy).toHaveBeenCalledTimes(1);
       expect(String(spy.mock.calls[0]?.[0])).toContain("cannot instantiate");
       expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
@@ -172,50 +172,50 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
 
   it("Track 1 (null track): calls instantiateFromBaseIfConfirmed, not instantiateFromExisting", () => {
     const result: InstantiateResult = { base, ir, vfs, track: null };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
-    expect(deps.instantiateFromBaseIfConfirmed).toHaveBeenCalledTimes(1);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
+    expect(deps.instantiateFromStartIfConfirmed).toHaveBeenCalledTimes(1);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
   });
 
   it("Track 1: passes base, vfs, ir to instantiateFromBaseIfConfirmed", () => {
     const result: InstantiateResult = { base, ir, vfs, track: null };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
-    expect(deps.instantiateFromBaseIfConfirmed).toHaveBeenCalledWith(base, { vfs, ir });
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
+    expect(deps.instantiateFromStartIfConfirmed).toHaveBeenCalledWith(base, { vfs, ir });
   });
 
   // F1 fix: doCommit (StudioShell.tsx) sets skipRebaseConfirm: true once
-  // BaseResolutionAdapter.onConfirm has already resolved the rebase question
+  // StartResolutionAdapter.onConfirm has already resolved the rebase question
   // synchronously (confirmRebaseTo) — the reducer must forward that as a
-  // third `{ skipConfirm: true }` argument so instantiateFromBaseIfConfirmed
+  // third `{ skipConfirm: true }` argument so instantiateFromStartIfConfirmed
   // does not ask a second time. Absent/false (the default, asserted just
   // above) keeps the original 2-arg call shape for every other caller.
   it("Track 1 with skipRebaseConfirm: true forwards { skipConfirm: true } as a third arg", () => {
     const result: InstantiateResult = { base, ir, vfs, track: null, skipRebaseConfirm: true };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
-    expect(deps.instantiateFromBaseIfConfirmed).toHaveBeenCalledWith(base, { vfs, ir }, { skipConfirm: true });
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
+    expect(deps.instantiateFromStartIfConfirmed).toHaveBeenCalledWith(base, { vfs, ir }, { skipConfirm: true });
   });
 
   it("Track 1 (non-adapt string): routes to Track 1 path (default)", () => {
     const result: InstantiateResult = { base, ir, vfs, track: "copy" };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
-    expect(deps.instantiateFromBaseIfConfirmed).toHaveBeenCalledTimes(1);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps);
+    expect(deps.instantiateFromStartIfConfirmed).toHaveBeenCalledTimes(1);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
   });
 
   it("skips instantiation and warns when base is absent from result", () => {
     // result with no base field
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, {}, deps);
+    applyStepCompletion(CHOOSE_START_STEP_ID, {}, deps);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStartIfConfirmed).not.toHaveBeenCalled();
   });
 
   // A `result` of literally `undefined` (not `{}`) previously threw
   // (`payload.base` read off an `undefined`-cast value) — surfaced by the
   // journey-corpus harness (spec 032) driving a step with nothing to report.
   it("does not throw and skips instantiation when result is undefined", () => {
-    expect(() => applyStepCompletion(CHOOSE_BASE_STEP_ID, undefined, deps)).not.toThrow();
+    expect(() => applyStepCompletion(CHOOSE_START_STEP_ID, undefined, deps)).not.toThrow();
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+    expect(deps.instantiateFromStartIfConfirmed).not.toHaveBeenCalled();
   });
 });
 
@@ -244,7 +244,7 @@ describe("R5 — unknown step id is a harmless no-op", () => {
     it(`no-op for step id "${id}"`, () => {
       expect(() => applyStepCompletion(id, undefined, deps)).not.toThrow();
       expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-      expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+      expect(deps.instantiateFromStartIfConfirmed).not.toHaveBeenCalled();
     });
   }
 });
@@ -266,13 +266,13 @@ describe("R4 — the reducer holds no store state of its own", () => {
     const deps1 = makeDepsMock();
     const deps2 = makeDepsMock();
     const result: InstantiateResult = {
-      base: makeBaseKeyboard(),
+      base: makeStartKeyboard(),
       ir: makeKeyboardIR(),
       vfs: makeVirtualFS(),
       track: "adapt",
     };
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps1);
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps2);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps1);
+    applyStepCompletion(CHOOSE_START_STEP_ID, result, deps2);
     expect(deps1.instantiateFromExisting).toHaveBeenCalledTimes(1);
     expect(deps2.instantiateFromExisting).toHaveBeenCalledTimes(1);
     // deps1's dep was not called by the deps2 invocation (no cross-contamination)
@@ -309,20 +309,20 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
   // fully-shaped (if empty) KeyboardIR.
   const realIr = makeTestIR([]);
   const realVfs = new Map() as VirtualFS;
-  const base = makeBaseKeyboard("copy_edit_base");
+  const base = makeStartKeyboard("copy_edit_base");
 
   /** Reducer deps backed by the real store's instantiate actions. */
   function realStoreDeps(): ReducerDeps {
     const st = useWorkingCopyStore.getState();
     return {
       ...makeDepsMock(),
-      instantiateFromBase: st.instantiateFromBase,
+      instantiateFromStart: st.instantiateFromStart,
       instantiateFromExisting: st.instantiateFromExisting,
       // Mirror the production Track-1 wrapper: only instantiate when the IR/VFS
       // are present (the real-engine invariant), else report "skipped".
-      instantiateFromBaseIfConfirmed: (b, opts) => {
+      instantiateFromStartIfConfirmed: (b, opts) => {
         if (opts.ir === null || opts.vfs === null) return false;
-        st.instantiateFromBase(b, {
+        st.instantiateFromStart(b, {
           vfs: opts.vfs,
           ir: opts.ir,
           ...(opts.removalCapabilities !== undefined ? { removalCapabilities: opts.removalCapabilities } : {}),
@@ -333,7 +333,7 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
   }
 
   it("TI-1 Track 1 (copy): instantiateFromBase yields a non-null ir + instantiationMode 'new-from-base'", () => {
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "copy" }, realStoreDeps());
+    applyStepCompletion(CHOOSE_START_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "copy" }, realStoreDeps());
     const st = useWorkingCopyStore.getState();
     expect(st.ir).not.toBeNull();
     expect(st.instantiationMode).toBe("new-from-base");
@@ -341,7 +341,7 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
   });
 
   it("TI-1 Track 2 (adapt): instantiateFromExisting yields a non-null ir + instantiationMode 'adapt-existing'", () => {
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "adapt" }, realStoreDeps());
+    applyStepCompletion(CHOOSE_START_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "adapt" }, realStoreDeps());
     const st = useWorkingCopyStore.getState();
     expect(st.ir).not.toBeNull();
     expect(st.instantiationMode).toBe("adapt-existing");
@@ -349,7 +349,7 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
   });
 
   it("TI-2 Track 2 (adapt) preserves the loaded keyboard's identity (not reset)", () => {
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "adapt" }, realStoreDeps());
+    applyStepCompletion(CHOOSE_START_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "adapt" }, realStoreDeps());
     const st = useWorkingCopyStore.getState();
     // Track 2 keeps identity from the loaded keyboard (Track 1 would null it).
     expect(st.identity?.keyboardId).toBe(base.id);

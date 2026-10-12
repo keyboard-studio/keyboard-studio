@@ -97,7 +97,7 @@ export const fixtures: QuestionModule["fixtures"] = {
 // composed tag the descriptor declares.
 // Decision spike (km/decisions-spike): base-keyboard probe AND the single
 // system answering "what script did the base decide" (spec 087 Q2 — the
-// adaptation catalog reads posture via extractBaseScriptPosture below). Reads the script from the catalog entry — the codec leaves the
+// adaptation catalog reads posture via extractStartScriptPosture below). Reads the script from the catalog entry — the codec leaves the
 // IR header's bcp47 empty on real catalog imports, so the catalog is
 // primary and the IR header is a fallback. Only ISO 15924 script codes
 // this question offers are extractable — "romanization-Latn", "fonipa",
@@ -127,7 +127,7 @@ export function extractTargetScript(ctx: ExtractContext): string | undefined {
  * provenance of the target-script decision: the one place a script
  * distribution becomes "single-script" or "mixed".
  */
-export interface BaseScriptPosture {
+export interface StartScriptPosture {
   posture: "single-script" | "mixed";
   /** Largest-share script subtag ("" when the distribution is empty). */
   dominantScript: string;
@@ -141,10 +141,10 @@ export interface BaseScriptPosture {
  * The sole implementation of that policy: a dominant share at or above
  * `singleScriptThreshold` is single-script, anything below is mixed. Pure.
  */
-export function extractBaseScriptPosture(
+export function extractStartScriptPosture(
   distribution: Record<string, number>,
   singleScriptThreshold: number,
-): BaseScriptPosture {
+): StartScriptPosture {
   let dominantScript = "";
   let dominantShare = 0;
   for (const [script, share] of Object.entries(distribution)) {

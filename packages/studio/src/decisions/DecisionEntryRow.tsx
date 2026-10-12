@@ -473,7 +473,7 @@ export function DecisionEntryRow({
   };
 
   // A derived-axis id, as author-facing prose (FR-008). The ids are the
-  // `DiscoveryAxisVector` keys `recordBaseContribution.ts` reads off the
+  // `DiscoveryAxisVector` keys `recordStartContribution.ts` reads off the
   // working copy; an id this build does not name still degrades to prose,
   // never the raw code and never blank (FR-014).
   const axisLabel = (axisId: string): string => {
@@ -525,7 +525,7 @@ export function DecisionEntryRow({
   };
 
   // A metadata field code, as author-facing prose (FR-008). The codes are
-  // the `inheritedMetadataOf` keys `recordBaseContribution.ts` writes; an
+  // the `inheritedMetadataOf` keys `recordStartContribution.ts` writes; an
   // unknown code degrades the same way as an unknown axis id (FR-014).
   const fieldLabel = (field: string): string => {
     switch (field) {
@@ -620,7 +620,7 @@ export function DecisionEntryRow({
       id: "trail.entry.headline.acceptedSuggested",
       message: `Accepted suggested ${value} for ${question}, from ${source}`,
     });
-  } else if (spec.id === "fromBase") {
+  } else if (spec.id === "fromStart") {
     const value = spec.value;
     const question = questionText(spec.question);
     headline = t({
@@ -654,7 +654,7 @@ export function DecisionEntryRow({
       id: "trail.entry.headline.editorStep.noChange",
       message: `${stage} (changed nothing)`,
     });
-  } else if (spec.id === "baseContribution") {
+  } else if (spec.id === "startContribution") {
     // FR-030/FR-031: names the base and, per FR-011's "only what happened"
     // rule, states only the counts the variant actually carries — a count
     // T021 OMITTED (never a fabricated zero) contributes no clause at all.
@@ -699,7 +699,7 @@ export function DecisionEntryRow({
       spec.inheritedFieldCount !== undefined
     ) {
       // All three present: the exact sentence the contract names
-      // (trail.entry.headline.baseContribution), rendered verbatim rather
+      // (trail.entry.headline.startContribution), rendered verbatim rather
       // than re-composed from the clauses above.
       const startingKeyCount = spec.startingKeyCount;
       const derivedAxisCount = spec.derivedAxisCount;
@@ -836,12 +836,12 @@ export function DecisionEntryRow({
   // `resolveImpact` (which has nothing to diff here). `null` when this entry
   // is not a base-contribution at all, so the existing four-state impact
   // rendering below is untouched for every other kind (T030's scope).
-  const isBaseContribution = entry.payload.kind === "base-contribution";
-  let baseContributionDetail: React.ReactNode | null = null;
-  if (isBaseContribution) {
+  const isStartContribution = entry.payload.kind === "base-contribution";
+  let startContributionDetail: React.ReactNode | null = null;
+  if (isStartContribution) {
     const payload = entry.payload;
     if (payload.kind !== "base-contribution") {
-      // Unreachable by construction — `isBaseContribution` is this same
+      // Unreachable by construction — `isStartContribution` is this same
       // check — but keeps the block below narrowed without an assertion.
       throw new Error("unreachable: isBaseContribution without a base-contribution payload");
     }
@@ -875,7 +875,7 @@ export function DecisionEntryRow({
           : null;
     const modeLine = modeText !== null ? <p style={noticeStyle}>{modeText}</p> : null;
 
-    baseContributionDetail = (
+    startContributionDetail = (
       <>
         {modeLine}
         {!hasDerived && !hasInherited ? (
@@ -913,14 +913,14 @@ export function DecisionEntryRow({
   // collapse/expand: the working copy may have moved on, and a re-derived
   // counterfactual should reflect the IR as it is now rather than as it was the
   // first time this row happened to be opened. Never called for a
-  // base-contribution entry — see `baseContributionDetail` above.
+  // base-contribution entry — see `startContributionDetail` above.
   //
   // `useEntryImpact` must be called unconditionally (hooks rule), so the gating
   // lives in its arguments: with `expanded` false, or with no async resolver, it
   // runs nothing. When an async resolver IS supplied it owns resolution entirely,
   // including the synchronous stored-capture case — routing that through the sync
   // resolver as well would ask the same question twice.
-  const asyncEnabled = resolveImpactAsync !== undefined && !isBaseContribution;
+  const asyncEnabled = resolveImpactAsync !== undefined && !isStartContribution;
   const asyncResolution = useEntryImpact(
     entry,
     expanded && asyncEnabled,
@@ -928,7 +928,7 @@ export function DecisionEntryRow({
   );
   const impact = asyncEnabled
     ? asyncResolution.impact
-    : expanded && !isBaseContribution
+    : expanded && !isStartContribution
       ? resolveImpact(entry)
       : null;
   const impactPending = asyncEnabled && asyncResolution.pending;
@@ -1044,8 +1044,8 @@ export function DecisionEntryRow({
       {expanded && (
         <div data-testid="decision-entry-impact" id={impactRegionId} style={{ marginTop: 4 }}>
           {detailBlock}
-          {baseContributionDetail !== null ? (
-            baseContributionDetail
+          {startContributionDetail !== null ? (
+            startContributionDetail
           ) : impactPending ? (
             // The one transient state. Only ever reached for an entry whose effect
             // has to be re-derived by projecting (spec 059); a stored capture

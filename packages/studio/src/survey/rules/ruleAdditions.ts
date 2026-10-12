@@ -89,16 +89,16 @@ export const EMPTY_RULE_ADDITIONS: DerivedRuleAdditions = {
  */
 export function deriveRuleAdditions(
   workingIr: KeyboardIR | null | undefined,
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
 ): DerivedRuleAdditions {
   if (workingIr == null) return EMPTY_RULE_ADDITIONS;
 
   const baseRuleIds = new Set<string>();
-  for (const group of baseIr.groups) {
+  for (const group of startIr.groups) {
     for (const rule of group.rules) baseRuleIds.add(rule.nodeId);
   }
   const baseStoreIds = new Set<string>();
-  for (const store of baseIr.stores) baseStoreIds.add(store.nodeId);
+  for (const store of startIr.stores) baseStoreIds.add(store.nodeId);
 
   const groups: RuleAdditionGroup[] = [];
   for (const workingGroup of workingIr.groups) {

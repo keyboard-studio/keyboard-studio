@@ -28,7 +28,7 @@
 // type-checks as the `getWorkingCopyState` argument with no store import here.
 
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   DiscoveryAxisVector,
   KeyboardIR,
   RemovalCapability,
@@ -39,7 +39,7 @@ import type { DecisionSet } from "./decisionTypes.ts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveProjectKeyFromWorkingCopy } from "../lib/draftPersistence.ts";
 import { createDecisionRecorder, type DecisionRecorder, type DecisionRecorderDeps } from "./createDecisionRecorder.ts";
-import type { InstantiatedMode } from "./recordBaseContribution.ts";
+import type { InstantiatedMode } from "./recordStartContribution.ts";
 import type { AnswerProposal } from "./recordSurveyAnswers.ts";
 import type { SavedAnswer } from "../steps/answerTypes.ts";
 import type { SourceSnapshotter } from "./snapshotSource.ts";
@@ -51,9 +51,9 @@ export interface WorkingCopyStateForRecording {
   carveChars: ReadonlySet<string>;
   deletedTouchKeyIds: ReadonlySet<string>;
   phaseResults: readonly SurveyPhaseResult[];
-  baseIr: KeyboardIR | null;
+  startIr: KeyboardIR | null;
   identity: { keyboardId?: string } | null;
-  baseKeyboard: BaseKeyboard | null;
+  startKeyboard: StartKeyboard | null;
   irAxes: Partial<DiscoveryAxisVector>;
   instantiationMode: InstantiatedMode | null;
   removalCapabilities: Map<string, RemovalCapability>;
@@ -150,7 +150,7 @@ export function createStudioDecisionRecorder(
     getMechanismAssignments: () => selectDesktopAssignments(getWorkingCopyState().phaseResults),
     // The base IR the working copy was instantiated from (research D-05) —
     // `null` before instantiation.
-    getBaseIr: () => getWorkingCopyState().baseIr,
+    getStartIr: () => getWorkingCopyState().startIr,
     getDeletedNodeIds: () => getWorkingCopyState().deletedNodeIds,
     getDeletedItemIds: () => getWorkingCopyState().deletedItemIds,
     // Issue #1809, ruling §1: the aggregated carved character set for the
@@ -166,15 +166,15 @@ export function createStudioDecisionRecorder(
     getKeyboardId: () => deriveProjectKeyFromWorkingCopy(getWorkingCopyState()),
     // specs/055 FR-030..FR-035 (research D-11): the base baseline, read
     // straight off the instantiated store — never a re-read of the base's
-    // source. `null` before instantiation; `recordBaseContribution` (called
+    // source. `null` before instantiation; `recordStartContribution` (called
     // only at `choose_base` completion) treats that as "no entry yet",
     // never a fabricated zero.
-    getBaseKeyboard: () => getWorkingCopyState().baseKeyboard,
+    getStartKeyboard: () => getWorkingCopyState().startKeyboard,
     getIrAxes: () => getWorkingCopyState().irAxes,
     getInstantiationMode: () => getWorkingCopyState().instantiationMode,
     getRemovalCapabilities: () => getWorkingCopyState().removalCapabilities,
     // specs/055 FR-032/FR-033: `resolveProposal` seeded with the base's
-    // inherited values — the SAME three fields `recordBaseContribution`'s
+    // inherited values — the SAME three fields `recordStartContribution`'s
     // `inheritedMetadataOf` reports above (script/targets/version), read
     // straight off the instantiated store, never a re-read of the base's
     // source. This is the wiring `recordSurveyAnswers.ts`'s module header
@@ -182,7 +182,7 @@ export function createStudioDecisionRecorder(
     // was carried from the base, not typed by the author, so
     // `deriveAnswerProvenance` returns `{ agency: "base-derived", source:
     // "base" }` instead of falling through to `"hand-set"` — reaching the
-    // already-authored `trail.entry.headline.fromBase` message.
+    // already-authored `trail.entry.headline.fromStart` message.
     //
     // No new provenance concept (FR-032): this is a lookup over data the
     // base-contribution recorder already reads, not a second "came from
@@ -198,7 +198,7 @@ export function createStudioDecisionRecorder(
     // pre-filled with, so a seeded default the author kept reads as accepted
     // rather than chosen.
     resolveProposal: (questionId, stepId) => {
-      const base = getWorkingCopyState().baseKeyboard;
+      const base = getWorkingCopyState().startKeyboard;
       if (base !== null) {
         switch (questionId) {
           case "script":

@@ -21,7 +21,7 @@ import { escapeHtml } from "../shared/escapeHtml.js";
  * build does not produce fails `kmc` (and a produced file the package does not
  * list is dropped from the `.kmp`, silently, under CompilerWarningsAsErrors).
  * Derived from the emitted `.kmn`'s `&TARGETS` store (what kmc actually reads),
- * not from `BaseKeyboard.targets` — the two can diverge during scaffolding/import.
+ * not from `StartKeyboard.targets` — the two can diverge during scaffolding/import.
  */
 export const KMW_JS_TARGETS: ReadonlySet<string> = new Set([
   "any",

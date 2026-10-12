@@ -9,7 +9,7 @@ describe("deriveProjectLabel precedence", () => {
       deriveProjectLabel({
         scaffoldSpec: { displayName: "My Ewondo" },
         identity: { displayName: "Ewondo (patch)" },
-        baseKeyboard: { displayName: "French Basic" },
+        startKeyboard: { displayName: "French Basic" },
       }),
     ).toBe("My Ewondo");
   });
@@ -18,13 +18,13 @@ describe("deriveProjectLabel precedence", () => {
     expect(
       deriveProjectLabel({
         identity: { displayName: "Ewondo (patch)" },
-        baseKeyboard: { displayName: "French Basic" },
+        startKeyboard: { displayName: "French Basic" },
       }),
     ).toBe("Ewondo (patch)");
   });
 
   it("tier 3: the base keyboard when neither of the first two is set", () => {
-    expect(deriveProjectLabel({ baseKeyboard: { displayName: "French Basic" } })).toBe(
+    expect(deriveProjectLabel({ startKeyboard: { displayName: "French Basic" } })).toBe(
       "French Basic",
     );
   });
@@ -32,7 +32,7 @@ describe("deriveProjectLabel precedence", () => {
   it("tier 4: null when there is nothing to name", () => {
     expect(deriveProjectLabel({})).toBeNull();
     expect(
-      deriveProjectLabel({ scaffoldSpec: null, identity: null, baseKeyboard: null }),
+      deriveProjectLabel({ scaffoldSpec: null, identity: null, startKeyboard: null }),
     ).toBeNull();
   });
 });
@@ -51,7 +51,7 @@ describe("blank-string skips", () => {
     expect(
       deriveProjectLabel({
         identity: { displayName: "   " },
-        baseKeyboard: { displayName: "French Basic" },
+        startKeyboard: { displayName: "French Basic" },
       }),
     ).toBe("French Basic");
   });
@@ -61,7 +61,7 @@ describe("blank-string skips", () => {
       deriveProjectLabel({
         scaffoldSpec: { displayName: null },
         identity: { displayName: null },
-        baseKeyboard: { displayName: "French Basic" },
+        startKeyboard: { displayName: "French Basic" },
       }),
     ).toBe("French Basic");
   });
@@ -97,7 +97,7 @@ describe("the case that used to distinguish the two engines", () => {
       deriveProjectLabel({
         scaffoldSpec: null,
         identity: { displayName: "Cree (Woods)" },
-        baseKeyboard: { displayName: "bj_cree_woods" },
+        startKeyboard: { displayName: "bj_cree_woods" },
       }),
     ).toBe("Cree (Woods)");
   });

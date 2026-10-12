@@ -6,13 +6,13 @@
 //
 // See specs/035-mobile-touch-derivation/data-model.md Entity 2 and
 // research.md R3 for the governing contract:
-//   - removals  = buildProducedSet(baseIr) minus buildProducedSet(projectedIr),
+//   - removals  = buildProducedSet(startIr) minus buildProducedSet(projectedIr),
 //     a produced-*character* diff (not a rule-presence diff) because carve
 //     nul-fills carved slots — the rule survives, outputting `nul`; only the
 //     character disappears from the produced set. buildProducedSet's
 //     run-merge NFC behavior means a carved base+combining (NFD-emitting)
 //     sequence surfaces as its precomposed codepoint here (pinned by test 3).
-//   - placements = Phase C physical + individual assignments, with a hostKey
+//   - placements = Phase C physical + individual assignments, with a baseKey
 //     extracted the same way TouchGallery's per-character suggestion useMemo
 //     does (packages/studio/src/editors/assignLoop/TouchGallery.tsx).
 //
@@ -24,31 +24,31 @@
 // it rather than re-deriving carve semantics.
 //
 // Pure: no store reads, no React imports. Callers (the touch build pipeline)
-// pass baseIr, the carve overlay, and phaseResults explicitly.
+// pass startIr, the carve overlay, and phaseResults explicitly.
 
 import type { KeyboardIR, MechanismRef, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { buildProducedSet } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
 import { applyCarveMutate } from "../steps/editorMutate.js";
-import { extractMechanismHostKey } from "./extractMechanismHostKey.js";
+import { extractMechanismBaseKey } from "./extractMechanismBaseKey.js";
 
 /** Shared empty carved-character set for the `carveChars` default parameter. */
 const EMPTY_DERIVE_CARVE_CHARS: ReadonlySet<string> = new Set();
 
 // ---------------------------------------------------------------------------
-// hostKey extraction — shared with TouchGallery's per-character suggestion
-// logic via extractMechanismHostKey (packages/studio/src/lib/extractMechanismHostKey.ts).
+// baseKey extraction — shared with TouchGallery's per-character suggestion
+// logic via extractMechanismBaseKey (packages/studio/src/lib/extractMechanismBaseKey.ts).
 // ---------------------------------------------------------------------------
 
 /**
  * Extract the physical host key a Phase C mechanism targets. An unrecognized
  * pattern, or a recognized pattern whose slot value fails its own extraction
- * regex (empty hostKey), both return `undefined` here so the caller omits the
- * placement rather than emitting one with an empty hostKey.
+ * regex (empty baseKey), both return `undefined` here so the caller omits the
+ * placement rather than emitting one with an empty baseKey.
  */
-function extractHostKey(m: MechanismRef): string | undefined {
-  const result = extractMechanismHostKey(m);
-  return result !== undefined && result.hostKey.length > 0 ? result.hostKey : undefined;
+function extractBaseKey(m: MechanismRef): string | undefined {
+  const result = extractMechanismBaseKey(m);
+  return result !== undefined && result.baseKey.length > 0 ? result.baseKey : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ function extractHostKey(m: MechanismRef): string | undefined {
  * Derive the {@link DesktopModifications} overlay from the working copy's
  * carve overlay and Phase C assignments.
  *
- * @param baseIr          The pristine instantiation-time base IR (never mutated).
+ * @param startIr          The pristine instantiation-time base IR (never mutated).
  * @param deletedNodeIds  Whole-node carve deletions (group/rule/store/raw nodeIds).
  * @param deletedItemIds  Glyph-level carve item ids (store slots + bare node ids).
  * @param phaseResults    The working copy's survey phase results (Phase C holds
@@ -70,15 +70,15 @@ function extractHostKey(m: MechanismRef): string | undefined {
  *                        the same pruned result as the .kmn projection (§11).
  */
 export function deriveDesktopModifications(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
   phaseResults: readonly SurveyPhaseResult[],
   carveChars: ReadonlySet<string> = EMPTY_DERIVE_CARVE_CHARS,
 ): DesktopModifications {
   // --- removals: produced-set diff over the carve-projected IR -------------
-  const projectedIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds, carveChars);
-  const baseProduced = buildProducedSet(baseIr);
+  const projectedIr = applyCarveMutate(startIr, deletedNodeIds, deletedItemIds, carveChars);
+  const baseProduced = buildProducedSet(startIr);
   const projectedProduced = buildProducedSet(projectedIr);
   const removals = [...baseProduced]
     .filter((ch) => !projectedProduced.has(ch))
@@ -89,13 +89,13 @@ export function deriveDesktopModifications(
     phaseResults.find((p) => p.phase === "C")?.assignments ?? []
   ).filter((a) => a.modality === "physical" && a.scope === "individual");
 
-  const placements: { char: string; hostKey: string }[] = [];
+  const placements: { char: string; baseKey: string }[] = [];
   for (const a of desktopAssignments) {
     const mechanism = a.mechanisms[0];
     if (mechanism === undefined) continue;
-    const hostKey = extractHostKey(mechanism);
-    if (hostKey !== undefined) {
-      placements.push({ char: a.target, hostKey });
+    const baseKey = extractBaseKey(mechanism);
+    if (baseKey !== undefined) {
+      placements.push({ char: a.target, baseKey });
     }
   }
 

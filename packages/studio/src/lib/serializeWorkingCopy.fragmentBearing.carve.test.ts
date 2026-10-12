@@ -148,7 +148,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     const vfs = stubKmnVfs(keyboardId);
 
     // Seed the store (ZIP path reads from the store).
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
 
     // Apply the two deletions through the store overlay (mirrors deleteNode() in the SPA).
     useWorkingCopyStore.getState().deleteNode("rule#remove");
@@ -165,7 +165,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     const { warnings: previewWarnings } = projectWorkingCopyVfs({
       vfs: previewVfs,
       keyboardId,
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds,
       deletedItemIds,
       assignments: [],
@@ -274,7 +274,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
       { path: `source/${keyboardId}.kmn`, content: baseContent, isBinary: false },
     ]);
 
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     // No deletions recorded.
 
     // PREVIEW path — empty deletion sets, no re-emit expected.
@@ -282,7 +282,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     projectWorkingCopyVfs({
       vfs: previewVfs,
       keyboardId,
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       assignments: [],
@@ -309,7 +309,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     const ir = buildFragmentBearingIR();
     const vfs = stubKmnVfs(keyboardId);
 
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().deleteNode("rule#remove");
 
     const { deletedNodeIds, deletedItemIds } = useWorkingCopyStore.getState();
@@ -319,7 +319,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
     projectWorkingCopyVfs({
       vfs: previewVfs,
       keyboardId,
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds,
       deletedItemIds,
       assignments: [],
@@ -327,20 +327,20 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
       identity: null,
     });
 
-    // baseIr groups/stores/raw must be unchanged.
+    // startIr groups/stores/raw must be unchanged.
     expect(ir.groups[0]?.rules.length, "baseIr groups[0].rules not mutated").toBe(2);
     expect(ir.stores.length,           "baseIr stores not mutated").toBe(3);
     expect(ir.raw.length,              "baseIr raw not mutated").toBe(3);
 
-    // ZIP path — projectWorkingCopyForOutput clones baseVfs before projecting.
+    // ZIP path — projectWorkingCopyForOutput clones startVfs before projecting.
     const guardResult = await projectWorkingCopyForOutput();
     expect(guardResult, "zip: projectWorkingCopyForOutput must not return null in mutation-guard test").not.toBeNull();
 
     const storeState = useWorkingCopyStore.getState();
-    // The store's baseVfs entry must still hold the original stub content.
-    const baseVfsContent = storeState.baseVfs?.get(`source/${keyboardId}.kmn`)?.content;
-    expect(baseVfsContent, "baseVfs in store must not be mutated by zip path").toBe("c stub\n");
-    // The store's baseIr must still have both rules.
-    expect(storeState.baseIr?.groups[0]?.rules.length, "baseIr in store not mutated by zip path").toBe(2);
+    // The store's startVfs entry must still hold the original stub content.
+    const startVfsContent = storeState.startVfs?.get(`source/${keyboardId}.kmn`)?.content;
+    expect(startVfsContent, "baseVfs in store must not be mutated by zip path").toBe("c stub\n");
+    // The store's startIr must still have both rules.
+    expect(storeState.startIr?.groups[0]?.rules.length, "baseIr in store not mutated by zip path").toBe(2);
   });
 });

@@ -9,7 +9,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import {
   TouchGallery,
   buildTouchMechanismRef,
-  hostKeyShortLabel,
+  baseKeyShortLabel,
   isCasingBearingTouchLayer,
 } from "./TouchGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -87,7 +87,7 @@ describe("buildTouchMechanismRef — case-derived layer (spec 074 FR-006)", () =
     ] as const) {
       const ref = buildTouchMechanismRef(method, "K_A", "n", "Á");
       expect(ref?.slotValues?.["layer"]).toBe("shift");
-      // hostKey keeps its exact current meaning: a resolved vkey.
+      // baseKey keeps its exact current meaning: a resolved vkey.
       expect(ref?.slotValues?.["hostKey"]).toBe("K_A");
     }
   });
@@ -101,11 +101,11 @@ describe("buildTouchMechanismRef — case-derived layer (spec 074 FR-006)", () =
 });
 
 describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () => {
-  /** Apply the default long-press method on `hostKey` for the current char. */
-  async function applyLongpressOn(hostKey: string) {
+  /** Apply the default long-press method on `baseKey` for the current char. */
+  async function applyLongpressOn(baseKey: string) {
     const select = screen.queryByRole("button", { name: /host key/i });
     expect(select).not.toBeNull();
-    await changeSelectMenu(select!, hostKey);
+    await changeSelectMenu(select!, baseKey);
     const applyBtn =
       screen
         .queryAllByRole("button")
@@ -402,17 +402,17 @@ describe("TouchGallery — suggestion Accept carries an explicit layer (spec 074
 // Spec 074 Phase 7 (T051/T052) — FR-013: case-correct host-key labels.
 //
 // A Keyman vkey name carries no case of its own (`K_A` names the A key);
-// case is a property of the layer a placement targets. `hostKeyShortLabel`
+// case is a property of the layer a placement targets. `baseKeyShortLabel`
 // takes the layer explicitly and cases the returned letter to match it.
 // ---------------------------------------------------------------------------
 
 // Every real vkey id in keyOptions.ts is already all-uppercase, so testing
-// the casing decision only through hostKeyShortLabel's output cannot tell a
+// the casing decision only through baseKeyShortLabel's output cannot tell a
 // correct component match from an accidental substring match — both render
 // "A" for "ncaps" today. This block tests the predicate directly, so a
 // regression from `components.includes("caps")` to the substring form
 // `layer.includes("caps")` fails HERE (isCasingBearingTouchLayer("ncaps")
-// would flip from false to true) even though hostKeyShortLabel's own output
+// would flip from false to true) even though baseKeyShortLabel's own output
 // would stay byte-identical for every real key id.
 describe("isCasingBearingTouchLayer — component match, not substring (spec 074 FR-013)", () => {
   it("is true for shift, caps, and casing-bearing compounds", () => {
@@ -435,24 +435,24 @@ describe("isCasingBearingTouchLayer — component match, not substring (spec 074
 
 describe("hostKeyShortLabel — case-correct labels by layer (spec 074 FR-013)", () => {
   it("reads lowercase on the default layer and uppercase on the shift layer", () => {
-    expect(hostKeyShortLabel("K_A", "default")).toBe("a");
-    expect(hostKeyShortLabel("K_A", "shift")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "default")).toBe("a");
+    expect(baseKeyShortLabel("K_A", "shift")).toBe("A");
   });
 
   it("reads uppercase for a casing-bearing compound layer id (rightalt-shift)", () => {
-    expect(hostKeyShortLabel("K_A", "rightalt-shift")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "rightalt-shift")).toBe("A");
   });
 
   it("does not mistake 'ncaps' for a caps-bearing layer (component match, not substring)", () => {
-    expect(hostKeyShortLabel("K_A", "ncaps")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "ncaps")).toBe("A");
   });
 
   it("leaves non-casing layer ids reading the raw uppercase vkey letter (today's floor, now pinned)", () => {
-    expect(hostKeyShortLabel("K_A", "alt")).toBe("A");
-    expect(hostKeyShortLabel("K_A", "ctrl")).toBe("A");
-    expect(hostKeyShortLabel("K_A", "rightalt")).toBe("A");
-    expect(hostKeyShortLabel("K_A", "rightctrl")).toBe("A");
-    expect(hostKeyShortLabel("K_A", "leftctrl")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "alt")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "ctrl")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "rightalt")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "rightctrl")).toBe("A");
+    expect(baseKeyShortLabel("K_A", "leftctrl")).toBe("A");
   });
 });
 

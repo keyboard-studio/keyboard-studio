@@ -14,7 +14,7 @@
 //   wording is REBASE_CONFIRM_MESSAGE below). Shared by confirmRebaseIfEdited
 //   (below) and needsRebaseConfirm (the SAME-base-aware variant used by
 //   SurveyView's synchronous confirm-click guard — see
-//   BaseResolutionAdapter.onConfirm in editors/adapters/panelAdapters.tsx).
+//   StartResolutionAdapter.onConfirm in editors/adapters/panelAdapters.tsx).
 //
 // confirmRebaseIfEdited:
 //   Returns true  — proceed with instantiation (no edits, or user confirmed).
@@ -32,22 +32,22 @@
 //   no-op at the store layer (workingCopyStore's resolveInstantiationCase),
 //   never a discard, however much the working copy has been edited.
 //   `confirmRebaseTo` combines the predicate with the actual window.confirm
-//   call. SurveyView's BaseResolutionAdapter.onConfirm calls confirmRebaseTo
-//   SYNCHRONOUSLY, inside the click handler, BEFORE flipping baseConfirmed /
+//   call. SurveyView's StartResolutionAdapter.onConfirm calls confirmRebaseTo
+//   SYNCHRONOUSLY, inside the click handler, BEFORE flipping startConfirmed /
 //   calling onComplete — window.confirm is itself synchronous, so a Cancel can
 //   still prevent the wizard from advancing at all (an after-the-fact effect,
 //   by contrast, cannot un-advance a wizard step that already committed).
 //
-// instantiateFromBaseIfConfirmed:
+// instantiateFromStartIfConfirmed:
 //   Shared body for onInstantiate callbacks in OutputScreen and SurveyView.
 //   NOT reachable from the Compare tab, which passes no onInstantiate at all
 //   (spec 057 FR-022).
 //   Guards on ir/vfs availability, calls confirmRebaseIfEdited (unless the
 //   caller passes `skipConfirm: true` — see the `options` param doc below),
-//   then dispatches instantiateFromBase.
+//   then dispatches instantiateFromStart.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import type { BaseKeyboard, RemovalCapability, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, RemovalCapability, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore, type IdentityPatch } from "../stores/workingCopyStore.ts";
 import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
@@ -92,9 +92,9 @@ export function confirmRebaseIfEdited(): boolean {
 }
 
 /**
- * Pure predicate (no window.confirm): would committing `newBaseId` right now
+ * Pure predicate (no window.confirm): would committing `newStartId` right now
  * switch the base under an edited working copy (and so need the rebase
- * consent)? Always false when `newBaseId` matches the currently
+ * consent)? Always false when `newStartId` matches the currently
  * instantiated base — a same-base re-confirm is never a switch (see the
  * module doc above).
  *
@@ -102,13 +102,13 @@ export function confirmRebaseIfEdited(): boolean {
  * `stores/workingCopyStore.ts` (~lines 602-634) treats a same-id but
  * different-`instantiationMode` re-pick as a genuine switch — an axis this
  * predicate doesn't consider, because it is unreachable from
- * `BaseResolutionAdapter.onConfirm` (the track is chosen downstream of
+ * `StartResolutionAdapter.onConfirm` (the track is chosen downstream of
  * choose_base). Keep the two predicates' id/mode handling in sync if that
  * ever changes, so they don't silently diverge.
  */
-export function needsRebaseConfirm(newBaseId: string): boolean {
+export function needsRebaseConfirm(newStartId: string): boolean {
   const s = useWorkingCopyStore.getState();
-  if (s.baseKeyboard?.id === newBaseId) return false;
+  if (s.startKeyboard?.id === newStartId) return false;
   return hasUnsavedEdits();
 }
 
@@ -118,8 +118,8 @@ export function needsRebaseConfirm(newBaseId: string): boolean {
  * (no dialog) when no confirm is needed per {@link needsRebaseConfirm};
  * otherwise shows the native confirm and returns the user's choice.
  */
-export function confirmRebaseTo(newBaseId: string): boolean {
-  if (!needsRebaseConfirm(newBaseId)) return true;
+export function confirmRebaseTo(newStartId: string): boolean {
+  if (!needsRebaseConfirm(newStartId)) return true;
   return window.confirm(REBASE_CONFIRM_MESSAGE);
 }
 
@@ -128,12 +128,12 @@ export function confirmRebaseTo(newBaseId: string): boolean {
  *
  * Guards that `ir` and `vfs` are non-null (mock-engine path), runs
  * {@link confirmRebaseIfEdited} (reads live store state to avoid stale-closure
- * issues) unless `options.skipConfirm` is set, then calls `instantiateFromBase`
+ * issues) unless `options.skipConfirm` is set, then calls `instantiateFromStart`
  * from the store.
  *
  * `options.skipConfirm` — set by SurveyView's doCommit (via the reducer's
  * choose_base case) when the caller has ALREADY resolved the rebase question
- * synchronously via {@link confirmRebaseTo} in BaseResolutionAdapter.onConfirm
+ * synchronously via {@link confirmRebaseTo} in StartResolutionAdapter.onConfirm
  * (F1 fix). Without this, doCommit's downstream call here would show the SAME
  * confirm dialog a second time for the one user click. Callers with no such
  * upstream synchronous check (usePreviewArtifact's decoupled onInstantiate)
@@ -161,7 +161,7 @@ export function confirmRebaseTo(newBaseId: string): boolean {
  * Returns undefined when the identity step recorded no language tag, so the
  * copy starts with no overlay exactly as before.
  */
-export function identitySeedFromSession(base: BaseKeyboard): IdentityPatch | undefined {
+export function identitySeedFromSession(base: StartKeyboard): IdentityPatch | undefined {
   const result = deriveIdentityResult(getDecisionSnapshot());
   const bcp47 = result?.bcp47.trim() ?? "";
   if (bcp47 === "") return undefined;
@@ -173,8 +173,8 @@ export function identitySeedFromSession(base: BaseKeyboard): IdentityPatch | und
   };
 }
 
-export function instantiateFromBaseIfConfirmed(
-  base: BaseKeyboard,
+export function instantiateFromStartIfConfirmed(
+  base: StartKeyboard,
   { vfs, ir, removalCapabilities }: { vfs: VirtualFS | null; ir: KeyboardIR | null; removalCapabilities?: Map<string, RemovalCapability> },
   options?: { skipConfirm?: boolean },
 ): boolean {
@@ -184,7 +184,7 @@ export function instantiateFromBaseIfConfirmed(
   }
   if (!options?.skipConfirm && !confirmRebaseIfEdited()) return false;
   const identitySeed = identitySeedFromSession(base);
-  useWorkingCopyStore.getState().instantiateFromBase(base, {
+  useWorkingCopyStore.getState().instantiateFromStart(base, {
     vfs,
     ir,
     ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
@@ -195,7 +195,7 @@ export function instantiateFromBaseIfConfirmed(
 
 /**
  * Track 2 (adapt) instantiation with the author's identity seed applied —
- * the adapt counterpart of {@link instantiateFromBaseIfConfirmed}'s seeding.
+ * the adapt counterpart of {@link instantiateFromStartIfConfirmed}'s seeding.
  *
  * The setup-decision gate (spec 092) made instantiation wait until the
  * authoring-track decision is recorded, so an adapt walk now ALWAYS lands
@@ -212,7 +212,7 @@ export function instantiateFromBaseIfConfirmed(
  * identity is first written fixes every downstream reader at once.
  */
 export function instantiateFromExistingWithIdentitySeed(
-  base: BaseKeyboard,
+  base: StartKeyboard,
   opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
 ): void {
   const identitySeed = identitySeedFromSession(base);

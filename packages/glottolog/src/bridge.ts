@@ -14,12 +14,12 @@
 //
 // See contracts/keyboard-base-bridge-api.md and data-model.md.
 
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { byIso639p3 } from "./catalog.js";
 import { relatedIsoCodes } from "./index.js";
-import type { Iso639P3, KeyboardBaseCandidate, Script } from "./types.js";
+import type { Iso639P3, KeyboardStartCandidate, Script } from "./types.js";
 
-export type { KeyboardBaseCandidate } from "./types.js";
+export type { KeyboardStartCandidate } from "./types.js";
 
 /** The target language the caller wants a base keyboard for. */
 export interface BridgeTarget {
@@ -45,7 +45,7 @@ export interface BridgeDeps {
   /** Phonebook map: keyboard id → the BCP47 tags it declares. */
   languagesById: Readonly<Record<string, readonly string[]>>;
   /**
-   * OPTIONAL. The existing script-based fallback (studio's `suggestBases`),
+   * OPTIONAL. The existing script-based fallback (studio's `suggestStarts`),
    * injected to supply Tier 2 candidates. When omitted, Tier 2 is skipped and
    * only direct + genealogical candidates are returned.
    */
@@ -53,11 +53,11 @@ export interface BridgeDeps {
     script: string;
     bcp47?: string;
   }): ReadonlyArray<{ keyboardId: string }>;
-  /** OPTIONAL resolver keyboardId → BaseKeyboard, to populate `candidate.base`. */
-  getBase?(keyboardId: string): BaseKeyboard | undefined;
+  /** OPTIONAL resolver keyboardId → StartKeyboard, to populate `candidate.base`. */
+  getStart?(keyboardId: string): StartKeyboard | undefined;
 }
 
-/** Options for {@link findKeyboardBaseCandidates}. */
+/** Options for {@link findKeyboardStartCandidates}. */
 export interface BridgeOptions {
   /** Opt-in cap on the number of results; default: no cap (D9). */
   maxResults?: number;
@@ -74,7 +74,7 @@ interface RelatedLink {
 }
 
 /** Tier precedence for the final ordering (direct < genealogical < fallback). */
-const TIER_RANK: Record<KeyboardBaseCandidate["tier"], number> = {
+const TIER_RANK: Record<KeyboardStartCandidate["tier"], number> = {
   direct: 0,
   genealogical: 1,
   "script-fallback": 2,
@@ -98,11 +98,11 @@ const TIER_RANK: Record<KeyboardBaseCandidate["tier"], number> = {
  *  7. `[]` only when every tier is empty (FR-015). Pure: no I/O; identical
  *     input ⇒ identical output.
  */
-export function findKeyboardBaseCandidates(
+export function findKeyboardStartCandidates(
   target: BridgeTarget,
   deps: BridgeDeps,
   opts: BridgeOptions = {},
-): KeyboardBaseCandidate[] {
+): KeyboardStartCandidate[] {
   const resolved = deps.resolveLanguage(target.bcp47);
   // No script ⇒ cannot enforce script coincidence ⇒ never guess (FR-017b).
   if (!resolved || !resolved.script) return [];
@@ -132,7 +132,7 @@ export function findKeyboardBaseCandidates(
   const targetGlottocode =
     targetIso !== undefined ? byIso639p3(targetIso)[0]?.glottocode : undefined;
 
-  const candidates: KeyboardBaseCandidate[] = [];
+  const candidates: KeyboardStartCandidate[] = [];
   const surfaced = new Set<string>();
 
   // --- Direct + genealogical tiers, from the phonebook -----------------------
@@ -173,7 +173,7 @@ export function findKeyboardBaseCandidates(
     if (!isDirect && best === null) continue; // no link on the target script
 
     surfaced.add(keyboardId);
-    const base = deps.getBase?.(keyboardId);
+    const base = deps.getStart?.(keyboardId);
     if (isDirect) {
       // A direct keyboard also covering relatives keeps them in alsoSupports.
       if (best !== null) also.add(best.iso639p3);
@@ -217,7 +217,7 @@ export function findKeyboardBaseCandidates(
     for (const { keyboardId } of fallback) {
       if (surfaced.has(keyboardId)) continue; // already a stronger candidate
       surfaced.add(keyboardId);
-      const base = deps.getBase?.(keyboardId);
+      const base = deps.getStart?.(keyboardId);
       candidates.push({
         keyboardId,
         tier: "script-fallback",

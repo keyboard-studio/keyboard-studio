@@ -1,7 +1,7 @@
 // Shared test-render helper for Lingui-ified chrome components.
 //
 // PR #1248's later commits localized shared chrome (Label, ResizeHandle,
-// BaseKeyboardPicker, OskModeToggle, and friends) with Lingui's useLingui()/
+// StartKeyboardPicker, OskModeToggle, and friends) with Lingui's useLingui()/
 // <Trans>, which throw "useLingui hook was used without I18nProvider" unless
 // an <I18nProvider> ancestor is present at render time (see
 // ../../../docs/i18n-spike.md). In the app this is AppRoot's job (see

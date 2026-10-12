@@ -17,7 +17,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { createScaffolderService } from "./index.js";
 import { compile } from "../compiler/index.js";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Minimal compilable KMN — mirrors the minimal.kmn fixture used in
@@ -34,7 +34,7 @@ group(main) using keys
 + [K_B] > 'b'
 `;
 
-const BASE_KEYBOARD: BaseKeyboard = {
+const START_KEYBOARD: StartKeyboard = {
   id: "integration_base",
   path: "release/i/integration_base",
   script: "Latn",
@@ -90,7 +90,7 @@ describe("scaffold→compile integration: fetch-OK base (Case A)", () => {
 
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs, warnings } = await service.scaffold(
-      BASE_KEYBOARD,
+      START_KEYBOARD,
       "my_integration_kb",
       "My Integration Keyboard",
     );
@@ -109,7 +109,7 @@ describe("scaffold→compile integration: fetch-OK base (Case A)", () => {
 
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(
-      BASE_KEYBOARD,
+      START_KEYBOARD,
       "my_integration_kb",
       "My Integration Keyboard",
     );
@@ -133,7 +133,7 @@ describe("scaffold→compile integration: fetch-OK base (Case A)", () => {
 
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
     const { vfs } = await service.scaffold(
-      BASE_KEYBOARD,
+      START_KEYBOARD,
       "my_integration_kb",
       "My Integration Keyboard",
     );
@@ -163,7 +163,7 @@ describe("scaffold→compile integration: 404 stub path (Case B)", () => {
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
 
     const { vfs, warnings } = await service.scaffold(
-      BASE_KEYBOARD,
+      START_KEYBOARD,
       "stub_kb",
       "Stub Keyboard",
     );
@@ -178,7 +178,7 @@ describe("scaffold→compile integration: 404 stub path (Case B)", () => {
     const mockFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
 
-    const { vfs } = await service.scaffold(BASE_KEYBOARD, "stub_kb", "Stub Keyboard");
+    const { vfs } = await service.scaffold(START_KEYBOARD, "stub_kb", "Stub Keyboard");
 
     const content = vfs.get("source/stub_kb.kmn")!.content as string;
     expect(content).toContain("store(&NAME)");
@@ -191,7 +191,7 @@ describe("scaffold→compile integration: 404 stub path (Case B)", () => {
     const mockFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
 
-    const { vfs } = await service.scaffold(BASE_KEYBOARD, "stub_kb", "Stub Keyboard");
+    const { vfs } = await service.scaffold(START_KEYBOARD, "stub_kb", "Stub Keyboard");
 
     const result = await compile(vfs, "stub_kb");
 
@@ -208,7 +208,7 @@ describe("scaffold→compile integration: 404 stub path (Case B)", () => {
     const mockFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
     const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
 
-    const { vfs } = await service.scaffold(BASE_KEYBOARD, "stub_kb", "Stub Keyboard");
+    const { vfs } = await service.scaffold(START_KEYBOARD, "stub_kb", "Stub Keyboard");
 
     const result = await compile(vfs, "stub_kb");
 

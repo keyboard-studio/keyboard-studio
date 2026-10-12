@@ -48,7 +48,7 @@ import { plural } from "@lingui/core/macro";
 import type { InventoryChar, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import {
-  basePunctuationCoverage,
+  startPunctuationCoverage,
   buildPunctuationProposal,
   computeInventoryDelta,
   glyphCategory,
@@ -135,7 +135,7 @@ function isExemplarProvenance(p: DraftProvenance | undefined): boolean {
 }
 
 /** The base-derived provenances — what the base group is made of. */
-function isBaseProvenance(p: DraftProvenance | undefined): boolean {
+function isStartProvenance(p: DraftProvenance | undefined): boolean {
   return p === "base" || p === "ascii-floor";
 }
 
@@ -271,11 +271,11 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   // then nothing is proposed from the base; the ASCII floor is a fallback for a
   // base whose output is UNKNOWABLE (opaque fragments), not for a missing one.
   const ir = useWorkingCopyStore((s) => s.ir);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
-  const baseCoverage = useMemo(() => (ir === null ? null : basePunctuationCoverage(ir)), [ir]);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const baseCoverage = useMemo(() => (ir === null ? null : startPunctuationCoverage(ir)), [ir]);
   const baseCoverageIncomplete = baseCoverage === null || !baseCoverage.coverageComplete;
 
-  const evidenceKey = punctuationKey(inventory?.resolvedTag, baseKeyboard?.id);
+  const evidenceKey = punctuationKey(inventory?.resolvedTag, startKeyboard?.id);
 
   // FR-023: a phase-C confirmedInventory already on the session means the
   // author confirmed this step (possibly before proposals existed). Their
@@ -362,7 +362,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   // anyway.
   useEffect(() => {
     if (loading || baseCoverage === null) return;
-    const seedKey = "punctuation-base:" + (baseKeyboard?.id ?? "working-copy");
+    const seedKey = "punctuation-base:" + (startKeyboard?.id ?? "working-copy");
     const currentDraft = getCharacterInventoryValue();
     const proposal = buildPunctuationProposal({
       exemplars: inventory,
@@ -382,7 +382,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
       proposal.baseCoverageIncomplete ? "ascii-floor" : "base",
       seedKey,
     );
-  }, [loading, baseCoverage, baseKeyboard, inventory, alreadyConfirmed, seedProposals]);
+  }, [loading, baseCoverage, startKeyboard, inventory, alreadyConfirmed, seedProposals]);
 
   // FR-011: how many of the chosen marks the base cannot type yet — the
   // missing side of the inventory delta, visible before Done. This is
@@ -416,12 +416,12 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   // the single-valued provenance; an authored character is one the author
   // typed or picked (or re-ticked after removing — see `tick`).
   const cldrChosen = punctuation.filter((c) => isExemplarProvenance(provenance[c]));
-  const baseChosen = punctuation.filter((c) => isBaseProvenance(provenance[c]));
+  const startChosen = punctuation.filter((c) => isStartProvenance(provenance[c]));
   const otherChosen = punctuation.filter(
-    (c) => !isExemplarProvenance(provenance[c]) && !isBaseProvenance(provenance[c]),
+    (c) => !isExemplarProvenance(provenance[c]) && !isStartProvenance(provenance[c]),
   );
-  const producedByBase = (c: string): boolean => baseCoverage?.produced.includes(c) === true;
-  const baseName = baseKeyboard?.displayName ?? baseKeyboard?.id ?? null;
+  const producedByStart = (c: string): boolean => baseCoverage?.produced.includes(c) === true;
+  const baseName = startKeyboard?.displayName ?? startKeyboard?.id ?? null;
   const cldrSourceLabel = (
     inventory?.source ?? (cldrChosen[0] !== undefined ? provenance[cldrChosen[0]] : undefined) ?? "cldr"
   ).toUpperCase();
@@ -772,14 +772,14 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
                       key={c}
                       char={c}
                       isProposed
-                      alsoBase={producedByBase(c)}
+                      alsoBase={producedByStart(c)}
                       onRemove={removeChar}
                     />
                   ))}
                 </div>
               </div>
             )}
-            {baseChosen.length > 0 && (
+            {startChosen.length > 0 && (
               <div
                 data-testid="base-punctuation-group"
                 role="group"
@@ -812,7 +812,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
                   </Trans>
                 </p>
                 <div style={chipRow}>
-                  {baseChosen.map((c) => (
+                  {startChosen.map((c) => (
                     <ChosenChip key={c} char={c} isProposed onRemove={removeChar} />
                   ))}
                 </div>
@@ -826,7 +826,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
                   message: "Chosen punctuation — click to remove",
                 })}
               >
-                {(cldrChosen.length > 0 || baseChosen.length > 0) && (
+                {(cldrChosen.length > 0 || startChosen.length > 0) && (
                   <p style={groupCaption}>
                     <Trans id="survey.punctuation.authoredGroup.caption">
                       Added by you — click a mark to remove it.

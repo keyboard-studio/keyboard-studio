@@ -7,7 +7,7 @@
 //   4. Deleted store node: store removed.
 //   5. Deleted raw fragment: fragment removed.
 //   6. header + comments pass through untouched.
-//   7. baseIr is NOT mutated.
+//   7. startIr is NOT mutated.
 //   8. Structural sharing: a group with no deleted rules keeps its reference.
 
 import { describe, it, expect } from "vitest";

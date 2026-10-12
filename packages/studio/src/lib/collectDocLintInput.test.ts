@@ -98,7 +98,7 @@ describe("collectDocLintInput", () => {
     expect(input.copyrightHolders).toEqual({ license: "Jane Doe", kmn: "Jane Doe", kps: "Jane Doe", readme: "Jane Doe" });
     expect(input.targets).toEqual(["windows", "mac"]);
     expect(input.deletedFilenames).toEqual([]);
-    expect(input.baseHistoryMdText).toBeUndefined();
+    expect(input.startHistoryMdText).toBeUndefined();
     // Consistent holders, matching version: the shared checks stay silent.
     expect(runDocChecks(input).map((f) => f.code)).not.toContain("KM_LINT_COPYRIGHT_HOLDER_INCONSISTENT");
   });

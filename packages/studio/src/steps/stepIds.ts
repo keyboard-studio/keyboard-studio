@@ -19,4 +19,4 @@ export const MECHANISMS_STEP_ID = "mechanisms" as const;
 export const TOUCH_STEP_ID = "touch" as const;
 
 /** Step id for the choose-base step — fires the copy/adapt instantiation on complete. */
-export const CHOOSE_BASE_STEP_ID = "choose_base" as const;
+export const CHOOSE_START_STEP_ID = "choose_base" as const;

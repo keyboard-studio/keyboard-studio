@@ -124,7 +124,7 @@ vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.t
 // the barrel), so the shallow stubs must be registered for the files too.
 vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/panels/StartResolution.tsx", () => import("./test/studioShellMocks/StartResolution.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
@@ -372,7 +372,7 @@ describe("StudioShell — in-place keyboard switch while SurveyView stays mounte
     // occurred because the hash never changed), and the working copy really
     // did switch to B.
     expect(window.location.hash).toBe("#survey");
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(INPLACE_B_ID);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(INPLACE_B_ID);
 
     // ---- A real edit to B's (now live) working copy ----
     const EDITED_B_LABEL = `${INPLACE_B_NAME} EDITED`;
@@ -446,7 +446,7 @@ describe("StudioShell — in-place keyboard switch while SurveyView stays mounte
     switchViaTopBarDropdown(INPLACE_A_NAME);
 
     expect(window.location.hash).toBe("#survey");
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(INPLACE_A_ID);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(INPLACE_A_ID);
 
     const EDITED_A_LABEL = `${INPLACE_A_NAME} EDITED`;
     act(() => {

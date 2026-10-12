@@ -109,7 +109,7 @@ function makeRaltAssignment(): MechanismAssignment {
 }
 
 /** A "phone" platform with a default layer: K_E (plain) + K_NUMLOCK (anchor). */
-function makeBaseTouchJson(): string {
+function makeStartTouchJson(): string {
   return JSON.stringify({
     phone: {
       layer: [
@@ -144,12 +144,12 @@ function makeVfsWithTouchLayout(touchJson: string) {
 
 describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation", () => {
   it("surfaces the modifier-combo layer id, with real key text from the freshly re-parsed .kmn", () => {
-    const vfs = makeVfsWithTouchLayout(makeBaseTouchJson());
+    const vfs = makeVfsWithTouchLayout(makeStartTouchJson());
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makeRaltAssignment()],
       getPattern,
@@ -180,12 +180,12 @@ describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation"
   // store-indirection path — the shape the real content pattern actually
   // uses. This test uses that real shape directly.
   it("surfaces real key text via the real pattern's store/any()/index() indirection shape", () => {
-    const vfs = makeVfsWithTouchLayout(makeBaseTouchJson());
+    const vfs = makeVfsWithTouchLayout(makeStartTouchJson());
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makeRaltAssignment()],
       getPattern: getRealShapePattern,
@@ -205,12 +205,12 @@ describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation"
   });
 
   it("adds a reachability switch on the default layer's anchor key", () => {
-    const vfs = makeVfsWithTouchLayout(makeBaseTouchJson());
+    const vfs = makeVfsWithTouchLayout(makeStartTouchJson());
 
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makeRaltAssignment()],
       getPattern,
@@ -238,7 +238,7 @@ describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation"
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makeRaltAssignment()],
       getPattern,
@@ -286,7 +286,7 @@ describe("projectWorkingCopyVfs — step 2.5 desktop-to-touch layer propagation"
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       assignments: [makeRaltAssignment()],
       getPattern,

@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import type { BaseKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { mixedDiagnosticsResult } from "@keyboard-studio/contracts/fixtures";
 import type { ContextToleranceResult } from "../lib/contextToleranceAnalysis.ts";
@@ -22,7 +22,7 @@ const mockEngine = {
     Promise.resolve(mixedDiagnosticsResult),
   ),
   fetchKeyboardSourceToVfs: vi.fn(
-    (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+    (_startKeyboard: StartKeyboard, vfs: VirtualFS) => {
       // Seed a .kmn file so findKmnPath and parseKmn work in the hook.
       vfs.set("source/test_kb.kmn", "c test\n", false);
       return Promise.resolve({});
@@ -83,7 +83,7 @@ vi.mock("../lib/contextToleranceAnalysis.ts", () => ({
   analyseContextTolerance: (ir: KeyboardIR, isCurrent: () => boolean) => analyse(ir, isCurrent),
 }));
 
-const baseKb: BaseKeyboard = {
+const baseKb: StartKeyboard = {
   id: "test_kb",
   path: "release/t/test_kb",
   script: "Latn",

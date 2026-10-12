@@ -10,7 +10,7 @@
 // no langtags match, this arrives empty and the author may type a code directly
 // or leave it blank (graceful degradation, spec 030 FR-003/US4-3). The code
 // drives IdentityLiteResult.bcp47 (buildTargetBcp47 in IdentityLite.tsx); an
-// empty subtag degrades suggestBases() to script-match ranking (spec §8).
+// empty subtag degrades suggestStarts() to script-match ranking (spec §8).
 //
 // Type is "autocomplete" with options_source "@langtags_iso639" so the author
 // can search the code list when overriding; the native datalist always accepts

@@ -66,8 +66,8 @@ vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
   useKeyboardArtifact: () => ({ stage: mockStage.current, retry: vi.fn(), recompile: vi.fn() }),
 }));
 
-vi.mock("./BaseKeyboardPicker.tsx", () => ({
-  BaseKeyboardPicker: ({ onChange }: { onChange: (kb: unknown) => void }) => (
+vi.mock("./StartKeyboardPicker.tsx", () => ({
+  StartKeyboardPicker: ({ onChange }: { onChange: (kb: unknown) => void }) => (
     <button data-testid="base-picker" onClick={() => onChange(basicKbdus)}>pick</button>
   ),
 }));
@@ -79,7 +79,7 @@ vi.mock("../editors/panels/TrackOneIdentityPanel.tsx", () => ({
 }));
 vi.mock("../lib/confirmRebase.ts", () => ({
   confirmRebaseIfEdited: () => true,
-  instantiateFromBaseIfConfirmed: vi.fn(),
+  instantiateFromStartIfConfirmed: vi.fn(),
 }));
 vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({ useWorkingCopyTransform: () => null }));
 vi.mock("./SignUpPanel.tsx", () => ({ SignUpPanel: () => <section data-testid="signup-panel" /> }));
@@ -90,7 +90,7 @@ function seed() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir: makeTestIR([]) });
   // spec 064: the attribution gates block BOTH downloads — the .kmp is the
   // primary artifact, not a shortcut past them. This suite is about the package
   // build, so give it an author; the gate itself is asserted in

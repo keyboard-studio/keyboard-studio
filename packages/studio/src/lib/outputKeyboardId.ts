@@ -32,20 +32,20 @@ import type { IdentityPatch } from "../stores/identityPatch.ts";
  * still keyed under the base's id (which is what makes the pre-naming
  * `output.identity.warn` banner true — see OutputScreen).
  *
- * Do not inline `identity?.keyboardId ?? baseKeyboard.id` at a new call site;
+ * Do not inline `identity?.keyboardId ?? startKeyboard.id` at a new call site;
  * call this, and extend it here if the rule needs to grow.
  *
  * @param identity     The working copy's identity overlay — `null` until the
  *                     author names the keyboard, and `keyboardId` is optional
  *                     within it even then (Track 2 imports never set one).
- * @param baseKeyboard The base, whose `.id` is the fallback. `null` before
+ * @param startKeyboard The base, whose `.id` is the fallback. `null` before
  *                     instantiation (cold arrival at `#output`), which yields
  *                     `""` — there is no id to announce and no artifact to name.
  * @returns The id, or `""` when neither source can supply one.
  */
 export function resolveOutputKeyboardId(
   identity: Pick<IdentityPatch, "keyboardId"> | null | undefined,
-  baseKeyboard: { id: string } | null | undefined,
+  startKeyboard: { id: string } | null | undefined,
 ): string {
-  return identity?.keyboardId ?? baseKeyboard?.id ?? "";
+  return identity?.keyboardId ?? startKeyboard?.id ?? "";
 }

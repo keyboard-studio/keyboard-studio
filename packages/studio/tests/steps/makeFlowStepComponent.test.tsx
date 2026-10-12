@@ -84,7 +84,7 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
 
 // ---------------------------------------------------------------------------
 // Mock stores — return deterministic values. Spec 089: the factory reads
-// localBase (session), the decision set (decision store), and the working
+// localStart (session), the decision set (decision store), and the working
 // copy's history-entry state + validator findings. It writes NOTHING.
 // ---------------------------------------------------------------------------
 
@@ -92,7 +92,7 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
 vi.mock("../../src/stores/surveySessionStore.ts", () => ({
   useSurveySessionStore: (selector: (s: unknown) => unknown) => {
     const store = {
-      localBase: { displayName: "Test Base" },
+      localStart: { displayName: "Test Base" },
 
     };
     return selector(store);

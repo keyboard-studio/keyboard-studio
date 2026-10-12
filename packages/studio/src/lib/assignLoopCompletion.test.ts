@@ -27,7 +27,7 @@ import {
 import { manifest } from "../steps/manifest.ts";
 import { repropagate as mockRepropagate } from "../steps/repropagate.ts";
 import { buildTouchLayoutJson } from "./buildTouchLayoutJson.ts";
-import { resolveBaseTouchJson } from "./resolveBaseTouchJson.ts";
+import { resolveStartTouchJson } from "./resolveStartTouchJson.ts";
 import {
   applyPhysicalCompletionEffects,
   applyTouchCompletionEffects,
@@ -35,11 +35,11 @@ import {
 
 vi.mock("../steps/repropagate.ts", () => ({ repropagate: vi.fn() }));
 vi.mock("./buildTouchLayoutJson.ts", () => ({ buildTouchLayoutJson: vi.fn() }));
-vi.mock("./resolveBaseTouchJson.ts", () => ({ resolveBaseTouchJson: vi.fn() }));
+vi.mock("./resolveStartTouchJson.ts", () => ({ resolveStartTouchJson: vi.fn() }));
 
 const mockReprop = mockRepropagate as ReturnType<typeof vi.fn>;
 const mockBuild = buildTouchLayoutJson as ReturnType<typeof vi.fn>;
-const mockResolve = resolveBaseTouchJson as ReturnType<typeof vi.fn>;
+const mockResolve = resolveStartTouchJson as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   bindManifest(manifest);
@@ -87,7 +87,7 @@ describe("applyPhysicalCompletionEffects (R1 re-homed)", () => {
 });
 
 describe("applyTouchCompletionEffects (R2 re-homed)", () => {
-  const baseIr = makeTestIR([]);
+  const startIr = makeTestIR([]);
   const assignments = [{ key: "a" }] as unknown as TouchAssignment[];
   const EMPTY_MODS = { removals: [], placements: [] };
 
@@ -99,7 +99,7 @@ describe("applyTouchCompletionEffects (R2 re-homed)", () => {
   it("baseIr null: clears the stored layout, builds nothing, clears the stale flag", () => {
     seedStaleTouch();
     useWorkingCopyStore.getState().setTouchLayoutJson("{\"prev\":true}");
-    applyTouchCompletionEffects({ assignments, baseIr: null, baseVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
+    applyTouchCompletionEffects({ assignments, startIr: null, startVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
     expect(mockBuild).not.toHaveBeenCalled();
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
     expect(useWorkingCopyStore.getState().staleSteps.has("touch")).toBe(false);
@@ -108,7 +108,7 @@ describe("applyTouchCompletionEffects (R2 re-homed)", () => {
   it("Case A (no shipped layout): builds without baseTouchJson and stores the json", () => {
     mockResolve.mockReturnValue(undefined);
     mockBuild.mockReturnValue({ json: "{\"built\":true}", warnings: [] });
-    applyTouchCompletionEffects({ assignments, baseIr, baseVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
+    applyTouchCompletionEffects({ assignments, startIr, startVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
     expect(mockBuild).toHaveBeenCalledTimes(1);
     const opts = mockBuild.mock.calls[0]![2] as Record<string, unknown>;
     expect("baseTouchJson" in opts).toBe(false);
@@ -119,7 +119,7 @@ describe("applyTouchCompletionEffects (R2 re-homed)", () => {
   it("Case B (shipped layout, import-adapt): passes baseTouchJson through", () => {
     mockResolve.mockReturnValue("{\"shipped\":true}");
     mockBuild.mockReturnValue({ json: "{\"adapted\":true}", warnings: [] });
-    applyTouchCompletionEffects({ assignments, baseIr, baseVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
+    applyTouchCompletionEffects({ assignments, startIr, startVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
     const opts = mockBuild.mock.calls[0]![2] as Record<string, unknown>;
     expect(opts.baseTouchJson).toBe("{\"shipped\":true}");
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBe("{\"adapted\":true}");
@@ -128,7 +128,7 @@ describe("applyTouchCompletionEffects (R2 re-homed)", () => {
   it("reseed (R10): never passes the shipped layout through, even when present", () => {
     mockResolve.mockReturnValue("{\"shipped\":true}");
     mockBuild.mockReturnValue({ json: "{\"reseeded\":true}", warnings: [] });
-    applyTouchCompletionEffects({ assignments, baseIr, baseVfs: null, mods: EMPTY_MODS, seedSource: "reseed-from-desktop" });
+    applyTouchCompletionEffects({ assignments, startIr, startVfs: null, mods: EMPTY_MODS, seedSource: "reseed-from-desktop" });
     const opts = mockBuild.mock.calls[0]![2] as Record<string, unknown>;
     expect("baseTouchJson" in opts).toBe(false);
     expect(opts.seedSource).toBe("reseed-from-desktop");
@@ -136,7 +136,7 @@ describe("applyTouchCompletionEffects (R2 re-homed)", () => {
 
   it("R11 don't-emit (no edits, no mods, import-adapt): builds nothing, stores null", () => {
     mockResolve.mockReturnValue("{\"shipped\":true}");
-    applyTouchCompletionEffects({ assignments: [], baseIr, baseVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
+    applyTouchCompletionEffects({ assignments: [], startIr, startVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" });
     expect(mockBuild).not.toHaveBeenCalled();
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
   });
@@ -148,7 +148,7 @@ describe("applyTouchCompletionEffects (R2 re-homed)", () => {
       throw new Error("emit blew up");
     });
     expect(() =>
-      applyTouchCompletionEffects({ assignments, baseIr, baseVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" }),
+      applyTouchCompletionEffects({ assignments, startIr, startVfs: null, mods: EMPTY_MODS, seedSource: "import-adapt" }),
     ).not.toThrow();
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
     expect(useWorkingCopyStore.getState().staleSteps.has("touch")).toBe(false);

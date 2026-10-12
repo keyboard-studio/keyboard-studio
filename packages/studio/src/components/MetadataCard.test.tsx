@@ -6,11 +6,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
-import type { BaseKeyboard, BaseDocumentationProfile } from "@keyboard-studio/contracts";
+import type { StartKeyboard, StartDocumentationProfile } from "@keyboard-studio/contracts";
 import { MetadataCard } from "./MetadataCard.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
-const KB: BaseKeyboard = {
+const KB: StartKeyboard = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",
@@ -19,7 +19,7 @@ const KB: BaseKeyboard = {
   version: "1.0",
 };
 
-const OTHER_KB: BaseKeyboard = {
+const OTHER_KB: StartKeyboard = {
   id: "sil_euro_latin",
   path: "release/s/sil_euro_latin",
   script: "Latn",
@@ -28,7 +28,7 @@ const OTHER_KB: BaseKeyboard = {
   version: "1.0",
 };
 
-const MINIMAL_PROFILE: BaseDocumentationProfile = {
+const MINIMAL_PROFILE: StartDocumentationProfile = {
   level: "minimal",
   members: ["welcome-htm"],
   welcomeConvention: "flat",
@@ -38,7 +38,7 @@ const MINIMAL_PROFILE: BaseDocumentationProfile = {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.setState({ baseKeyboard: null, baseDocProfile: null });
+  useWorkingCopyStore.setState({ startKeyboard: null, startDocProfile: null });
 });
 
 describe("MetadataCard — documentation badge (spec 080 FR-008)", () => {
@@ -50,8 +50,8 @@ describe("MetadataCard — documentation badge (spec 080 FR-008)", () => {
 
   it("renders no badge when the committed profile's level is 'unknown'", () => {
     useWorkingCopyStore.setState({
-      baseKeyboard: KB,
-      baseDocProfile: {
+      startKeyboard: KB,
+      startDocProfile: {
         level: "unknown",
         members: [],
         welcomeConvention: "absent",
@@ -64,15 +64,15 @@ describe("MetadataCard — documentation badge (spec 080 FR-008)", () => {
   });
 
   it("renders the badge for a known level committed for THIS card's base", () => {
-    useWorkingCopyStore.setState({ baseKeyboard: KB, baseDocProfile: MINIMAL_PROFILE });
+    useWorkingCopyStore.setState({ startKeyboard: KB, startDocProfile: MINIMAL_PROFILE });
     render(<MetadataCard kb={KB} />);
     expect(screen.getByText("Minimal documentation")).toBeTruthy();
   });
 
   it("does not attribute a committed profile to a DIFFERENT card's base", () => {
-    // baseDocProfile in the store belongs to KB (the confirmed base) — a card
+    // startDocProfile in the store belongs to KB (the confirmed base) — a card
     // rendering a different, not-yet-confirmed base must not show its badge.
-    useWorkingCopyStore.setState({ baseKeyboard: KB, baseDocProfile: MINIMAL_PROFILE });
+    useWorkingCopyStore.setState({ startKeyboard: KB, startDocProfile: MINIMAL_PROFILE });
     render(<MetadataCard kb={OTHER_KB} />);
     expect(screen.queryByText(/documentation/i)).toBeNull();
   });

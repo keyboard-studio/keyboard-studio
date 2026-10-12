@@ -12,7 +12,7 @@
 //       the full picker, which is the documented reason a picker is reachable
 //       from this screen at all.
 //   (c) "Change starting keyboard" is a pure navigation action: it routes to the
-//       survey's choose_base step, rewinds history, clears the baseConfirmed
+//       survey's choose_base step, rewinds history, clears the startConfirmed
 //       commit gate, and mutates the working copy not at all.
 //   (d) The download control announces the id it will actually emit
 //       (identity.keyboardId, the same source serializeWorkingCopy resolves) —
@@ -50,10 +50,10 @@ vi.mock("../hooks/useKeyboardArtifact.ts", async (importOriginal) => ({
   }),
 }));
 
-// The picker itself reaches for BaseBrowserService; stub it so the slot's
+// The picker itself reaches for StartBrowserService; stub it so the slot's
 // presence/absence is what this file measures, not the service.
-vi.mock("./BaseKeyboardPicker.tsx", () => ({
-  BaseKeyboardPicker: () => <div data-testid="base-picker-stub" />,
+vi.mock("./StartKeyboardPicker.tsx", () => ({
+  StartKeyboardPicker: () => <div data-testid="base-picker-stub" />,
 }));
 vi.mock("./KmnEditor.tsx", () => ({ KmnEditor: () => <div data-testid="kmn-editor-stub" /> }));
 vi.mock("./SignUpPanel.tsx", () => ({ SignUpPanel: () => null }));
@@ -130,7 +130,7 @@ describe("OutputScreen — left-pane scope", () => {
     session.advance("choose_base");
     session.advance("track");
     session.advance("characters");
-    session.setBaseConfirmed(true);
+    session.setStartConfirmed(true);
 
     const { OutputScreen } = await import("./OutputScreen.tsx");
     render(<OutputScreen />);
@@ -144,11 +144,11 @@ describe("OutputScreen — left-pane scope", () => {
     expect(after.history).toEqual(["identity"]);
     // The stale confirmation must not arm StudioShell's instantiation effect
     // on the next compile settle.
-    expect(after.baseConfirmed).toBe(false);
+    expect(after.startConfirmed).toBe(false);
     expect(navigateTo).toHaveBeenCalledWith("survey");
 
     // The working copy is untouched — re-basing is answered at the destination.
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(basicKbdus.id);
   });
 
   it("the download control announces the id it will emit, not the base id", async () => {

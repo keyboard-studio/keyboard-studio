@@ -9,7 +9,7 @@ const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 const NON_EMPTY_REMOVALS: DesktopModifications = { removals: ["x"], placements: [] };
 const NON_EMPTY_PLACEMENTS: DesktopModifications = {
   removals: [],
-  placements: [{ char: "y", hostKey: "K_Y" }],
+  placements: [{ char: "y", baseKey: "K_Y" }],
 };
 
 describe("shouldEmitTouchLayout — R11 matrix", () => {

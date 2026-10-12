@@ -75,22 +75,22 @@ export function hasUnaccountedOpaqueFragment(ir: KeyboardIR): boolean {
  *                  to match their bucket (`true` for `covered`, `false` for
  *                  `missing`) — every other field, including `method`, is
  *                  preserved unchanged.
- * @param baseIr  - The base keyboard's parsed IR.
+ * @param startIr  - The base keyboard's parsed IR.
  * @param options - Forwarded to `producedGlyphs` (e.g. `includeSpace`).
  * @returns An `InventoryDelta` partitioning `needed` into `missing`/`covered`.
  *
  * @example
  * ```ts
- * const { missing, covered, coverageComplete } = computeInventoryDelta(needed, baseIr);
+ * const { missing, covered, coverageComplete } = computeInventoryDelta(needed, startIr);
  * const worklist = missing; // characters Phase B still needs to place
  * ```
  */
 export function computeInventoryDelta(
   needed: InventoryChar[],
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   options: { includeSpace?: boolean } = {},
 ): InventoryDelta {
-  const produced = new Set(producedGlyphs(baseIr, options));
+  const produced = new Set(producedGlyphs(startIr, options));
 
   const missing: InventoryChar[] = [];
   const covered: InventoryChar[] = [];
@@ -114,6 +114,6 @@ export function computeInventoryDelta(
   return {
     missing,
     covered,
-    coverageComplete: !hasUnaccountedOpaqueFragment(baseIr),
+    coverageComplete: !hasUnaccountedOpaqueFragment(startIr),
   };
 }

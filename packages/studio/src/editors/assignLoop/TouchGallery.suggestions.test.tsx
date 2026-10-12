@@ -46,7 +46,7 @@ describe("TouchGallery — suggestion card gated on the current char's producer 
 
     // Desktop (Phase C, physical) assignments for BOTH "ǯ" and "x" — each has
     // its own simple_swap mechanism, so the suggestion computation's `da`
-    // branch fires for both, proposing a "replace" card (extractMechanismHostKey).
+    // branch fires for both, proposing a "replace" card (extractMechanismBaseKey).
     const zhCaronDesktopAssignment: MechanismAssignment = {
       scope: "individual",
       target: "ǯ",
@@ -150,9 +150,9 @@ describe("TouchGallery — accepting a suggestion stays on the same character", 
     expect(flickOption).not.toBeNull();
     await act(async () => { fireEvent.click(flickOption!); });
 
-    const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect).not.toBeNull();
-    await changeSelectMenu(hostKeySelect!, "K_B");
+    const baseKeySelect = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect).not.toBeNull();
+    await changeSelectMenu(baseKeySelect!, "K_B");
     const directionSelect = screen.queryByRole("button", { name: /flick direction/i });
     expect(directionSelect).not.toBeNull();
     await changeSelectMenu(directionSelect!, "n");
@@ -255,7 +255,7 @@ describe("TouchGallery — suggestion card variants", () => {
   it("shows a 'longpress' suggestion for a multi-token modifier_as_layer_switch combo (SHIFT+CTRL+RALT)", async () => {
     // Regression: the host-key extraction previously hardcoded a
     // /\[RALT\s+.../ regex, which silently produced no suggestion (empty
-    // hostKey) for any combo other than a bare RALT bracket. A three-token
+    // baseKey) for any combo other than a bare RALT bracket. A three-token
     // combo exercises the general parseKeySpec-based extraction.
     const layerSwitchAssignment: MechanismAssignment = {
       scope: "individual",
@@ -277,7 +277,7 @@ describe("TouchGallery — suggestion card variants", () => {
     });
 
     // The suggestion names the extracted host key ("4", from K_4) — not the
-    // "a key" fallback the component shows when hostKey extraction fails.
+    // "a key" fallback the component shows when baseKey extraction fails.
     expect(screen.queryByText(/Suggested: long-press 4 to reach/i)).not.toBeNull();
     expect(screen.queryByText(/Suggested: long-press a key to reach/i)).toBeNull();
   });

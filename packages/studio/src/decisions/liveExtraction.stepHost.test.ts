@@ -16,7 +16,7 @@
 //   itself is pinned at pass level in liveExtraction.test.ts.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { createVirtualFS, type BaseKeyboard, type KeyboardIR } from "@keyboard-studio/contracts";
+import { createVirtualFS, type StartKeyboard, type KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -24,7 +24,7 @@ import { runLiveExtractionFromStores } from "./liveExtraction.ts";
 
 const COPYRIGHT = "(c) 2009-2019 SIL International";
 
-function catalogEntry(): BaseKeyboard {
+function catalogEntry(): StartKeyboard {
   return {
     id: "basic_kbdfr",
     path: "release/basic/basic_kbdfr",
@@ -54,7 +54,7 @@ function driveSetup(opts: { copyright?: string; track: "adapt" | "copy" }): void
   decisions.record({ id: "author-name", value: "Test Author", provenance: "asked" });
   useWorkingCopyStore
     .getState()
-    .instantiateFromBase(catalogEntry(), {
+    .instantiateFromStart(catalogEntry(), {
       vfs: createVirtualFS([]),
       ir: bundleIR(opts.copyright),
     });
@@ -117,7 +117,7 @@ describe("live extraction at setup (real stores, real registry)", () => {
   // pass gates on seedWhen + reachability, not on `requires` satisfaction.
   it("(5) post-#1901 order (no author-name at setup) → the holder still seeds on the update track", () => {
     const decisions = useDecisionStore.getState();
-    useWorkingCopyStore.getState().instantiateFromBase(catalogEntry(), {
+    useWorkingCopyStore.getState().instantiateFromStart(catalogEntry(), {
       vfs: createVirtualFS([]),
       ir: bundleIR(COPYRIGHT),
     });
@@ -169,7 +169,7 @@ describe("live extraction at setup (real stores, real registry)", () => {
 
   it("(6) post-#1901 order, copy track → no seed (the copied notice is not proposed)", () => {
     const decisions = useDecisionStore.getState();
-    useWorkingCopyStore.getState().instantiateFromBase(catalogEntry(), {
+    useWorkingCopyStore.getState().instantiateFromStart(catalogEntry(), {
       vfs: createVirtualFS([]),
       ir: bundleIR(COPYRIGHT),
     });

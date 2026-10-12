@@ -5,7 +5,7 @@
 //   - heading text ("Live preview" vs "Touch preview")
 //   - default oskMode ("desktop" vs "touch")
 //   - warning label ("Apply warnings:" vs "Preview warnings:")
-//   - baseKeyboard prop nullability (MechanismGallery passes non-null; TouchGallery may pass null)
+//   - startKeyboard prop nullability (MechanismGallery passes non-null; TouchGallery may pass null)
 //
 // Keeping BOTH defaultOskMode values explicit as props means the rendered
 // behaviour is identical to the original local components — no silent defaults.
@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "../../components/OSKFrame.tsx";
 import { useIsNarrow } from "../../hooks/useViewport.ts";
@@ -24,7 +24,7 @@ import {
 } from "../../lib/galleryTheme.ts";
 
 export interface GalleryPreviewPaneProps {
-  baseKeyboard: BaseKeyboard | null;
+  startKeyboard: StartKeyboard | null;
   stage: Stage;
   retry: () => void;
   defaultOskMode: OskMode;
@@ -33,7 +33,7 @@ export interface GalleryPreviewPaneProps {
 }
 
 export function GalleryPreviewPane({
-  baseKeyboard,
+  startKeyboard,
   stage,
   retry,
   defaultOskMode,
@@ -214,7 +214,7 @@ export function GalleryPreviewPane({
 
       <div style={{ display: stage.kind === "error" ? "none" : "block" }}>
         <OSKFrame
-          baseKeyboard={baseKeyboard}
+          startKeyboard={startKeyboard}
           oskMode={oskMode}
           stage={stage}
           retry={retry}

@@ -255,7 +255,7 @@ export interface PlacementMap {
  * which is inconsistently applied across the corpus and names layers that do
  * not always exist top-level.
  */
-export interface TouchPlacementHost {
+export interface TouchPlacementBase {
   /** Virtual key name of the MAIN key the longpress hangs off of (e.g. `"K_E"`). */
   vkey: string;
   /** Coarse bucket of the host key's own outer layer id. */
@@ -273,7 +273,7 @@ export interface TouchPlacementEntry {
   /** Target codepoint in `"U+XXXX"` notation — same convention as {@link PlacementEntry.codepoint}. */
   codepoint: string;
   /** Corpus-attested longpress hosts, in descending `priorCount` order. */
-  hosts: TouchPlacementHost[];
+  hosts: TouchPlacementBase[];
 }
 
 // ---------------------------------------------------------------------------

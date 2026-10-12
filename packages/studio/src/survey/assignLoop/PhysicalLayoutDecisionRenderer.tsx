@@ -22,13 +22,13 @@ import { MechanismGallery } from "../../editors/assignLoop/MechanismGallery.tsx"
 export function PhysicalLayoutDecisionRenderer({
   onChange,
 }: DecisionRendererProps<PhysicalLayoutValue>) {
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const placementMap = usePlacementPriors();
   const marksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
 
   return (
     <MechanismGallery
-      selectedBaseKeyboard={baseKeyboard}
+      selectedStartKeyboard={startKeyboard}
       onComplete={() => onChange(currentPhysicalLayoutValue())}
       {...(placementMap ? { placementMap } : {})}
       {...(marksWorklist !== undefined ? { worklist: marksWorklist } : {})}

@@ -8,7 +8,7 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { deriveRuleAdditions, type RuleSetValue } from "./ruleAdditions.ts";
 
 export function currentRuleSetValue(): RuleSetValue {
-  const { ir, baseIr } = useWorkingCopyStore.getState();
-  if (ir === null || baseIr === null) return { groups: [], stores: [] };
-  return deriveRuleAdditions(ir, baseIr);
+  const { ir, startIr } = useWorkingCopyStore.getState();
+  if (ir === null || startIr === null) return { groups: [], stores: [] };
+  return deriveRuleAdditions(ir, startIr);
 }

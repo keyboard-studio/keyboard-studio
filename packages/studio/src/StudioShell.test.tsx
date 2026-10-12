@@ -17,7 +17,7 @@
 // Strategy: mock every child component at the shallowest level so each mock
 // renders a unique data-testid and a single button that fires its callback.
 // Heavy hook dependencies (useKeyboardArtifact, useWorkingCopyTransform,
-// instantiateFromBaseIfConfirmed) are mocked to keep WASM and VFS out of the
+// instantiateFromStartIfConfirmed) are mocked to keep WASM and VFS out of the
 // picture. Navigation to a starting stage is achieved by clicking through the
 // sequence of mocked buttons that lead up to it.
 
@@ -48,7 +48,7 @@ vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.t
 // the barrel), so the shallow stubs must be registered for the files too.
 vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/panels/StartResolution.tsx", () => import("./test/studioShellMocks/StartResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
@@ -86,7 +86,7 @@ import { navigateTo } from "./lib/navigate.ts";
 import { markVisited } from "./lib/firstVisit.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { instantiateFromBaseIfConfirmed, confirmRebaseTo } from "./lib/confirmRebase.ts";
+import { instantiateFromStartIfConfirmed, confirmRebaseTo } from "./lib/confirmRebase.ts";
 import {
   saveDraft,
   loadDraft,
@@ -99,7 +99,7 @@ import {
   type DurableDraft,
 } from "./lib/draftPersistence.ts";
 
-const instantiateSpy = instantiateFromBaseIfConfirmed as ReturnType<typeof vi.fn>;
+const instantiateSpy = instantiateFromStartIfConfirmed as ReturnType<typeof vi.fn>;
 const confirmRebaseToSpy = confirmRebaseTo as ReturnType<typeof vi.fn>;
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ const confirmRebaseToSpy = confirmRebaseTo as ReturnType<typeof vi.fn>;
  * the real community-layout step; its suggestion is preselected, so confirming
  * is one click) -> choose_base.
  */
-function advanceToBase() {
+function advanceToStart() {
   fireEvent.click(screen.getByTestId("survey-advance"));
   fireEvent.click(screen.getByTestId("layout-continue"));
 }
@@ -122,7 +122,7 @@ function advanceToBase() {
  * real user clicks with a render flush in between (preview-before-commit).
  */
 function advanceToTrack() {
-  advanceToBase();
+  advanceToStart();
   fireEvent.click(screen.getByTestId("base-preview"));
   fireEvent.click(screen.getByTestId("base-confirm"));
 }
@@ -251,7 +251,7 @@ afterEach(() => {
 describe("SurveyView — prefill → B transition", () => {
   it("renders the B stage after Prefill onConfirm is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToPrefill();
@@ -272,7 +272,7 @@ describe("SurveyView — prefill → B transition", () => {
 describe("SurveyView — B → punctuation → carve transition", () => {
   it("renders the punctuation page after PhaseB onComplete, then carve after punctuation Done", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToB();
@@ -304,7 +304,7 @@ describe("SurveyView — B → punctuation → carve transition", () => {
 describe("SurveyView — carve → deadkeys → rules → mechanisms transition", () => {
   it("renders the deadkeys stage after CarveGallery onComplete is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToCarve();
@@ -318,7 +318,7 @@ describe("SurveyView — carve → deadkeys → rules → mechanisms transition"
 
   it("renders the rules stage after Deadkeys onComplete is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToDeadkeys();
@@ -332,7 +332,7 @@ describe("SurveyView — carve → deadkeys → rules → mechanisms transition"
 
   it("renders the mechanisms stage after the rules step's Continue is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToRules();
@@ -357,7 +357,7 @@ describe("SurveyView — carve → deadkeys → rules → mechanisms transition"
 describe("SurveyView — mechanisms → F transition", () => {
   it("renders the touch_seed_source fork after MechanismGallery onComplete is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToMechanisms();
@@ -408,7 +408,7 @@ describe("SurveyView — mechanisms → F transition", () => {
 describe("SurveyView — touch_seed_source suppresses the outer OSK pane (P0 fix)", () => {
   it("does not mount the outer persistent OSKFrame while touch_seed_source is active", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToTouchSeedSource();
@@ -438,7 +438,7 @@ describe("SurveyView — touch_seed_source suppresses the outer OSK pane (P0 fix
 describe("SurveyView — B → prefill back-navigation", () => {
   it("returns to prefill stage when PhaseB onBack is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToB();
@@ -458,7 +458,7 @@ describe("SurveyView — B → prefill back-navigation", () => {
 describe("SurveyView — carve → B back-navigation", () => {
   it("returns to B stage (not prefill) when CarveGallery onBack is called, via the invisibles and punctuation pages", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToCarve();
@@ -495,7 +495,7 @@ describe("SurveyView — carve → B back-navigation", () => {
 describe("SurveyView — F → E back-navigation", () => {
   it("returns to Phase E (touch gallery, not B) when PhaseF onBack is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToF();
@@ -519,7 +519,7 @@ describe("SurveyView — F → E back-navigation", () => {
 describe("SurveyView — mechanisms → rules → deadkeys → carve back-navigation", () => {
   it("returns to the rules stage (not deadkeys) when MechanismGallery onBack is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToMechanisms();
@@ -535,7 +535,7 @@ describe("SurveyView — mechanisms → rules → deadkeys → carve back-naviga
 
   it("returns to the deadkeys stage (not carve) when the rules step's Back is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToRules();
@@ -549,7 +549,7 @@ describe("SurveyView — mechanisms → rules → deadkeys → carve back-naviga
 
   it("returns to carve stage when Deadkeys onBack is called", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToDeadkeys();
@@ -839,22 +839,22 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
     expect(loadDraft(activeKey!)).toBe(true);
   }
 
-  // F1/P1 regression (was "résumé pre-seeds instantiatedForBaseIdRef"):
+  // F1/P1 regression (was "résumé pre-seeds instantiatedForStartIdRef"):
   // the SAME invariant now holds structurally off the silent boot-restore
   // effect (StudioShell.tsx, the `restoredProjectKey !== null` branch) rather
   // than off a banner click — a compile-pipeline settle for the
   // already-restored base must not re-run doCommit (no second
-  // instantiateFromBaseIfConfirmed call) or pop the rebase-confirm dialog.
+  // instantiateFromStartIfConfirmed call) or pop the rebase-confirm dialog.
   it("a pipeline settle for the silently-restored base does not re-instantiate or confirm", async () => {
     window.location.hash = "";
     localStorage.clear();
 
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs: createVirtualFS([]),
       ir: makeTestIR([]),
     });
-    useSurveySessionStore.getState().setLocalBase(basicKbdus);
-    useSurveySessionStore.getState().setBaseConfirmed(true);
+    useSurveySessionStore.getState().setLocalStart(basicKbdus);
+    useSurveySessionStore.getState().setStartConfirmed(true);
     useSurveySessionStore.getState().advance("choose_base");
 
     const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
@@ -915,7 +915,7 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
 
     // Reach an L4-equivalent position (base confirmed, track chosen, on the
     // characters/prefill step) via the top-level stores.
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs: createVirtualFS([]),
       ir: makeTestIR([]),
     });
@@ -929,8 +929,8 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
       record({ id: "language-code", value: "en", provenance: "asked" });
       record({ id: "target-script", value: "Latn", provenance: "asked" });
     }
-    useSurveySessionStore.getState().setLocalBase(basicKbdus);
-    useSurveySessionStore.getState().setBaseConfirmed(true);
+    useSurveySessionStore.getState().setLocalStart(basicKbdus);
+    useSurveySessionStore.getState().setStartConfirmed(true);
     useSurveySessionStore.getState().advance("choose_base");
     useSurveySessionStore.getState().advance("track");
     useSurveySessionStore.getState().advance("characters");
@@ -1013,7 +1013,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
     localStorage.clear();
 
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // L1 progress: survey-advance gives hasMeaningfulProgress() a true reading
@@ -1027,17 +1027,17 @@ describe("F6 wiring: promotePendingAutosave", () => {
     saveDraft(PENDING_PROJECT_KEY);
     expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
 
-    // Preview the (mocked) base — sets localBase, arming the commit button.
+    // Preview the (mocked) base — sets localStart, arming the commit button.
     fireEvent.click(screen.getByTestId("base-preview"));
 
     // Drive the compile pipeline settle for that SAME base id ("basic_kbdus",
-    // the mock's fakeBase — matches basicKbdus.id) and manually instantiate
-    // the working copy, since `instantiateFromBaseIfConfirmed` is mocked to a
+    // the mock's fakeStart — matches basicKbdus.id) and manually instantiate
+    // the working copy, since `instantiateFromStartIfConfirmed` is mocked to a
     // no-op for every test in this file (see the module-level vi.mock above) —
     // doCommit's own body does not depend on that mock actually instantiating;
     // it only needs a real working copy in place to derive a real project key.
     act(() => {
-      useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
         vfs: createVirtualFS([]),
         ir: makeTestIR([]),
       });
@@ -1095,7 +1095,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
     const pendingIdBase = { ...basicKbdus, id: PENDING_PROJECT_KEY };
 
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -1104,11 +1104,11 @@ describe("F6 wiring: promotePendingAutosave", () => {
     expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
 
     act(() => {
-      // Bypasses the mock BaseResolution's hardcoded fakeBase id (fixed at
-      // "basic_kbdus") — setLocalBase directly, matching the real
-      // BaseResolutionAdapter.onPreview effect.
-      useSurveySessionStore.getState().setLocalBase(pendingIdBase);
-      useWorkingCopyStore.getState().instantiateFromBase(pendingIdBase, {
+      // Bypasses the mock StartResolution's hardcoded fakeStart id (fixed at
+      // "basic_kbdus") — setLocalStart directly, matching the real
+      // StartResolutionAdapter.onPreview effect.
+      useSurveySessionStore.getState().setLocalStart(pendingIdBase);
+      useWorkingCopyStore.getState().instantiateFromStart(pendingIdBase, {
         vfs: createVirtualFS([]),
         ir: makeTestIR([]),
       });
@@ -1145,7 +1145,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
     vi.useFakeTimers();
 
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -1194,7 +1194,7 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
     window.location.hash = "#survey";
 
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToF();
@@ -1218,7 +1218,7 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
 describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R12)", () => {
   it("onBack passed to TouchGallery sets stage to touch_seed_source, not mechanisms", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // Advance to the fork, confirm it, then reach Phase E (touch).
@@ -1238,7 +1238,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 
   it("the chooser's own Back reaches mechanisms (the step genuinely visited immediately before touch_seed_source)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToTouchSeedSource();
@@ -1258,7 +1258,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 
   it("after returning to the fork from E, can re-confirm to reach E again", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // Advance to Phase E.
@@ -1282,7 +1282,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 // ---------------------------------------------------------------------------
 //
 // The Track 2 path clicks "track-adapt" instead of "track-copy", which skips
-// the project-name step and calls instantiateFromExisting (not instantiateFromBase).
+// the project-name step and calls instantiateFromExisting (not instantiateFromStart).
 //
 // useKeyboardArtifact is mocked to return { stage: { kind: "idle" } } which means
 // onInstantiate never fires in this shallow test. We can still verify the ROUTING
@@ -1302,7 +1302,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 describe("SurveyView — Track 2 (adapt) routing", () => {
   it("clicking track-adapt advances through attribution to prefill, skipping project-name", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // Drive to the track stage.
@@ -1325,7 +1325,7 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 
   it("track-copy still advances through attribution and project-name to prefill (regression guard)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToTrack();
@@ -1357,7 +1357,7 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)", () => {
   it("adapt-track: selects adapt → skips project_name → prefill-confirm → stage-B → phase-b-done → punctuation → carve → back-backs land on stage-B (not prefill)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // Drive to track stage, then select adapt (skips project_name).
@@ -1406,8 +1406,8 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
 // ---------------------------------------------------------------------------
 //
 // handlePhaseEComplete must call setTouchLayoutJson with JSON derived from
-// buildTouchLayoutJson(baseIr, assignments, opts) — NOT scaffoldTouchLayout(ir)
-// with the assignments ignored. We seed baseIr into the store, emit a
+// buildTouchLayoutJson(startIr, assignments, opts) — NOT scaffoldTouchLayout(ir)
+// with the assignments ignored. We seed startIr into the store, emit a
 // longpress assignment from the TouchGallery mock, and assert the stored
 // touchLayoutJson contains the assignment data.
 //
@@ -1419,15 +1419,15 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
 describe("SurveyView — handlePhaseEComplete applies assignments to output (Defect B)", () => {
   it("import-adapt + a real edit: setTouchLayoutJson is called with JSON containing the emitted assignment", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Seed baseIr into the store so handlePhaseEComplete can call buildTouchLayoutJson.
+    // Seed startIr into the store so handlePhaseEComplete can call buildTouchLayoutJson.
     // The mock buildTouchLayoutJson serialises its `assignments` arg into the JSON,
     // so we can assert the round-trip without touching real engine code.
     const fakeIr = makeTestIR([]);
     act(() => {
-      useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
         vfs: createVirtualFS([]),
         ir: fakeIr,
       });
@@ -1471,10 +1471,10 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 
   it("baseIr null: setTouchLayoutJson(null) regardless of seedSource (the one gate the reducer still owns)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // baseIr is null — store is not seeded. handlePhaseEComplete must call
+    // startIr is null — store is not seeded. handlePhaseEComplete must call
     // setTouchLayoutJson(null) rather than attempting to build a layout.
     touchEAssignments.current = [];
 
@@ -1491,20 +1491,20 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
       fireEvent.click(screen.getByTestId("touch-continue"));
     });
 
-    // Store baseIr is null → touchLayoutJson must remain null.
+    // Store startIr is null → touchLayoutJson must remain null.
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
   });
 
   it("import-adapt + no edits + empty mods: setTouchLayoutJson(null) (truly-untouched no-op)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Seed baseIr so the branch condition is clear: assignments empty → null,
-    // regardless of baseIr presence.
+    // Seed startIr so the branch condition is clear: assignments empty → null,
+    // regardless of startIr presence.
     const fakeIr = makeTestIR([]);
     act(() => {
-      useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
         vfs: createVirtualFS([]),
         ir: fakeIr,
       });
@@ -1533,12 +1533,12 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 
   it("reseed-from-desktop: setTouchLayoutJson is called (non-null) even with zero Phase E edits", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     const fakeIr = makeTestIR([]);
     act(() => {
-      useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
         vfs: createVirtualFS([]),
         ir: fakeIr,
       });
@@ -1651,7 +1651,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 describe("T029 — runtime step order matches manifest spine order", () => {
   it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → touch → help", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // identity (manifest step)
@@ -1736,7 +1736,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
 
   it("adapt-track skips project_name (side trail) and lands on characters via attribution (P0 fix, #1901)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToTrack();
@@ -1755,7 +1755,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
 
   it("characters step comes BEFORE carve in the manifest (FR-012)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToB();
@@ -1773,7 +1773,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
 
   it("applyStepCompletion fires lockDesktop when mechanisms completes (R1)", async () => {
     await act(async () => {
-      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
     await advanceToMechanisms();
@@ -1811,7 +1811,7 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
     // is anywhere other than "done" (see surveySessionStore.ts's
     // sanitizeHistory doc comment for the corruption class this repairs).
     const fakeIr = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs: createVirtualFS([]),
       ir: fakeIr,
     });
@@ -1854,7 +1854,7 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
     // effect it triggers) forms a render -> setState -> render cycle, this
     // either hangs (test times out) or notifyCount grows unboundedly.
     await act(async () => {
-      render(<><SurveyView baseKeyboard={basicKbdus} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={basicKbdus} /><ActiveStepNav /></>);
     });
 
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
@@ -1875,7 +1875,7 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
     // backToUnfinishedGallery wiring) is on-screen and exercised, not just
     // the mocked step body inside it.
     const fakeIr = makeTestIR([]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs: createVirtualFS([]),
       ir: fakeIr,
     });
@@ -1903,7 +1903,7 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
     expect(useSurveySessionStore.getState().activeStepId).toBe("help");
 
     await act(async () => {
-      render(<><SurveyView baseKeyboard={basicKbdus} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={basicKbdus} /><ActiveStepNav /></>);
     });
 
     // PhaseFGate's wrapped step body renders (empty confirmedInventory means
@@ -1933,18 +1933,18 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
 
 describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)", () => {
   /**
-   * Mount the way `StudioShell` does: `baseKeyboard` is the WORKING-COPY
+   * Mount the way `StudioShell` does: `startKeyboard` is the WORKING-COPY
    * STORE's base, not a fixed prop. That matters on the remount — `SurveyView`
-   * syncs `localBase` from this prop, so remounting with a hardcoded `null`
+   * syncs `localStart` from this prop, so remounting with a hardcoded `null`
    * would blank a base the author had already chosen and tell us nothing about
    * traversal.
    */
   async function mountSurvey() {
     const base =
-      useWorkingCopyStore.getState().baseKeyboard ??
-      useSurveySessionStore.getState().localBase;
+      useWorkingCopyStore.getState().startKeyboard ??
+      useSurveySessionStore.getState().localStart;
     await act(async () => {
-      render(<><SurveyView baseKeyboard={base} /><ActiveStepNav /></>);
+      render(<><SurveyView startKeyboard={base} /><ActiveStepNav /></>);
     });
   }
 
@@ -2193,7 +2193,7 @@ describe("StudioShell — journey footer mount (T052, FR-040)", () => {
         .publishStepWalk("identity", [{ id: "il_language_english", done: false }]);
     });
 
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
 
     const footer = document.querySelector("footer");
     expect(footer).not.toBeNull();

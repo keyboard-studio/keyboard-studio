@@ -22,9 +22,9 @@
 // while an Arabic Ewondo keyboard must report the real `ewo` -> `ewo-Arab`.
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard } from "@keyboard-studio/contracts";
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   DecisionEntry,
   DecisionImpact,
   DecisionRecord,
@@ -41,7 +41,7 @@ import { resolveImpactAsync, type ResolveImpactAsyncDeps } from "./impact.ts";
 // Fixture — a base whose descriptor declares SOMEONE ELSE's language
 // ---------------------------------------------------------------------------
 
-const BASE_ID = "test_base";
+const START_ID = "test_base";
 
 const KMN = [
   "store(&NAME) 'Test Base'",
@@ -63,7 +63,7 @@ const KPS = [
   "  <Keyboards>",
   "    <Keyboard>",
   "      <Name>Test Base</Name>",
-  `      <ID>${BASE_ID}</ID>`,
+  `      <ID>${START_ID}</ID>`,
   "      <Version>1.0</Version>",
   "      <Languages>",
   '        <Language ID="en">en</Language>',
@@ -74,9 +74,9 @@ const KPS = [
   "",
 ].join("\n");
 
-const BASE: BaseKeyboard = makeBaseKeyboard({
-  id: BASE_ID,
-  path: `release/t/${BASE_ID}`,
+const BASE: StartKeyboard = makeStartKeyboard({
+  id: START_ID,
+  path: `release/t/${START_ID}`,
   script: "Latn",
   targets: ["windows", "web"],
   displayName: "Test Base",
@@ -100,11 +100,11 @@ function answers(languageCode: string, targetScript: string): SurveyAnswer[] {
  */
 function seedSession(languageCode: string, targetScript: string): string {
   const vfs = createVirtualFS([
-    { path: `source/${BASE_ID}.kmn`, content: KMN, isBinary: false },
-    { path: `source/${BASE_ID}.kps`, content: KPS, isBinary: false },
+    { path: `source/${START_ID}.kmn`, content: KMN, isBinary: false },
+    { path: `source/${START_ID}.kps`, content: KPS, isBinary: false },
   ]);
-  const { ir } = parseKmn(KMN, `${BASE_ID}.kmn`);
-  useWorkingCopyStore.getState().instantiateFromBase(BASE, { vfs, ir });
+  const { ir } = parseKmn(KMN, `${START_ID}.kmn`);
+  useWorkingCopyStore.getState().instantiateFromStart(BASE, { vfs, ir });
   const identity = extractIdentityLite({ phase: "A", answers: answers(languageCode, targetScript) });
   useWorkingCopyStore.getState().setIdentity({
     displayName: identity.english,
@@ -135,16 +135,16 @@ function answerEntry(entryId: string, questionId: string, value: string): Decisi
 }
 
 function recordOf(entries: DecisionEntry[]): DecisionRecord {
-  return { keyboardId: BASE_ID, entries } as DecisionRecord;
+  return { keyboardId: START_ID, entries } as DecisionRecord;
 }
 
 /** The resolver wired the way StudioShell wires it: the projection is the real one. */
 function asyncDeps(record: DecisionRecord): ResolveImpactAsyncDeps {
   return {
-    getWorkingIR: () => useWorkingCopyStore.getState().baseIr,
+    getWorkingIR: () => useWorkingCopyStore.getState().startIr,
     isDesktopLocked: () => false,
     isTouchLocked: () => false,
-    hasWorkingCopy: () => useWorkingCopyStore.getState().baseIr !== null,
+    hasWorkingCopy: () => useWorkingCopyStore.getState().startIr !== null,
     getRecord: () => record,
     project: (opts) => projectWorkingCopyForOutput(opts),
   };
@@ -213,7 +213,7 @@ describe("script answer whose script IS the language's default", () => {
 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
-    const kps = projected!.vfs.get(`source/${BASE_ID}.kps`)?.content as string;
+    const kps = projected!.vfs.get(`source/${START_ID}.kps`)?.content as string;
     expect(kps).toContain('<Language ID="ewo">');
     expect(kps).not.toContain("ewo-Latn");
     // And the base's own language is gone, so this is not passing by inertia.

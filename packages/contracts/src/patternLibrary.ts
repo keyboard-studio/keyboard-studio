@@ -1,7 +1,7 @@
 // see spec.md section 5 / section 7.2 / section 8 step 4 — pattern-library service
 
 import type { Pattern } from "./pattern";
-import type { BaseKeyboard } from "./baseKeyboard";
+import type { StartKeyboard } from "./startKeyboard";
 import type { DiscoveryAxisVector } from "./axes";
 import type { PatternMatch } from "./patternMatch";
 
@@ -84,7 +84,7 @@ export interface PatternLibraryService {
    * @see PatternMatch
    */
   filterFor(
-    base: BaseKeyboard,
+    base: StartKeyboard,
     axes?: DiscoveryAxisVector
   ): Promise<PatternMatch[]>;
 }

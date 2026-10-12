@@ -1,7 +1,7 @@
 // Check 3.4 — KM_LINT_HISTORY_TRUNCATED
 // Criteria (criteria.json "3.4-history-cumulative"): "HISTORY.md is
 // cumulative — prior entries are preserved, not overwritten." Fires when a
-// base HISTORY.md entry present at instantiation (`DocLintInput.baseHistoryMdText`,
+// base HISTORY.md entry present at instantiation (`DocLintInput.startHistoryMdText`,
 // data-model.md §7) is missing from the current text.
 
 import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
@@ -15,11 +15,11 @@ function entryKey(version: string, date: string | null): string {
  * Check that every base HISTORY.md entry present at instantiation is still
  * present in the current text (by version + date).
  *
- * @param input - Documentation check input (uses `baseHistoryMdText` and
+ * @param input - Documentation check input (uses `startHistoryMdText` and
  *   `members["history-md"]`).
  */
 export function checkHistoryCumulative(input: DocLintInput): LintFinding[] {
-  const baseText = input.baseHistoryMdText;
+  const baseText = input.startHistoryMdText;
   const currentText = input.members["history-md"];
   if (baseText === undefined || currentText === undefined) return [];
 

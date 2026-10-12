@@ -11,7 +11,7 @@
 // character-inventory decision value — both panes read/write one list.
 //
 // Data source: buildCharacterMap (engine, a parallel-track character-discovery
-// deliverable) via lib/services.ts's characterMapGroups wrapper. baseIr comes
+// deliverable) via lib/services.ts's characterMapGroups wrapper. startIr comes
 // from workingCopyStore; bcp47/languageName come from the same
 // surveySessionStore.surveyContext PhaseB itself reads (context.bcp47_tag /
 // context.language_name) — no new plumbing invented for this pane.
@@ -106,8 +106,8 @@ export function CharacterMapPane({
   scope = "alphabet",
 }: CharacterMapPaneProps = {}) {
   const { t } = useLingui();
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const decisions = useDecisionStore((s) => s.decisions);
   const surveyContext = deriveSurveyContext(decisions);
   const bcp47 = surveyContext.bcp47_tag;
@@ -164,11 +164,11 @@ export function CharacterMapPane({
   const closeCharInfo = charInfo.close;
 
   // No base IR / no BCP47 yet — short-circuit BEFORE the fetch, mirroring
-  // SuggestionPanel's own `!bcp47 || baseIr === null` guard (PhaseB.tsx). Without
+  // SuggestionPanel's own `!bcp47 || startIr === null` guard (PhaseB.tsx). Without
   // this, characterMapGroups(...) was called unconditionally and always showed
   // the generic "No characters available" empty state instead of a message that
   // tells the author WHY (and what to do instead).
-  const noBaseOrLanguage = baseIr === null || !bcp47;
+  const noBaseOrLanguage = startIr === null || !bcp47;
   const displayName =
     languageName ?? bcp47 ?? t({ id: "survey.characterMapPane.genericLanguage", message: "this language" });
 
@@ -177,16 +177,16 @@ export function CharacterMapPane({
   // "lif-Deva" -> "Deva"). Forwarded to buildCharacterMap's opts.baseScripts
   // so the base keyboard's script(s) are enumerated alongside the target
   // script — this only drives WHICH groups are built, not the "blocks my
-  // keyboard uses" filter below (that filter narrows by usedByBase instead).
+  // keyboard uses" filter below (that filter narrows by usedByStart instead).
   const baseScripts = useMemo<string[]>(() => {
     const set = new Set<string>();
-    if (baseKeyboard?.script) set.add(baseKeyboard.script);
-    for (const tag of baseKeyboard?.languages ?? []) {
+    if (startKeyboard?.script) set.add(startKeyboard.script);
+    for (const tag of startKeyboard?.languages ?? []) {
       const script = scriptSubtagOf(tag);
       if (script !== undefined) set.add(script);
     }
     return [...set];
-  }, [baseKeyboard]);
+  }, [startKeyboard]);
 
   // Fetch the character map whenever the base IR, base keyboard, or language
   // identity changes.
@@ -206,7 +206,7 @@ export function CharacterMapPane({
     }
     let cancelled = false;
     setLoadState({ status: "loading" });
-    characterMapGroups(baseIr, bcp47, languageName, baseScripts)
+    characterMapGroups(startIr, bcp47, languageName, baseScripts)
       .then((groups) => {
         if (!cancelled) setLoadState({ status: "done", groups });
       })
@@ -216,15 +216,15 @@ export function CharacterMapPane({
     return () => {
       cancelled = true;
     };
-  }, [noBaseOrLanguage, baseIr, bcp47, languageName, baseKeyboard, baseScripts, searchFiltersPopover.reset, closeCharInfo]);
+  }, [noBaseOrLanguage, startIr, bcp47, languageName, startKeyboard, baseScripts, searchFiltersPopover.reset, closeCharInfo]);
 
   // Whether the loaded groups actually carry a known produced set — the
-  // engine only sets `usedByBase: true` on any group when it had a baseIr to
+  // engine only sets `usedByStart: true` on any group when it had a startIr to
   // derive producedGlyphs() from (see buildCharacterMap). Without at least
-  // one usedByBase group the "blocks my keyboard uses" filter is meaningless,
+  // one usedByStart group the "blocks my keyboard uses" filter is meaningless,
   // so it stays hidden and every group shows regardless of `blocksOnly`.
   const hasKnownBlocks = useMemo(
-    () => loadState.status === "done" && loadState.groups.some((g) => g.usedByBase),
+    () => loadState.status === "done" && loadState.groups.some((g) => g.usedByStart),
     [loadState],
   );
 
@@ -233,8 +233,8 @@ export function CharacterMapPane({
   // a "your base already types this" affordance. Browser-safe, memoized on the
   // base IR (no I/O). Empty set when there is no base IR.
   const baseProduced = useMemo<Set<string>>(
-    () => (baseIr !== null ? buildProducedSet(baseIr) : new Set<string>()),
-    [baseIr],
+    () => (startIr !== null ? buildProducedSet(startIr) : new Set<string>()),
+    [startIr],
   );
 
 
@@ -293,7 +293,7 @@ export function CharacterMapPane({
     }
     if (blocksOnly && hasKnownBlocks) {
       return cased.filter(
-        (g) => g.usedByBase || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
+        (g) => g.usedByStart || g.cells.some((c) => chars.includes(c.char.normalize("NFC"))),
       );
     }
     return cased;

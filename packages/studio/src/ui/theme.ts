@@ -4,7 +4,7 @@
 //
 //   1. CSS custom-property accessors — canonical tokens backed by the
 //      `--app-*` variables already defined in index.css and consumed by
-//      BaseResolution. Primitives MUST use these so that a host-page
+//      StartResolution. Primitives MUST use these so that a host-page
 //      theme change propagates automatically.
 //
 //   2. Legacy-named constants (galleryTheme.ts compatibility) — these used

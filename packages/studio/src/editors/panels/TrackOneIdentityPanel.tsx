@@ -8,7 +8,7 @@
 // (adapt-existing) because identity is preserved from the loaded keyboard.
 //
 // Behaviour:
-//   - Seeded from baseKeyboard.id / baseKeyboard.displayName on first mount
+//   - Seeded from startKeyboard.id / startKeyboard.displayName on first mount
 //     (or from the existing identity patch if the user already set one).
 //   - On every change, calls setIdentity({ displayName, keyboardId }) so the
 //     projection layer immediately picks up displayName (spacebar caption) and
@@ -34,7 +34,7 @@ import { CARD_BORDER, TEXT_DIM, WARNING } from "../../ui/theme.ts";
 export function TrackOneIdentityPanel() {
   const { t } = useLingui();
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const setIdentity = useWorkingCopyStore((s) => s.setIdentity);
   // The identity-lite answers, derived from the decision store (spec 089).
@@ -56,31 +56,31 @@ export function TrackOneIdentityPanel() {
 
   // Seed from store whenever the working copy is (re-)instantiated.
   // We guard with a ref to avoid re-seeding after the user has already typed.
-  const seededForBaseRef = useRef<string | null>(null);
+  const seededForStartRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (baseKeyboard === null) return;
-    if (seededForBaseRef.current === baseKeyboard.id) return; // already seeded for this base
+    if (startKeyboard === null) return;
+    if (seededForStartRef.current === startKeyboard.id) return; // already seeded for this base
 
     // Seed from the store's identity patch first; fall back to base metadata.
-    const seedId = identity?.keyboardId ?? baseKeyboard.id;
-    const seedName = identity?.displayName ?? baseKeyboard.displayName;
+    const seedId = identity?.keyboardId ?? startKeyboard.id;
+    const seedName = identity?.displayName ?? startKeyboard.displayName;
 
     setKeyboardId(seedId);
     setDisplayName(seedName);
     setIdTouched(false);
-    seededForBaseRef.current = baseKeyboard.id;
-  }, [baseKeyboard, identity]);
+    seededForStartRef.current = startKeyboard.id;
+  }, [startKeyboard, identity]);
 
   // Only render for Track 1.
-  if (instantiationMode !== "new-from-base" || baseKeyboard === null) {
+  if (instantiationMode !== "new-from-base" || startKeyboard === null) {
     return null;
   }
 
   const idValidation = validateKeyboardId(keyboardId.trim());
   const idError = idValidation.valid ? null : (idValidation.reason ?? t({ id: "editor.trackOneIdentity.invalidKeyboardId", message: "invalid keyboard id" }));
   const isIdValid = idValidation.valid;
-  const isIdUntouched = keyboardId.trim() === baseKeyboard.id;
+  const isIdUntouched = keyboardId.trim() === startKeyboard.id;
 
   // The identity-lite answers, carried into every patch this panel writes.
   //

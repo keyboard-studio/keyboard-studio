@@ -1,6 +1,6 @@
 // see spec.md §7.2 §9 — filterFor() unit tests
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Pattern, BaseKeyboard, DiscoveryAxisVector } from "@keyboard-studio/contracts";
+import type { Pattern, StartKeyboard, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import { filterFor } from "./filterFor.js";
 
 // Minimal Pattern factory for test doubles
@@ -25,8 +25,8 @@ vi.mock("./loader.js", () => ({
 import { getPatterns } from "./loader.js";
 const mockGetPatterns = vi.mocked(getPatterns);
 
-const latinBase: BaseKeyboard = { script: "Latn" } as unknown as BaseKeyboard;
-const arabicBase: BaseKeyboard = { script: "Arab" } as unknown as BaseKeyboard;
+const latinStart: StartKeyboard = { script: "Latn" } as unknown as StartKeyboard;
+const arabicStart: StartKeyboard = { script: "Arab" } as unknown as StartKeyboard;
 
 describe("filterFor()", () => {
   beforeEach(() => {
@@ -41,7 +41,7 @@ describe("filterFor()", () => {
     ];
     mockGetPatterns.mockReturnValue(patterns);
 
-    const result = await filterFor(latinBase, undefined);
+    const result = await filterFor(latinStart, undefined);
 
     // p1 (universal) and p2 (Latin) match; p3 (Arab) does not
     expect(result).toHaveLength(2);
@@ -66,7 +66,7 @@ describe("filterFor()", () => {
       scale: "small",
     } as unknown as DiscoveryAxisVector;
 
-    const result = await filterFor(arabicBase, axes);
+    const result = await filterFor(arabicStart, axes);
 
     expect(result).toHaveLength(3);
     expect(result[0]!.patternId).toBe("primary-p");
@@ -87,7 +87,7 @@ describe("filterFor()", () => {
     ];
     mockGetPatterns.mockReturnValue(patterns);
 
-    const result = await filterFor(latinBase, undefined);
+    const result = await filterFor(latinStart, undefined);
 
     expect(result.map(m => m.patternId)).toEqual(["deadkey-p"]);
   });

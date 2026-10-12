@@ -32,7 +32,7 @@ export interface SiblingAccentProposal {
    *  proposal's own placement is NOT included in `placements` (the caller
    *  already placed it before raising this proposal). */
   acceptedChar: string;
-  hostKey: string;
+  baseKey: string;
   placements: SiblingAccentPlacement[];
 }
 
@@ -91,7 +91,9 @@ export function SiblingAccentProposalBanner({
       }
       confirmAriaLabel={t({
         id: "editor.assignLoop.touch.siblingAccents.confirmAriaLabel",
-        message: `Add the related accented letters to ${{ hostKey: proposal.hostKey }}`,
+        // The values key stays `hostKey`: it is the Lingui placeholder name
+        // in the catalog string ({hostKey}), not a code identifier (#1810).
+        message: `Add the related accented letters to ${{ hostKey: proposal.baseKey }}`,
       })}
       onConfirm={onConfirm}
       declineLabel={

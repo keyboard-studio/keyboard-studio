@@ -27,7 +27,7 @@
 import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   seedReturningVisitor,
@@ -35,7 +35,7 @@ import {
 } from "./helpers/surveyFlow";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Test",
   english: "Test",
   targetScript: "Latn",
@@ -58,7 +58,7 @@ test.describe("browser Back mid-survey (F7)", () => {
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
 

@@ -5,7 +5,7 @@
 // mutates the same shared character-inventory value):
 //   - characterMapGroups is mocked via vi.mock("../lib/services.ts") so no
 //     network/CLDR traffic occurs and the returned groups are deterministic.
-//   - baseIr/bcp47/languageName are read by the pane from the REAL
+//   - startIr/bcp47/languageName are read by the pane from the REAL
 //     workingCopyStore/surveySessionStore singletons (not mocked) — seeded
 //     directly, matching BuildListView.test.tsx's convention.
 //   - the inventory draft is the real decision-backed state; reset in before/afterEach
@@ -66,7 +66,7 @@ const { getGroupsResult, callCount, unsupportedDisplays } = vi.hoisted(() => {
 vi.mock("../lib/services.ts", () => ({
   USE_REAL: false,
   characterMapGroups: async (
-    _baseIr: unknown,
+    _startIr: unknown,
     _bcp47?: string,
     _languageName?: string,
     _baseScripts?: readonly string[],
@@ -98,7 +98,7 @@ function twoGroupFixture(): CharacterMapGroup[] {
       block: "Latin",
       tier: "main",
       script: "Latn",
-      usedByBase: false,
+      usedByStart: false,
       cells: [
         { char: "a", isCombiningMark: false },
         { char: "b", isCombiningMark: false },
@@ -108,7 +108,7 @@ function twoGroupFixture(): CharacterMapGroup[] {
       block: "Combining Diacritical Marks",
       tier: "auxiliary",
       script: "Latn",
-      usedByBase: false,
+      usedByStart: false,
       cells: [{ char: COMBINING_ACUTE, isCombiningMark: true }],
     },
   ];
@@ -134,8 +134,8 @@ function seedIdentityDecisions(languageCode: string, languageName: string): void
   record({ id: "target-script", value: "Latn", provenance: "asked" });
 }
 
-function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
-  useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
+function seedStartAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
+  useWorkingCopyStore.getState().instantiateFromStart(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
   });
@@ -143,14 +143,14 @@ function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
 }
 
 /** Seed a base whose IR PRODUCES the given glyphs (one rule per char). */
-function seedBaseProducing(produced: string[], bcp47 = "yo", languageName = "Yoruba"): void {
+function seedStartProducing(produced: string[], bcp47 = "yo", languageName = "Yoruba"): void {
   const rules = produced.map((c, i) => ({
     nodeId: `rule#${i}`,
     context: [{ kind: "vkey" as const, name: "K_A", modifiers: [] }],
     output: [{ kind: "char" as const, value: c.normalize("NFC") }],
   }));
   const group: IRGroup = { nodeId: "group#main", name: "main", usingKeys: true, readonly: false, rules };
-  useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
+  useWorkingCopyStore.getState().instantiateFromStart(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([group]),
   });
@@ -179,7 +179,7 @@ afterEach(() => {
 
 describe("CharacterMapPane — data path", () => {
   it("renders both groups with their tier label after data loads", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -189,7 +189,7 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("renders a cell's glyph and U+ codepoint notation", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -202,7 +202,7 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("renders the dotted-circle affordance for a combining-mark cell", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -215,7 +215,7 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("renders a deterministic box placeholder (not the glyph) when the selected font can't render a cell — codepoint label and click/aria behavior stay unchanged (Requirement 1)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     unsupportedDisplays.set(["b"]);
     render(<CharacterMapPane />);
 
@@ -242,7 +242,7 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("never boxes a combining-mark cell even when the font-support checker reports it unsupported (regression)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     // The dotted-circle-prefixed display string for the fixture's combining
     // mark cell (◌ + U+0301) — report it as "unsupported" via the mocked
     // useFontSupportChecker, exactly the shape of the measureText misfire
@@ -263,7 +263,7 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("clicking a cell toggles it into the draft store and flips aria-pressed", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -291,7 +291,7 @@ describe("CharacterMapPane — data path", () => {
   // catalog sentence, not a translated action word spliced with raw char/
   // codepoint data via template literal outside any t()/Trans call.
   it("announces toggling a cell as one full catalog sentence, not an assembled fragment", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -310,13 +310,13 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("hides uppercase letters of a cased script, showing only the lowercase (spec 047)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [
           { char: "a", isCombiningMark: false },
           { char: "A", isCombiningMark: false },
@@ -339,13 +339,13 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("clicking a cased letter adds BOTH cases to the alphabet; clicking again removes both (spec 047)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [
           { char: "a", isCombiningMark: false },
           { char: "b", isCombiningMark: false },
@@ -369,13 +369,13 @@ describe("CharacterMapPane — data path", () => {
 
   it("tints base-keyboard output glyphs (with an accessible hint) until the author selects them", async () => {
     // Base produces "a" but not "b".
-    seedBaseProducing(["a"]);
+    seedStartProducing(["a"]);
     getGroupsResult.set([
       {
         block: "Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [
           { char: "a", isCombiningMark: false },
           { char: "b", isCombiningMark: false },
@@ -400,13 +400,13 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("shows a loanword letter as selected, and clicking it removes it from the loanword list only", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [
           { char: "a", isCombiningMark: false },
           { char: "q", isCombiningMark: false },
@@ -426,13 +426,13 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("shows only letters, numerals, and marks; excludes symbols and separators (spec 047)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Mixed",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [
           { char: "a", isCombiningMark: false }, // letter — kept
           { char: "5", isCombiningMark: false }, // numeral — kept (word-forming)
@@ -455,9 +455,9 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("shows the dashed-outline base-output legend note when the base produces glyphs", async () => {
-    seedBaseProducing(["a"]);
+    seedStartProducing(["a"]);
     getGroupsResult.set([
-      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
+      { block: "Latin", tier: "main", script: "Latn", usedByStart: false, cells: [{ char: "a", isCombiningMark: false }] },
     ]);
     render(<CharacterMapPane />);
     await waitFor(() => {
@@ -468,9 +468,9 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("omits the base-output legend note when the base produces nothing", async () => {
-    seedBaseAndLanguage(); // makeTestIR([]) — empty produced set
+    seedStartAndLanguage(); // makeTestIR([]) — empty produced set
     getGroupsResult.set([
-      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
+      { block: "Latin", tier: "main", script: "Latn", usedByStart: false, cells: [{ char: "a", isCombiningMark: false }] },
     ]);
     render(<CharacterMapPane />);
     await waitFor(() => {
@@ -482,7 +482,7 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("a cell already present in the inventory chars renders aria-pressed=true on mount", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     inventoryOps("characters").setAll(["b"]);
     render(<CharacterMapPane />);
 
@@ -505,7 +505,7 @@ describe("CharacterMapPane — data path", () => {
 
 describe("CharacterMapPane — short-circuit (no verified character list)", () => {
   it("baseIr === null: renders the no-verified-list message and never calls characterMapGroups", () => {
-    // No instantiateFromBase call — baseIr stays null (workingCopyStore default).
+    // No instantiateFromStart call — startIr stays null (workingCopyStore default).
     seedIdentityDecisions("yo", "Yoruba");
     render(<CharacterMapPane />);
 
@@ -514,7 +514,7 @@ describe("CharacterMapPane — short-circuit (no verified character list)", () =
   });
 
   it("no bcp47_tag in context: renders the no-verified-list message and never calls characterMapGroups", () => {
-    useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
+    useWorkingCopyStore.getState().instantiateFromStart(TEST_BASE, {
       vfs: { files: new Map() },
       ir: makeTestIR([]),
     });
@@ -536,7 +536,7 @@ describe("CharacterMapPane — short-circuit (no verified character list)", () =
 
 describe("CharacterMapPane — raw code point entry", () => {
   it("adds a character by U+XXXX code point and clears the field on success", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -556,7 +556,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("accepts liberal hex forms (bare hex, lowercase u+) — canonical parser drops the 0x form", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -575,7 +575,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("rejects an out-of-range code point and shows an inline error without mutating the store", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -591,7 +591,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("rejects a surrogate-half code point", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -606,7 +606,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("rejects a noncharacter code point (plane-end and Arabic-presentation-forms range)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -627,7 +627,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("allows a PUA code point after the role prompt (the escape hatch's whole point, spec 071 FR-004)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -649,7 +649,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("PUA answered 'mark' lands in the Marks store with a permanent declared role (US6 AC2)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -668,7 +668,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("PUA answered 'letter' lands in the Letters store and never in Marks (US6 AC3)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -686,7 +686,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("cancelling the PUA role prompt adds nothing", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -702,7 +702,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("clears a stale error as soon as the field is edited again", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -718,7 +718,7 @@ describe("CharacterMapPane — raw code point entry", () => {
   });
 
   it("disables the Add button while the field is empty or whitespace-only", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -746,20 +746,20 @@ describe("CharacterMapPane — raw code point entry", () => {
 
 describe("CharacterMapPane — digits & punctuation tiers", () => {
   it("renders the digits tier; punctuation/symbols are not shown on this page (spec 047)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Digits",
         tier: "digits",
         script: "Common",
-        usedByBase: false,
+        usedByStart: false,
         cells: [{ char: "0", isCombiningMark: false }],
       },
       {
         block: "Punctuation",
         tier: "punctuation",
         script: "Common",
-        usedByBase: false,
+        usedByStart: false,
         cells: [{ char: ".", isCombiningMark: false }],
       },
     ]);
@@ -787,7 +787,7 @@ function openSearchFilters(): void {
 
 describe("CharacterMapPane — search filter", () => {
   it("filters cells by substring match, dropping groups with zero surviving cells", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -806,7 +806,7 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("shows a 'no characters match' message when the filter yields zero cells anywhere", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -821,7 +821,7 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("matches by Unicode name — 'acute' finds the combining acute accent cell", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -832,7 +832,7 @@ describe("CharacterMapPane — search filter", () => {
         block: "Combining Diacritical Marks",
         tier: "auxiliary",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [{ char: COMBINING_ACUTE, isCombiningMark: true, name: "COMBINING ACUTE ACCENT" }],
       },
     ]);
@@ -854,13 +854,13 @@ describe("CharacterMapPane — search filter", () => {
     // uppercase letters of cased scripts (spec 047 refinement), so an uppercase
     // fixture would be filtered out of the grid entirely. This test exercises
     // the code-point search mechanism, independent of casing.
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Basic Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [
           { char: "a", isCombiningMark: false }, // U+0061
           { char: "0", isCombiningMark: false }, // U+0030
@@ -889,13 +889,13 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("unchecking the Unicode value filter stops codepoint matches", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Basic Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [{ char: "a", isCombiningMark: false }], // U+0061
       },
     ]);
@@ -915,13 +915,13 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("unchecking the Character filter stops glyph matches while a Name match still surfaces the same cell", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [{ char: "ø", isCombiningMark: false, name: "LATIN SMALL LETTER O WITH STROKE" }],
       },
     ]);
@@ -949,13 +949,13 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("unchecking the Name filter stops name-substring matches while a Character (glyph) match still surfaces the same cell", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [{ char: "ø", isCombiningMark: false, name: "LATIN SMALL LETTER O WITH STROKE" }],
       },
     ]);
@@ -979,7 +979,7 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("a language/base change resets the search filter checkboxes back to all-checked", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -1011,13 +1011,13 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("matches by base letter — 'o' finds o, an accented o, and a non-decomposing o-variant", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       {
         block: "Latin",
         tier: "main",
         script: "Latn",
-        usedByBase: false,
+        usedByStart: false,
         cells: [
           { char: "o", isCombiningMark: false, name: "LATIN SMALL LETTER O" },
           { char: "ó", isCombiningMark: false, name: "LATIN SMALL LETTER O WITH ACUTE" },
@@ -1048,7 +1048,7 @@ describe("CharacterMapPane — search filter", () => {
   // -------------------------------------------------------------------------
 
   it("a real user click-then-type into the search box narrows the grid (regression coverage for the reported 'search bar does nothing' bug)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -1072,7 +1072,7 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("refuses to uncheck the last remaining search filter — at least one field stays selected, so a query never silently matches nothing", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -1104,7 +1104,7 @@ describe("CharacterMapPane — search filter", () => {
   // -------------------------------------------------------------------------
 
   it("the filter checkboxes are not present until the 'Search filters' trigger is opened", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -1123,7 +1123,7 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("Escape closes the filters panel and returns focus to the trigger", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -1140,7 +1140,7 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("a pointerdown outside the trigger and panel closes the filters popover", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -1155,7 +1155,7 @@ describe("CharacterMapPane — search filter", () => {
   });
 
   it("toggling a checkbox inside the open panel keeps it open", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
@@ -1193,9 +1193,9 @@ describe("CharacterMapPane — per-group render cap", () => {
   const TEST_CAP = 30;
 
   it("renders an at-cap group in full — no 'Showing N of M' truncation note", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
-      { block: "Synthetic", tier: "main", script: "Latn", usedByBase: false, cells: syntheticCells(TEST_CAP) },
+      { block: "Synthetic", tier: "main", script: "Latn", usedByStart: false, cells: syntheticCells(TEST_CAP) },
     ]);
     render(<CharacterMapPane maxCellsPerGroup={TEST_CAP} />);
 
@@ -1211,10 +1211,10 @@ describe("CharacterMapPane — per-group render cap", () => {
   });
 
   it("caps a group larger than the cap and shows 'Showing N of M'", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     const over = TEST_CAP + 5;
     getGroupsResult.set([
-      { block: "Synthetic", tier: "main", script: "Latn", usedByBase: false, cells: syntheticCells(over) },
+      { block: "Synthetic", tier: "main", script: "Latn", usedByStart: false, cells: syntheticCells(over) },
     ]);
     render(<CharacterMapPane maxCellsPerGroup={TEST_CAP} />);
 
@@ -1238,14 +1238,14 @@ describe("CharacterMapPane — per-group render cap", () => {
 
 // ---------------------------------------------------------------------------
 // Blocks-my-keyboard-uses filter — a checkbox (checked by default) that
-// narrows the grid to only the groups the engine tagged usedByBase: true
+// narrows the grid to only the groups the engine tagged usedByStart: true
 // (the Unicode blocks the base keyboard actually produces, via
 // producedGlyphs — see packages/engine/.../characterMap.ts), with the
 // "auto-unhide" mechanism: any group already represented in the author's
 // accumulating alphabet is shown too, so adding a character from a hidden
 // block unhides that whole block even while the checkbox stays checked. The
 // checkbox itself only renders once we actually know the base's blocks (at
-// least one loaded group is usedByBase: true) — otherwise the filter would
+// least one loaded group is usedByStart: true) — otherwise the filter would
 // be meaningless, so every group shows.
 // ---------------------------------------------------------------------------
 
@@ -1255,21 +1255,21 @@ function blocksFixture(): CharacterMapGroup[] {
       block: "Latin",
       tier: "main",
       script: "Latn",
-      usedByBase: true,
+      usedByStart: true,
       cells: [{ char: "a", isCombiningMark: false }],
     },
     {
       block: "Combining Diacritical Marks",
       tier: "auxiliary",
       script: "Latn",
-      usedByBase: true,
+      usedByStart: true,
       cells: [{ char: COMBINING_ACUTE, isCombiningMark: true }],
     },
     {
       block: "Greek",
       tier: "block",
       script: "Grek",
-      usedByBase: false,
+      usedByStart: false,
       cells: [{ char: "α", isCombiningMark: false, name: "GREEK SMALL LETTER ALPHA" }],
     },
   ];
@@ -1277,7 +1277,7 @@ function blocksFixture(): CharacterMapGroup[] {
 
 describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
   it("is checked by default; shows usedByBase groups, hides the non-used Greek group", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
@@ -1287,7 +1287,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
     const checkbox = screen.getByRole("checkbox", { name: "Show only blocks my keyboard uses" });
     expect((checkbox as HTMLInputElement).checked).toBe(true);
 
-    // usedByBase groups show...
+    // usedByStart groups show...
     expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     expect(
       screen.getByLabelText("Combining Diacritical Marks characters (loanwords)"),
@@ -1297,7 +1297,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
   });
 
   it("unchecking shows all groups, including the previously-hidden Greek group", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
@@ -1314,7 +1314,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
   });
 
   it("adding a character from a hidden block (reached via search) unhides that block while the checkbox stays checked", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
@@ -1340,7 +1340,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
   });
 
   it("search is whole-set: finds a hidden-block character even while the box is checked", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
@@ -1354,7 +1354,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
   });
 
   it("announces the filter state via the aria-live region on toggle", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set(blocksFixture());
     render(<CharacterMapPane />);
 
@@ -1371,10 +1371,10 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
   });
 
   it("hides the checkbox entirely when no loaded group is usedByBase (e.g. no producedGlyphs known), and shows every group", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
-      { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
-      { block: "Greek", tier: "block", script: "Grek", usedByBase: false, cells: [{ char: "α", isCombiningMark: false }] },
+      { block: "Latin", tier: "main", script: "Latn", usedByStart: false, cells: [{ char: "a", isCombiningMark: false }] },
+      { block: "Greek", tier: "block", script: "Grek", usedByStart: false, cells: [{ char: "α", isCombiningMark: false }] },
     ]);
     render(<CharacterMapPane />);
 
@@ -1390,14 +1390,14 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
     // Uncurated scripts share generic fallback block names ("Letters"), so two
     // groups can be tier:"block"/block:"Letters" and differ only by script.
     // groupKey() must include script or React drops one of them. Neither
-    // group is usedByBase, so the filter is inactive (checkbox hidden) and
+    // group is usedByStart, so the filter is inactive (checkbox hidden) and
     // both render without needing to be toggled.
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     getGroupsResult.set([
       // Two caseless-script letters (Greek α is lowercase; Devanagari क is
       // caseless) so neither is removed by the uppercase fold (spec 047).
-      { block: "Letters", tier: "block", script: "Grek", usedByBase: false, cells: [{ char: "α", isCombiningMark: false }] },
-      { block: "Letters", tier: "block", script: "Deva", usedByBase: false, cells: [{ char: "क", isCombiningMark: false }] },
+      { block: "Letters", tier: "block", script: "Grek", usedByStart: false, cells: [{ char: "α", isCombiningMark: false }] },
+      { block: "Letters", tier: "block", script: "Deva", usedByStart: false, cells: [{ char: "क", isCombiningMark: false }] },
     ]);
     render(<CharacterMapPane />);
 
@@ -1418,7 +1418,7 @@ describe("CharacterMapPane — blocks-my-keyboard-uses filter", () => {
 
 describe("CharacterMapPane — per-group Hide/Show", () => {
   it("clicking Hide collapses a group's cells but keeps its heading present", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1441,7 +1441,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("clicking Show restores the cells", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1460,7 +1460,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("hiding one group leaves other groups' cells visible (per-group, not all-or-nothing)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1477,7 +1477,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("hidden state does not remove the group from the data — heading still queryable and re-fetch is not triggered", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1495,7 +1495,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("announces the hide/show action via the shared aria-live region", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1511,7 +1511,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("a language/base change resets hiddenGroups — a previously-hidden group renders expanded again", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1535,7 +1535,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("search bypasses a per-group Hide: a matching cell in a hidden group still renders while the query is active, and the group re-collapses once the query is cleared", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1565,7 +1565,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("pairs the Hide/Show button's aria-controls with the cell grid's id", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1580,7 +1580,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
   });
 
   it("keeps aria-controls pointing at an element that exists while the group is collapsed (no dangling idref)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1616,7 +1616,7 @@ describe("CharacterMapPane — per-group Hide/Show", () => {
 
 describe("CharacterMapPane — zoom control", () => {
   it("defaults to 100% and renders the glyph at fontSize 22 (unchanged from pre-zoom)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1631,7 +1631,7 @@ describe("CharacterMapPane — zoom control", () => {
   });
 
   it("clicking + increases the rendered glyph font-size and updates the zoom indicator", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1648,7 +1648,7 @@ describe("CharacterMapPane — zoom control", () => {
   });
 
   it("clicking − decreases the rendered glyph font-size and updates the zoom indicator", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1667,7 +1667,7 @@ describe("CharacterMapPane — zoom control", () => {
   });
 
   it("disables − at the minimum zoom and re-enables it after zooming back in", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1691,7 +1691,7 @@ describe("CharacterMapPane — zoom control", () => {
   });
 
   it("disables + at the maximum zoom", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1715,7 +1715,7 @@ describe("CharacterMapPane — zoom control", () => {
   });
 
   it("moves focus to the zoom-in button when zoom-out hits ZOOM_MIN, and vice versa (clamp-boundary focus management)", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1742,7 +1742,7 @@ describe("CharacterMapPane — zoom control", () => {
   });
 
   it("announces the new zoom level via the shared aria-live region", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
 
     await waitFor(() => {
@@ -1754,7 +1754,7 @@ describe("CharacterMapPane — zoom control", () => {
   });
 
   it("scales the codepoint label and the missing-glyph box fallback alongside the glyph", async () => {
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     unsupportedDisplays.set(["b"]);
     render(<CharacterMapPane />);
 

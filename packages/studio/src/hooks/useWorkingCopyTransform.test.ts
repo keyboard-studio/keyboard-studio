@@ -1,8 +1,8 @@
 // Tests for useWorkingCopyTransform.
 //
 // Coverage goals:
-//   1. Returns null when workingCopyStore has no baseIr (not yet instantiated).
-//   2. Returns a VfsTransform function when baseIr is set.
+//   1. Returns null when workingCopyStore has no startIr (not yet instantiated).
+//   2. Returns a VfsTransform function when startIr is set.
 //   3. The transform applies carve deletions (calls applyCarveToVfs).
 //   4. The transform applies assignments when patternMap is supplied.
 //   5. The transform applies identity (calls applyIdentityStubMutation).
@@ -84,11 +84,11 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function seedBase() {
+function seedStart() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs,
     ir: makeTestIR([]),
   });
@@ -113,7 +113,7 @@ describe("useWorkingCopyTransform — null when not instantiated", () => {
 describe("useWorkingCopyTransform — returns a function when instantiated", () => {
   it("returns a VfsTransform function after instantiation", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const { result } = renderHook(() => useWorkingCopyTransform());
     expect(result.current).not.toBeNull();
     expect(typeof result.current).toBe("function");
@@ -123,7 +123,7 @@ describe("useWorkingCopyTransform — returns a function when instantiated", () 
 describe("useWorkingCopyTransform — projection steps", () => {
   it("always calls applyCarveToVfs (step 1)", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const { result } = renderHook(() => useWorkingCopyTransform());
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -140,7 +140,7 @@ describe("useWorkingCopyTransform — projection steps", () => {
 
   it("calls applyAssignmentsToVfs when patternMap is supplied and assignments exist", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     // Add a Phase C assignment to the store.
     useWorkingCopyStore.getState().recordAssignments([
       {
@@ -178,7 +178,7 @@ describe("useWorkingCopyTransform — projection steps", () => {
 
   it("does NOT call applyAssignmentsToVfs when there are no assignments", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const patternMap = new Map<string, Pattern>();
     const { result } = renderHook(() => useWorkingCopyTransform({ patternMap }));
     const vfs = createVirtualFS([
@@ -190,7 +190,7 @@ describe("useWorkingCopyTransform — projection steps", () => {
 
   it("calls applyIdentityStubMutation when identity.displayName is set (step 3)", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     useWorkingCopyStore.getState().setIdentity({ displayName: "Hausa Keyboard" });
     const { result } = renderHook(() => useWorkingCopyTransform());
     const vfs = createVirtualFS([
@@ -206,8 +206,8 @@ describe("useWorkingCopyTransform — projection steps", () => {
 
   it("does NOT call applyIdentityStubMutation when identity is null", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
-    // identity is null after instantiateFromBase (Track 1).
+    seedStart();
+    // identity is null after instantiateFromStart (Track 1).
     expect(useWorkingCopyStore.getState().identity).toBeNull();
     const { result } = renderHook(() => useWorkingCopyTransform());
     const vfs = createVirtualFS([
@@ -219,7 +219,7 @@ describe("useWorkingCopyTransform — projection steps", () => {
 
   it("accumulates warnings from all three layers and returns them", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     // Make carve and assignments each return a warning.
     applyCarveToVfsSpy.mockReturnValueOnce({ warnings: ["carve-warning"] });
     applyAssignmentsToVfsSpy.mockReturnValueOnce({ kmn: "", warnings: ["assign-warning"] });
@@ -255,7 +255,7 @@ describe("useWorkingCopyTransform — projection steps", () => {
 describe("useWorkingCopyTransform — memoization", () => {
   it("returns the same transform reference when no layer changes between renders", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const { result, rerender } = renderHook(() => useWorkingCopyTransform());
     const first = result.current;
     rerender();
@@ -264,7 +264,7 @@ describe("useWorkingCopyTransform — memoization", () => {
 
   it("returns a new transform reference when deletedNodeIds changes", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const { result } = renderHook(() => useWorkingCopyTransform());
     const first = result.current;
     // Add a deletion.
@@ -279,7 +279,7 @@ describe("useWorkingCopyTransform — memoization", () => {
 describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
   it("injects touchLayoutJson into source/<keyboardId>.keyman-touch-layout when store field is set", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const touchJson = '{"phone":{"displayUnderlying":false,"layer":[]}}';
     useWorkingCopyStore.getState().setTouchLayoutJson(touchJson);
     const { result } = renderHook(() => useWorkingCopyTransform());
@@ -295,8 +295,8 @@ describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
 
   it("does NOT create .keyman-touch-layout when touchLayoutJson is null in the store", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
-    // touchLayoutJson is null after instantiateFromBase.
+    seedStart();
+    // touchLayoutJson is null after instantiateFromStart.
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
     const { result } = renderHook(() => useWorkingCopyTransform());
     const vfs = createVirtualFS([
@@ -308,7 +308,7 @@ describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
 
   it("returns a new transform reference when touchLayoutJson changes", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const { result } = renderHook(() => useWorkingCopyTransform());
     const first = result.current;
     act(() => {
@@ -326,7 +326,7 @@ describe("useWorkingCopyTransform — effectiveKeyboardId (Track 1 identity rena
   // runCompile can pick it up.
   it("returns effectiveKeyboardId when identity.keyboardId differs from the base id", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     useWorkingCopyStore.getState().setIdentity({ keyboardId: "ha_sil" });
     const { result } = renderHook(() => useWorkingCopyTransform());
     const vfs = createVirtualFS([
@@ -341,7 +341,7 @@ describe("useWorkingCopyTransform — effectiveKeyboardId (Track 1 identity rena
 
   it("does NOT return effectiveKeyboardId when identity.keyboardId is unset", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     const { result } = renderHook(() => useWorkingCopyTransform());
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -352,7 +352,7 @@ describe("useWorkingCopyTransform — effectiveKeyboardId (Track 1 identity rena
 
   it("does NOT return effectiveKeyboardId when identity.keyboardId equals the base id", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     useWorkingCopyStore.getState().setIdentity({ keyboardId: "basic_kbdus" });
     const { result } = renderHook(() => useWorkingCopyTransform());
     const vfs = createVirtualFS([
@@ -366,7 +366,7 @@ describe("useWorkingCopyTransform — effectiveKeyboardId (Track 1 identity rena
 describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
   // Regression coverage: commit base A (basic_kbdus), carve a node off it, then
   // preview a DIFFERENT candidate base B (sil_euro_latin) before confirming any
-  // switch. Without the previewedBaseId gate, the transform below would project
+  // switch. Without the previewedStartId gate, the transform below would project
   // base A's deletedNodeIds (its own IR's node ids) onto base B's freshly-fetched
   // VFS — a cross-base projection that left the candidate base's compile pipeline
   // unable to reach "ready" (the only escape was "Start over"). With the gate,
@@ -374,7 +374,7 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
   // stale carve overlay and compiles cleanly.
   it("returns null when previewedBaseId differs from the store's instantiated base", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase(); // instantiates basic_kbdus (base A)
+    seedStart(); // instantiates basic_kbdus (base A)
     act(() => {
       useWorkingCopyStore.getState().deleteNode("rule#0"); // carve on base A
     });
@@ -382,19 +382,19 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
 
     // Preview candidate base B (sil_euro_latin) — a different id.
     const { result } = renderHook(() =>
-      useWorkingCopyTransform({ previewedBaseId: silEuroLatin.id }),
+      useWorkingCopyTransform({ previewedStartId: silEuroLatin.id }),
     );
     expect(result.current).toBeNull();
   });
 
   it("still returns a transform when previewedBaseId matches the store's base (re-preview of the committed base)", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase(); // instantiates basic_kbdus
+    seedStart(); // instantiates basic_kbdus
     act(() => {
       useWorkingCopyStore.getState().deleteNode("rule#0");
     });
     const { result } = renderHook(() =>
-      useWorkingCopyTransform({ previewedBaseId: basicKbdus.id }),
+      useWorkingCopyTransform({ previewedStartId: basicKbdus.id }),
     );
     expect(result.current).not.toBeNull();
     expect(typeof result.current).toBe("function");
@@ -402,10 +402,10 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
 
   it("still returns a transform when previewedBaseId matches the store's base and the carve is empty (legacy no-op case)", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase(); // instantiates basic_kbdus; no deletions made — deletedNodeIds is empty.
+    seedStart(); // instantiates basic_kbdus; no deletions made — deletedNodeIds is empty.
     expect(useWorkingCopyStore.getState().deletedNodeIds.size).toBe(0);
     const { result } = renderHook(() =>
-      useWorkingCopyTransform({ previewedBaseId: basicKbdus.id }),
+      useWorkingCopyTransform({ previewedStartId: basicKbdus.id }),
     );
     // Matching id + empty carve is the legacy (pre-F4) behavior: a transform
     // is still returned (there is nothing to gate away — an empty carve is
@@ -416,7 +416,7 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
 
   it("does not gate when previewedBaseId is omitted (existing callers unaffected)", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     act(() => {
       useWorkingCopyStore.getState().deleteNode("rule#0");
     });
@@ -427,7 +427,7 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
   it("warns once (dev-only) when previewedBaseId is omitted while a transform is built, and not when it is supplied", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    seedBase();
+    seedStart();
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
@@ -449,7 +449,7 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
 
     // Supplied explicitly — no F4-footgun warning.
     const { result: result2 } = renderHook(() =>
-      useWorkingCopyTransform({ previewedBaseId: basicKbdus.id }),
+      useWorkingCopyTransform({ previewedStartId: basicKbdus.id }),
     );
     result2.current!(vfs, "basic_kbdus");
     const omittedWarnings2 = warnSpy.mock.calls.filter((c) =>
@@ -462,18 +462,18 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
 
   it("recovers a transform once previewedBaseId returns to matching the committed base", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     act(() => {
       useWorkingCopyStore.getState().deleteNode("rule#0");
     });
     const { result, rerender } = renderHook(
-      ({ previewedBaseId }: { previewedBaseId: string | null }) =>
-        useWorkingCopyTransform({ previewedBaseId }),
-      { initialProps: { previewedBaseId: silEuroLatin.id } },
+      ({ previewedStartId }: { previewedStartId: string | null }) =>
+        useWorkingCopyTransform({ previewedStartId }),
+      { initialProps: { previewedStartId: silEuroLatin.id } },
     );
     expect(result.current).toBeNull();
     // The author returns to previewing the already-committed base A.
-    rerender({ previewedBaseId: basicKbdus.id });
+    rerender({ previewedStartId: basicKbdus.id });
     expect(result.current).not.toBeNull();
     expect(typeof result.current).toBe("function");
   });
@@ -482,7 +482,7 @@ describe("useWorkingCopyTransform — previewedBaseId gate (bug F4)", () => {
 describe("useWorkingCopyTransform — assignment-warning when patternMap is null", () => {
   it("adds a warning when assignments exist but patternMap is null", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBase();
+    seedStart();
     useWorkingCopyStore.getState().recordAssignments([
       {
         scope: "keyboard-default",
@@ -556,8 +556,8 @@ function makeKeyEditVfs() {
   ]);
 }
 
-function seedBaseWithKeyEditKmn() {
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+function seedStartWithKeyEditKmn() {
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
     vfs: makeKeyEditVfs(),
     ir: makeTestIR([]),
   });
@@ -583,7 +583,7 @@ describe("useWorkingCopyTransform — liveLayoutOverride: preview-identity (R10.
     projectWorkingCopyVfs({
       vfs: emittedVfs,
       keyboardId: "basic_kbdus",
-      baseIr: makeTestIR([]),
+      startIr: makeTestIR([]),
       deletedNodeIds: new Set(),
       keyEditOps: [RENAME_OP],
       assignments: [],
@@ -597,7 +597,7 @@ describe("useWorkingCopyTransform — liveLayoutOverride: preview-identity (R10.
     // fed the SAME keyEditOps via liveLayoutOverride. Before T053/T054 this
     // surface would have stayed at the untouched "T_A" (TouchGallery's old
     // local transform never called projectWorkingCopyVfs at all).
-    seedBaseWithKeyEditKmn();
+    seedStartWithKeyEditKmn();
     const { result } = renderHook(() =>
       useWorkingCopyTransform({
         liveLayoutOverride: { touchLayoutJson: null, keyEditOps: [RENAME_OP] },
@@ -613,7 +613,7 @@ describe("useWorkingCopyTransform — liveLayoutOverride: preview-identity (R10.
 describe("useWorkingCopyTransform — liveLayoutOverride: memo-key refresh (T053)", () => {
   it("returns a NEW transform reference when keyEditOps changes between renders, and the new transform actually reflects the new op", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBaseWithKeyEditKmn();
+    seedStartWithKeyEditKmn();
     const { result, rerender } = renderHook(
       ({ ops }: { ops: readonly KeyEditOperation[] }) =>
         useWorkingCopyTransform({
@@ -641,7 +641,7 @@ describe("useWorkingCopyTransform — liveLayoutOverride: memo-key refresh (T053
 
   it("does NOT return a new transform reference for a semantically-identical (but reference-different) keyEditOps array", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBaseWithKeyEditKmn();
+    seedStartWithKeyEditKmn();
     const { result, rerender } = renderHook(
       ({ ops }: { ops: readonly KeyEditOperation[] }) =>
         useWorkingCopyTransform({
@@ -662,7 +662,7 @@ describe("useWorkingCopyTransform — liveLayoutOverride: memo-key refresh (T053
 describe("useWorkingCopyTransform — liveLayoutOverride does not bypass existing gates (T055)", () => {
   it("still returns null when baseIr is null, even with a liveLayoutOverride supplied", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    // No seedBase() — baseIr stays null.
+    // No seedStart() — startIr stays null.
     const { result } = renderHook(() =>
       useWorkingCopyTransform({
         liveLayoutOverride: { touchLayoutJson: null, keyEditOps: [RENAME_OP] },
@@ -673,10 +673,10 @@ describe("useWorkingCopyTransform — liveLayoutOverride does not bypass existin
 
   it("still returns null when previewedBaseId mismatches the store's base, even with a liveLayoutOverride supplied", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBaseWithKeyEditKmn(); // instantiates basic_kbdus (base A)
+    seedStartWithKeyEditKmn(); // instantiates basic_kbdus (base A)
     const { result } = renderHook(() =>
       useWorkingCopyTransform({
-        previewedBaseId: silEuroLatin.id, // a different candidate base
+        previewedStartId: silEuroLatin.id, // a different candidate base
         liveLayoutOverride: { touchLayoutJson: null, keyEditOps: [RENAME_OP] },
       }),
     );
@@ -698,11 +698,11 @@ describe("useWorkingCopyTransform — disabled families (spec 082 FR-018)", () =
     };
   }
 
-  function seedBaseWithGuardFamily() {
+  function seedStartWithGuardFamily() {
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
     ]);
-    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs,
       ir: makeTestIR({
         groups: [
@@ -742,7 +742,7 @@ describe("useWorkingCopyTransform — disabled families (spec 082 FR-018)", () =
 
   it("passes the store's deletion set through untouched when nothing is disabled", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBaseWithGuardFamily();
+    seedStartWithGuardFamily();
     const { result } = renderHook(() => useWorkingCopyTransform());
     result.current!(freshVfs(), "basic_kbdus");
     expect(lastDeletedItemIds().size).toBe(0);
@@ -750,7 +750,7 @@ describe("useWorkingCopyTransform — disabled families (spec 082 FR-018)", () =
 
   it("merges disabled family member ids into deletedItemIds; re-enable removes them", async () => {
     const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
-    seedBaseWithGuardFamily();
+    seedStartWithGuardFamily();
     const familyId = familyIdOf("guard-1");
     expect(familyIdOf("guard-2")).toBe(familyId);
 

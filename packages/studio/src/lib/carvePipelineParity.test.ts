@@ -98,9 +98,9 @@ const DELETED_NODE_IDS = new Set(["rule#blockMe", "rule#allowMe"]);
 const DELETED_ITEM_IDS = new Set(["store#dkt003b#1"]);
 
 /** Engine path: applyCarveToVfs with the T015 carvePipeline opts. */
-function enginePath(baseIr: KeyboardIR): string {
+function enginePath(startIr: KeyboardIR): string {
   const vfs = stubKmnVfs("test");
-  const result = applyCarveToVfs(vfs, "test", baseIr, DELETED_NODE_IDS, {
+  const result = applyCarveToVfs(vfs, "test", startIr, DELETED_NODE_IDS, {
     carvePipeline: {
       deletedItemIds: DELETED_ITEM_IDS,
       dispositions: DISPOSITIONS,
@@ -114,9 +114,9 @@ function enginePath(baseIr: KeyboardIR): string {
 }
 
 /** Studio path: the mutate seam, then emit. */
-function seamPath(baseIr: KeyboardIR): string {
+function seamPath(startIr: KeyboardIR): string {
   const seamIr = applyCarveMutate(
-    baseIr,
+    startIr,
     DELETED_NODE_IDS,
     DELETED_ITEM_IDS,
     undefined,
@@ -134,8 +134,8 @@ function seamPath(baseIr: KeyboardIR): string {
 
 describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
   it("produces byte-identical .kmn output on both paths", () => {
-    const baseIr = carvePipelineFixture();
-    expect(enginePath(baseIr)).toBe(seamPath(baseIr));
+    const startIr = carvePipelineFixture();
+    expect(enginePath(startIr)).toBe(seamPath(startIr));
   });
 
   it("block rule carve → owned suppression rule (not removed)", () => {
@@ -227,13 +227,13 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
   });
 
   it("does not mutate the base IR on either path", () => {
-    const baseIr = carvePipelineFixture();
-    const before = JSON.stringify(baseIr);
-    enginePath(baseIr);
-    applyCarveMutate(baseIr, DELETED_NODE_IDS, DELETED_ITEM_IDS, undefined, {
+    const startIr = carvePipelineFixture();
+    const before = JSON.stringify(startIr);
+    enginePath(startIr);
+    applyCarveMutate(startIr, DELETED_NODE_IDS, DELETED_ITEM_IDS, undefined, {
       dispositions: DISPOSITIONS,
       loud: false,
     });
-    expect(JSON.stringify(baseIr)).toBe(before);
+    expect(JSON.stringify(startIr)).toBe(before);
   });
 });

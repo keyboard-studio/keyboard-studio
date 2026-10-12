@@ -51,32 +51,32 @@ const fixtureExists = fs.existsSync(CAMEROON_TOUCH_LAYOUT);
 // Helpers: build TouchAssignment objects
 // ---------------------------------------------------------------------------
 
-function longpress(hostKey: string, char: string): TouchAssignment {
+function longpress(baseKey: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "longpress_alternates", slotValues: { hostKey, char } }],
+    mechanisms: [{ patternId: "longpress_alternates", slotValues: { hostKey: baseKey, char } }],
     source: "user",
   };
 }
 
-function flickAssignment(hostKey: string, direction: string, char: string): TouchAssignment {
+function flickAssignment(baseKey: string, direction: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "flick_gestures", slotValues: { hostKey, direction, char } }],
+    mechanisms: [{ patternId: "flick_gestures", slotValues: { hostKey: baseKey, direction, char } }],
     source: "user",
   };
 }
 
-function multitap(hostKey: string, char: string): TouchAssignment {
+function multitap(baseKey: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "multitap", slotValues: { hostKey, char } }],
+    mechanisms: [{ patternId: "multitap", slotValues: { hostKey: baseKey, char } }],
     source: "user",
   };
 }
@@ -91,12 +91,12 @@ function inherited(char: string): TouchAssignment {
   };
 }
 
-function keyReplace(hostKey: string, char: string): TouchAssignment {
+function keyReplace(baseKey: string, char: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
-    mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey, char } }],
+    mechanisms: [{ patternId: "touch_key_replace", slotValues: { hostKey: baseKey, char } }],
     source: "user",
   };
 }
@@ -813,13 +813,13 @@ describe("isTouchSubKeyDuplicate", () => {
 // this block covers the explicit form, a non-default target, and the misses.
 // ---------------------------------------------------------------------------
 
-function longpressOnLayer(hostKey: string, char: string, layer: string): TouchAssignment {
+function longpressOnLayer(baseKey: string, char: string, layer: string): TouchAssignment {
   return {
     scope: "individual",
     target: char,
     modality: "touch",
     mechanisms: [
-      { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+      { patternId: "longpress_alternates", slotValues: { hostKey: baseKey, char, layer } },
     ],
     source: "user",
   };
@@ -932,8 +932,8 @@ function makeGenericModifierLayerJson(): string {
   });
 }
 
-function longpressOnFnLayer(hostKey: string, char: string): TouchAssignment {
-  return longpressOnLayer(hostKey, char, "fn");
+function longpressOnFnLayer(baseKey: string, char: string): TouchAssignment {
+  return longpressOnLayer(baseKey, char, "fn");
 }
 
 describe("applyTouchAssignmentsToRawJson — positional fallback into blank placeholder (layout-agnostic)", () => {

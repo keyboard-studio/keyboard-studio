@@ -10,7 +10,7 @@
 //
 // Also verified, per the HANDOFF's own wording: the G7 *starting-point*
 // item. Completing choose_base with NO instantiated working copy leaves NO
-// base-contribution entry — the recorder's recordBaseContribution returns
+// base-contribution entry — the recorder's recordStartContribution returns
 // null when the working copy was never seeded, and the recorder fires
 // synchronously inside handleComplete, before StudioShell's doCommit
 // effect instantiates the copy. That residue is RECORDED in
@@ -53,7 +53,7 @@ function TrivialStep({
   );
 }
 
-function ChooseBaseStep({
+function ChooseStartStep({
   onComplete,
 }: {
   onComplete: (r: unknown) => void;
@@ -70,7 +70,7 @@ function ChooseBaseStep({
       onClick: () =>
         onComplete({
           base: { id: "basic_kbdus" },
-          baseKeyboard: { id: "basic_kbdus" },
+          startKeyboard: { id: "basic_kbdus" },
           instantiationMode: "copy",
         }),
     },
@@ -80,7 +80,7 @@ function ChooseBaseStep({
 
 vi.mock("../steps/manifest.ts", () => ({
   manifest: [
-    { kind: "editor-step", id: "choose_base", title: "Choose base", inputs: [], writes: [], component: ChooseBaseStep },
+    { kind: "editor-step", id: "choose_base", title: "Choose base", inputs: [], writes: [], component: ChooseStartStep },
     { kind: "editor-step", id: "layout", title: "Layout", inputs: [], writes: [], component: TrivialStep },
     { kind: "editor-step", id: "punctuation", title: "Punctuation", inputs: [], writes: [], component: TrivialStep },
     { kind: "editor-step", id: "convenience", title: "Convenience", inputs: [], writes: [], component: TrivialStep },
@@ -123,9 +123,9 @@ const snapshotter: Snapshotter = {
 
 function depsWithRealRecorder(): ReducerDeps {
   return {
-    instantiateFromBase: vi.fn(),
+    instantiateFromStart: vi.fn(),
     instantiateFromExisting: vi.fn(),
-    instantiateFromBaseIfConfirmed: vi.fn(() => true),
+    instantiateFromStartIfConfirmed: vi.fn(() => true),
     recordDecision: createStudioDecisionRecorder({
       getWorkingCopyState: useWorkingCopyStore.getState,
       snapshotter,

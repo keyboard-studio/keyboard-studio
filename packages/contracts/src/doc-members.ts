@@ -76,13 +76,13 @@ export interface DocMemberState {
 // ---------------------------------------------------------------------------
 
 /** "unknown" until computed for the focused/selected base (FR-008). */
-export type BaseDocLevel = "none" | "minimal" | "full" | "unknown";
+export type StartDocLevel = "none" | "minimal" | "full" | "unknown";
 
 /** Which welcome-page convention a base uses; "folder" wins when both exist. */
 export type WelcomeConvention = "folder" | "flat" | "absent";
 
-export interface BaseDocumentationProfile {
-  level: BaseDocLevel;
+export interface StartDocumentationProfile {
+  level: StartDocLevel;
   /** Members the base ships (from its .kps <Files>). */
   members: DocMemberId[];
   welcomeConvention: WelcomeConvention;
@@ -189,5 +189,5 @@ export interface DocLintInput {
   /** For criterion 3.7. */
   deletedFilenames: string[];
   /** For criterion 3.4 (entries present at instantiation). */
-  baseHistoryMdText?: string;
+  startHistoryMdText?: string;
 }

@@ -32,7 +32,7 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseTrackCopy,
   driveAttributionStep,
   acceptProjectName,
@@ -44,7 +44,7 @@ import {
   driveConvenienceStep,
 } from "./helpers/surveyFlow";
 
-const BASE_KEYBOARD_ID = "basic_kbdus";
+const START_KEYBOARD_ID = "basic_kbdus";
 
 /** Identity answers that resolve the target language to Bafut. */
 const BAFUT = { english: "Bafut", autonym: "Bafut", script: "Latn", languageCode: "bfd" };
@@ -57,7 +57,7 @@ async function reachBafutAlphabet(page: Page): Promise<void> {
   await seedReturningVisitor(page);
   await page.goto("/");
   await driveIdentityLite(page, BAFUT);
-  await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+  await pickStartKeyboard(page, START_KEYBOARD_ID);
   // The copy track, deliberately: its project-name step is what writes the
   // language tag onto the working copy. The adapt track skips that step, so
   // the needed set never consults the exemplar index there and this walk

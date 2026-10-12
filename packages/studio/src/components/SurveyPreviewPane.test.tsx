@@ -7,26 +7,26 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { screen, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { SurveyPreviewPane } from "./SurveyPreviewPane.tsx";
 import type { OskMode } from "./OskModeToggle.tsx";
 
-const BASE: BaseKeyboard = {
+const BASE: StartKeyboard = {
   id: "basic_kbdus",
   displayName: "US",
   // The pane only reads `displayName`; OSKFrame owns the rest.
-} as BaseKeyboard;
+} as StartKeyboard;
 
 const noop = () => {};
 
 function renderPane(overrides: {
-  localBase?: BaseKeyboard | null;
+  localStart?: StartKeyboard | null;
   compact?: boolean;
 }) {
   const mode: OskMode = "desktop";
   render(
     <SurveyPreviewPane
-      localBase={overrides.localBase === undefined ? BASE : overrides.localBase}
+      localStart={overrides.localStart === undefined ? BASE : overrides.localStart}
       oskMode={mode}
       onOskModeChange={noop}
       stage={{ kind: "idle" }}
@@ -59,7 +59,7 @@ describe("SurveyPreviewPane", () => {
   });
 
   it("shows the empty hint and no OSK when no base keyboard is picked", () => {
-    renderPane({ localBase: null });
+    renderPane({ localStart: null });
     expect(screen.queryByTitle("On-screen keyboard preview")).toBeNull();
     expect(
       screen.getByText(/Choose a starting keyboard/, { exact: false }),

@@ -8,7 +8,7 @@
 // (useInventoryDraft.ts, research D-090-10), never a store write.
 //
 // Store reads:
-//   surveySessionStore: identityResult, localBase, surveyContext, charactersSubStage
+//   surveySessionStore: identityResult, localStart, surveyContext, charactersSubStage
 //   workingCopyStore:   validatorFindings (via useValidatorFindings hook)
 //
 // No survey-level side effects (Article IV / G2): the component reports
@@ -33,7 +33,7 @@ import {
   useCharacterInventoryValue,
 } from "./useInventoryDraft.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useStepWalkStore, peekStepCursor } from "../stores/stepWalkStore.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
@@ -62,7 +62,7 @@ import { Suspense } from "react";
 export interface CharactersStepExtras {
   Prefill: ComponentType<{
     identity: IdentityLiteResult;
-    base: BaseKeyboard;
+    base: StartKeyboard;
     onConfirm: () => void;
     onBack?: () => void;
   }>;
@@ -136,7 +136,7 @@ const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const
  *      renders it `reproposed{outside-script}` until the author reconfirms
  *      or removes it (T080).
  */
-function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void {
+function confirmPrefill(identity: IdentityLiteResult, base: StartKeyboard): void {
   const draft = getCharacterInventoryValue();
   const ops = inventoryOps(CHARACTERS_STEP_ID);
   const key = alphabetKeyOf(identity, base);
@@ -181,7 +181,7 @@ function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void 
  * Self-contained characters step adapter — the `character-inventory`
  * module's renderer (spec 090 T021).
  *
- * Hosts the prefill -> PhaseB substage driven by the persisted
+ * Bases the prefill -> PhaseB substage driven by the persisted
  * `charactersSubStage` store slot, so back-from-carve remounts at PhaseB
  * rather than replaying prefill (spec 027 §4). The DecisionRendererProps
  * value is the shared accumulator's current record; the draft edits
@@ -197,7 +197,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   // Spec 089 FR-005: identity + context are derived from the decision store.
   const decisions = useDecisionStore((s) => s.decisions);
   const identityResult = deriveIdentityResult(decisions);
-  const localBase = useSurveySessionStore((s) => s.localBase);
+  const localStart = useSurveySessionStore((s) => s.localStart);
   const surveyContext = deriveSurveyContext(decisions);
   const charactersSubStage = useSurveySessionStore((s) => s.charactersSubStage);
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
@@ -275,18 +275,18 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   // Guard: prefill requires both identity and base (unreachable once the step
   // is properly entered, but matches today's null fallback).
   if (charactersSubStage === "prefill") {
-    if (identityResult === null || localBase === null || Prefill === undefined) {
+    if (identityResult === null || localStart === null || Prefill === undefined) {
       return null;
     }
     return (
       <Prefill
         identity={identityResult}
-        base={localBase}
+        base={localStart}
         onConfirm={() => {
           // Only this prefill -> B transition may reset the draft alphabet —
           // never a BuildListView/CharacterMapPane render — and only when the
           // evidence it was built from changed (confirmPrefill above).
-          confirmPrefill(identityResult, localBase);
+          confirmPrefill(identityResult, localStart);
           setCharactersSubStage("B");
         }}
         // Conditionally spread (not `() => onBack?.()`) — F7 sweep: an

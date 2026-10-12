@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadLangtags } from "../lib/langtagsDefaults.ts";
 import { parseKmn } from "@keyboard-studio/engine";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard } from "@keyboard-studio/contracts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import characterInventoryModule from "../survey/questions/gallery/characterInventory.ts";
 import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
@@ -77,7 +77,7 @@ function loadKeyboard(kb: (typeof KEYBOARDS)[number]) {
   const here = dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(resolve(here, kb.kmnPath), "utf-8");
   const { ir } = parseKmn(source, kb.id);
-  const catalog = makeBaseKeyboard({
+  const catalog = makeStartKeyboard({
     id: kb.id,
     script: kb.script,
     path: `release/test/${kb.id}`,

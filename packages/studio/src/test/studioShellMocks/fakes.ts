@@ -50,8 +50,8 @@ export const fakeAttributionPhaseResult = {
   confirmedInventory: [],
 };
 
-/** The base keyboard the BaseResolution stub previews. */
-export const fakeBase = {
+/** The base keyboard the StartResolution stub previews. */
+export const fakeStart = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",

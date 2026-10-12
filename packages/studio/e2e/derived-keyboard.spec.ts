@@ -36,7 +36,7 @@ import { test, expect, type Page } from "playwright/test";
 import {
   seedReturningVisitor,
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   acceptProjectName,
@@ -61,7 +61,7 @@ declare global {
   }
 }
 
-const BASE_KEYBOARD_ID = "bj_cree_woods";
+const START_KEYBOARD_ID = "bj_cree_woods";
 // The two literal rules producing U+14EC on this fixture (see
 // carve.spec.ts's port note — verified sole producers).
 const TARGET_RULE_IDS = ["rule#18", "rule#20"];
@@ -152,7 +152,7 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
     autonym: "Nehiyawewin",
     script: "other",
   });
-  await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+  await pickStartKeyboard(page, START_KEYBOARD_ID);
   await chooseAdaptTrack(page);
 
   // The post-track attribution step (#1901): author name (blank for a
@@ -217,7 +217,7 @@ test("spec 093 SC-001: changing windows-layout after carve + mechanisms — surv
   await page.getByTestId("layout-continue").click();
 
   // ---- Forward again through the re-completions. ----
-  await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+  await pickStartKeyboard(page, START_KEYBOARD_ID);
   await chooseAdaptTrack(page);
   // Re-walk through attribution: the asked records render pre-filled
   // (author name from the first pass, holder preserved from the base) —

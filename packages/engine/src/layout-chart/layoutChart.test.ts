@@ -19,7 +19,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** A base K_A rule plus a SHIFT-cased K_A rule — one non-empty combo in use. */
-function baseIr(): KeyboardIR {
+function startIr(): KeyboardIR {
   return makeTestIR([
     {
       nodeId: "g1",
@@ -69,11 +69,11 @@ function touchLayoutFixture(): TouchLayoutIR {
 }
 
 function desktopOnlyInput(): LayoutChartInput {
-  return { displayName: "Test KB", kvks: null, ir: baseIr(), touchLayout: null };
+  return { displayName: "Test KB", kvks: null, ir: startIr(), touchLayout: null };
 }
 
 function desktopAndTouchInput(): LayoutChartInput {
-  return { displayName: "Test KB", kvks: null, ir: baseIr(), touchLayout: touchLayoutFixture() };
+  return { displayName: "Test KB", kvks: null, ir: startIr(), touchLayout: touchLayoutFixture() };
 }
 
 function legibilityKvksInput(): LayoutChartInput {

@@ -5,7 +5,7 @@
 // doc comment + installDraftAutosave's P1 synchronous save):
 //
 //   1. A working copy is instantiated under Track 1 before `identity` is set.
-//      `deriveProjectKeyFromWorkingCopy` falls back to `baseKeyboard.id`, so
+//      `deriveProjectKeyFromWorkingCopy` falls back to `startKeyboard.id`, so
 //      the FIRST autosave install writes the "My keyboards" index row keyed
 //      on the base id ("key A").
 //   2. The author later completes the identity step and picks a CUSTOM
@@ -68,29 +68,29 @@ afterEach(() => {
 
 describe("installDraftAutosave — re-deriving the project key after a live identity rename", () => {
   it("does not grow the 'My keyboards' index to two rows when re-installed under the post-rename key", () => {
-    const baseId = "basic_kbdus";
+    const startId = "basic_kbdus";
     const customId = "my_custom_keyboard_id";
 
     // Step 1: Track 1 instantiation before identity is set. The derived key
-    // is baseKeyboard.id (deriveProjectKeyFromWorkingCopy's documented
+    // is startKeyboard.id (deriveProjectKeyFromWorkingCopy's documented
     // fallback), and installDraftAutosave's own synchronous install-time save
     // (P1 fix) writes the first "My keyboards" row under it.
-    instantiateMinimal(baseId);
-    expect(deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState())).toBe(baseId);
-    const teardownA = installDraftAutosave(baseId);
+    instantiateMinimal(startId);
+    expect(deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState())).toBe(startId);
+    const teardownA = installDraftAutosave(startId);
 
     expect(listDrafts()).toHaveLength(1);
-    expect(listDrafts()[0]?.projectKey).toBe(baseId);
-    expect(localStorage.getItem(draftKey(baseId))).not.toBeNull();
+    expect(listDrafts()[0]?.projectKey).toBe(startId);
+    expect(localStorage.getItem(draftKey(startId))).not.toBeNull();
 
     // Step 2: the author completes the identity step live and picks a custom
     // keyboard id — exactly what TrackOneIdentityPanel's setIdentity call
-    // does. The derived key flips from baseId to customId...
+    // does. The derived key flips from startId to customId...
     useWorkingCopyStore.getState().setIdentity({ keyboardId: customId });
     expect(deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState())).toBe(customId);
 
     // ...but nothing has told the ALREADY-INSTALLED autosave (still closed
-    // over baseId) to move — the index still shows exactly the one row from
+    // over startId) to move — the index still shows exactly the one row from
     // step 1 at this point (sanity: this line alone is not the defect).
     expect(listDrafts()).toHaveLength(1);
 
@@ -102,13 +102,13 @@ describe("installDraftAutosave — re-deriving the project key after a live iden
     installDraftAutosave(customId);
 
     // EXPECTED (post-fix): the index still has exactly one row, now keyed on
-    // the current project id, and the stale baseId record is gone.
+    // the current project id, and the stale startId record is gone.
     // ACTUAL (bug): upsertIndexEntry matches by exact projectKey, so this
     // creates a SECOND row instead of replacing the first.
     const entries = listDrafts();
     expect(entries).toHaveLength(1);
     expect(entries[0]?.projectKey).toBe(customId);
-    expect(localStorage.getItem(draftKey(baseId))).toBeNull();
+    expect(localStorage.getItem(draftKey(startId))).toBeNull();
   });
 });
 
@@ -120,20 +120,20 @@ describe("plain reload after a rename — no Resume click involved", () => {
     // through localStorage — not via resumeProject() — because the whole
     // point of this test is that Resume was never clicked: this is a plain
     // browser refresh on a tab that already had the renamed project active.
-    const baseId = "basic_kbdus";
+    const startId = "basic_kbdus";
     const customId = "my_custom_keyboard_id_reload";
 
-    instantiateMinimal(baseId);
-    const teardownA = installDraftAutosave(baseId);
+    instantiateMinimal(startId);
+    const teardownA = installDraftAutosave(startId);
     useWorkingCopyStore.getState().setIdentity({ keyboardId: customId });
     teardownA();
     // Mirrors the real autosave's stale closure: the NEXT write after the
-    // rename still lands under baseId, now carrying the renamed identity.
-    const teardownB = installDraftAutosave(baseId);
+    // rename still lands under startId, now carrying the renamed identity.
+    const teardownB = installDraftAutosave(startId);
     teardownB();
 
     expect(listDrafts()).toHaveLength(1);
-    expect(resolveActiveProjectKey()).toBe(baseId);
+    expect(resolveActiveProjectKey()).toBe(startId);
 
     // Simulate the tab closing and reopening: the in-memory stores go back
     // to their pre-boot shape, and only localStorage + the active pointer
@@ -143,11 +143,11 @@ describe("plain reload after a rename — no Resume click involved", () => {
     resetInventoryDraft();
 
     // main.tsx's pre-mount restore: resolve the active pointer, then
-    // loadDraft() it. The pointer still names baseId — loadDraft() does not
+    // loadDraft() it. The pointer still names startId — loadDraft() does not
     // itself move it — but the record's CONTENT (identity.keyboardId) is
     // customId.
     const activeKey = resolveActiveProjectKey();
-    expect(activeKey).toBe(baseId);
+    expect(activeKey).toBe(startId);
     expect(loadDraft(activeKey!)).toBe(true);
     expect(
       deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState()),
@@ -161,7 +161,7 @@ describe("plain reload after a rename — no Resume click involved", () => {
     const entries = listDrafts();
     expect(entries).toHaveLength(1);
     expect(entries[0]?.projectKey).toBe(customId);
-    expect(localStorage.getItem(draftKey(baseId))).toBeNull();
+    expect(localStorage.getItem(draftKey(startId))).toBeNull();
   });
 });
 

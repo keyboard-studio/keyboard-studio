@@ -41,7 +41,7 @@ export interface CollectDocLintInputArgs {
   /** The rendered / current member texts (absent members are simply not checked). */
   members: Partial<Record<DocMemberId, string>>;
   /** The base's HISTORY at instantiation (criterion 3.4); omit on a copy. */
-  baseHistoryMdText?: string | null;
+  startHistoryMdText?: string | null;
 }
 
 /**
@@ -145,7 +145,7 @@ export function collectDocLintInput(args: CollectDocLintInputArgs): DocLintInput
   if (readme !== undefined) holders.readme = readme;
   if (history !== undefined) holders.history = history;
 
-  const baseHistory = args.baseHistoryMdText;
+  const startHistory = args.startHistoryMdText;
   return {
     keyboardId,
     keyboardVersion,
@@ -155,7 +155,7 @@ export function collectDocLintInput(args: CollectDocLintInputArgs): DocLintInput
     copyrightHolders: holders,
     members,
     deletedFilenames: [],
-    ...(baseHistory !== undefined && baseHistory !== null ? { baseHistoryMdText: baseHistory } : {}),
+    ...(startHistory !== undefined && startHistory !== null ? { startHistoryMdText: startHistory } : {}),
   };
 }
 

@@ -1,14 +1,14 @@
 // Tests for serializeWorkingCopy — canonical output serialization (P4).
 //
 // Coverage:
-//   1. Returns null when working copy is not instantiated (baseKeyboard null).
-//   2. Returns null when baseVfs is null.
-//   3. Returns null when baseIr is null.
+//   1. Returns null when working copy is not instantiated (startKeyboard null).
+//   2. Returns null when startVfs is null.
+//   3. Returns null when startIr is null.
 //   4. Returns { bytes, warnings, keyboardId } when fully instantiated.
-//   5. Clones baseVfs before projecting — original baseVfs is not mutated.
+//   5. Clones startVfs before projecting — original startVfs is not mutated.
 //   6. Physical assignments resolved via pattern library and forwarded.
 //   7. Touch assignments not forwarded to projection.
-//   8. keyboardId in result matches store's baseKeyboard.id.
+//   8. keyboardId in result matches store's startKeyboard.id.
 //   9. Warnings from projection are surfaced in result.
 //  10. Preview≡output equivalence: projectWorkingCopyVfs called with identical
 //      inputs by both serializeWorkingCopy (output path) and useWorkingCopyTransform
@@ -61,7 +61,7 @@ function seedStore(opts: { withAssignments?: MechanismAssignment[] } = {}) {
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
   const ir = makeTestIR([]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   if (opts.withAssignments !== undefined && opts.withAssignments.length > 0) {
     useWorkingCopyStore.getState().recordAssignments(opts.withAssignments);
   }
@@ -92,7 +92,7 @@ describe("serializeWorkingCopy — not-instantiated returns null", () => {
     // Directly patch store state to simulate partial initialisation.
     // (This cannot happen via the public API but defends against future regressions.)
     const state = useWorkingCopyStore.getState();
-    // Instantiate normally then clear only baseVfs.
+    // Instantiate normally then clear only startVfs.
     seedStore();
     // Zustand set is not directly accessible; use reset() and check null guard.
     // Since we cannot set individual slots via public API here, just test the
@@ -163,14 +163,14 @@ describe("serializeWorkingCopy — happy path", () => {
     const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(callArg).toBeDefined();
     expect(callArg["keyboardId"]).toBe(basicKbdus.id);
-    // baseIr is forwarded to the helper — but instantiation now derives facets
+    // startIr is forwarded to the helper — but instantiation now derives facets
     // (spec 048) via an immutable top-level spread (see
-    // engine/src/facets/accessors.ts deriveFacets), so the stored baseIr is a
+    // engine/src/facets/accessors.ts deriveFacets), so the stored startIr is a
     // NEW object, never reference-equal to the `ir` passed into
-    // instantiateFromBase. Assert structural equality against the derived
+    // instantiateFromStart. Assert structural equality against the derived
     // shape instead of identity. This fixture has no output content, so
     // casing derives to "undetermined".
-    expect(callArg["baseIr"]).toEqual({
+    expect(callArg["startIr"]).toEqual({
       ...ir,
       facets: { casing: { provenance: "undetermined" } },
     });
@@ -187,7 +187,7 @@ describe("serializeWorkingCopy — happy path", () => {
     await serializeWorkingCopy();
     const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
     // The `vfs` passed to projectWorkingCopyVfs must NOT be the same object as
-    // the original baseVfs stored at instantiation time.
+    // the original startVfs stored at instantiation time.
     expect(callArg["vfs"]).not.toBe(vfs);
     // But it should have the same entries.
     const passedVfs = callArg["vfs"] as ReturnType<typeof createVirtualFS>;
@@ -275,7 +275,7 @@ describe("serializeWorkingCopy — preview≡output equivalence", () => {
     //
     // We seed the store, call serializeWorkingCopy, then build a transform via
     // useWorkingCopyTransform and run it. Both should produce one call each to
-    // projectWorkingCopyVfsSpy with the same keyboardId, baseIr, deletedNodeIds,
+    // projectWorkingCopyVfsSpy with the same keyboardId, startIr, deletedNodeIds,
     // and identity.
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
 
@@ -298,11 +298,11 @@ describe("serializeWorkingCopy — preview≡output equivalence", () => {
     // same store state (as the hook would).
     const state = useWorkingCopyStore.getState();
     const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
-    const previewVfs = createVirtualFS(state.baseVfs!.entries());
+    const previewVfs = createVirtualFS(state.startVfs!.entries());
     projectWorkingCopyVfs({
       vfs: previewVfs,
-      keyboardId: state.baseKeyboard!.id,
-      baseIr: state.baseIr!,
+      keyboardId: state.startKeyboard!.id,
+      startIr: state.startIr!,
       deletedNodeIds: state.deletedNodeIds,
       assignments: state.phaseResults.flatMap((p) => p.assignments ?? []).filter((a) => a.modality === "physical"),
       getPattern: () => undefined,
@@ -311,9 +311,9 @@ describe("serializeWorkingCopy — preview≡output equivalence", () => {
     const previewCall = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(previewCall).toBeDefined();
 
-    // Both paths pass the same keyboardId, baseIr, identity, and deletedNodeIds.
+    // Both paths pass the same keyboardId, startIr, identity, and deletedNodeIds.
     expect(outputCall["keyboardId"]).toBe(previewCall["keyboardId"]);
-    expect(outputCall["baseIr"]).toBe(previewCall["baseIr"]);
+    expect(outputCall["startIr"]).toBe(previewCall["startIr"]);
     expect(outputCall["identity"]).toEqual(previewCall["identity"]);
     const outDeleted = outputCall["deletedNodeIds"] as Set<string>;
     const preDeleted = previewCall["deletedNodeIds"] as Set<string>;
@@ -446,7 +446,7 @@ describe("serializeWorkingCopy — touchLayoutJson forwarded to projectWorkingCo
   it("passes touchLayoutJson: null to projectWorkingCopyVfs when store field is null", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedStore();
-    // touchLayoutJson is null by default after instantiateFromBase.
+    // touchLayoutJson is null by default after instantiateFromStart.
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
     await serializeWorkingCopy();
     expect(projectWorkingCopyVfsSpy).toHaveBeenCalledOnce();
@@ -461,7 +461,7 @@ describe("serializeWorkingCopy — touchLayoutJson forwarded to projectWorkingCo
 
 /**
  * Seed the store with instantiateFromExisting (Track 2 / adapt-existing).
- * baseIr.header.version is set to the given version string.
+ * startIr.header.version is set to the given version string.
  * Pass kpsContent to also seed source/basic_kbdus.kps in the VFS.
  */
 function seedAdaptStore(originalVersion = "1.0", kpsContent?: string) {
@@ -616,8 +616,8 @@ describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never b
     // What the Track 1 instantiation seam (useKeyboardArtifact's scaffold
     // branch) sets: the images and convention, with every prose slice null.
     const wc = useWorkingCopyStore.getState();
-    wc.setBaseWelcomeImages(IMAGES);
-    wc.setBaseWelcomeConvention("folder");
+    wc.setStartWelcomeImages(IMAGES);
+    wc.setStartWelcomeConvention("folder");
     wc.setHelpDocs({ description: "My own description.", usageTips: [] });
 
     const projected = await projectWorkingCopyForOutput();
@@ -650,7 +650,7 @@ describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never b
   it("names images that were dropped from the saved draft instead of shipping without them silently", async () => {
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedStore();
-    useWorkingCopyStore.setState({ baseWelcomeImages: null, baseWelcomeImagesDropped: true });
+    useWorkingCopyStore.setState({ startWelcomeImages: null, startWelcomeImagesDropped: true });
     const projected = await projectWorkingCopyForOutput();
     expect(projected!.warnings.some((w) => w.startsWith("[docs]") && w.includes("too large to keep"))).toBe(true);
   });
@@ -658,7 +658,7 @@ describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never b
   it("hands the image names to the projection as welcomeFolderFiles for the descriptor", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedStore();
-    useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+    useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
     await serializeWorkingCopy();
     const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(callArg["welcomeFolderFiles"]).toEqual(["desktop_default.png", "phone_default.png"]);
@@ -678,7 +678,7 @@ describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 0
   it("adapt track, undecided: the attribution stub sits above the base's entries (criteria 19.2 / 3.4)", async () => {
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedAdaptStore("1.0");
-    useWorkingCopyStore.getState().setBaseHistoryMdText(BASE_HISTORY);
+    useWorkingCopyStore.getState().setStartHistoryMdText(BASE_HISTORY);
     const projected = await projectWorkingCopyForOutput();
     const history = projected!.vfs.get("HISTORY.md")!.content as string;
     expect(history.startsWith("## 1.1 (")).toBe(true);
@@ -690,7 +690,7 @@ describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 0
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedAdaptStore("1.0");
     const wc = useWorkingCopyStore.getState();
-    wc.setBaseHistoryMdText(BASE_HISTORY);
+    wc.setStartHistoryMdText(BASE_HISTORY);
     wc.setHistoryEntryState({ status: "edited", proposal: PROPOSAL, editedBullets: ["Reworked the shift layer."] });
     const projected = await projectWorkingCopyForOutput();
     const history = projected!.vfs.get("HISTORY.md")!.content as string;
@@ -706,7 +706,7 @@ describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 0
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedStore();
     const wc = useWorkingCopyStore.getState();
-    wc.setBaseHistoryMdText(BASE_HISTORY); // a stale slice must never leak onto a copy (FR-007)
+    wc.setStartHistoryMdText(BASE_HISTORY); // a stale slice must never leak onto a copy (FR-007)
     wc.setHistoryEntryState({ status: "confirmed", proposal: { ...PROPOSAL, version: "1.0" }, editedBullets: null });
     const projected = await projectWorkingCopyForOutput();
     const history = projected!.vfs.get("HISTORY.md")!.content as string;
@@ -758,7 +758,7 @@ describe("serializeWorkingCopy — layout charts (spec 079 FR-013..FR-015)", () 
   it("a base that ships images keeps them and gets NO charts by default (FR-015)", async () => {
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedStore();
-    useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+    useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
     const projected = await projectWorkingCopyForOutput();
     expect(chartNames(projected!.vfs)).toEqual([]);
     expect([...(projected!.vfs.get("source/welcome/desktop_default.png")!.content as Uint8Array)]).toEqual([1, 2, 3]);
@@ -767,7 +767,7 @@ describe("serializeWorkingCopy — layout charts (spec 079 FR-013..FR-015)", () 
   it("opting to regenerate adds charts beside the base images without touching them", async () => {
     const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
     seedStore();
-    useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+    useWorkingCopyStore.getState().setStartWelcomeImages(IMAGES);
     useWorkingCopyStore.getState().setChartPreference("regenerate");
     const projected = await projectWorkingCopyForOutput();
     const vfs = projected!.vfs;

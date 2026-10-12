@@ -16,7 +16,7 @@
 // checkout and is out of reach for a unit test.
 
 import { describe, expect, it, beforeEach } from "vitest";
-import { basePunctuationCoverage, glyphCategory, parseKmn, producedGlyphs } from "@keyboard-studio/engine";
+import { startPunctuationCoverage, glyphCategory, parseKmn, producedGlyphs } from "@keyboard-studio/engine";
 import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions } from "../../survey/useInventoryDraft.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
@@ -52,7 +52,7 @@ beforeEach(() => {
 describe("SC-007 — emitted punctuation ⊆ confirmed punctuation inventory", () => {
   it("with zero interaction, every punctuation character the keyboard emits is in the confirmed inventory", () => {
     const { ir } = parseKmn(PARITY_KMN, "parity");
-    const coverage = basePunctuationCoverage(ir);
+    const coverage = startPunctuationCoverage(ir);
     expect(coverage.coverageComplete).toBe(true);
     expect([...coverage.produced].sort()).toEqual([",", ".", "!", "?"].sort());
 
@@ -68,7 +68,7 @@ describe("SC-007 — emitted punctuation ⊆ confirmed punctuation inventory", (
 
   it("names the character carve's always-keep rule re-admits after the author declined it (deferred carve-side concern)", () => {
     const { ir } = parseKmn(PARITY_KMN, "parity");
-    const coverage = basePunctuationCoverage(ir);
+    const coverage = startPunctuationCoverage(ir);
     inventoryOps("characters").seedProposals(coverage.produced, "base", "punctuation-base:parity");
     inventoryOps("characters").remove("?");
     expect(getCharacterInventoryValue().rejected).toEqual(["?"]);

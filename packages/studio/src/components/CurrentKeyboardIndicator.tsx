@@ -27,7 +27,7 @@
 // "what is current" regardless — it derives the current project's KEY the
 // same way draftPersistence.ts's own `saveDraft` caller does, straight off the
 // live working-copy store (`deriveProjectKeyFromWorkingCopy({ identity,
-// baseKeyboard })`), so it can never disagree with its own displayed name.
+// startKeyboard })`), so it can never disagree with its own displayed name.
 // WHEN THE AUTHOR SWITCHES PROJECTS via this control's dropdown, `handleChange`
 // goes through the shared `switchActiveProject()` helper
 // (lib/switchActiveProject.ts), which re-pins the pointer to the
@@ -89,7 +89,7 @@ const SELECT_ID = "nav-current-keyboard-select";
 /**
  * Sentinel option value for the fixed "Manage all keyboards…" row. Never a
  * real project key: draftPersistence.ts's keys come off
- * `identity.keyboardId` / `baseKeyboard.id`, both non-empty author/base
+ * `identity.keyboardId` / `startKeyboard.id`, both non-empty author/base
  * identifiers, so this token cannot collide with one.
  */
 const MANAGE_ALL_VALUE = "__manage-all__";
@@ -171,23 +171,23 @@ export function CurrentKeyboardIndicator() {
   const decisions = useDecisionStore((s) => s.decisions);
   const scaffoldSpec = deriveScaffoldSpec(decisions);
   const identity = useWorkingCopyStore((s) => s.identity);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
 
   const currentLabel = useMemo(
-    () => deriveProjectLabel({ scaffoldSpec, identity, baseKeyboard }),
-    [scaffoldSpec, identity, baseKeyboard],
+    () => deriveProjectLabel({ scaffoldSpec, identity, startKeyboard }),
+    [scaffoldSpec, identity, startKeyboard],
   );
 
   // In practice non-null whenever `currentLabel` is non-null: Track 1's
   // `project_name` step (the FIRST tier of FR-041's precedence) runs AFTER
   // base selection, and Track 2 sets `identity.keyboardId` at instantiation —
-  // before either tier can be non-blank there is always a `baseKeyboard`,
+  // before either tier can be non-blank there is always a `startKeyboard`,
   // hence always a key. The `UNKEYED_CURRENT_VALUE` fallback exists only so
   // this can never hand `SelectMenu` a `value` matching zero options, not
   // because this path is expected to be exercised.
   const currentProjectKey = useMemo(
-    () => deriveProjectKeyFromWorkingCopy({ identity, baseKeyboard }) ?? UNKEYED_CURRENT_VALUE,
-    [identity, baseKeyboard],
+    () => deriveProjectKeyFromWorkingCopy({ identity, startKeyboard }) ?? UNKEYED_CURRENT_VALUE,
+    [identity, startKeyboard],
   );
 
   // ---------------------------------------------------------------------------

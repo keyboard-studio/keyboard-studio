@@ -37,8 +37,8 @@ import {
   type MechanismAssignment,
 } from "@keyboard-studio/contracts";
 import { applyCarveMutate } from "../steps/editorMutate.ts";
-import { occupiedHostKeys } from "../lib/occupiedHostKeys.ts";
-import { extractMechanismHostKey } from "../lib/extractMechanismHostKey.ts";
+import { occupiedBaseKeys } from "../lib/occupiedBaseKeys.ts";
+import { extractMechanismBaseKey } from "../lib/extractMechanismBaseKey.ts";
 import type { DecisionEntryInput } from "./decisionLogStore.ts";
 
 /** Shared empty carved-character set for the optional `getCarveChars` dep. */
@@ -96,7 +96,7 @@ export interface RecordEditorStepDeps {
    * reconstructs the "before mechanisms ran" occupancy `keysAdded` is measured
    * against (research D-05) — never a snapshot taken at stage entry.
    */
-  getBaseIr: () => KeyboardIR | null;
+  getStartIr: () => KeyboardIR | null;
   /** Ids of the carved-away rule/store nodes, for the carve projection. */
   getDeletedNodeIds: () => ReadonlySet<string>;
   /** Ids of the carved-away store-slot items, for the carve projection. */
@@ -156,8 +156,8 @@ function assignmentTargets(result: unknown): string[] {
  * snapshotted at stage entry — carve is the only stage between instantiation
  * and mechanisms, and the store holds all three inputs at completion time.
  * `after` is `before` unioned with the host key of each phase-C assignment's
- * mechanisms, read directly via `extractMechanismHostKey` — never by re-running
- * `occupiedHostKeys` on a hypothetical post-mechanisms IR (that function only
+ * mechanisms, read directly via `extractMechanismBaseKey` — never by re-running
+ * `occupiedBaseKeys` on a hypothetical post-mechanisms IR (that function only
  * recognizes mechanisms reconstructable from IR rule shape; a real
  * `MechanismRef` is available here and must be used instead).
  *
@@ -166,14 +166,14 @@ function assignmentTargets(result: unknown): string[] {
  */
 function countNewlyOccupiedKeys(
   assignments: readonly MechanismAssignment[],
-  deps: Pick<RecordEditorStepDeps, "getBaseIr" | "getDeletedNodeIds" | "getDeletedItemIds" | "getCarveChars">,
+  deps: Pick<RecordEditorStepDeps, "getStartIr" | "getDeletedNodeIds" | "getDeletedItemIds" | "getCarveChars">,
 ): number | undefined {
-  const baseIr = deps.getBaseIr();
-  if (baseIr === null) return undefined;
+  const startIr = deps.getStartIr();
+  if (startIr === null) return undefined;
 
-  const before = occupiedHostKeys(
+  const before = occupiedBaseKeys(
     applyCarveMutate(
-      baseIr,
+      startIr,
       deps.getDeletedNodeIds(),
       deps.getDeletedItemIds(),
       deps.getCarveChars?.() ?? EMPTY_RECORD_CARVE_CHARS,
@@ -182,9 +182,9 @@ function countNewlyOccupiedKeys(
   const after = new Set(before);
   for (const assignment of assignments) {
     for (const mechanism of assignment.mechanisms) {
-      const hostKeyResult = extractMechanismHostKey(mechanism);
-      if (hostKeyResult !== undefined && hostKeyResult.hostKey.length > 0) {
-        after.add(hostKeyResult.hostKey);
+      const baseKeyResult = extractMechanismBaseKey(mechanism);
+      if (baseKeyResult !== undefined && baseKeyResult.baseKey.length > 0) {
+        after.add(baseKeyResult.baseKey);
       }
     }
   }
@@ -211,7 +211,7 @@ export function observeEditorStep(
     | "getDeletionCounts"
     | "getDeletedIds"
     | "getMechanismAssignments"
-    | "getBaseIr"
+    | "getStartIr"
     | "getDeletedNodeIds"
     | "getDeletedItemIds"
     | "getCarveChars"

@@ -3,10 +3,10 @@
 //
 // Why this exists: the working-copy carve projection re-emits the .kmn from
 // the session's base IR. On the Track 1 (copy) path, scaffold() has already
-// renamed every sibling file (source/<baseId>.kvks → source/<newId>.kvks) and
+// renamed every sibling file (source/<startId>.kvks → source/<newId>.kvks) and
 // rewritten the header stores to match — but the base IR captured at keyboard
 // SELECTION still carries the base-id filenames. A carve re-emit therefore
-// stamps stale references (e.g. `store(&VISUALKEYBOARD) '<baseId>.kvks'`)
+// stamps stale references (e.g. `store(&VISUALKEYBOARD) '<startId>.kvks'`)
 // over the scaffolded .kmn. stripDanglingAssetStores then removes those
 // now-dangling references before the preview compile, and the compiled
 // keyboard silently loses its visual keyboard / touch layout — the OSK falls

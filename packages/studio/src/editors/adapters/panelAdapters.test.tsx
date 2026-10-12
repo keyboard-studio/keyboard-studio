@@ -1,4 +1,4 @@
-// Regression coverage for BaseResolutionAdapter's suggest-target wiring
+// Regression coverage for StartResolutionAdapter's suggest-target wiring
 // (refs #1021). The adapter must build SuggestTarget from
 // surveySessionStore.identityResult (written by IdentityLiteAdapter before
 // this step is reached), not from workingCopyStore.identity, which is null
@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import {
   basicKbdus,
   silEuroLatin,
@@ -22,13 +22,13 @@ import {
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import type { Decision } from "../../decisions/decisionTypes.ts";
-import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
+import { useStartPreviewStatusStore } from "../../stores/startPreviewStatusStore.ts";
 import { recordAnswersAsDecisions } from "../../steps/reducer.ts";
 
 // ---------------------------------------------------------------------------
-// jsdom does not implement scrollIntoView — BaseKeyboardPicker (rendered
-// inside BaseResolution) may call it; stub it out globally like the existing
-// BaseKeyboardPicker.test.tsx does.
+// jsdom does not implement scrollIntoView — StartKeyboardPicker (rendered
+// inside StartResolution) may call it; stub it out globally like the existing
+// StartKeyboardPicker.test.tsx does.
 // ---------------------------------------------------------------------------
 
 beforeAll(() => {
@@ -36,19 +36,19 @@ beforeAll(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Service mock — BaseResolution loads bases via getBaseBrowserService().
+// Service mock — StartResolution loads bases via getStartBrowserService().
 // vi.mock is hoisted, so it runs before the panelAdapters import below.
 // ---------------------------------------------------------------------------
 
-const BASES: BaseKeyboard[] = [basicKbdus, silEuroLatin];
+const BASES: StartKeyboard[] = [basicKbdus, silEuroLatin];
 
 vi.mock("../../lib/services.ts", () => ({
-  getBaseBrowserService: () => ({ listAll: () => Promise.resolve(BASES) }),
-  // spec 080 FR-008: BaseResolution's doc-profile hook calls this on every
+  getStartBrowserService: () => ({ listAll: () => Promise.resolve(BASES) }),
+  // spec 080 FR-008: StartResolution's doc-profile hook calls this on every
   // preview; default every base to "unknown" (no badge) — this file's
   // coverage is the preview/commit wiring, not the classification badge
-  // itself (see BaseResolution.test.tsx for that).
-  getBaseDocProfile: () =>
+  // itself (see StartResolution.test.tsx for that).
+  getStartDocProfile: () =>
     Promise.resolve({
       level: "unknown",
       members: [],
@@ -59,7 +59,7 @@ vi.mock("../../lib/services.ts", () => ({
   USE_REAL: false,
 }));
 
-import { BaseResolutionAdapter, IdentityLiteAdapter } from "./panelAdapters.tsx";
+import { StartResolutionAdapter, IdentityLiteAdapter } from "./panelAdapters.tsx";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -67,7 +67,7 @@ import { BaseResolutionAdapter, IdentityLiteAdapter } from "./panelAdapters.tsx"
 
 /**
  * Seed the identity decisions the identity step's completion records
- * (spec 089: BaseResolutionAdapter reads deriveIdentityResult(decisions)
+ * (spec 089: StartResolutionAdapter reads deriveIdentityResult(decisions)
  * in place of the deleted surveySessionStore.identityResult field).
  * Defaults reproduce the old makeIdentityResult({}) fixture: Hausa/Latn.
  */
@@ -86,14 +86,14 @@ afterEach(() => {
   // Reset the preview-status store between tests — it is a module-level
   // singleton (Zustand), so a test that flips it to "ready" would otherwise
   // leak into the next test's initial render.
-  useBasePreviewStatusStore.setState({ status: "idle" });
+  useStartPreviewStatusStore.setState({ status: "idle" });
 });
 
 describe("BaseResolutionAdapter — suggest target derived from the decision store (spec 089)", () => {
   it("declared-language identity decisions surface the language-match badge", async () => {
     seedIdentityDecisions();
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Already supports your language")).toBeDefined();
@@ -103,7 +103,7 @@ describe("BaseResolutionAdapter — suggest target derived from the decision sto
   it("no identity decisions falls back to script-only target without crashing", async () => {
     // No decisions recorded — deriveIdentityResult returns null.
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -114,7 +114,7 @@ describe("BaseResolutionAdapter — suggest target derived from the decision sto
   it("empty language-code decision (bcp47 === '') falls back to script-only target without crashing", async () => {
     seedIdentityDecisions({ languageCode: "" });
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -127,7 +127,7 @@ describe("BaseResolutionAdapter — suggest target derived from the decision sto
     // prefill.script "" — the adapter's `|| "Latn"` fallback covers it.
     seedIdentityDecisions({ languageCode: "", targetScript: "" });
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -137,17 +137,17 @@ describe("BaseResolutionAdapter — suggest target derived from the decision sto
 });
 
 // ---------------------------------------------------------------------------
-// BaseResolutionAdapter — preview-before-commit split (gallery-hosted since
+// StartResolutionAdapter — preview-before-commit split (gallery-hosted since
 // spec 090 T013: the adapter is the host wrapper; the renderer is
-// survey/chooseBase/BaseKeyboardRenderer.tsx).
+// survey/chooseStart/StartKeyboardRenderer.tsx).
 //
 // Preview (every suggestion-card / search-result click) must write
-// setLocalBase WITHOUT calling onComplete and WITHOUT recording any
+// setLocalStart WITHOUT calling onComplete and WITHOUT recording any
 // decision (the wizard does not advance, the working copy is not
 // instantiated). Commit (the "Choose this keyboard" button) must record
 // the `base-keyboard` decision BEFORE calling onComplete (R7 ordering —
 // StudioShell's single-instantiation effect arms off the recorded
-// decision; the session baseConfirmed flag is no longer written at all).
+// decision; the session startConfirmed flag is no longer written at all).
 // ---------------------------------------------------------------------------
 
 describe("BaseResolutionAdapter — preview vs commit", () => {
@@ -155,18 +155,18 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     seedIdentityDecisions();
     const onComplete = vi.fn();
 
-    render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
 
     const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     fireEvent.click(card);
 
     await waitFor(() => {
-      expect(useSurveySessionStore.getState().localBase?.id).toBe("sil_euro_latin");
+      expect(useSurveySessionStore.getState().localStart?.id).toBe("sil_euro_latin");
     });
     expect(onComplete).not.toHaveBeenCalled();
     // A preview is not a decision — nothing is recorded.
     expect(useDecisionStore.getState().decisions["base-keyboard"]).toBeUndefined();
-    // basePreviewStatusStore stays at its default "idle" (nothing in this
+    // startPreviewStatusStore stays at its default "idle" (nothing in this
     // unit test publishes to it), so the confirm button stays disabled too —
     // a preview alone can never reach the commit path.
     expect((screen.getByTestId("base-confirm") as HTMLButtonElement).disabled).toBe(true);
@@ -184,17 +184,17 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     useDecisionStore.setState({ record: recordSpy });
 
     const onComplete = vi.fn();
-    render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
+    render(<StartResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
 
     const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     fireEvent.click(card);
 
     // Follow-up fix on PR #1174: the confirm button is now gated on
-    // previewStatus === "ready" (read from basePreviewStatusStore). This unit
+    // previewStatus === "ready" (read from startPreviewStatusStore). This unit
     // test has no StudioShell/SurveyView mounted to publish that status from
     // the real compile pipeline, so drive it directly — mirroring what a
     // settled preview compile would publish.
-    useBasePreviewStatusStore.getState().setStatus("ready");
+    useStartPreviewStatusStore.getState().setStatus("ready");
 
     const confirm = await waitFor(() => {
       const btn = screen.getByTestId("base-confirm") as HTMLButtonElement;
@@ -219,7 +219,7 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     });
     expect(useDecisionStore.getState().decisions["base-keyboard"]).toBeDefined();
     // The retired session flag is untouched by the whole flow.
-    expect(useSurveySessionStore.getState().baseConfirmed).toBe(false);
+    expect(useSurveySessionStore.getState().startConfirmed).toBe(false);
 
     // Call-order assertion: the record fires strictly before onComplete
     // (R7 — "writes before advance").

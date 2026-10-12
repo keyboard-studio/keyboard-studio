@@ -124,14 +124,14 @@ describe("FindPanel — find by character", () => {
     render(<FindPanel layout={fixtureLayout()} ruleIndex={fixtureRuleIndex()} onJumpToResult={onJump} />);
     selectCharMode();
 
-    // U_00A1's text is "¡", a longpress sub-key under T_0021 (longpressHost).
+    // U_00A1's text is "¡", a longpress sub-key under T_0021 (longpressBase).
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "¡" } });
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
 
     expect(onJump).toHaveBeenCalledTimes(1);
     const result = onJump.mock.calls[0]?.[0];
     expect(result.address).toBe(
-      touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressHost),
+      touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase),
     );
     // NOT the sub-key address form.
     expect(result.address).not.toContain(":sk:");

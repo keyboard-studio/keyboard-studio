@@ -71,7 +71,7 @@ import { msg, plural } from "@lingui/core/macro";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { useShallow } from "zustand/react/shallow";
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   KeyboardIR,
   Pattern,
   MechanismAssignment,
@@ -98,7 +98,7 @@ import {
   isMnemonicLayout,
   planShiftAssignment,
   buildShiftRuleLines,
-  buildBaseRuleLines,
+  buildStartRuleLines,
   buildCasePairRuleLines,
   MODIFIER_EXCLUSIONS,
   canonicalizeCombo,
@@ -579,20 +579,20 @@ function buildDeadkeyAssignment(params: {
 // ---------------------------------------------------------------------------
 
 interface GalleryPreviewWithPatternsProps {
-  selectedBaseKeyboard: BaseKeyboard;
+  selectedStartKeyboard: StartKeyboard;
   stage: Stage;
   retry: () => void;
 }
 
 function GalleryPreviewWithPatterns({
-  selectedBaseKeyboard,
+  selectedStartKeyboard,
   stage,
   retry,
 }: GalleryPreviewWithPatternsProps) {
   const { t } = useLingui();
   return (
     <GalleryPreviewPane
-      baseKeyboard={selectedBaseKeyboard}
+      startKeyboard={selectedStartKeyboard}
       stage={stage}
       retry={retry}
       defaultOskMode="desktop"
@@ -1519,7 +1519,7 @@ function MethodChooser({
 // ---------------------------------------------------------------------------
 
 export interface MechanismGalleryProps {
-  selectedBaseKeyboard: BaseKeyboard | null;
+  selectedStartKeyboard: StartKeyboard | null;
   onComplete?: () => void;
   onBack?: () => void;
   /**
@@ -1542,7 +1542,7 @@ export interface MechanismGalleryProps {
 }
 
 export function MechanismGallery({
-  selectedBaseKeyboard,
+  selectedStartKeyboard,
   onComplete,
   onBack,
   placementMap,
@@ -1601,7 +1601,7 @@ export function MechanismGallery({
   );
 
   // -- "Existing methods" (base keyboard producers for currentChar) --------
-  // baseIr is the source of truth projectWorkingCopyVfs itself projects
+  // startIr is the source of truth projectWorkingCopyVfs itself projects
   // from (never mutated by carve/output projection) — the same source
   // useInventoryDiff() reads for the lettersToAdd/alreadyProduced diff below.
   // removalCapabilities/deletedItemIds/isItemDeleted/cascadeDelete are the
@@ -1609,7 +1609,7 @@ export function MechanismGallery({
   // introduced here; a deletion recorded from this gallery is undone by the
   // same Undo the carve gallery uses, and is projected at output by the
   // existing carve-deletion projection step.
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   // deletedItemIds is selected (even though only isItemDeleted is called
   // below) purely so this component re-renders when the overlay changes —
@@ -1685,14 +1685,14 @@ export function MechanismGallery({
   // different sets. `excludeBackspaceCorrections: true` matches every other
   // base-produced-set caller in this file (see `baseProducedSet` below) so a
   // char reachable only via a backspace-correction rule is not wrongly
-  // counted as directly produced here either. Memoized on `baseIr` alone —
+  // counted as directly produced here either. Memoized on `startIr` alone —
   // this never reacts to session assignments, same as `lettersToAdd`.
   const baseOnlyProducedSet = useMemo(
     () =>
-      baseIr !== null
-        ? buildProducedSet(baseIr, { excludeBackspaceCorrections: true })
+      startIr !== null
+        ? buildProducedSet(startIr, { excludeBackspaceCorrections: true })
         : new Set<string>(),
-    [baseIr],
+    [startIr],
   );
 
   // The BASE (pre-augmentWithComposable) SESSION-AWARE produced set — this
@@ -1710,7 +1710,7 @@ export function MechanismGallery({
   // early-out in collectCompositionMethod (`baseProduced.has(targetChar)`)
   // would suppress the real "A + ◌̂ → Â" composition row.
   //
-  // `buildSessionProducedSet` (not bare `buildProducedSet(baseIr, ...)`) —
+  // `buildSessionProducedSet` (not bare `buildProducedSet(startIr, ...)`) —
   // shaped-bug fix (diacritic-implementability): this session's physical
   // assignments are injected into the base .kmn (applyAssignments), reparsed,
   // and the produced set is rebuilt from that preview IR, so a mark produced
@@ -1720,7 +1720,7 @@ export function MechanismGallery({
   // packages/engine/src/pattern-apply/sessionProducedSet.ts.
   //
   // Perf dedup (km-synthesis): this is the SAME round-trip useInventoryDiff()
-  // already computes internally (identical baseIr/sessionAssignments/
+  // already computes internally (identical startIr/sessionAssignments/
   // getPatternByIdSync inputs — sessionAssignments here is
   // selectDesktopAssignments(phaseResults), same as useInventoryDiff.ts's own
   // derivation) to produce its pre-augment set — reuse that hook's
@@ -1901,7 +1901,7 @@ export function MechanismGallery({
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedBaseKeyboard === null) {
+    if (selectedStartKeyboard === null) {
       setPatternMap(new Map());
       setLoadError(null);
       return;
@@ -1931,7 +1931,7 @@ export function MechanismGallery({
     // markInputOrder="postfix" reaching `axes` can only be base-derived: the
     // script-class prior structurally never emits it (default-fill.ts's
     // load-bearing invariant) and the survey doesn't elicit it yet — it is
-    // seeded onto irAxes at instantiation by seedIrAxesFromBaseIr (spec §7.2
+    // seeded onto irAxes at instantiation by seedIrAxesFromStartIr (spec §7.2
     // rule 3a, #926). defaultFillAxes() correctly leaves an already-present axis
     // out of its own axisFills, so reconstruct the import-derived provenance
     // here (rather than threading a separate store slot) to keep it visible on
@@ -1967,7 +1967,7 @@ export function MechanismGallery({
         : undefined;
 
     svc
-      .filterFor(selectedBaseKeyboard, fullAxes)
+      .filterFor(selectedStartKeyboard, fullAxes)
       .then((ranked) => {
         // Load ranked patterns PLUS every pattern the add-a-key UI's three
         // methods can write (the combined "swap" card writes EITHER
@@ -2005,7 +2005,7 @@ export function MechanismGallery({
         setLoadError(msg);
         setLoading(false);
       });
-  }, [selectedBaseKeyboard, axes, setAxisFills]);
+  }, [selectedStartKeyboard, axes, setAxisFills]);
 
   // ---------------------------------------------------------------------------
   // Keyboard artifact pipeline — owns the single WASM compile for Phase C.
@@ -2030,7 +2030,7 @@ export function MechanismGallery({
   );
   const galleryVfsTransform = useWorkingCopyTransform({ patternMap });
   const { stage: artifactStage, retry: artifactRetry } = useKeyboardArtifact(
-    selectedBaseKeyboard,
+    selectedStartKeyboard,
     galleryScaffoldSpec,
     galleryVfsTransform,
   );
@@ -2082,11 +2082,11 @@ export function MechanismGallery({
       : null;
 
   // Working IR used to plan shift-layer assignments — prefer the carve
-  // working IR (ir), falling back to baseIr before the carve step has run.
+  // working IR (ir), falling back to startIr before the carve step has run.
   // Null when the working copy has not been instantiated yet (e.g. a bare
   // inventory-only render in tests); shift targeting is disabled in that case
   // since planShiftAssignment has nothing to evaluate against.
-  const workingIr = useWorkingCopyStore((s) => s.ir ?? s.baseIr);
+  const workingIr = useWorkingCopyStore((s) => s.ir ?? s.startIr);
   // The casing locale is read by useCasePairCompanion itself — the gallery no
   // longer plumbs a bcp47 tag, which is what keeps `caseCounterpart` down to
   // exactly one caller.
@@ -2904,7 +2904,7 @@ export function MechanismGallery({
         // CAPS-handling key would shadow that key's pre-existing CAPS/NCAPS
         // pair, since applyAssignments splices new lines before existing
         // ones (first-match-wins).
-        const kmnRules = buildBaseRuleLines(resolvedSwapVkey, currentChar, {
+        const kmnRules = buildStartRuleLines(resolvedSwapVkey, currentChar, {
           capsHandling,
         }).join("\n");
         assignment = {
@@ -2942,7 +2942,7 @@ export function MechanismGallery({
             baseAssignment: assignment,
             // "Counterpart already placed" (spec §Edge Cases). `simple_swap`
             // records its rule text as already-emitted .kmn lines in
-            // `slotValues.kmnRules` (buildBaseRuleLines / buildShiftRuleLines /
+            // `slotValues.kmnRules` (buildStartRuleLines / buildShiftRuleLines /
             // buildCasePairRuleLines all interpolate the vkey literally), so we
             // don't have exactly one line shape to string-match against — a
             // combined CAPS quad, a bare shift line, and a CAPS/NCAPS shift pair
@@ -3277,7 +3277,7 @@ export function MechanismGallery({
     if (pendingCompanion.capsHandling) {
       // CAPS-handling key: the base assignment just recorded (for
       // originalChar) already carries an explicit NCAPS/CAPS pair
-      // (buildBaseRuleLines). Appending a SEPARATE companion assignment with
+      // (buildStartRuleLines). Appending a SEPARATE companion assignment with
       // its own [CAPS K_X] line would conflict with that pair's [CAPS K_X]
       // line — two rules targeting the identical context, first-inserted
       // silently wins (Layer-A Check #10). Instead, REPLACE the base
@@ -3459,8 +3459,8 @@ export function MechanismGallery({
 
   // -- "Existing methods" — base keyboard's own producers for currentChar --
   //
-  // Runs collectCharContributors against baseIr (never the carve working
-  // IR — baseIr is the same source-of-truth projectWorkingCopyVfs itself
+  // Runs collectCharContributors against startIr (never the carve working
+  // IR — startIr is the same source-of-truth projectWorkingCopyVfs itself
   // projects from) to find every place in the BASE keyboard that already
   // produces currentChar, then flattens it to one row per method:
   //   - a ruleNodeId is a whole-rule delete candidate — deletable unless
@@ -3483,7 +3483,7 @@ export function MechanismGallery({
   //     that can't be split) is always muted, never silently dropped.
   // A method already removed THIS session (its id already in
   // deletedItemIds, via the existing carve overlay) is filtered out
-  // entirely — collectCharContributors always reads baseIr, which never
+  // entirely — collectCharContributors always reads startIr, which never
   // reflects the overlay itself.
   interface ExistingMethodRow {
     id: string;
@@ -3506,14 +3506,14 @@ export function MechanismGallery({
 
   const existingMethodContributors = useMemo<CharContributors | null>(
     () =>
-      baseIr !== null && currentChar !== null
-        ? collectCharContributors(baseIr, currentChar)
+      startIr !== null && currentChar !== null
+        ? collectCharContributors(startIr, currentChar)
         : null,
-    [baseIr, currentChar],
+    [startIr, currentChar],
   );
 
   const existingMethods = useMemo<ExistingMethodRow[]>(() => {
-    if (existingMethodContributors === null || baseIr === null) return [];
+    if (existingMethodContributors === null || startIr === null) return [];
 
     // `descriptors` is INDEX-PARALLEL to ruleNodeIds, then storeSlots, then
     // blocked, concatenated in that order (see collectCharContributors.ts's
@@ -3577,12 +3577,12 @@ export function MechanismGallery({
       const capability: RemovalCapability | undefined =
         removalCapabilities.get(nodeId);
       const notRemovable = (capability ?? "").startsWith("not-removable:");
-      const ruleBaseLabel = composeContributorLabel(descriptor, i18n);
+      const ruleStartLabel = composeContributorLabel(descriptor, i18n);
       rows.push({
         id: nodeId,
         label: notRemovable
-          ? appendNotDeletableSuffix(ruleBaseLabel, i18n)
-          : ruleBaseLabel,
+          ? appendNotDeletableSuffix(ruleStartLabel, i18n)
+          : ruleStartLabel,
         deletable: !notRemovable,
         isUsed: false,
         kind: "rule",
@@ -3601,13 +3601,13 @@ export function MechanismGallery({
 
     existingMethodContributors.blocked.forEach((b, i) => {
       const descriptor = blockedDescriptors[i];
-      const blockedBaseLabel =
+      const blockedStartLabel =
         descriptor !== undefined
           ? composeContributorLabel(descriptor, i18n)
           : b.label;
       rows.push({
         id: `blocked:${i}:${b.label}`,
-        label: appendNotDeletableSuffix(blockedBaseLabel, i18n),
+        label: appendNotDeletableSuffix(blockedStartLabel, i18n),
         deletable: false,
         isUsed: false,
         kind: "blocked",
@@ -3673,7 +3673,7 @@ export function MechanismGallery({
     // called in the body — see the store-selector comment above.
   }, [
     existingMethodContributors,
-    baseIr,
+    startIr,
     removalCapabilities,
     isItemDeleted,
     deletedItemIds,
@@ -3754,7 +3754,7 @@ export function MechanismGallery({
   // Guard: no base keyboard
   // ---------------------------------------------------------------------------
 
-  if (selectedBaseKeyboard === null) {
+  if (selectedStartKeyboard === null) {
     return (
       <GalleryEmptyState
         {...(onBack !== undefined ? { onBack } : {})}
@@ -4997,7 +4997,7 @@ export function MechanismGallery({
     >
       {!loading && loadError === null ? (
         <GalleryPreviewWithPatterns
-          selectedBaseKeyboard={selectedBaseKeyboard}
+          selectedStartKeyboard={selectedStartKeyboard}
           stage={artifactStage}
           retry={artifactRetry}
         />

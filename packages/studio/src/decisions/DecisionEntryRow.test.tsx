@@ -207,7 +207,7 @@ describe("clause lists are locale-formatted, not comma-joined (km-triage/km-doma
   // all assembled from clauses that have ALREADY been through the catalog. A
   // hardcoded `", "` between them bakes an English list convention into
   // translated output with no seam a translator can reach — the same defect
-  // `trail.entry.headline.baseContribution.joinTwo` exists to avoid for two
+  // `trail.entry.headline.startContribution.joinTwo` exists to avoid for two
   // items. `Intl.ListFormat` in the active locale is the seam.
   it("joins two headline dimensions with the locale's conjunction", () => {
     render(
@@ -250,7 +250,7 @@ describe("clause lists are locale-formatted, not comma-joined (km-triage/km-doma
             stepId: "choose_base",
             payload: {
               kind: "base-contribution",
-              baseId: "basic_kbdus",
+              startId: "basic_kbdus",
               baseDisplayName: "US English",
               derivedAxes: [],
               inheritedMetadata: [
@@ -814,7 +814,7 @@ describe("enrichment — the expanded detail (what was recorded)", () => {
             stepId: "choose_base",
             payload: {
               kind: "base-contribution",
-              baseId: "basic_kbdus",
+              startId: "basic_kbdus",
               baseDisplayName: "US English",
               derivedAxes: [],
               inheritedMetadata: [],

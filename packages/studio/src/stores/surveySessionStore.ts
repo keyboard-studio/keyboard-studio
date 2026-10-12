@@ -4,7 +4,7 @@
 // the walked-history stack for back navigation, and the five value slots set
 // across wizard steps. Also holds the characters step's internal substage
 // (CharactersSubStage, spec 027 Stage 4) so it survives component remounts.
-// Does NOT hold pipeline state (instantiatedForBaseIdRef, oskMode) — those remain
+// Does NOT hold pipeline state (instantiatedForStartIdRef, oskMode) — those remain
 // component-local per spec §4.
 //
 // Architecture contract:
@@ -30,7 +30,7 @@
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
 import { create } from "zustand";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 // Imported directly from TYPE-ONLY LEAF modules (identityLiteResult.ts /
 // types.ts), NOT from the survey/index.ts barrel — that barrel re-exports
 // PhaseB.tsx at runtime, and PhaseB.tsx now imports this store at runtime too
@@ -304,14 +304,14 @@ export interface SurveySessionState {
 
   /**
    * Local base selection that drives the compile pipeline immediately on pick.
-   * Separate from workingCopyStore.baseKeyboard — set as soon as BaseResolution
+   * Separate from workingCopyStore.startKeyboard — set as soon as StartResolution
    * resolves, before the compile cycle completes. Null until first base selection.
    */
-  localBase: BaseKeyboard | null;
+  localStart: StartKeyboard | null;
 
   /**
    * Preview-before-commit gate for the "Choose a starting keyboard" step.
-   * `localBase` now drives a LIVE PREVIEW as soon as the author clicks a
+   * `localStart` now drives a LIVE PREVIEW as soon as the author clicks a
    * search result or suggestion card, without instantiating the working
    * copy or advancing the wizard (so several bases can be tried). This flag
    * is set true only when the author clicks the explicit "Choose this
@@ -322,7 +322,7 @@ export interface SurveySessionState {
    * restored draft is intentional — a draft that already passed choose_base
    * must re-instantiate on restore exactly as it does today.
    */
-  baseConfirmed: boolean;
+  startConfirmed: boolean;
 
   /**
    * Internal substage for the characters manifest step (spec 027 Stage 4).
@@ -460,13 +460,13 @@ export interface SurveySessionState {
    * through and nothing at-or-after the picker survives. Sanitizes first, for
    * the same persisted-stale-"help" reason as the primitives above.
    *
-   * Also clears `baseConfirmed`. That flag arms StudioShell's
+   * Also clears `startConfirmed`. That flag arms StudioShell's
    * single-instantiation effect (see StudioShell.tsx — the effect commits as
    * soon as a compile settles for the confirmed base). Landing on the picker
    * with it still true would let the very next pipeline settle instantiate
    * WITHOUT the author clicking "Choose this keyboard" — re-basing, and
    * discarding edits, on the strength of a stale confirmation from the base
-   * they are trying to move away from. BaseResolutionAdapter's onPreview also
+   * they are trying to move away from. StartResolutionAdapter's onPreview also
    * clears it, but that only fires if the author previews first, which is not
    * guaranteed to happen before the effect runs.
    *
@@ -474,7 +474,7 @@ export interface SurveySessionState {
    * stack (a hydrated draft that never walked it): empty is Back-safe
    * (popHistory guards it) and can never resurface a stale forward entry.
    */
-  backToChooseBase: () => void;
+  backToChooseStart: () => void;
 
   /** Reset every slot to initial (start-over). Includes clearing history. */
   reset: () => void;
@@ -487,10 +487,10 @@ export interface SurveySessionState {
   hydrate: (snapshot: SurveySessionSnapshot) => void;
 
   /** Plain setter — local base driving the compile pipeline. */
-  setLocalBase: (b: BaseKeyboard | null) => void;
+  setLocalStart: (b: StartKeyboard | null) => void;
 
   /** Plain setter — the choose_base preview-before-commit gate. */
-  setBaseConfirmed: (v: boolean) => void;
+  setStartConfirmed: (v: boolean) => void;
 
   /** Plain setter — characters step internal substage (spec 027 Stage 4). */
   setCharactersSubStage: (s: CharactersSubStage) => void;
@@ -563,9 +563,9 @@ export interface SurveySessionState {
 type SurveySessionData = Omit<
   SurveySessionState,
   | "advance" | "popHistory" | "jumpToStep" | "backToTouchSeedSource"
-  | "backToUnfinishedGallery" | "backToChooseBase" | "reset" | "hydrate"
-  | "setLocalBase" | "setCharactersSubStage"
-  | "setBaseConfirmed" | "setDiscoveryMethod"
+  | "backToUnfinishedGallery" | "backToChooseStart" | "reset" | "hydrate"
+  | "setLocalStart" | "setCharactersSubStage"
+  | "setStartConfirmed" | "setDiscoveryMethod"
   | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
 
@@ -599,8 +599,8 @@ const INITIAL_STATE = {
   lastNavigation: "advance" as const,
   marksMigrationNeeded: false,
 
-  localBase: null,
-  baseConfirmed: false,
+  localStart: null,
+  startConfirmed: false,
   charactersSubStage: "prefill" as CharactersSubStage,
   discoveryMethod: null as DiscoveryMethod | null,
   markedForLaterDesktop: [] as readonly string[],
@@ -737,8 +737,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
     }),
 
   // See the interface docstring above for why this is a Back (not an advance),
-  // why it truncates rather than pops, and why it must clear baseConfirmed.
-  backToChooseBase: () =>
+  // why it truncates rather than pops, and why it must clear startConfirmed.
+  backToChooseStart: () =>
     set((s) => {
       const sanitized = sanitizeHistory(s.activeStepId, s.history);
       const pickerIndex = sanitized.indexOf("choose_base");
@@ -746,7 +746,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
         activeStepId: "choose_base" as ActiveStepId,
         history: pickerIndex === -1 ? ([] as readonly ActiveStepId[]) : sanitized.slice(0, pickerIndex),
         lastNavigation: "pop" as const,
-        baseConfirmed: false,
+        startConfirmed: false,
       };
     }),
 
@@ -782,8 +782,8 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
 
 
-  setLocalBase: (b) => set({ localBase: b }),
-  setBaseConfirmed: (v) => set({ baseConfirmed: v }),
+  setLocalStart: (b) => set({ localStart: b }),
+  setStartConfirmed: (v) => set({ startConfirmed: v }),
   setCharactersSubStage: (s) => set({ charactersSubStage: s }),
 
 
@@ -831,8 +831,8 @@ export function snapshotTraversal(): TraversalSnapshot {
     lastNavigation: s.lastNavigation,
     marksMigrationNeeded: s.marksMigrationNeeded,
 
-    localBase: s.localBase,
-    baseConfirmed: s.baseConfirmed,
+    localStart: s.localStart,
+    startConfirmed: s.startConfirmed,
     charactersSubStage: s.charactersSubStage,
     discoveryMethod: s.discoveryMethod,
     markedForLaterDesktop: s.markedForLaterDesktop,

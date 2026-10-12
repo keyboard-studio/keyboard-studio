@@ -20,14 +20,14 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   confirmPrefill,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
-const BASE_KEYBOARD_ID = "basic_kbdfr";
+const START_KEYBOARD_ID = "basic_kbdfr";
 
 /** Identity answers that resolve the target language to Ewondo. */
 const EWONDO = { english: "Ewondo", autonym: "Ewondo", script: "Latn" };
@@ -41,7 +41,7 @@ async function reachPhaseBChooser(page: Page): Promise<void> {
   await seedReturningVisitor(page);
   await page.goto("/");
   await driveIdentityLite(page, EWONDO);
-  await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+  await pickStartKeyboard(page, START_KEYBOARD_ID);
   await chooseAdaptTrack(page);
   await driveAttributionStep(page);
   await confirmPrefill(page);

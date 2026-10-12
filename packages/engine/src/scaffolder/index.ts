@@ -5,7 +5,7 @@ import type {
   RoutingGroup,
 } from "@keyboard-studio/contracts";
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   VirtualFS,
   KeyboardIR,
   Attribution,
@@ -28,7 +28,7 @@ import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardS
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
-import { detectBaseLayoutFamily } from "../placement/filters.js";
+import { detectStartLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 // The doc stubs (welcome/readme) own their own escaping now — see
@@ -67,7 +67,7 @@ export interface ScaffolderServiceOptions {
  * "azerty"/"fr*" tokens (Belgian kbdbe, African French, basic_kbdfr, …); those
  * are corrected by groupFromLayoutFamily() once the IR is available.
  */
-function detectGroup(base: BaseKeyboard): RoutingGroup {
+function detectGroup(base: StartKeyboard): RoutingGroup {
   if (base.script !== "Latn") return "non-roman";
   const id = base.id.toLowerCase();
   if (id.includes("azerty") || id.startsWith("fre_") || id.startsWith("french_") || id.startsWith("fr_")) {
@@ -82,7 +82,7 @@ function detectGroup(base: BaseKeyboard): RoutingGroup {
  * caller falls back to the id-based detectGroup() heuristic.
  */
 function groupFromLayoutFamily(
-  family: ReturnType<typeof detectBaseLayoutFamily>,
+  family: ReturnType<typeof detectStartLayoutFamily>,
 ): RoutingGroup | null {
   if (family === "AZERTY") return "azerty";
   if (family === "QWERTY" || family === "QWERTZ") return "qwerty-qwertz";
@@ -95,9 +95,9 @@ function escapeForRegex(s: string): string {
 }
 
 // Build a word-boundary-anchored matcher for a literal id token, so a base id
-// that is a prefix of another token (e.g. `base_id_extra`) is not over-rewritten.
-function buildIdTokenRegex(baseId: string): RegExp {
-  return new RegExp(`(?<![\\w])${escapeForRegex(baseId)}(?![\\w])`, "g");
+// that is a prefix of another token (e.g. `start_id_extra`) is not over-rewritten.
+function buildIdTokenRegex(startId: string): RegExp {
+  return new RegExp(`(?<![\\w])${escapeForRegex(startId)}(?![\\w])`, "g");
 }
 
 /**
@@ -108,9 +108,9 @@ function buildIdTokenRegex(baseId: string): RegExp {
  * <Copyright>, <Description> — are left untouched because they do not look
  * like file paths. Word-boundary anchors prevent partial-token rewrites.
  */
-function rewriteKpsFilePaths(xml: string, baseId: string, keyboardId: string): string {
-  const escaped = escapeForRegex(baseId);
-  const tokenRe = buildIdTokenRegex(baseId);
+function rewriteKpsFilePaths(xml: string, startId: string, keyboardId: string): string {
+  const escaped = escapeForRegex(startId);
+  const tokenRe = buildIdTokenRegex(startId);
   let out = xml.replace(
     /(<Name\b[^>]*>)([^<]*)(<\/Name>)/gi,
     (m, open: string, value: string, close: string) => {
@@ -132,8 +132,8 @@ function rewriteKpsFilePaths(xml: string, baseId: string, keyboardId: string): s
  * place the keyboard ID there. Free text in <encoding fontname="...">, layer
  * names, and key contents is preserved.
  */
-function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): string {
-  const escaped = escapeForRegex(baseId);
+function rewriteKvksKbdname(xml: string, startId: string, keyboardId: string): string {
+  const escaped = escapeForRegex(startId);
   return xml.replace(
     new RegExp(`(<kbdname\\b[^>]*>)${escaped}(<\\/kbdname>)`, "gi"),
     `$1${keyboardId}$2`
@@ -142,8 +142,8 @@ function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): st
 
 /**
  * Rewrite a Keyman project file (.kpj) so its per-file <Filename>/<Filepath>
- * references to the id-basename source files (e.g. `<baseId>.kmn`,
- * `source\<baseId>.kps`) point at the new id after a rename. Only the base-id
+ * references to the id-basename source files (e.g. `<startId>.kmn`,
+ * `source\<startId>.kps`) point at the new id after a rename. Only the base-id
  * *token* inside <Filename>/<Filepath> element text is rewritten (word-boundary
  * anchored), so file GUIDs (<ID>id_…</ID>), display <Name>s, and files that do
  * not use the id as their basename (HISTORY.md, LICENSE.md, README.md) are left
@@ -151,8 +151,8 @@ function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): st
  * (parseKpjFlags) are content-independent of this; the rewrite exists so the
  * emitted project stays coherent when opened in Keyman Developer.
  */
-function rewriteKpjFilePaths(xml: string, baseId: string, keyboardId: string): string {
-  const tokenRe = buildIdTokenRegex(baseId);
+function rewriteKpjFilePaths(xml: string, startId: string, keyboardId: string): string {
+  const tokenRe = buildIdTokenRegex(startId);
   return xml.replace(
     /(<(Filename|Filepath)\b[^>]*>)([^<]*)(<\/\2>)/gi,
     (_m, open: string, _tag: string, value: string, close: string) =>
@@ -161,10 +161,10 @@ function rewriteKpjFilePaths(xml: string, baseId: string, keyboardId: string): s
 }
 
 /** @internal Exported for unit testing only. */
-export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
+export function renameFilesInVfs(vfs: VirtualFS, startId: string, keyboardId: string): void {
   // Sibling-file extensions that conventionally use the keyboard id as
   // their basename in keymanapp/keyboards. The rename is gated on the
-  // path actually existing at `source/<baseId><ext>` so unrelated files
+  // path actually existing at `source/<startId><ext>` so unrelated files
   // in subdirectories (e.g. source/welcome/welcome.htm) are not touched.
   // `.css`, `.htm`, and `.js` mirror the path-bearing system stores
   // (&KMW_EMBEDCSS, &KMW_HELPFILE, &KMW_EMBEDJS) so the renamed file path
@@ -174,7 +174,7 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
   // own source/project files, not asset-store entries, and stay separate.
   const extensions = [".kmn", ".kps", ...assetFileExtensions()];
   for (const ext of extensions) {
-    const oldPath = `source/${baseId}${ext}`;
+    const oldPath = `source/${startId}${ext}`;
     const entry = vfs.get(oldPath);
     if (entry !== undefined) {
       vfs.delete(oldPath);
@@ -182,45 +182,45 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
       let content = entry.content;
       if (!entry.isBinary && typeof content === "string") {
         if (ext === ".kps") {
-          content = rewriteKpsFilePaths(content, baseId, keyboardId);
+          content = rewriteKpsFilePaths(content, startId, keyboardId);
         } else if (ext === ".kvks") {
-          content = rewriteKvksKbdname(content, baseId, keyboardId);
+          content = rewriteKvksKbdname(content, startId, keyboardId);
         }
       }
       vfs.set(newPath, content, entry.isBinary);
     }
   }
 
-  const oldHelp = `source/help/${baseId}.php`;
+  const oldHelp = `source/help/${startId}.php`;
   const helpEntry = vfs.get(oldHelp);
   if (helpEntry !== undefined) {
     vfs.delete(oldHelp);
     vfs.set(`source/help/${keyboardId}.php`, helpEntry.content, helpEntry.isBinary);
   }
 
-  // The .kpj project file lives at the VFS ROOT (`<baseId>.kpj`), not under
+  // The .kpj project file lives at the VFS ROOT (`<startId>.kpj`), not under
   // source/, so the extension loop above never sees it. compile() looks it up
   // as `<keyboardId>.kpj`; without this rename the file keeps the old id,
   // compile() misses it, and the base keyboard's compiler flags are silently
   // dropped (falls back to defaults). Rename it and rewrite its internal
   // <Filename>/<Filepath> references so the emitted project stays coherent.
-  const oldKpj = `${baseId}.kpj`;
+  const oldKpj = `${startId}.kpj`;
   const kpjEntry = vfs.get(oldKpj);
   if (kpjEntry !== undefined) {
     vfs.delete(oldKpj);
     let content = kpjEntry.content;
     if (!kpjEntry.isBinary && typeof content === "string") {
-      content = rewriteKpjFilePaths(content, baseId, keyboardId);
+      content = rewriteKpjFilePaths(content, startId, keyboardId);
     }
     vfs.set(`${keyboardId}.kpj`, content, kpjEntry.isBinary);
   }
 
-  // Rewrite `.kmw-keyboard-<baseId>` selectors in every *.css entry.
+  // Rewrite `.kmw-keyboard-<startId>` selectors in every *.css entry.
   // Word-boundary anchor ensures we don't rewrite substrings that start with
-  // the base id followed by additional alphanumerics (e.g. `base_id_extra`).
+  // the base id followed by additional alphanumerics (e.g. `start_id_extra`).
   // Iterated AFTER the file-rename pass so the matched *.css files already
   // live at their new <keyboardId>.css paths.
-  const cssBaseClassRe = new RegExp(`kmw-keyboard-${baseId}\\b`, "g");
+  const cssBaseClassRe = new RegExp(`kmw-keyboard-${startId}\\b`, "g");
   for (const cssPath of vfs.list("").filter((p) => p.endsWith(".css"))) {
     const cssEntry = vfs.get(cssPath);
     if (cssEntry === undefined || typeof cssEntry.content !== "string") continue;
@@ -332,7 +332,7 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
  * `../build/*` artifacts). Whether the scaffolded VFS (which does carry a
  * generated `.kps`) ever replaces it in the working-copy store is a race the
  * commit seam intentionally does not re-run (StudioShell's
- * `instantiatedForBaseIdRef`), so serialization completes the directory here
+ * `instantiatedForStartIdRef`), so serialization completes the directory here
  * instead — a downloaded keyboard must be submittable as-is (spec §12).
  */
 /**
@@ -406,13 +406,13 @@ function singleLineNotice(
  * to prevent.
  */
 export function resolveInheritedHolders(
-  baseLicenseText: string | undefined,
-  baseHolderOverride?: string,
+  startLicenseText: string | undefined,
+  startHolderOverride?: string,
 ): {
   inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[];
   licenseUnparseable: { reason: string; line: string } | null;
 } {
-  const holderOverride = baseHolderOverride?.trim() ?? "";
+  const holderOverride = startHolderOverride?.trim() ?? "";
   if (holderOverride !== "") {
     // D5 escape hatch: the author told us who held the copyright, so the notice
     // is retained rather than dropped. No year — that is precisely what the
@@ -424,11 +424,11 @@ export function resolveInheritedHolders(
     };
   }
 
-  if (baseLicenseText === undefined) {
+  if (startLicenseText === undefined) {
     return { inherited: [], licenseUnparseable: null };
   }
 
-  const parsed = parseCopyright(baseLicenseText);
+  const parsed = parseCopyright(startLicenseText);
   if (parsed.ok) {
     return { inherited: parsed.block, licenseUnparseable: null };
   }
@@ -663,7 +663,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
     },
 
     async scaffold(
-      base: BaseKeyboard,
+      base: StartKeyboard,
       keyboardId: string,
       displayName: string,
       scaffoldOpts?: ScaffoldOptions
@@ -680,13 +680,13 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       let group: RoutingGroup = scaffoldOpts?.group ?? detectGroup(base);
       const refineGroupFromIR = (ir: KeyboardIR): void => {
         if (scaffoldOpts?.group !== undefined || base.script !== "Latn") return;
-        group = groupFromLayoutFamily(detectBaseLayoutFamily(ir)) ?? group;
+        group = groupFromLayoutFamily(detectStartLayoutFamily(ir)) ?? group;
       };
       const vfs = createVirtualFS();
       const warnings: string[] = [];
-      let baseLicenseText: string | undefined;
-      let baseWelcomeImages: WelcomeFolderImage[] | undefined;
-      let baseWelcomeConvention: WelcomeConvention | undefined;
+      let startLicenseText: string | undefined;
+      let startWelcomeImages: WelcomeFolderImage[] | undefined;
+      let startWelcomeConvention: WelcomeConvention | undefined;
       const attribution = scaffoldOpts?.attribution;
       // spec 064 D2: the year records when the work was PUBLISHED, and is
       // injectable so tests never read the clock.
@@ -694,7 +694,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       // Shared IR-apply path for both the base-fetched .kmn and the caller-supplied
       // pre-parsed IR branches below: refine group, scaffold identity/group into
       // the IR, then emit the .kmn text back into the VFS.
-      const applyIrAndEmit = (ir: KeyboardIR, targetBaseId: string): void => {
+      const applyIrAndEmit = (ir: KeyboardIR, targetStartId: string): void => {
         refineGroupFromIR(ir);
         scaffoldIR(ir, {
           identity: {
@@ -709,7 +709,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
           },
           group,
         });
-        vfs.set(`source/${targetBaseId}.kmn`, emit(ir));
+        vfs.set(`source/${targetStartId}.kmn`, emit(ir));
       };
 
       let loaderFonts: import("@keyboard-studio/contracts").KpsFontEntry[] = [];
@@ -723,12 +723,12 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         loaderFonts = loaderResult.fonts;
         loaderStylesheets = loaderResult.stylesheets;
         warnings.push(...loaderResult.warnings);
-        baseLicenseText = loaderResult.baseLicenseText;
+        startLicenseText = loaderResult.startLicenseText;
         // spec 080 R9: a Track 1 copy inherits the base's welcome IMAGES (and
-        // nothing of its prose — baseWelcomeHtmText/baseHelpPhpText are
+        // nothing of its prose — startWelcomeHtmText/startHelpPhpText are
         // deliberately not surfaced from here, FR-007).
-        baseWelcomeImages = loaderResult.baseWelcomeImages;
-        baseWelcomeConvention = loaderResult.baseWelcomeConvention;
+        startWelcomeImages = loaderResult.startWelcomeImages;
+        startWelcomeConvention = loaderResult.startWelcomeConvention;
       } catch (err) {
         // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
         // (network error, 404, or offline). Fall through to stub-only output and
@@ -742,8 +742,8 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       // has been fetched, then merge the new author on top. See
       // resolveInheritedHolders for the D4/D5 policy.
       const { inherited: inheritedHolders, licenseUnparseable } = resolveInheritedHolders(
-        baseLicenseText,
-        scaffoldOpts?.baseHolderOverride,
+        startLicenseText,
+        scaffoldOpts?.startHolderOverride,
       );
 
       // Only the line is needed here: `inheritedHolderCount` in the result comes
@@ -757,20 +757,20 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       const attributionMissing = copyrightLine === null;
 
       const kmnVfsPath = vfs.list("source/").find((p) => p.endsWith(".kmn"));
-      const actualBaseId = kmnVfsPath != null
+      const actualStartId = kmnVfsPath != null
         ? kmnVfsPath.replace(/^source\//, "").replace(/\.kmn$/, "")
         : base.id;
 
-      const kmnEntry = vfs.get(`source/${actualBaseId}.kmn`);
+      const kmnEntry = vfs.get(`source/${actualStartId}.kmn`);
       if (kmnEntry !== undefined && typeof kmnEntry.content === "string") {
-        const ir = scaffoldOpts?.ir ?? parse(kmnEntry.content, actualBaseId).ir;
-        applyIrAndEmit(ir, actualBaseId);
+        const ir = scaffoldOpts?.ir ?? parse(kmnEntry.content, actualStartId).ir;
+        applyIrAndEmit(ir, actualStartId);
       } else if (scaffoldOpts?.ir !== undefined) {
         // No base .kmn was fetched but caller supplied a pre-parsed IR — use it.
-        applyIrAndEmit(scaffoldOpts.ir, actualBaseId);
+        applyIrAndEmit(scaffoldOpts.ir, actualStartId);
       }
 
-      renameFilesInVfs(vfs, actualBaseId, keyboardId);
+      renameFilesInVfs(vfs, actualStartId, keyboardId);
       applyTouchLayoutCleanup(vfs, keyboardId);
       generateStubs(
         vfs,
@@ -803,14 +803,14 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         ...(licenseUnparseable !== null ? { licenseUnparseable } : {}),
         // Handed back so the working copy can keep it — the download path needs it
         // to retain these same holders when it completes a missing LICENSE.md.
-        ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
+        ...(startLicenseText !== undefined ? { startLicenseText } : {}),
         // spec 080 FR-006/R9: the base's welcome images, for the copy's own
         // welcome folder. Handed back rather than written: the projection writes
         // them beside the RENDERED page at output (fetch-don't-write).
-        ...(baseWelcomeImages !== undefined && baseWelcomeImages.length > 0
-          ? { baseWelcomeImages }
+        ...(startWelcomeImages !== undefined && startWelcomeImages.length > 0
+          ? { startWelcomeImages }
           : {}),
-        ...(baseWelcomeConvention !== undefined ? { baseWelcomeConvention } : {}),
+        ...(startWelcomeConvention !== undefined ? { startWelcomeConvention } : {}),
       };
     },
 

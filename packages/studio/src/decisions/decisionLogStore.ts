@@ -173,7 +173,7 @@ export function slotKeyOf(stepId: string, payload: DecisionPayload): string {
   }
   if (payload.kind === "editor-action") return `${stepId}${d}e${d}${payload.actionType}`;
   // base-contribution (specs/055-legible-decision-trail D-11), recorded once at
-  // `choose_base` by recordBaseContribution.ts. The slot only needs to exist
+  // `choose_base` by recordStartContribution.ts. The slot only needs to exist
   // and not collide with a survey or editor slot; whether such an entry is ever
   // superseded is that producer's business, not this function's.
   return `${stepId}${d}b${d}${payload.kind}`;
@@ -222,7 +222,7 @@ export function payloadsEqual(a: DecisionPayload, b: DecisionPayload): boolean {
     // fabricated `0` — FR-005a). Plain `===` already tells `undefined` apart
     // from `0`, so no coalescing belongs here.
     if (
-      a.baseId !== b.baseId ||
+      a.startId !== b.startId ||
       a.baseDisplayName !== b.baseDisplayName ||
       a.startingKeyCount !== b.startingKeyCount ||
       a.instantiationMode !== b.instantiationMode

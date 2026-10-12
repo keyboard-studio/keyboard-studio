@@ -393,16 +393,16 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     // this base label — via keySequenceLabel. Bare shape (no deadkey, e.g.
     // Bamum bare transliteration): a single direct keypress, no trigger to
     // reconstruct.
-    const faithfulBaseLabel = inputItem && inputItem.kind === 'char'
+    const faithfulStartLabel = inputItem && inputItem.kind === 'char'
       ? displayChar(inputItem.value)
       : inputItem && inputItem.kind === 'vkey'
         ? desktopVkeyLabel(inputItem.name)
         : undefined;
-    const keySteps: string[] | undefined = faithfulBaseLabel === undefined
+    const keySteps: string[] | undefined = faithfulStartLabel === undefined
       ? undefined
       : hasDeadkey
-        ? keySequenceLabel(rule, ir, faithfulBaseLabel)
-        : [faithfulBaseLabel];
+        ? keySequenceLabel(rule, ir, faithfulStartLabel)
+        : [faithfulStartLabel];
 
     const gid = `${outputStore.nodeId}#${i}`;
     if (seen.has(gid)) continue;  // dedup: same store+index appearing in multiple rules
@@ -1247,7 +1247,7 @@ function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement;
 //   S-05 (mnemonic: char, '+', char — no store, no fan-out): two steps, both
 //     literal characters, quoted-literal only (never mapped through vkeyLabel).
 //
-// `resolvedBaseLabel` — when supplied, this call is for ONE SLOT of a
+// `resolvedStartLabel` — when supplied, this call is for ONE SLOT of a
 // parallel-store fan-out glyph (S-02/S-03); the label for that slot's base
 // store item is the caller's job (expandParallelStoreRule already computes
 // it), not this function's.
@@ -1256,22 +1256,22 @@ function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement;
 export function keySequenceLabel(
   rule: IRRule,
   ir: KeyboardIR,
-  resolvedBaseLabel?: string,
+  resolvedStartLabel?: string,
 ): string[] | undefined {
   const ctx = rule.context;
 
-  if (resolvedBaseLabel !== undefined) {
+  if (resolvedStartLabel !== undefined) {
     const dkEl = ctx.find((el) => el.kind === 'deadkey');
     if (dkEl !== undefined && dkEl.kind === 'deadkey') {
       // S-02/S-06 deadkey body: trigger THEN base.
       const trigger = findDeadkeyTrigger(ir, dkEl.id);
       if (trigger === undefined) return undefined;
       const triggerLabel = primaryChordLabel(trigger.el, trigger.rule);
-      return triggerLabel !== undefined ? [triggerLabel, resolvedBaseLabel] : undefined;
+      return triggerLabel !== undefined ? [triggerLabel, resolvedStartLabel] : undefined;
     }
     // S-03 sequence: base (any(), non-terminal) THEN the fixed literal trigger.
     const triggerLabel = bareTriggerLabel(ctx);
-    return triggerLabel !== undefined ? [resolvedBaseLabel, triggerLabel] : undefined;
+    return triggerLabel !== undefined ? [resolvedStartLabel, triggerLabel] : undefined;
   }
 
   // S-01: a single bare vkey rule (no '+', no store).
@@ -1462,7 +1462,7 @@ function storeConditionOutcome(storeRef: string, ir: KeyboardIR, negate: boolean
   return { kind: 'text', text: `when it ${verb} certain letters` };
 }
 
-/** Shared per-slot base label (mirrors expandParallelStoreRule's faithfulBaseLabel / irToCharacterView's sequenceShapeCells baseSlotLabel — all three route their vkey case through the exported `desktopVkeyLabel` so the touch-only-vkey check lives in exactly one place). */
+/** Shared per-slot base label (mirrors expandParallelStoreRule's faithfulStartLabel / irToCharacterView's sequenceShapeCells baseSlotLabel — all three route their vkey case through the exported `desktopVkeyLabel` so the touch-only-vkey check lives in exactly one place). */
 function slotItemLabel(item: StoreItem | undefined): string | undefined {
   if (item === undefined) return undefined;
   if (item.kind === 'char') return displayChar(item.value);

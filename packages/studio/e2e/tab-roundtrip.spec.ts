@@ -24,7 +24,7 @@
 import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   confirmPrefill,
@@ -35,7 +35,7 @@ import {
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
 const FIXTURE = {
-  baseKeyboardId: "basic_kbdfr",
+  startKeyboardId: "basic_kbdfr",
   autonym: "Test Autonym",
   english: "Test",
   targetScript: "other",
@@ -97,7 +97,7 @@ test.describe("tab round trip preserves the author's position (spec 057 US1)", (
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
-    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
 

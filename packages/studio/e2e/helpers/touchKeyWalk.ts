@@ -15,14 +15,14 @@
 import { expect, type Page } from "playwright/test";
 import {
   driveIdentityLite as driveIdentityLiteBase,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
   seedReturningVisitor,
 } from "./surveyFlow";
 
-export const BASE_KEYBOARD_ID = "bambara";
+export const START_KEYBOARD_ID = "bambara";
 
 /**
  * The one Phase B character this walk adds, and its derived uppercase
@@ -32,8 +32,8 @@ export const BASE_KEYBOARD_ID = "bambara";
  */
 export const PLACED_CHAR = "ø";
 export const PLACED_CHAR_UPPER = "Ø";
-const PLACED_CHAR_HOST_KEY = "K_W";
-const PLACED_CHAR_UPPER_HOST_KEY = "K_X";
+const PLACED_CHAR_BASE_KEY = "K_W";
+const PLACED_CHAR_UPPER_BASE_KEY = "K_X";
 
 /** Which seed branch the touch_seed_source fork should take. */
 export type TouchSeedChoice = "reseed" | "import-adapt";
@@ -56,7 +56,7 @@ async function skipCarve(page: Page): Promise<void> {
 }
 
 /**
- * Places one Mechanisms character on a Right-Alt layer + `hostKey`. bambara's
+ * Places one Mechanisms character on a Right-Alt layer + `baseKey`. bambara's
  * `.kmn` covers the whole base US layout, so a new character has no free
  * zero-layer key and must go on an AltGr layer; neither host key below is one
  * bambara's own RALT rules use.
@@ -64,7 +64,7 @@ async function skipCarve(page: Page): Promise<void> {
 async function placeMechanismCharacter(
   page: Page,
   char: string,
-  hostKey: string,
+  baseKey: string,
 ): Promise<void> {
   const applyButton = page.getByRole("button", { name: `Apply method for ${char}` });
   await expect(applyButton).toBeVisible({ timeout: 15_000 });
@@ -73,7 +73,7 @@ async function placeMechanismCharacter(
     await page.getByRole("button", { name: "Layer 1 for layer-switch combo" }).click();
     await page.locator('ul[role="listbox"]').locator('li[data-value="RALT"]').click();
     await page.getByRole("button", { name: "Physical key for Assign to a key" }).click();
-    await page.locator('ul[role="listbox"]').locator(`li[data-value="${hostKey}"]`).click();
+    await page.locator('ul[role="listbox"]').locator(`li[data-value="${baseKey}"]`).click();
   }
   await expect(applyButton).toBeEnabled();
   await applyButton.click();
@@ -85,9 +85,9 @@ async function driveMechanisms(page: Page): Promise<void> {
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();
   }
-  await placeMechanismCharacter(page, PLACED_CHAR, PLACED_CHAR_HOST_KEY);
+  await placeMechanismCharacter(page, PLACED_CHAR, PLACED_CHAR_BASE_KEY);
   await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
-  await placeMechanismCharacter(page, PLACED_CHAR_UPPER, PLACED_CHAR_UPPER_HOST_KEY);
+  await placeMechanismCharacter(page, PLACED_CHAR_UPPER, PLACED_CHAR_UPPER_BASE_KEY);
   await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
 }
 
@@ -133,7 +133,7 @@ export async function driveToTouchStep(
   await seedReturningVisitor(page);
   await page.goto("/");
   await driveIdentityLite(page);
-  await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+  await pickStartKeyboard(page, START_KEYBOARD_ID);
   await chooseAdaptTrack(page);
   await confirmPrefill(page);
   await buildOneCharacterList(page, PLACED_CHAR);

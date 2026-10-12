@@ -38,40 +38,40 @@ import { readVfsText } from "../lib/vfsText.ts";
 const EMPTY: LintFinding[] = [];
 
 export function useDocumentationFindings(): LintFinding[] {
-  const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
-  const baseHistoryMdText = useWorkingCopyStore((s) => s.baseHistoryMdText);
-  const baseLicenseText = useWorkingCopyStore((s) => s.baseLicenseText);
+  const startHistoryMdText = useWorkingCopyStore((s) => s.startHistoryMdText);
+  const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const baselineDocFindings = useWorkingCopyStore((s) => s.baselineDocFindings);
   const docs = useDocsPreview();
   const memberStates = useDocMemberStates();
 
   return useMemo(() => {
-    if (baseVfs === null || baseIr === null || baseKeyboard === null) return EMPTY;
+    if (startVfs === null || startIr === null || startKeyboard === null) return EMPTY;
     const isAdaptation = instantiationMode === "adapt-existing";
-    const keyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
-    const rawVersion = baseIr.header.version?.trim() || "1.0";
+    const keyboardId = resolveOutputKeyboardId(identity, startKeyboard);
+    const rawVersion = startIr.header.version?.trim() || "1.0";
     const keyboardVersion = isAdaptation ? bumpKeyboardVersion(rawVersion) : rawVersion;
 
-    const kmnPath = findKmnPath(baseVfs);
-    const kmnText = kmnPath ? (readVfsText(baseVfs, kmnPath) ?? null) : null;
-    const kpsPath = baseVfs.list("source/").find((p) => p.toLowerCase().endsWith(".kps"));
-    const kpsText = kpsPath !== undefined ? (readVfsText(baseVfs, kpsPath) ?? null) : null;
-    const kvksText = readVfsText(baseVfs, `source/${baseKeyboard.id}.kvks`) ?? null;
-    const touchPath = findTouchLayoutPath(baseVfs);
-    const touchJson = touchLayoutJson ?? (touchPath ? (readVfsText(baseVfs, touchPath) ?? null) : null);
-    const licenseText = readVfsText(baseVfs, "LICENSE.md") ?? baseLicenseText;
+    const kmnPath = findKmnPath(startVfs);
+    const kmnText = kmnPath ? (readVfsText(startVfs, kmnPath) ?? null) : null;
+    const kpsPath = startVfs.list("source/").find((p) => p.toLowerCase().endsWith(".kps"));
+    const kpsText = kpsPath !== undefined ? (readVfsText(startVfs, kpsPath) ?? null) : null;
+    const kvksText = readVfsText(startVfs, `source/${startKeyboard.id}.kvks`) ?? null;
+    const touchPath = findTouchLayoutPath(startVfs);
+    const touchJson = touchLayoutJson ?? (touchPath ? (readVfsText(startVfs, touchPath) ?? null) : null);
+    const licenseText = readVfsText(startVfs, "LICENSE.md") ?? startLicenseText;
 
     const historyMd = renderHistoryMd(historyEntryState, {
       version: keyboardVersion,
       dateIso: new Date().toISOString().slice(0, 10),
-      adaptedFrom: isAdaptation ? { id: baseKeyboard.id, version: rawVersion } : null,
-      baseHistoryText: isAdaptation ? (baseHistoryMdText ?? readVfsText(baseVfs, "HISTORY.md") ?? null) : null,
+      adaptedFrom: isAdaptation ? { id: startKeyboard.id, version: rawVersion } : null,
+      startHistoryText: isAdaptation ? (startHistoryMdText ?? readVfsText(startVfs, "HISTORY.md") ?? null) : null,
     });
 
     const members: Partial<Record<DocMemberId, string>> = {
@@ -86,21 +86,21 @@ export function useDocumentationFindings(): LintFinding[] {
     const findings = runDocChecks(
       collectDocLintInput({
         keyboardId,
-        displayName: identity?.displayName ?? baseKeyboard.displayName,
+        displayName: identity?.displayName ?? startKeyboard.displayName,
         keyboardVersion,
         kmnText,
         kpsText,
         kvksText,
         touchLayoutJson: touchJson,
         members,
-        ...(isAdaptation ? { baseHistoryMdText } : {}),
+        ...(isAdaptation ? { startHistoryMdText } : {}),
       }),
     );
     if (findings.length === 0) return EMPTY;
 
     const tierOf = new Map(memberStates.map((s) => [s.member, s.tier]));
     const baselineCodes = new Set(
-      (baselineDocFindings ?? []).map((b) => `${docMemberForPath(b.location?.file, baseKeyboard.id) ?? ""}:${b.code}`),
+      (baselineDocFindings ?? []).map((b) => `${docMemberForPath(b.location?.file, startKeyboard.id) ?? ""}:${b.code}`),
     );
     return findings.map((f) => {
       const member = docMemberForPath(f.location?.file, keyboardId);
@@ -108,14 +108,14 @@ export function useDocumentationFindings(): LintFinding[] {
       return baselineCodes.has(`${member}:${f.code}`) ? { ...f, origin: "upstream" as const } : f;
     });
   }, [
-    baseVfs,
-    baseIr,
-    baseKeyboard,
+    startVfs,
+    startIr,
+    startKeyboard,
     identity,
     instantiationMode,
     historyEntryState,
-    baseHistoryMdText,
-    baseLicenseText,
+    startHistoryMdText,
+    startLicenseText,
     touchLayoutJson,
     baselineDocFindings,
     docs,

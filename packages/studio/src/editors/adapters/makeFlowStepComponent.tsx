@@ -81,7 +81,7 @@ const SCREEN_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
 // ---------------------------------------------------------------------------
 
 export interface FlowStepDeps {
-  localBase: { displayName: string } | null;
+  localStart: { displayName: string } | null;
   /**
    * The live decision set (spec 089 FR-005). Everything the per-flow options
    * used to read from stored session fields — the identity result, the
@@ -244,7 +244,7 @@ export function makeFlowStepComponent<Extracted>(
     const localizedTitle = titleMessage ? resolveMessage(i18n, titleMessage) : resolvedTitle;
 
     // C2.5 — all store access here, never in FlowStepHost.
-    const localBase = useSurveySessionStore((s) => s.localBase);
+    const localStart = useSurveySessionStore((s) => s.localStart);
     // Spec 089 FR-005: the identity result, scaffold spec, survey context,
     // and selected track are no longer stored session fields — they derive
     // from the decision store's live set, here at the factory boundary.
@@ -271,7 +271,7 @@ export function makeFlowStepComponent<Extracted>(
     // Mutable ref so seed callbacks always read current store values.
     const depsRef = useRef<FlowStepDeps>({} as FlowStepDeps);
     depsRef.current = {
-      localBase,
+      localStart,
       decisions,
       surveyContext,
       findingsByQuestionId,

@@ -201,7 +201,7 @@ describe("annotations — longpress / multitap / flick counts", () => {
       layerId: TOUCH_JOIN_LAYERS.default,
     });
     const row = vm!.rows[1]!;
-    const host = cellFor(row.keys, TOUCH_JOIN_IDS.longpressHost);
+    const host = cellFor(row.keys, TOUCH_JOIN_IDS.longpressBase);
     expect(host.annotations).toEqual({ longpress: 2, multitap: 0, flick: 1 });
   });
 

@@ -11,7 +11,7 @@
 
 import type { CSSProperties } from "react";
 import { Trans } from "@lingui/react/macro";
-import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import type { StartKeyboard } from "@keyboard-studio/contracts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { TEXT_MAIN, FONT } from "../survey/surveyStyles.ts";
 import { OSKFrame } from "./OSKFrame.tsx";
@@ -19,7 +19,7 @@ import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
 import { CharacterMapPane } from "../survey/CharacterMapPane.tsx";
 
 export interface SurveyPreviewPaneProps {
-  localBase: BaseKeyboard | null;
+  localStart: StartKeyboard | null;
   oskMode: OskMode;
   onOskModeChange: (mode: OskMode) => void;
   /** Lifted from useKeyboardArtifact in the parent screen. */
@@ -36,7 +36,7 @@ export interface SurveyPreviewPaneProps {
 }
 
 export function SurveyPreviewPane({
-  localBase,
+  localStart,
   oskMode,
   onOskModeChange,
   stage,
@@ -70,7 +70,7 @@ export function SurveyPreviewPane({
             scope={activeStepId === "punctuation" ? "punctuation" : "alphabet"}
           />
         </div>
-      ) : localBase === null ? (
+      ) : localStart === null ? (
         <div
           style={{
             flex: 1,
@@ -122,7 +122,7 @@ export function SurveyPreviewPane({
                 color: "var(--app-accent-text)",
               }}
             >
-              {localBase.displayName}
+              {localStart.displayName}
             </h2>
             <div
               style={{
@@ -136,7 +136,7 @@ export function SurveyPreviewPane({
             </div>
           </div>
           <OSKFrame
-            baseKeyboard={localBase}
+            startKeyboard={localStart}
             oskMode={oskMode}
             stage={stage}
             retry={retry}

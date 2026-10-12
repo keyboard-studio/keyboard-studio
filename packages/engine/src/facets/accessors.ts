@@ -23,7 +23,7 @@ export const CASING_FACET_ID = "casing";
  * Returns a new `KeyboardIR`; does not touch `ir.facetOverrides`.
  *
  * Called once at working-copy instantiation — both Track 1
- * (`instantiateFromBase`) and Track 2 (`instantiateFromExisting`) call this on
+ * (`instantiateFromStart`) and Track 2 (`instantiateFromExisting`) call this on
  * the freshly-parsed IR before it is set on the store, so both tracks derive
  * facets identically (spec 048 Edge Case).
  */

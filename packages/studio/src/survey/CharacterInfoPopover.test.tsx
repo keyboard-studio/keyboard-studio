@@ -6,7 +6,7 @@
 //     with a tiny stub table — the popover path under test is
 //     describeCharacter (the REAL engine helper) + the hook + the pane
 //     wiring; the real 1.5 MB table never loads in jsdom.
-//   - baseIr/bcp47/languageName come from the real workingCopyStore /
+//   - startIr/bcp47/languageName come from the real workingCopyStore /
 //     surveySessionStore singletons, seeded directly.
 //
 // What is pinned here:
@@ -138,7 +138,7 @@ function fixture(): CharacterMapGroup[] {
       block: "Latin",
       tier: "main",
       script: "Latn",
-      usedByBase: false,
+      usedByStart: false,
       cells: [
         { char: "a", isCombiningMark: false },
         { char: "b", isCombiningMark: false },
@@ -148,14 +148,14 @@ function fixture(): CharacterMapGroup[] {
       block: "Combining Diacritical Marks",
       tier: "auxiliary",
       script: "Latn",
-      usedByBase: false,
+      usedByStart: false,
       cells: [{ char: COMBINING_ACUTE, isCombiningMark: true }],
     },
     {
       block: "Devanagari",
       tier: "auxiliary",
       script: "Deva",
-      usedByBase: false,
+      usedByStart: false,
       cells: [{ char: KSSA, isCombiningMark: false }],
     },
   ];
@@ -181,8 +181,8 @@ function seedIdentityDecisions(languageCode: string, languageName: string): void
   record({ id: "target-script", value: "Latn", provenance: "asked" });
 }
 
-function seedBaseAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
-  useWorkingCopyStore.getState().instantiateFromBase(TEST_BASE, {
+function seedStartAndLanguage(bcp47 = "yo", languageName = "Yoruba"): void {
+  useWorkingCopyStore.getState().instantiateFromStart(TEST_BASE, {
     vfs: { files: new Map() },
     ir: makeTestIR([]),
   });
@@ -209,7 +209,7 @@ async function renderPaneAndGetCell(
   groupLabel: string,
   namePattern: RegExp,
 ): Promise<HTMLElement> {
-  seedBaseAndLanguage();
+  seedStartAndLanguage();
   render(<CharacterMapPane />);
   await waitFor(() => {
     expect(screen.getByLabelText(groupLabel)).toBeTruthy();
@@ -339,7 +339,7 @@ describe("CharacterInfoPopover", () => {
 
   it("moves the popover when the pointer goes from one cell to another", async () => {
     // Two cells in the fixture Latin group: a, b. Render once, grab both.
-    seedBaseAndLanguage();
+    seedStartAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();

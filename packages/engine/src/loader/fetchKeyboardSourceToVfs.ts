@@ -1,14 +1,14 @@
 // Fetch a base keyboard's source files from the keymanapp/keyboards
 // release tree into the VirtualFS, ready for CompilerService.compile().
 //
-// Resolves `<proxyBase>/<baseKeyboard.path>/source/<id>.kmn`, parses the
+// Resolves `<proxyBase>/<startKeyboard.path>/source/<id>.kmn`, parses the
 // header for sibling deps (see shared/siblingAssetStores.ts for the
 // canonical store inventory), fetches each, plus the optional <id>.kpj for
 // compiler flags. Writes everything flat into the VFS at `source/...` (the
 // layout CompilerService.compile() expects).
 
 import type {
-  BaseKeyboard,
+  StartKeyboard,
   VirtualFS,
   KpsFontEntry,
   KpsStylesheetEntry,
@@ -17,7 +17,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
 import { parseKpjFlags, type CompilerOptions } from "../compiler/parseKpjFlags.js";
-import { kpsRefToPosix, parseKpsFiles, parseKpsFontRefs } from "../base-browser/kps-parser.js";
+import { kpsRefToPosix, parseKpsFiles, parseKpsFontRefs } from "../start-browser/kps-parser.js";
 import { extractWelcomeImageRefs } from "../shared/helpDocsRender.js";
 import { parseKvks } from "../codec/parse-kvks.js";
 import { pathUtils } from "../compiler/pathUtils.js";
@@ -77,7 +77,7 @@ export interface FetchKeyboardSourceResult {
    * block (base holders + the new author), so parking the base's copy at the
    * same path would collide with it.
    */
-  baseLicenseText?: string;
+  startLicenseText?: string;
   /**
    * The base keyboard's own welcome page, verbatim, or undefined when it has
    * none (spec 061 FR-013). Fetched for merge purposes at render time only —
@@ -90,19 +90,19 @@ export interface FetchKeyboardSourceResult {
    * declared flat name). A declared file that 404s degrades to the next probe
    * rather than failing (edge case: ghost descriptor entry).
    */
-  baseWelcomeHtmText?: string;
+  startWelcomeHtmText?: string;
   /**
    * The base keyboard's own `source/help/<id>.php`, verbatim, or undefined
    * when it has none. Same fetch-don't-write contract as
-   * {@link baseWelcomeHtmText}.
+   * {@link startWelcomeHtmText}.
    */
-  baseHelpPhpText?: string;
+  startHelpPhpText?: string;
   /**
    * Which welcome-page convention the base uses (spec 080 data-model §6):
    * `"folder"` (`source/welcome/welcome.htm`, the corpus majority), `"flat"`
    * (`source/welcome.htm`), or `"absent"`. `folder` wins when both exist.
    */
-  baseWelcomeConvention?: WelcomeConvention;
+  startWelcomeConvention?: WelcomeConvention;
   /**
    * The base's welcome-folder images, fetched as bytes (spec 080 FR-006): every
    * `welcome\…` file its `.kps` `<Files>` lists other than the page itself, in
@@ -113,19 +113,19 @@ export interface FetchKeyboardSourceResult {
    * fetch-don't-write contract: the projection writes them beside the
    * rendered page at output.
    */
-  baseWelcomeImages?: WelcomeFolderImage[];
+  startWelcomeImages?: WelcomeFolderImage[];
   /**
    * The base keyboard's own `README.md`, verbatim, or undefined when it has
    * none (spec 080 FR-006 inheritance). Fetch-don't-write, like
-   * {@link baseLicenseText}: it lives at the keyboard root.
+   * {@link startLicenseText}: it lives at the keyboard root.
    */
-  baseReadmeMdText?: string;
+  startReadmeMdText?: string;
   /**
    * The base keyboard's own `HISTORY.md`, verbatim, or undefined when it has
    * none. Fetch-don't-write; the adapt track's rendered HISTORY preserves
    * these entries below the new one (criterion 3.4).
    */
-  baseHistoryMdText?: string;
+  startHistoryMdText?: string;
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -192,18 +192,18 @@ async function getBytes(
  * canonical store inventory and which stores are required vs. optional.
  */
 export async function fetchKeyboardSourceToVfs(
-  baseKeyboard: BaseKeyboard,
+  startKeyboard: StartKeyboard,
   vfs: VirtualFS,
   opts?: FetchKeyboardSourceOptions,
 ): Promise<FetchKeyboardSourceResult> {
   const proxyBase = opts?.proxyBase ?? DEFAULT_PROXY;
   const fetchImpl = opts?.fetchImpl ?? globalThis.fetch.bind(globalThis);
-  const baseUrl = `${proxyBase}/${baseKeyboard.path}`;
+  const baseUrl = `${proxyBase}/${startKeyboard.path}`;
   const filesLoaded: string[] = [];
   const warnings: string[] = [];
 
   // Step 1: required .kmn.
-  const kmnUrl = `${baseUrl}/source/${baseKeyboard.id}.kmn`;
+  const kmnUrl = `${baseUrl}/source/${startKeyboard.id}.kmn`;
   const kmnResp = await getText(kmnUrl, fetchImpl);
   if (!kmnResp.ok || kmnResp.text === undefined) {
     const detail = kmnResp.networkError
@@ -213,7 +213,7 @@ export async function fetchKeyboardSourceToVfs(
       `fetchKeyboardSourceToVfs: required .kmn not found at ${kmnUrl} (${detail})`,
     );
   }
-  const kmnVfsPath = `source/${baseKeyboard.id}.kmn`;
+  const kmnVfsPath = `source/${startKeyboard.id}.kmn`;
   vfs.set(kmnVfsPath, kmnResp.text);
   filesLoaded.push(kmnVfsPath);
 
@@ -238,7 +238,7 @@ export async function fetchKeyboardSourceToVfs(
         throw new Error(
           `fetchKeyboardSourceToVfs: required sibling ` +
             `&${r.store.storeName} '${r.store.path}' not found at ${r.url} (${detail})` +
-            ` for keyboard '${baseKeyboard.id}'`,
+            ` for keyboard '${startKeyboard.id}'`,
         );
       }
       warnings.push(
@@ -270,7 +270,7 @@ export async function fetchKeyboardSourceToVfs(
   // like ../build/*.kmx that must not leak into the VFS).
   const fonts: KpsFontEntry[] = [];
   const stylesheets: KpsStylesheetEntry[] = [];
-  const kpsUrl = `${baseUrl}/source/${baseKeyboard.id}.kps`;
+  const kpsUrl = `${baseUrl}/source/${startKeyboard.id}.kps`;
   const kpsResp = await getText(kpsUrl, fetchImpl);
   // Hoisted: the welcome-page resolution below (spec 080 R3) reads the same
   // descriptor for `<WelcomeFile>` and the `welcome\…` `<Files>` entries.
@@ -289,7 +289,7 @@ export async function fetchKeyboardSourceToVfs(
     // VFS.get() returns a VirtualFSEntry ({ path, content, isBinary }), not
     // the raw content — read .content. Text siblings were written with
     // string content; binary entries would have Uint8Array which we skip.
-    const kvksVfsPath = `source/${baseKeyboard.id}.kvks`;
+    const kvksVfsPath = `source/${startKeyboard.id}.kvks`;
     let kvksFamilyStr: string | undefined;
     const kvksEntry = vfs.get(kvksVfsPath);
     if (kvksEntry !== undefined && typeof kvksEntry.content === "string") {
@@ -297,7 +297,7 @@ export async function fetchKeyboardSourceToVfs(
     }
     // Fallback: check the touch-layout's top-level "font" value.
     if (kvksFamilyStr === undefined) {
-      const tlVfsPath = `source/${baseKeyboard.id}.keyman-touch-layout`;
+      const tlVfsPath = `source/${startKeyboard.id}.keyman-touch-layout`;
       const tlEntry = vfs.get(tlVfsPath);
       if (tlEntry !== undefined && typeof tlEntry.content === "string") {
         try {
@@ -323,7 +323,7 @@ export async function fetchKeyboardSourceToVfs(
     // Fetch each font file in parallel.
     const fontFetchResults = await Promise.all(
       [...allRaw.entries()].map(async ([rawPath, isOskFont]) => {
-        const ttfRelPath = resolveKpsFontPath(rawPath, baseKeyboard.path);
+        const ttfRelPath = resolveKpsFontPath(rawPath, startKeyboard.path);
         if (ttfRelPath === null) {
           return {
             ok: false as const,
@@ -376,7 +376,7 @@ export async function fetchKeyboardSourceToVfs(
     // resolveKpsFontPath enforces the release/ tree boundary for both.
     const cssFetchResults = await Promise.all(
       cssRefs.map(async (rawPath) => {
-        const cssRelPath = resolveKpsFontPath(rawPath, baseKeyboard.path);
+        const cssRelPath = resolveKpsFontPath(rawPath, startKeyboard.path);
         if (cssRelPath === null) {
           return {
             ok: false as const,
@@ -420,12 +420,12 @@ export async function fetchKeyboardSourceToVfs(
   }
 
   // Step 5: optional .kpj.
-  const kpjUrl = `${baseUrl}/${baseKeyboard.id}.kpj`;
+  const kpjUrl = `${baseUrl}/${startKeyboard.id}.kpj`;
   const kpjResp = await getText(kpjUrl, fetchImpl);
   let options: Required<CompilerOptions> = DEFAULT_OPTIONS;
   if (kpjResp.ok && kpjResp.text !== undefined) {
     options = parseKpjFlags(kpjResp.text);
-    const kpjVfsPath = `${baseKeyboard.id}.kpj`;
+    const kpjVfsPath = `${startKeyboard.id}.kpj`;
     vfs.set(kpjVfsPath, kpjResp.text);
     filesLoaded.push(kpjVfsPath);
   } else {
@@ -441,44 +441,44 @@ export async function fetchKeyboardSourceToVfs(
   // spec 064 FR-011: the base's LICENSE.md, for copyright accumulation. Absence
   // is non-fatal and NOT a warning — ~545 of 554 legacy keyboards have none, and
   // a missing license file is a normal condition the caller decides about.
-  let baseLicenseText: string | undefined;
+  let startLicenseText: string | undefined;
   const licenseResp = await getText(`${baseUrl}/LICENSE.md`, fetchImpl);
   if (licenseResp.ok && licenseResp.text !== undefined) {
-    baseLicenseText = licenseResp.text;
+    startLicenseText = licenseResp.text;
   }
 
   // spec 061 FR-013: the base's own welcome page / help.php, for merge purposes
-  // at render time only — not written into the VFS (see baseWelcomeHtmText
+  // at render time only — not written into the VFS (see startWelcomeHtmText
   // doc comment). Absence is non-fatal and NOT a warning, same tolerance as
-  // baseLicenseText: most bases have no help page at all.
+  // startLicenseText: most bases have no help page at all.
   //
   // spec 080 R3: the welcome page is resolved through the three-step probe
   // (descriptor-named → folder → flat) and, on the folder convention, its
   // sibling images come along too.
-  const welcome = await resolveBaseWelcome(baseUrl, kpsText, fetchImpl);
-  const baseWelcomeHtmText = welcome.text;
-  const baseWelcomeConvention = welcome.convention;
-  const baseWelcomeImages = welcome.images;
+  const welcome = await resolveStartWelcome(baseUrl, kpsText, fetchImpl);
+  const startWelcomeHtmText = welcome.text;
+  const startWelcomeConvention = welcome.convention;
+  const startWelcomeImages = welcome.images;
   warnings.push(...welcome.warnings);
 
-  let baseHelpPhpText: string | undefined;
-  const helpPhpResp = await getText(`${baseUrl}/source/help/${baseKeyboard.id}.php`, fetchImpl);
+  let startHelpPhpText: string | undefined;
+  const helpPhpResp = await getText(`${baseUrl}/source/help/${startKeyboard.id}.php`, fetchImpl);
   if (helpPhpResp.ok && helpPhpResp.text !== undefined) {
-    baseHelpPhpText = helpPhpResp.text;
+    startHelpPhpText = helpPhpResp.text;
   }
 
   // spec 080 FR-006: the base's README.md / HISTORY.md, for inheritance at
   // render time (README prose) and preservation below the new entry (HISTORY,
   // criterion 3.4). Root-level like LICENSE.md; absence is silent.
-  let baseReadmeMdText: string | undefined;
+  let startReadmeMdText: string | undefined;
   const readmeResp = await getText(`${baseUrl}/README.md`, fetchImpl);
   if (readmeResp.ok && readmeResp.text !== undefined) {
-    baseReadmeMdText = readmeResp.text;
+    startReadmeMdText = readmeResp.text;
   }
-  let baseHistoryMdText: string | undefined;
+  let startHistoryMdText: string | undefined;
   const historyResp = await getText(`${baseUrl}/HISTORY.md`, fetchImpl);
   if (historyResp.ok && historyResp.text !== undefined) {
-    baseHistoryMdText = historyResp.text;
+    startHistoryMdText = historyResp.text;
   }
 
   return {
@@ -487,13 +487,13 @@ export async function fetchKeyboardSourceToVfs(
     warnings,
     fonts,
     stylesheets,
-    ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
-    ...(baseWelcomeHtmText !== undefined ? { baseWelcomeHtmText } : {}),
-    ...(baseHelpPhpText !== undefined ? { baseHelpPhpText } : {}),
-    baseWelcomeConvention,
-    ...(baseWelcomeImages.length > 0 ? { baseWelcomeImages } : {}),
-    ...(baseReadmeMdText !== undefined ? { baseReadmeMdText } : {}),
-    ...(baseHistoryMdText !== undefined ? { baseHistoryMdText } : {}),
+    ...(startLicenseText !== undefined ? { startLicenseText } : {}),
+    ...(startWelcomeHtmText !== undefined ? { startWelcomeHtmText } : {}),
+    ...(startHelpPhpText !== undefined ? { startHelpPhpText } : {}),
+    startWelcomeConvention,
+    ...(startWelcomeImages.length > 0 ? { startWelcomeImages } : {}),
+    ...(startReadmeMdText !== undefined ? { startReadmeMdText } : {}),
+    ...(startHistoryMdText !== undefined ? { startHistoryMdText } : {}),
   };
 }
 
@@ -523,7 +523,7 @@ const WELCOME_FOLDER_PREFIX = "welcome/";
 const FOLDER_WELCOME_PAGE = "welcome/welcome.htm";
 const FLAT_WELCOME_PAGE = "welcome.htm";
 
-interface ResolvedBaseWelcome {
+interface ResolvedStartWelcome {
   text: string | undefined;
   convention: WelcomeConvention;
   images: WelcomeFolderImage[];
@@ -548,11 +548,11 @@ interface ResolvedBaseWelcome {
  * bytes. Each miss is skipped and recorded — a listed file the base does not
  * ship is the base's defect, and the output must still build.
  */
-async function resolveBaseWelcome(
+async function resolveStartWelcome(
   baseUrl: string,
   kpsText: string | undefined,
   fetchImpl: FetchFn,
-): Promise<ResolvedBaseWelcome> {
+): Promise<ResolvedStartWelcome> {
   const warnings: string[] = [];
   const declaredRaw = kpsText !== undefined ? parseKpsWelcomeFile(kpsText) : undefined;
   const declared = declaredRaw !== undefined ? kpsRefToPosix(declaredRaw) : undefined;

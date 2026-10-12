@@ -30,7 +30,7 @@ import type { DesktopModifications } from "@keyboard-studio/engine";
 import { repropagate } from "../steps/repropagate.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { buildTouchLayoutJson } from "./buildTouchLayoutJson.ts";
-import { resolveBaseTouchJson } from "./resolveBaseTouchJson.ts";
+import { resolveStartTouchJson } from "./resolveStartTouchJson.ts";
 import {
   resolveTouchSeedSource,
   shouldEmitTouchLayout,
@@ -65,9 +65,9 @@ export interface TouchCompleteResult {
   /** Non-inherited touch assignments from Phase E (pre-filtered by TouchGallery). */
   assignments: TouchAssignment[];
   /** The base IR at lock time (post-lockDesktop snapshot). */
-  baseIr: KeyboardIR | null;
+  startIr: KeyboardIR | null;
   /** The base VFS (for resolving the shipped .keyman-touch-layout, if any). */
-  baseVfs: VirtualFS | null;
+  startVfs: VirtualFS | null;
   /**
    * Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
    * removals + Phase C individual letter placements. Computed by the touch
@@ -97,7 +97,7 @@ const EMPTY_DESKTOP_MODIFICATIONS: DesktopModifications = {
  * the reseed path never pass the shipped layout through (R10).
  */
 function buildTouchLayoutJsonForStep(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   assignments: TouchAssignment[],
   opts: {
     baseTouchJson?: string;
@@ -113,7 +113,7 @@ function buildTouchLayoutJsonForStep(
   if (!shouldEmitTouchLayout(seedSource, opts.mods, hasRealEdits)) {
     return { json: null, warnings: [] };
   }
-  return buildTouchLayoutJson(baseIr, assignments, {
+  return buildTouchLayoutJson(startIr, assignments, {
     // Reseed discards the shipped layout (R10) — never pass baseTouchJson
     // through on that path, even though buildTouchLayoutJson's own Case A
     // branch condition would ignore it anyway.
@@ -141,21 +141,21 @@ export function applyTouchCompletionEffects(
   const payload = result ?? {};
   const {
     assignments = [],
-    baseIr = null,
-    baseVfs = null,
+    startIr = null,
+    startVfs = null,
     mods = EMPTY_DESKTOP_MODIFICATIONS,
     seedSource = null,
   } = payload;
 
   const wc = useWorkingCopyStore.getState();
-  if (baseIr === null) {
+  if (startIr === null) {
     // No working IR to derive from — clear the stored touch layout (KMW
     // uses its native default).
     wc.setTouchLayoutJson(null);
   } else {
     try {
-      const baseTouchJson = resolveBaseTouchJson(baseVfs);
-      const { json, warnings } = buildTouchLayoutJsonForStep(baseIr, assignments, {
+      const baseTouchJson = resolveStartTouchJson(startVfs);
+      const { json, warnings } = buildTouchLayoutJsonForStep(startIr, assignments, {
         ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
         mods,
         seedSource,

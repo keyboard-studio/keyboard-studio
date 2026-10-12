@@ -433,7 +433,7 @@ export function SurveyRunner({
   // source. A record the extraction pass seeded (provenance extracted /
   // default) IS the question's seed — value from the record, the source
   // label rendered from the record (see recordProvenanceCaption below) —
-  // so a converted step needs no per-step seed callbacks at all. Hosts
+  // so a converted step needs no per-step seed callbacks at all. Bases
   // whose seeders are not yet converted keep working through the prop
   // fallback in callerProposal.
   function recordForQuestion(questionId: string) {
@@ -507,11 +507,11 @@ export function SurveyRunner({
       const base = useDecisionStore.getState().decisions["base-keyboard"]?.value as
         | { id?: unknown }
         | undefined;
-      const baseId = typeof base?.id === "string" ? base.id : undefined;
-      if (baseId === undefined) return undefined;
+      const startId = typeof base?.id === "string" ? base.id : undefined;
+      if (startId === undefined) return undefined;
       return typeof record.offered === "string"
-        ? `from ${baseId}: ${record.offered}`
-        : `from ${baseId}`;
+        ? `from ${startId}: ${record.offered}`
+        : `from ${startId}`;
     }
     return undefined;
   }

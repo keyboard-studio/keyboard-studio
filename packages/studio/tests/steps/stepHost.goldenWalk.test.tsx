@@ -11,8 +11,8 @@
 //
 //   1. `applyStepCompletion` from `steps/reducer.ts` — spy via vi.spyOn after
 //      import.  Records which step IDs flow through the reducer.
-//   2. `surveySessionStore` mutators (advance, popHistory, setLocalBase,
-//      setBaseConfirmed, setCharactersSubStage) AND `decisionStore` mutators
+//   2. `surveySessionStore` mutators (advance, popHistory, setLocalStart,
+//      setStartConfirmed, setCharactersSubStage) AND `decisionStore` mutators
 //      (record, recordAll, forget) — injected via the stores' setState so
 
 //      the spy still executes the real logic.  Records call order.
@@ -98,8 +98,8 @@ vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMoc
 // the barrel), so the shallow stubs must be registered for the files too.
 vi.mock("../../src/survey/Prefill.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("../../src/survey/PhaseB.tsx", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
-  import("../../src/test/studioShellMocks/BaseResolution.tsx"),
+vi.mock("../../src/editors/panels/StartResolution.tsx", () =>
+  import("../../src/test/studioShellMocks/StartResolution.tsx"),
 );
 vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () =>
   import("../../src/test/studioShellMocks/CarveGalleryV2.tsx"),
@@ -192,7 +192,7 @@ import * as ReducerModule from "../../src/steps/reducer.ts";
 function renderSurveyWithNav() {
   return render(
     <>
-      <SurveyView baseKeyboard={null} />
+      <SurveyView startKeyboard={null} />
       <ActiveStepNav />
     </>,
   );
@@ -240,8 +240,8 @@ const SESSION_MUTATOR_NAMES = [
   "advance",
   "popHistory",
 
-  "setLocalBase",
-  "setBaseConfirmed",
+  "setLocalStart",
+  "setStartConfirmed",
   "setCharactersSubStage",
 ] as const;
 
@@ -415,7 +415,7 @@ function createRecorder() {
  * `testId` — the common case, one click per step. `testIds` — for choose_base
  * (preview-before-commit): TWO separate clicks (preview, then confirm) folded
  * into the SAME recorder step window, so the fixture's single "choose_base"
- * entry captures both setLocalBase (preview) and setBaseConfirmed (confirm)
+ * entry captures both setLocalStart (preview) and setStartConfirmed (confirm)
  * in real call order, exactly as the real two-click user flow produces them.
  */
 /**

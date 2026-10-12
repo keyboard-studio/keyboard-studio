@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { parseKmn } from "@keyboard-studio/engine";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { makeStartKeyboard } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
 import { mineCorpus } from "./corpusMine.ts";
 import type { CorpusSample } from "./corpusMine.ts";
@@ -22,7 +22,7 @@ group(main) using keys
   return {
     id,
     ir,
-    catalog: makeBaseKeyboard({
+    catalog: makeStartKeyboard({
       id,
       script,
       path: `release/test/${id}`,

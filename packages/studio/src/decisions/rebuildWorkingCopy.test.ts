@@ -192,7 +192,7 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
 
   it("installs the rebuilt IR + overlay channels into the working copy store", () => {
     const ir = baseIR();
-    useWorkingCopyStore.setState({ baseIr: ir, ir });
+    useWorkingCopyStore.setState({ startIr: ir, ir });
     useDecisionStore.getState().recordAll([
       rec({ id: "author-name", value: "Test Author", provenance: "asked" }),
       rec({ id: "authoring-track", value: "copy", provenance: "asked" }),
@@ -217,7 +217,7 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
 
   it("installs the folded carve slice into the working copy's carve state (D-090-24)", () => {
     const ir = baseIR();
-    useWorkingCopyStore.setState({ baseIr: ir, ir });
+    useWorkingCopyStore.setState({ startIr: ir, ir });
     useDecisionStore.getState().recordAll([
       rec({ id: "authoring-track", value: "copy", provenance: "asked" }),
       rec({
@@ -257,7 +257,7 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
     // (doCommit's order: instantiate → extraction seeds → this entry);
     // the decision store still carries the set recorded under the old
     // base, including an extracted record naming the old source.
-    const newBase = makeTestIR({
+    const newStart = makeTestIR({
       header: {
         name: "French Basic",
         keyboardId: "basic_kbdfr",
@@ -266,9 +266,9 @@ describe("rebuildWorkingCopyFromStores — the live entry (T009)", () => {
       },
     });
     useWorkingCopyStore.setState({
-      baseIr: newBase,
-      ir: newBase,
-      baseKeyboard: {
+      startIr: newStart,
+      ir: newStart,
+      startKeyboard: {
         id: "basic_kbdfr",
         path: "release/basic/basic_kbdfr",
         script: "Latn",

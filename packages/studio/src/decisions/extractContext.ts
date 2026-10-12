@@ -6,7 +6,7 @@
 // touch layout, and character inventory live in the IR. Each decision reads
 // from whichever holds it.
 
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import { getLoadedLangtags } from "../lib/langtagsDefaults.ts";
 
 /**
@@ -63,7 +63,7 @@ export interface ExtractContext {
    * Catalog entry: id, script, languages[], displayName, version.
    * Where language identity lives when the IR does not carry it.
    */
-  catalog: BaseKeyboard | null;
+  catalog: StartKeyboard | null;
   /**
    * Resolves a bare language subtag to its English name via the (lazily
    * loaded) langtags dataset; undefined when not loaded or unknown.
@@ -97,15 +97,15 @@ export interface IdentityLookupInputs {
 
 /**
  * Build the bundle from the working-copy store's canonical slots
- * (`baseIr`, `baseKeyboard`) — no new store, no new fetch.
+ * (`startIr`, `startKeyboard`) — no new store, no new fetch.
  */
 export function buildExtractContext(
-  baseIr: KeyboardIR | null,
-  baseKeyboard: BaseKeyboard | null,
+  startIr: KeyboardIR | null,
+  startKeyboard: StartKeyboard | null,
 ): ExtractContext {
   return {
-    ir: baseIr,
-    catalog: baseKeyboard,
+    ir: startIr,
+    catalog: startKeyboard,
     resolveLanguageName: (subtag) => {
       const key = subtag.toLowerCase();
       return getLoadedLangtags()

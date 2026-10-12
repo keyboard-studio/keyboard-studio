@@ -2,7 +2,7 @@
 // metadata) as the extraction input (spec 087, clarify Q1).
 
 import { describe, it, expect } from "vitest";
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import type { StartKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
 
@@ -26,7 +26,7 @@ function fixtureIR(bcp47: string[], keyboardId = "sil_cameroon_qwerty"): Keyboar
   };
 }
 
-function fixtureCatalog(overrides: Partial<BaseKeyboard> = {}): BaseKeyboard {
+function fixtureCatalog(overrides: Partial<StartKeyboard> = {}): StartKeyboard {
   return {
     id: "sil_cameroon_qwerty",
     path: "release/s/sil_cameroon_qwerty",

@@ -13,7 +13,7 @@
 // implementability, see packages/engine/src/pattern-apply/sessionProducedSet.ts):
 //
 //   - `lettersToAdd`/`alreadyProduced` are computed from the STATIC, base-only
-//     produced set (`buildProducedSet(baseIr, ...)`, unchanged from before this
+//     produced set (`buildProducedSet(startIr, ...)`, unchanged from before this
 //     fix) — this is the WALK's fixed denominator. It must NOT react to this
 //     session's own assignments: MechanismGallery's `currentChar` is documented
 //     as "does NOT auto-advance when a method is applied" and
@@ -27,7 +27,7 @@
 //     was caught by the existing companion-proposal test suite during this
 //     fix's own regression pass.
 //   - `producedSet` (the returned field) IS session-aware —
-//     `buildSessionProducedSet(baseIr, sessionAssignments, getPatternByIdSync)`
+//     `buildSessionProducedSet(startIr, sessionAssignments, getPatternByIdSync)`
 //     augmented with composability — but is exposed ONLY for consumers that
 //     need "is X reachable given everything this session has done" for
 //     INFORMATIONAL or GATE purposes that don't drive walk membership:
@@ -44,8 +44,8 @@
 //         "must not reflow the walk mid-session" reason as above.
 //
 // Memoization:
-//   - baseProducedSetForWalk is memoized on baseIr + inventory ONLY (object-
-//     reference stable — the working-copy store never mutates baseIr in
+//   - baseProducedSetForWalk is memoized on startIr + inventory ONLY (object-
+//     reference stable — the working-copy store never mutates startIr in
 //     place, it replaces the slot) — no dependency on session assignments, by
 //     design (see above).
 //   - producedSet (session-aware) is additionally memoized on this session's
@@ -78,7 +78,7 @@
 //     placement for (see that module's doc; the companion only ever proposes
 //     lower->upper, never the reverse).
 //
-// baseIr-null fallback: when baseIr is null (working copy not yet instantiated),
+// startIr-null fallback: when startIr is null (working copy not yet instantiated),
 // lettersToAdd === inventory (full alphabet) and alreadyProduced === [] — the
 // gallery behaves exactly as it did before the diff was wired.
 
@@ -143,13 +143,13 @@ export interface InventoryDiff {
   producedSet: ReadonlySet<string>;
   /**
    * The SESSION-AWARE produced-glyph set BEFORE composability augmentation —
-   * i.e. the raw `buildSessionProducedSet(baseIr, sessionAssignments,
+   * i.e. the raw `buildSessionProducedSet(startIr, sessionAssignments,
    * getPatternByIdSync)` result this hook already computes internally to
    * derive `producedSet`. Exposed so consumers that only need the
    * pre-augment set (MechanismGallery's `baseProducedSet` composition-row
    * feed, TouchGallery's `desktopDirectProducedSet`) don't re-run the same
    * expensive round-trip a second time per render — perf dedup, no behavior
-   * change (same baseIr/sessionAssignments/getPatternByIdSync inputs as
+   * change (same startIr/sessionAssignments/getPatternByIdSync inputs as
    * before).
    */
   rawProducedSet: ReadonlySet<string>;
@@ -164,12 +164,12 @@ export interface InventoryDiff {
  *     decomposed inventory entry (e.g. "é") correctly matches the
  *     precomposed "é" the base produces.
  *
- * When `baseIr` is null the hook returns
+ * When `startIr` is null the hook returns
  * `{ lettersToAdd: inventory, alreadyProduced: [], producedSet: empty set }`
  * — the caller sees no diff and the gallery works as before instantiation.
  */
 export function useInventoryDiff(): InventoryDiff {
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
 
@@ -187,13 +187,13 @@ export function useInventoryDiff(): InventoryDiff {
   // must NOT depend on sessionAssignments.
   const baseProducedSetForWalk = useMemo<Set<string>>(
     () =>
-      baseIr !== null
+      startIr !== null
         ? augmentWithComposable(
-            buildProducedSet(baseIr, { excludeBackspaceCorrections: true }),
+            buildProducedSet(startIr, { excludeBackspaceCorrections: true }),
             inventory,
           )
         : new Set<string>(),
-    [baseIr, inventory],
+    [startIr, inventory],
   );
 
   // The orphaned delta, memoized SEPARATELY so the frozen arithmetic above is
@@ -201,10 +201,10 @@ export function useInventoryDiff(): InventoryDiff {
   // are asked the same question and differ only in reachability.
   const orphanedSet = useMemo<Set<string>>(
     () =>
-      baseIr !== null
-        ? buildReachableProducedSet(baseIr, { excludeBackspaceCorrections: true }).orphaned
+      startIr !== null
+        ? buildReachableProducedSet(startIr, { excludeBackspaceCorrections: true }).orphaned
         : new Set<string>(),
-    [baseIr],
+    [startIr],
   );
 
   // SESSION-AWARE, PRE-AUGMENT — the raw round-trip, computed once and
@@ -213,22 +213,22 @@ export function useInventoryDiff(): InventoryDiff {
   // redo it (perf dedup — km-synthesis).
   const rawProducedSet = useMemo<Set<string>>(
     () =>
-      baseIr !== null
-        ? buildSessionProducedSet(baseIr, sessionAssignments, getPatternByIdSync)
+      startIr !== null
+        ? buildSessionProducedSet(startIr, sessionAssignments, getPatternByIdSync)
         : new Set<string>(),
-    [baseIr, sessionAssignments],
+    [startIr, sessionAssignments],
   );
 
   // SESSION-AWARE, augmented — returned as `producedSet` for
   // informational/gate consumers only (see module doc).
   const producedSet = useMemo<Set<string>>(
-    () => (baseIr !== null ? augmentWithComposable(rawProducedSet, inventory) : new Set<string>()),
-    [baseIr, inventory, rawProducedSet],
+    () => (startIr !== null ? augmentWithComposable(rawProducedSet, inventory) : new Set<string>()),
+    [startIr, inventory, rawProducedSet],
   );
 
   return useMemo<InventoryDiff>(() => {
-    if (baseIr === null) {
-      // The baseIr-null fallback must return ALL THREE arrays (FR-011): a caller
+    if (startIr === null) {
+      // The startIr-null fallback must return ALL THREE arrays (FR-011): a caller
       // destructuring `producedButUnreachable` here would otherwise read
       // `undefined` before instantiation and throw on `.length`.
       return {
@@ -271,5 +271,5 @@ export function useInventoryDiff(): InventoryDiff {
       producedSet,
       rawProducedSet,
     };
-  }, [baseIr, baseProducedSetForWalk, orphanedSet, producedSet, rawProducedSet, inventory]);
+  }, [startIr, baseProducedSetForWalk, orphanedSet, producedSet, rawProducedSet, inventory]);
 }

@@ -242,14 +242,14 @@ export { DEADKEY_SKIP_REASONS } from "./deadkey.js";
 export type { DeadkeySkipCounts } from "./deadkey.js";
 
 // Re-export touch (longpress) mining so the scanner can use it directly.
-export { mineLongpressHosts, aggregateTouchHosts, touchHostsToEntries } from "./touch-mining.js";
-export type { TouchHostObservation, TouchLayerClass } from "./touch-mining.js";
+export { mineLongpressBases, aggregateTouchBases, touchBasesToEntries } from "./touch-mining.js";
+export type { TouchBaseObservation, TouchLayerClass } from "./touch-mining.js";
 
 // Re-export filter helpers so the supportability scanner can use them directly.
 export {
   isMnemonicKeyboard,
   hasNonUSBase,
-  detectBaseLayoutFamily,
+  detectStartLayoutFamily,
   hasInvertedNumberRow,
 } from "./filters.js";
 

@@ -128,7 +128,7 @@ const fakeIdentity = {
   },
 };
 
-const fakeBase = {
+const fakeStart = {
   id: "basic_kbdus",
   path: "release/b/basic_kbdus",
   script: "Latn",
@@ -137,7 +137,7 @@ const fakeBase = {
   version: "1.0",
 };
 
-/** alphabetKey (steps/evidence.ts) of fakeIdentity + fakeBase: bcp47|script|variant|baseId. */
+/** alphabetKey (steps/evidence.ts) of fakeIdentity + fakeStart: bcp47|script|variant|startId. */
 const CURRENT_KEY = "tl-Latn|Latn|Latn|basic_kbdus";
 
 /** The identity decisions a completed identity step records for `identity`
@@ -158,7 +158,7 @@ function seedIdentity(identity: typeof fakeIdentity & { region?: string }): void
 function seedSessionStore() {
   seedIdentity(fakeIdentity);
   useSurveySessionStore.setState({
-    localBase: fakeBase,
+    localStart: fakeStart,
     charactersSubStage: "prefill",
   });
 }
@@ -534,12 +534,12 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
 
   // Spec 089: the identity cases re-record the identity decisions with one
   // fact changed (the derived identity follows); the base case still patches
-  // the session's localBase.
+  // the session's localStart.
   it.each([
     ["bcp47", () => seedIdentity({ ...fakeIdentity, languageSubtag: "tm" })],
     ["script", () => seedIdentity({ ...fakeIdentity, targetScriptRaw: "Cyrl" })],
     ["variant", () => seedIdentity({ ...fakeIdentity, targetScriptRaw: "fonipa" })],
-    ["base", () => useSurveySessionStore.setState({ localBase: { ...fakeBase, id: "basic_kbdfr" } })],
+    ["base", () => useSurveySessionStore.setState({ localStart: { ...fakeStart, id: "basic_kbdfr" } })],
   ])(
     "(T039/T059) a changed %s takes the changed branch: proposal chars cleared, old punctuation seeds cleared, new stamp, author addition carried over (R-07)",
     (_what, patch) => {
@@ -595,7 +595,7 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
     // Base changes (still Latin script) — the addition fits.
-    act(() => useSurveySessionStore.setState({ localBase: { ...fakeBase, id: "basic_kbdfr" } }));
+    act(() => useSurveySessionStore.setState({ localStart: { ...fakeStart, id: "basic_kbdfr" } }));
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     const s = getCharacterInventoryValue();

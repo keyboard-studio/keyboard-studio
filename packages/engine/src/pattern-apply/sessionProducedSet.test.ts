@@ -8,7 +8,7 @@
 //
 // Test categories:
 //   (a) EMPTY / no-physical-assignments — short-circuit path matches
-//       buildProducedSet(baseIr, {excludeBackspaceCorrections:true}) directly.
+//       buildProducedSet(startIr, {excludeBackspaceCorrections:true}) directly.
 //   (b) DEADKEY-BYPRODUCT (the crux) — a deadkey_single_tap assignment whose
 //       double-tap trigger rule emits the BARE combining mark as a raw
 //       output byproduct (never any assignment's own `target`), proving the
@@ -42,7 +42,7 @@ const BASE_KMN =
   "\n" +
   "+ [K_ZH] > 'ж'\n";
 
-function makeBaseIr(): KeyboardIR {
+function makeStartIr(): KeyboardIR {
   return parse(BASE_KMN, "session-produced-set-test").ir;
 }
 
@@ -60,15 +60,15 @@ describe("buildSessionProducedSet — empty / no-physical-assignments (short-cir
   const resolver = makeResolver([]);
 
   it("with an empty assignments array, returns the same set as buildProducedSet(baseIr, {excludeBackspaceCorrections:true})", () => {
-    const baseIr = makeBaseIr();
-    const expected = buildProducedSet(baseIr, { excludeBackspaceCorrections: true });
-    const actual = buildSessionProducedSet(baseIr, [], resolver);
+    const startIr = makeStartIr();
+    const expected = buildProducedSet(startIr, { excludeBackspaceCorrections: true });
+    const actual = buildSessionProducedSet(startIr, [], resolver);
     expect(actual).toEqual(expected);
   });
 
   it("with only touch-modality assignments (no physical entries), still matches the base-only set", () => {
-    const baseIr = makeBaseIr();
-    const expected = buildProducedSet(baseIr, { excludeBackspaceCorrections: true });
+    const startIr = makeStartIr();
+    const expected = buildProducedSet(startIr, { excludeBackspaceCorrections: true });
     const touchOnly: MechanismAssignment[] = [
       {
         scope: "keyboard-default",
@@ -77,13 +77,13 @@ describe("buildSessionProducedSet — empty / no-physical-assignments (short-cir
         mechanisms: [{ patternId: "some_touch_pattern" }],
       },
     ];
-    const actual = buildSessionProducedSet(baseIr, touchOnly, resolver);
+    const actual = buildSessionProducedSet(startIr, touchOnly, resolver);
     expect(actual).toEqual(expected);
   });
 
   it("the base-only set itself contains the base rule's plain output ('ж') as a sanity check on the fixture", () => {
-    const baseIr = makeBaseIr();
-    const actual = buildSessionProducedSet(baseIr, [], resolver);
+    const startIr = makeStartIr();
+    const actual = buildSessionProducedSet(startIr, [], resolver);
     expect(actual.has("ж")).toBe(true);
   });
 });
@@ -129,7 +129,7 @@ describe("buildSessionProducedSet — deadkey double-tap byproduct (the crux bug
   }
 
   it("the composed target 'ӝ' (U+04DD) is present in the session produced set", () => {
-    const baseIr = makeBaseIr();
+    const startIr = makeStartIr();
     const pattern = getById("deadkey_single_tap")!;
     const resolver = (id: string) => (id === pattern.id ? pattern : undefined);
 
@@ -141,12 +141,12 @@ describe("buildSessionProducedSet — deadkey double-tap byproduct (the crux bug
       accentChar: "̈",
     });
 
-    const produced = buildSessionProducedSet(baseIr, [assignment], resolver);
+    const produced = buildSessionProducedSet(startIr, [assignment], resolver);
     expect(produced.has("ӝ")).toBe(true);
   });
 
   it("the BARE combining diaeresis U+0308 double-tap byproduct is present in the session produced set — proving the emit->applyAssignments->parse->buildProducedSet route (not direct target-threading)", () => {
-    const baseIr = makeBaseIr();
+    const startIr = makeStartIr();
     const pattern = getById("deadkey_single_tap")!;
     const resolver = (id: string) => (id === pattern.id ? pattern : undefined);
 
@@ -158,7 +158,7 @@ describe("buildSessionProducedSet — deadkey double-tap byproduct (the crux bug
       accentChar: "̈",
     });
 
-    const produced = buildSessionProducedSet(baseIr, [assignment], resolver);
+    const produced = buildSessionProducedSet(startIr, [assignment], resolver);
 
     // U+0308 is NEVER any assignment's own `target` (the target is "ӝ") — it
     // only appears because the pattern's double-tap trigger rule
@@ -169,8 +169,8 @@ describe("buildSessionProducedSet — deadkey double-tap byproduct (the crux bug
   });
 
   it("does NOT contain U+0308 in the BASE-ONLY set (proves the byproduct is genuinely session-introduced, not already present in the base)", () => {
-    const baseIr = makeBaseIr();
-    const baseOnly = buildProducedSet(baseIr, { excludeBackspaceCorrections: true });
+    const startIr = makeStartIr();
+    const baseOnly = buildProducedSet(startIr, { excludeBackspaceCorrections: true });
     expect(baseOnly.has("̈")).toBe(false);
   });
 });
@@ -184,7 +184,7 @@ describe("buildSessionProducedSet — deadkey double-tap byproduct (the crux bug
 // substituted+injected fragment produces unparseable merged KMN,
 // buildSessionProducedSet must
 //   (1) never throw, and
-//   (2) return buildProducedSet(baseIr, {excludeBackspaceCorrections:true})
+//   (2) return buildProducedSet(startIr, {excludeBackspaceCorrections:true})
 //       (the base-only set) as a safe fallback.
 //
 // NOTE: at the time this test was authored, sessionProducedSet.ts has NOT
@@ -228,14 +228,14 @@ describe("buildSessionProducedSet — parse-failure fallback (never throws)", ()
   };
 
   it("does not throw when the merged KMN is unparseable", () => {
-    const baseIr = makeBaseIr();
-    expect(() => buildSessionProducedSet(baseIr, [brokenAssignment], resolver)).not.toThrow();
+    const startIr = makeStartIr();
+    expect(() => buildSessionProducedSet(startIr, [brokenAssignment], resolver)).not.toThrow();
   });
 
   it("falls back to the base-only produced set (buildProducedSet(baseIr, {excludeBackspaceCorrections:true})) on parse failure", () => {
-    const baseIr = makeBaseIr();
-    const expected = buildProducedSet(baseIr, { excludeBackspaceCorrections: true });
-    const actual = buildSessionProducedSet(baseIr, [brokenAssignment], resolver);
+    const startIr = makeStartIr();
+    const expected = buildProducedSet(startIr, { excludeBackspaceCorrections: true });
+    const actual = buildSessionProducedSet(startIr, [brokenAssignment], resolver);
     expect(actual).toEqual(expected);
   });
 });

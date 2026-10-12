@@ -276,13 +276,13 @@ function missingGuardReasoning(char: string, cp: number, ortho: OrthographyModel
   const inAlphabet = new Set(ortho.alphabet);
   const alphabetPart = nonBases.filter((ch) => inAlphabet.has(ch));
   const nonLetterPart = nonBases.filter((ch) => !inAlphabet.has(ch));
-  const nonBasePreview = previewList(alphabetPart, 12);
+  const nonStartPreview = previewList(alphabetPart, 12);
   const extra = nonLetterClause(nonLetterPart);
   if (bases.length === 0) {
-    return `${label} has no attachment bases in your orthography — guard it after every character: {${nonBasePreview}}${extra}.`;
+    return `${label} has no attachment bases in your orthography — guard it after every character: {${nonStartPreview}}${extra}.`;
   }
-  const basePreview = previewList(bases, 8);
-  return `${label} attaches to {${basePreview}} in your orthography — guard it after everything else: {${nonBasePreview}}${extra}.`;
+  const startPreview = previewList(bases, 8);
+  return `${label} attaches to {${startPreview}} in your orthography — guard it after everything else: {${nonStartPreview}}${extra}.`;
 }
 
 /**

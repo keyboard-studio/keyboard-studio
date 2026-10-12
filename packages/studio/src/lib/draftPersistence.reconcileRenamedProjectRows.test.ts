@@ -65,14 +65,14 @@ afterEach(() => {
 
 describe("reconcileRenamedProjectRows — merges a pre-existing duplicate pair", () => {
   it("merges a stale base-id row into the self-consistent renamed-id row (survivor already newer — the typical shape)", () => {
-    const baseId = "basic_kbdus";
+    const startId = "basic_kbdus";
     const customId = "my_renamed_project";
 
-    // Stale row: content has moved on to customId, but is still filed at baseId.
-    instantiateMinimal(baseId);
-    saveDraft(baseId);
+    // Stale row: content has moved on to customId, but is still filed at startId.
+    instantiateMinimal(startId);
+    saveDraft(startId);
     useWorkingCopyStore.getState().setIdentity({ keyboardId: customId });
-    saveDraft(baseId); // re-save under the SAME (stale) key — mirrors the defect
+    saveDraft(startId); // re-save under the SAME (stale) key — mirrors the defect
 
     // Survivor row: self-consistent, filed exactly where its own content says.
     saveDraft(customId);
@@ -80,7 +80,7 @@ describe("reconcileRenamedProjectRows — merges a pre-existing duplicate pair",
     // Sanity on the RAW records — not `listDrafts()`, which itself calls
     // `reconcileRenamedProjectRows()` and would merge this fixture away
     // before the explicit call below gets to run.
-    expect(localStorage.getItem(draftKey(baseId))).not.toBeNull();
+    expect(localStorage.getItem(draftKey(startId))).not.toBeNull();
     expect(localStorage.getItem(draftKey(customId))).not.toBeNull();
 
     const merged = reconcileRenamedProjectRows();
@@ -89,15 +89,15 @@ describe("reconcileRenamedProjectRows — merges a pre-existing duplicate pair",
     const entries = listDrafts();
     expect(entries).toHaveLength(1);
     expect(entries[0]?.projectKey).toBe(customId);
-    expect(localStorage.getItem(draftKey(baseId))).toBeNull();
+    expect(localStorage.getItem(draftKey(startId))).toBeNull();
     expect(localStorage.getItem(draftKey(customId))).not.toBeNull();
   });
 
   it("carries the newer content over to the survivor key when the STALE row happens to hold the newer savedAt", () => {
-    const baseId = "basic_kbdus_2";
+    const startId = "basic_kbdus_2";
     const customId = "my_renamed_project_2";
 
-    instantiateMinimal(baseId);
+    instantiateMinimal(startId);
     // Identity is set BEFORE either save below, so both rows' stored content
     // derives to the SAME key (customId) — only their FILED key (the
     // `saveDraft` argument) differs, exactly mirroring the real defect shape
@@ -111,11 +111,11 @@ describe("reconcileRenamedProjectRows — merges a pre-existing duplicate pair",
     saveDraft(customId); // survivor: self-consistent, written FIRST (older savedAt)
     now += 10_000;
 
-    saveDraft(baseId); // stale: same content, filed at baseId, written SECOND (newer savedAt)
+    saveDraft(startId); // stale: same content, filed at startId, written SECOND (newer savedAt)
 
     nowSpy.mockRestore();
 
-    const staleRaw = localStorage.getItem(draftKey(baseId));
+    const staleRaw = localStorage.getItem(draftKey(startId));
     const survivorRaw = localStorage.getItem(draftKey(customId));
     expect(staleRaw).not.toBeNull();
     expect(survivorRaw).not.toBeNull();
@@ -126,7 +126,7 @@ describe("reconcileRenamedProjectRows — merges a pre-existing duplicate pair",
     const merged = reconcileRenamedProjectRows();
 
     expect(merged).toBe(1);
-    expect(localStorage.getItem(draftKey(baseId))).toBeNull();
+    expect(localStorage.getItem(draftKey(startId))).toBeNull();
     const survivorAfterRaw = localStorage.getItem(draftKey(customId));
     expect(survivorAfterRaw).not.toBeNull();
     const survivorAfter = JSON.parse(survivorAfterRaw!) as DurableDraft;
@@ -141,13 +141,13 @@ describe("reconcileRenamedProjectRows — merges a pre-existing duplicate pair",
   });
 
   it("is idempotent — a second call merges nothing further", () => {
-    const baseId = "basic_kbdus_3";
+    const startId = "basic_kbdus_3";
     const customId = "my_renamed_project_3";
 
-    instantiateMinimal(baseId);
-    saveDraft(baseId);
+    instantiateMinimal(startId);
+    saveDraft(startId);
     useWorkingCopyStore.getState().setIdentity({ keyboardId: customId });
-    saveDraft(baseId);
+    saveDraft(startId);
     saveDraft(customId);
 
     expect(reconcileRenamedProjectRows()).toBe(1);
@@ -205,14 +205,14 @@ describe("reconcileRenamedProjectRows — merges a pre-existing duplicate pair",
 
 describe("reconcileRenamedProjectRows — awkward inputs", () => {
   it("never touches the PENDING_PROJECT_KEY record while merging an unrelated real duplicate pair", () => {
-    const baseId = "kbd_awkward_pending_base";
+    const startId = "kbd_awkward_pending_base";
     const customId = "kbd_awkward_pending_renamed";
 
     // The classic duplicate pair (same shape as the first test above).
-    instantiateMinimal(baseId);
-    saveDraft(baseId);
+    instantiateMinimal(startId);
+    saveDraft(startId);
     useWorkingCopyStore.getState().setIdentity({ keyboardId: customId });
-    saveDraft(baseId);
+    saveDraft(startId);
     saveDraft(customId);
 
     // A pending-slot record, written alongside it. `saveDraft`'s VR-2 guard
@@ -228,7 +228,7 @@ describe("reconcileRenamedProjectRows — awkward inputs", () => {
 
     const merged = reconcileRenamedProjectRows();
 
-    expect(merged).toBe(1); // only the real baseId/customId pair
+    expect(merged).toBe(1); // only the real startId/customId pair
     // The pending record is byte-identical — never read as a merge
     // candidate (it has no index row to iterate over), never relocated,
     // never cleared.
@@ -317,13 +317,13 @@ describe("reconcileRenamedProjectRows — awkward inputs", () => {
   });
 
   it("is idempotent byte-for-byte, not just in its returned merge count", () => {
-    const baseId = "kbd_awkward_idempotent_base";
+    const startId = "kbd_awkward_idempotent_base";
     const customId = "kbd_awkward_idempotent_renamed";
 
-    instantiateMinimal(baseId);
-    saveDraft(baseId);
+    instantiateMinimal(startId);
+    saveDraft(startId);
     useWorkingCopyStore.getState().setIdentity({ keyboardId: customId });
-    saveDraft(baseId);
+    saveDraft(startId);
     saveDraft(customId);
 
     expect(reconcileRenamedProjectRows()).toBe(1);
@@ -332,7 +332,7 @@ describe("reconcileRenamedProjectRows — awkward inputs", () => {
     const recordSnapshot = localStorage.getItem(draftKey(customId));
     expect(indexSnapshot).not.toBeNull();
     expect(recordSnapshot).not.toBeNull();
-    expect(localStorage.getItem(draftKey(baseId))).toBeNull();
+    expect(localStorage.getItem(draftKey(startId))).toBeNull();
 
     expect(reconcileRenamedProjectRows()).toBe(0);
 
@@ -343,19 +343,19 @@ describe("reconcileRenamedProjectRows — awkward inputs", () => {
   });
 
   it("a three-row pile-up (base id + two successive renames) converges to exactly one row — the FINAL renamed id", () => {
-    const baseId = "kbd_awkward_pileup_base";
+    const startId = "kbd_awkward_pileup_base";
     const midId = "kbd_awkward_pileup_mid";
     const finalId = "kbd_awkward_pileup_final";
 
     // Mirrors what a long-lived autosave subscription that never migrated
     // (the pre-fix defect, TWICE in a row) would leave on disk:
-    //   1. Instantiated + saved under baseId (original filing).
-    instantiateMinimal(baseId);
-    saveDraft(baseId);
-    //   2. Renamed to midId, but the still-baseId-scoped autosave keeps
-    //      writing under baseId with content that now says midId.
+    //   1. Instantiated + saved under startId (original filing).
+    instantiateMinimal(startId);
+    saveDraft(startId);
+    //   2. Renamed to midId, but the still-startId-scoped autosave keeps
+    //      writing under startId with content that now says midId.
     useWorkingCopyStore.getState().setIdentity({ keyboardId: midId });
-    saveDraft(baseId);
+    saveDraft(startId);
     //   3. A (still-pre-fix) install writes the first self-consistent row
     //      under midId.
     saveDraft(midId);
@@ -370,7 +370,7 @@ describe("reconcileRenamedProjectRows — awkward inputs", () => {
       projectKey: string;
     }>;
     expect(before.map((e) => e.projectKey).sort()).toEqual(
-      [baseId, midId, finalId].sort(),
+      [startId, midId, finalId].sort(),
     );
 
     // Run reconciliation to a fixed point — `listDrafts()` (the real public
@@ -390,7 +390,7 @@ describe("reconcileRenamedProjectRows — awkward inputs", () => {
     expect(after).toHaveLength(1);
     expect(after[0]?.projectKey).toBe(finalId);
     expect(totalMerged).toBe(2);
-    expect(localStorage.getItem(draftKey(baseId))).toBeNull();
+    expect(localStorage.getItem(draftKey(startId))).toBeNull();
     expect(localStorage.getItem(draftKey(midId))).toBeNull();
     expect(localStorage.getItem(draftKey(finalId))).not.toBeNull();
   });
@@ -431,19 +431,19 @@ describe("reconcileRenamedProjectRows — awkward inputs", () => {
 
 describe("reconcileRenamedProjectRows — must never lose status:'submitted'/prUrl (confirmed P0)", () => {
   it("preserves 'submitted' + prUrl when the STALE row is the submitted one and the SURVIVOR is already newer (common branch)", () => {
-    const baseId = "kbd_status_base_1";
+    const startId = "kbd_status_base_1";
     const customId = "kbd_status_renamed_1";
     const prUrl = "https://github.com/example/keyboards/pull/101";
 
-    // Stale row: written under baseId, then submitted (author filed the PR
-    // while the record was still under baseId — the plausible real-world
+    // Stale row: written under startId, then submitted (author filed the PR
+    // while the record was still under startId — the plausible real-world
     // order the bug report names).
-    instantiateMinimal(baseId);
-    saveDraft(baseId);
+    instantiateMinimal(startId);
+    saveDraft(startId);
     useWorkingCopyStore.getState().setIdentity({ keyboardId: customId });
-    saveDraft(baseId); // re-save under the SAME (stale) key — content now says customId
-    expect(resolveActiveProjectKey()).toBe(baseId);
-    void recordProjectSubmission(prUrl, null); // marks baseId's row submitted + prUrl
+    saveDraft(startId); // re-save under the SAME (stale) key — content now says customId
+    expect(resolveActiveProjectKey()).toBe(startId);
+    void recordProjectSubmission(prUrl, null); // marks startId's row submitted + prUrl
 
     // Survivor row: self-consistent, filed exactly where its own content
     // says, written AFTER the submission above — so it is the newer row and
@@ -452,7 +452,7 @@ describe("reconcileRenamedProjectRows — must never lose status:'submitted'/prU
     saveDraft(customId);
 
     const beforeMerge = readRawIndexEntries();
-    const staleRow = beforeMerge.find((e) => e.projectKey === baseId);
+    const staleRow = beforeMerge.find((e) => e.projectKey === startId);
     expect(staleRow?.status).toBe("submitted");
     expect(staleRow?.prUrl).toBe(prUrl);
 
@@ -481,11 +481,11 @@ describe("reconcileRenamedProjectRows — must never lose status:'submitted'/prU
   });
 
   it("preserves 'submitted' + prUrl when the STALE row is the submitted one and holds the NEWER savedAt (relocate branch)", () => {
-    const baseId = "kbd_status_base_2";
+    const startId = "kbd_status_base_2";
     const customId = "kbd_status_renamed_2";
     const prUrl = "https://github.com/example/keyboards/pull/202";
 
-    instantiateMinimal(baseId);
+    instantiateMinimal(startId);
     // Identity set BEFORE either save, so both rows' stored CONTENT derives
     // to the same key (customId) — only their FILED key differs, mirroring
     // the real defect shape (one project, two filings) exactly like
@@ -498,15 +498,15 @@ describe("reconcileRenamedProjectRows — must never lose status:'submitted'/prU
 
     saveDraft(customId); // survivor: self-consistent, written FIRST (older savedAt), never submitted
     now += 10_000;
-    saveDraft(baseId); // stale: same content, filed at baseId, written SECOND (newer savedAt)
+    saveDraft(startId); // stale: same content, filed at startId, written SECOND (newer savedAt)
 
     nowSpy.mockRestore();
 
-    expect(resolveActiveProjectKey()).toBe(baseId);
-    void recordProjectSubmission(prUrl, null); // marks the STALE (baseId) row submitted + prUrl
+    expect(resolveActiveProjectKey()).toBe(startId);
+    void recordProjectSubmission(prUrl, null); // marks the STALE (startId) row submitted + prUrl
 
     const beforeMerge = readRawIndexEntries();
-    const staleRow = beforeMerge.find((e) => e.projectKey === baseId);
+    const staleRow = beforeMerge.find((e) => e.projectKey === startId);
     expect(staleRow?.status).toBe("submitted");
     expect(staleRow?.prUrl).toBe(prUrl);
 

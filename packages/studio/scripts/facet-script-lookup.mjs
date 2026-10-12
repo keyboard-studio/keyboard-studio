@@ -57,7 +57,7 @@ export function loadFacetScripts(facetIndexPath) {
  * Null when no tag declares one.
  *
  * Deliberately a local copy, NOT an import of the engine's
- * `extractScriptSubtag` (packages/engine/src/base-browser/kps-parser.ts):
+ * `extractScriptSubtag` (packages/engine/src/start-browser/kps-parser.ts):
  * this file is consumed by the plain-node postbuild script, which cannot
  * import engine TS sources, and the two implementations intentionally
  * diverge — the engine scans ALL subtags, while this one skips the primary

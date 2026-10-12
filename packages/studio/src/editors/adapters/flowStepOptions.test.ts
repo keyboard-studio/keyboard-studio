@@ -27,7 +27,7 @@ import {
   slugRetainsMostLetters,
 } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
-import { createVirtualFS, makeBaseKeyboard, slugifyKeyboardId } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeStartKeyboard, slugifyKeyboardId } from "@keyboard-studio/contracts";
 import pfMoreDetailGateMod from "../../survey/questions/f/pf_more_detail_gate.ts";
 import pfDocLanguageMod from "../../survey/questions/f/pf_doc_language.ts";
 import pfHistoryEntryMod from "../../survey/questions/f/pf_history_entry.ts";
@@ -42,7 +42,7 @@ import { buildExtractContext, type ExtractContext } from "../../decisions/extrac
 import { questionRegistry } from "../../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type {
-  BaseDocumentationProfile,
+  StartDocumentationProfile,
   HistoryEntryState,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
@@ -64,7 +64,7 @@ function decisionSet(values: Partial<Record<DecisionId, unknown>>): DecisionSet 
 
 function buildDeps(overrides?: Partial<FlowStepDeps>): { deps: FlowStepDeps } {
   const deps: FlowStepDeps = {
-    localBase: null,
+    localStart: null,
     decisions: {},
     surveyContext: {},
     findingsByQuestionId: {},
@@ -88,12 +88,12 @@ function buildResult(
 
 describe("trackOptions.buildContext", () => {
   it("returns base_name from localBase.displayName", () => {
-    const { deps } = buildDeps({ localBase: { displayName: "English (US)" } });
+    const { deps } = buildDeps({ localStart: { displayName: "English (US)" } });
     expect(trackOptions.buildContext(deps)).toEqual({ base_name: "English (US)" });
   });
 
   it("falls back to empty string when localBase is null", () => {
-    const { deps } = buildDeps({ localBase: null });
+    const { deps } = buildDeps({ localStart: null });
     expect(trackOptions.buildContext(deps)).toEqual({ base_name: "" });
   });
 });
@@ -449,7 +449,7 @@ describe("phaseFOptions.onMount", () => {
     // (no FlowStepDeps setter) — assert the resulting store state.
     const written = useWorkingCopyStore.getState().historyEntryState;
     expect(written?.status).toBe("proposed");
-    expect(written?.proposal.version).toBe("1.0"); // no baseIr set -> "1.0" default
+    expect(written?.proposal.version).toBe("1.0"); // no startIr set -> "1.0" default
     expect(written?.proposal.bullets).toEqual(["Initial release."]); // empty decision record
   });
 
@@ -505,7 +505,7 @@ describe("pf_contact_info lookup default (spec 092 T036)", () => {
     return {
       ...base,
       phaseF: {
-        seeds: { instantiationMode: null, baseKeyboard: null, baseVfs: null },
+        seeds: { instantiationMode: null, startKeyboard: null, startVfs: null },
         authorContact,
       },
     };
@@ -561,7 +561,7 @@ describe("pf_contact_info lookup default (spec 092 T036)", () => {
 // survey/PhaseFAdaptiveDescription.integration.test.tsx (SC-005).
 // ---------------------------------------------------------------------------
 
-const FULL_PROFILE: BaseDocumentationProfile = {
+const FULL_PROFILE: StartDocumentationProfile = {
   level: "full",
   members: ["welcome-htm"],
   welcomeConvention: "folder",
@@ -569,7 +569,7 @@ const FULL_PROFILE: BaseDocumentationProfile = {
   welcomeImages: [],
 };
 
-const NONE_PROFILE: BaseDocumentationProfile = {
+const NONE_PROFILE: StartDocumentationProfile = {
   level: "none",
   members: [],
   welcomeConvention: "absent",
@@ -594,9 +594,9 @@ describe("pf_welcome_paragraph — adaptive description seed + required override
   it("adapt-full: the pass seeds the base's usable description and required is waived", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
-      baseDocProfile: FULL_PROFILE,
-      baseWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
-      baseHelpPhpText: null,
+      startDocProfile: FULL_PROFILE,
+      startWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
+      startHelpPhpText: null,
     });
     const { deps } = buildDeps();
 
@@ -609,9 +609,9 @@ describe("pf_welcome_paragraph — adaptive description seed + required override
   it("net-new (new-from-base): never seeds, required override stays true (today's behavior)", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "new-from-base",
-      baseDocProfile: FULL_PROFILE,
-      baseWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
-      baseHelpPhpText: null,
+      startDocProfile: FULL_PROFILE,
+      startWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
+      startHelpPhpText: null,
     });
     const { deps } = buildDeps();
 
@@ -633,9 +633,9 @@ describe("pf_welcome_paragraph — adaptive description seed + required override
   it("adapt track, base classified none: never seeds", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
-      baseDocProfile: NONE_PROFILE,
-      baseWelcomeHtmText: null,
-      baseHelpPhpText: null,
+      startDocProfile: NONE_PROFILE,
+      startWelcomeHtmText: null,
+      startHelpPhpText: null,
     });
     const { deps } = buildDeps();
 
@@ -726,7 +726,7 @@ describe("extraction pass — Phase F choice defaults", () => {
 // ---------------------------------------------------------------------------
 
 describe("extraction pass — Phase F derived text proposals", () => {
-  const BASE = makeBaseKeyboard({
+  const BASE = makeStartKeyboard({
     id: "sil_bafut",
     path: "release/sil/sil_bafut",
     script: "Latn",
@@ -735,21 +735,21 @@ describe("extraction pass — Phase F derived text proposals", () => {
     version: "1.2",
   });
 
-  function withBase(instantiationMode: "new-from-base" | "adapt-existing"): void {
-    const baseVfs = createVirtualFS();
-    baseVfs.set("source/sil_bafut.kps", '<Info><WebSite URL="https://bafut.org">https://bafut.org</WebSite></Info>');
+  function withStart(instantiationMode: "new-from-base" | "adapt-existing"): void {
+    const startVfs = createVirtualFS();
+    startVfs.set("source/sil_bafut.kps", '<Info><WebSite URL="https://bafut.org">https://bafut.org</WebSite></Info>');
     useWorkingCopyStore.getState().reset();
-    useWorkingCopyStore.setState({ instantiationMode, baseKeyboard: BASE, baseVfs });
+    useWorkingCopyStore.setState({ instantiationMode, startKeyboard: BASE, startVfs });
   }
 
   it("an update proposes the released package's website", () => {
-    withBase("adapt-existing");
+    withStart("adapt-existing");
     expect(passSeedWithGateOpen("pf_project_url")).toBe("https://bafut.org");
     expect(passSeedWithGateOpen("pf_provenance_basis")).toBeUndefined();
   });
 
   it("a copy proposes the copied keyboard as its provenance", () => {
-    withBase("new-from-base");
+    withStart("new-from-base");
     expect(passSeedWithGateOpen("pf_provenance_basis")).toBe(
       "This keyboard started as a copy of the Bafut keyboard (sil_bafut).",
     );
@@ -758,11 +758,11 @@ describe("extraction pass — Phase F derived text proposals", () => {
 
   it("names a source for every data-backed seed, and none for the plain gate default", () => {
     // Extracted records: provenance "extracted", source = the base's id.
-    withBase("adapt-existing");
+    withStart("adapt-existing");
     useWorkingCopyStore.setState({
-      baseDocProfile: FULL_PROFILE,
-      baseWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
-      baseHelpPhpText: null,
+      startDocProfile: FULL_PROFILE,
+      startWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
+      startHelpPhpText: null,
     });
     useDecisionStore.getState().reset();
     recordIdentity("bfd");

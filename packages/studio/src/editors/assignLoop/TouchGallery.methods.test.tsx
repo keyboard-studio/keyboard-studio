@@ -158,9 +158,9 @@ describe("TouchGallery — multiple methods per character", () => {
     });
 
     // Apply method 1: long-press K_A (the chooser's default active method).
-    const hostKeySelect1 = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect1).not.toBeNull();
-    await changeSelectMenu(hostKeySelect1!, "K_A");
+    const baseKeySelect1 = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect1).not.toBeNull();
+    await changeSelectMenu(baseKeySelect1!, "K_A");
     let applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -173,9 +173,9 @@ describe("TouchGallery — multiple methods per character", () => {
     expect(multitapOption).not.toBeNull();
     await act(async () => { fireEvent.click(multitapOption!); });
 
-    const hostKeySelect2 = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect2).not.toBeNull();
-    await changeSelectMenu(hostKeySelect2!, "K_B");
+    const baseKeySelect2 = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect2).not.toBeNull();
+    await changeSelectMenu(baseKeySelect2!, "K_B");
     applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -297,8 +297,8 @@ describe("TouchGallery — Apply lives in the open method card", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
-    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
-    await changeSelectMenu(hostKeySelect, "K_A");
+    const baseKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(baseKeySelect, "K_A");
 
     const applyBtn = screen
       .getAllByRole("button", { name: /Apply touch method for/i })
@@ -315,7 +315,7 @@ describe("TouchGallery — Apply lives in the open method card", () => {
 describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", () => {
   it("revisiting an already-configured character skips the suggestion and does not duplicate its mechanism", async () => {
     // "ä" is decomposable and not in the default layout → longpress suggestion,
-    // derives hostKey K_A automatically so Accept records the mechanism directly.
+    // derives baseKey K_A automatically so Accept records the mechanism directly.
     seedStore({ withInventory: ["ä", "ö"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
@@ -351,11 +351,11 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     expect(configuredGroup).not.toBeNull();
     expect(configuredGroup!.querySelectorAll("button").length).toBe(1);
 
-    // P1 fix (b): even if the same method+hostKey is (re-)applied via the
+    // P1 fix (b): even if the same method+baseKey is (re-)applied via the
     // chooser, appendMechanismToChar dedupes — no second identical chip.
-    const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect).not.toBeNull();
-    await changeSelectMenu(hostKeySelect!, "K_A");
+    const baseKeySelect = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect).not.toBeNull();
+    await changeSelectMenu(baseKeySelect!, "K_A");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -379,9 +379,9 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     });
 
     const applyIdenticalLongpress = async () => {
-      const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
-      expect(hostKeySelect).not.toBeNull();
-      await changeSelectMenu(hostKeySelect!, "K_A");
+      const baseKeySelect = screen.queryByRole("button", { name: /host key/i });
+      expect(baseKeySelect).not.toBeNull();
+      await changeSelectMenu(baseKeySelect!, "K_A");
       const applyBtn = screen.queryAllByRole("button").find(
         (b) => b.textContent?.trim() === "Apply method",
       ) ?? null;
@@ -391,7 +391,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
 
     // Apply longpress K_A once.
     await applyIdenticalLongpress();
-    // Apply the exact same method+hostKey again (chooser stays open/reopens
+    // Apply the exact same method+baseKey again (chooser stays open/reopens
     // at the default longpress method after Apply resets its inputs).
     await applyIdenticalLongpress();
 
@@ -414,8 +414,8 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     seedStore({ withInventory: ["中", "y"] });
 
     // Seed an existing mechanism for "中" whose slotValues key order is
-    // { char, hostKey } — the reverse of what buildMechanismRef produces
-    // ({ hostKey, char }). A JSON.stringify-based comparison would treat
+    // { char, baseKey } — the reverse of what buildMechanismRef produces
+    // ({ baseKey, char }). A JSON.stringify-based comparison would treat
     // this as a distinct ref and append a duplicate; the structural
     // comparison must recognize it as the same mechanism.
     useWorkingCopyStore.getState().setTouchDraft({
@@ -444,11 +444,11 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     // suggestion, so the chooser (not a suggestion card) shows directly.
     expectCurrentChar("中");
 
-    // Apply the same method+hostKey via the chooser (default method is
+    // Apply the same method+baseKey via the chooser (default method is
     // already "longpress_alternates" — matches buildMechanismRef's key order).
-    const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect).not.toBeNull();
-    await changeSelectMenu(hostKeySelect!, "K_A");
+    const baseKeySelect = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect).not.toBeNull();
+    await changeSelectMenu(baseKeySelect!, "K_A");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -507,9 +507,9 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     let entry = draft?.charTouchEntries.find(([c]) => c === "a");
     expect(entry?.[1]?.mechanisms.map((m) => m.patternId)).toEqual(["touch_inherited"]);
 
-    const hostKeySelect = screen.queryByRole("button", { name: /host key/i });
-    expect(hostKeySelect).not.toBeNull();
-    await changeSelectMenu(hostKeySelect!, "K_A");
+    const baseKeySelect = screen.queryByRole("button", { name: /host key/i });
+    expect(baseKeySelect).not.toBeNull();
+    await changeSelectMenu(baseKeySelect!, "K_A");
     const applyBtn = screen.queryAllByRole("button").find(
       (b) => b.textContent?.trim() === "Apply method",
     ) ?? null;
@@ -527,7 +527,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
 // ---------------------------------------------------------------------------
 // "Enter my own character..." custom host-key option + U+ notation —
 // feature coverage for the shared host-key picker (longpress / flick /
-// multitap / replace all share the same `hostKey` state).
+// multitap / replace all share the same `baseKey` state).
 //
 // "中" has no Phase C desktop assignment, is not in the default touch
 // layout, and is not decomposable-accented, so suggestion.kind === "none"
@@ -542,8 +542,8 @@ describe("TouchGallery — custom host-key option", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     expect(
       screen.getByLabelText(/Custom character for long-press host key/i),
     ).toBeTruthy();
@@ -554,8 +554,8 @@ describe("TouchGallery — custom host-key option", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
       target: { value: "b" },
     });
@@ -576,8 +576,8 @@ describe("TouchGallery — custom host-key option", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
       target: { value: "U+0062" },
     });
@@ -597,8 +597,8 @@ describe("TouchGallery — custom host-key option", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
       target: { value: "é" },
     });
@@ -614,8 +614,8 @@ describe("TouchGallery — custom host-key option", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
       target: { value: "U+ZZZZ" },
     });
@@ -629,8 +629,8 @@ describe("TouchGallery — custom host-key option", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     const customInput = screen.getByLabelText(/Custom character for long-press host key/i);
     expect(customInput.getAttribute("placeholder")).toBeNull();
   });
@@ -643,8 +643,8 @@ describe("TouchGallery — custom host-key option", () => {
     expect(
       screen.queryByText("Type a character directly, or a Unicode value like U+00E9."),
     ).toBeNull();
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     expect(
       screen.getByText("Type a character directly, or a Unicode value like U+00E9."),
     ).toBeTruthy();
@@ -655,8 +655,8 @@ describe("TouchGallery — custom host-key option", () => {
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
-    const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
-    await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
+    const baseKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
+    await changeSelectMenu(baseKeySelect, CUSTOM_KEY_OPTION_VALUE);
     fireEvent.change(screen.getByLabelText(/Custom character for long-press host key/i), {
       target: { value: "b" },
     });

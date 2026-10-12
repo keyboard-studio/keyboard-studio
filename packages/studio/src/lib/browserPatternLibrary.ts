@@ -27,7 +27,7 @@ import { rankPatterns } from "@keyboard-studio/engine";
 import { PatternSchema } from "@keyboard-studio/engine/pattern-schema";
 import type {
   Pattern,
-  BaseKeyboard,
+  StartKeyboard,
   DiscoveryAxisVector,
   PatternMatch,
   PatternLibraryService,
@@ -119,7 +119,7 @@ class BrowserPatternLibraryService implements PatternLibraryService {
     return Promise.resolve(patternIndex().byId.get(id));
   }
 
-  filterFor(base: BaseKeyboard, axes?: DiscoveryAxisVector): Promise<PatternMatch[]> {
+  filterFor(base: StartKeyboard, axes?: DiscoveryAxisVector): Promise<PatternMatch[]> {
     return Promise.resolve(rankPatterns(patternIndex().all, base, axes));
   }
 }

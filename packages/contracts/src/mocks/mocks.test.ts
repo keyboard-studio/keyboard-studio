@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mockBaseBrowser } from "./mockBaseBrowser";
+import { mockStartBrowser } from "./mockStartBrowser";
 import { mockPatternLibrary } from "./mockPatternLibrary";
 import { mockScaffolder } from "./mockScaffolder";
 import { mockOutputService } from "./mockOutputService";
@@ -8,7 +8,7 @@ import {
   basicKbdus,
   silEuroLatin,
   silDevanagariPhonetic,
-  sampleBaseKeyboards,
+  sampleStartKeyboards,
   latinDeadkeyAcuteSingle,
   samplePatterns,
   layerCFindings,
@@ -17,19 +17,19 @@ import {
 } from "../fixtures/index";
 
 // ---------------------------------------------------------------------------
-// mockBaseBrowser
+// mockStartBrowser
 // ---------------------------------------------------------------------------
 
-describe("mockBaseBrowser", () => {
+describe("mockStartBrowser", () => {
   it("listAll returns non-empty array containing the basic_kbdus fixture", async () => {
-    const all = await mockBaseBrowser.listAll();
+    const all = await mockStartBrowser.listAll();
     expect(all.length).toBeGreaterThanOrEqual(3);
     const ids = all.map((kb) => kb.id);
     expect(ids).toContain("basic_kbdus");
   });
 
   it("listAll result contains elements with required BaseKeyboard shape", async () => {
-    const all = await mockBaseBrowser.listAll();
+    const all = await mockStartBrowser.listAll();
     const first = all[0]!;
     expect(first).toMatchObject({
       id: expect.any(String),
@@ -42,7 +42,7 @@ describe("mockBaseBrowser", () => {
   });
 
   it("getById('basic_kbdus') returns the basic_kbdus fixture", async () => {
-    const result = await mockBaseBrowser.getById("basic_kbdus");
+    const result = await mockStartBrowser.getById("basic_kbdus");
     expect(result).toBeDefined();
     expect(result!.id).toBe("basic_kbdus");
     expect(result!.path).toBe("release/basic/basic_kbdus");
@@ -50,42 +50,42 @@ describe("mockBaseBrowser", () => {
   });
 
   it("getById('sil_euro_latin') returns the sil_euro_latin fixture", async () => {
-    const result = await mockBaseBrowser.getById("sil_euro_latin");
+    const result = await mockStartBrowser.getById("sil_euro_latin");
     expect(result).toBeDefined();
     expect(result!.script).toBe("Latn");
   });
 
   it("getById('sil_devanagari_phonetic') returns the Devanagari fixture", async () => {
-    const result = await mockBaseBrowser.getById("sil_devanagari_phonetic");
+    const result = await mockStartBrowser.getById("sil_devanagari_phonetic");
     expect(result).toBeDefined();
     expect(result!.script).toBe("Deva");
   });
 
   it("getById('unknown') returns undefined", async () => {
-    const result = await mockBaseBrowser.getById("unknown");
+    const result = await mockStartBrowser.getById("unknown");
     expect(result).toBeUndefined();
   });
 
   it("search by query matches id case-insensitively", async () => {
-    const results = await mockBaseBrowser.search("BASIC_KBDUS");
+    const results = await mockStartBrowser.search("BASIC_KBDUS");
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0]!.id).toBe("basic_kbdus");
   });
 
   it("search with script filter returns only matching script", async () => {
-    const results = await mockBaseBrowser.search("", { script: "Deva" });
+    const results = await mockStartBrowser.search("", { script: "Deva" });
     expect(results.every((kb) => kb.script === "Deva")).toBe(true);
     expect(results.length).toBeGreaterThanOrEqual(1);
   });
 
   it("search with target filter includes only keyboards with that target", async () => {
-    const results = await mockBaseBrowser.search("", { target: "mobile" });
+    const results = await mockStartBrowser.search("", { target: "mobile" });
     expect(results.every((kb) => kb.targets.includes("mobile"))).toBe(true);
   });
 
   it("search with empty query and no filters returns all keyboards", async () => {
-    const all = await mockBaseBrowser.listAll();
-    const searched = await mockBaseBrowser.search("");
+    const all = await mockStartBrowser.listAll();
+    const searched = await mockStartBrowser.search("");
     expect(searched.length).toBe(all.length);
   });
 });
@@ -306,7 +306,7 @@ describe("makeMockVirtualFS", () => {
 
 describe("fixture cross-checks", () => {
   it("sampleBaseKeyboards has exactly 3 entries", () => {
-    expect(sampleBaseKeyboards).toHaveLength(3);
+    expect(sampleStartKeyboards).toHaveLength(3);
   });
 
   it("basicKbdus path matches spec §4", () => {

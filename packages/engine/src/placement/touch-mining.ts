@@ -35,7 +35,7 @@ import { isSingleCodepoint, isStandardKey } from "./filters.js";
 export type TouchLayerClass = "default" | "shift" | "other";
 
 /** One raw (unaggregated) longpress-host observation from a single keyboard. */
-export interface TouchHostObservation {
+export interface TouchBaseObservation {
   /** Target codepoint in "U+XXXX" notation. */
   codepoint: string;
   /** Virtual key name of the MAIN key the longpress hangs off of. */
@@ -65,10 +65,10 @@ function producedChar(key: TouchKeyIR): string | undefined {
  * Mine every longpress (`sk[]`) host in `layout`, one observation per
  * (codepoint, host vkey, layerClass) instance found. The caller is
  * responsible for per-keyboard dedup / cross-corpus aggregation (see
- * `aggregateTouchHosts`) — this function does not vote, it only observes.
+ * `aggregateTouchBases`) — this function does not vote, it only observes.
  */
-export function mineLongpressHosts(layout: TouchLayoutIR): TouchHostObservation[] {
-  const out: TouchHostObservation[] = [];
+export function mineLongpressBases(layout: TouchLayoutIR): TouchBaseObservation[] {
+  const out: TouchBaseObservation[] = [];
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
       const layerClass = layerClassFor(layer.id);
@@ -103,8 +103,8 @@ export function mineLongpressHosts(layout: TouchLayoutIR): TouchHostObservation[
  * "independent keyboards" voting semantics of the physical-mechanism corpus
  * priors (spec §7.6).
  */
-export function aggregateTouchHosts(
-  perKeyboardObservations: TouchHostObservation[][],
+export function aggregateTouchBases(
+  perKeyboardObservations: TouchBaseObservation[][],
 ): Map<string, Map<string, { vkey: string; layerClass: TouchLayerClass; priorCount: number }>> {
   const byCodepoint = new Map<
     string,
@@ -137,12 +137,12 @@ export function aggregateTouchHosts(
 }
 
 /**
- * Convert `aggregateTouchHosts`'s result into the `TouchPlacementEntry[]`
+ * Convert `aggregateTouchBases`'s result into the `TouchPlacementEntry[]`
  * shape carried on `PlacementPriorsJSON.touch` — hosts sorted by descending
  * `priorCount` (best-first, matching `PlacementEntry.candidates`'
  * best-first convention), entries sorted by codepoint for determinism.
  */
-export function touchHostsToEntries(
+export function touchBasesToEntries(
   byCodepoint: Map<string, Map<string, { vkey: string; layerClass: TouchLayerClass; priorCount: number }>>,
 ): TouchPlacementEntry[] {
   const entries: TouchPlacementEntry[] = [];

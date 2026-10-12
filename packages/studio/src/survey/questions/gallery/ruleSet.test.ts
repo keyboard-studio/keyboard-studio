@@ -24,7 +24,7 @@ function rule(nodeId: string, output: string, added = false): IRRule {
   } as IRRule;
 }
 
-function baseIr(): KeyboardIR {
+function startIr(): KeyboardIR {
   return makeTestIR([
     { nodeId: "g-main", name: "main", usingKeys: true, rules: [rule("r-base", "a")] },
   ]);
@@ -51,7 +51,7 @@ describe("ruleSet module contract", () => {
   });
 
   it("apply with no value, no IR, or no additions writes nothing", () => {
-    const ir = baseIr();
+    const ir = startIr();
     expect(ruleSet.apply(undefined, ctx(ir))).toEqual({});
     expect(ruleSet.apply(VALUE, ctx(null))).toEqual({});
     expect(ruleSet.apply({ groups: [], stores: [] }, ctx(ir))).toEqual({});
@@ -60,7 +60,7 @@ describe("ruleSet module contract", () => {
 
 describe("ruleSet apply (splice)", () => {
   it("splices the additions into the base IR in working order, deterministically", () => {
-    const ir = baseIr();
+    const ir = startIr();
     const first = ruleSet.apply(VALUE, ctx(ir));
     const second = ruleSet.apply(VALUE, ctx(ir));
     expect(first).toEqual(second);
@@ -73,7 +73,7 @@ describe("ruleSet apply (splice)", () => {
     // deadkeys-defined or windows-layout runs this apply with value
     // undefined. With a recorded rule-set decision the splice still
     // happens; without one, the invocation is a no-op.
-    const ir = baseIr();
+    const ir = startIr();
     const withRecord = ctx(ir, {
       "rule-set": { id: "rule-set", value: VALUE, provenance: "asked" },
     });
@@ -85,7 +85,7 @@ describe("ruleSet apply (splice)", () => {
   });
 
   it("never resurrects an addition the recorded carve decision removed", () => {
-    const ir = baseIr();
+    const ir = startIr();
     const decisions: ApplyContext["decisions"] = {
       "carved-layout": {
         id: "carved-layout",

@@ -10,7 +10,7 @@
 //
 // `apply` is a deliberate no-op (execution shape D-090-38, the
 // D-090-12 / D-090-30 wall): R2's build does not consume the ops at
-// all — `buildTouchLayoutJson` takes baseIr + TouchAssignment[] +
+// all — `buildTouchLayoutJson` takes startIr + TouchAssignment[] +
 // {baseTouchJson, mods, seedSource} (completion-time inputs the
 // value does not carry), and its output lands in the bare
 // `touchLayoutJson` store string, for which 089's patch contract

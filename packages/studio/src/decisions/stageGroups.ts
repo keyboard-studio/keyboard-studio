@@ -95,7 +95,7 @@ function latestEditorAction(
 }
 
 /** The first effective base-contribution entry's starting count, or `undefined` if none. */
-function firstBaseContribution(
+function firstStartContribution(
   effective: readonly DecisionEntry[],
 ): { startingKeyCount: number | undefined } | undefined {
   for (const entry of effective) {
@@ -149,7 +149,7 @@ function computeRollUp(
   const editorAction = latestEditorAction(effective);
   if (editorAction !== undefined) return editorRollUp(editorAction.actionType, editorAction.summary);
 
-  const base = firstBaseContribution(effective);
+  const base = firstStartContribution(effective);
   if (base !== undefined) return { kind: "base-contribution", startingKeyCount: base.startingKeyCount };
 
   // Survey answers and gallery decisions counted separately (spec 090 US5):

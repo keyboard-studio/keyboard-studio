@@ -544,7 +544,7 @@ describe("renameTouchKey — the complete T091 reference fix-up", () => {
     expect(addresses).toContain("phone:default:T_0021");
 
     const host = result.ir.touchLayout!.platforms[0]!.layers[0]!.rows[1]!.keys[0]!;
-    expect(host.id).toBe(TOUCH_JOIN_IDS.longpressHost);
+    expect(host.id).toBe(TOUCH_JOIN_IDS.longpressBase);
     expect(host.sk?.[0]?.id).toBe("U_00A1RENAMED");
   });
 

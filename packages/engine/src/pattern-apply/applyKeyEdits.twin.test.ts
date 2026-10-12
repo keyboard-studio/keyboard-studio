@@ -107,7 +107,7 @@ function buildOps(): KeyEditOperation[] {
     {
       seq: 6,
       kind: "setSubKey",
-      address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.longpressHost),
+      address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.longpressBase),
       sub: { kind: "sk", id: "U_203D" },
       fields: { text: "‽‽", output: "‽‽" },
     },
@@ -119,7 +119,7 @@ function buildOps(): KeyEditOperation[] {
     {
       seq: 7,
       kind: "removeSubKey",
-      address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.longpressHost),
+      address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.longpressBase),
       sub: { kind: "flick", id: "n" },
     },
     // 8. Deliberately unresolvable — both appliers must skip it (never
@@ -460,7 +460,7 @@ describe("applyKeyEdits twin equivalence — move (spec 065 T028)", () => {
     // present to survive, then move it.
     const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
     const before = parseTouchLayout(rawJson);
-    const address = touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.longpressHost);
+    const address = touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.longpressBase);
     const ops: KeyEditOperation[] = [
       { seq: 1, kind: "set", address, fields: { width: 175, pad: 5, hint: "h", layer: "shift" } },
       { seq: 2, kind: "move", address, direction: "down" },
@@ -472,7 +472,7 @@ describe("applyKeyEdits twin equivalence — move (spec 065 T028)", () => {
 
     const find = (layout: TouchLayoutIR): TouchKeyIR | undefined => {
       for (const row of phoneDefault(layout).rows) {
-        const hit = row.keys.find((k) => k.id === TOUCH_JOIN_IDS.longpressHost);
+        const hit = row.keys.find((k) => k.id === TOUCH_JOIN_IDS.longpressBase);
         if (hit) return hit;
       }
       return undefined;
@@ -558,7 +558,7 @@ describe("applyKeyEdits twin equivalence — setSubKey upsert (spec 065 T042)", 
     return undefined;
   }
 
-  const HOST = TOUCH_JOIN_IDS.longpressHost;
+  const HOST = TOUCH_JOIN_IDS.longpressBase;
   const address = touchKeyAddress("phone", "default", HOST);
 
   it("APPENDS a new longpress rather than warning, on both sides", () => {

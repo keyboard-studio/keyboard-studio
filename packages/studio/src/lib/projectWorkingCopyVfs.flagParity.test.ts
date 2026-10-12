@@ -142,19 +142,19 @@ interface Scenario {
   assignments?: readonly MechanismAssignment[];
   touchLayoutJson?: string;
   /** Start from the bare scaffold (parsed to IR) instead of the fixture keyboard. */
-  scaffoldBase?: boolean;
+  scaffoldStart?: boolean;
   /** Non-vacuity: the edit really changed (or deliberately did not change) the output. */
   effect: (out: Projected) => void;
 }
 
 /** Run the real projection for one scenario. */
 function project(sc: Omit<Scenario, "name" | "effect">): Projected {
-  const vfs = sc.scaffoldBase === true ? stubKmnVfs("kb", SCAFFOLD_KMN) : stubKmnVfs("kb");
+  const vfs = sc.scaffoldStart === true ? stubKmnVfs("kb", SCAFFOLD_KMN) : stubKmnVfs("kb");
   const assignments = [...(sc.assignments ?? [])];
   projectWorkingCopyVfs({
     vfs,
     keyboardId: "kb",
-    baseIr: sc.scaffoldBase === true ? parseKmn(SCAFFOLD_KMN, "kb").ir : makeFixtureIr(),
+    startIr: sc.scaffoldStart === true ? parseKmn(SCAFFOLD_KMN, "kb").ir : makeFixtureIr(),
     deletedNodeIds: new Set(sc.deletedNodeIds ?? []),
     deletedItemIds: new Set(sc.deletedItemIds ?? []),
     assignments,
@@ -263,7 +263,7 @@ const SCENARIOS: readonly Scenario[] = [
   {
     name: "physical mechanism assignment over a bare scaffold",
     assignments: [makeAssignment()],
-    scaffoldBase: true,
+    scaffoldStart: true,
     effect: (out) => expect(out.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/),
   },
   {
@@ -312,7 +312,7 @@ describe("projectWorkingCopyVfs — seam projection output (single path, spec 08
     const res = projectWorkingCopyVfs({
       vfs,
       keyboardId: "kb",
-      baseIr: makeFixtureIr(),
+      startIr: makeFixtureIr(),
       deletedNodeIds: overlay.deletedNodeIds,
       deletedItemIds: new Set(),
       assignments: [],

@@ -94,7 +94,7 @@ export interface CompileResult {
 /**
  * Input shape for {@link makeCompileResult}. Mirrors {@link CompileResult}
  * exactly today (all fields required). The factory exists for symmetry with
- * {@link makePattern} / {@link makeBaseKeyboard} and as a forward-compatible
+ * {@link makePattern} / {@link makeStartKeyboard} and as a forward-compatible
  * anchor when optional fields land.
  */
 export type CompileResultInit = {

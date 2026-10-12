@@ -34,11 +34,11 @@ function projectKmn(baseKmn: string, ops: DeadkeyOperation[]): {
   const vfs = createVirtualFS([
     { path: `source/${KBID}.kmn`, content: baseKmn, isBinary: false },
   ]);
-  const baseIr = parseKmn(baseKmn, KBID).ir;
+  const startIr = parseKmn(baseKmn, KBID).ir;
   const { warnings } = projectWorkingCopyVfs({
     vfs,
     keyboardId: KBID,
-    baseIr,
+    startIr,
     deletedNodeIds: new Set<string>(),
     deletedItemIds: new Set<string>(),
     deletedTouchKeyIds: new Set<string>(),
@@ -148,11 +148,11 @@ describe("delete — the old trigger follows the keyboard's open/closed posture"
     // leave the terminal rule standing.
     const { vfs } = projectKmn(BASE_KMN, [DEFINE, PAIR_A]);
     const clustered = vfs.get(`source/${KBID}.kmn`)!.content as string;
-    const closedBase = `${clustered}\n+ [K_5] > beep\n`;
+    const closedStart = `${clustered}\n+ [K_5] > beep\n`;
 
     const compiled = await compileAfterOps(
       [{ kind: "delete", id: 0x3000 }],
-      closedBase,
+      closedStart,
     );
     const result = simulate(compiled, [key("K_5")]);
     expect(result.trace[0]!.beep).toBe(true);

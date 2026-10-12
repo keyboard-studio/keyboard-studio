@@ -36,7 +36,7 @@ export function seedStore(
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
   const ir = opts.ir ?? makeTestIR([]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   if (opts.withInventory !== undefined) {
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
@@ -85,7 +85,7 @@ export function seedWithDesktopAssignment(
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
   const ir = makeTestIR([]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],

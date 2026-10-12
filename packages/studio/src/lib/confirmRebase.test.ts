@@ -1,7 +1,7 @@
 // confirmRebase — unit tests for the F1 same-base-aware rebase guard.
 //
 // Exercises hasUnsavedEdits, needsRebaseConfirm, confirmRebaseTo, and
-// instantiateFromBaseIfConfirmed({ skipConfirm }) against the REAL
+// instantiateFromStartIfConfirmed({ skipConfirm }) against the REAL
 // workingCopyStore singleton (unmocked — same idiom as
 // hooks/usePreviewArtifact.reinstantiate.test.ts): not-instantiated,
 // same-base-id, different-id-no-edits, different-id-with-edits (Cancel/OK),
@@ -22,13 +22,13 @@ import {
   identitySeedFromSession,
   needsRebaseConfirm,
   confirmRebaseTo,
-  instantiateFromBaseIfConfirmed,
+  instantiateFromStartIfConfirmed,
   instantiateFromExistingWithIdentitySeed,
   REBASE_CONFIRM_MESSAGE,
 } from "./confirmRebase.ts";
 
 function instantiate(base = basicKbdus) {
-  useWorkingCopyStore.getState().instantiateFromBase(base, {
+  useWorkingCopyStore.getState().instantiateFromStart(base, {
     vfs: createVirtualFS([]),
     ir: makeTestIR([]),
   });
@@ -128,21 +128,21 @@ describe("confirmRebaseTo", () => {
   });
 });
 
-describe("instantiateFromBaseIfConfirmed", () => {
+describe("instantiateFromStartIfConfirmed", () => {
   it("returns false and never touches the store when ir/vfs are null (mock-engine path)", () => {
     const confirmSpy = vi.spyOn(window, "confirm");
-    const result = instantiateFromBaseIfConfirmed(basicKbdus, { vfs: null, ir: null });
+    const result = instantiateFromStartIfConfirmed(basicKbdus, { vfs: null, ir: null });
     expect(result).toBe(false);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().baseKeyboard).toBeNull();
+    expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
   });
 
   it("proceeds without a confirm dialog when there are no edits", () => {
     const confirmSpy = vi.spyOn(window, "confirm");
-    const result = instantiateFromBaseIfConfirmed(basicKbdus, payload);
+    const result = instantiateFromStartIfConfirmed(basicKbdus, payload);
     expect(result).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(basicKbdus.id);
   });
 
   it("Cancel on the confirm dialog aborts — instantiate is never called", () => {
@@ -150,11 +150,11 @@ describe("instantiateFromBaseIfConfirmed", () => {
     recordAnEdit();
     vi.spyOn(window, "confirm").mockReturnValue(false);
 
-    const result = instantiateFromBaseIfConfirmed(silEuroLatin, payload);
+    const result = instantiateFromStartIfConfirmed(silEuroLatin, payload);
 
     expect(result).toBe(false);
     // Store untouched — still the ORIGINAL base, edits preserved.
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(basicKbdus.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(basicKbdus.id);
     expect(useWorkingCopyStore.getState().phaseResults.length).toBeGreaterThan(0);
   });
 
@@ -163,10 +163,10 @@ describe("instantiateFromBaseIfConfirmed", () => {
     recordAnEdit();
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
-    const result = instantiateFromBaseIfConfirmed(silEuroLatin, payload);
+    const result = instantiateFromStartIfConfirmed(silEuroLatin, payload);
 
     expect(result).toBe(true);
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(silEuroLatin.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(silEuroLatin.id);
   });
 
   it("skipConfirm bypasses the dialog even with edits recorded", () => {
@@ -174,11 +174,11 @@ describe("instantiateFromBaseIfConfirmed", () => {
     recordAnEdit();
     const confirmSpy = vi.spyOn(window, "confirm");
 
-    const result = instantiateFromBaseIfConfirmed(silEuroLatin, payload, { skipConfirm: true });
+    const result = instantiateFromStartIfConfirmed(silEuroLatin, payload, { skipConfirm: true });
 
     expect(result).toBe(true);
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(silEuroLatin.id);
+    expect(useWorkingCopyStore.getState().startKeyboard?.id).toBe(silEuroLatin.id);
   });
 });
 
@@ -240,7 +240,7 @@ describe("instantiateFromBaseIfConfirmed — identity seed", () => {
   it("starts the working copy with the identity step's language", () => {
     seedIdentityDecisions("bfd", "Bafut");
     useWorkingCopyStore.getState().reset();
-    expect(instantiateFromBaseIfConfirmed(basicKbdus, payload)).toBe(true);
+    expect(instantiateFromStartIfConfirmed(basicKbdus, payload)).toBe(true);
     expect(useWorkingCopyStore.getState().identity).toEqual({
       displayName: basicKbdus.displayName,
       bcp47: "bfd-Latn",
@@ -250,14 +250,14 @@ describe("instantiateFromBaseIfConfirmed — identity seed", () => {
 
   it("keeps identity null when there is no language to seed", () => {
     useWorkingCopyStore.getState().reset();
-    expect(instantiateFromBaseIfConfirmed(basicKbdus, payload)).toBe(true);
+    expect(instantiateFromStartIfConfirmed(basicKbdus, payload)).toBe(true);
     expect(useWorkingCopyStore.getState().identity).toBeNull();
   });
 
   it("does not count the seed as an edit, so a base switch needs no confirm", () => {
     seedIdentityDecisions("bfd", "Bafut");
     useWorkingCopyStore.getState().reset();
-    instantiateFromBaseIfConfirmed(basicKbdus, payload);
+    instantiateFromStartIfConfirmed(basicKbdus, payload);
     expect(hasUnsavedEdits()).toBe(false);
   });
 });

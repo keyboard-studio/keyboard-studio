@@ -32,7 +32,7 @@ import {
   driveAttributionStep,
   confirmPrefill,
   driveIdentityLite,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -42,7 +42,7 @@ async function adapt(page: Page, keyboardId: string): Promise<void> {
   await seedReturningVisitor(page);
   await page.goto("/");
   await driveIdentityLite(page);
-  await pickBaseKeyboard(page, keyboardId);
+  await pickStartKeyboard(page, keyboardId);
   await chooseAdaptTrack(page);
   await driveAttributionStep(page);
   await confirmPrefill(page);

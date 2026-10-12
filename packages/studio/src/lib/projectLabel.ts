@@ -30,7 +30,7 @@ export interface ProjectLabelInput {
    */
   readonly identity?: { readonly displayName?: string | null } | null;
   /** The base keyboard the working copy was instantiated from. */
-  readonly baseKeyboard?: { readonly displayName?: string | null } | null;
+  readonly startKeyboard?: { readonly displayName?: string | null } | null;
 }
 
 /** A blank or whitespace-only name is not a name — fall through to the next tier. */
@@ -46,7 +46,7 @@ function usable(value: string | null | undefined): string | null {
  * Precedence (FR-041, in this order):
  *   1. `scaffoldSpec.displayName` — the name the author typed at project_name
  *   2. `identity.displayName`     — the working-copy identity patch
- *   3. `baseKeyboard.displayName` — the keyboard being adapted
+ *   3. `startKeyboard.displayName` — the keyboard being adapted
  *   4. `null`                     — nothing to name yet
  *
  * Returns `null` rather than a placeholder: the footer renders no project row
@@ -57,6 +57,6 @@ export function deriveProjectLabel(input: ProjectLabelInput): string | null {
   return (
     usable(input.scaffoldSpec?.displayName) ??
     usable(input.identity?.displayName) ??
-    usable(input.baseKeyboard?.displayName)
+    usable(input.startKeyboard?.displayName)
   );
 }

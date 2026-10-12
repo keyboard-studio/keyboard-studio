@@ -152,42 +152,42 @@ export function highlightRule(kmnText: string): TokenSpan[] {
   }
 
   const { head, comment } = splitTrailingComment(rest);
-  const headBase = base;
+  const headStart = base;
 
   const pushSide = (
     side: string,
-    sideBase: number,
+    sideStart: number,
     classify: (tok: string) => SpanKind,
   ): void => {
     let cursor = 0;
-    for (const tok of tokenizeSide(side, sideBase)) {
-      if (tok.start > sideBase + cursor) {
-        push("text", side.slice(cursor, tok.start - sideBase), sideBase + cursor, tok.start);
+    for (const tok of tokenizeSide(side, sideStart)) {
+      if (tok.start > sideStart + cursor) {
+        push("text", side.slice(cursor, tok.start - sideStart), sideStart + cursor, tok.start);
       }
       push(classify(tok.text), tok.text, tok.start, tok.end);
-      cursor = tok.end - sideBase;
+      cursor = tok.end - sideStart;
     }
     if (cursor < side.length) {
-      push("text", side.slice(cursor), sideBase + cursor, sideBase + side.length);
+      push("text", side.slice(cursor), sideStart + cursor, sideStart + side.length);
     }
   };
 
   const arrow = splitOnArrow(head);
   if (arrow === null) {
     // Not a rule line — everything is undifferentiated text.
-    pushSide(head, headBase, () => "text");
+    pushSide(head, headStart, () => "text");
   } else {
-    pushSide(arrow.lhs, headBase, classifyContextToken);
-    push("operator", ">", headBase + arrow.arrowAt, headBase + arrow.arrowAt + 1);
-    pushSide(arrow.rhs, headBase + arrow.arrowAt + 1, classifyOutputToken);
+    pushSide(arrow.lhs, headStart, classifyContextToken);
+    push("operator", ">", headStart + arrow.arrowAt, headStart + arrow.arrowAt + 1);
+    pushSide(arrow.rhs, headStart + arrow.arrowAt + 1, classifyOutputToken);
   }
 
   if (comment !== undefined) {
-    // Comment offsets are relative to `rest`, which starts at `headBase`
+    // Comment offsets are relative to `rest`, which starts at `headStart`
     // in the original string.
-    const absStart = headBase + comment.start;
-    const absEnd = headBase + comment.end;
-    const gapStart = headBase + head.length;
+    const absStart = headStart + comment.start;
+    const absEnd = headStart + comment.end;
+    const gapStart = headStart + head.length;
     if (absStart > gapStart) {
       push("text", rest.slice(head.length, comment.start), gapStart, absStart);
     }

@@ -29,7 +29,7 @@ import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import {
-  BaseResolutionAdapter,
+  StartResolutionAdapter,
   IdentityLiteAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
 import {
@@ -96,17 +96,17 @@ export const layoutStep: EditorStep = step({
 });
 
 /**
- * Choose-base step: BaseResolution (keyboard base picker ONLY).
+ * Choose-base step: StartResolution (keyboard base picker ONLY).
  * Track selection is a separate manifest step (trackStep).
  *
  * spec 080: this step also surfaces the documentation-completeness badge on
  * suggestion cards / MetadataCard (FR-008) — a DISPLAY-ONLY addition; it adds
  * no new writes to the step's own completion path.
  */
-export const chooseBaseStep: EditorStep = step({
+export const chooseStartStep: EditorStep = step({
   id: "choose_base",
   title: "Choose Base Keyboard",
-  component: BaseResolutionAdapter,
+  component: StartResolutionAdapter,
   specRef: ["§8", "specs/080-documentation-completeness"],
   persistence: "working-copy",
 });
@@ -331,7 +331,7 @@ export const packageStep: EditorStep = step({
  */
 export const registeredEditorSteps: readonly EditorStep[] = [
   identityStep,
-  chooseBaseStep,
+  chooseStartStep,
   trackStep,
   attributionStep,
   projectNameStep,

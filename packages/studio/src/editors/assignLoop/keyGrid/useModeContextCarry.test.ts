@@ -258,9 +258,9 @@ describe("carryKeyToCharacter", () => {
   });
 
   it("falls back to a longpress sub-key's self-output when the host key has no main output of its own", () => {
-    // T_0021 (longpressHost) has no `output`, no decodable id, and no rule of
+    // T_0021 (longpressBase) has no `output`, no decodable id, and no rule of
     // its own — only its `sk[]` children (U_00A1 / U_203D) self-output.
-    const address = touchKeyAddress(PHONE, "default", TOUCH_JOIN_IDS.longpressHost);
+    const address = touchKeyAddress(PHONE, "default", TOUCH_JOIN_IDS.longpressBase);
     expect(carryKeyToCharacter(fixtureLayout(), fixtureIndex(), address)).toBe("¡"); // ¡
   });
 

@@ -36,7 +36,7 @@
 import { test, expect, type Page, type FrameLocator } from "playwright/test";
 import {
   driveIdentityLite as driveIdentityLiteBase,
-  pickBaseKeyboard,
+  pickStartKeyboard,
   chooseAdaptTrack,
   driveAttributionStep,
   confirmPrefill,
@@ -48,7 +48,7 @@ import {
 // Fixture constants
 // ---------------------------------------------------------------------------
 
-const BASE_KEYBOARD_ID = "bambara";
+const START_KEYBOARD_ID = "bambara";
 
 /**
  * M (>=1) placed letter — same role touch-derivation-us1.spec.ts's PLACED_CHAR
@@ -74,8 +74,8 @@ const BASE_KEYBOARD_ID = "bambara";
  */
 const PLACED_CHAR = "ø";
 const PLACED_CHAR_UPPER = "Ø";
-const PLACED_CHAR_HOST_KEY = "K_W";
-const PLACED_CHAR_UPPER_HOST_KEY = "K_X";
+const PLACED_CHAR_BASE_KEY = "K_W";
+const PLACED_CHAR_UPPER_BASE_KEY = "K_X";
 
 /** The task's own worked example — U+025B, assigned via AssignPanel's field. */
 const ASSIGNED_CHAR = "ɛ";
@@ -126,7 +126,7 @@ async function skipCarve(page: Page): Promise<void> {
 
 /**
  * Places one Mechanisms character via the "Assign to a key" method on a
- * Right-Alt (AltGr) layer + `hostKey` — neither bambara's `.kmn` nor this
+ * Right-Alt (AltGr) layer + `baseKey` — neither bambara's `.kmn` nor this
  * walk's OWN earlier placement (for the case counterpart) ever reuses the
  * same host key, so each call targets a distinct, genuinely free combo. A
  * no-op past the layer/key pickers when Apply is already enabled (mirrors
@@ -134,7 +134,7 @@ async function skipCarve(page: Page): Promise<void> {
  * a decomposable letter — not this fixture's path, but the same defensive
  * shape).
  */
-async function placeMechanismCharacter(page: Page, char: string, hostKey: string): Promise<void> {
+async function placeMechanismCharacter(page: Page, char: string, baseKey: string): Promise<void> {
   const applyButton = page.getByRole("button", { name: `Apply method for ${char}` });
   await expect(applyButton).toBeVisible({ timeout: 15_000 });
   if (await applyButton.isDisabled()) {
@@ -142,7 +142,7 @@ async function placeMechanismCharacter(page: Page, char: string, hostKey: string
     await page.getByRole("button", { name: "Layer 1 for layer-switch combo" }).click();
     await page.locator('ul[role="listbox"]').locator('li[data-value="RALT"]').click();
     await page.getByRole("button", { name: "Physical key for Assign to a key" }).click();
-    await page.locator('ul[role="listbox"]').locator(`li[data-value="${hostKey}"]`).click();
+    await page.locator('ul[role="listbox"]').locator(`li[data-value="${baseKey}"]`).click();
   }
   await expect(applyButton).toBeEnabled();
   await applyButton.click();
@@ -160,9 +160,9 @@ async function driveMechanisms(page: Page): Promise<void> {
   if (await startButton.isVisible().catch(() => false)) {
     await startButton.click();
   }
-  await placeMechanismCharacter(page, PLACED_CHAR, PLACED_CHAR_HOST_KEY);
+  await placeMechanismCharacter(page, PLACED_CHAR, PLACED_CHAR_BASE_KEY);
   await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
-  await placeMechanismCharacter(page, PLACED_CHAR_UPPER, PLACED_CHAR_UPPER_HOST_KEY);
+  await placeMechanismCharacter(page, PLACED_CHAR_UPPER, PLACED_CHAR_UPPER_BASE_KEY);
   await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
 }
 
@@ -234,7 +234,7 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 063 SC-004)"
     // --- Navigation to the touch stage (not counted — SC-004 measures the
     //     assign action itself, not the survey walk to reach it). ---
     await driveIdentityLite(page);
-    await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
+    await pickStartKeyboard(page, START_KEYBOARD_ID);
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
     await confirmPrefill(page);

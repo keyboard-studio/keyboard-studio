@@ -11,12 +11,12 @@ import { LayoutFamilyQuestion } from "./LayoutFamilyQuestion.tsx";
 import {
   getLayoutFamilyAnswer,
   saveLayoutFamilyAnswer,
-  setLikelyHostDeps,
+  setLikelyBaseDeps,
 } from "../../lib/layoutFamily.ts";
 
 beforeEach(() => {
   useSurveyAnswerStore.getState().reset();
-  setLikelyHostDeps(undefined);
+  setLikelyBaseDeps(undefined);
 });
 
 afterEach(() => {
@@ -61,9 +61,9 @@ describe("LayoutFamilyQuestion", () => {
   });
 
   it("reads the stored answer first (override-deps seam)", () => {
-    setLikelyHostDeps({
-      likelyHostLayouts: () => [{ id: "x", label: "Should not appear" }],
-      layoutFamilyHosts: (answer) => [{ id: `lf-${answer}`, label: `Hosts for ${answer}` }],
+    setLikelyBaseDeps({
+      likelyBaseLayouts: () => [{ id: "x", label: "Should not appear" }],
+      layoutFamilyBases: (answer) => [{ id: `lf-${answer}`, label: `Hosts for ${answer}` }],
     });
     saveLayoutFamilyAnswer("qwertz");
     render(<LayoutFamilyQuestion bcp47="de" />);

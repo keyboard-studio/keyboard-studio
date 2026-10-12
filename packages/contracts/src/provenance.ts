@@ -138,7 +138,7 @@ export interface KeyboardProvenance {
  * Input shape for {@link makeKeyboardProvenance}. Identical to
  * {@link KeyboardProvenance} — every field is already optional — but named
  * separately to match the `XInit` factory convention used across the package
- * (see {@link BaseKeyboardInit}).
+ * (see {@link StartKeyboardInit}).
  */
 export type KeyboardProvenanceInit = KeyboardProvenance;
 

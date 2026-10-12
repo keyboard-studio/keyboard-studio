@@ -58,7 +58,7 @@ export const enumerateTouchMethodsForCharSpy: Mock = vi.fn();
 // left over from an earlier test in the same suite (the bug this comment is
 // guarding against).
 export function defaultBuildTouchLayoutJsonImpl(
-  _baseIr: unknown,
+  _startIr: unknown,
   assignments: Array<{ target: string; mechanisms: Array<{ patternId: string }> }>,
 ) {
   return {
@@ -89,7 +89,7 @@ export const buildTouchLayoutJsonSpy = vi.fn(defaultBuildTouchLayoutJsonImpl);
 // ---------------------------------------------------------------------------
 
 export const useKeyboardArtifact = (
-  _baseKeyboard: unknown,
+  _startKeyboard: unknown,
   _scaffoldSpec: unknown,
   vfsTransform: ((vfs: VirtualFS, kbId: string) => { warnings: string[] }) | null | undefined,
 ): { stage: Stage; retry: Mock; recompile: Mock } => {

@@ -31,8 +31,8 @@ vi.mock("../hooks/useKeyboardArtifact.ts", async (importOriginal) => ({
   }),
 }));
 
-vi.mock("./BaseKeyboardPicker.tsx", () => ({
-  BaseKeyboardPicker: () => <div data-testid="base-picker-stub" />,
+vi.mock("./StartKeyboardPicker.tsx", () => ({
+  StartKeyboardPicker: () => <div data-testid="base-picker-stub" />,
 }));
 vi.mock("./KmnEditor.tsx", () => ({ KmnEditor: () => <div data-testid="kmn-editor-stub" /> }));
 vi.mock("./SignUpPanel.tsx", () => ({ SignUpPanel: () => null }));

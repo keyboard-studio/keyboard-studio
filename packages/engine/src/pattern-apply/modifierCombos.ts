@@ -57,7 +57,7 @@
  * combo is a legitimately distinct combo now (`["NCAPS"]` stays `["NCAPS"]`,
  * it does NOT collapse to `[]`). Folding a caps-pair-shaped `NCAPS` combo
  * down to its non-caps combo — the behavior the picker/emitted-`.kmn` case
- * still wants, since `buildBaseRuleLines`/`buildCasePairRuleLines`
+ * still wants, since `buildStartRuleLines`/`buildCasePairRuleLines`
  * (shiftRules.ts) always emit an `NCAPS`/`CAPS` sibling pair with identical
  * non-caps modifiers — is a SEPARATE, sibling-aware step: see
  * {@link foldCasePairCombo}, used by the IR-scanning functions below
@@ -528,7 +528,7 @@ function firstRuleCharOutput(rule: IRRule): string | undefined {
  * Resolve a rule's canonicalized combo for IR-scanning purposes, folding an
  * NCAPS-bearing combo down to its non-caps form when — and only when — a
  * sibling rule in the SAME group targets the SAME vkey with the identical
- * non-caps modifier set plus CAPS: the exact shape `buildBaseRuleLines`/
+ * non-caps modifier set plus CAPS: the exact shape `buildStartRuleLines`/
  * `buildCasePairRuleLines` (shiftRules.ts) emit for a CAPS-handling
  * case-pair quad (e.g. `+ [NCAPS K_E] > ...` alongside `+ [CAPS K_E] > ...`).
  * This preserves the pre-existing case-pair reporting behavior (the two

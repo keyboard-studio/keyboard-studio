@@ -9,7 +9,7 @@
 // them visibly inert under the keep-inert override.
 //
 // AC#1: A store-slot carve blanks the keycap labeled with that slot's char in
-//       both layer files; sibling keys and layer structure survive; baseIr is
+//       both layer files; sibling keys and layer structure survive; startIr is
 //       not mutated.
 // AC#2: Ordering — a carve of a char plus an S-01 assignment of the same char
 //       in one projection ends with the keycap POPULATED (Step 3.5 assignment
@@ -154,7 +154,7 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#dkt#0"]), // carve the é slot
       assignments: [],
@@ -192,7 +192,7 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#dkt#0"]), // carve the é slot
       carveTouchKeepInert: new Set(["é"]),
@@ -241,7 +241,7 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#dkt#0"]),
       assignments: [s01Assignment],
@@ -271,7 +271,7 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set([carveRule.nodeId]),
       deletedItemIds: new Set(),
       assignments: [],
@@ -338,7 +338,7 @@ describe("projectWorkingCopyVfs — group-level carve keycaps (#1803)", () => {
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set([extraGroup.nodeId]),
       deletedItemIds: new Set(),
       assignments: [],

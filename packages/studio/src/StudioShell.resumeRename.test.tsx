@@ -3,7 +3,7 @@
 //
 // Reproduces the user-visible bug end to end: seed a "My keyboards" index
 // with ONE row + a per-project draft record whose stored working copy has
-// already drifted (identity.keyboardId !== baseKeyboard.id — a completed
+// already drifted (identity.keyboardId !== startKeyboard.id — a completed
 // Track-1 rename, exactly what a real autosave record looks like once the
 // author has picked a custom keyboard id but the record is still filed under
 // the ORIGINAL base-id key — see draftPersistence.ts's
@@ -14,18 +14,18 @@
 // Mechanism (see the lower-level counterpart,
 // lib/draftPersistence.resumeRename.test.ts, for the same defect isolated
 // without a shell mount):
-//   1. MyKeyboardsList's handleResume calls resumeProject(baseId), which
+//   1. MyKeyboardsList's handleResume calls resumeProject(startId), which
 //      loadDraft()s the record into the working-copy/survey-session stores —
-//      the store now has identity.keyboardId = customId, baseKeyboard.id =
-//      baseId — then navigates to #survey.
+//      the store now has identity.keyboardId = customId, startKeyboard.id =
+//      startId — then navigates to #survey.
 //   2. SurveyView mounts FRESH (it was not mounted while on #profile). Its
 //      mount effect (StudioShell.tsx ~L789-802) derives the project key from
-//      the JUST-RESTORED working copy (customId, not baseId) and calls
+//      the JUST-RESTORED working copy (customId, not startId) and calls
 //      installDraftAutosave(customId), whose synchronous install-time save
 //      (P1 fix) upserts a SECOND "My keyboards" index row under customId.
-//      The original baseId row is never removed — nothing on the résumé path
+//      The original startId row is never removed — nothing on the résumé path
 //      runs doCommit's cleanup (`clearPersistenceDraft`), because
-//      `instantiatedForBaseIdRef` is pre-seeded specifically to make doCommit
+//      `instantiatedForStartIdRef` is pre-seeded specifically to make doCommit
 //      early-return.
 //
 // Mocking strategy: the same child-component/hook stub set as
@@ -40,7 +40,7 @@
 
 // SECOND SCENARIO (the second describe below): the reload path the Resume
 // click does NOT cover. A project whose stored
-// `identity.keyboardId !== baseKeyboard.id` (a completed mid-session rename), restored via the BOOT path — `main.tsx`'s
+// `identity.keyboardId !== startKeyboard.id` (a completed mid-session rename), restored via the BOOT path — `main.tsx`'s
 // pre-mount `loadDraft(resolveActiveProjectKey())` call — with NO Resume
 // click anywhere.
 //
@@ -86,7 +86,7 @@ vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.t
 // the barrel), so the shallow stubs must be registered for the files too.
 vi.mock("./survey/Prefill.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./survey/PhaseB.tsx", () => import("./test/studioShellMocks/surveyIndex.tsx"));
-vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/panels/StartResolution.tsx", () => import("./test/studioShellMocks/StartResolution.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
@@ -131,9 +131,9 @@ import {
   DRAFT_INDEX_KEY,
 } from "./lib/draftPersistence.ts";
 
-const BASE_ID = "basic_kbdus";
+const START_ID = "basic_kbdus";
 const CUSTOM_ID = "my_renamed_keyboard";
-const RELOAD_BASE_ID = "basic_kbdus_reload";
+const RELOAD_START_ID = "basic_kbdus_reload";
 const RELOAD_CUSTOM_ID = "my_renamed_keyboard_reload";
 
 beforeEach(() => {
@@ -150,12 +150,12 @@ afterEach(() => {
 
 describe("StudioShell — Resume from My keyboards does not duplicate the index row (bug repro)", () => {
   it("clicking Resume on a renamed project leaves exactly one 'My keyboards' entry", async () => {
-    seedRenamedProjectDraft(BASE_ID, CUSTOM_ID);
+    seedRenamedProjectDraft(START_ID, CUSTOM_ID);
     markVisited(); // returning-visitor landing gate, belt-and-suspenders with loadDraftMeta()
 
     // Sanity: the seed left exactly the one row a real prior session would.
     expect(listDrafts()).toHaveLength(1);
-    expect(listDrafts()[0]?.projectKey).toBe(BASE_ID);
+    expect(listDrafts()[0]?.projectKey).toBe(START_ID);
 
     window.location.hash = "#profile";
 
@@ -166,21 +166,21 @@ describe("StudioShell — Resume from My keyboards does not duplicate the index 
     const resumeButton = await screen.findByRole("button", { name: /Resume/i });
     fireEvent.click(resumeButton);
 
-    // Resume -> resumeProject(BASE_ID) applies the draft (identity.keyboardId
+    // Resume -> resumeProject(START_ID) applies the draft (identity.keyboardId
     // now CUSTOM_ID in the live store) -> navigateTo("survey") -> real
     // hashchange -> SurveyView mounts FRESH, tripping its mount effect.
     await screen.findByTestId("stage-identity");
 
     const entries = listDrafts();
     // EXPECTED (post-fix): still exactly one row, now keyed on the current
-    // (post-rename) project id, with the stale BASE_ID record gone.
+    // (post-rename) project id, with the stale START_ID record gone.
     // ACTUAL (bug): SurveyView's mount effect derives CUSTOM_ID from the
     // just-restored working copy and installDraftAutosave(CUSTOM_ID) writes
-    // a SECOND row — upsertIndexEntry matches by exact projectKey, so BASE_ID's
+    // a SECOND row — upsertIndexEntry matches by exact projectKey, so START_ID's
     // row is untouched rather than replaced.
     expect(entries).toHaveLength(1);
     expect(entries[0]?.projectKey).toBe(CUSTOM_ID);
-    expect(localStorage.getItem(draftKey(BASE_ID))).toBeNull();
+    expect(localStorage.getItem(draftKey(START_ID))).toBeNull();
 
     // Belt-and-suspenders on the raw index too (same fact, different vantage
     // point — a length-1 listDrafts() with the wrong survivor would be an
@@ -194,11 +194,11 @@ describe("StudioShell — Resume from My keyboards does not duplicate the index 
 
 describe("StudioShell — bare reload of a renamed project does not duplicate the index row (no Resume click)", () => {
   it("main.tsx's pre-mount loadDraft() + a direct #survey mount leaves exactly one 'My keyboards' entry", async () => {
-    seedRenamedProjectDraft(RELOAD_BASE_ID, RELOAD_CUSTOM_ID);
+    seedRenamedProjectDraft(RELOAD_START_ID, RELOAD_CUSTOM_ID);
     markVisited();
 
     expect(listDrafts()).toHaveLength(1);
-    expect(listDrafts()[0]?.projectKey).toBe(RELOAD_BASE_ID);
+    expect(listDrafts()[0]?.projectKey).toBe(RELOAD_START_ID);
 
     // ---- The exact boot sequence main.tsx's mountApp() runs BEFORE React
     // ever mounts, per that file:
@@ -208,7 +208,7 @@ describe("StudioShell — bare reload of a renamed project does not duplicate th
     // which (unlike resumeProject) never touches the active-project pointer
     // on success.
     const activeProjectKey = resolveActiveProjectKey();
-    expect(activeProjectKey).toBe(RELOAD_BASE_ID);
+    expect(activeProjectKey).toBe(RELOAD_START_ID);
     const applied = loadDraft(activeProjectKey!);
     expect(applied).toBe(true);
 
@@ -216,7 +216,7 @@ describe("StudioShell — bare reload of a renamed project does not duplicate th
     // key — exactly the condition that makes installDraftAutosave's own
     // key-change migration the only thing standing between this path and a
     // duplicate row.
-    expect(resolveActiveProjectKey()).toBe(RELOAD_BASE_ID);
+    expect(resolveActiveProjectKey()).toBe(RELOAD_START_ID);
 
     // A bare reload lands wherever the browser's own hash already was — no
     // navigateTo call, no Resume click, no #profile round trip.
@@ -229,13 +229,13 @@ describe("StudioShell — bare reload of a renamed project does not duplicate th
 
     const entries = listDrafts();
     // EXPECTED (the fix's "covered for free" claim): still exactly one row,
-    // now keyed on the post-rename id, with the stale RELOAD_BASE_ID record gone —
+    // now keyed on the post-rename id, with the stale RELOAD_START_ID record gone —
     // via installDraftAutosave's own migration, triggered purely by
     // SurveyView's mount effect deriving RELOAD_CUSTOM_ID from the loadDraft()-
     // restored working copy, with no click anywhere in this test.
     expect(entries).toHaveLength(1);
     expect(entries[0]?.projectKey).toBe(RELOAD_CUSTOM_ID);
-    expect(localStorage.getItem(draftKey(RELOAD_BASE_ID))).toBeNull();
+    expect(localStorage.getItem(draftKey(RELOAD_START_ID))).toBeNull();
 
     const rawIndex = JSON.parse(localStorage.getItem(DRAFT_INDEX_KEY) ?? "[]") as Array<{
       projectKey: string;

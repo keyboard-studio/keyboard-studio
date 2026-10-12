@@ -130,7 +130,7 @@ const ConvenienceCharsStep: ComponentType<DecisionRendererProps<RetainedConvenie
   const setStatus = useSurveyAnswerStore((s) => s.setStatus);
   const glyphFontStack = useGlyphFontStack();
 
-  // The working copy, not baseIr: carve operates on `ir`, so the letters on
+  // The working copy, not startIr: carve operates on `ir`, so the letters on
   // offer must be the ones carve will actually see. (Carve's own deletions are
   // an overlay, not an IR mutation, so re-entering this step after a carve
   // pass still offers the same list.)

@@ -25,34 +25,34 @@ export function useDocMemberStates(): DocMemberState[] {
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const helpDocs = useWorkingCopyStore((s) => s.helpDocs);
   const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
-  const baseWelcomeHtmText = useWorkingCopyStore((s) => s.baseWelcomeHtmText);
-  const baseHelpPhpText = useWorkingCopyStore((s) => s.baseHelpPhpText);
-  const baseReadmeMdText = useWorkingCopyStore((s) => s.baseReadmeMdText);
-  const baseHistoryMdText = useWorkingCopyStore((s) => s.baseHistoryMdText);
-  const baseWelcomeImages = useWorkingCopyStore((s) => s.baseWelcomeImages);
-  const baseWelcomeImagesDropped = useWorkingCopyStore((s) => s.baseWelcomeImagesDropped);
+  const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
+  const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
+  const startReadmeMdText = useWorkingCopyStore((s) => s.startReadmeMdText);
+  const startHistoryMdText = useWorkingCopyStore((s) => s.startHistoryMdText);
+  const startWelcomeImages = useWorkingCopyStore((s) => s.startWelcomeImages);
+  const startWelcomeImagesDropped = useWorkingCopyStore((s) => s.startWelcomeImagesDropped);
   const identity = useWorkingCopyStore((s) => s.identity);
-  const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
 
   return useMemo(() => {
-    const carriedNames = welcomeFolderFileNames(baseWelcomeImages);
+    const carriedNames = welcomeFolderFileNames(startWelcomeImages);
     const missingInheritedImages =
-      baseWelcomeHtmText !== null ? missingInheritedImageRefs(baseWelcomeHtmText, carriedNames) : [];
+      startWelcomeHtmText !== null ? missingInheritedImageRefs(startWelcomeHtmText, carriedNames) : [];
     const states = deriveDocMemberStates({
       instantiationMode,
       helpDocs,
       historyEntryState,
       base: {
-        welcomeHtmText: baseWelcomeHtmText,
-        helpPhpText: baseHelpPhpText,
-        readmeMdText: baseReadmeMdText,
-        historyMdText: baseHistoryMdText,
+        welcomeHtmText: startWelcomeHtmText,
+        helpPhpText: startHelpPhpText,
+        readmeMdText: startReadmeMdText,
+        historyMdText: startHistoryMdText,
         hasWelcomeImages: carriedNames.length > 0,
       },
-      keyboardId: resolveOutputKeyboardId(identity, baseKeyboard),
+      keyboardId: resolveOutputKeyboardId(identity, startKeyboard),
       missingInheritedImages,
     });
-    if (!baseWelcomeImagesDropped) return states;
+    if (!startWelcomeImagesDropped) return states;
     // The same loss the projection names in its warnings, on the row it affects.
     return states.map((s) =>
       s.member === "welcome-htm" ? { ...s, warnings: [...s.warnings, WELCOME_IMAGES_DROPPED_WARNING] } : s,
@@ -61,13 +61,13 @@ export function useDocMemberStates(): DocMemberState[] {
     instantiationMode,
     helpDocs,
     historyEntryState,
-    baseWelcomeHtmText,
-    baseHelpPhpText,
-    baseReadmeMdText,
-    baseHistoryMdText,
-    baseWelcomeImages,
-    baseWelcomeImagesDropped,
+    startWelcomeHtmText,
+    startHelpPhpText,
+    startReadmeMdText,
+    startHistoryMdText,
+    startWelcomeImages,
+    startWelcomeImagesDropped,
     identity,
-    baseKeyboard,
+    startKeyboard,
   ]);
 }

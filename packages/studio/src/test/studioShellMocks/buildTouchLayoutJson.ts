@@ -3,7 +3,7 @@
 // assignments it was given, so a test can assert what reached the working copy.
 
 export const buildTouchLayoutJson = (
-  _baseIr: unknown,
+  _startIr: unknown,
   assignments: Array<{ target: string; mechanisms: Array<{ patternId: string; slotValues?: Record<string, string> }> }>,
 ) => ({
   json: JSON.stringify({ _mock: true, assignments }),

@@ -11,13 +11,13 @@
 //      decision since spec 090 T011 — see the readers below.)
 //   2. The FR-023 likely-host resolution ORDER: (a) the author's layout_family
 //      answer, refined by bcp47 region where coarse (qwerty + en-GB → UK
-//      English); (b) `likelyHostLayouts(bcp47[])` when the question is
+//      English); (b) `likelyBaseLayouts(bcp47[])` when the question is
 //      unanswered; (c) the five reference hosts when no signal exists.
 //
-// T011 owns the reference data (`packages/studio/src/lib/referenceHostLayouts.ts`:
-// `likelyHostLayouts`, the versioned region→layout table, the rich host maps).
+// T011 owns the reference data (`packages/studio/src/lib/referenceBaseLayouts.ts`:
+// `likelyBaseLayouts`, the versioned region→layout table, the rich host maps).
 // This module consumes that resolver directly — it never reimplements the
-// table. `setLikelyHostDeps` remains as a test seam overriding the default.
+// table. `setLikelyBaseDeps` remains as a test seam overriding the default.
 
 import { useMemo } from "react";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
@@ -25,11 +25,11 @@ import { peekDecision, useDecisionStore } from "../stores/decisionStore.ts";
 import type { StepAnswers, StepId } from "../steps/answerTypes.ts";
 // T011's reference module — consumed, never reimplemented.
 import {
-  HOST_LAYOUTS,
-  REFERENCE_HOST_IDS,
-  likelyHostLayouts as t011LikelyHostLayouts,
-} from "./referenceHostLayouts.ts";
-import type { HostLayoutId, LayoutFamilyAnswer } from "./referenceHostLayouts.ts";
+  BASE_LAYOUTS,
+  REFERENCE_BASE_IDS,
+  likelyBaseLayouts as t011LikelyBaseLayouts,
+} from "./referenceBaseLayouts.ts";
+import type { BaseLayoutId, LayoutFamilyAnswer } from "./referenceBaseLayouts.ts";
 import { windowsLayoutById } from "./windowsLayouts.ts";
 import type { WindowsLayout } from "./windowsLayouts.ts";
 
@@ -131,12 +131,12 @@ export function saveLayoutFamilyAnswer(value: LayoutFamilyValue | undefined, scr
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal host-layout reference. T011's richer HostLayout type must be
+ * Minimal host-layout reference. T011's richer BaseLayout type must be
  * assignable to this shape (id + label); the resolution order only needs
  * identity and an author-facing label.
  */
-export interface HostLayoutRef {
-  /** Stable id — T011's referenceHostLayouts.ts owns the canonical ids. */
+export interface BaseLayoutRef {
+  /** Stable id — T011's referenceBaseLayouts.ts owns the canonical ids. */
   id: string;
   /** Author-facing label, e.g. "UK English". */
   label: string;
@@ -144,48 +144,48 @@ export interface HostLayoutRef {
 
 /**
  * The five FR-023 reference hosts in canonical order (ruling A3). Labels come
- * from T011's HOST_LAYOUTS — this module owns no host data of its own.
+ * from T011's BASE_LAYOUTS — this module owns no host data of its own.
  */
-export const REFERENCE_HOSTS: readonly HostLayoutRef[] = REFERENCE_HOST_IDS.map((id) => ({
+export const REFERENCE_BASES: readonly BaseLayoutRef[] = REFERENCE_BASE_IDS.map((id) => ({
   id,
-  label: HOST_LAYOUTS[id].label,
+  label: BASE_LAYOUTS[id].label,
 }));
 
 /**
- * T011's contract: `packages/studio/src/lib/referenceHostLayouts.ts`.
+ * T011's contract: `packages/studio/src/lib/referenceBaseLayouts.ts`.
  * Injected only by tests; production resolves through T011's module directly.
  */
-export interface LikelyHostDeps {
+export interface LikelyBaseDeps {
   /** T011: resolves bcp47 tags through the versioned region→layout mapping. */
-  likelyHostLayouts: (bcp47: string[]) => HostLayoutRef[];
-  /** T011: the full reference-host records; defaults to REFERENCE_HOSTS. */
-  referenceHosts?: readonly HostLayoutRef[];
+  likelyBaseLayouts: (bcp47: string[]) => BaseLayoutRef[];
+  /** T011: the full reference-host records; defaults to REFERENCE_BASES. */
+  referenceBases?: readonly BaseLayoutRef[];
   /**
    * Maps a layout_family answer through T011's versioned table, refining
    * coarse answers by bcp47 region (qwerty + en-GB → UK English).
    */
-  layoutFamilyHosts?: (answer: LayoutFamilyValue, bcp47: string[]) => HostLayoutRef[];
+  layoutFamilyBases?: (answer: LayoutFamilyValue, bcp47: string[]) => BaseLayoutRef[];
 }
 
-function toRefs(ids: readonly HostLayoutId[]): HostLayoutRef[] {
-  return ids.map((id) => ({ id, label: HOST_LAYOUTS[id].label }));
+function toRefs(ids: readonly BaseLayoutId[]): BaseLayoutRef[] {
+  return ids.map((id) => ({ id, label: BASE_LAYOUTS[id].label }));
 }
 
-let likelyHostDepsOverride: LikelyHostDeps | undefined;
+let likelyBaseDepsOverride: LikelyBaseDeps | undefined;
 
 /**
  * Override the T011-backed default resolution — primarily a test seam.
  * Production code resolves through T011's module directly.
  */
-export function setLikelyHostDeps(deps: LikelyHostDeps | undefined): void {
-  likelyHostDepsOverride = deps;
+export function setLikelyBaseDeps(deps: LikelyBaseDeps | undefined): void {
+  likelyBaseDepsOverride = deps;
 }
 
-export type LikelyHostSource = "layout-family" | "bcp47" | "default";
+export type LikelyBaseSource = "layout-family" | "bcp47" | "default";
 
-export interface LikelyHostResolution {
-  hosts: HostLayoutRef[];
-  source: LikelyHostSource;
+export interface LikelyBaseResolution {
+  hosts: BaseLayoutRef[];
+  source: LikelyBaseSource;
 }
 
 /**
@@ -193,40 +193,40 @@ export interface LikelyHostResolution {
  * the five reference hosts.
  *
  * Without injected deps this delegates the order to T011's
- * `likelyHostLayouts(bcp47, layoutFamilyAnswer)`, which implements the full
+ * `likelyBaseLayouts(bcp47, layoutFamilyAnswer)`, which implements the full
  * order (answer → bcp47 → default); the source is derived from which inputs
  * T011 could have consumed. With injected deps (tests) the three steps run
  * explicitly against the stub.
  */
-export function resolveLikelyHostLayouts(opts: {
+export function resolveLikelyBaseLayouts(opts: {
   layoutFamily: LayoutFamilyValue | undefined;
   bcp47: string[];
-  deps?: LikelyHostDeps;
+  deps?: LikelyBaseDeps;
   /**
    * Reference host id of the layout the author picked on the layout step, when
    * the pick IS one of the five reference hosts: the exact answer, ahead of
    * any family or language-tag inference (spec 076 A4).
    */
-  pickedHost?: HostLayoutId | undefined;
-}): LikelyHostResolution {
-  if (opts.pickedHost !== undefined) {
-    return { hosts: toRefs([opts.pickedHost]), source: "layout-family" };
+  pickedBase?: BaseLayoutId | undefined;
+}): LikelyBaseResolution {
+  if (opts.pickedBase !== undefined) {
+    return { hosts: toRefs([opts.pickedBase]), source: "layout-family" };
   }
-  const deps = opts.deps ?? likelyHostDepsOverride;
+  const deps = opts.deps ?? likelyBaseDepsOverride;
   if (deps === undefined) return resolveWithT011(opts.layoutFamily, opts.bcp47);
 
-  const reference = deps.referenceHosts ?? REFERENCE_HOSTS;
+  const reference = deps.referenceBases ?? REFERENCE_BASES;
 
   // (a) The author's answer is primary — via T011's versioned table.
-  if (opts.layoutFamily !== undefined && deps.layoutFamilyHosts !== undefined) {
-    const hosts = deps.layoutFamilyHosts(opts.layoutFamily, opts.bcp47);
+  if (opts.layoutFamily !== undefined && deps.layoutFamilyBases !== undefined) {
+    const hosts = deps.layoutFamilyBases(opts.layoutFamily, opts.bcp47);
     if (hosts.length > 0) return { hosts: [...hosts], source: "layout-family" };
     // A table miss falls through to bcp47 inference — never to silence.
   }
 
   // (b) Language-tag inference when the question is unanswered (or the table missed).
-  if (deps.likelyHostLayouts !== undefined) {
-    const hosts = deps.likelyHostLayouts(opts.bcp47);
+  if (deps.likelyBaseLayouts !== undefined) {
+    const hosts = deps.likelyBaseLayouts(opts.bcp47);
     if (hosts.length > 0) return { hosts: [...hosts], source: "bcp47" };
   }
 
@@ -245,9 +245,9 @@ export function resolveLikelyHostLayouts(opts: {
 function resolveWithT011(
   layoutFamily: LayoutFamilyValue | undefined,
   bcp47: string[],
-): LikelyHostResolution {
-  const hosts = toRefs(t011LikelyHostLayouts(bcp47, layoutFamily));
-  const source: LikelyHostSource =
+): LikelyBaseResolution {
+  const hosts = toRefs(t011LikelyBaseLayouts(bcp47, layoutFamily));
+  const source: LikelyBaseSource =
     layoutFamily !== undefined && layoutFamily !== "non-roman"
       ? "layout-family"
       : bcp47.length > 0
@@ -261,17 +261,17 @@ function resolveWithT011(
  * closed-keyboard card): the stored layout_family answer is read first, per
  * the FR-023 order, through T011's resolver.
  */
-export function useLikelyHostLayouts(bcp47: string | undefined): LikelyHostResolution {
+export function useLikelyBaseLayouts(bcp47: string | undefined): LikelyBaseResolution {
   const layoutFamily = useLayoutFamilyAnswer();
   const pick = usePickedWindowsLayout();
-  const pickedHost = pick?.host;
+  const pickedBase = pick?.host;
   return useMemo(
     () =>
-      resolveLikelyHostLayouts({
+      resolveLikelyBaseLayouts({
         layoutFamily,
         bcp47: bcp47 === undefined ? [] : [bcp47],
-        pickedHost,
+        pickedBase,
       }),
-    [layoutFamily, pickedHost, bcp47],
+    [layoutFamily, pickedBase, bcp47],
   );
 }

@@ -267,7 +267,7 @@ function baseEntry(entryId: string, startingKeyCount: number): DecisionEntry {
     stepId: "choose_base",
     payload: {
       kind: "base-contribution",
-      baseId: "basic_kbdfr",
+      startId: "basic_kbdfr",
       baseDisplayName: "French",
       startingKeyCount,
       derivedAxes: [],
@@ -408,7 +408,7 @@ describe("FR-023 — a stage's one-line account, available without expanding", (
   //
   // Fix: `trail.stage.rollUp.composed` now carries a single, genuinely GENERIC
   // meaning — "{stage} ({detail})" — mirroring
-  // `trail.entry.headline.baseContribution.withDetail`'s established pattern.
+  // `trail.entry.headline.startContribution.withDetail`'s established pattern.
   // Each branch pre-formats its own already-pluralized clause (via its own
   // distinct id) before handing it to `detail`, so one id can honestly serve
   // all three without merging distinct meanings.

@@ -33,10 +33,10 @@ installMechanismGalleryHooks();
 
 describe("MechanismGallery — already-produced section", () => {
   it("does not render the already-produced toggle when alreadyProduced is empty", async () => {
-    // baseIr is null => alreadyProduced === [].
+    // startIr is null => alreadyProduced === [].
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
     expect(
       screen.queryByRole("button", { name: /characters already covered/i }),
@@ -76,7 +76,7 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
 
     // "z" stays in lettersToAdd (not produced at all); "Û" is composable, so
     // useInventoryDiff folds it into alreadyProduced (green badge) even
@@ -84,7 +84,7 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     seedInventory(["z", "Û"]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     // Jump to "Û" via its char-scroll-strip chip (U+00DB) — reachable even
@@ -127,11 +127,11 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
     seedInventory(["y", "z"]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     collectCharContributorsSpy.mockImplementationOnce(() => ({
@@ -184,14 +184,14 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
 
     // "y" stays in lettersToAdd (starting currentChar); "z" is directly
     // produced (green) via ruleZ above.
     seedInventory(["y", "z"]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     // Override collectCharContributors for exactly the NEXT call (currentChar
@@ -269,11 +269,11 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
     seedInventory(["y", "z"]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     collectCharContributorsSpy.mockImplementationOnce(() =>
@@ -319,11 +319,11 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
     seedInventory(["y", "z"]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     collectCharContributorsSpy.mockImplementationOnce(() =>
@@ -377,11 +377,11 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
     ]);
     useWorkingCopyStore
       .getState()
-      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
     seedInventory(["y", "z"]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedStartKeyboard={basicKbdus} />);
     });
 
     collectCharContributorsSpy.mockImplementationOnce(() =>

@@ -36,7 +36,7 @@
 // Out of scope (§16): none of these methods build a wordlist or prediction
 // model. Discovery enumerates characters only.
 
-import type { BaseKeyboard } from "./baseKeyboard";
+import type { StartKeyboard } from "./startKeyboard";
 import type { LinguistInventory } from "./linguistInventory";
 
 /**
@@ -117,7 +117,7 @@ export interface CharacterDiscoveryService {
    * @returns Harvested characters, highest-frequency first.
    * @see spec.md §8 step 4
    */
-  harvestFromText(sample: string, base: BaseKeyboard): Promise<InventoryChar[]>;
+  harvestFromText(sample: string, base: StartKeyboard): Promise<InventoryChar[]>;
 
   /**
    * The orthography / authoritative-source method, realized as the LLM linguist
@@ -167,7 +167,7 @@ export interface CharacterDiscoveryService {
    * @see spec.md §8 step 4
    */
   pickerCandidates(
-    base: BaseKeyboard,
+    base: StartKeyboard,
     bcp47?: string
   ): Promise<InventoryChar[]>;
 }

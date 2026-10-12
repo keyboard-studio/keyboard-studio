@@ -111,9 +111,9 @@ export interface CharacterMapGroup {
   /**
    * true when this group's block contains at least one character the base
    * keyboard actually produces (via producedGlyphs); the studio's "blocks my
-   * keyboard uses" filter shows only usedByBase groups.
+   * keyboard uses" filter shows only usedByStart groups.
    */
-  usedByBase: boolean;
+  usedByStart: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -805,7 +805,7 @@ function groupByBlock(
     tier,
     cells,
     script,
-    usedByBase: cells.some((c) => produced.has(c.char.normalize("NFC"))),
+    usedByStart: cells.some((c) => produced.has(c.char.normalize("NFC"))),
   }));
 }
 
@@ -873,7 +873,7 @@ function taggedByCodepointAscending(a: ScriptTaggedChar, b: ScriptTaggedChar): n
  * their digits, then their punctuation/symbols — grouped by (script, Unicode
  * block name), deduplicated globally (first tier to introduce a char wins).
  *
- * @param baseIr      Parsed KeyboardIR of the working-copy base. When `bcp47`
+ * @param startIr      Parsed KeyboardIR of the working-copy base. When `bcp47`
  *                    is omitted, its first header.bcp47 tag is used to resolve
  *                    CLDR exemplars and the target script. May be null when
  *                    no base is available yet — the function then degrades to
@@ -897,7 +897,7 @@ function taggedByCodepointAscending(a: ScriptTaggedChar, b: ScriptTaggedChar): n
  *                    injection seam.
  */
 export async function buildCharacterMap(
-  baseIr: KeyboardIR | null,
+  startIr: KeyboardIR | null,
   bcp47?: string,
   languageName?: string,
   opts?: { baseScripts?: readonly string[]; loader?: CldrFullLoader },
@@ -916,14 +916,14 @@ export async function buildCharacterMap(
   }
 
   // Static extraction of the base keyboard's own produced glyphs — drives
-  // each group's `usedByBase` flag (see CharacterMapGroup), which the
+  // each group's `usedByStart` flag (see CharacterMapGroup), which the
   // studio's "blocks my keyboard uses" filter narrows to. Empty (not
   // computed) when there's no base to derive it from.
   const produced = new Set<string>(
-    baseIr === null ? [] : producedGlyphs(baseIr).map((c) => c.normalize("NFC")),
+    startIr === null ? [] : producedGlyphs(startIr).map((c) => c.normalize("NFC")),
   );
 
-  const effectiveBcp47 = bcp47 ?? baseIr?.header.bcp47[0];
+  const effectiveBcp47 = bcp47 ?? startIr?.header.bcp47[0];
   const targetScript = resolveScript(effectiveBcp47);
 
   // Enumeration set: target script (if resolved), then caller-declared base

@@ -15,7 +15,7 @@
 //      dropUnbackedBitmapStore -> stripDanglingAssetStores -> parseKmn ->
 //      recognizePatterns -> parseTouchLayout -> classifyRemovalCapabilities
 //      chain useKeyboardArtifact runs before it fires onInstantiate, then
-//      workingCopyStore.instantiateFromBase.
+//      workingCopyStore.instantiateFromStart.
 //   2. Carve one character — irToCharacterView resolves its contributors and
 //      workingCopyStore.cascadeDelete records them, as CarveGalleryV2's
 //      toggleCell does.
@@ -58,7 +58,7 @@ import { unzipSync } from "fflate";
 import {
   buildProducedSet,
   createVirtualFS,
-  type BaseKeyboard,
+  type StartKeyboard,
   type KeyboardIR,
   type MechanismAssignment,
   type TouchAssignment,
@@ -130,9 +130,9 @@ function readText(vfs: VirtualFS, path: string): string | undefined {
 /**
  * Instantiate the working copy exactly as the studio's open-base run does
  * (useKeyboardArtifact's fetch branch, then its parse branch, then
- * onInstantiate -> instantiateFromBase).
+ * onInstantiate -> instantiateFromStart).
  */
-async function instantiateLikeStudio(base: BaseKeyboard): Promise<void> {
+async function instantiateLikeStudio(base: StartKeyboard): Promise<void> {
   const vfs = createVirtualFS();
   await fetchKeyboardSourceToVfs(base, vfs, { proxyBase: PROXY, fetchImpl: fixtureFetch });
 
@@ -153,7 +153,7 @@ async function instantiateLikeStudio(base: BaseKeyboard): Promise<void> {
   }
   const removalCapabilities = classifyRemovalCapabilities(ir);
 
-  useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir, removalCapabilities });
+  useWorkingCopyStore.getState().instantiateFromStart(base, { vfs, ir, removalCapabilities });
 }
 
 /** CarveGalleryV2.toggleCell for one character. Returns the ids it cascaded. */
@@ -175,13 +175,13 @@ function carveCharacter(ch: string): string[] {
 function completeTouchStep(assignments: TouchAssignment[]): void {
   const s = useWorkingCopyStore.getState();
   const mods =
-    s.baseIr === null
+    s.startIr === null
       ? { removals: [], placements: [] }
-      : deriveDesktopModifications(s.baseIr, s.deletedNodeIds, s.deletedItemIds, s.phaseResults);
+      : deriveDesktopModifications(s.startIr, s.deletedNodeIds, s.deletedItemIds, s.phaseResults);
   applyTouchCompletionEffects({
     assignments,
-    baseIr: s.baseIr,
-    baseVfs: s.baseVfs,
+    startIr: s.startIr,
+    startVfs: s.startVfs,
     mods,
     seedSource: selectTouchSeedSource(getDecisionSnapshot()),
   });
@@ -193,7 +193,7 @@ function completeTouchStep(assignments: TouchAssignment[]): void {
 
 interface WalkCase {
   label: string;
-  base: BaseKeyboard;
+  base: StartKeyboard;
   /** Author-chosen identity (the walk always names the keyboard). */
   identity: { keyboardId: string; displayName: string; bcp47: string };
   /** A character the base produces that the author discards. */
@@ -201,10 +201,10 @@ interface WalkCase {
   /** A character the base does NOT produce, placed on the desktop. */
   newChar: string;
   desktopAssignment: MechanismAssignment;
-  touchHostKey: string;
+  touchBaseKey: string;
 }
 
-function baseKeyboard(id: string, script: string, displayName: string): BaseKeyboard {
+function startKeyboard(id: string, script: string, displayName: string): StartKeyboard {
   return {
     id,
     path: `release/basic/${id}`,
@@ -212,13 +212,13 @@ function baseKeyboard(id: string, script: string, displayName: string): BaseKeyb
     targets: ["windows", "macosx", "linux", "web", "mobile", "tablet"],
     displayName,
     version: "1.0",
-  } as BaseKeyboard;
+  } as StartKeyboard;
 }
 
 const CASES: WalkCase[] = [
   {
     label: "Latin — basic_kbdus",
-    base: baseKeyboard("basic_kbdus", "Latn", "US Basic"),
+    base: startKeyboard("basic_kbdus", "Latn", "US Basic"),
     identity: { keyboardId: "oracle_walk_latn", displayName: "Oracle Walk Latin", bcp47: "en" },
     carve: "~",
     newChar: "é",
@@ -243,11 +243,11 @@ const CASES: WalkCase[] = [
       ],
       source: "user",
     },
-    touchHostKey: "K_E",
+    touchBaseKey: "K_E",
   },
   {
     label: "Cyrillic — basic_kbdru",
-    base: baseKeyboard("basic_kbdru", "Cyrl", "Russian Basic"),
+    base: startKeyboard("basic_kbdru", "Cyrl", "Russian Basic"),
     identity: { keyboardId: "oracle_walk_cyrl", displayName: "Oracle Walk Cyrillic", bcp47: "kk-Cyrl" },
     carve: "ё",
     newChar: "ә",
@@ -265,7 +265,7 @@ const CASES: WalkCase[] = [
       ],
       source: "user",
     },
-    touchHostKey: "K_F",
+    touchBaseKey: "K_F",
   },
 ];
 
@@ -328,8 +328,8 @@ describe("MVP walk compile oracle — the blocking-diagnostic filter is not vacu
 
         // --- 1. instantiate -------------------------------------------------
         await instantiateLikeStudio(c.base);
-        const baseIr = useWorkingCopyStore.getState().baseIr!;
-        const baseProduced = buildProducedSet(baseIr);
+        const startIr = useWorkingCopyStore.getState().startIr!;
+        const baseProduced = buildProducedSet(startIr);
         // Preconditions that keep the edits meaningful.
         expect(baseProduced.has(c.carve), `base must produce the carved "${c.carve}"`).toBe(true);
         expect(baseProduced.has(c.newChar), `base must NOT already produce "${c.newChar}"`).toBe(false);
@@ -354,7 +354,7 @@ describe("MVP walk compile oracle — the blocking-diagnostic filter is not vacu
           mechanisms: [
             {
               patternId: "longpress_alternates",
-              slotValues: { hostKey: c.touchHostKey, char: c.newChar, layer: "default" },
+              slotValues: { hostKey: c.touchBaseKey, char: c.newChar, layer: "default" },
             },
           ],
           source: "user",

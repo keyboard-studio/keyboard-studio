@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { unzipSync } from "fflate";
 import { toZip, serializeToZip } from "./zip.js";
-import type { VirtualFSEntry, VirtualFS, BaseKeyboard } from "@keyboard-studio/contracts";
+import type { VirtualFSEntry, VirtualFS, StartKeyboard } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { createScaffolderService } from "../scaffolder/index.js";
 
@@ -237,7 +237,7 @@ group(main) using keys
 + [K_A] > 'a'
 `;
 
-const ZIP_TEST_BASE: BaseKeyboard = {
+const ZIP_TEST_BASE: StartKeyboard = {
   id: "zip_test_base",
   path: "release/z/zip_test_base",
   script: "Latn",

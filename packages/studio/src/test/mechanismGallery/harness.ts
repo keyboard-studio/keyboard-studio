@@ -45,7 +45,7 @@ export function suggestionRowText(): string {
 // Seeders and IR fixtures
 // ---------------------------------------------------------------------------
 
-/** Seed confirmedInventory via Phase B result. baseIr stays null so
+/** Seed confirmedInventory via Phase B result. startIr stays null so
  *  useInventoryDiff returns lettersToAdd === inventory (no diff).
  *
  *  The first-entry intro splash shows until the mechanism gallery intro is
@@ -111,7 +111,7 @@ export function instantiateWorkingCopy(opts: { mnemonic?: boolean; caps?: boolea
   const seedVfs = stubKmnVfs("basic_kbdus", "c test\n");
   const group = opts.caps === true ? mainGroupWithCaps() : mainGroup();
   const ir = makeTestIR([group], opts.mnemonic === true ? [mnemonicStore()] : []);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: seedVfs, ir });
 }
 
 /** Build a `main` group with a single rule under the given vkey/modifiers. */
@@ -134,7 +134,7 @@ export function groupWithModifiers(vkey: string, modifiers: string[]): IRGroup {
 export function instantiateWithModifiersInUse(vkey: string, modifiers: string[]): void {
   const seedVfs = stubKmnVfs("basic_kbdus", "c test\n");
   const ir = makeTestIR([groupWithModifiers(vkey, modifiers)], []);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: seedVfs, ir });
 }
 
 /**

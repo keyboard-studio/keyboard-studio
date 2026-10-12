@@ -94,7 +94,7 @@ export interface FindPanelResult {
   readonly platform: string;
   readonly layerId: string;
   readonly keyId: string;
-  /** The host key's keycap, when it has one worth showing (see `hostLabel` below for why this can be empty). */
+  /** The host key's keycap, when it has one worth showing (see `baseLabel` below for why this can be empty). */
   readonly keycap: string;
   /**
    * Present only for a character-search match — carries `kind`/`direction`/
@@ -132,7 +132,7 @@ export interface FindPanelProps {
 // file's module doc, "Result ordering respects direction")
 // ---------------------------------------------------------------------------
 
-function hostAddressOf(descriptor: TouchMethodDescriptor): string {
+function baseAddressOf(descriptor: TouchMethodDescriptor): string {
   if (descriptor.kind === "tap") return descriptor.id;
   // A longpress/multitap/flick descriptor's `id` is a SUB-entry address
   // (`touchSubKeyAddress`/`touchFlickAddress`) — not something a grid cell
@@ -179,7 +179,7 @@ function collectCharResults(layout: TouchLayoutIR, query: string): FindPanelResu
   return enumerateTouchMethodsForChar(layout, char).map((descriptor) => {
     const parts = parseTouchKeyAddress(descriptor.id);
     return {
-      address: hostAddressOf(descriptor),
+      address: baseAddressOf(descriptor),
       platform: descriptor.platform,
       layerId: descriptor.layer,
       keyId: parts?.keyId ?? descriptor.id,
@@ -276,7 +276,7 @@ export function FindPanel({ layout, ruleIndex, onJumpToResult, label }: FindPane
 
   /** Shared ArrowUp/Down/Home/End/Enter handling — used by BOTH the query input (id/char modes) and the results listbox itself (no-output mode, which has no input). */
   function handleResultsKeyDown(event: ReactKeyboardEvent): void {
-    // Never hijack IME candidate confirmation (mirrors BaseKeyboardPicker.tsx's own guard).
+    // Never hijack IME candidate confirmation (mirrors StartKeyboardPicker.tsx's own guard).
     if (event.nativeEvent.isComposing) return;
     if (results.length === 0 && event.key !== "Enter") return;
 
@@ -416,7 +416,7 @@ export function FindPanel({ layout, ruleIndex, onJumpToResult, label }: FindPane
         {results.map((result, i) => {
           const isActive = i === safeActiveIndex;
           return (
-            // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- APG listbox pattern: keyboard selection happens on the input/listbox (handleResultsKeyDown), never on the individual option; onClick is the redundant pointer affordance (same precedent as BaseKeyboardPicker.tsx / ui/SelectMenu.tsx)
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- APG listbox pattern: keyboard selection happens on the input/listbox (handleResultsKeyDown), never on the individual option; onClick is the redundant pointer affordance (same precedent as StartKeyboardPicker.tsx / ui/SelectMenu.tsx)
             <li
               key={result.address + (result.matchDetail?.id ?? "")}
               id={`${uid}-option-${i}`}

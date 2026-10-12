@@ -2,14 +2,14 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { I18n } from "@lingui/core";
-import { makeBaseKeyboard, type BaseKeyboard, type BaseKeyboardInit } from "@keyboard-studio/contracts";
+import { makeStartKeyboard, type StartKeyboard, type StartKeyboardInit } from "@keyboard-studio/contracts";
 import { buildPrefillRows, buildScriptAlignmentRows } from "./Prefill.tsx";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
 import { _setContentCatalogForTesting, _resetContentI18nForTesting } from "../lib/contentI18n.ts";
 
-function base(overrides: Partial<BaseKeyboardInit> = {}): BaseKeyboard {
-  return makeBaseKeyboard({
+function base(overrides: Partial<StartKeyboardInit> = {}): StartKeyboard {
+  return makeStartKeyboard({
     id: "basic_kbdus",
     path: "release/b/basic_kbdus",
     script: "Latn",

@@ -31,7 +31,7 @@ function makeContext(): ApplyContext {
 function fingerprintStores(): string {
   return JSON.stringify({
     decisions: useDecisionStore.getState().decisions,
-    base: useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
+    base: useWorkingCopyStore.getState().startKeyboard?.id ?? null,
   });
 }
 

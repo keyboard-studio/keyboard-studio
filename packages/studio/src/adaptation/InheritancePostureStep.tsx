@@ -92,7 +92,7 @@ export function InheritancePostureStep({
   useEffect(() => {
     setChoices(Object.fromEntries(governed.map((e) => [e.facet, e.posture])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posture.baseId]);
+  }, [posture.startId]);
 
   function confirm() {
     // Record exactly one event per governed facet (FR-007 / SC-006). The default
@@ -117,7 +117,7 @@ export function InheritancePostureStep({
         source: action === "confirmed" ? "confirmed" : "overridden",
       };
     });
-    onConfirm({ baseId: posture.baseId, entries: resolvedEntries });
+    onConfirm({ startId: posture.startId, entries: resolvedEntries });
   }
 
   // Spec 081: Back and "Confirm and continue" live in the studio footer. No

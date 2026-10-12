@@ -58,7 +58,7 @@ export function hex4(id: number): string {
  *   applyMutatePatch/DEADKEY_WRITES. The caller then calls setWorkingIR.
  */
 export function commitDeadkeyResult(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   result: DeadkeyMutationResult,
 ): DeadkeyCommit {
   if (!result.ok) {
@@ -67,7 +67,7 @@ export function commitDeadkeyResult(
   return {
     ok: true,
     ir: applyMutatePatch(
-      baseIr,
+      startIr,
       { groups: result.ir.groups, stores: result.ir.stores },
       DEADKEY_WRITES,
     ),
@@ -77,14 +77,14 @@ export function commitDeadkeyResult(
 /**
  * Commit a studio-side deadkey IR edit (pairs, author name, merge, repair)
  * through the same mutate seam. `next` must be a fresh IR derived from
- * `baseIr`; only its groups[]/stores[] are taken as the patch.
+ * `startIr`; only its groups[]/stores[] are taken as the patch.
  */
 export function commitDeadkeyEdit(
-  baseIr: KeyboardIR,
+  startIr: KeyboardIR,
   next: KeyboardIR,
 ): KeyboardIR {
   return applyMutatePatch(
-    baseIr,
+    startIr,
     { groups: next.groups, stores: next.stores, raw: next.raw },
     DEADKEY_WRITES,
   );
@@ -270,16 +270,16 @@ export function withMergedDeadkeyPairs(
     );
   }
   const next = structuredClone(ir);
-  const fromBases = storeByName(next, from.baseStore);
+  const fromStarts = storeByName(next, from.baseStore);
   const fromOutputs = storeByName(next, from.outputStore);
   const toBases = storeByName(next, to.baseStore);
   const toOutputs = storeByName(next, to.outputStore);
-  if (!fromBases || !fromOutputs || !toBases || !toOutputs) {
+  if (!fromStarts || !fromOutputs || !toBases || !toOutputs) {
     throw new Error("withMergedDeadkeyPairs: fan-out store lookup failed after clone");
   }
-  const n = Math.min(fromBases.items.length, fromOutputs.items.length);
+  const n = Math.min(fromStarts.items.length, fromOutputs.items.length);
   for (let i = 0; i < n; i++) {
-    const b = fromBases.items[i];
+    const b = fromStarts.items[i];
     const o = fromOutputs.items[i];
     if (b?.kind === "char" && o?.kind === "char") {
       toBases.items.push({ kind: "char", value: b.value });

@@ -107,11 +107,11 @@ function baseLayoutKeyIds(ir: KeyboardIR): ReadonlySet<string> {
  * There is nothing to re-derive here since `baseLayoutKeyIds` only indexes
  * top-level `row.keys` ids, not sub-key ids.
  */
-function stampKey(key: TouchKeyIR, baseIds: ReadonlySet<string>): TouchKeyIR {
+function stampKey(key: TouchKeyIR, startIds: ReadonlySet<string>): TouchKeyIR {
   if (key.provenance === "hand-set") {
     return structuredClone(key);
   }
-  const provenance: TouchKeyProvenance = baseIds.has(key.id)
+  const provenance: TouchKeyProvenance = startIds.has(key.id)
     ? "base-derived"
     : "physical-suggested";
   return { ...structuredClone(key), provenance };
@@ -148,7 +148,7 @@ export function touchSuggest(input: TouchSuggestInput): TouchLayoutIR {
   };
   void _policy; // reserved for the override layer; engine carries the defaults.
 
-  const baseIds = baseLayoutKeyIds(input.physicalIR);
+  const startIds = baseLayoutKeyIds(input.physicalIR);
   const derived = scaffoldTouchLayout(input.physicalIR);
 
   // Stamp provenance on every produced key (pure — fresh structures).
@@ -158,7 +158,7 @@ export function touchSuggest(input: TouchSuggestInput): TouchLayoutIR {
       layers: platform.layers.map((layer) => ({
         ...layer,
         rows: layer.rows.map((row) => ({
-          keys: row.keys.map((key) => stampKey(key, baseIds)),
+          keys: row.keys.map((key) => stampKey(key, startIds)),
         })),
       })),
     })),

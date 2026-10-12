@@ -48,7 +48,7 @@ export interface IdentityLiteResult {
   /**
    * Full BCP47 target tag combining language subtag + normalized script/variant,
    * e.g. "ha-Latn", "hi-Deva", "fr-Latn", "und-fonipa".
-   * Empty string when `languageSubtag` was left blank — `suggestBases()` falls
+   * Empty string when `languageSubtag` was left blank — `suggestStarts()` falls
    * back to script-match ranking in that case.
    */
   bcp47: string;

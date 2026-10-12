@@ -55,7 +55,7 @@ export interface MarkTreatmentAnswer {
 }
 
 /** How the base keyboard produces marked letters, when detectable. */
-export type BaseMarkMechanism = "combining-keystroke" | "precomposed";
+export type StartMarkMechanism = "combining-keystroke" | "precomposed";
 
 /**
  * The prefill each class's answer starts from (FR-009: never an open choice).
@@ -79,7 +79,7 @@ export interface MarkTreatmentPrefill {
     /** Widest attested base count among the class's marks. */
     productivitySpread: number;
     /** The base keyboard's own mechanism, when detectable. */
-    baseMechanism: BaseMarkMechanism | null;
+    baseMechanism: StartMarkMechanism | null;
     /** False when the key budget cannot seat the promoted keys (FR-015). */
     promotionAffordable: boolean;
     /** Plain-language reason, present iff promotionAffordable is false. */

@@ -7,7 +7,7 @@
 // per-character contributor records into the incremental `deletedItemIds`
 // set — but that union is NOT equivalent to a single aggregated-R pass for
 // whole-rule "no rows left" deletion and fully-tainted literal outputs. The
-// projection must therefore union collectTaintedContributors(baseIr,
+// projection must therefore union collectTaintedContributors(startIr,
 // carveChars) over the incremental set, and every artifact (.kmn, .kvks,
 // .keyman-touch-layout) must see that same union.
 //
@@ -215,7 +215,7 @@ describe("projectWorkingCopyVfs — issue #1809 ruling §1 + §11 aggregated car
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set<string>(),
       carveChars: new Set(["ä", "ö"]),
@@ -243,7 +243,7 @@ describe("projectWorkingCopyVfs — issue #1809 ruling §1 + §11 aggregated car
     expect(keys.some((k) => k["id"] === "T_carved_K_Q")).toBe(false);
     expect(keys.find((k) => k["id"] === "K_A")).toMatchObject({ text: "a" });
 
-    // baseIr is never mutated by the projection.
+    // startIr is never mutated by the projection.
     expect(ir).toEqual(irBefore);
   });
 
@@ -254,7 +254,7 @@ describe("projectWorkingCopyVfs — issue #1809 ruling §1 + §11 aggregated car
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set<string>(),
       // No carveChars — the pre-§1 behavior: nothing nominated, no edits.
@@ -280,7 +280,7 @@ describe("projectWorkingCopyVfs — issue #1809 §7 carve/explicit-touch-deletio
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#dkt#0"]),
       carveChars: new Set(["é"]),
@@ -319,7 +319,7 @@ describe("projectWorkingCopyVfs — issue #1809 §7 carve/explicit-touch-deletio
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
-      baseIr: ir,
+      startIr: ir,
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(["store#dkt#0"]),
       carveChars: new Set(["é"]),
