@@ -908,13 +908,12 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
 // ---------------------------------------------------------------------------
 // spec 094 (T042) — test-and-revise loop.
 //
-// Build 1 → open Carve (a full-layout step) from Output's section list → Back
+// Build 1 → open Rules (a full-layout step) from Output's section list → Back
 // to testing (the hash returns to #output without passing any other step) →
 // build 2 → reload, and both builds are still listed. Build 2 is made with no
 // survey step visited after it, so the reload proves Output itself autosaves.
-// The section list shows
-// only steps that recorded a decision, and this walk accepts Rules as-is, so
-// Carve stands in for it. The visit is a round trip, not an edit; the
+// The walk accepts Rules as it was, and the section list still offers it
+// ("Kept as it was"). The visit is a round trip, not an edit; the
 // edit-and-keep and Discard paths are covered by the golden walks
 // (stepHost.goldenWalk.test.tsx).
 // Non-blocking in CI, like the rest of this file.
@@ -933,18 +932,19 @@ test.describe("spec 094: test builds and the revise-from-Output loop", () => {
     await page.goto("/");
   });
 
-  test("T042: build 1, revise Carve and come back, build 2, both survive a reload", async ({ page }) => {
+  test("T042: build 1, revise Rules and come back, build 2, both survive a reload", async ({ page }) => {
     await walkToOutput(page, FIXTURE);
 
     const first = await makeTestBuild(page);
     expect(first.suggestedFilename()).toMatch(/-test-build-1\.kmp$/);
     await expect(page.getByTestId("test-build-list").locator("li")).toHaveCount(1);
 
-    // Open Carve from the section list (a disclosure; expand it if collapsed).
+    // Open Rules from the section list (a disclosure; expand it if collapsed).
     const toggle = page.getByTestId("output-section-list-toggle");
     if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
-    await page.getByTestId("output-section-carve").click();
-    await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId("output-section-rules").click();
+    // Opened from Output, the footer offers "Back to testing" in place of Continue.
+    await expect(page.getByTestId("step-revision-back-to-testing")).toBeVisible({ timeout: 30_000 });
     expect(new URL(page.url()).hash).not.toBe("#output");
 
     // Full-layout step, Output origin: the footer offers "Back to testing".

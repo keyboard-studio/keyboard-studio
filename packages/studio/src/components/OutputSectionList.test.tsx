@@ -61,8 +61,12 @@ afterEach(() => {
   useSurveySessionStore.getState().reset();
 });
 
+const STEP_IDS: ReadonlySet<string> = new Set([
+  "identity", "layout", "choose_base", "track", "characters", "rules", "mechanisms", "touch_seed_source", "touch",
+]);
+
 describe("completedSections", () => {
-  it("keeps walked steps with recorded decisions, in walked order, minus the starting-point steps", () => {
+  it("keeps every finished step in walked order, minus the starting-point steps", () => {
     const entries = [
       surveyEntry("identity"),
       surveyEntry("choose_base"),
@@ -72,12 +76,28 @@ describe("completedSections", () => {
       surveyEntry("rules"),
     ];
     const groups = buildStageGroups({ entries });
-    const ids = completedSections(
+    const sections = completedSections(
       ["identity", "layout", "choose_base", "track", "characters", "rules", "mechanisms", "touch"],
       groups,
-    ).map((s) => s.stepId);
-    // "touch" was visited but nothing was recorded for it; "rules" keeps walked order.
-    expect(ids).toEqual(["identity", "characters", "rules", "mechanisms"]);
+      { activeStepId: "touch_seed_source", stepIds: STEP_IDS },
+    );
+    // "touch" was finished with nothing recorded: listed, with no roll-up.
+    expect(sections.map((s) => s.stepId)).toEqual(["identity", "characters", "rules", "mechanisms", "touch"]);
+    expect(sections.find((s) => s.stepId === "touch")?.group).toBeUndefined();
+  });
+
+  it("leaves out the step the walk is still on, and ids this build has no step for", () => {
+    const sections = completedSections(["characters", "rules", "done", "retired_step"], [], {
+      activeStepId: "rules",
+      stepIds: STEP_IDS,
+    });
+    expect(sections.map((s) => s.stepId)).toEqual(["characters"]);
+  });
+
+  it("keeps the step the walk is on when it has decisions recorded (walked back to it)", () => {
+    const groups = buildStageGroups({ entries: [surveyEntry("rules")] });
+    const sections = completedSections(["rules"], groups, { activeStepId: "rules", stepIds: STEP_IDS });
+    expect(sections.map((s) => s.stepId)).toEqual(["rules"]);
   });
 });
 
@@ -113,6 +133,15 @@ describe("OutputSectionList", () => {
     expect(screen.getByRole("button", { name: "Revise Characters: 2 answers" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Revise Mechanisms: 2 mechanisms assigned" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Revise Rules: 1 answer" })).toBeTruthy();
+  });
+
+  it("lists a step finished without changes as kept as it was", () => {
+    seed([surveyEntry("characters")], ["characters", "rules"]);
+    useSurveySessionStore.setState({ activeStepId: "mechanisms" as never });
+    render(<OutputSectionList />);
+    fireEvent.click(screen.getByRole("button", { name: "Revise a section" }));
+
+    expect(screen.getByRole("button", { name: "Revise Rules: Kept as it was" })).toBeTruthy();
   });
 
   it("opens a section with the return-to-Output seam", () => {

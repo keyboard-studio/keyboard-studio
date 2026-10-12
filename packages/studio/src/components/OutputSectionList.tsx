@@ -7,10 +7,13 @@
 // survey again.
 //
 // Membership and order come from what the author actually did, not from a
-// hand-kept list (constitution Article IX): the steps they walked
-// (`visited`, in walked order) that have decisions recorded. The steps that
-// choose the starting point are left out — revising them would re-instantiate
-// the working copy, which this loop must never do (FR-005).
+// hand-kept list (constitution Article IX): the steps they walked past
+// (`visited`, in walked order), whether or not they changed anything there. A
+// step finished with nothing changed (Rules accepted as it was, say) is as
+// revisable as one with decisions recorded. The step the walk is still on is
+// not finished, and the steps that choose the starting point are left out —
+// revising them would re-instantiate the working copy, which this loop must
+// never do (FR-005).
 //
 // An ARIA APG disclosure: one button toggles the list (docs/accessibility.md).
 
@@ -23,6 +26,7 @@ import { formatClauseList, dimensionLabel } from "../decisions/stageText.ts";
 import { stageLabel, unreachableReasonLabel } from "../decisions/progressDots.ts";
 import { useSurveySessionStore, type ActiveStepId } from "../stores/surveySessionStore.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import { manifest } from "../steps/manifest.ts";
 import { ACCENT, BORDER, TEXT_DIM } from "../ui/theme.ts";
 
 /** Steps that pick the starting point. Revising one would replace the working copy (FR-005). */
@@ -30,30 +34,55 @@ const STARTING_POINT_STEPS: ReadonlySet<string> = new Set(["layout", "choose_bas
 
 export interface OutputSection {
   stepId: string;
-  group: StageGroup;
+  /** Absent when the step was finished with nothing recorded. */
+  group?: StageGroup;
 }
 
-/** The completed, revisable sections, in the order the author walked them. */
+export interface CompletedSectionsScope {
+  /** Where the walk stands; that step is not finished. */
+  activeStepId: string;
+  /** The steps this build has. A visited id outside it (a terminal, a retired step) is not a section. */
+  stepIds: ReadonlySet<string>;
+}
+
+/** The finished, revisable sections, in the order the author walked them. */
 export function completedSections(
   visited: readonly string[],
   groups: readonly StageGroup[],
+  scope: CompletedSectionsScope,
 ): OutputSection[] {
   const byStep = new Map(groups.map((g) => [g.stepId, g]));
   const out: OutputSection[] = [];
   for (const stepId of visited) {
     if (STARTING_POINT_STEPS.has(stepId)) continue;
     const group = byStep.get(stepId);
-    if (group === undefined || group.rollUp.kind === "not-recorded") continue;
-    out.push({ stepId, group });
+    const recorded = group !== undefined && group.rollUp.kind !== "not-recorded";
+    if (recorded) {
+      out.push({ stepId, group });
+      continue;
+    }
+    if (stepId === scope.activeStepId || !scope.stepIds.has(stepId)) continue;
+    out.push({ stepId });
   }
   return out;
 }
 
-export function OutputSectionList() {
-  const { t, i18n } = useLingui();
+/** The live scope: the walk's position and this build's steps. */
+export function useCompletedSections(): OutputSection[] {
   const record = useDecisionLogStore((s) => s.record);
   const visited = useSurveySessionStore((s) => s.visited);
-  const sections = useMemo(() => completedSections(visited, buildStageGroups(record)), [visited, record]);
+  const activeStepId = useSurveySessionStore((s) => s.activeStepId);
+  return useMemo(
+    () => completedSections(visited, buildStageGroups(record), { activeStepId, stepIds: MANIFEST_STEP_IDS }),
+    [visited, record, activeStepId],
+  );
+}
+
+const MANIFEST_STEP_IDS: ReadonlySet<string> = new Set(manifest.map((s) => s.id));
+
+export function OutputSectionList() {
+  const { t, i18n } = useLingui();
+  const sections = useCompletedSections();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const listId = useId();
@@ -61,6 +90,9 @@ export function OutputSectionList() {
   if (sections.length === 0) return null;
 
   const summary = ({ group }: OutputSection): string => {
+    if (group === undefined) {
+      return t({ id: "output.sections.summary.unchanged", message: "Kept as it was" });
+    }
     const rollUp = group.rollUp;
     switch (rollUp.kind) {
       case "editor-summary":

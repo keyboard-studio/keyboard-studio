@@ -11,11 +11,10 @@ import { useId, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { REPORT_TEXT_MAX, useTestingStore } from "../stores/testingStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
-import { buildStageGroups } from "../decisions/stageGroups.ts";
 import { stageLabel } from "../decisions/progressDots.ts";
-import { useSurveySessionStore, type ActiveStepId } from "../stores/surveySessionStore.ts";
+import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
-import { completedSections } from "./OutputSectionList.tsx";
+import { useCompletedSections } from "./OutputSectionList.tsx";
 import { ACCENT, BORDER, TEXT_DIM } from "../ui/theme.ts";
 
 const LINK_STYLE = {
@@ -33,9 +32,7 @@ export function TesterReports() {
   const builds = useTestingStore((s) => s.builds);
   const reports = useTestingStore((s) => s.reports);
   const frozen = useTestingStore((s) => s.frozen);
-  const record = useDecisionLogStore((s) => s.record);
-  const visited = useSurveySessionStore((s) => s.visited);
-  const sections = useMemo(() => completedSections(visited, buildStageGroups(record)), [visited, record]);
+  const sections = useCompletedSections();
 
   const buildNumbers = useMemo(() => [...new Set(builds.map((b) => b.number))], [builds]);
   const latest = buildNumbers[buildNumbers.length - 1];
