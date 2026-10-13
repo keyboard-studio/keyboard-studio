@@ -477,6 +477,23 @@ export function useKeyboardArtifact(
   // A genuinely different base or scaffold target changes the key and runs;
   // retry() calls run() directly and is unaffected.
   const lastFullRunKeyRef = useRef<string | null>(null);
+  // Value key of the last transform re-apply+recompile performed by the
+  // transformVersion effect below (`<transformVersion>|<base id>|<scaffold
+  // keyboardId>|<scaffold displayName>`) — the same value-not-identity
+  // discipline as lastFullRunKeyRef, one effect over. That effect's deps
+  // include scaffoldSpec, which callers re-derive on every render, so an
+  // unchanged transform target arrives as a fresh object identity per
+  // render. Every fire ends in runCompile → setStage, the host re-renders
+  // on the stage change and re-derives the spec, and the effect refires:
+  // once transformVersion is armed the loop needs no further input and is
+  // self-sustaining (#2044 — measured ~6–8 full compiles/second after
+  // carve → Continue, saturating the main thread: the tab "freeze"). The
+  // version is part of the key, so a genuine transform change (which bumps
+  // it) still re-applies; only identity churn is skipped. SurveyView also
+  // memoizes its derivation now — this guard is the defence in depth for
+  // every other caller, the same reason the start effect keeps its guard
+  // even with well-behaved hosts.
+  const lastTransformRunKeyRef = useRef<string | null>(null);
   // Version counter bumped when vfsTransform changes after the first fetch.
   // Drives the re-apply+recompile effect without touching run()'s dep array.
   const [transformVersion, setTransformVersion] = useState(0);
@@ -1070,6 +1087,13 @@ export function useKeyboardArtifact(
   // isFullRun=false: onInstantiate is NOT fired, so no "switching base
   // keyboards" confirmation dialog is triggered by assignment changes.
   useEffect(() => {
+    if (transformVersion === 0) {
+      // A full run resets the version to 0 (see the start effect above), so
+      // version 0 marks a fresh keyboard lifecycle: drop the guard key with
+      // it, so the next keyboard's first re-apply is never compared against
+      // this keyboard's last one.
+      lastTransformRunKeyRef.current = null;
+    }
     if (
       transformVersion === 0 ||
       !hasFetchedRef.current ||
@@ -1078,6 +1102,14 @@ export function useKeyboardArtifact(
     ) {
       return;
     }
+
+    // Value-key guard (see lastTransformRunKeyRef): this exact transform
+    // target has already been re-applied and recompiled — a re-render that
+    // only carries a fresh scaffoldSpec identity (equal values) must not
+    // re-apply or recompile again.
+    const transformRunKey = `${transformVersion}|${startKeyboard.id}|${scaffoldSpec?.keyboardId ?? ""}|${scaffoldSpec?.displayName ?? ""}`;
+    if (lastTransformRunKeyRef.current === transformRunKey) return;
+    lastTransformRunKeyRef.current = transformRunKey;
 
     const keyboardId = scaffoldSpec?.keyboardId ?? startKeyboard.id;
     const transform = vfsTransformRef.current;

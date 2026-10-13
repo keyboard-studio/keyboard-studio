@@ -16,13 +16,24 @@
 //      (scaffold spy stays at 1).
 //   3. A VALUE change (different scaffold keyboardId) starts a new run.
 //   4. retry() bypasses the guard and re-runs for the same value key.
+//
+// #2044: the transformVersion effect had NO such guard. Once a vfsTransform
+// change armed the version, every host re-render carrying a fresh
+// scaffoldSpec identity refired the re-apply+recompile effect, and each
+// compile's stage transitions re-rendered the host — a self-sustaining loop
+// (~6–8 full compiles/second) that froze the tab on carve → Continue. The
+// "transform re-apply refire guard" describe block below pins the value-key
+// guard added there (lastTransformRunKeyRef):
+//   5. Identity churn with equal values does NOT re-apply or recompile.
+//   6. A genuine transform change still re-applies (the guard keys on
+//      transformVersion, so it cannot latch shut).
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { StartKeyboard, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeTestIR, mixedDiagnosticsResult } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { OnInstantiateCallback } from "./useKeyboardArtifact";
+import type { OnInstantiateCallback, VfsTransform } from "./useKeyboardArtifact";
 
 const mockIr = makeTestIR([]);
 
@@ -181,5 +192,96 @@ describe("useKeyboardArtifact — full-run refire guard", () => {
     });
     await settle();
     expect(mockEngine.fetchKeyboardSourceToVfs).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("useKeyboardArtifact — transform re-apply refire guard (#2044)", () => {
+  const makeTransform = () =>
+    vi.fn<Parameters<VfsTransform>, ReturnType<VfsTransform>>(() => ({
+      warnings: [] as string[],
+    }));
+
+  it("does not re-apply or recompile when re-rendered with fresh scaffoldSpec identities but equal values", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+    const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
+    const spec = { keyboardId: "test_kb_copy", displayName: "Test Copy" };
+    const transformA = makeTransform();
+    const transformB = makeTransform();
+
+    const { result, rerender } = renderHook(
+      (props: {
+        spec: { keyboardId: string; displayName: string };
+        transform: VfsTransform;
+      }) => useKeyboardArtifact(baseKb, props.spec, props.transform, onInstantiate),
+      { initialProps: { spec, transform: transformA as VfsTransform } },
+    );
+    await settle();
+    expect(result.current.stage.kind).toBe("ready");
+    // Full run: scaffolded once, transform applied once, compiled once.
+    expect(scaffoldSpy).toHaveBeenCalledTimes(1);
+    expect(transformA).toHaveBeenCalledTimes(1);
+    expect(mockEngine.compile).toHaveBeenCalledTimes(1);
+
+    // A genuine transform change after the fetch arms transformVersion:
+    // the new transform is re-applied and the keyboard recompiled, once.
+    rerender({ spec, transform: transformB as VfsTransform });
+    await settle();
+    expect(transformB).toHaveBeenCalledTimes(1);
+    expect(mockEngine.compile).toHaveBeenCalledTimes(2);
+
+    // Identity churn with equal values — the host's per-render
+    // re-derivation of scaffoldSpec. Pre-fix, each of these rerenders
+    // refired the transform effect: another re-apply and another compile,
+    // and in the live wiring each compile's stage transitions re-rendered
+    // the host, sustaining the loop with no further input. The value-key
+    // guard must hold both counts flat.
+    rerender({ spec: { ...spec }, transform: transformB as VfsTransform });
+    await settle();
+    rerender({
+      spec: { keyboardId: "test_kb_copy", displayName: "Test Copy" },
+      transform: transformB as VfsTransform,
+    });
+    await settle();
+    rerender({ spec: { ...spec }, transform: transformB as VfsTransform });
+    await settle();
+
+    expect(transformB).toHaveBeenCalledTimes(1);
+    expect(mockEngine.compile).toHaveBeenCalledTimes(2);
+    expect(scaffoldSpy).toHaveBeenCalledTimes(1);
+    expect(onInstantiate).toHaveBeenCalledTimes(1);
+  });
+
+  it("still re-applies when the transform changes again after identity churn (guard keys on transformVersion)", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+    const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
+    const spec = { keyboardId: "test_kb_copy", displayName: "Test Copy" };
+    const transformA = makeTransform();
+    const transformB = makeTransform();
+    const transformC = makeTransform();
+
+    const { rerender } = renderHook(
+      (props: {
+        spec: { keyboardId: string; displayName: string };
+        transform: VfsTransform;
+      }) => useKeyboardArtifact(baseKb, props.spec, props.transform, onInstantiate),
+      { initialProps: { spec, transform: transformA as VfsTransform } },
+    );
+    await settle();
+    expect(mockEngine.compile).toHaveBeenCalledTimes(1);
+
+    rerender({ spec, transform: transformB as VfsTransform });
+    await settle();
+    expect(transformB).toHaveBeenCalledTimes(1);
+    expect(mockEngine.compile).toHaveBeenCalledTimes(2);
+
+    // Churn (skipped by the guard), then a genuine transform change: the
+    // version bump changes the guard key, so the re-apply still happens.
+    rerender({ spec: { ...spec }, transform: transformB as VfsTransform });
+    await settle();
+    rerender({ spec: { ...spec }, transform: transformC as VfsTransform });
+    await settle();
+
+    expect(transformC).toHaveBeenCalledTimes(1);
+    expect(mockEngine.compile).toHaveBeenCalledTimes(3);
   });
 });
