@@ -209,6 +209,20 @@ export function CriterionRow({
             {evidenceCheckLine(model)}
           </>
         );
+      case "precertified":
+        return (
+          <>
+            {evidenceLines(model)}
+            {evidenceCheckLine(model)}
+          </>
+        );
+      case "compile":
+        return (
+          <>
+            {evidenceLines(model)}
+            {evidenceCheckLine(model)}
+          </>
+        );
       default: {
         const _exhaustive: never = model.kind;
         return String(_exhaustive);

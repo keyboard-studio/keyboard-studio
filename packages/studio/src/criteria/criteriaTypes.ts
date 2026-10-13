@@ -11,7 +11,11 @@
 // builds its EvidenceModel only when a row is expanded, so mounting the full
 // catalog computes nothing beyond statuses and counts.
 
-import type { Criterion, LintFinding } from "@keyboard-studio/contracts";
+import type {
+  CompileResult,
+  Criterion,
+  LintFinding,
+} from "@keyboard-studio/contracts";
 
 /**
  * Which surface is asking for the judgment. "authored" judges the author's
@@ -90,6 +94,15 @@ export interface CriteriaInput {
    * regardless — a foreign keyboard can never claim precertification.
    */
   precertified?: ReadonlySet<string>;
+  /**
+   * The compile result for the artifact under judgment (Batch 1: the
+   * §7.6/§7.21 severity mapping). Absent or null means no compile ran
+   * for this artifact — the compile rows then resolve Not yet checkable
+   * with that reason, never Met: a compile that did not happen is not a
+   * clean compile. Both hosts supply it from their artifact stage
+   * (stage.compileResult) once the stage is ready.
+   */
+  compileResult?: CompileResult | null;
 }
 
 /**
@@ -102,6 +115,7 @@ export interface EvidenceModel {
   kind:
     | "scaffolder"
     | "precertified"
+    | "compile"
     | "lint-pass"
     | "lint-finding"
     | "not-implemented"

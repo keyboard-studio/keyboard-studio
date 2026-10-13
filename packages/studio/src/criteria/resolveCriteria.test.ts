@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ALL_CRITERIA } from "@keyboard-studio/contracts";
+import { ALL_CRITERIA, makeCompileResult } from "@keyboard-studio/contracts";
 import type { Criterion, LintFinding } from "@keyboard-studio/contracts";
 
 import { EMPTY_CRITERIA_RECORD } from "./criteriaTypes.ts";
@@ -318,6 +318,94 @@ describe("resolveCriteria — attestations and confirmations", () => {
     const redRow = rowFor(firstRed.id, input);
     expect(redRow.status).toBe("needs-human");
     expect(redRow.controls).toBeNull();
+  });
+});
+
+describe("resolveCriteria — compile-result mapping (Batch 1, §§7.6/7.21)", () => {
+  const compileErrors = criterionByLintRuleId("KM_LINT_COMPILE_ERRORS");
+  const compileWarnings = criterionByLintRuleId("KM_LINT_COMPILE_HAS_WARNINGS");
+
+  function compileResult(
+    diagnostics: Array<{ severity: "warning" | "error" | "fatal" | "info" | "hint"; message: string }>,
+    success = true,
+  ) {
+    return makeCompileResult({
+      success,
+      artifacts: [],
+      diagnostics: diagnostics.map((d) => ({
+        code: "KM_ERROR_TEST" as const,
+        layer: "A" as const,
+        severity: d.severity,
+        message: d.message,
+      })),
+      compileMs: 1,
+      isWarmCompile: true,
+    });
+  }
+
+  it("with no compile result, both rows are Not yet checkable — never Met", () => {
+    for (const mode of ["authored", "foreign"] as const) {
+      const input = makeInput({ mode });
+      for (const row of [compileErrors, compileWarnings]) {
+        const resolved = rowFor(row.id, input);
+        expect(resolved.status).toBe("not-yet-checkable");
+        expect(resolved.evidence().kind).toBe("context-missing");
+        expect(resolved.evidence().lines.join(" ")).toContain(
+          "no compile result",
+        );
+      }
+    }
+  });
+
+  it("a clean compile resolves both rows Met", () => {
+    const input = makeInput({ compileResult: compileResult([]) });
+    expect(rowFor(compileErrors.id, input).status).toBe("met");
+    const warnings = rowFor(compileWarnings.id, input);
+    expect(warnings.status).toBe("met");
+    expect(warnings.evidence().kind).toBe("compile");
+  });
+
+  it("a warning-only compile fails 7.6 but passes 7.21", () => {
+    const input = makeInput({
+      compileResult: compileResult([
+        { severity: "warning", message: "Something is off." },
+      ]),
+    });
+    expect(rowFor(compileErrors.id, input).status).toBe("met");
+    const warnings = rowFor(compileWarnings.id, input);
+    expect(warnings.status).toBe("not-met");
+    expect(warnings.evidence().lines).toContain("Something is off.");
+  });
+
+  it("an error compile fails both rows, naming the diagnostic", () => {
+    const input = makeInput({
+      compileResult: compileResult(
+        [{ severity: "error", message: "Bad rule." }],
+        false,
+      ),
+    });
+    for (const row of [compileErrors, compileWarnings]) {
+      const resolved = rowFor(row.id, input);
+      expect(resolved.status).toBe("not-met");
+      expect(resolved.evidence().lines).toContain("Bad rule.");
+    }
+  });
+
+  it("success === false with no diagnostics still fails both rows", () => {
+    const input = makeInput({ compileResult: compileResult([], false) });
+    expect(rowFor(compileErrors.id, input).status).toBe("not-met");
+    expect(rowFor(compileWarnings.id, input).status).toBe("not-met");
+  });
+
+  it("the mapping applies identically in foreign mode", () => {
+    const input = makeInput({
+      mode: "foreign",
+      compileResult: compileResult([
+        { severity: "fatal", message: "Parse fatal." },
+      ]),
+    });
+    expect(rowFor(compileErrors.id, input).status).toBe("not-met");
+    expect(rowFor(compileWarnings.id, input).status).toBe("not-met");
   });
 });
 

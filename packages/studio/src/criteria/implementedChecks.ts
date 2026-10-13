@@ -1,16 +1,35 @@
 // Implemented layer-c lint checks (spec 084).
 //
-// The set of lint codes the resolver treats as actually enforced. It is
-// derived by scanning packages/keyboard-lint/src/checks for the codes
-// emitted as a finding's `code:` literal — the same source-scan method as
-// decisions/gateCoverage.test.ts's registeredLintCodes() — and keeping
-// exactly the scanned codes that are also a catalog criterion's
-// lintRuleId. criteriaCatalog.test.ts re-runs that scan and fails when
-// this set drifts from it.
+// The set of lint codes the resolver treats as actually enforced. It
+// has exactly two sources, and criteriaCatalog.test.ts re-derives both
+// and fails when this set drifts from them:
+//
+//   1. The producer scan: scanning packages/keyboard-lint/src/checks
+//      for the codes emitted as a finding's `code:` literal — the same
+//      source-scan method as decisions/gateCoverage.test.ts's
+//      registeredLintCodes() — keeping the scanned codes that are also
+//      a catalog criterion's lintRuleId.
+//   2. ASSEMBLY_SYNTHESIZED_CODES below: codes no lint check emits,
+//      produced by a named synthesis in the criteria assembly (the
+//      compile-result severity mapping in compileMapping.ts). This is
+//      an explicit named set, not a weakening of the scan: every code
+//      here must name its synthesis, and the test pins the set exactly.
 //
 // Warning: adding a lint check means adding its code here in the same
 // change. Until a code is listed here, its criterion honestly resolves
 // Not yet checkable rather than claiming a pass no check produced.
+
+/**
+ * Codes produced by a named synthesis in the criteria assembly rather
+ * than by a keyboard-lint check: §§7.6/7.21 map the host's compile
+ * result by diagnostic severity (compileMapping.ts). Precertified codes
+ * (precertify.ts) are NOT here — precertification is a separate
+ * resolver mechanism, not an implemented check.
+ */
+export const ASSEMBLY_SYNTHESIZED_CODES: ReadonlySet<string> = new Set([
+  "KM_LINT_COMPILE_HAS_WARNINGS",
+  "KM_LINT_COMPILE_ERRORS",
+]);
 
 /** Lint codes with a real check behind them, mapped to catalog criteria. */
 export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
@@ -59,4 +78,8 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   // .kps text in runCriteriaChecks.
   "KM_LINT_PHP_OSK_LAYERS_INCOMPLETE",
   "KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING",
+  // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
+  // compile-result severity mapping, compileMapping.ts.
+  "KM_LINT_COMPILE_HAS_WARNINGS",
+  "KM_LINT_COMPILE_ERRORS",
 ]);

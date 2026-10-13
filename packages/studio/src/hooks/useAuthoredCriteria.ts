@@ -32,7 +32,7 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
   const attestations = useCriteriaRecordStore((s) => s.attestations);
   const confirmations = useCriteriaRecordStore((s) => s.confirmations);
 
-  const { ready, vfs, lintFindings, contextMissing } = findings;
+  const { ready, vfs, lintFindings, contextMissing, compileResult } = findings;
 
   return useMemo(() => {
     if (!ready || vfs === null) return null;
@@ -47,6 +47,15 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
       // bundle, so the generation-manifest criteria are precertified
       // (precertify.ts). Foreign mode never passes this.
       precertified: PRECERTIFIED_LINT_CODES,
+      compileResult,
     });
-  }, [ready, vfs, lintFindings, contextMissing, attestations, confirmations]);
+  }, [
+    ready,
+    vfs,
+    lintFindings,
+    contextMissing,
+    attestations,
+    confirmations,
+    compileResult,
+  ]);
 }

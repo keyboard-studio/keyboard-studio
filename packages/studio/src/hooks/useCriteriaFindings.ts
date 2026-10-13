@@ -38,7 +38,11 @@
 // degradation, never a fake inventory and never a silent pass.
 
 import { useEffect, useMemo, useState } from "react";
-import type { LintFinding, VirtualFS } from "@keyboard-studio/contracts";
+import type {
+  CompileResult,
+  LintFinding,
+  VirtualFS,
+} from "@keyboard-studio/contracts";
 import { KeyboardLintEngine } from "@keymanapp/keyboard-lint";
 
 import { assembleLintContext } from "../criteria/assembleLintContext.ts";
@@ -78,6 +82,13 @@ export interface CriteriaFindings {
   keyboardId: string | null;
   /** The judged artifact's VFS (null until the stage is ready). */
   vfs: VirtualFS | null;
+  /**
+   * The stage's compile result (Batch 1: the §§7.6/7.21 severity
+   * mapping reads it via CriteriaInput.compileResult). Null until the
+   * stage is ready — the resolver never sees a compile result for an
+   * artifact whose compile has not completed.
+   */
+  compileResult: CompileResult | null;
 }
 
 interface EngineRun {
@@ -110,7 +121,8 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
         // A failed engine run must not wedge the page: report no engine
         // findings for this artifact, but keep the contextMissing map so
         // checks that could not run still resolve Not yet checkable.
-        if (!cancelled) setEngineRun({ forVfs: vfs, findings: [], contextMissing });
+        if (!cancelled)
+          setEngineRun({ forVfs: vfs, findings: [], contextMissing });
       });
     return () => {
       cancelled = true;
@@ -120,7 +132,8 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
   const runIsCurrent = engineRun !== null && engineRun.forVfs === vfs;
 
   const lintFindings = useMemo(
-    () => mergeLintFindings(docFindings, runIsCurrent ? engineRun.findings : []),
+    () =>
+      mergeLintFindings(docFindings, runIsCurrent ? engineRun.findings : []),
     [docFindings, engineRun, runIsCurrent],
   );
 
@@ -130,5 +143,6 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     ready: readyStage !== null && runIsCurrent,
     keyboardId,
     vfs,
+    compileResult: readyStage?.compileResult ?? null,
   };
 }

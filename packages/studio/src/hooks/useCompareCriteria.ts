@@ -45,7 +45,11 @@
 
 import { useEffect, useState } from "react";
 import { ALL_CRITERIA } from "@keyboard-studio/contracts";
-import type { VirtualFS } from "@keyboard-studio/contracts";
+import type {
+  CompileResult,
+  CriteriaPlacement,
+  VirtualFS,
+} from "@keyboard-studio/contracts";
 import { KeyboardLintEngine, runDocChecks } from "@keymanapp/keyboard-lint";
 
 import { assembleLintContext } from "../criteria/assembleLintContext.ts";
@@ -59,29 +63,81 @@ import { collectDocLintInputFromVfs } from "../lib/collectDocLintInputFromVfs.ts
 import type { CompareArtifact } from "./useCompareArtifact.ts";
 import { mergeLintFindings } from "./useCriteriaFindings.ts";
 
+/** Options the Compare host supplies from its artifact (Batch 1). */
+export interface JudgeForeignOptions {
+  /**
+   * The Compare pipeline's compile result for this keyboard (the
+   * §§7.6/7.21 severity mapping). Omitted when no compile ran — the
+   * compile rows then resolve Not yet checkable, never Met.
+   */
+  compileResult?: CompileResult | null;
+  /**
+   * Repository placement from the catalog keyboard's repo path
+   * (§13.1). Defaults to "release" when the path is unknown.
+   */
+  placement?: CriteriaPlacement;
+}
+
+/**
+ * The repository placement a catalog keyboard's repo path states:
+ * `release/…`, `experimental/…`, or `legacy/…` — the first segment is
+ * the keyboards repo's tier folder. Anything else is "unknown".
+ */
+export function placementFromRepoPath(
+  path: string | undefined,
+): CriteriaPlacement {
+  const tier = path?.split("/")[0];
+  if (tier === "release" || tier === "experimental" || tier === "legacy") {
+    return tier;
+  }
+  return "unknown";
+}
+
 /**
  * Judge one foreign keyboard VFS: doc + engine findings, merged, run
  * through the pure resolver in foreign mode. A failed engine run does
  * not discard the judgment: the doc findings still stand, and the
  * contextMissing map keeps the checks that could not run resolving
  * Not yet checkable rather than Met.
+ *
+ * Batch 1: the assembly runs with the foreign flags — scratchScan on
+ * (1.13's CHECK-NOW arm; authored mode precertifies instead and never
+ * scans) and deprecationInPlay on (mirroring the facts below, §§15–16
+ * applicable by default). No precertified set is ever passed here.
  */
 export async function judgeForeignKeyboard(
   vfs: VirtualFS,
   keyboardId: string,
   displayName: string,
+  options: JudgeForeignOptions = {},
 ): Promise<CriteriaResult> {
-  const { ctx, contextMissing } = assembleLintContext({ vfs, keyboardId });
+  const { ctx, contextMissing } = assembleLintContext({
+    vfs,
+    keyboardId,
+    placement: options.placement ?? "release",
+    scratchScan: true,
+    deprecationInPlay: true,
+  });
   const docFindings = runDocChecks(
     collectDocLintInputFromVfs(vfs, keyboardId, displayName),
   );
-  let engineFindings: Awaited<ReturnType<KeyboardLintEngine["lintWithContext"]>> = [];
+  let engineFindings: Awaited<
+    ReturnType<KeyboardLintEngine["lintWithContext"]>
+  > = [];
   try {
-    engineFindings = await new KeyboardLintEngine().lintWithContext(vfs, keyboardId, ctx);
+    engineFindings = await new KeyboardLintEngine().lintWithContext(
+      vfs,
+      keyboardId,
+      ctx,
+    );
   } catch {
     engineFindings = [];
   }
-  const facts = { ...deriveCriteriaFacts(vfs), deprecated: true, partnerPackage: true };
+  const facts = {
+    ...deriveCriteriaFacts(vfs),
+    deprecated: true,
+    partnerPackage: true,
+  };
   return resolveCriteria({
     criteria: ALL_CRITERIA,
     mode: "foreign",
@@ -89,6 +145,7 @@ export async function judgeForeignKeyboard(
     record: EMPTY_CRITERIA_RECORD,
     facts,
     contextMissing,
+    compileResult: options.compileResult ?? null,
   });
 }
 
@@ -110,6 +167,8 @@ export function useCompareCriteria(artifact: CompareArtifact): CompareCriteria {
   const readyStage = stage.kind === "ready" ? stage : null;
   const vfs = readyStage?.vfs ?? null;
   const keyboardId = readyStage?.keyboardId ?? null;
+  const compileResult = readyStage?.compileResult ?? null;
+  const placement = placementFromRepoPath(artifact.startKeyboard?.path);
   const displayName = artifact.startKeyboard?.displayName ?? keyboardId ?? "";
 
   const [run, setRun] = useState<CompareRun | null>(null);
@@ -117,13 +176,16 @@ export function useCompareCriteria(artifact: CompareArtifact): CompareCriteria {
   useEffect(() => {
     if (vfs === null || keyboardId === null) return;
     let cancelled = false;
-    void judgeForeignKeyboard(vfs, keyboardId, displayName).then((result) => {
+    void judgeForeignKeyboard(vfs, keyboardId, displayName, {
+      compileResult,
+      placement,
+    }).then((result) => {
       if (!cancelled) setRun({ forVfs: vfs, result });
     });
     return () => {
       cancelled = true;
     };
-  }, [vfs, keyboardId, displayName]);
+  }, [vfs, keyboardId, displayName, compileResult, placement]);
 
   const runIsCurrent = run !== null && vfs !== null && run.forVfs === vfs;
 

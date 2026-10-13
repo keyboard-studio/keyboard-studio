@@ -28,6 +28,7 @@ import type {
   EvidenceModel,
   ResolvedRow,
 } from "./criteriaTypes.ts";
+import { resolveCompileRow } from "./compileMapping.ts";
 import { IMPLEMENTED_LINT_CODES } from "./implementedChecks.ts";
 import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
 
@@ -153,6 +154,16 @@ function resolveRow(
           }),
         };
       }
+      // Compile-result mapping (Batch 1, §§7.6/7.21): a named synthesis
+      // from the host's compile result, not a lint finding — see
+      // compileMapping.ts. Runs before the implemented gate because its
+      // codes are in the implemented set via that synthesis.
+      const compileRow = resolveCompileRow(
+        criterion,
+        lintRuleId,
+        input.compileResult,
+      );
+      if (compileRow) return compileRow;
       if (!IMPLEMENTED_LINT_CODES.has(lintRuleId)) {
         return {
           criterion,

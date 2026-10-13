@@ -22,14 +22,26 @@
 // stability is checked.
 //
 // RESULT (pinned below): the per-criterion statuses are EQUAL before
-// and after the mutation. That is the expected outcome, and the fixture
-// is built to make it a meaningful one: the stripped stores name
-// packaging assets (icon, visual keyboard, touch layout, help panel),
-// and no criteria-mapped check reads those store lines — the doc checks
-// read the .kvks / touch-layout FILES (absent in both runs, so their
-// layer ids are the same), the §18 checks read the touch-layout file
-// directly by path, and &TARGETS / &COPYRIGHT / &KEYBOARDVERSION are
-// never asset stores, so they survive the strip in both runs.
+// and after the mutation, with ONE named exception introduced by spec
+// 084 Batch 1. The fixture is built to make equality meaningful: the
+// stripped stores name packaging assets (icon, visual keyboard, touch
+// layout, help panel), and (until Batch 1) no criteria-mapped check
+// read those store lines — the doc checks read the .kvks /
+// touch-layout FILES (absent in both runs, so their layer ids are the
+// same), the §18 checks read the touch-layout file directly by path,
+// and &TARGETS / &COPYRIGHT / &KEYBOARDVERSION are never asset stores,
+// so they survive the strip in both runs.
+//
+// THE BATCH 1 EXCEPTION — §7.9 (bitmap placeholder): the 7.9 check
+// reads the &BITMAP store itself. On the pristine fixture the store
+// names an .ico that was NOT fetched, so 7.9 fires (the shipped source
+// references an icon absent from the bundle snapshot). The preview
+// strip removes exactly that dangling store, so the mutated snapshot
+// carries no bitmap reference at all and 7.9 resolves Met. Both
+// verdicts are honest about the VFS each run judged; the Compare panel
+// judges the ready-stage (post-strip) VFS, as every other check does,
+// so on the panel this fixture's dangling bitmap reads Met. The test
+// pins the divergence to this single row rather than forbidding it.
 
 import { describe, expect, it } from "vitest";
 
@@ -135,7 +147,7 @@ describe("T5.3 preview-mutation verification", () => {
     expect(stripped.sort()).toEqual(["BITMAP", "KMW_HELPFILE", "VISUALKEYBOARD"]);
   });
 
-  it("foreign criteria statuses are EQUAL on the pristine VFS and after the preview mutation", async () => {
+  it("foreign criteria statuses are EQUAL on the pristine VFS and after the preview mutation, except the pinned §7.9 divergence", async () => {
     const pristine = pristineVfs();
     const before = await judgeForeignKeyboard(pristine, KEYBOARD_ID, DISPLAY_NAME);
 
@@ -151,7 +163,36 @@ describe("T5.3 preview-mutation verification", () => {
 
     const beforeStatuses = before.rows.map((row) => [row.criterion.id, row.status]);
     const afterStatuses = after.rows.map((row) => [row.criterion.id, row.status]);
-    expect(afterStatuses).toEqual(beforeStatuses);
-    expect(after.counts).toEqual(before.counts);
+
+    // Every row agrees except §7.9, whose divergence is pinned above:
+    // pristine = Not met (dangling &BITMAP reference), mutated = Met
+    // (the strip removed the store the check reads).
+    const differing = beforeStatuses.filter(
+      ([id, status], i) => afterStatuses[i]?.[1] !== status || afterStatuses[i]?.[0] !== id,
+    );
+    expect(differing.map(([id]) => id)).toEqual([
+      "7.9-bitmap-not-template-placeholder",
+    ]);
+    const bitmapBefore = before.rows.find(
+      (row) => row.criterion.id === "7.9-bitmap-not-template-placeholder",
+    );
+    const bitmapAfter = after.rows.find(
+      (row) => row.criterion.id === "7.9-bitmap-not-template-placeholder",
+    );
+    expect(bitmapBefore?.status).toBe("not-met");
+    expect(bitmapAfter?.status).toBe("met");
+
+    // Counts therefore differ by exactly that one row moving
+    // not-met → met; nothing else moves.
+    expect(after.counts.met).toBe(before.counts.met + 1);
+    expect(after.counts["not-met"]).toBe(before.counts["not-met"] - 1);
+    for (const status of [
+      "not-applicable",
+      "needs-author",
+      "needs-human",
+      "not-yet-checkable",
+    ] as const) {
+      expect(after.counts[status]).toBe(before.counts[status]);
+    }
   });
 });
