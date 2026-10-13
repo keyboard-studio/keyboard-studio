@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { makeEmptyDecisionRecord, type DecisionEntry } from "@keyboard-studio/contracts";
 import { render } from "../test/renderWithI18n.tsx";
-import { useTestingStore } from "../stores/testingStore.ts";
+import { REPORT_TEXT_MAX, useTestingStore } from "../stores/testingStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 
@@ -37,6 +37,7 @@ beforeEach(() => {
   useDecisionLogStore.getState().hydrate({ ...makeEmptyDecisionRecord(), entries: [entry("rules", 1)] });
   useSurveySessionStore.setState({ visited: ["rules"] as never });
   build("a".repeat(64));
+  jumpToLocation.mockReturnValue({ kind: "arrived", at: { route: "survey", step: "rules" } });
 });
 
 afterEach(() => {
@@ -79,6 +80,39 @@ describe("TesterReports", () => {
     const report = useTestingStore.getState().reports[0]!;
     fireEvent.click(screen.getByTestId(`report-open-${report.reportId}`));
     expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "rules" }, { returnTo: { route: "output" } });
+  });
+
+  it("states the reason in a polite status region when the jump is refused", () => {
+    render(<TesterReports />);
+    addReport("Rule fires twice", "rules");
+    const report = useTestingStore.getState().reports[0]!;
+    expect(screen.getByTestId("report-jump-status").getAttribute("aria-live")).toBe("polite");
+    jumpToLocation.mockReturnValueOnce({ kind: "refused", reason: "beyond-gate" } as never);
+    fireEvent.click(screen.getByTestId(`report-open-${report.reportId}`));
+    expect(screen.getByTestId("report-jump-status").textContent).not.toBe("");
+    jumpToLocation.mockReturnValueOnce({ kind: "arrived", at: { route: "survey", step: "rules" } } as never);
+    fireEvent.click(screen.getByTestId(`report-open-${report.reportId}`));
+    expect(screen.getByTestId("report-jump-status").textContent).toBe("");
+  });
+
+  it("gives each row's buttons a distinguishable name that starts with the visible text", () => {
+    render(<TesterReports />);
+    addReport("First problem", "rules");
+    addReport("Second problem that is long enough to be cut off somewhere here", "");
+    const [one, two] = useTestingStore.getState().reports;
+    expect(screen.getByTestId(`report-toggle-${one!.reportId}`).getAttribute("aria-label")).toBe("Mark fixed: First problem");
+    expect(screen.getByTestId(`report-open-${one!.reportId}`).getAttribute("aria-label")).toMatch(/^Open .+: First problem$/);
+    expect(screen.getByTestId(`report-toggle-${two!.reportId}`).getAttribute("aria-label")).toBe(
+      "Mark fixed: Second problem that is long enough to be…",
+    );
+    fireEvent.click(screen.getByTestId(`report-toggle-${one!.reportId}`));
+    expect(screen.getByTestId(`report-toggle-${one!.reportId}`).getAttribute("aria-label")).toBe("Reopen: First problem");
+  });
+
+  it("names the real maximum in the error message", () => {
+    render(<TesterReports />);
+    addReport("   ");
+    expect(screen.getByRole("alert").textContent).toContain(String(REPORT_TEXT_MAX));
   });
 
   it("marking fixed then making a build shows 'fixed in build N'; reopening clears it (FR-014)", () => {

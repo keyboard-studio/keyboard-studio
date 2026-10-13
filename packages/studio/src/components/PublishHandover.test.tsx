@@ -125,6 +125,28 @@ describe("PublishHandover", () => {
     expect(screen.getByTestId("submit-panel")).toBeTruthy();
   });
 
+  it("moves focus through the hand-over: heading, back to the opener, then the revealed submit panel", async () => {
+    recordBuild(FP_A, 0);
+    renderHandover(FP_A);
+
+    await open();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Before you publish" }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("publish-handover-cancel"));
+    });
+    expect(document.activeElement).toBe(screen.getByTestId("publish-handover-open"));
+
+    await open();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("publish-handover-confirm"));
+    });
+    const revealed = screen.getByTestId("publish-handover-revealed");
+    expect(revealed.getAttribute("aria-label")).toBe("Submit your keyboard");
+    expect(document.activeElement).toBe(revealed);
+    expect(revealed.contains(screen.getByTestId("submit-panel"))).toBe(true);
+  });
+
   it("says when there are no open reports", async () => {
     recordBuild(FP_A, 0);
     renderHandover(FP_A);

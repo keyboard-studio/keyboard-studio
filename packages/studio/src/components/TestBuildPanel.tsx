@@ -7,7 +7,7 @@
 // Builds are numbered, listed with what changed since the previous one, and
 // read-only once the project is submitted.
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { outputBlockers, type OutputBlockersInput } from "../lib/outputBlockers.ts";
 import { collidingBuildNumbers, useTestingStore } from "../stores/testingStore.ts";
@@ -15,6 +15,7 @@ import type { TestBuild } from "../lib/draftTypes.ts";
 import { stageLabel } from "../decisions/progressDots.ts";
 import { formatClauseList } from "../decisions/stageText.ts";
 import { ACCENT, BORDER, TEXT_DIM } from "../ui/theme.ts";
+import { visuallyHidden } from "../survey/surveyStyles.ts";
 import { TesterReports } from "./TesterReports.tsx";
 
 export interface TestBuildPanelProps {
@@ -50,7 +51,10 @@ export function TestBuildPanel({ gate, nextTestVersion, busy, onMakeTestBuild }:
   const colliding = collidingBuildNumbers(builds);
 
   const version = nextTestVersion ?? "";
-  const buttonLabel =
+  // The button's name is its visible text (WCAG 2.5.3); what the build will be,
+  // or why it cannot be made, rides in its description.
+  const descriptionId = useId();
+  const buttonDescription =
     firstBlocker !== undefined
       ? i18n.t(firstBlocker.downloadAria)
       : t({
@@ -89,7 +93,7 @@ export function TestBuildPanel({ gate, nextTestVersion, busy, onMakeTestBuild }:
         type="button"
         data-testid="make-test-build"
         disabled={!enabled}
-        aria-label={buttonLabel}
+        aria-describedby={descriptionId}
         onClick={() => void make()}
         style={{
           alignSelf: "flex-start",
@@ -105,6 +109,9 @@ export function TestBuildPanel({ gate, nextTestVersion, busy, onMakeTestBuild }:
       >
         <Trans id="output.testing.make">Make a test build</Trans>
       </button>
+      <span id={descriptionId} style={visuallyHidden}>
+        {buttonDescription}
+      </span>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, maxWidth: "46ch" }}>
         {frozen ? (
           <Trans id="output.testing.frozen">
@@ -149,7 +156,7 @@ export function TestBuildPanel({ gate, nextTestVersion, busy, onMakeTestBuild }:
           })}
         </ol>
       )}
-      <span role="status" aria-live="polite" style={{ fontSize: 12, color: TEXT_DIM }}>
+      <span role="status" aria-live="polite" data-testid="test-build-status" style={{ fontSize: 12, color: TEXT_DIM }}>
         {status}
       </span>
       {/* spec 094 FR-012: reports attach to a build, so they appear once one exists. */}

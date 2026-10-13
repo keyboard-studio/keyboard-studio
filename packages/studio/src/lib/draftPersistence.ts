@@ -1523,6 +1523,7 @@ type ApplyEnvelopeOutcome =
  * the `wasDraftRestoredThisBoot()` / `restoredDraftSavedAt()` boot flags —
  * those are `loadDraft`-only side effects layered on top by its caller.
  */
+// Keep in step with RevisionSnapshot: a store restored here must also be captured and restored there, and vice versa.
 function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): ApplyEnvelopeOutcome {
   // Spec 088 (C-4.2): a v1 envelope is migrated BEFORE any version gate
   // runs, so the VR-1 check below only ever sees current-version envelopes
@@ -1686,6 +1687,7 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
  * restored into the SAME stores — a rollback of the one working copy, not a
  * second copy (Article III).
  */
+// Keep in step with applyEnvelopeToStores: a store captured here must also be restored by the draft restore, and vice versa.
 export interface RevisionSnapshot {
   workingCopy: DurableDraft["workingCopy"];
   decisions: DecisionSet;

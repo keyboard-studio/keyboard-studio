@@ -1,11 +1,14 @@
 // The artifact pipeline for OutputScreen.
 //
-// Spec 057 (FR-026): NOT renamed and NOT modified. It used to be shared with
-// PreviewScreen; the Compare tab that replaced that screen has its own
-// deliberately weaker hook (useCompareArtifact) which passes no onInstantiate.
-// Output still needs this one's instantiate path and its download gate, so the
-// rename sweep stops at the tab's author-facing surfaces and leaves this name
-// alone.
+// Spec 057 (FR-026): NOT renamed. It used to be shared with PreviewScreen; the
+// Compare tab that replaced that screen has its own deliberately weaker hook
+// (useCompareArtifact) which passes no onInstantiate. Output still needs this
+// one's instantiate path and its download gate, so the rename sweep stops at
+// the tab's author-facing surfaces and leaves this name alone.
+//
+// Spec 094 added the test-build path (handleMakeTestBuild): the same .kmp build
+// as the primary download, stamped with a test version, recorded in the testing
+// store only once the download has been handed to the browser (FR-011).
 //
 // Encapsulates: startKeyboard / pickerMode / scaffoldSpec local state,
 // useKeyboardArtifact, useWorkingCopyTransform, onInstantiate, diagnostics
@@ -206,6 +209,9 @@ export function usePreviewArtifact(): PreviewArtifact {
   const [kmpError, setKmpError] = useState<string | null>(null);
   const [kmpDiagnostics, setKmpDiagnostics] = useState<CompilerDiagnostic[]>([]);
   const blobUrlRef = useRef<string | null>(null);
+  // Set synchronously at entry so a double click cannot start two test builds
+  // before the busy state re-renders the button disabled.
+  const makingTestBuildRef = useRef(false);
 
   // Helper: revoke and clear any lingering download blob URL. Shared by both
   // downloads — one ref, because only one download is ever in flight (each
@@ -447,6 +453,17 @@ export function usePreviewArtifact(): PreviewArtifact {
     }
   }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason]);
 
+  // Shared by the .kmp and test-build paths: show the real reason and keep the
+  // .zip available — never a silent fallback, and never a dead end.
+  const reportKmpError = useCallback((err: unknown) => {
+    if (err instanceof OutputBundleError) {
+      setKmpError(err.message);
+      setKmpDiagnostics(err.diagnostics);
+    } else {
+      setKmpError(err instanceof Error ? err.message : "Package build failed");
+    }
+  }, []);
+
   // The installable package — the primary download. Same gates as the zip:
   // .kmp is the default artifact, not a privileged shortcut past them.
   const handleDownloadKmp = useCallback(async () => {
@@ -478,18 +495,11 @@ export function usePreviewArtifact(): PreviewArtifact {
       // Keyman's own MIME type for a package.
       triggerDownload(result.bytes, result.filename, "application/octet-stream");
     } catch (err: unknown) {
-      // Show the real reason and keep the .zip available — never a silent
-      // fallback, and never a dead end.
-      if (err instanceof OutputBundleError) {
-        setKmpError(err.message);
-        setKmpDiagnostics(err.diagnostics);
-      } else {
-        setKmpError(err instanceof Error ? err.message : "Package build failed");
-      }
+      reportKmpError(err);
     } finally {
       setBuildingKmp(false);
     }
-  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason]);
+  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason]);
 
   // spec 094: the next test build's version, from the same resolver the
   // publish version comes from. Recomputed as builds are recorded.
@@ -505,19 +515,37 @@ export function usePreviewArtifact(): PreviewArtifact {
   const handleMakeTestBuild = useCallback(async (): Promise<TestBuild | null> => {
     if (stage.kind !== "ready" || coverageGate.blocked || emissionBlockReason !== null) return null;
     if (nextTestVersion === null) return null;
-    const number = useTestingStore.getState().nextBuildNumber;
+    if (makingTestBuildRef.current) return null;
+    makingTestBuildRef.current = true;
     setBuildingKmp(true);
     setKmpError(null);
     setKmpDiagnostics([]);
     setDownloadWarnings([]);
     try {
+      // A frozen project records nothing, so it must not download either.
+      if (useTestingStore.getState().frozen) {
+        setKmpError("This project is frozen; test builds are no longer available.");
+        return null;
+      }
+      const number = useTestingStore.getState().nextBuildNumber;
       const result = await buildTestBuildKmp({ number, version: nextTestVersion });
       if (result === null) {
         setKmpError("Nothing to download — select a keyboard first.");
         return null;
       }
-      // Only a build that succeeded uses up a number (FR-011).
-      const fingerprint = (await computeWorkingCopyFingerprint()) ?? "";
+      // Without a fingerprint the build cannot be compared with the next one,
+      // so it is a failed build and uses up no number (FR-011).
+      const fingerprint = await computeWorkingCopyFingerprint();
+      if (fingerprint === null) {
+        setKmpError("Package build failed");
+        return null;
+      }
+      if (result.warnings.length > 0) {
+        devLog.warn("[studio] test build projection warnings:", result.warnings);
+        setDownloadWarnings(result.warnings);
+      }
+      triggerDownload(result.bytes, result.filename, "application/octet-stream");
+      // Only a build that was handed to the browser uses up a number (FR-011).
       const testing = useTestingStore.getState();
       const previous = testing.builds[testing.builds.length - 1];
       const entries = useDecisionLogStore.getState().record.entries;
@@ -530,24 +558,19 @@ export function usePreviewArtifact(): PreviewArtifact {
             ? []
             : changedSectionsSince(entries, previous.decisionCursor, previous.fingerprint !== fingerprint),
       });
-      if (result.warnings.length > 0) {
-        devLog.warn("[studio] test build projection warnings:", result.warnings);
-        setDownloadWarnings(result.warnings);
+      if (build === null) {
+        setKmpError("This project is frozen; test builds are no longer available.");
+        return null;
       }
-      triggerDownload(result.bytes, result.filename, "application/octet-stream");
       return build;
     } catch (err: unknown) {
-      if (err instanceof OutputBundleError) {
-        setKmpError(err.message);
-        setKmpDiagnostics(err.diagnostics);
-      } else {
-        setKmpError(err instanceof Error ? err.message : "Package build failed");
-      }
+      reportKmpError(err);
       return null;
     } finally {
+      makingTestBuildRef.current = false;
       setBuildingKmp(false);
     }
-  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason, nextTestVersion]);
+  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, nextTestVersion]);
 
   return {
     startKeyboard,

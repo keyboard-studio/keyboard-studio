@@ -29,7 +29,7 @@ vi.mock("../hooks/useKeyboardArtifact.ts", async (importOriginal) => ({
   useKeyboardArtifact: () => ({ stage: READY_STAGE, retry: vi.fn(), recompile: vi.fn() }),
 }));
 
-const jumpToLocation = vi.fn();
+const jumpToLocation = vi.fn((..._args: unknown[]): unknown => ({ kind: "arrived", at: { route: "survey", step: "touch" } }));
 vi.mock("../lib/jumpToLocation.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/jumpToLocation.ts")>()),
   jumpToLocation: (...args: unknown[]) => jumpToLocation(...args),
@@ -106,6 +106,23 @@ describe("OutputScreen — blocker Open buttons (spec 094 FR-004)", () => {
 
     fireEvent.click(screen.getByTestId("output-open-identity"));
     expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "identity" }, { returnTo: { route: "output" } });
+  });
+
+  it("states why in a polite status line when the jump is refused, and clears it on the next arrival", async () => {
+    seedInstantiatedWorkingCopy([], { attributed: true });
+    useWorkingCopyStore.setState({ staleSteps: new Set(["touch"]) });
+    const { OutputScreen } = await import("./OutputScreen.tsx");
+    render(<OutputScreen />);
+
+    const status = screen.getByTestId("output-jump-status");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(status.textContent).toBe("");
+    jumpToLocation.mockReturnValueOnce({ kind: "refused", reason: "beyond-gate" });
+    fireEvent.click(screen.getByTestId("output-open-touch"));
+    expect(screen.getByTestId("output-jump-status").textContent).not.toBe("");
+    jumpToLocation.mockReturnValueOnce({ kind: "arrived", at: { route: "survey", step: "touch" } });
+    fireEvent.click(screen.getByTestId("output-open-touch"));
+    expect(screen.getByTestId("output-jump-status").textContent).toBe("");
   });
 
   it("offers no Open button while nothing blocks", async () => {

@@ -2,7 +2,7 @@
 // SurveyView (which owns it otherwise) is unmounted on that route.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 
 const teardown = vi.fn();
 const install = vi.fn((_key: string) => teardown);
@@ -43,5 +43,39 @@ describe("useOutputAutosave", () => {
     const { unmount } = renderHook(() => useOutputAutosave());
     unmount();
     expect(install).not.toHaveBeenCalled();
+  });
+
+  it("re-installs under the new key when the project key changes while Output is open", () => {
+    useWorkingCopyStore.setState({
+      identity: { keyboardId: "first_kbd" },
+    } as unknown as Partial<ReturnType<typeof useWorkingCopyStore.getState>>);
+    const { unmount } = renderHook(() => useOutputAutosave());
+    expect(install).toHaveBeenLastCalledWith("first_kbd");
+
+    act(() => {
+      useWorkingCopyStore.setState({
+        identity: { keyboardId: "second_kbd" },
+      } as unknown as Partial<ReturnType<typeof useWorkingCopyStore.getState>>);
+    });
+    expect(teardown).toHaveBeenCalledTimes(1);
+    expect(install).toHaveBeenCalledTimes(2);
+    expect(install).toHaveBeenLastCalledWith("second_kbd");
+    unmount();
+    expect(teardown).toHaveBeenCalledTimes(2);
+  });
+
+  it("installs once the working copy finishes instantiating after mount", () => {
+    useWorkingCopyStore.setState({ identity: null, baseKeyboard: null } as unknown as Partial<
+      ReturnType<typeof useWorkingCopyStore.getState>
+    >);
+    renderHook(() => useOutputAutosave());
+    expect(install).not.toHaveBeenCalled();
+    act(() => {
+      useWorkingCopyStore.setState({
+        identity: { keyboardId: "late_kbd" },
+      } as unknown as Partial<ReturnType<typeof useWorkingCopyStore.getState>>);
+    });
+    expect(install).toHaveBeenCalledTimes(1);
+    expect(install).toHaveBeenCalledWith("late_kbd");
   });
 });

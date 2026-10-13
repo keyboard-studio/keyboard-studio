@@ -35,6 +35,7 @@
 // same explanatory pattern PhaseFGate uses, reusing the identical shared
 // selector (lib/unimplementedInventory.ts via usePreviewArtifact).
 
+import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
@@ -52,6 +53,7 @@ import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer.ts";
 import { outputBlockers } from "../lib/outputBlockers.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import { unreachableReasonLabel } from "../decisions/progressDots.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { OutputSectionList } from "./OutputSectionList.tsx";
 import { TestBuildPanel } from "./TestBuildPanel.tsx";
@@ -278,8 +280,14 @@ export function OutputScreen() {
   // blocker itself, so the banner and the gate cannot point at different steps.
   const blockerStepId = (kind: "touchStale" | "attribution"): string | undefined =>
     outputGate.blockers.find((b) => b.kind === kind)?.stepId;
+  // A refused jump says why in the one polite status line beside the banners.
+  const [jumpStatus, setJumpStatus] = useState<string | null>(null);
   const openBlockerStep = (stepId: string) => {
-    jumpToLocation({ route: "survey", step: stepId as ActiveStepId }, { returnTo: { route: "output" } });
+    const outcome = jumpToLocation(
+      { route: "survey", step: stepId as ActiveStepId },
+      { returnTo: { route: "output" } },
+    );
+    setJumpStatus(outcome.kind === "refused" ? unreachableReasonLabel(outcome.reason, i18n) : null);
   };
   const touchBlockerStep = blockerStepId("touchStale");
   const attributionBlockerStep = blockerStepId("attribution");
@@ -717,6 +725,14 @@ export function OutputScreen() {
                 )}
               </div>
             )}
+            <span
+              role="status"
+              aria-live="polite"
+              data-testid="output-jump-status"
+              style={{ display: "block", fontSize: 11, marginTop: 4 }}
+            >
+              {jumpStatus}
+            </span>
             {downloadError !== null && (
               <div role="alert" style={{ fontSize: 11, color: "var(--app-danger-text)", marginTop: 4 }}>
                 {downloadError}

@@ -103,7 +103,7 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
       <button
         type="button"
         data-testid="survey-reset-arm"
-        aria-label={t({ id: "nav.reset.ariaLabel", message: "Start this keyboard over" })}
+        aria-label={t({ id: "nav.reset.ariaLabel", message: "Reset: start this keyboard over" })}
         aria-expanded={confirming}
         // "true", not "dialog": the confirm popover carries role="alert" and no
         // dialog semantics (see the panel below), so advertising a dialog would

@@ -34,6 +34,10 @@ function renderPanel(overrides: Partial<TestBuildPanelProps> = {}) {
   );
 }
 
+// The description the button points at (no jest-dom in this package: read the element).
+const description = () =>
+  document.getElementById(button().getAttribute("aria-describedby") ?? "")?.textContent ?? "";
+
 const button = () => screen.getByTestId("make-test-build") as HTMLButtonElement;
 
 afterEach(() => {
@@ -50,15 +54,17 @@ describe("TestBuildPanel", () => {
     expect(button().disabled).toBe(true);
   });
 
-  it("gives the first blocker as its accessible name when disabled", () => {
+  it("gives the first blocker as its accessible description when disabled", () => {
     renderPanel({ gate: { ...CLEAR_GATE, touchStale: true, attributionMissing: true } });
-    expect(button().getAttribute("aria-label")).toMatch(/touch layout is out of date/);
+    expect(description()).toMatch(/touch layout is out of date/);
+    expect(button().getAttribute("aria-label")).toBeNull();
+    expect(button().textContent).toBe("Make a test build");
   });
 
   it("is disabled with its own reason when no test version fits, while the download stays available", () => {
     renderPanel({ nextTestVersion: null });
     expect(button().disabled).toBe(true);
-    expect(button().getAttribute("aria-label")).toMatch(/no room for a test version/);
+    expect(description()).toMatch(/no room for a test version/);
   });
 
   it("a failed build records nothing (FR-011)", async () => {
@@ -67,7 +73,7 @@ describe("TestBuildPanel", () => {
       fireEvent.click(button());
     });
     expect(screen.queryByTestId("test-build-list")).toBeNull();
-    expect(screen.getByRole("status").textContent).toBe("");
+    expect(screen.getByTestId("test-build-status").textContent).toBe("");
   });
 
   it("lists a successful build with its number, version and changes, and announces it", async () => {
@@ -88,7 +94,7 @@ describe("TestBuildPanel", () => {
     expect(list.textContent).toMatch(/Build 1 \(version 2\.3\.1\)/);
     expect(list.textContent).toMatch(/First build/);
     expect(list.textContent).toMatch(/Build 2 .*Changed: Rules and Source edited directly/);
-    expect(screen.getByRole("status").textContent).toBe("Test build 2 downloaded.");
+    expect(screen.getByTestId("test-build-status").textContent).toBe("Test build 2 downloaded.");
   });
 
   it("shows 'Same as build N' for a rebuild with no edit", async () => {
@@ -126,9 +132,11 @@ describe("TestBuildPanel — tester reports (spec 094 T037)", () => {
   });
 });
 
-describe("TestBuildPanel — accessible name when enabled", () => {
+describe("TestBuildPanel — accessible name and description when enabled", () => {
   it("names the next build and its version", () => {
     renderPanel();
-    expect(button().getAttribute("aria-label")).toBe("Make test build 1, version 2.3.1, and download it");
+    expect(button().getAttribute("aria-label")).toBeNull();
+    expect(button().textContent).toBe("Make a test build");
+    expect(description()).toBe("Make test build 1, version 2.3.1, and download it");
   });
 });

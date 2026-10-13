@@ -9,7 +9,7 @@
 // With no test builds, or once the project is submitted, it renders its
 // children directly, so the no-testing path is exactly as before.
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { changedSectionsSince, useTestingStore } from "../stores/testingStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
@@ -56,7 +56,36 @@ export function PublishHandover({
   const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
   const [checkedFor, setCheckedFor] = useState<string | null>(null);
 
-  if (last === undefined || frozen || confirmedFor === last.buildId) return <>{children}</>;
+  // Each press swaps what is on screen, which would drop focus to the body:
+  // the press names where focus goes, and it moves once that element mounts.
+  const openRef = useRef<HTMLButtonElement | null>(null);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const revealedRef = useRef<HTMLDivElement | null>(null);
+  const pendingFocus = useRef<"open" | "heading" | "revealed" | null>(null);
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (target === null) return;
+    const el = { open: openRef, heading: headingRef, revealed: revealedRef }[target].current;
+    if (el === null) return;
+    pendingFocus.current = null;
+    el.focus();
+  });
+
+  if (last === undefined) return <>{children}</>;
+  if (frozen || confirmedFor === last.buildId) {
+    return (
+      <div
+        ref={revealedRef}
+        tabIndex={-1}
+        role="group"
+        aria-label={t({ id: "output.publishHandover.submitRegionLabel", message: "Submit your keyboard" })}
+        data-testid="publish-handover-revealed"
+        style={{ outline: "none" }}
+      >
+        {children}
+      </div>
+    );
+  }
 
   const current = checkedFor === last.buildId ? check : ({ kind: "idle" } as const);
   const n = last.number;
@@ -64,6 +93,7 @@ export function PublishHandover({
 
   const runCheck = async () => {
     const build = last;
+    pendingFocus.current = "heading";
     setCheckedFor(build.buildId);
     setCheck({ kind: "checking" });
     let fingerprint: string | null = null;
@@ -117,6 +147,7 @@ export function PublishHandover({
       {current.kind === "idle" ? (
         <button
           type="button"
+          ref={openRef}
           data-testid="publish-handover-open"
           onClick={() => void runCheck()}
           style={BUTTON_STYLE}
@@ -124,7 +155,7 @@ export function PublishHandover({
           <Trans id="output.publishHandover.open">Testing done, publish</Trans>
         </button>
       ) : (
-        <h3 style={{ margin: 0, fontSize: 13 }}>
+        <h3 ref={headingRef} tabIndex={-1} style={{ margin: 0, fontSize: 13, outline: "none" }}>
           <Trans id="output.publishHandover.heading">Before you publish</Trans>
         </h3>
       )}
@@ -172,7 +203,10 @@ export function PublishHandover({
             <button
               type="button"
               data-testid="publish-handover-confirm"
-              onClick={() => setConfirmedFor(last.buildId)}
+              onClick={() => {
+                pendingFocus.current = "revealed";
+                setConfirmedFor(last.buildId);
+              }}
               style={BUTTON_STYLE}
             >
               <Trans id="output.publishHandover.confirm">Continue to submit</Trans>
@@ -180,7 +214,10 @@ export function PublishHandover({
             <button
               type="button"
               data-testid="publish-handover-cancel"
-              onClick={() => setCheck({ kind: "idle" })}
+              onClick={() => {
+                pendingFocus.current = "open";
+                setCheck({ kind: "idle" });
+              }}
               style={{ ...BUTTON_STYLE, border: `1px solid ${BORDER}`, color: TEXT_DIM }}
             >
               <Trans id="output.publishHandover.cancel">Not yet</Trans>

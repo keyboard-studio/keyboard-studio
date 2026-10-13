@@ -11,7 +11,7 @@ import { useId, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { REPORT_TEXT_MAX, useTestingStore } from "../stores/testingStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
-import { stageLabel } from "../decisions/progressDots.ts";
+import { stageLabel, unreachableReasonLabel } from "../decisions/progressDots.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
 import { useCompletedSections } from "./OutputSectionList.tsx";
@@ -27,6 +27,11 @@ const LINK_STYLE = {
   font: "inherit",
 } as const;
 
+/** The report text as it appears in a button's name, so each row's buttons differ. */
+function nameSnippet(text: string): string {
+  return text.length > 40 ? `${text.slice(0, 40).trimEnd()}…` : text;
+}
+
 export function TesterReports() {
   const { t, i18n } = useLingui();
   const builds = useTestingStore((s) => s.builds);
@@ -40,6 +45,7 @@ export function TesterReports() {
   const [foundIn, setFoundIn] = useState<string>("");
   const [sectionId, setSectionId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [jumpStatus, setJumpStatus] = useState<string | null>(null);
   const ids = { text: useId(), build: useId(), section: useId(), error: useId() };
 
   const add = (event: React.FormEvent) => {
@@ -51,7 +57,7 @@ export function TesterReports() {
       ...(sectionId !== "" ? { sectionId } : {}),
     });
     if (report === null) {
-      setError(t({ id: "output.testing.reports.error", message: "Describe the problem (up to 2000 characters)." }));
+      setError(t({ id: "output.testing.reports.error", message: `Describe the problem (up to ${REPORT_TEXT_MAX} characters).` }));
       return;
     }
     setError(null);
@@ -60,7 +66,11 @@ export function TesterReports() {
   };
 
   const openSection = (stepId: string) => {
-    jumpToLocation({ route: "survey", step: stepId as ActiveStepId }, { returnTo: { route: "output" } });
+    const outcome = jumpToLocation(
+      { route: "survey", step: stepId as ActiveStepId },
+      { returnTo: { route: "output" } },
+    );
+    setJumpStatus(outcome.kind === "refused" ? unreachableReasonLabel(outcome.reason, i18n) : null);
   };
 
   const setStatus = (reportId: string, status: "open" | "fixed") => {
@@ -152,6 +162,7 @@ export function TesterReports() {
                   : t({ id: "output.testing.reports.fixedPending", message: `Found in build ${found} · fixed, not yet in a build` });
             const section = report.sectionId;
             const sectionName = section !== undefined ? stageLabel(section, i18n) : "";
+            const snippet = nameSnippet(report.text);
             return (
               <li key={report.reportId} data-testid={`report-${report.reportId}`}>
                 <span>{report.text}</span>{" "}
@@ -162,6 +173,10 @@ export function TesterReports() {
                     <button
                       type="button"
                       data-testid={`report-open-${report.reportId}`}
+                      aria-label={t({
+                        id: "output.testing.reports.openSectionAria",
+                        message: `Open ${sectionName}: ${snippet}`,
+                      })}
                       onClick={() => openSection(section)}
                       style={LINK_STYLE}
                     >
@@ -175,6 +190,11 @@ export function TesterReports() {
                     <button
                       type="button"
                       data-testid={`report-toggle-${report.reportId}`}
+                      aria-label={
+                        report.status === "open"
+                          ? t({ id: "output.testing.reports.markFixedAria", message: `Mark fixed: ${snippet}` })
+                          : t({ id: "output.testing.reports.reopenAria", message: `Reopen: ${snippet}` })
+                      }
                       onClick={() => setStatus(report.reportId, report.status === "open" ? "fixed" : "open")}
                       style={LINK_STYLE}
                     >
@@ -189,6 +209,9 @@ export function TesterReports() {
           })}
         </ul>
       )}
+      <span role="status" aria-live="polite" data-testid="report-jump-status" style={{ fontSize: 12, color: TEXT_DIM }}>
+        {jumpStatus}
+      </span>
       <p style={{ margin: 0, fontSize: 11, color: TEXT_DIM }}>
         <Trans id="output.testing.reports.note">
           These are your own notes. Testers send their reports to you however they like.

@@ -36,6 +36,12 @@ describe("SurveyResetButton", () => {
     expect(screen.getByTestId("survey-reset-arm")).toBeTruthy();
   });
 
+  it("keeps the visible text 'Reset' inside the accessible name (WCAG 2.5.3)", () => {
+    render(<SurveyResetButton onReset={vi.fn()} />);
+    const trigger = screen.getByTestId("survey-reset-arm");
+    expect(trigger.getAttribute("aria-label")).toContain(trigger.textContent);
+  });
+
   it("a second click on the trigger disarms without firing onReset", () => {
     const onReset = vi.fn();
     render(<SurveyResetButton onReset={onReset} />);

@@ -14,15 +14,20 @@
 // same pagehide flush and the same orphan guard as SurveyView's install: no
 // new timer, and D3 is not involved (it saves; it never validates). Nothing is
 // installed while no working copy is instantiated.
+//
+// The key is subscribed to, not read once: a working copy that finishes
+// instantiating after mount installs then, and a key that changes while Output
+// is open (the author renames the keyboard id) re-installs under the new key,
+// which installDraftAutosave migrates the old filing to.
 
 import { useEffect } from "react";
 import { deriveProjectKeyFromWorkingCopy, installDraftAutosave } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 export function useOutputAutosave(): void {
+  const projectKey = useWorkingCopyStore((s) => deriveProjectKeyFromWorkingCopy(s));
   useEffect(() => {
-    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
     if (projectKey === null) return;
     return installDraftAutosave(projectKey);
-  }, []);
+  }, [projectKey]);
 }
