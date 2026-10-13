@@ -80,6 +80,12 @@ export interface ViewState {
   scrollTop: Readonly<Record<string, number>>;
   /** The keyboard currently loaded on the Compare tab, if any (Q5). */
   compareSelection: CompareSession | null;
+  /**
+   * Compare tab: whether the foreign criteria panel is open (spec 084
+   * T5.4). Presentation only — opening the panel reads the loaded
+   * keyboard's preview VFS and writes nothing anywhere (FR-023).
+   */
+  compareCriteriaOpen: boolean;
 
   setFlowMapSection: (section: FlowMapSection) => void;
   setTrailCollapsedSteps: (steps: ReadonlySet<string>) => void;
@@ -89,6 +95,7 @@ export interface ViewState {
   setOskMode: (surface: OskSurface, mode: OskMode) => void;
   setScrollTop: (paneId: string, top: number) => void;
   setCompareSelection: (session: CompareSession | null) => void;
+  setCompareCriteriaOpen: (open: boolean) => void;
 
   /** Clear every slot back to its initial value (FR-052). */
   reset: () => void;
@@ -104,6 +111,7 @@ type ViewStateData = Omit<
   | "setOskMode"
   | "setScrollTop"
   | "setCompareSelection"
+  | "setCompareCriteriaOpen"
   | "reset"
 >;
 
@@ -120,6 +128,7 @@ const INITIAL_STATE: ViewStateData = {
   oskMode: INITIAL_OSK_MODE,
   scrollTop: {},
   compareSelection: null,
+  compareCriteriaOpen: false,
 };
 
 export const useViewStateStore = create<ViewState>((set, get) => ({
@@ -148,6 +157,8 @@ export const useViewStateStore = create<ViewState>((set, get) => ({
     set({ scrollTop: { ...get().scrollTop, [paneId]: top } }),
 
   setCompareSelection: (compareSelection) => set({ compareSelection }),
+
+  setCompareCriteriaOpen: (compareCriteriaOpen) => set({ compareCriteriaOpen }),
 
   reset: () =>
     set({ ...INITIAL_STATE, trailCollapsedSteps: new Set<string>() }),

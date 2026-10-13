@@ -11,11 +11,12 @@
 // misbehaves. Each names the write path it forbids.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { screen, cleanup } from "@testing-library/react";
+import { screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { useViewStateStore } from "../stores/viewStateStore.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 
@@ -66,6 +67,19 @@ function seedWorkingCopy() {
     vfs: createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }]),
     ir: makeTestIR([]),
   });
+}
+
+/** The working copy's VFS as (path, content) pairs — the byte-level snapshot. */
+function snapshotWorkingCopyBytes() {
+  const vfs = useWorkingCopyStore.getState().startVfs;
+  if (vfs === null) return null;
+  return vfs
+    .entries()
+    .map((e) => [
+      e.path,
+      typeof e.content === "string" ? e.content : [...(e.content as Uint8Array)],
+    ])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
 }
 
 function snapshotProject() {
@@ -204,5 +218,59 @@ describe("what the tab IS for (FR-024)", () => {
     expect(useViewStateStore.getState().compareSelection).not.toBeNull();
     expect(useWorkingCopyStore.getState().startKeyboard).toBeNull();
     expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+  });
+});
+
+describe("Check criteria panel stays isolated (spec 084 T5.5, FR-023)", () => {
+  it("judging a foreign keyboard writes nothing: pipeline args stay null, working copy byte-identical, criteria record empty, no record controls rendered", async () => {
+    seedWorkingCopy();
+    const before = snapshotProject();
+    const beforeBytes = snapshotWorkingCopyBytes();
+
+    render(<CompareScreen />);
+    screen.getByTestId("base-picker").click();
+
+    // Open the criteria panel and wait for the foreign judgment to settle.
+    const checkButton = await screen.findByTestId("compare-check-criteria");
+    expect((checkButton as HTMLButtonElement).disabled).toBe(false);
+    checkButton.click();
+    await waitFor(() => expect(screen.getByTestId("criteria-page")).toBeTruthy());
+    // The panel states what was judged (plan §4: the keyboard as previewed).
+    expect(screen.getByTestId("criteria-judged-note").textContent).toContain("as previewed");
+
+    // Expand a row — evidence renders, and expanding is part of the
+    // isolation surface (it is where authored mode shows its controls).
+    const expandButtons = screen.getAllByTestId("criteria-row-expand");
+    expect(expandButtons.length).toBeGreaterThan(0);
+    const firstExpand = expandButtons[0];
+    if (firstExpand === undefined) throw new Error("no criteria row to expand");
+    fireEvent.click(firstExpand);
+    expect(screen.getAllByTestId("criteria-row-evidence").length).toBeGreaterThan(0);
+
+    // The artifact pipeline was still called with no scaffold spec, no
+    // VFS transform and no onInstantiate.
+    expect(keyboardArtifactCalls.length).toBeGreaterThan(0);
+    for (const args of keyboardArtifactCalls) {
+      expect(args[1] ?? null).toBeNull();
+      expect(args[2] ?? null).toBeNull();
+      expect(args[3] ?? null).toBeNull();
+    }
+    expect(useWorkingCopyTransformSpy).not.toHaveBeenCalled();
+    expect(instantiateSpy).not.toHaveBeenCalled();
+
+    // The working copy is untouched, byte for byte.
+    expect(snapshotProject()).toEqual(before);
+    expect(snapshotWorkingCopyBytes()).toEqual(beforeBytes);
+
+    // No criteria record was written for the foreign keyboard.
+    expect(useCriteriaRecordStore.getState().attestations).toEqual({});
+    expect(useCriteriaRecordStore.getState().confirmations).toEqual({});
+
+    // No attestation / confirmation controls exist in the panel.
+    expect(screen.queryByTestId("criteria-attest-controls")).toBeNull();
+    expect(screen.queryByTestId("criteria-confirm-controls")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "No" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Confirm" })).toBeNull();
   });
 });
