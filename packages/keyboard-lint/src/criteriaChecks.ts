@@ -63,6 +63,7 @@ import {
   checkVersionLeadingZero,
   checkVersionVPrefix,
 } from "./checks/criteria/check-version.js";
+import { checkDeprecatedKpsLinkage } from "./checks/criteria/check-deprecated-kps.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
@@ -135,6 +136,16 @@ export function runCriteriaChecks(
     }),
   );
   findings.push(...checkWoffInPackage(filePaths, input.kpsFileNames, kpsPath));
+
+  // 15.3 — the judged keyboard's own .kps Related packages linkage
+  // (gated inside the check on deprecationInPlay).
+  findings.push(
+    ...checkDeprecatedKpsLinkage(
+      input.kpsText,
+      input.deprecationInPlay,
+      kpsPath,
+    ),
+  );
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.

@@ -54,4 +54,9 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_REGION_001_TAG",
   "KM_LINT_PUA_KEYBOARD_PLACEMENT",
   "KM_LINT_MATH_LATIN_LOOKALIKE",
+  // Spec 084 Batch 1 (doc + kps group) — 11.2 runs inside runDocChecks
+  // as the complement of 11.6; 15.3 reads the judged keyboard's own
+  // .kps text in runCriteriaChecks.
+  "KM_LINT_PHP_OSK_LAYERS_INCOMPLETE",
+  "KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING",
 ]);

@@ -151,7 +151,7 @@ describe("CriteriaPage — header and rows agree", () => {
 
     expect(screen.getAllByTestId("criteria-row")).toHaveLength(149);
     expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
-      "77 of 149 criteria resolved",
+      "79 of 149 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
     expect(counted).toBe(149);

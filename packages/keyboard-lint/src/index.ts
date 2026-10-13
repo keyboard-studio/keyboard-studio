@@ -2,7 +2,11 @@
 // Public API: the engine class, the lintWithContext helper, and individual check functions.
 
 export { KeyboardLintEngine } from "./lintEngine.js";
-export { lintContextTolerance, lintWithContext, runDocChecks } from "./lintContext.js";
+export {
+  lintContextTolerance,
+  lintWithContext,
+  runDocChecks,
+} from "./lintContext.js";
 export type { LintContext } from "./lintContext.js";
 export { runCriteriaChecks } from "./criteriaChecks.js";
 
@@ -40,6 +44,7 @@ export { checkHistoryStaleFileRefs } from "./checks/docs/check-3-7-history-stale
 export { checkCopyrightHolder } from "./checks/docs/check-4-7-copyright-holder.js";
 export { checkReadmeTargets } from "./checks/docs/check-5-7-readme-targets.js";
 export { checkHtmlWellFormed } from "./checks/docs/check-11-5-html-wellformed.js";
+export { checkOskLayersListed } from "./checks/docs/check-11-2-osk-layers.js";
 export { checkDataStatesComplete } from "./checks/docs/check-11-6-data-states.js";
 
 // spec 084 Batch 1 — the criteria checks (checks/criteria/*) and their
@@ -62,21 +67,34 @@ export {
   checkKvksBlank,
   irUsesRalt,
 } from "./checks/criteria/check-kvks.js";
-export { checkBitmapPlaceholder, bitmapReference } from "./checks/criteria/check-bitmap.js";
+export {
+  checkBitmapPlaceholder,
+  bitmapReference,
+} from "./checks/criteria/check-bitmap.js";
 export { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
 export { checkTouchLayoutFontMismatch } from "./checks/criteria/check-touch-font.js";
 export {
   checkIndustryFonts,
   checkWoffInPackage,
 } from "./checks/criteria/check-package-fonts.js";
-export { checkStrayScratchFiles, isScratchPath } from "./checks/criteria/check-scratch-files.js";
-export { checkRegion001, tagUsesRegion001 } from "./checks/criteria/check-bcp47.js";
+export {
+  checkStrayScratchFiles,
+  isScratchPath,
+} from "./checks/criteria/check-scratch-files.js";
+export {
+  checkRegion001,
+  tagUsesRegion001,
+} from "./checks/criteria/check-bcp47.js";
 export {
   scanProducedRanges,
   checkPuaPlacement,
   checkMathLatinLookalikes,
 } from "./checks/criteria/check-produced-set.js";
 export type { ProducedRanges } from "./checks/criteria/check-produced-set.js";
+export {
+  checkDeprecatedKpsLinkage,
+  deprecatedRelatedPackageIds,
+} from "./checks/criteria/check-deprecated-kps.js";
 export { checkPagenameFormat } from "./checks/docs/check-11-7-pagename-format.js";
 export { checkBodyParity } from "./checks/docs/check-11-9-body-parity.js";
 export { checkStyleParity } from "./checks/docs/check-11-10-style-parity.js";
