@@ -926,10 +926,26 @@
     "specs/084-criteria-compliance-page": {
       "title": "Feature Specification: Criteria compliance page — per-keyboard approval-criteria status in the decisions-tab pattern",
       "hash": "sha256:fa6d650ed0aed094",
-      "status": "unreviewed",
-      "implements": [],
+      "status": "implemented",
+      "implements": [
+        "packages/studio/src/criteria/resolveCriteria.ts",
+        "packages/studio/src/criteria/criteriaTypes.ts",
+        "packages/studio/src/criteria/applicability.ts",
+        "packages/studio/src/criteria/implementedChecks.ts",
+        "packages/studio/src/criteria/assembleLintContext.ts",
+        "packages/studio/src/criteria/CriteriaPage.tsx",
+        "packages/studio/src/criteria/CriterionRow.tsx",
+        "packages/studio/src/criteria/CriteriaSummary.tsx",
+        "packages/studio/src/criteria/deriveCriteriaFacts.ts",
+        "packages/studio/src/hooks/useCriteriaFindings.ts",
+        "packages/studio/src/hooks/useAuthoredCriteria.ts",
+        "packages/studio/src/hooks/useCompareCriteria.ts",
+        "packages/studio/src/components/CriteriaScreen.tsx",
+        "packages/studio/src/lib/collectDocLintInputFromVfs.ts",
+        "packages/studio/src/stores/criteriaRecordStore.ts"
+      ],
       "decisions": [],
-      "notes": "Amendment + implementation plan approved by Matthew 2026-10-13 (\"Implement spec 084 per this plan\"); implementation in progress on branch km/084-criteria-page. Originally proposed — planning spec only (PR #1937). Acknowledged 2026-10-13 for the amendment/plan-approval status update."
+      "notes": "Implemented 2026-10-13 on branch km/084-criteria-page per plan.md decisions D1-D9: authored page at #criteria route (Output summary card) + Check criteria button inline on the Compare tab in foreign mode (spec 057 FR-023 isolation preserved; T5.3 preview-mutation verification: per-criterion statuses equal on pristine vs preview-mutated VFS). Layer-c honestly 19 of 67 implemented (48 Not yet checkable); yellow band = on-page author attestation (no survey questions exist for the 32 surveyQuestionIds). Originally proposed as planning spec (PR #1937); amendment + plan approved by Matthew 2026-10-13."
     },
     "specs/085-adaptive-placement-basis": {
       "title": "Feature Specification: Adaptive placement basis — base-derived default, author-observed override, expressed driver",

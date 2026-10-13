@@ -947,7 +947,7 @@ export async function driveHelpPhase(
  * the label only; contract §1 keeps the token so bookmarks and every existing
  * hash assertion survive).
  */
-export type TabRoute = "survey" | "preview" | "output" | "trail" | "flowmap";
+export type TabRoute = "survey" | "preview" | "output" | "trail" | "flowmap" | "criteria";
 
 /**
  * Switch top-level tabs the way an author does — by clicking the nav link.
