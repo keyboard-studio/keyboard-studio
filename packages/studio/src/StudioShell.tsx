@@ -345,7 +345,22 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // Spec 089 FR-005: scaffoldSpec + surveyContext are derived from the
   // decision store, not held as session fields.
   const decisions = useDecisionStore((s) => s.decisions);
-  const scaffoldSpec = deriveScaffoldSpec(decisions);
+  // Memoized (#2044): deriveScaffoldSpec returns a FRESH object on every
+  // call once the copy-track identity decisions exist, and scaffoldSpec
+  // feeds useKeyboardArtifact's effect dependency arrays. Deriving it bare
+  // on every render handed the artifact pipeline a new dep identity per
+  // render; each artifact stage transition re-rendered SurveyView, which
+  // re-derived the spec, which refired the transform re-apply+recompile
+  // effect — a self-sustaining loop at ~6–8 compiles/second that froze the
+  // tab on carve → Continue. The decision store only replaces `decisions`
+  // when a decision actually changes, so keying the memo on it keeps the
+  // spec's identity stable between genuine changes. (The hook also guards
+  // by value now — see lastTransformRunKeyRef in useKeyboardArtifact.ts —
+  // but the churn stops here, at the source.)
+  const scaffoldSpec = useMemo(
+    () => deriveScaffoldSpec(decisions),
+    [decisions],
+  );
   const localStart = useSurveySessionStore((s) => s.localStart);
   const surveyContext = deriveSurveyContext(decisions);
 
