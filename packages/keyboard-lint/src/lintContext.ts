@@ -4,7 +4,8 @@
 // package-internal function that accepts optional context so 18.6 can run when
 // the compile gate provides both a KeyboardIR and a LinguistInventory.
 
-import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, ToleranceReport, TouchLayoutIR, DocLintInput } from "@keyboard-studio/contracts";
+import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, ToleranceReport, TouchLayoutIR, DocLintInput, CriteriaLintInput } from "@keyboard-studio/contracts";
+import { runCriteriaChecks } from "./criteriaChecks.js";
 import { parseTouchLayout, touchLayoutPath } from "./parsers/parseTouchLayout.js";
 import { checkLongpress } from "./checks/check-18-1-longpress.js";
 import { checkTouchRows } from "./checks/check-18-2-touch-rows.js";
@@ -110,6 +111,15 @@ export interface LintContext {
    * optional inputs above.
    */
   docLintInput?: DocLintInput;
+  /**
+   * Engine-parsed .kvks/.kps facts plus mode flags (contracts
+   * CriteriaLintInput); required for the spec 084 Batch 1 criteria
+   * checks in criteriaChecks.ts. Absent -> silently skipped, same
+   * gating shape as the other optional inputs above. Only the criteria
+   * assembly assembles this — the locked phase-gate lint() path never
+   * sets it, so no other surface's findings change.
+   */
+  criteriaInput?: CriteriaLintInput;
 }
 
 /**
@@ -182,6 +192,14 @@ export async function lintWithContext(
   // gating shape as every optional input above).
   if (ctx.docLintInput) {
     findings.push(...runDocChecks(ctx.docLintInput));
+  }
+
+  // spec 084 Batch 1: the criteria checks — only when the criteria
+  // assembly has assembled a CriteriaLintInput (same gating shape).
+  if (ctx.criteriaInput) {
+    findings.push(
+      ...runCriteriaChecks(fs, keyboardId, ctx.keyboardIR, ctx.criteriaInput),
+    );
   }
 
   return findings;

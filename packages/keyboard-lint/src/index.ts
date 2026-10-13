@@ -4,6 +4,7 @@
 export { KeyboardLintEngine } from "./lintEngine.js";
 export { lintContextTolerance, lintWithContext, runDocChecks } from "./lintContext.js";
 export type { LintContext } from "./lintContext.js";
+export { runCriteriaChecks } from "./criteriaChecks.js";
 
 export { parseTouchLayout } from "./parsers/parseTouchLayout.js";
 
@@ -40,6 +41,42 @@ export { checkCopyrightHolder } from "./checks/docs/check-4-7-copyright-holder.j
 export { checkReadmeTargets } from "./checks/docs/check-5-7-readme-targets.js";
 export { checkHtmlWellFormed } from "./checks/docs/check-11-5-html-wellformed.js";
 export { checkDataStatesComplete } from "./checks/docs/check-11-6-data-states.js";
+
+// spec 084 Batch 1 — the criteria checks (checks/criteria/*) and their
+// shared produced-set scan (Batch 2's 7.12 reuses scanProducedRanges).
+export {
+  checkVersionFormat,
+  checkVersionLeadingZero,
+  checkVersionVPrefix,
+} from "./checks/criteria/check-version.js";
+export {
+  checkIdContainsKeyboard,
+  checkDisplayNameUnderscore,
+} from "./checks/criteria/check-identity.js";
+export {
+  checkTargetsAnyAlone,
+  checkTargetsMobileWithoutTouch,
+} from "./checks/criteria/check-targets.js";
+export {
+  checkRaltMissingUsealtgr,
+  checkKvksBlank,
+  irUsesRalt,
+} from "./checks/criteria/check-kvks.js";
+export { checkBitmapPlaceholder, bitmapReference } from "./checks/criteria/check-bitmap.js";
+export { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
+export { checkTouchLayoutFontMismatch } from "./checks/criteria/check-touch-font.js";
+export {
+  checkIndustryFonts,
+  checkWoffInPackage,
+} from "./checks/criteria/check-package-fonts.js";
+export { checkStrayScratchFiles, isScratchPath } from "./checks/criteria/check-scratch-files.js";
+export { checkRegion001, tagUsesRegion001 } from "./checks/criteria/check-bcp47.js";
+export {
+  scanProducedRanges,
+  checkPuaPlacement,
+  checkMathLatinLookalikes,
+} from "./checks/criteria/check-produced-set.js";
+export type { ProducedRanges } from "./checks/criteria/check-produced-set.js";
 export { checkPagenameFormat } from "./checks/docs/check-11-7-pagename-format.js";
 export { checkBodyParity } from "./checks/docs/check-11-9-body-parity.js";
 export { checkStyleParity } from "./checks/docs/check-11-10-style-parity.js";
