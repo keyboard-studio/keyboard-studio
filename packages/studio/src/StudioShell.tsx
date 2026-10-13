@@ -76,6 +76,7 @@ import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useStepNavStore } from "./stores/stepNavStore.ts";
 import { useSurveyAnswerStore, peekStepAnswers } from "./stores/surveyAnswerStore.ts";
 import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/decisionStore.ts";
+import { useCriteriaRecordStore } from "./stores/criteriaRecordStore.ts";
 import { deriveScaffoldSpec, deriveSurveyContext } from "./decisions/identitySelectors.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import {
@@ -1400,6 +1401,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     // Spec 088 FR-007: the decision records belong to the abandoned project
     // too — reset in the same start-over path as the answer store.
     useDecisionStore.getState().reset();
+    // Spec 084 D5: the criteria attestations and confirmations belong to
+    // the abandoned project too — reset beside the decision records.
+    useCriteriaRecordStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
