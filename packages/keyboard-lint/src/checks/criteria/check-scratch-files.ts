@@ -53,7 +53,6 @@ export function isScratchPath(path: string): boolean {
 /** 1.13 foreign arm — one finding naming every scratch artefact found. */
 export function checkStrayScratchFiles(
   filePaths: readonly string[],
-  keyboardId: string,
 ): LintFinding[] {
   const offenders = filePaths.filter(isScratchPath);
   if (offenders.length === 0) return [];

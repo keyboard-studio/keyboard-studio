@@ -117,18 +117,22 @@ describe("checkWoffInPackage (9.6)", () => {
 describe("checkStrayScratchFiles (1.13 foreign arm)", () => {
   it("passes a clean keyboard folder", () => {
     expect(
-      checkStrayScratchFiles(
-        ["source/demo.kmn", "source/demo.kps", "HISTORY.md", "README.md"],
-        "demo",
-      ),
+      checkStrayScratchFiles([
+        "source/demo.kmn",
+        "source/demo.kps",
+        "HISTORY.md",
+        "README.md",
+      ]),
     ).toEqual([]);
   });
 
   it("flags backup and scratch artefacts, naming them", () => {
-    const findings = checkStrayScratchFiles(
-      ["source/demo.kmn", "source/demo.kmn.bak", "test.txt", ".DS_Store"],
-      "demo",
-    );
+    const findings = checkStrayScratchFiles([
+      "source/demo.kmn",
+      "source/demo.kmn.bak",
+      "test.txt",
+      ".DS_Store",
+    ]);
     expect(findings).toHaveLength(1);
     expect(findings[0]!.code).toBe("KM_LINT_STRAY_SCRATCH_FILES");
     expect(findings[0]!.message).toContain("demo.kmn.bak");

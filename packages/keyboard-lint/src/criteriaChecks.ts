@@ -98,7 +98,7 @@ export function runCriteriaChecks(
 
   // 1.13 foreign arm — authored mode precertifies this and never scans.
   if (input.scratchScan) {
-    findings.push(...checkStrayScratchFiles(filePaths, keyboardId));
+    findings.push(...checkStrayScratchFiles(filePaths));
   }
 
   // 7.10 — raw .kmn text scan; runs even when the IR failed to parse.
