@@ -4,7 +4,7 @@
 2026-10-05, planning-only) + Amendment 2026-10-13 in the same file
 (Compare-tab button, yellow-band attestation, corrected check counts).
 **Branch for this plan**: `spec/084-criteria-plan` off `origin/main`
-@ 9fa2f17d. **Status**: planned, not implemented.
+@ 9fa2f17d. **Status**: approved 2026-10-13, implementation in progress.
 **Owner directive for the amendment**: 2026-10-13 — the page is mainly
 for the output (studio-built) keyboard, plus a button on the existing
 preview tab to check an existing keyboard.

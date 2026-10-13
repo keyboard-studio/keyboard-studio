@@ -4,9 +4,11 @@
 
 **Created**: 2026-10-05
 
-**Status**: **Proposed** — planning spec only; no implementation.
-Implementation plan added 2026-10-13 (`plan.md` + `tasks.md` in this
-directory), including Amendment 2026-10-13 below.
+**Status**: **Approved — implementation in progress.** Amendment +
+implementation plan approved by Matthew 2026-10-13 ("Implement spec 084
+per this plan"); implementation in progress on branch
+`km/084-criteria-page`. Implementation plan added 2026-10-13 (`plan.md` +
+`tasks.md` in this directory), including Amendment 2026-10-13 below.
 
 **Input**: Owner directive 2026-10-05 (side-chat): surface the keyboard-approval
 criteria on a page similar to the decisions tab, so that once the studio

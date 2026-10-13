@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-11",
+  "lastUpdated": "2026-10-13",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -925,11 +925,11 @@
     },
     "specs/084-criteria-compliance-page": {
       "title": "Feature Specification: Criteria compliance page — per-keyboard approval-criteria status in the decisions-tab pattern",
-      "hash": "sha256:3b6c9f55b6d40e07",
+      "hash": "sha256:fa6d650ed0aed094",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
-      "notes": "Proposed — planning spec only (PR #1937); no implementation yet. Acknowledged to register the section; implementation is future work."
+      "notes": "Amendment + implementation plan approved by Matthew 2026-10-13 (\"Implement spec 084 per this plan\"); implementation in progress on branch km/084-criteria-page. Originally proposed — planning spec only (PR #1937). Acknowledged 2026-10-13 for the amendment/plan-approval status update."
     },
     "specs/085-adaptive-placement-basis": {
       "title": "Feature Specification: Adaptive placement basis — base-derived default, author-observed override, expressed driver",
