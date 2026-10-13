@@ -12,6 +12,9 @@
 //                         while the tab is labelled "Compare".
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
+//   #criteria           — CriteriaScreen: the criteria compliance page
+//                         (spec 084) — every catalog criterion judged
+//                         against the keyboard Output would ship.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
@@ -107,6 +110,7 @@ import { runCompleteness } from "./dashboard/completeness.ts";
 import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
+import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
 import { Trans, useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
@@ -174,6 +178,7 @@ const VALID_ROUTES = new Set<RouteId>(
       "output",
       "flowmap",
       "trail",
+      "criteria",
       "profile",
     ] as const
   ).filter((r) => r !== "flowmap" || SHOW_FLOWMAP),
@@ -2135,6 +2140,12 @@ export function StudioShell() {
           stepStatuses={trailStepStatuses}
         />
       );
+      break;
+    case "criteria":
+      // Spec 084. The host assembles its own pipeline, findings, and
+      // record-store callbacks (see CriteriaScreen's header) — the pure
+      // CriteriaPage it renders reads no store, per the D8 layer rule.
+      content = <CriteriaScreen />;
       break;
     case "profile":
       content = <ProfileScreen />;
