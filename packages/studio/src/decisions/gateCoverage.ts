@@ -78,6 +78,31 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "11.7-pagename-format", code: "KM_LINT_PHP_PAGENAME_FORMAT", criteria: "welcome.php pagename follows the house format.", why: "generated documentation markup; no DecisionId" },
   { id: "11.9-body-parity", code: "KM_LINT_PHP_HTM_BODY_MISMATCH", criteria: "welcome.php and welcome.htm bodies agree.", why: "generated documentation markup; no DecisionId" },
   { id: "11.10-style-parity", code: "KM_LINT_PHP_HTM_STYLE_MISMATCH", criteria: "welcome.php and welcome.htm inline styles agree.", why: "generated documentation markup; no DecisionId" },
+  // Spec 084 Batch 1 (criteria checks in keyboard-lint's checks/criteria/
+  // and docs/check-11-2): submission-hygiene checks the criteria page
+  // judges; none of them validates a fact a DecisionId captures, so all
+  // are honest gaps here — the criteria resolver, not the decision
+  // trail, is their consumer.
+  { id: "1.6-id-contains-keyboard", code: "KM_LINT_ID_CONTAINS_KEYBOARD", criteria: "Keyboard ID, folder name, and display name do not contain the word \"keyboard\".", why: "keyboard identity naming; no DecisionId captures the display name" },
+  { id: "1.13-stray-scratch-files", code: "KM_LINT_STRAY_SCRATCH_FILES", criteria: "No stray scratch or test files in the keyboard folder.", why: "repository file hygiene; no DecisionId" },
+  { id: "2.3-version-format", code: "KM_LINT_VERSION_FORMAT", criteria: "Version number is dot-separated and entirely numeric.", why: "keyboard version is not a DecisionId" },
+  { id: "2.4-version-leading-zero", code: "KM_LINT_VERSION_LEADING_ZERO", criteria: "No version component has a leading zero.", why: "keyboard version is not a DecisionId" },
+  { id: "2.5-version-v-prefix", code: "KM_LINT_VERSION_V_PREFIX", criteria: "Version has no `v` prefix and no non-numeric labels.", why: "keyboard version is not a DecisionId" },
+  { id: "7.2-targets-any-alone", code: "KM_LINT_TARGETS_ANY_NOT_ALONE", criteria: ".kmn targets line uses `any` alone, not combined with platform names.", why: "platform targets are not a DecisionId" },
+  { id: "7.3-targets-mobile-without-touch", code: "KM_LINT_TARGETS_MOBILE_WITHOUT_TOUCH", criteria: ".kmn targets do not include `mobile` unless a touch layout exists.", why: "platform targets are not a DecisionId" },
+  { id: "7.5-ralt-usealtgr", code: "KM_LINT_RALT_MISSING_USEALTGR", criteria: "If the keyboard uses RALT, the .kvks includes the usealtgr tag.", why: "visual keyboard flags; no DecisionId" },
+  { id: "7.7a-display-name-underscore", code: "KM_LINT_DISPLAY_NAME_UNDERSCORE", criteria: "Keyboard display name contains no literal underscore characters.", why: "keyboard identity naming; no DecisionId captures the display name" },
+  { id: "7.9-bitmap-placeholder", code: "KM_LINT_BITMAP_PLACEHOLDER", criteria: "store(&BITMAP) references the actual keyboard .ico, not a placeholder.", why: "package asset references; no DecisionId" },
+  { id: "7.10-store-syntax", code: "KM_LINT_STORE_SYNTAX_INVALID", criteria: "All .kmn string-literal stores have balanced quotes and valid syntax.", why: "source syntax hygiene; no DecisionId" },
+  { id: "7.16-kvks-blank", code: "KM_LINT_KVKS_BLANK", criteria: "The .kvks on-screen keyboard layout is populated, not blank.", why: "visual keyboard contents; no DecisionId" },
+  { id: "7.20-touch-font-mismatch", code: "KM_LINT_TOUCH_LAYOUT_FONT_MISMATCH", criteria: "Same font is selected for phone and tablet layouts.", why: "touch layout font selection; no DecisionId" },
+  { id: "8.12-kps-industry-font", code: "KM_LINT_KPS_INDUSTRY_FONT", criteria: "No industry fonts (Arial, Times, Tahoma, etc.) in the package.", why: "package font selection; no DecisionId" },
+  { id: "9.6-woff-in-package", code: "KM_LINT_WOFF_FONT_IN_PACKAGE", criteria: "No .woff or web-only font formats in keyboard packages.", why: "package font formats; no DecisionId" },
+  { id: "11.2-php-osk-layers", code: "KM_LINT_PHP_OSK_LAYERS_INCOMPLETE", criteria: "If using OSK syntax, all desktop and mobile layers are listed in data-states.", why: "generated documentation markup; no DecisionId" },
+  { id: "12.4-region-001", code: "KM_LINT_REGION_001_TAG", criteria: "Region code 001 is never used in BCP47 tags.", why: "language tagging; no DecisionId" },
+  { id: "13.1-pua-placement", code: "KM_LINT_PUA_KEYBOARD_PLACEMENT", criteria: "PUA codepoint use means the keyboard is in experimental/.", why: "encoding placement; no DecisionId" },
+  { id: "13.4-math-latin-lookalikes", code: "KM_LINT_MATH_LATIN_LOOKALIKE", criteria: "No mathematical Latin look-alike characters in keyboard output.", why: "output character hygiene; no DecisionId" },
+  { id: "15.3-deprecated-kps-linkage", code: "KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING", criteria: "Legacy package ID is listed in the new keyboard's .kps Related packages as Deprecated.", why: "deprecation bookkeeping; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {

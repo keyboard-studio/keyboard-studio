@@ -158,6 +158,41 @@ are author-influenced), not file-inventory properties.
    hint already document this). **This is Matthew's call, not a
    silent fix.**
 
+## Batch 1 landed (2026-10-13, PR #2048)
+
+Batch 1 (the plumb + scan batch below) is implemented on this branch:
+commits `e99bf745` (IR/VFS lint checks), `b9dc15e1` (doc + kps checks),
+`41b3d0e4` (precertify), `ade0ecd6` (compile-result mapping),
+`62414744` (eslint fix). **IMPLEMENTED_LINT_CODES: 19 → 41** — 39
+producer-scanned lint/doc checks plus the 2 assembly-synthesized
+compile mappings (`ASSEMBLY_SYNTHESIZED_CODES`, pinned exactly by the
+catalog drift guard). 1.1 is precertified (authored only), not a lint
+code; 1.13 is both precertified (authored) and scanned (foreign).
+
+All 23 listed rows landed (the batch text says 22; the row list
+enumerates 23 — counted and verified individually): PRECERTIFY 1.1,
+1.13 · compile mapping 7.6, 7.21 · version validator 2.3, 2.4, 2.5 ·
+1.6, 7.7a · scans 7.2, 7.3, 7.5, 7.9, 7.10, 7.16, 7.20, 8.12, 9.6,
+11.2, 12.4, 13.1, 13.4, 15.3.
+
+Fixture verification (the real `sil_cameroon_qwerty` corpus folder —
+the Ewondo walk's base — judged in authored mode through the real
+assembly + resolver, with a clean compile result): every Batch 1 row
+resolves — 22 Met, 15.3 Not applicable (not deprecated) — and Not yet
+checkable falls **44 → 22** (22 rows resolved; the remaining 22 are
+Batches 2–5, the KPJ-blocked pair, and the EXTERNAL rows). No Batch 1
+check false-fires on this real, merged keyboard.
+
+Placement notes: 11.2 is a doc check in `runDocChecks`; 15.3 reads the
+judged keyboard's own `.kps` text via `CriteriaLintInput`; the
+.kvks/.kps parsers stay engine-side and their facts cross into
+keyboard-lint as a contracts shape (keyboard-lint imports contracts
+only). One interaction pinned in `compareCriteriaVerification.test.ts`:
+7.9 reads `&BITMAP`, and the Compare preview strip removes that store
+when its `.ico` is dangling, so 7.9 is the single named
+pristine-vs-mutated divergence (Not met → Met) — both verdicts honest
+about the VFS judged.
+
 ## Recommended implementation batches
 
 - **Batch 1 — plumb + scan (all S, inputs in hand; 22 rows):**
