@@ -5,6 +5,8 @@
 **Created**: 2026-10-05
 
 **Status**: **Proposed** — planning spec only; no implementation.
+Implementation plan added 2026-10-13 (`plan.md` + `tasks.md` in this
+directory), including Amendment 2026-10-13 below.
 
 **Input**: Owner directive 2026-10-05 (side-chat): surface the keyboard-approval
 criteria on a page similar to the decisions tab, so that once the studio
@@ -177,3 +179,71 @@ never claim the keyboard "is approved" or "will be approved".
 - New per-project record for red-checklist confirmations (mirroring the
   decision record's append-only style, session/project scope TBD in
   implementation)
+
+## Amendment 2026-10-13 — Compare-tab button, yellow-band attestation, corrected counts
+
+Owner directive 2026-10-13: the page is mainly for the output
+(studio-built) keyboard, and it would be helpful to have a button to
+check existing keyboards on the existing preview tab. Full reasoning,
+architecture, and task breakdown: `plan.md` / `tasks.md` in this
+directory. This amendment adds one scenario and corrects three
+things the original text got wrong or left unimplementable:
+
+### US6 — check an existing keyboard from the Compare tab (P1)
+
+The preview tab (route token `preview`, labelled "Compare",
+`CompareScreen`, spec 057 US2) gains a **Check criteria** button,
+enabled when a keyboard is loaded and its artifact is ready. It opens
+the same criteria list inline on that tab, resolved in **foreign
+mode** against the loaded keyboard's VFS:
+
+1. **Given** a foreign keyboard loaded on Compare, **When** the
+   author clicks Check criteria, **Then** all 149 criteria render
+   with statuses resolved from that keyboard's own files.
+2. Scaffolder-bake criteria are **Not yet checkable** in foreign
+   mode (no scaffolder ran; "Met by construction" is a claim only
+   a studio-built keyboard may make), with that reason as evidence.
+3. Yellow-survey criteria show Needs author and red-checklist
+   criteria show Needs human, **without** answer/confirm controls:
+   there is no project record on this tab, and spec 057 FR-023
+   isolation is structural — the check writes nothing to the working
+   copy, the survey/decision stores, or any per-project record.
+4. Clicking the button changes nothing about the author's own
+   keyboard (the existing Compare isolation tests must still pass,
+   extended to cover the click).
+
+This is a single-keyboard read, not the automatic comparison view
+the Non-goals defer; the shared resolver keeps that future view
+possible.
+
+### Correction 1 — implemented layer-c checks: 19 of 67
+
+The original text said "roughly two-thirds of the band" is
+unimplemented, following a "~26 implemented" shorthand that counts
+emitted lint codes, not criteria-mapped ones. Verified against
+`packages/keyboard-lint` on 2026-10-13 (the gateCoverage scanning
+method): **19** of the 67 `lintRuleId`s have an implemented check
+(13 documentation codes, `KM_LINT_INVENTORY_UNCOVERED`, 5 §18
+`KM_WARN_*` codes); **48 are Not yet checkable**. 9 further emitted
+codes have no criteria row and are out of scope for the resolver.
+
+### Correction 2 — the yellow band has no survey answers to read
+
+The original band handling assumed the 32 `surveyQuestionId`s key
+real survey answers. They do not: no question module, flow, decision,
+or answer-store entry uses any of them, and no answer semantics are
+defined anywhere. US4 is therefore implemented by **author
+attestation on the page itself** (plan decision D3): a Needs author
+row expands to the criterion as a question with Yes / No /
+Not applicable controls, recorded per project alongside the
+red-checklist confirmations (one new draft-carried record,
+plan D5). Minting the 32 as real survey-walk questions is a
+follow-up decision, not part of this spec.
+
+### Placement — own route, linked from Output
+
+The authored page is its own route (token `criteria`, label
+"Criteria"), following the decisions-trail precedent, with a summary
+card on the Output screen linking to it — Output remains its main
+home and discovery point, but the page is reachable before Output
+is unblocked and is deep-linkable like `#trail`.
