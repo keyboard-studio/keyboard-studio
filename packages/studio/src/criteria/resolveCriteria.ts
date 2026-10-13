@@ -29,6 +29,7 @@ import type {
   ResolvedRow,
 } from "./criteriaTypes.ts";
 import { IMPLEMENTED_LINT_CODES } from "./implementedChecks.ts";
+import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
 
 const ALL_STATUSES: readonly CriterionStatus[] = [
   "met",
@@ -132,6 +133,26 @@ function resolveRow(
 
     case "layer-c-enforce": {
       const lintRuleId = criterion.lintRuleId;
+      // Precertification (Batch 1): decided at generation time from the
+      // generator's closed manifest, prior to and independent of any
+      // lint pass. Authored mode only — the mode check is here, in the
+      // resolver, so a foreign judgment cannot claim it even if a host
+      // passed the set by mistake.
+      if (input.mode === "authored" && input.precertified?.has(lintRuleId)) {
+        return {
+          criterion,
+          status: "met",
+          controls: null,
+          evidence: () => ({
+            kind: "precertified",
+            lines: [
+              PRECERTIFY_EVIDENCE[lintRuleId] ??
+                "Precertified by generation: settled by the generator's closed output manifest.",
+            ],
+            lintRuleId,
+          }),
+        };
+      }
       if (!IMPLEMENTED_LINT_CODES.has(lintRuleId)) {
         return {
           criterion,

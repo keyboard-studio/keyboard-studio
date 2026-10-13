@@ -321,6 +321,63 @@ describe("resolveCriteria — attestations and confirmations", () => {
   });
 });
 
+describe("resolveCriteria — precertification (Batch 1)", () => {
+  const precertified = new Set([
+    "KM_LINT_FILES_OUTSIDE_FOLDER",
+    "KM_LINT_STRAY_SCRATCH_FILES",
+  ]);
+  const filesOutside = criterionByLintRuleId("KM_LINT_FILES_OUTSIDE_FOLDER");
+  const strayScratch = criterionByLintRuleId("KM_LINT_STRAY_SCRATCH_FILES");
+
+  it("resolves 1.1 Met in authored mode from precertification, with generation evidence", () => {
+    const row = rowFor(filesOutside.id, makeInput({ precertified }));
+    expect(row.status).toBe("met");
+    const evidence = row.evidence();
+    expect(evidence.kind).toBe("precertified");
+    expect(evidence.lines.join(" ")).toContain("Precertified by generation");
+    expect(evidence.lines.join(" ")).toContain("closed manifest");
+  });
+
+  it("resolves 1.13 Met in authored mode via precertification, not the lint-pass path", () => {
+    const row = rowFor(strayScratch.id, makeInput({ precertified }));
+    expect(row.status).toBe("met");
+    expect(row.evidence().kind).toBe("precertified");
+  });
+
+  it("without the precertified set, authored 1.1 stays Not yet checkable (no lint check exists for it)", () => {
+    const row = rowFor(filesOutside.id, makeInput());
+    expect(row.status).toBe("not-yet-checkable");
+    expect(row.evidence().kind).toBe("not-implemented");
+  });
+
+  it("foreign mode can never claim precertification, even if the set is passed by mistake", () => {
+    const input = makeInput({ mode: "foreign", precertified });
+    const outside = rowFor(filesOutside.id, input);
+    expect(outside.status).toBe("not-yet-checkable");
+    expect(outside.evidence().kind).toBe("not-implemented");
+    // 1.13 foreign resolves through its real scan check instead: with
+    // no findings it is a lint pass, never a precertification.
+    const stray = rowFor(strayScratch.id, input);
+    expect(stray.status).toBe("met");
+    expect(stray.evidence().kind).toBe("lint-pass");
+  });
+
+  it("a foreign scratch finding marks 1.13 Not met through the scan arm", () => {
+    const finding: LintFinding = {
+      code: "KM_LINT_STRAY_SCRATCH_FILES",
+      severity: "warning",
+      layer: "C",
+      message: "The keyboard folder contains stray scratch/test file(s): test.txt.",
+    };
+    const row = rowFor(
+      strayScratch.id,
+      makeInput({ mode: "foreign", lintFindings: [finding] }),
+    );
+    expect(row.status).toBe("not-met");
+    expect(row.evidence().kind).toBe("lint-finding");
+  });
+});
+
 describe("resolveCriteria — applicability", () => {
   const noFacts: CriteriaFacts = {
     fontBundled: false,

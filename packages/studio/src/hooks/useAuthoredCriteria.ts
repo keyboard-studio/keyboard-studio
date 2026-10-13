@@ -20,6 +20,7 @@ import { useMemo } from "react";
 import { ALL_CRITERIA } from "@keyboard-studio/contracts";
 
 import { deriveCriteriaFacts } from "../criteria/deriveCriteriaFacts.ts";
+import { PRECERTIFIED_LINT_CODES } from "../criteria/precertify.ts";
 import { resolveCriteria } from "../criteria/resolveCriteria.ts";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
@@ -42,6 +43,10 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
       record: { attestations, confirmations },
       facts: deriveCriteriaFacts(vfs),
       contextMissing,
+      // The artifact under judgment is the generator's own output
+      // bundle, so the generation-manifest criteria are precertified
+      // (precertify.ts). Foreign mode never passes this.
+      precertified: PRECERTIFIED_LINT_CODES,
     });
   }, [ready, vfs, lintFindings, contextMissing, attestations, confirmations]);
 }

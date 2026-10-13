@@ -81,6 +81,15 @@ export interface CriteriaInput {
    * that did not run is not a check that passed.
    */
   contextMissing?: Readonly<Record<string, string>>;
+  /**
+   * Lint codes precertified by generation (precertify.ts): settled at
+   * generation time from the generator's closed manifest, authored mode
+   * only. The authored host supplies PRECERTIFIED_LINT_CODES because
+   * the artifact it judges IS the generated output bundle; the foreign
+   * host never supplies it, and the resolver ignores it in foreign mode
+   * regardless — a foreign keyboard can never claim precertification.
+   */
+  precertified?: ReadonlySet<string>;
 }
 
 /**
@@ -92,6 +101,7 @@ export interface CriteriaInput {
 export interface EvidenceModel {
   kind:
     | "scaffolder"
+    | "precertified"
     | "lint-pass"
     | "lint-finding"
     | "not-implemented"
