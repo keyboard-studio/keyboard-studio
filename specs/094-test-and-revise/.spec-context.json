@@ -3,7 +3,7 @@
   "specName": "Test-and-revise loop before publishing",
   "branch": "094-test-and-revise",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
