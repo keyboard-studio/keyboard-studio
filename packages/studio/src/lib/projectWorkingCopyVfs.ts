@@ -96,6 +96,7 @@ import {
   collectLayerCombosInUse,
   applyIdentityToKps,
   applyContextToleranceOverlay,
+  TOUCH_LAYOUT_JSON_INDENT,
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
@@ -338,6 +339,23 @@ export interface ProjectWorkingCopyVfsResult {
 // ---------------------------------------------------------------------------
 
 /**
+ * Re-indent a single-line `.keyman-touch-layout` string to the tabulated form
+ * every writer now emits (`TOUCH_LAYOUT_JSON_INDENT`). `touchLayoutJson` is
+ * persisted with the draft and restored verbatim, so a draft saved before the
+ * writers were fixed still carries compact JSON — which Keyman Developer
+ * cannot open. Already-multi-line input and unparseable input pass through
+ * unchanged, so a current draft's bytes are never rewritten.
+ */
+export function tabulateTouchLayoutJson(json: string): string {
+  if (json.includes("\n")) return json;
+  try {
+    return JSON.stringify(JSON.parse(json), null, TOUCH_LAYOUT_JSON_INDENT);
+  } catch {
+    return json;
+  }
+}
+
+/**
  * Apply carve + assignments + identity projection layers onto `input.vfs`
  * in-place, returning any accumulated warnings.
  *
@@ -384,7 +402,11 @@ export function projectWorkingCopyVfs(
   // Previously serializeWorkingCopy injected this inline before calling this helper;
   // centralizing it here is the fix that makes the OSK preview equivalent to the ZIP.
   if (touchLayoutJson !== null && touchLayoutJson !== undefined) {
-    vfs.set(`source/${keyboardId}.keyman-touch-layout`, touchLayoutJson, false);
+    vfs.set(
+      `source/${keyboardId}.keyman-touch-layout`,
+      tabulateTouchLayoutJson(touchLayoutJson),
+      false,
+    );
   }
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.

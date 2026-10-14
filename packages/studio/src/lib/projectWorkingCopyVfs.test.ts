@@ -474,7 +474,26 @@ describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
     });
     const entry = vfs.get("source/test_kb.keyman-touch-layout");
     expect(entry).toBeDefined();
-    expect(entry?.content).toBe(touchJson);
+    // A one-line layout (e.g. restored from a draft saved before every writer
+    // tabulated its output) is re-indented: Keyman Developer cannot open it.
+    expect(entry?.content).toBe(JSON.stringify(JSON.parse(touchJson), null, 2));
+  });
+
+  it("leaves an already-tabulated touchLayoutJson byte-identical", async () => {
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = makeVfs();
+    const touchJson = '{\n  "phone": {\n    "layer": []\n  }\n}';
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      startIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      touchLayoutJson: touchJson,
+    });
+    expect(vfs.get("source/test_kb.keyman-touch-layout")?.content).toBe(touchJson);
   });
 
   it("does NOT create a .keyman-touch-layout entry when touchLayoutJson is null", async () => {
@@ -552,7 +571,7 @@ describe("projectWorkingCopyVfs — touch layout injection (step 0)", () => {
     // New path must hold the injected content.
     const renamed = vfs.get("source/ha_sil.keyman-touch-layout");
     expect(renamed).toBeDefined();
-    expect(renamed?.content).toBe(touchJson);
+    expect(renamed?.content).toBe(JSON.stringify(JSON.parse(touchJson), null, 2));
   });
 });
 
