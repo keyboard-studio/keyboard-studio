@@ -1,1 +1,26 @@
-{"approach":"One pure resolver (resolveCriteria) + one presentation, two hosts: authored page at new #criteria route (linked from Output) and inline panel on the Compare tab. Lint assembly reuses useDocumentationFindings for the doc band and KeyboardLintEngine.lintWithContext over the judged VFS for the rest. Attestations/confirmations in a new draft-carried criteriaRecordStore, authored projects only.","branch":"spec/084-criteria-plan","currentStep":"plan","history":[{"date":"2026-10-05","step":"specify","summary":"Planning spec PR #1937 (merged 847947df): criteria compliance page, 149 criteria, six statuses, decisions-tab pattern, planning-only."},{"date":"2026-10-13","step":"plan","summary":"Full implementation plan (plan.md + tasks.md) incl. Amendment 2026-10-13: Compare-tab Check criteria button in foreign mode (spec 057 isolation preserved), yellow band resolved by on-page author attestation (no survey questions exist for the 32 surveyQuestionIds), corrected layer-c counts (19 of 67 implemented, 48 not yet checkable)."}],"specName":"084-criteria-compliance-page","status":"planned","step_summaries":{"plan":"plan.md (architecture, decisions D1-D9, verified counts/APIs, isolation constraints, testing gates) and tasks.md (Phases 0-6) written 2026-10-13. No implementation."},"workflow":"speckit"}
+{
+  "approach": "One pure resolver (resolveCriteria) + one presentation, two hosts: authored page at new #criteria route (linked from Output) and inline panel on the Compare tab. Lint assembly reuses useDocumentationFindings for the doc band and KeyboardLintEngine.lintWithContext over the judged VFS for the rest. Attestations/confirmations in a new draft-carried criteriaRecordStore, authored projects only.",
+  "branch": "spec/084-criteria-plan",
+  "currentStep": "plan",
+  "history": [
+    {
+      "date": "2026-10-05",
+      "step": "specify",
+      "summary": "Planning spec PR #1937 (merged 847947df): criteria compliance page, 149 criteria, six statuses, decisions-tab pattern, planning-only.",
+      "kind": "start"
+    },
+    {
+      "date": "2026-10-13",
+      "step": "plan",
+      "summary": "Full implementation plan (plan.md + tasks.md) incl. Amendment 2026-10-13: Compare-tab Check criteria button in foreign mode (spec 057 isolation preserved), yellow band resolved by on-page author attestation (no survey questions exist for the 32 surveyQuestionIds), corrected layer-c counts (19 of 67 implemented, 48 not yet checkable).",
+      "kind": "start"
+    }
+  ],
+  "specName": "084-criteria-compliance-page",
+  "status": "planned",
+  "step_summaries": {
+    "plan": "plan.md (architecture, decisions D1-D9, verified counts/APIs, isolation constraints, testing gates) and tasks.md (Phases 0-6) written 2026-10-13. No implementation."
+  },
+  "workflow": "speckit",
+  "telemetryInstanceId": "aa0018b1-505c-479a-a2c4-96bd519d27c8"
+}
