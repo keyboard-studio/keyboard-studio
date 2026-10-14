@@ -39,6 +39,9 @@ __pycache__/
 # CodeGraph local index (dhigby/codegraph)
 .codegraph/
 
+# ProjectAtlas local index
+.projectatlas/
+
 # Triage log + scratch state (per-machine; populated by /km-triage)
 .escalations/
 
