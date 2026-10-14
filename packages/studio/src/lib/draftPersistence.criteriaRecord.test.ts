@@ -129,6 +129,7 @@ describe("spec 084 — a draft written without a criteria record", () => {
       attestations: {},
       confirmations: {},
       contrastiveAttestation: null,
+      fontLicenseAttestations: {},
     });
   });
 

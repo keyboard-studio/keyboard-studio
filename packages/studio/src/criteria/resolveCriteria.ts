@@ -30,6 +30,7 @@ import type {
 } from "./criteriaTypes.ts";
 import { resolveAssemblyVerdictRow } from "./assemblyVerdicts.ts";
 import { resolveCompileRow } from "./compileMapping.ts";
+import { resolveFontLicenseRow } from "./fontLicense.ts";
 import { IMPLEMENTED_LINT_CODES } from "./implementedChecks.ts";
 import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
 
@@ -177,6 +178,12 @@ function resolveRow(
         input.mode,
       );
       if (verdictRow) return verdictRow;
+      // Font-license attestations (Batch 5: 9.1/9.2): resolved from
+      // the criteria record, not from any check — see fontLicense.ts.
+      // Before the implemented gate because their codes are
+      // deliberately NOT in IMPLEMENTED_LINT_CODES.
+      const fontRow = resolveFontLicenseRow(criterion, lintRuleId, input);
+      if (fontRow) return fontRow;
       if (!IMPLEMENTED_LINT_CODES.has(lintRuleId)) {
         return {
           criterion,

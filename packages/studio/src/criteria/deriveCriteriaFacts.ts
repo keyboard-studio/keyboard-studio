@@ -25,13 +25,16 @@ export function deriveCriteriaFacts(
   vfs: VirtualFS,
   instantiationMode?: "adapt-existing" | "new-from-base",
 ): CriteriaFacts {
-  const fontBundled = vfs
+  const bundledFonts = vfs
     .list()
-    .some((path) =>
+    .filter((path) =>
       FONT_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(ext)),
-    );
+    )
+    .map((path) => path.split(/[\\/]/).pop() ?? path)
+    .sort();
   return {
-    fontBundled,
+    fontBundled: bundledFonts.length > 0,
+    bundledFonts,
     deprecated: false,
     partnerPackage: false,
     ...(instantiationMode !== undefined ? { instantiationMode } : {}),

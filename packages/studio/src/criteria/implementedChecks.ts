@@ -27,6 +27,13 @@
  * (assemblyVerdicts.ts, Batch 3). Precertified codes (precertify.ts)
  * are NOT here — precertification is a separate resolver mechanism,
  * not an implemented check.
+ *
+ * Also NOT here, deliberately (Batch 5): KM_LINT_FONT_LICENSE_EMPTY
+ * and KM_LINT_FONT_LICENSE_NOT_OPEN (§§9.1/9.2). No lint check emits
+ * them and no synthesis maps them — the corpus .kps carries no
+ * per-font license field, so the rows resolve through the criteria
+ * record's per-font license attestations (fontLicense.ts). Listing
+ * them in either set would claim a mechanism that does not exist.
  */
 export const ASSEMBLY_SYNTHESIZED_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_COMPILE_HAS_WARNINGS",

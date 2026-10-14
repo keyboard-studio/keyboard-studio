@@ -39,6 +39,13 @@ export interface CriteriaPageProps {
   /** §12.3 (Batch 3): the contrastive-region attestation controls. */
   onAttestContrastive?: () => void;
   onClearContrastive?: () => void;
+  /** §§9.1/9.2 (Batch 5): the per-font license attestation controls. */
+  onAttestFontLicense?: (
+    fontName: string,
+    license: string,
+    openConfirmed: boolean,
+  ) => void;
+  onClearFontLicense?: (fontName: string) => void;
   /** A statement of what was judged (e.g. the preview caveat in foreign mode). */
   judgedNote?: string;
 }
@@ -113,6 +120,8 @@ export function CriteriaPage({
   onUnconfirm,
   onAttestContrastive,
   onClearContrastive,
+  onAttestFontLicense,
+  onClearFontLicense,
   judgedNote,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
@@ -173,6 +182,8 @@ export function CriteriaPage({
                     {...(onUnconfirm !== undefined ? { onUnconfirm } : {})}
                     {...(onAttestContrastive !== undefined ? { onAttestContrastive } : {})}
                     {...(onClearContrastive !== undefined ? { onClearContrastive } : {})}
+                    {...(onAttestFontLicense !== undefined ? { onAttestFontLicense } : {})}
+                    {...(onClearFontLicense !== undefined ? { onClearFontLicense } : {})}
                   />
                 ))}
               </ul>

@@ -45,6 +45,14 @@ export interface CriterionRowProps {
   onAttestContrastive?: () => void;
   /** §12.3 (Batch 3): withdraw the contrastive-region attestation. */
   onClearContrastive?: () => void;
+  /** §§9.1/9.2 (Batch 5): record one font's license attestation. */
+  onAttestFontLicense?: (
+    fontName: string,
+    license: string,
+    openConfirmed: boolean,
+  ) => void;
+  /** §§9.1/9.2 (Batch 5): remove one font's license attestation. */
+  onClearFontLicense?: (fontName: string) => void;
 }
 
 /**
@@ -126,6 +134,8 @@ export function CriterionRow({
   onUnconfirm,
   onAttestContrastive,
   onClearContrastive,
+  onAttestFontLicense,
+  onClearFontLicense,
 }: CriterionRowProps) {
   const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
@@ -253,6 +263,11 @@ export function CriterionRow({
     row.controls === "contrastive" &&
     mode === "authored" &&
     (onAttestContrastive !== undefined || onClearContrastive !== undefined);
+  const showFontControls =
+    row.controls === "font-attest" &&
+    mode === "authored" &&
+    row.fontLicense !== undefined &&
+    (onAttestFontLicense !== undefined || onClearFontLicense !== undefined);
 
   return (
     <li style={rowStyle} data-testid="criteria-row" data-status={row.status}>
@@ -401,8 +416,126 @@ export function CriterionRow({
                 </div>
               )
             ))}
+
+          {showFontControls && row.fontLicense !== undefined && (
+            <div data-testid="criteria-font-controls" style={{ marginTop: 4 }}>
+              {row.fontLicense.bundledFonts.map((font) => (
+                <FontAttestationEditor
+                  key={`${font}:${row.fontLicense!.attestations[font]?.at ?? ""}`}
+                  fontName={font}
+                  {...(row.fontLicense!.attestations[font] !== undefined
+                    ? { attestation: row.fontLicense!.attestations[font] }
+                    : {})}
+                  {...(onAttestFontLicense !== undefined
+                    ? { onAttestFontLicense }
+                    : {})}
+                  {...(onClearFontLicense !== undefined
+                    ? { onClearFontLicense }
+                    : {})}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * One bundled font's license attestation editor (§§9.1/9.2, Batch 5):
+ * a license field plus the open-license confirmation, saved as one
+ * record. The editor is keyed by the attestation's timestamp, so a
+ * saved (or cleared) attestation remounts it with the recorded values.
+ */
+function FontAttestationEditor({
+  fontName,
+  attestation,
+  onAttestFontLicense,
+  onClearFontLicense,
+}: {
+  fontName: string;
+  attestation?: { license: string; openConfirmed: boolean; at: string };
+  onAttestFontLicense?: (
+    fontName: string,
+    license: string,
+    openConfirmed: boolean,
+  ) => void;
+  onClearFontLicense?: (fontName: string) => void;
+}) {
+  const { t } = useLingui();
+  const [license, setLicense] = useState(attestation?.license ?? "");
+  const [openConfirmed, setOpenConfirmed] = useState(
+    attestation?.openConfirmed ?? false,
+  );
+  return (
+    <div
+      data-testid={`criteria-font-editor-${fontName}`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap",
+        marginTop: 4,
+      }}
+    >
+      <span style={{ fontSize: 12, color: TEXT_DIM }}>{fontName}</span>
+      <input
+        type="text"
+        data-testid={`criteria-font-license-${fontName}`}
+        aria-label={t({
+          id: "criteria.font.licenseLabel",
+          message: "License for this font",
+        })}
+        placeholder={t({
+          id: "criteria.font.licensePlaceholder",
+          message: "License, e.g. OFL-1.1",
+        })}
+        value={license}
+        onChange={(e) => setLicense(e.target.value)}
+        style={{ fontSize: 12, padding: "2px 6px" }}
+      />
+      <label
+        style={{
+          fontSize: 12,
+          color: TEXT_DIM,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        <input
+          type="checkbox"
+          data-testid={`criteria-font-open-${fontName}`}
+          checked={openConfirmed}
+          onChange={(e) => setOpenConfirmed(e.target.checked)}
+        />
+        {t({
+          id: "criteria.font.openLabel",
+          message: "This is an open license",
+        })}
+      </label>
+      {onAttestFontLicense !== undefined && (
+        <button
+          type="button"
+          data-testid={`criteria-font-save-${fontName}`}
+          style={controlButtonStyle}
+          disabled={license.trim() === ""}
+          onClick={() => onAttestFontLicense(fontName, license.trim(), openConfirmed)}
+        >
+          {t({ id: "criteria.font.save", message: "Save attestation" })}
+        </button>
+      )}
+      {attestation !== undefined && onClearFontLicense !== undefined && (
+        <button
+          type="button"
+          data-testid={`criteria-font-clear-${fontName}`}
+          style={controlButtonStyle}
+          onClick={() => onClearFontLicense(fontName)}
+        >
+          {t({ id: "criteria.font.clear", message: "Clear" })}
+        </button>
+      )}
+    </div>
   );
 }

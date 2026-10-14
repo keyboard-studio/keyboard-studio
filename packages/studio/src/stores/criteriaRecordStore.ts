@@ -29,6 +29,20 @@ export interface Confirmation {
 }
 
 /**
+ * One bundled font's license attestation (spec 084 Batch 5, criteria
+ * 9.1/9.2): the license the author asserts for the font (e.g.
+ * "OFL-1.1"), whether the author confirms it is an open license, and
+ * when. Keyed by font file name in the record — the corpus .kps has
+ * no per-font license field, so this record is the only honest source
+ * for these two criteria.
+ */
+export interface FontLicenseAttestation {
+  license: string;
+  openConfirmed: boolean;
+  at: string;
+}
+
+/**
  * The persisted shape — it IS the draft's `criteriaRecord` slice; the draft
  * writer performs no transformation on it.
  */
@@ -44,6 +58,12 @@ export interface CriteriaRecord {
    * the key) still satisfy it; applyCriteriaRecordSnapshot defaults it.
    */
   contrastiveAttestation?: { at: string } | null;
+  /**
+   * Per-font license attestations, keyed by font file name (Batch 5).
+   * Optional in the type so drafts written before Batch 5 (which lack
+   * the key) still satisfy it; applyCriteriaRecordSnapshot defaults it.
+   */
+  fontLicenseAttestations?: Record<string, FontLicenseAttestation>;
 }
 
 /** The empty record: what a project with no attestations or confirmations carries. */
@@ -51,6 +71,7 @@ export const EMPTY_CRITERIA_RECORD: CriteriaRecord = {
   attestations: {},
   confirmations: {},
   contrastiveAttestation: null,
+  fontLicenseAttestations: {},
 };
 
 export interface CriteriaRecordStoreState extends CriteriaRecord {
@@ -66,6 +87,14 @@ export interface CriteriaRecordStoreState extends CriteriaRecord {
   attestContrastiveRegion: () => void;
   /** Remove the contrastive-region attestation outright. */
   clearContrastiveRegion: () => void;
+  /** Record (or replace) one bundled font's license attestation (§§9.1/9.2), stamped with the current time. */
+  attestFontLicense: (
+    fontName: string,
+    license: string,
+    openConfirmed: boolean,
+  ) => void;
+  /** Remove one font's license attestation outright. */
+  clearFontLicense: (fontName: string) => void;
   /** Start-over / new-project only — wired beside decisionStore's reset. */
   reset: () => void;
 }
@@ -74,6 +103,7 @@ export const useCriteriaRecordStore = create<CriteriaRecordStoreState>()((set) =
   attestations: {},
   confirmations: {},
   contrastiveAttestation: null,
+  fontLicenseAttestations: {},
 
   attest: (criterionId, answer) =>
     set((s) => ({
@@ -112,18 +142,44 @@ export const useCriteriaRecordStore = create<CriteriaRecordStoreState>()((set) =
 
   clearContrastiveRegion: () => set({ contrastiveAttestation: null }),
 
+  attestFontLicense: (fontName, license, openConfirmed) =>
+    set((s) => ({
+      fontLicenseAttestations: {
+        ...(s.fontLicenseAttestations ?? {}),
+        [fontName]: { license, openConfirmed, at: new Date().toISOString() },
+      },
+    })),
+
+  clearFontLicense: (fontName) =>
+    set((s) => {
+      if (s.fontLicenseAttestations?.[fontName] === undefined) return s;
+      const fontLicenseAttestations = { ...s.fontLicenseAttestations };
+      delete fontLicenseAttestations[fontName];
+      return { fontLicenseAttestations };
+    }),
+
   reset: () =>
-    set({ attestations: {}, confirmations: {}, contrastiveAttestation: null }),
+    set({
+      attestations: {},
+      confirmations: {},
+      contrastiveAttestation: null,
+      fontLicenseAttestations: {},
+    }),
 }));
 
 /** The persisted shape — the draft's `criteriaRecord` slice, untransformed. */
 export function getCriteriaRecordSnapshot(): CriteriaRecord {
-  const { attestations, confirmations, contrastiveAttestation } =
-    useCriteriaRecordStore.getState();
+  const {
+    attestations,
+    confirmations,
+    contrastiveAttestation,
+    fontLicenseAttestations,
+  } = useCriteriaRecordStore.getState();
   return {
     attestations,
     confirmations,
     contrastiveAttestation: contrastiveAttestation ?? null,
+    fontLicenseAttestations: fontLicenseAttestations ?? {},
   };
 }
 
@@ -134,5 +190,7 @@ export function applyCriteriaRecordSnapshot(snapshot: CriteriaRecord): void {
     confirmations: snapshot.confirmations,
     // Drafts written before Batch 3 lack the key entirely.
     contrastiveAttestation: snapshot.contrastiveAttestation ?? null,
+    // Drafts written before Batch 5 lack the key entirely.
+    fontLicenseAttestations: snapshot.fontLicenseAttestations ?? {},
   });
 }

@@ -54,6 +54,8 @@ export function CriteriaScreen() {
   const clearContrastiveRegion = useCriteriaRecordStore(
     (s) => s.clearContrastiveRegion,
   );
+  const attestFontLicense = useCriteriaRecordStore((s) => s.attestFontLicense);
+  const clearFontLicense = useCriteriaRecordStore((s) => s.clearFontLicense);
 
   if (result === null) {
     return (
@@ -96,6 +98,8 @@ export function CriteriaScreen() {
       onUnconfirm={unconfirm}
       onAttestContrastive={attestContrastiveRegion}
       onClearContrastive={clearContrastiveRegion}
+      onAttestFontLicense={attestFontLicense}
+      onClearFontLicense={clearFontLicense}
     />
   );
 }

@@ -43,17 +43,35 @@ export type AttestationAnswer = "yes" | "no" | "not-applicable";
  * the criteria record store's snapshot; in foreign mode it is always
  * EMPTY_CRITERIA_RECORD.
  */
+/**
+ * One bundled font's license attestation (Batch 5, criteria 9.1/9.2):
+ * the license the author asserts for the font (e.g. "OFL-1.1"), and
+ * whether the author confirms that license is an open one.
+ */
+export interface FontLicenseAttestation {
+  license: string;
+  openConfirmed: boolean;
+  at: string;
+}
+
 export interface CriteriaRecordInput {
   attestations: Readonly<
     Record<string, { answer: AttestationAnswer; at: string }>
   >;
   confirmations: Readonly<Record<string, { at: string }>>;
+  /**
+   * Per-font license attestations, keyed by font file name (Batch 5).
+   * Optional so records assembled before Batch 5 remain valid inputs;
+   * an absent map reads as "no font attested".
+   */
+  fontLicenseAttestations?: Readonly<Record<string, FontLicenseAttestation>>;
 }
 
 /** The shared empty record: no attestations, no confirmations. */
 export const EMPTY_CRITERIA_RECORD: CriteriaRecordInput = Object.freeze({
   attestations: Object.freeze({}),
   confirmations: Object.freeze({}),
+  fontLicenseAttestations: Object.freeze({}),
 });
 
 /**
@@ -64,6 +82,12 @@ export const EMPTY_CRITERIA_RECORD: CriteriaRecordInput = Object.freeze({
 export interface CriteriaFacts {
   /** The package bundles a font. */
   fontBundled: boolean;
+  /**
+   * The bundled fonts' file names (basenames, sorted) — the inventory
+   * the §9 license rows judge (Batch 5). Empty when no font is
+   * bundled; optional for facts assembled before Batch 5.
+   */
+  bundledFonts?: readonly string[];
   /** The keyboard is deprecated. */
   deprecated: boolean;
   /** The package is a partner-organization package. */
@@ -134,6 +158,13 @@ export interface CriteriaInput {
    * attestation control state. Authored host only.
    */
   contrastiveRegionAttested?: boolean;
+  /**
+   * Supporting-evidence hints scanned from the package's LICENSE.md
+   * (Batch 5, §9.2): open-license family names the file mentions.
+   * Shown as evidence only — they never decide the row; the author's
+   * per-font attestation does.
+   */
+  licenseTextHints?: readonly string[];
 }
 
 /**
@@ -168,12 +199,21 @@ export interface ResolvedRow {
   criterion: Criterion;
   status: CriterionStatus;
   /** The in-place control this row offers, resolved here — never in a view. */
-  controls: "attest" | "confirm" | "contrastive" | null;
+  controls: "attest" | "confirm" | "contrastive" | "font-attest" | null;
   /**
    * For the §12.3 row (controls: "contrastive"): whether the author's
    * contrastive-region attestation is currently recorded.
    */
   contrastiveAttested?: boolean;
+  /**
+   * For the §9 rows (controls: "font-attest"): the bundled-font
+   * inventory and the author's per-font license attestations, so the
+   * row's editor renders from the same data the resolver judged.
+   */
+  fontLicense?: {
+    bundledFonts: readonly string[];
+    attestations: Readonly<Record<string, FontLicenseAttestation>>;
+  };
   /** Lazy evidence: call only when the row's evidence is shown. */
   evidence: () => EvidenceModel;
 }

@@ -19,6 +19,7 @@ describe("criteriaRecordStore (spec 084 D5)", () => {
       attestations: {},
       confirmations: {},
       contrastiveAttestation: null,
+      fontLicenseAttestations: {},
     });
   });
 
@@ -76,6 +77,7 @@ describe("criteriaRecordStore (spec 084 D5)", () => {
       attestations: {},
       confirmations: {},
       contrastiveAttestation: null,
+      fontLicenseAttestations: {},
     });
   });
 
@@ -95,6 +97,33 @@ describe("criteriaRecordStore (spec 084 D5)", () => {
     // A pre-Batch-3 snapshot (no key at all) restores as unattested.
     applyCriteriaRecordSnapshot({ attestations: {}, confirmations: {} });
     expect(useCriteriaRecordStore.getState().contrastiveAttestation).toBeNull();
+  });
+
+  it("font license attestations (§§9.1/9.2): attest, replace, clear, legacy default", () => {
+    const store = useCriteriaRecordStore.getState();
+    store.attestFontLicense("AndikaAfr-R.ttf", "OFL-1.1", true);
+    const first = useCriteriaRecordStore.getState().fontLicenseAttestations?.["AndikaAfr-R.ttf"];
+    expect(first?.license).toBe("OFL-1.1");
+    expect(first?.openConfirmed).toBe(true);
+    expect(Number.isNaN(Date.parse(first!.at))).toBe(false);
+    expect(getCriteriaRecordSnapshot().fontLicenseAttestations).toEqual({
+      "AndikaAfr-R.ttf": first,
+    });
+
+    store.attestFontLicense("AndikaAfr-R.ttf", "OFL-1.1", false);
+    expect(
+      useCriteriaRecordStore.getState().fontLicenseAttestations?.["AndikaAfr-R.ttf"]
+        ?.openConfirmed,
+    ).toBe(false);
+
+    store.clearFontLicense("AndikaAfr-R.ttf");
+    expect(
+      useCriteriaRecordStore.getState().fontLicenseAttestations?.["AndikaAfr-R.ttf"],
+    ).toBeUndefined();
+
+    // A pre-Batch-5 snapshot (no key at all) restores as an empty map.
+    applyCriteriaRecordSnapshot({ attestations: {}, confirmations: {} });
+    expect(useCriteriaRecordStore.getState().fontLicenseAttestations).toEqual({});
   });
 
   it("snapshot → apply is a round-trip identity", () => {
