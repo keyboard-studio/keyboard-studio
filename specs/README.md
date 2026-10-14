@@ -19,18 +19,21 @@ gaps are normal (001, 003, 004, 006, 054 never existed).
 | [081-footer-step-nav](081-footer-step-nav/) | Step library and footer navigation components |
 | [082-rule-access-tracks](082-rule-access-tracks/) | Rule access tracks (in flight) |
 
-## Live, under review (8)
+## Live, held by ruling (3)
 
-024 (GitHub delivery consolidation, unbuilt) · 050 (text-sample prefill,
-half built) · 056 (accessibility) · 077 (base decisions, unbuilt) ·
-083 (deadkey lifecycle) · 084 (criteria page) · 085 (adaptive placement,
-unbuilt) · 093 (derived keyboard) — disposition pending a maintainer ruling;
-until then these remain live and citable.
+- **024** (GitHub delivery consolidation, unbuilt) — kept as the vehicle for
+  the OAuth-vs-GitHub-App decision; retire or build when that is decided.
+- **056** (ADA / WCAG accessibility baseline) — a program spec, not a feature
+  spec: its in-folder tracker is the compliance record of truth, and the
+  program is mid-flight by design.
+- **083** (deadkey lifecycle) — kept until 082 lands, then retired as covered
+  by 076/082.
 
-## Retired (72)
+## Retired (77)
 
 A retired spec's folder holds `AS-BUILT.md` — the summary of record,
 including what did *not* ship as specified — plus occasionally a pinned file
 the AS-BUILT references. Full text lives in [`_archive/`](_archive/) under
 the same folder name. Most recently retired (2026-10-14): 008, 009, 023, 025,
-031, 032, 048, 078, 086, 087, 088, 089, 090, 091, 092, 094.
+031, 032, 048, 050, 077, 078, 084, 085, 086, 087, 088, 089, 090, 091, 092,
+093, 094.
