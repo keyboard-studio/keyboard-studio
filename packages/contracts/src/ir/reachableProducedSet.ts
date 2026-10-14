@@ -28,7 +28,7 @@
  *
  * | Consumer | View | Why |
  * |---|---|---|
- * | Layer C inventory-coverage check | **this one** | Already scope-guarded to a *scaffolded* IR with no opaque fragments — a keyboard WE generated, where an orphan `T_` rule can only be our own bug. Zero legacy-corpus fallout by construction. |
+ * | Layer C inventory-coverage check | **this one** | Runs whenever a surface deliberately supplies an inventory, on any IR with no opaque fragments (spec 084 Batch 4 deleted the origin guard — see check-18-6's header). An orphan `T_` rule credits nothing here: output nobody can type is not coverage. Corpus fallout is nil by construction — no corpus surface supplies an inventory, so the check never runs there. |
  * | The orphan-rule Layer C check | **this one** | It is the reporting surface. |
  * | Studio inventory diff | **neither — EXTEND** | Switching would move characters from "already produced" into "letters to add" for the ~205 corpus bases with orphan rules, silently increasing author workload and moving the §18.6 denominator. It gains a third `producedButUnreachable` array instead. |
  * | Facet-transform propose / verify | plain | "Did my transform change what the rules emit" is a rules-only question; reachability would make a no-regression assertion flaky whenever the layout is edited in the same session. |

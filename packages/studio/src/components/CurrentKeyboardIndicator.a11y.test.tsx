@@ -30,7 +30,7 @@ const mockedNavigateTo = vi.mocked(navigateTo);
 
 function makeMinimalIr(): KeyboardIR {
   return {
-    origin: "scaffolded" as const,
+    origin: "synthesized" as const,
     header: {
       keyboardId: "test",
       name: "test",

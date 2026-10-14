@@ -519,8 +519,9 @@ export interface TouchKeyRuleJoinFixtureOptions {
  * Build the fixture IR. Fresh, deeply-independent objects on every call.
  *
  * `origin` is `"imported"` deliberately: both real canaries are imported
- * keyboards, and several checks are gated on origin, so a fixture claiming to be
- * scaffolded would exercise the wrong branch.
+ * keyboards, so the fixture claims the provenance the canaries actually
+ * carry. (No check gates on origin since spec 084 Batch 4 deleted the
+ * §18.6 origin guard; the value is provenance, not a branch selector.)
  */
 export function makeTouchKeyRuleJoinFixture(
   options: TouchKeyRuleJoinFixtureOptions = {},

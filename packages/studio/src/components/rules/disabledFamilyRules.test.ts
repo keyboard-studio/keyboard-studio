@@ -29,7 +29,7 @@ function plainRule(nodeId: string, vkey: string, out: string): IRRule {
 
 function testIr(): KeyboardIR {
   return {
-    origin: "scaffolded",
+    origin: "synthesized",
     header: {
       keyboardId: "t",
       name: "t",

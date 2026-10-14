@@ -5,12 +5,17 @@
 // (see specs/035-mobile-touch-derivation/contracts/simplification.md, "Extended:
 // criterion 18.6 gains a touch-side check").
 //
-// SCOPE GUARD differs deliberately from the desktop sibling
+// RUN CONDITION, contrasted with the desktop sibling
 // (check-18-6-inventory-coverage.ts):
-//   - No `origin === "scaffolded"` guard — imported bases (Case B, spec 035) are
-//     this check's primary audience.
-//   - No raw-fragment skip — this check walks a TouchLayoutIR, not IR rules, so
-//     opaque `.kmn` fragments are not relevant to it.
+//   - No origin condition in either check. This one never had one —
+//     imported bases (Case B, spec 035) are its primary audience — and
+//     spec 084 Batch 4 deleted the desktop check's `origin ===
+//     "scaffolded"` guard (and the origin value itself), so the two
+//     siblings now agree: origin is provenance, not a gate.
+//   - No raw-fragment skip here — this check walks a TouchLayoutIR, not
+//     IR rules, so opaque `.kmn` fragments are not relevant to it. The
+//     desktop sibling keeps its fragment skip, the one guard element
+//     that protects a real failure mode there.
 //
 // TRAVERSAL: the reachable-layer + char-collection walk is the canonical
 // `computeTouchCoverage` in @keyboard-studio/contracts — shared with the
@@ -25,14 +30,18 @@
 // KM_LINT_TOUCH_KEY_NO_RULE, KM_LINT_TOUCH_RULE_ORPHAN, and
 // KM_HINT_TOUCH_KEY_ID_CASE.
 //
-// WHY HERE AND NOT IN check-18-6-inventory-coverage.ts. The two 18.6 modules are
-// not interchangeable. That one opens with `if (ir.origin !== "scaffolded")
-// return []`, and the reachability-view adoption there depends on exactly that
-// guard for its safety. All three codes below must fire on IMPORTED keyboards —
-// both Cameroon canaries are imported — so behind that guard they would never
-// run, and SC-002 would be unsatisfiable while the code looked correct. This
-// module has no origin guard (see the SCOPE GUARD note below), which is why the
-// join contract's own §5.1 cites it as the precedent.
+// WHY HERE AND NOT IN check-18-6-inventory-coverage.ts. The two 18.6 modules
+// are not interchangeable: the desktop module answers an inventory-vs-rules
+// question (produced set vs LinguistInventory), while the three codes below
+// answer rules-vs-layout JOIN questions and share this module's traversal
+// machinery (the join resolver, the touch-key/rule index). Historically the
+// split was forced by the desktop module's origin guard — all three codes
+// must fire on IMPORTED keyboards (both Cameroon canaries are imported), so
+// behind that guard they would never have run, and SC-002 would have been
+// unsatisfiable while the code looked correct; the join contract's own §5.1
+// cites this module's guard-free run as the precedent. Spec 084 Batch 4 has
+// since deleted the desktop guard, but the placement stands on the join
+// rationale alone: these codes live where their inputs are resolved.
 //
 // NO ROWS ARE ADDED TO criteria.json. `CriteriaBands.lintRuleId` is singular and
 // 1:1 with a criterion row; hanging several sibling codes off one row's

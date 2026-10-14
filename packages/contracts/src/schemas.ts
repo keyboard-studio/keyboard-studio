@@ -409,7 +409,7 @@ export const FacetValueSchema = z.object({
 
 export const KeyboardIRSchema = z
   .object({
-    origin: z.enum(["scaffolded", "imported", "synthesized"]),
+    origin: z.enum(["imported", "synthesized"]),
     touchLayout: TouchLayoutIRSchema.optional(),
     facets: z.record(z.string(), FacetValueSchema).optional(),
     facetOverrides: z.record(z.string(), z.string()).optional(),

@@ -26,7 +26,7 @@ function makeGroup(rules: IRRule[], nodeId = 'g1', name = 'main'): IRGroup {
 }
 
 function makeIR(overrides: TestIROptions = {}): KeyboardIR {
-  return makeTestIR({ origin: 'scaffolded', header: { keyboardId: '', name: '', version: '' }, ...overrides });
+  return makeTestIR({ origin: 'synthesized', header: { keyboardId: '', name: '', version: '' }, ...overrides });
 }
 
 function directRule(nodeId: string, key: string, ch: string): IRRule {

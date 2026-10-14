@@ -25,7 +25,7 @@ function guardRule(nodeId: string, vkey: string): IRRule {
 
 function seedIr(): void {
   const ir = {
-    origin: "scaffolded",
+    origin: "synthesized",
     header: {
       keyboardId: "t",
       name: "t",
