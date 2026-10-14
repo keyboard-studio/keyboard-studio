@@ -91,3 +91,6 @@ lib/ucd/*
 
 .vercel
 .env*
+
+# ProjectAtlas local index + generated MCP configs (machine-local state)
+.projectatlas/
