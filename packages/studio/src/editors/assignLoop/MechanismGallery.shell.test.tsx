@@ -13,10 +13,10 @@
 //     is unchanged by that move.
 //   - "Mark for later review" (mechanism-gallery-progression) is a per-
 //     character toggle — it records nothing in the working copy, but
-//     satisfies canGoNext exactly like an Apply, so Next/Done can advance
+//     satisfies canGoNext exactly like an Apply, so Next/Continue can advance
 //     past it. A marked character is never treated as covered for coverage
 //     purposes, only as "accounted for" (see lib/accountedForGate.ts).
-//   - The last character's forward button always reads "Done", disabled
+//   - The last character's forward button always reads "Continue", disabled
 //     until every character in lettersToAdd is implemented or marked.
 //   - Coverage status line: "<N> of <M> added".
 //   - Method chooser: "Type a sequence" always present; "Tap a trigger key, then a letter"

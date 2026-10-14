@@ -496,7 +496,7 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
   // nothing typed; a format character is content, and is handed off above.
   const addDisabled = !Array.from(inputVal).some((c) => !ASCII_WHITESPACE.has(c));
 
-  // Back / Done render in the footer (spec 081).
+  // Back / Continue render in the footer (spec 081).
   usePublishStepNav({
     ...(onBack !== undefined
       ? {
@@ -514,8 +514,8 @@ const PunctuationStep: ComponentType<DecisionRendererProps<InventoryDecisionValu
           : t({
               id: "survey.punctuation.doneButton",
               message: plural(punctuation.length, {
-                one: "Done (# mark)",
-                other: "Done (# marks)",
+                one: "Continue (# mark)",
+                other: "Continue (# marks)",
               }),
             }),
       onClick: complete,

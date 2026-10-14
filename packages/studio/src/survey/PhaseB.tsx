@@ -970,7 +970,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
     });
   }
 
-  // Back / Done render in the footer (spec 081); this screen is the step's
+  // Back / Continue render in the footer (spec 081); this screen is the step's
   // only publisher while it is shown.
   usePublishStepNav({
     back: {
@@ -982,8 +982,8 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       label: t({
         id: "survey.phaseB.buildList.doneButton",
         message: plural(chars.length, {
-          one: "Done (# character)",
-          other: "Done (# characters)",
+          one: "Continue (# character)",
+          other: "Continue (# characters)",
         }),
       }),
       onClick: handleDone,
