@@ -81,6 +81,7 @@ export {
   parseKvks,
   parseTouchLayout,
   emitTouchLayout,
+  TOUCH_LAYOUT_JSON_INDENT,
   OPAQUE_REASONS,
 } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
