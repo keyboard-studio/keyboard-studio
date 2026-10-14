@@ -48,6 +48,14 @@ export function CriteriaScreen() {
   const clearAttestation = useCriteriaRecordStore((s) => s.clearAttestation);
   const confirm = useCriteriaRecordStore((s) => s.confirm);
   const unconfirm = useCriteriaRecordStore((s) => s.unconfirm);
+  const attestContrastiveRegion = useCriteriaRecordStore(
+    (s) => s.attestContrastiveRegion,
+  );
+  const clearContrastiveRegion = useCriteriaRecordStore(
+    (s) => s.clearContrastiveRegion,
+  );
+  const attestFontLicense = useCriteriaRecordStore((s) => s.attestFontLicense);
+  const clearFontLicense = useCriteriaRecordStore((s) => s.clearFontLicense);
 
   if (result === null) {
     return (
@@ -88,6 +96,10 @@ export function CriteriaScreen() {
       onClearAttestation={clearAttestation}
       onConfirm={confirm}
       onUnconfirm={unconfirm}
+      onAttestContrastive={attestContrastiveRegion}
+      onClearContrastive={clearContrastiveRegion}
+      onAttestFontLicense={attestFontLicense}
+      onClearFontLicense={clearFontLicense}
     />
   );
 }

@@ -56,6 +56,13 @@ export function collectDocLintInputFromVfs(
     if (text !== undefined) members[member] = text;
   }
 
+  // Criterion 11.8: every bundled stylesheet under source/ (the help
+  // and welcome stylesheets are where image width rules live).
+  const cssTexts = paths
+    .filter((p) => p.startsWith("source/") && p.toLowerCase().endsWith(".css"))
+    .map((p) => readVfsText(vfs, p))
+    .filter((t): t is string => t !== undefined);
+
   return collectDocLintInput({
     keyboardId,
     displayName,
@@ -65,6 +72,7 @@ export function collectDocLintInputFromVfs(
     kvksText,
     touchLayoutJson,
     members,
+    cssTexts,
     // deletedFilenames is [] by construction in collectDocLintInput: this
     // VFS is a read-only snapshot, and no file in it was deleted by anyone.
   });

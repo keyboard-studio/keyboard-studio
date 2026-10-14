@@ -8,6 +8,7 @@
 
 import type { Criterion } from "@keyboard-studio/contracts";
 
+import { VERSION_VERDICT_CODES } from "./assemblyVerdicts.ts";
 import type { CriteriaFacts } from "./criteriaTypes.ts";
 
 /** A named applicability verdict: the criterion does not apply, and why. */
@@ -40,6 +41,20 @@ export function applicabilityFor(
     return {
       reason:
         "This criterion concerns partner-organization packages, and this package is not a partner-organization package.",
+    };
+  }
+  // Batch 3: the version-bump rows (2.1/2.2/2.6) presuppose a
+  // previously deployed version. A new-from-base keyboard has none —
+  // its first version is simply its version.
+  const lintRuleId = "lintRuleId" in criterion ? criterion.lintRuleId : undefined;
+  if (
+    lintRuleId !== undefined &&
+    VERSION_VERDICT_CODES.has(lintRuleId) &&
+    facts.instantiationMode === "new-from-base"
+  ) {
+    return {
+      reason:
+        "This criterion concerns incrementing a previously deployed version, and a keyboard created new from a base has no previously deployed version.",
     };
   }
   return null;

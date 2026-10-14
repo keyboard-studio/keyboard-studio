@@ -52,9 +52,19 @@ import {
   applyInventoryOutcome,
   assembleLintContext,
 } from "../criteria/assembleLintContext.ts";
+import { computeAssemblyVerdicts } from "../criteria/assemblyVerdicts.ts";
 import { buildCriteriaInventory } from "../criteria/buildCriteriaInventory.ts";
+import type {
+  CriteriaAssemblyVerdict,
+} from "../criteria/criteriaTypes.ts";
 import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
-import { sourcedExemplars, type SourcedInventory } from "../lib/services.ts";
+import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
+import {
+  getStartBrowserService,
+  sourcedExemplars,
+  type SourcedInventory,
+} from "../lib/services.ts";
+import { useCriteriaRecordStore } from "../stores/criteriaRecordStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { Stage } from "./useKeyboardArtifact.ts";
@@ -100,6 +110,16 @@ export interface CriteriaFindings {
    * artifact whose compile has not completed.
    */
   compileResult: CompileResult | null;
+  /**
+   * Assembly verdicts (Batch 3: 1.5 + 2.1/2.2/2.6), computed from the
+   * working copy's instantiation state and the start-keyboard
+   * catalog. Empty until the catalog has loaded and a base keyboard
+   * exists — the affected rows then resolve Not yet checkable with
+   * the reason, never Met.
+   */
+  assemblyVerdicts: ReadonlyMap<string, CriteriaAssemblyVerdict>;
+  /** The working copy's instantiation mode, for the resolver's facts. */
+  instantiationMode: "adapt-existing" | "new-from-base" | null;
 }
 
 interface EngineRun {
@@ -121,6 +141,51 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
   const identity = useWorkingCopyStore((s) => s.identity);
   const decisions = useDecisionStore((s) => s.decisions);
 
+  // Batch 3 verdict inputs: the instantiation state (for 1.5 +
+  // 2.1/2.2/2.6) and the author's contrastive-region attestation (for
+  // 12.3, carried into the assembly below).
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const contrastiveAttestation = useCriteriaRecordStore(
+    (s) => s.contrastiveAttestation,
+  );
+
+  // The start-keyboard catalog for the 1.5 verdict: loaded once per
+  // mount; null until it settles (and on failure) — the verdict is
+  // withheld while null, never guessed from an unloaded catalog.
+  const [catalog, setCatalog] = useState<
+    readonly { id: string; path: string }[] | null
+  >(null);
+  useEffect(() => {
+    let cancelled = false;
+    getStartBrowserService()
+      .listAll()
+      .then((all) => {
+        if (!cancelled) setCatalog(all.map((k) => ({ id: k.id, path: k.path })));
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const assemblyVerdicts = useMemo<
+    ReadonlyMap<string, CriteriaAssemblyVerdict>
+  >(() => {
+    if (startKeyboard === null || startIr === null) return new Map();
+    if (instantiationMode === null) return new Map();
+    return computeAssemblyVerdicts({
+      catalog,
+      baseKeyboardId: startKeyboard.id,
+      outputKeyboardId: resolveOutputKeyboardId(identity, startKeyboard),
+      instantiationMode,
+      startVersion: startIr.header.version ?? "1.0",
+    });
+  }, [catalog, startKeyboard, startIr, identity, instantiationMode]);
+
   const readyStage = stage.kind === "ready" ? stage : null;
   const vfs = readyStage?.vfs ?? null;
   const keyboardId = readyStage?.keyboardId ?? null;
@@ -132,7 +197,11 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     let cancelled = false;
 
     void (async () => {
-      const assembled = assembleLintContext({ vfs, keyboardId });
+      const assembled = assembleLintContext({
+        vfs,
+        keyboardId,
+        contrastiveRegionAttested: contrastiveAttestation != null,
+      });
 
       // The keyboard's language targets: the author's tags first (the
       // identity patch, then the decision-derived tag), then the judged
@@ -205,7 +274,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     return () => {
       cancelled = true;
     };
-  }, [vfs, keyboardId, session, identity, decisions]);
+  }, [vfs, keyboardId, session, identity, decisions, contrastiveAttestation]);
 
   const runIsCurrent = engineRun !== null && engineRun.forVfs === vfs;
 
@@ -222,5 +291,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     keyboardId,
     vfs,
     compileResult: readyStage?.compileResult ?? null,
+    assemblyVerdicts,
+    instantiationMode: startKeyboard !== null ? instantiationMode : null,
   };
 }

@@ -43,6 +43,31 @@ export interface CriteriaLintInput {
   kpsFontRefs: readonly string[];
   /** BCP47 language tags declared by the .kps (engine parseKps). */
   kpsLanguages: readonly string[];
+  /**
+   * Platform targets declared by the .kps (engine parseKps), e.g.
+   * ["windows", "web"]. Batch 2 (criterion 8.13): compared against the
+   * .kmn IR header targets and the compiled members in the .kps file
+   * list. Empty when the .kps is absent or unparseable.
+   */
+  kpsTargets: readonly string[];
+  /**
+   * Font family names extracted from the name tables (IDs 16, else 1)
+   * of the .kps-listed font files that are present in the judged VFS
+   * (Batch 3, criterion 8.7). The extraction runs in the studio
+   * assembly (fontFamilyNames.ts) because it reads raw VFS binaries;
+   * only the resulting family names cross into keyboard-lint. A font
+   * file the .kps lists but the VFS does not carry contributes no
+   * family — its absence is itself the 8.7 finding's substance.
+   */
+  kpsFontFamilies: readonly string[];
+  /**
+   * The author has attested that this keyboard's numeric region subtag
+   * is explicitly contrastive (Batch 3, criterion 12.3's exception
+   * clause). Authored host only, sourced from criteriaRecordStore;
+   * the foreign host passes false — no attestation exists for a
+   * keyboard the author does not own.
+   */
+  contrastiveRegionAttested: boolean;
   /** Display name declared by the .kps (engine parseKps), when present. */
   kpsDisplayName?: string;
   /**

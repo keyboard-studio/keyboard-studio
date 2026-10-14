@@ -21,11 +21,22 @@ import type { CriteriaFacts } from "./criteriaTypes.ts";
 
 const FONT_EXTENSIONS: readonly string[] = [".ttf", ".otf", ".woff", ".woff2"];
 
-export function deriveCriteriaFacts(vfs: VirtualFS): CriteriaFacts {
-  const fontBundled = vfs
+export function deriveCriteriaFacts(
+  vfs: VirtualFS,
+  instantiationMode?: "adapt-existing" | "new-from-base",
+): CriteriaFacts {
+  const bundledFonts = vfs
     .list()
-    .some((path) =>
+    .filter((path) =>
       FONT_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(ext)),
-    );
-  return { fontBundled, deprecated: false, partnerPackage: false };
+    )
+    .map((path) => path.split(/[\\/]/).pop() ?? path)
+    .sort();
+  return {
+    fontBundled: bundledFonts.length > 0,
+    bundledFonts,
+    deprecated: false,
+    partnerPackage: false,
+    ...(instantiationMode !== undefined ? { instantiationMode } : {}),
+  };
 }

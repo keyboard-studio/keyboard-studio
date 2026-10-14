@@ -49,6 +49,7 @@ import { checkCopyrightHolder } from "./checks/docs/check-4-7-copyright-holder.j
 import { checkReadmeTargets } from "./checks/docs/check-5-7-readme-targets.js";
 import { checkHtmlWellFormed } from "./checks/docs/check-11-5-html-wellformed.js";
 import { checkOskLayersListed } from "./checks/docs/check-11-2-osk-layers.js";
+import { checkOskImageConstrained } from "./checks/docs/check-11-8-osk-image.js";
 import { checkDataStatesComplete } from "./checks/docs/check-11-6-data-states.js";
 import { checkPagenameFormat } from "./checks/docs/check-11-7-pagename-format.js";
 import { checkBodyParity } from "./checks/docs/check-11-9-body-parity.js";
@@ -56,8 +57,9 @@ import { checkStyleParity } from "./checks/docs/check-11-10-style-parity.js";
 
 /**
  * Run the US7/FR-019 documentation checks (thirteen codes; 3.6/7.1 share
- * one module) plus spec 084 Batch 1's 11.2 OSK-layers check, in criteria
- * order, returning every finding they produce.
+ * one module) plus spec 084's 11.2 OSK-layers check (Batch 1) and 11.8
+ * OSK-image check (Batch 2), in criteria order, returning every finding
+ * they produce.
  * Pure and total: each check returns `[]` on absent input members.
  */
 export function runDocChecks(input: DocLintInput): LintFinding[] {
@@ -71,6 +73,7 @@ export function runDocChecks(input: DocLintInput): LintFinding[] {
     ...checkReadmeTargets(input),
     ...checkHtmlWellFormed(input),
     ...checkOskLayersListed(input),
+    ...checkOskImageConstrained(input),
     ...checkDataStatesComplete(input),
     ...checkPagenameFormat(input),
     ...checkBodyParity(input),

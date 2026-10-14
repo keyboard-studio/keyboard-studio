@@ -20,6 +20,8 @@ export * from "./decisionRecord";
 export * from "./help-docs";
 export * from "./doc-members";
 export * from "./criteriaLintInput";
+export * from "./iso639_5";
+export * from "./cldrCurrency";
 export * from "./keyboard-ir";
 export * from "./keyboardId";
 // The single authoritative key-budget determination (spec 052 FR-016); axis A7

@@ -66,6 +66,20 @@ const FIXTURE_CRITERIA: Criterion[] = [
     description: "Fixture red criterion",
     preSubmitChecklistText: "Fixture checklist text to confirm.",
   },
+  {
+    id: "fix.6-numeric-region",
+    section: "12. Fixture tags",
+    band: "layer-c-enforce",
+    description: "Fixture numeric region criterion",
+    lintRuleId: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
+  },
+  {
+    id: "fix.7-font-license",
+    section: "9. Fixture fonts",
+    band: "layer-c-enforce",
+    description: "Fixture font license criterion",
+    lintRuleId: "KM_LINT_FONT_LICENSE_EMPTY",
+  },
 ];
 
 const HISTORY_FINDING: LintFinding = {
@@ -136,6 +150,8 @@ describe("CriteriaPage — header and rows agree", () => {
       "3. Fixture history",
       "4. Fixture questions",
       "5. Fixture checklist",
+      "12. Fixture tags",
+      "9. Fixture fonts",
     ]);
   });
 
@@ -151,7 +167,7 @@ describe("CriteriaPage — header and rows agree", () => {
 
     expect(screen.getAllByTestId("criteria-row")).toHaveLength(149);
     expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
-      "79 of 149 criteria resolved",
+      "91 of 149 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
     expect(counted).toBe(149);
@@ -289,6 +305,164 @@ describe("CriteriaPage — authored controls (US4)", () => {
     for (const row of screen.getAllByTestId("criteria-row")) expandRow(row);
     expect(screen.queryByTestId("criteria-attest-controls")).toBeNull();
     expect(screen.queryByTestId("criteria-confirm-controls")).toBeNull();
+  });
+});
+
+describe("CriteriaPage — §12.3 contrastive-region control (Batch 3)", () => {
+  const NUMERIC_FINDING: LintFinding = {
+    code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
+    severity: "warning",
+    layer: "C",
+    message: "BCP47 tag(s) use a numeric region subtag that is not attested as explicitly contrastive: es-419.",
+    hint: "Use the alpha-2 region code, or attest it.",
+  };
+
+  it("an unattested numeric region offers the attestation control on the Not-met row", () => {
+    const onAttestContrastive = vi.fn();
+    const result = resolveCriteria(
+      fixtureInput({ lintFindings: [NUMERIC_FINDING] }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        onAttestContrastive={onAttestContrastive}
+        onClearContrastive={vi.fn()}
+      />,
+    );
+    const row = rowByDescription("Fixture numeric region criterion");
+    expect(within(row).getByTestId("criteria-row-status").textContent).toBe("Not met");
+    expandRow(row);
+    fireEvent.click(within(row).getByTestId("criteria-contrastive-attest"));
+    expect(onAttestContrastive).toHaveBeenCalledTimes(1);
+  });
+
+  it("an attested keyboard shows the withdrawal control on the Met row", () => {
+    const onClearContrastive = vi.fn();
+    const result = resolveCriteria(
+      fixtureInput({ lintFindings: [], contrastiveRegionAttested: true }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        onAttestContrastive={vi.fn()}
+        onClearContrastive={onClearContrastive}
+      />,
+    );
+    const row = rowByDescription("Fixture numeric region criterion");
+    expect(within(row).getByTestId("criteria-row-status").textContent).toBe("Met");
+    expandRow(row);
+    expect(
+      within(row).getByTestId("criteria-contrastive-controls").textContent,
+    ).toContain("attested the numeric region");
+    fireEvent.click(within(row).getByTestId("criteria-contrastive-clear"));
+    expect(onClearContrastive).toHaveBeenCalledTimes(1);
+  });
+
+  it("foreign mode offers no contrastive control", () => {
+    const result = resolveCriteria(
+      fixtureInput({ mode: "foreign", lintFindings: [NUMERIC_FINDING] }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="foreign"
+        onAttestContrastive={vi.fn()}
+        onClearContrastive={vi.fn()}
+      />,
+    );
+    const row = rowByDescription("Fixture numeric region criterion");
+    expandRow(row);
+    expect(within(row).queryByTestId("criteria-contrastive-controls")).toBeNull();
+  });
+});
+
+describe("CriteriaPage — §9 font license attestation editor (Batch 5)", () => {
+  const FONT_FACTS: CriteriaFacts = {
+    ...BASELINE_FACTS,
+    bundledFonts: ["Fixture.ttf"],
+  };
+
+  it("an unattested font resolves Needs human and the editor saves license + open confirmation", () => {
+    const onAttestFontLicense = vi.fn();
+    const result = resolveCriteria(
+      fixtureInput({ facts: FONT_FACTS, lintFindings: [] }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        onAttestFontLicense={onAttestFontLicense}
+        onClearFontLicense={vi.fn()}
+      />,
+    );
+    const row = rowByDescription("Fixture font license criterion");
+    expect(within(row).getByTestId("criteria-row-status").textContent).toBe(
+      "Needs human",
+    );
+    expandRow(row);
+    fireEvent.change(within(row).getByTestId("criteria-font-license-Fixture.ttf"), {
+      target: { value: "OFL-1.1" },
+    });
+    fireEvent.click(within(row).getByTestId("criteria-font-open-Fixture.ttf"));
+    fireEvent.click(within(row).getByTestId("criteria-font-save-Fixture.ttf"));
+    expect(onAttestFontLicense).toHaveBeenCalledTimes(1);
+    expect(onAttestFontLicense).toHaveBeenCalledWith("Fixture.ttf", "OFL-1.1", true);
+  });
+
+  it("an attested font resolves Met and the editor offers Clear", () => {
+    const onClearFontLicense = vi.fn();
+    const result = resolveCriteria(
+      fixtureInput({
+        facts: FONT_FACTS,
+        lintFindings: [],
+        record: {
+          attestations: {},
+          confirmations: {},
+          fontLicenseAttestations: {
+            "Fixture.ttf": {
+              license: "OFL-1.1",
+              openConfirmed: true,
+              at: "2026-10-14T00:00:00.000Z",
+            },
+          },
+        },
+      }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        onAttestFontLicense={vi.fn()}
+        onClearFontLicense={onClearFontLicense}
+      />,
+    );
+    const row = rowByDescription("Fixture font license criterion");
+    expect(within(row).getByTestId("criteria-row-status").textContent).toBe("Met");
+    expandRow(row);
+    fireEvent.click(within(row).getByTestId("criteria-font-clear-Fixture.ttf"));
+    expect(onClearFontLicense).toHaveBeenCalledWith("Fixture.ttf");
+  });
+
+  it("foreign mode shows no font editor", () => {
+    const result = resolveCriteria(
+      fixtureInput({ mode: "foreign", facts: FONT_FACTS, lintFindings: [] }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="foreign"
+        onAttestFontLicense={vi.fn()}
+        onClearFontLicense={vi.fn()}
+      />,
+    );
+    const row = rowByDescription("Fixture font license criterion");
+    expect(within(row).getByTestId("criteria-row-status").textContent).toBe(
+      "Needs human",
+    );
+    expandRow(row);
+    expect(within(row).queryByTestId("criteria-font-controls")).toBeNull();
   });
 });
 
