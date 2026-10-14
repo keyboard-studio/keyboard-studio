@@ -19,7 +19,7 @@ This spec **implements**, and does not restate, the following. On conflict they 
 - [specs/071-marks-question-series/](../071-marks-question-series/spec.md) — the Accents and marks series. FR-023 (re-confirmation when alphabet edits change the evidence behind a completed station) is the model for this spec's shape-change rule, generalised to every step.
 - [specs/075-punctuation-defaults/](../075-punctuation-defaults/spec.md) — the punctuation step's seed-once-per-evidence-key behaviour and its "removals survive a step revisit" guarantee, which this feature adopts as the rule for every step.
 - [specs/053-decision-audit/](../053-decision-audit/spec.md) and [specs/055-legible-decision-trail/](../055-legible-decision-trail/spec.md) — the append-only decision record. This feature does not change the record's model.
-- [specs/012-step-model-manifest/](../012-step-model-manifest/) and constitution Article IX — the manifest is the single source of survey ordering. This feature adds no survey surface.
+- [specs/012-step-model-manifest/](../012-step-model-manifest/) and constitution Article IX — the decision registry is the source of survey ordering (specs 087/091); the manifest declares steps and states no order. This feature adds no survey surface.
 - Constitution Article IV / decision D3 — nothing in this feature validates, so it introduces no validation timer. Saving answers rides the existing autosave seam, which D3 does not govern.
 
 ## Problem statement

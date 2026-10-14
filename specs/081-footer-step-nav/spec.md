@@ -26,7 +26,7 @@ This spec **implements** the following and does not restate them. They win on co
   This spec keeps §9 as written and amends §6's height for coarse pointers only.
 - [specs/056-ada-accessibility/](../056-ada-accessibility/) and [docs/accessibility.md](../../docs/accessibility.md), house rules 1-4, 8, 11 and 12. Conformance evidence goes in [wcag-2.2-aa-tracker.md](../056-ada-accessibility/wcag-2.2-aa-tracker.md).
 - [specs/046-i18n-localization/](../046-i18n-localization/) and its [catalog-format contract](../046-i18n-localization/contracts/catalog-format.md). A message id is a permanent handle. Moving a string does not change its meaning, so its id stays.
-- [specs/012-step-model-manifest/](../012-step-model-manifest/) and constitution Article IX. The manifest stays the single source of step ordering. This feature adds no step and changes no ordering.
+- [specs/012-step-model-manifest/](../012-step-model-manifest/) and constitution Article IX. Step ordering is derived by the decision registry (specs 087/091); the manifest declares steps and states no order. This feature adds no step and changes no ordering.
 - Constitution Article IV / decision D3. Nothing here validates, so this feature adds no timer.
 
 ## Problem statement

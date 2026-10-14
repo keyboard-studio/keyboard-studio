@@ -6,6 +6,19 @@
 >
 > **Grilling status:** `/speckit-clarify` Session 2026-06-15 — 3 of 5 questions answered (Q2 deferred, Q5 skipped). See `## Clarifications` below.
 
+> **As-built note (2026-10-14):** What in this file actually runs: the axis
+> vector is default-filled from script-class priors for axes no phase elicits
+> — as built, **no phase elicits A4 (replacing-cycling), A5, or A6**, and the
+> fills supply only their off values, so **S-10 and S-11 are unreachable in
+> production** and spec 076 routes every blocking behaviour's loud/soft choice
+> through A6's `soft` value. The §7.5.1 corpus evaluation protocol was
+> **never run**; its text is archived in
+> [corpus-protocol-archive.md](corpus-protocol-archive.md). Two proposed
+> amendments never landed in this file: spec 076's axis A8 + strategy S-14 and
+> spec 077's four-tier assignment precedence — the three-tier precedence at
+> §7.7 is what is in force. The selection engine as built lives in
+> `packages/engine/src/strategy-selector/`.
+
 ## 7. Strategy selection
 
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](../../docs/spec-amendment-2026-06-08-keyboardir.md).*
@@ -501,7 +514,7 @@ Once import lands, the validation pass also runs against each exemplar's *import
 
 #### 7.5.1 Corpus evaluation protocol
 
-The hand-enumerated table above is the **seed fixture set**; once the KeyboardIR codec (§5a) and pattern recognizer (§8 step 2) land, the same round-trip runs at corpus scale. For every `release/` keyboard that passes the Layer A' import-fidelity checks: parse to IR, run the recognizer, derive the axis vector from the lifted patterns and IR structure, run the decision tree (§7.2), and compare the tree-selected primary against the dominant `strategyId` among the recognized patterns. Disagreements are emitted as `StrategyDivergence` records in the supportability scanner output (§13). Divergence *clusters* — many keyboards mis-routed the same way — are how the tree finds its next rules: the EuroLatin and IPA mismatches above were found by hand; the corpus pass finds the rest. Isolated divergences are triaged the same way as the known mismatches: the tree may be wrong, or the keyboard may be idiosyncratic — the record carries enough provenance to decide.
+**Never run.** The protocol (recognizer → axis vector → tree → `StrategyDivergence` records over the release corpus) was never executed; its full text is archived in [corpus-protocol-archive.md](corpus-protocol-archive.md). No `StrategyDivergence` records exist in the tree.
 
 ### 7.6 Corpus-derived placement priors
 
