@@ -25,7 +25,7 @@
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 
 /**
- * The seven top-level routes.
+ * The eight top-level routes.
  *
  * Defined HERE rather than in navigate.ts because the route token set is part
  * of the grammar this module owns — `parseLocation` has to know which tokens
@@ -48,6 +48,10 @@ export type RouteId =
   // not a developer aid — so it must never sit behind the dev gate in
   // StudioShell's VALID_ROUTES.
   | "trail"
+  // The criteria compliance page (spec 084). Unconditionally valid, like
+  // 'trail': it judges the author's own keyboard and must be reachable
+  // before Output is unblocked, so it never sits behind a gate either.
+  | "criteria"
   | "profile";
 
 /**
@@ -83,6 +87,7 @@ const ROUTES: ReadonlySet<RouteId> = new Set<RouteId>([
   "output",
   "flowmap",
   "trail",
+  "criteria",
   "profile",
 ]);
 

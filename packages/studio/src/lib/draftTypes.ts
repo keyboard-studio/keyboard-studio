@@ -30,6 +30,7 @@ import type { WorkingCopySnapshot } from "./persistWorkingCopy.ts";
 import type { DecisionRecordSnapshot } from "../decisions/decisionLogStore.ts";
 import type { SurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import type { CriteriaRecord } from "../stores/criteriaRecordStore.ts";
 
 /** Lightweight peek at a stored draft, for a future resume-affordance. */
 export interface DraftMeta {
@@ -141,6 +142,16 @@ export interface DurableDraft {
    * native v2 draft the writer produces carries it.
    */
   decisions?: DecisionSet;
+  /**
+   * Spec 084 D5: the criteria record store's snapshot — the author's
+   * per-project attestations and confirmations from the criteria page.
+   * Optional and additive with no `DRAFT_VERSION` bump, following the
+   * `decisionRecord` / `surveyAnswers` precedent: a draft written before
+   * this field existed (a pre-084 draft) has no `criteriaRecord`, and
+   * `loadDraft` reads that as an empty record rather than discarding an
+   * otherwise-good draft.
+   */
+  criteriaRecord?: CriteriaRecord;
   /**
    * Spec 088 US3 / contract C-4.3: v1 answers the migration could not map to
    * a decision (their question no longer exists). Carried on the migrated

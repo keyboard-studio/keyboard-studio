@@ -21,11 +21,11 @@ export function makeStore(name: string, nodeId: string, overrides: Partial<IRSto
 }
 
 /**
- * The one IR builder for the irToCarveNodes suites: an empty scaffolded IR
+ * The one IR builder for the irToCarveNodes suites: an empty in-memory IR
  * (the same shape as irToCarveNodes' own EMPTY_IR) carrying the given
  * groups/stores/patterns.
  * irToCarveNodes never reads `origin` or `header`, so every suite shares it.
  */
 export function makeIR(parts: TestIROptions = {}): KeyboardIR {
-  return makeTestIR({ origin: 'scaffolded', header: { keyboardId: '', name: '', version: '' }, ...parts });
+  return makeTestIR({ origin: 'synthesized', header: { keyboardId: '', name: '', version: '' }, ...parts });
 }

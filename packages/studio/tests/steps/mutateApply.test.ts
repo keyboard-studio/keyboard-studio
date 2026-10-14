@@ -22,7 +22,7 @@ import { charStore, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 function makeIR(): KeyboardIR {
   return makeTestIR({
-    origin: "scaffolded",
+    origin: "synthesized",
     header: {
       keyboardId: "kbd_test",
       name: "Original Name",

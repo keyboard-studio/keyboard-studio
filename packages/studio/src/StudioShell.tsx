@@ -12,6 +12,9 @@
 //                         while the tab is labelled "Compare".
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
+//   #criteria           — CriteriaScreen: the criteria compliance page
+//                         (spec 084) — every catalog criterion judged
+//                         against the keyboard Output would ship.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
@@ -76,6 +79,7 @@ import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useStepNavStore } from "./stores/stepNavStore.ts";
 import { useSurveyAnswerStore, peekStepAnswers } from "./stores/surveyAnswerStore.ts";
 import { useDecisionStore, getDecisionSnapshot, selectTrack } from "./stores/decisionStore.ts";
+import { useCriteriaRecordStore } from "./stores/criteriaRecordStore.ts";
 import { deriveScaffoldSpec, deriveSurveyContext } from "./decisions/identitySelectors.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import {
@@ -106,6 +110,7 @@ import { runCompleteness } from "./dashboard/completeness.ts";
 import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
+import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
 import { Trans, useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
@@ -173,6 +178,7 @@ const VALID_ROUTES = new Set<RouteId>(
       "output",
       "flowmap",
       "trail",
+      "criteria",
       "profile",
     ] as const
   ).filter((r) => r !== "flowmap" || SHOW_FLOWMAP),
@@ -1400,6 +1406,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     // Spec 088 FR-007: the decision records belong to the abandoned project
     // too — reset in the same start-over path as the answer store.
     useDecisionStore.getState().reset();
+    // Spec 084 D5: the criteria attestations and confirmations belong to
+    // the abandoned project too — reset beside the decision records.
+    useCriteriaRecordStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
@@ -2131,6 +2140,12 @@ export function StudioShell() {
           stepStatuses={trailStepStatuses}
         />
       );
+      break;
+    case "criteria":
+      // Spec 084. The host assembles its own pipeline, findings, and
+      // record-store callbacks (see CriteriaScreen's header) — the pure
+      // CriteriaPage it renders reads no store, per the D8 layer rule.
+      content = <CriteriaScreen />;
       break;
     case "profile":
       content = <ProfileScreen />;

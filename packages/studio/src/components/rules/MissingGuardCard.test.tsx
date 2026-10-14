@@ -39,7 +39,7 @@ function diablockRule(nodeId: string, vkey: string): IRRule {
 
 function seedIr(rules: IRRule[] = [diablockRule("r1", "K_C")]): void {
   const ir = {
-    origin: "scaffolded",
+    origin: "synthesized",
     header: { keyboardId: "t", name: "t", bcp47: [], copyright: "", version: "1.0", targets: [], storeDirectives: [] },
     stores: [],
     groups: [

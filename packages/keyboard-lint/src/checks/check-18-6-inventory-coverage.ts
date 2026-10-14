@@ -2,8 +2,20 @@
 // Criteria: Every character in the confirmed linguist inventory is produced by some
 // reachable input sequence in the draft keyboard.
 //
-// SCOPE GUARD: only runs when keyboardIR.origin === "scaffolded". If origin is
-// "imported" or "synthesized", or if any RawKmnFragment is present, return [].
+// RUN CONDITION (spec 084 Batch 4): this check runs whenever it is called
+// with an inventory — `lintWithContext` only calls it when the caller
+// supplied BOTH a keyboard IR and an inventory — and the IR carries no
+// RawKmnFragments. If any fragment is present, return []. There is NO
+// origin condition: the pre-Batch-4 guard (`ir.origin !== "scaffolded"`)
+// was deleted, with the "scaffolded" origin value itself, under
+// Matthew's 2026-10-13 streamline ruling — no production code ever
+// stamped an IR "scaffolded" (every IR birth goes through the parser,
+// which stamps "imported"), so the guard's precondition was
+// unsatisfiable outside this module's own unit tests and the check
+// could never fire on a real keyboard. The fragment condition is the
+// only guard element that protects a real failure mode (opaque content
+// the produced-set analysis cannot see through), so it is the only one
+// that stays.
 //
 // The emittable-char set is built via buildProducedSet() from @keyboard-studio/contracts.
 // That utility:
@@ -15,31 +27,39 @@
 //     item.value NFC-normalized individually; no cross-item run merging).
 //   - Ignores {kind:"deadkey"}, {kind:"beep"}, {kind:"raw"} elements.
 //   - Folds in RawKmnFragment.producedOutput sketches (output-side content of
-//     opaque rules, extracted by the codec). Irrelevant here: the scope guard
-//     below skips any IR with fragments before buildProducedSet is called.
+//     opaque rules, extracted by the codec). Irrelevant here: the fragment
+//     skip below returns before buildProducedSet is called on such an IR.
 //   - Excludes control characters U+0000-U+001F, DEL U+007F, and U+0020 SPACE by default.
 //
 // For each LinguistInventory char NOT in the emittable set, emit one finding.
 // The inventory char is NFC-normalized before lookup so precomposed codepoints in
 // the inventory match when the keyboard emits the NFC form directly.
 //
-// Accepted heuristic limit: opaque/raw fragments — if the keyboard body contains a
-// RawKmnFragment the scope guard exits early (ir.raw.length > 0 -> return []).
+// Accepted heuristic limit: opaque content — if the keyboard body contains a
+// RawKmnFragment the check exits early (ir.raw.length > 0 -> return []).
 // However if the raw content lives inside a store item marked {kind:"raw"}, the
 // store-expansion loop skips it and the character will appear uncovered even though
 // it is reachable. Reviewers should treat a finding on a keyboard with raw store
-// items as a possible false positive.
+// items as a possible false positive. (This caveat carried the whole weight of the
+// old origin guard's false-positive concern; with the guard gone it is stated here
+// and in every finding's hint instead.)
 
 // SPEC 058 FR-007/FR-008: this check adopts the REACHABILITY-AWARE view.
 //
-// It is the one Layer C consumer for which that switch is safe by construction,
-// and the two scope guards below are exactly why. The check only runs on a
-// SCAFFOLDED IR with no opaque fragments — a keyboard *we* generated. On such a
-// keyboard an orphan `T_` rule (a rule keyed on an id no key carries) can only be
-// our own bug, and it becomes a live possibility the moment rule synthesis ships
-// and a later edit deletes the key while leaving its rule behind. There is zero
-// legacy-corpus fallout: every corpus keyboard is `imported`, and the committed
-// `docs/keyboard-facet-index.json` never runs on a scaffolded IR.
+// It is the one Layer C consumer for which that switch is safe, and the
+// safety basis is now the run condition above rather than an origin
+// stamp: the check only runs when a surface deliberately supplies an
+// inventory (today: the spec 084 criteria assembly, authored mode only,
+// which builds the inventory from the author's confirmed decisions plus
+// the CLDR/SLDR exemplar baseline), and it skips any IR whose opaque
+// fragments would make the produced set untrustworthy. On such an IR an
+// orphan `T_` rule (a rule keyed on an id no key carries) is output
+// nobody can type — whether it is our own synthesis bug or inherited
+// from an imported base — and it becomes a live possibility the moment
+// rule synthesis ships and a later edit deletes the key while leaving
+// its rule behind. There is zero legacy-corpus fallout: no corpus
+// surface supplies an inventory, so the check never runs there, and the
+// committed `docs/keyboard-facet-index.json` is unaffected.
 //
 // The consequence worth stating: a character produced ONLY by an unreachable rule
 // now reports as uncovered here, where before it silently counted as covered. That
@@ -54,9 +74,10 @@ import { linguistInventoryChars, buildReachableProducedSet } from "@keyboard-stu
 
 /**
  * Check that every character in the linguist inventory is emittable by the keyboard.
- * Only runs for scaffolded keyboards with no raw fragments.
+ * Runs on any IR with no raw fragments; origin is not consulted (spec 084
+ * Batch 4 — see the module header for the deleted guard's history).
  *
- * @param ir - The keyboard IR (must have origin === "scaffolded" to run).
+ * @param ir - The keyboard IR.
  * @param inventory - The confirmed linguist inventory.
  * @param kmnPath - Virtual FS path used in `location.file`.
  */
@@ -65,10 +86,9 @@ export function checkInventoryCoverage(
   inventory: LinguistInventory,
   kmnPath: string
 ): LintFinding[] {
-  // Scope guard: only run for scaffolded keyboards
-  if (ir.origin !== "scaffolded") return [];
-
-  // Scope guard: skip if any RawKmnFragment is present (opaque content)
+  // Skip if any RawKmnFragment is present (opaque content the produced-set
+  // analysis cannot see through — the one real failure mode a guard can
+  // protect against here).
   if (ir.raw.length > 0) return [];
 
   // Build emittable set via the canonical shared utility.

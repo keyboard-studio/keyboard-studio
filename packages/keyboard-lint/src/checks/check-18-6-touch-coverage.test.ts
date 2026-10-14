@@ -61,11 +61,12 @@ describe("checkTouchCoverage (18.6 touch, KM_LINT_TOUCH_UNCOVERED)", () => {
     expect(findings).toEqual([]);
   });
 
-  it("still checks imported-origin keyboards — no scaffolded-only scope guard", () => {
-    // Unlike check-18-6-inventory-coverage (desktop), this check has no
-    // `origin === "scaffolded"` guard: imported bases (Case B) are its primary
-    // audience. checkTouchCoverage takes no `origin` input at all, so an
-    // imported layout is checked identically to a scaffolded one.
+  it("still checks imported-origin keyboards — no origin condition", () => {
+    // This check never had an origin guard: imported bases (Case B) are its
+    // primary audience. checkTouchCoverage takes no `origin` input at all,
+    // so an imported layout is checked identically to any other. (The
+    // desktop sibling's origin guard was deleted in spec 084 Batch 4, so
+    // the two §18.6 checks now agree on this.)
     const layout = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "K_A", text: "a" })] }] },
     ] });

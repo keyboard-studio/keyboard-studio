@@ -601,7 +601,7 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
 // lookup returns undefined → single '…' tile) — and for the simple vkey/char
 // rules that tests exercise, isParallelIndexFanOut returns false anyway.
 const EMPTY_IR: KeyboardIR = {
-  origin: 'scaffolded',
+  origin: 'synthesized',
   header: { keyboardId: '', name: '', bcp47: [], copyright: '', version: '', targets: [], storeDirectives: [] },
   stores: [],
   groups: [],

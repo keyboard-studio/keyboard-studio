@@ -45,7 +45,7 @@ function makePack(): RulePack {
 
 function seedIr(): void {
   const ir = {
-    origin: "scaffolded",
+    origin: "synthesized",
     header: {
       keyboardId: "t",
       name: "t",
