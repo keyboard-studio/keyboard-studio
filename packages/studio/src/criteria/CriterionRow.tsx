@@ -41,6 +41,10 @@ export interface CriterionRowProps {
   onClearAttestation?: (criterionId: string) => void;
   onConfirm?: (criterionId: string) => void;
   onUnconfirm?: (criterionId: string) => void;
+  /** §12.3 (Batch 3): record the contrastive-region attestation. */
+  onAttestContrastive?: () => void;
+  /** §12.3 (Batch 3): withdraw the contrastive-region attestation. */
+  onClearContrastive?: () => void;
 }
 
 /**
@@ -120,6 +124,8 @@ export function CriterionRow({
   onClearAttestation,
   onConfirm,
   onUnconfirm,
+  onAttestContrastive,
+  onClearContrastive,
 }: CriterionRowProps) {
   const { t, i18n } = useLingui();
   const [expanded, setExpanded] = useState(false);
@@ -223,6 +229,13 @@ export function CriterionRow({
             {evidenceCheckLine(model)}
           </>
         );
+      case "assembly":
+        return (
+          <>
+            {evidenceLines(model)}
+            {evidenceCheckLine(model)}
+          </>
+        );
       default: {
         const _exhaustive: never = model.kind;
         return String(_exhaustive);
@@ -236,6 +249,10 @@ export function CriterionRow({
     row.controls === "confirm" &&
     mode === "authored" &&
     (onConfirm !== undefined || onUnconfirm !== undefined);
+  const showContrastiveControls =
+    row.controls === "contrastive" &&
+    mode === "authored" &&
+    (onAttestContrastive !== undefined || onClearContrastive !== undefined);
 
   return (
     <li style={rowStyle} data-testid="criteria-row" data-status={row.status}>
@@ -339,6 +356,47 @@ export function CriterionRow({
                     onClick={() => onConfirm(criterion.id)}
                   >
                     {t({ id: "criteria.confirm.confirm", message: "Confirm" })}
+                  </button>
+                </div>
+              )
+            ))}
+
+          {showContrastiveControls &&
+            (row.contrastiveAttested ? (
+              onClearContrastive !== undefined && (
+                <div data-testid="criteria-contrastive-controls" style={{ marginTop: 4 }}>
+                  <span style={{ fontSize: 12, color: TEXT_DIM, marginRight: 6 }}>
+                    {t({
+                      id: "criteria.contrastive.attested",
+                      message: "You attested the numeric region is explicitly contrastive.",
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="criteria-contrastive-clear"
+                    style={controlButtonStyle}
+                    onClick={() => onClearContrastive()}
+                  >
+                    {t({ id: "criteria.contrastive.clear", message: "Withdraw attestation" })}
+                  </button>
+                </div>
+              )
+            ) : (
+              onAttestContrastive !== undefined && (
+                <div data-testid="criteria-contrastive-controls" style={{ marginTop: 4 }}>
+                  <span style={{ fontSize: 12, color: TEXT_DIM, marginRight: 6 }}>
+                    {t({
+                      id: "criteria.contrastive.prompt",
+                      message: "Is the numeric region deliberately contrastive with the alpha-2 region?",
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    data-testid="criteria-contrastive-attest"
+                    style={controlButtonStyle}
+                    onClick={() => onAttestContrastive()}
+                  >
+                    {t({ id: "criteria.contrastive.attest", message: "Attest it is contrastive" })}
                   </button>
                 </div>
               )

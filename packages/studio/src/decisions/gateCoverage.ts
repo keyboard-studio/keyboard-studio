@@ -115,6 +115,17 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "8.13-kps-targets-mismatch", code: "KM_LINT_KPS_TARGETS_MISMATCH", criteria: "Targets declared in .kmn match compiled files listed in the .kps.", why: "platform targets are not a DecisionId" },
   { id: "11.8-php-osk-image", code: "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED", criteria: "OSK graphics either use Keyman-generated form or custom images have width constraints.", why: "generated documentation markup; no DecisionId" },
   { id: "10.6-kps-numeric-region-tag", code: "KM_LINT_KPS_NUMERIC_REGION_TAG", criteria: "The .kps does not use numeric region codes in language tags.", why: "language-tag hygiene; no DecisionId" },
+  // Spec 084 Batch 3 (checks in keyboard-lint's checks/criteria/):
+  // same status as the Batch 1/2 entries — the criteria resolver is
+  // their consumer, and no DecisionId captures what they validate.
+  // The four assembly-verdict codes (1.5, 2.1, 2.2, 2.6) are NOT lint
+  // codes and do not belong in this registry: no check emits them;
+  // they are synthesized in the criteria assembly (assemblyVerdicts.ts)
+  // and pinned by criteriaCatalog.test.ts's synthesized-set guard.
+  { id: "8.7-kps-font-missing", code: "KM_LINT_KPS_FONT_MISSING", criteria: "All fonts used in the keyboard are listed in the .kps <Files>.", why: "font packaging; no DecisionId" },
+  { id: "12.2-iso-639-5-lang-code", code: "KM_LINT_ISO_639_5_LANG_CODE", criteria: "BCP47 tags do not use ISO 639-5 language codes.", why: "language-tag hygiene; no DecisionId" },
+  { id: "12.3-numeric-region-non-contrastive", code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", criteria: "A language tag does not include a numerical region code, unless it is explicitly contrastive.", why: "language-tag hygiene; no DecisionId" },
+  { id: "18.7-mandated-currency-char", code: "KM_LINT_MANDATED_CHAR_MISSING", criteria: "The keyboard can produce the mandated characters for currency (if applicable).", why: "character coverage; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {

@@ -36,6 +36,9 @@ export interface CriteriaPageProps {
   onClearAttestation?: (criterionId: string) => void;
   onConfirm?: (criterionId: string) => void;
   onUnconfirm?: (criterionId: string) => void;
+  /** §12.3 (Batch 3): the contrastive-region attestation controls. */
+  onAttestContrastive?: () => void;
+  onClearContrastive?: () => void;
   /** A statement of what was judged (e.g. the preview caveat in foreign mode). */
   judgedNote?: string;
 }
@@ -108,6 +111,8 @@ export function CriteriaPage({
   onClearAttestation,
   onConfirm,
   onUnconfirm,
+  onAttestContrastive,
+  onClearContrastive,
   judgedNote,
 }: CriteriaPageProps) {
   const { t, i18n } = useLingui();
@@ -166,6 +171,8 @@ export function CriteriaPage({
                     {...(onClearAttestation !== undefined ? { onClearAttestation } : {})}
                     {...(onConfirm !== undefined ? { onConfirm } : {})}
                     {...(onUnconfirm !== undefined ? { onUnconfirm } : {})}
+                    {...(onAttestContrastive !== undefined ? { onAttestContrastive } : {})}
+                    {...(onClearContrastive !== undefined ? { onClearContrastive } : {})}
                   />
                 ))}
               </ul>

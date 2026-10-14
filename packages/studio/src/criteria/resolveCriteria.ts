@@ -28,6 +28,7 @@ import type {
   EvidenceModel,
   ResolvedRow,
 } from "./criteriaTypes.ts";
+import { resolveAssemblyVerdictRow } from "./assemblyVerdicts.ts";
 import { resolveCompileRow } from "./compileMapping.ts";
 import { IMPLEMENTED_LINT_CODES } from "./implementedChecks.ts";
 import { PRECERTIFY_EVIDENCE } from "./precertify.ts";
@@ -164,6 +165,18 @@ function resolveRow(
         input.compileResult,
       );
       if (compileRow) return compileRow;
+      // Assembly verdicts (Batch 3: 1.5 + 2.1/2.2/2.6): synthesized by
+      // the authored host from instantiation state — see
+      // assemblyVerdicts.ts. Also before the implemented gate: their
+      // codes are in the implemented set via this synthesis, and a
+      // missing verdict must resolve Not yet checkable, never Met.
+      const verdictRow = resolveAssemblyVerdictRow(
+        criterion,
+        lintRuleId,
+        input.assemblyVerdicts,
+        input.mode,
+      );
+      if (verdictRow) return verdictRow;
       if (!IMPLEMENTED_LINT_CODES.has(lintRuleId)) {
         return {
           criterion,
@@ -192,8 +205,21 @@ function resolveRow(
         };
       }
       const findings = findingsByCode.get(lintRuleId) ?? [];
+      // §12.3 (Batch 3): the one layer-c row with an author control —
+      // the contrastive-region attestation. Offered in authored mode
+      // on both outcomes (attest to resolve a finding; withdraw to
+      // un-resolve a pass), never in foreign mode.
+      const withContrastiveControl = (row: ResolvedRow): ResolvedRow =>
+        lintRuleId === "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE" &&
+        input.mode === "authored"
+          ? {
+              ...row,
+              controls: "contrastive",
+              contrastiveAttested: input.contrastiveRegionAttested ?? false,
+            }
+          : row;
       if (findings.length > 0) {
-        return {
+        return withContrastiveControl({
           criterion,
           status: "not-met",
           controls: null,
@@ -207,9 +233,9 @@ function resolveRow(
             lintRuleId,
             findings,
           }),
-        };
+        });
       }
-      return {
+      return withContrastiveControl({
         criterion,
         status: "met",
         controls: null,
@@ -218,7 +244,7 @@ function resolveRow(
           lines: ["This check ran and reported no problems."],
           lintRuleId,
         }),
-      };
+      });
     }
 
     case "yellow-survey": {

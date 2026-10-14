@@ -102,6 +102,30 @@ const KPS = [
   "</Package>",
 ].join("\n");
 
+/** A minimal TTF binary whose name table carries one family record (ID 1, Windows). */
+function buildMinimalFont(family: string): Uint8Array {
+  const str: number[] = [];
+  for (const c of family) str.push(0, c.charCodeAt(0));
+  const headerSize = 6 + 12;
+  const nameTable: number[] = [
+    0, 0, 0, 1,
+    (headerSize >> 8) & 0xff, headerSize & 0xff,
+    0, 3, 0, 9, 0, 0, 0, 1,
+    (str.length >> 8) & 0xff, str.length & 0xff, 0, 0,
+    ...str,
+  ];
+  const nameOffset = 28;
+  return new Uint8Array([
+    0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+    0x6e, 0x61, 0x6d, 0x65, // "name"
+    0, 0, 0, 0,
+    0, 0, 0, nameOffset,
+    (nameTable.length >> 24) & 0xff, (nameTable.length >> 16) & 0xff,
+    (nameTable.length >> 8) & 0xff, nameTable.length & 0xff,
+    ...nameTable,
+  ]);
+}
+
 function fixtureVfs(): VirtualFS {
   return createVirtualFS([
     { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
@@ -135,6 +159,62 @@ describe("assembleLintContext", () => {
     });
     expect(ctx.keyboardIR).toBeDefined();
     expect(ctx.keyboardIR?.header.name).toBe("Criteria Fixture");
+  });
+
+  it("Batch 3 §8.7: extracts the family of a .kps-listed font present in the VFS", () => {
+    const font = buildMinimalFont("Fixture Sans");
+    const kpsWithFont = KPS.replace(
+      "</Files>",
+      "    <File><Name>..\\\\source\\\\FixtureSans.ttf</Name><Description></Description><FileType>.ttf</FileType></File>\n  </Files>",
+    );
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `source/${KEYBOARD_ID}.kps`, content: kpsWithFont, isBinary: false },
+      { path: "source/FixtureSans.ttf", content: font, isBinary: true },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    expect(ctx.criteriaInput?.kpsFontFamilies).toEqual(["Fixture Sans"]);
+    expect(ctx.criteriaInput?.kpsFontRefs.some((r) => r.includes("FixtureSans"))).toBe(true);
+  });
+
+  it("Batch 3 §8.7: a listed font absent from the VFS contributes no family", () => {
+    const kpsWithFont = KPS.replace(
+      "</Files>",
+      "    <File><Name>..\\\\source\\\\Missing.ttf</Name><Description></Description><FileType>.ttf</FileType></File>\n  </Files>",
+    );
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `source/${KEYBOARD_ID}.kps`, content: kpsWithFont, isBinary: false },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    expect(ctx.criteriaInput?.kpsFontFamilies).toEqual([]);
+  });
+
+  it("Batch 3 §18.7: a region with no CLDR currency entry is named context-missing", () => {
+    const kpsWithRegion = KPS.replace(
+      '<Language ID="en">English</Language>',
+      '<Language ID="und-XX">Nowhere</Language>',
+    );
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `source/${KEYBOARD_ID}.kps`, content: kpsWithRegion, isBinary: false },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { contextMissing } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    expect(contextMissing.KM_LINT_MANDATED_CHAR_MISSING).toContain("XX");
+  });
+
+  it("Batch 3 §12.3: the contrastive attestation option crosses into the criteria input", () => {
+    const attested = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+      contrastiveRegionAttested: true,
+    });
+    expect(attested.ctx.criteriaInput?.contrastiveRegionAttested).toBe(true);
+    const plain = assembleLintContext({ vfs: fixtureVfs(), keyboardId: KEYBOARD_ID });
+    expect(plain.ctx.criteriaInput?.contrastiveRegionAttested).toBe(false);
   });
 
   it("Batch 2 §8.13: a .kps with no <Targets> element contributes no declared targets and names the gap", () => {

@@ -52,6 +52,19 @@ export function scanProducedRanges(ir: KeyboardIR): ProducedRanges {
 }
 
 /**
+ * Every distinct character the keyboard can produce, as a set of
+ * single characters (Batch 3, criterion 18.7's reachability test).
+ * Same source as the range scan: buildProducedSet over the judged IR.
+ */
+export function producedCharacters(ir: KeyboardIR): ReadonlySet<string> {
+  const chars = new Set<string>();
+  for (const glyph of buildProducedSet(ir)) {
+    for (const ch of glyph) chars.add(ch);
+  }
+  return chars;
+}
+
+/**
  * 13.1 — PUA output outside experimental/ → finding. Authored
  * keyboards are placed in release/ by the generator invariant, so PUA
  * present resolves Not met there; foreign placement comes from the

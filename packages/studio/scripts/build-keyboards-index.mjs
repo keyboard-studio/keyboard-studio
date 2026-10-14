@@ -151,9 +151,12 @@ function parseKmnMetadata(kmnPath) {
   }
 }
 
+// Repository tiers the catalog enumerates — mirrors localKeyboards.ts.
+// Spec 084 Batch 3 (criterion 1.5): an ID taken in experimental/ or
+// legacy/ is just as taken as one in release/.
+const CATALOG_TIERS = ["release", "experimental", "legacy"];
+
 function scan(keyboardsRepoRoot, sourceRepoSlug, facetIndexPath) {
-  const releaseDir = path.join(keyboardsRepoRoot, "release");
-  if (!fs.existsSync(releaseDir)) return [];
   const facetScripts = loadFacetScripts(facetIndexPath);
   if (facetScripts.size === 0) {
     log(
@@ -162,46 +165,50 @@ function scan(keyboardsRepoRoot, sourceRepoSlug, facetIndexPath) {
     );
   }
   const out = [];
-  for (const vendor of fs.readdirSync(releaseDir)) {
-    const vendorDir = path.join(releaseDir, vendor);
-    let stat;
-    try {
-      stat = fs.statSync(vendorDir);
-    } catch {
-      continue;
-    }
-    if (!stat.isDirectory()) continue;
-    let kbDirs;
-    try {
-      kbDirs = fs.readdirSync(vendorDir);
-    } catch {
-      continue;
-    }
-    for (const id of kbDirs) {
-      const kbDir = path.join(vendorDir, id);
+  for (const tier of CATALOG_TIERS) {
+    const tierDir = path.join(keyboardsRepoRoot, tier);
+    if (!fs.existsSync(tierDir)) continue;
+    for (const vendor of fs.readdirSync(tierDir)) {
+      const vendorDir = path.join(tierDir, vendor);
+      let stat;
       try {
-        if (!fs.statSync(kbDir).isDirectory()) continue;
+        stat = fs.statSync(vendorDir);
       } catch {
         continue;
       }
-      const kmnPath = path.join(kbDir, "source", `${id}.kmn`);
-      if (!fs.existsSync(kmnPath)) continue;
-      const meta = parseKmnMetadata(kmnPath);
-      const kpsPath = path.join(kbDir, "source", `${id}.kps`);
-      const languages = parseKpsLanguages(kpsPath);
-      const entry = {
-        id,
-        path: `release/${vendor}/${id}`,
-        // Facet-index script facet > .kps declared tags > "Latn" — mirrors
-        // localKeyboards.ts via the shared facet-script-lookup module.
-        script: resolveKeyboardScript(id, languages, facetScripts),
-        targets: ["windows", "macosx", "linux", "web"],
-        displayName: meta.name !== "" ? meta.name : id,
-        version: meta.version,
-        sourceUrl: `https://github.com/${sourceRepoSlug}/tree/${REPO_BRANCH}/release/${vendor}/${id}`,
-      };
-      if (languages.length > 0) entry.languages = languages;
-      out.push(entry);
+      if (!stat.isDirectory()) continue;
+      let kbDirs;
+      try {
+        kbDirs = fs.readdirSync(vendorDir);
+      } catch {
+        continue;
+      }
+      for (const id of kbDirs) {
+        const kbDir = path.join(vendorDir, id);
+        try {
+          if (!fs.statSync(kbDir).isDirectory()) continue;
+        } catch {
+          continue;
+        }
+        const kmnPath = path.join(kbDir, "source", `${id}.kmn`);
+        if (!fs.existsSync(kmnPath)) continue;
+        const meta = parseKmnMetadata(kmnPath);
+        const kpsPath = path.join(kbDir, "source", `${id}.kps`);
+        const languages = parseKpsLanguages(kpsPath);
+        const entry = {
+          id,
+          path: `${tier}/${vendor}/${id}`,
+          // Facet-index script facet > .kps declared tags > "Latn" — mirrors
+          // localKeyboards.ts via the shared facet-script-lookup module.
+          script: resolveKeyboardScript(id, languages, facetScripts),
+          targets: ["windows", "macosx", "linux", "web"],
+          displayName: meta.name !== "" ? meta.name : id,
+          version: meta.version,
+          sourceUrl: `https://github.com/${sourceRepoSlug}/tree/${REPO_BRANCH}/${tier}/${vendor}/${id}`,
+        };
+        if (languages.length > 0) entry.languages = languages;
+        out.push(entry);
+      }
     }
   }
   out.sort((a, b) => a.id.localeCompare(b.id));

@@ -15,7 +15,11 @@ beforeEach(() => {
 describe("criteriaRecordStore (spec 084 D5)", () => {
   it("starts empty, matching EMPTY_CRITERIA_RECORD", () => {
     expect(getCriteriaRecordSnapshot()).toEqual(EMPTY_CRITERIA_RECORD);
-    expect(getCriteriaRecordSnapshot()).toEqual({ attestations: {}, confirmations: {} });
+    expect(getCriteriaRecordSnapshot()).toEqual({
+      attestations: {},
+      confirmations: {},
+      contrastiveAttestation: null,
+    });
   });
 
   it("attest records the answer with an ISO timestamp", () => {
@@ -68,7 +72,29 @@ describe("criteriaRecordStore (spec 084 D5)", () => {
     store.attest("criterion-a", "yes");
     store.confirm("criterion-b");
     store.reset();
-    expect(getCriteriaRecordSnapshot()).toEqual({ attestations: {}, confirmations: {} });
+    expect(getCriteriaRecordSnapshot()).toEqual({
+      attestations: {},
+      confirmations: {},
+      contrastiveAttestation: null,
+    });
+  });
+
+  it("contrastive-region attestation (§12.3): attest, snapshot, clear, legacy default", () => {
+    const store = useCriteriaRecordStore.getState();
+    expect(store.contrastiveAttestation).toBeNull();
+
+    store.attestContrastiveRegion();
+    const attested = useCriteriaRecordStore.getState().contrastiveAttestation;
+    expect(attested).not.toBeNull();
+    expect(Number.isNaN(Date.parse(attested!.at))).toBe(false);
+    expect(getCriteriaRecordSnapshot().contrastiveAttestation).toEqual(attested);
+
+    store.clearContrastiveRegion();
+    expect(useCriteriaRecordStore.getState().contrastiveAttestation).toBeNull();
+
+    // A pre-Batch-3 snapshot (no key at all) restores as unattested.
+    applyCriteriaRecordSnapshot({ attestations: {}, confirmations: {} });
+    expect(useCriteriaRecordStore.getState().contrastiveAttestation).toBeNull();
   });
 
   it("snapshot → apply is a round-trip identity", () => {

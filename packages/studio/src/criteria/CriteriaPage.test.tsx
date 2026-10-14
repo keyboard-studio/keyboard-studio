@@ -66,6 +66,13 @@ const FIXTURE_CRITERIA: Criterion[] = [
     description: "Fixture red criterion",
     preSubmitChecklistText: "Fixture checklist text to confirm.",
   },
+  {
+    id: "fix.6-numeric-region",
+    section: "12. Fixture tags",
+    band: "layer-c-enforce",
+    description: "Fixture numeric region criterion",
+    lintRuleId: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
+  },
 ];
 
 const HISTORY_FINDING: LintFinding = {
@@ -136,6 +143,7 @@ describe("CriteriaPage — header and rows agree", () => {
       "3. Fixture history",
       "4. Fixture questions",
       "5. Fixture checklist",
+      "12. Fixture tags",
     ]);
   });
 
@@ -151,7 +159,7 @@ describe("CriteriaPage — header and rows agree", () => {
 
     expect(screen.getAllByTestId("criteria-row")).toHaveLength(149);
     expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
-      "87 of 149 criteria resolved",
+      "91 of 149 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
     expect(counted).toBe(149);
@@ -289,6 +297,76 @@ describe("CriteriaPage — authored controls (US4)", () => {
     for (const row of screen.getAllByTestId("criteria-row")) expandRow(row);
     expect(screen.queryByTestId("criteria-attest-controls")).toBeNull();
     expect(screen.queryByTestId("criteria-confirm-controls")).toBeNull();
+  });
+});
+
+describe("CriteriaPage — §12.3 contrastive-region control (Batch 3)", () => {
+  const NUMERIC_FINDING: LintFinding = {
+    code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
+    severity: "warning",
+    layer: "C",
+    message: "BCP47 tag(s) use a numeric region subtag that is not attested as explicitly contrastive: es-419.",
+    hint: "Use the alpha-2 region code, or attest it.",
+  };
+
+  it("an unattested numeric region offers the attestation control on the Not-met row", () => {
+    const onAttestContrastive = vi.fn();
+    const result = resolveCriteria(
+      fixtureInput({ lintFindings: [NUMERIC_FINDING] }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        onAttestContrastive={onAttestContrastive}
+        onClearContrastive={vi.fn()}
+      />,
+    );
+    const row = rowByDescription("Fixture numeric region criterion");
+    expect(within(row).getByTestId("criteria-row-status").textContent).toBe("Not met");
+    expandRow(row);
+    fireEvent.click(within(row).getByTestId("criteria-contrastive-attest"));
+    expect(onAttestContrastive).toHaveBeenCalledTimes(1);
+  });
+
+  it("an attested keyboard shows the withdrawal control on the Met row", () => {
+    const onClearContrastive = vi.fn();
+    const result = resolveCriteria(
+      fixtureInput({ lintFindings: [], contrastiveRegionAttested: true }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="authored"
+        onAttestContrastive={vi.fn()}
+        onClearContrastive={onClearContrastive}
+      />,
+    );
+    const row = rowByDescription("Fixture numeric region criterion");
+    expect(within(row).getByTestId("criteria-row-status").textContent).toBe("Met");
+    expandRow(row);
+    expect(
+      within(row).getByTestId("criteria-contrastive-controls").textContent,
+    ).toContain("attested the numeric region");
+    fireEvent.click(within(row).getByTestId("criteria-contrastive-clear"));
+    expect(onClearContrastive).toHaveBeenCalledTimes(1);
+  });
+
+  it("foreign mode offers no contrastive control", () => {
+    const result = resolveCriteria(
+      fixtureInput({ mode: "foreign", lintFindings: [NUMERIC_FINDING] }),
+    );
+    render(
+      <CriteriaPage
+        result={result}
+        mode="foreign"
+        onAttestContrastive={vi.fn()}
+        onClearContrastive={vi.fn()}
+      />,
+    );
+    const row = rowByDescription("Fixture numeric region criterion");
+    expandRow(row);
+    expect(within(row).queryByTestId("criteria-contrastive-controls")).toBeNull();
   });
 });
 

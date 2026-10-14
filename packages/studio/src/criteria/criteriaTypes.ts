@@ -68,6 +68,24 @@ export interface CriteriaFacts {
   deprecated: boolean;
   /** The package is a partner-organization package. */
   partnerPackage: boolean;
+  /**
+   * How the judged keyboard was instantiated (Batch 3): the version
+   * rows 2.1/2.2/2.6 are Not applicable on a new-from-base keyboard
+   * (no previously deployed version). Absent when no instantiation
+   * context exists (the foreign host never sets it).
+   */
+  instantiationMode?: "adapt-existing" | "new-from-base";
+}
+
+/**
+ * One verdict from the criteria assembly's own synthesis (Batch 3:
+ * the catalog/instantiation rows 1.5 and 2.1/2.2/2.6 — see
+ * assemblyVerdicts.ts). Not a lint finding and not a compile mapping:
+ * the evidence is the studio's instantiation state.
+ */
+export interface CriteriaAssemblyVerdict {
+  status: "met" | "not-met";
+  lines: readonly string[];
 }
 
 /** Everything the pure resolver needs, and nothing it does not. */
@@ -103,6 +121,19 @@ export interface CriteriaInput {
    * (stage.compileResult) once the stage is ready.
    */
   compileResult?: CompileResult | null;
+  /**
+   * Verdicts synthesized by the criteria assembly from instantiation
+   * state (Batch 3: 1.5 + 2.1/2.2/2.6), keyed by lintRuleId. Authored
+   * host only; a verdict code with no entry resolves Not yet
+   * checkable with the reason, never Met.
+   */
+  assemblyVerdicts?: ReadonlyMap<string, CriteriaAssemblyVerdict>;
+  /**
+   * Whether the author has attested the numeric region subtag is
+   * explicitly contrastive (§12.3, Batch 3) — drives the row's
+   * attestation control state. Authored host only.
+   */
+  contrastiveRegionAttested?: boolean;
 }
 
 /**
@@ -116,6 +147,7 @@ export interface EvidenceModel {
     | "scaffolder"
     | "precertified"
     | "compile"
+    | "assembly"
     | "lint-pass"
     | "lint-finding"
     | "not-implemented"
@@ -136,7 +168,12 @@ export interface ResolvedRow {
   criterion: Criterion;
   status: CriterionStatus;
   /** The in-place control this row offers, resolved here — never in a view. */
-  controls: "attest" | "confirm" | null;
+  controls: "attest" | "confirm" | "contrastive" | null;
+  /**
+   * For the §12.3 row (controls: "contrastive"): whether the author's
+   * contrastive-region attestation is currently recorded.
+   */
+  contrastiveAttested?: boolean;
   /** Lazy evidence: call only when the row's evidence is shown. */
   evidence: () => EvidenceModel;
 }

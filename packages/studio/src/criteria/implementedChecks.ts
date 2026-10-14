@@ -22,13 +22,19 @@
 /**
  * Codes produced by a named synthesis in the criteria assembly rather
  * than by a keyboard-lint check: §§7.6/7.21 map the host's compile
- * result by diagnostic severity (compileMapping.ts). Precertified codes
- * (precertify.ts) are NOT here — precertification is a separate
- * resolver mechanism, not an implemented check.
+ * result by diagnostic severity (compileMapping.ts), and §§1.5/2.1/
+ * 2.2/2.6 are verdicts computed from the instantiation state
+ * (assemblyVerdicts.ts, Batch 3). Precertified codes (precertify.ts)
+ * are NOT here — precertification is a separate resolver mechanism,
+ * not an implemented check.
  */
 export const ASSEMBLY_SYNTHESIZED_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
+  "KM_LINT_DUPLICATE_KEYBOARD_ID",
+  "KM_LINT_VERSION_NOT_BUMPED",
+  "KM_LINT_SPURIOUS_VERSION_BUMP",
+  "KM_LINT_VERSION_NOT_INCREMENTED",
 ]);
 
 /** Lint codes with a real check behind them, mapped to catalog criteria. */
@@ -92,8 +98,20 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   // Spec 084 catch-up — 10.6 fell between the Batch 1/2 enumerations;
   // it is the same tag-parsing family as 12.4 in check-bcp47.
   "KM_LINT_KPS_NUMERIC_REGION_TAG",
+  // Spec 084 Batch 3 — checks in checks/criteria/ (12.2 ISO 639-5 and
+  // 12.3 numeric-region in check-bcp47, 8.7 package fonts, 18.7
+  // mandated currency characters).
+  "KM_LINT_ISO_639_5_LANG_CODE",
+  "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
+  "KM_LINT_KPS_FONT_MISSING",
+  "KM_LINT_MANDATED_CHAR_MISSING",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
-  // compile-result severity mapping, compileMapping.ts.
+  // compile-result severity mapping (compileMapping.ts) and the
+  // instantiation-state verdicts (assemblyVerdicts.ts).
   "KM_LINT_COMPILE_HAS_WARNINGS",
   "KM_LINT_COMPILE_ERRORS",
+  "KM_LINT_DUPLICATE_KEYBOARD_ID",
+  "KM_LINT_VERSION_NOT_BUMPED",
+  "KM_LINT_SPURIOUS_VERSION_BUMP",
+  "KM_LINT_VERSION_NOT_INCREMENTED",
 ]);

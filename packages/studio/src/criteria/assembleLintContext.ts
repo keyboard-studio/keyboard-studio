@@ -60,6 +60,7 @@ import type {
   LinguistInventory,
   VirtualFS,
 } from "@keyboard-studio/contracts";
+import { CLDR_TERRITORY_CURRENCY } from "@keyboard-studio/contracts";
 import {
   parseKmn,
   parseKps,
@@ -71,6 +72,22 @@ import type { LintContext } from "@keymanapp/keyboard-lint";
 
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { fontFamilyName } from "./fontFamilyNames.ts";
+
+/**
+ * The region subtag of a BCP47 tag (mirrors the rule in
+ * keyboard-lint's check-bcp47 regionSubtagOf — the assembly needs it
+ * to name §18.7's missing CLDR data before any check runs).
+ */
+function regionSubtagOfTag(tag: string): string | undefined {
+  const subtags = tag.split("-");
+  for (const s of subtags.slice(1)) {
+    if (/^[A-Za-z]{2}$/.test(s) || /^[0-9]{3}$/.test(s)) return s;
+    if (/^[A-Za-z]{4}$/.test(s)) continue;
+    return undefined;
+  }
+  return undefined;
+}
 
 /** The one criteria-mapped code whose inputs this assembly can fail to supply. */
 export const INVENTORY_UNCOVERED_CODE = "KM_LINT_INVENTORY_UNCOVERED";
@@ -109,7 +126,18 @@ export const IR_DEPENDENT_CRITERIA_CODES: readonly string[] = [
   "KM_LINT_KPS_TARGETS_MISMATCH",
   "KM_LINT_PUA_NOT_IN_EXPERIMENTAL",
   "KM_LINT_PUA_FONT_NO_DISPLAYMAP",
+  // Batch 3 (+ the 10.6 catch-up, whose IR dependence was under-named
+  // when it landed): the BCP47 tag checks, the package-font check, and
+  // the mandated-currency check all read the parsed IR.
+  "KM_LINT_KPS_NUMERIC_REGION_TAG",
+  "KM_LINT_ISO_639_5_LANG_CODE",
+  "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
+  "KM_LINT_KPS_FONT_MISSING",
+  "KM_LINT_MANDATED_CHAR_MISSING",
 ];
+
+/** §18.7's code: named here because a region without CLDR data is a missing input. */
+export const MANDATED_CHAR_CODE = "KM_LINT_MANDATED_CHAR_MISSING";
 
 /** §8.13's code: named here because an undeclared .kps target list is a missing input. */
 export const KPS_TARGETS_MISMATCH_CODE = "KM_LINT_KPS_TARGETS_MISMATCH";
@@ -147,6 +175,13 @@ export interface AssembleLintContextInput {
    * true, mirroring its resolver facts (§§15–16 applicable by default).
    */
   deprecationInPlay?: boolean;
+  /**
+   * The author has attested the numeric region subtag is explicitly
+   * contrastive (§12.3's exception, Batch 3). Authored host only, from
+   * criteriaRecordStore; default false (the foreign host never sets
+   * it — no attestation exists there).
+   */
+  contrastiveRegionAttested?: boolean;
 }
 
 export interface AssembledLintContext {
@@ -294,6 +329,25 @@ export function assembleLintContext(
     }
   }
 
+  // Batch 3 §8.7: family names of the .kps-listed font files that are
+  // actually present in this VFS (a listed-but-absent font contributes
+  // no family — its absence is the finding's substance).
+  const kpsFontFamilies: string[] = [];
+  if (kpsFontRefs.length > 0) {
+    const wanted = new Set(
+      kpsFontRefs.map((r) => (r.split(/[\\/]/).pop() ?? "").toLowerCase()),
+    );
+    for (const entry of vfs.entries()) {
+      const base = (entry.path.split(/[\\/]/).pop() ?? "").toLowerCase();
+      if (!wanted.has(base)) continue;
+      if (typeof entry.content === "string") continue;
+      const family = fontFamilyName(entry.content);
+      if (family !== undefined && !kpsFontFamilies.includes(family)) {
+        kpsFontFamilies.push(family);
+      }
+    }
+  }
+
   const criteriaInput: CriteriaLintInput = {
     ...(kvks !== undefined ? { kvks } : {}),
     ...(kvksPath !== undefined ? { kvksPath } : {}),
@@ -302,6 +356,8 @@ export function assembleLintContext(
     kpsFontRefs,
     kpsLanguages,
     kpsTargets,
+    kpsFontFamilies,
+    contrastiveRegionAttested: input.contrastiveRegionAttested ?? false,
     ...(kpsDisplayName !== undefined ? { kpsDisplayName } : {}),
     placement: input.placement ?? "release",
     deprecationInPlay: input.deprecationInPlay ?? false,
@@ -347,6 +403,25 @@ export function assembleLintContext(
     // (no .kps, or a .kps with no <Targets> element): name the missing
     // input rather than letting the row pass on an empty comparison.
     contextMissing[KPS_TARGETS_MISMATCH_CODE] = MISSING_KPS_TARGETS;
+  }
+  if (keyboardIR !== undefined) {
+    // §18.7 degrades honestly: a tag whose region has no CLDR currency
+    // entry cannot be judged — name the missing data rather than
+    // letting the row pass on an unchecked mandate.
+    const noDataRegions = new Set<string>();
+    for (const tag of [...keyboardIR.header.bcp47, ...kpsLanguages]) {
+      const region = regionSubtagOfTag(tag);
+      if (
+        region !== undefined &&
+        CLDR_TERRITORY_CURRENCY[region.toUpperCase()] === undefined
+      ) {
+        noDataRegions.add(region.toUpperCase());
+      }
+    }
+    if (noDataRegions.size > 0) {
+      contextMissing[MANDATED_CHAR_CODE] =
+        `CLDR currency data for region ${[...noDataRegions].sort().join(", ")}`;
+    }
   }
 
   return { ctx, contextMissing, script };

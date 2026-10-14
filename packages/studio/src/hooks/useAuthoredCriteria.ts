@@ -31,8 +31,19 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
   const findings = useCriteriaFindings(stage);
   const attestations = useCriteriaRecordStore((s) => s.attestations);
   const confirmations = useCriteriaRecordStore((s) => s.confirmations);
+  const contrastiveAttestation = useCriteriaRecordStore(
+    (s) => s.contrastiveAttestation,
+  );
 
-  const { ready, vfs, lintFindings, contextMissing, compileResult } = findings;
+  const {
+    ready,
+    vfs,
+    lintFindings,
+    contextMissing,
+    compileResult,
+    assemblyVerdicts,
+    instantiationMode,
+  } = findings;
 
   return useMemo(() => {
     if (!ready || vfs === null) return null;
@@ -41,13 +52,15 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
       mode: "authored",
       lintFindings,
       record: { attestations, confirmations },
-      facts: deriveCriteriaFacts(vfs),
+      facts: deriveCriteriaFacts(vfs, instantiationMode ?? undefined),
       contextMissing,
       // The artifact under judgment is the generator's own output
       // bundle, so the generation-manifest criteria are precertified
       // (precertify.ts). Foreign mode never passes this.
       precertified: PRECERTIFIED_LINT_CODES,
       compileResult,
+      assemblyVerdicts,
+      contrastiveRegionAttested: contrastiveAttestation != null,
     });
   }, [
     ready,
@@ -57,5 +70,8 @@ export function useAuthoredCriteria(stage: Stage): CriteriaResult | null {
     attestations,
     confirmations,
     compileResult,
+    assemblyVerdicts,
+    instantiationMode,
+    contrastiveAttestation,
   ]);
 }

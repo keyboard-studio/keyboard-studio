@@ -16,7 +16,67 @@
 // position applies.
 
 import type { LintFinding } from "@keyboard-studio/contracts";
+import { ISO_639_5_COLLECTIVE_CODES } from "@keyboard-studio/contracts";
 import { criteriaFinding, kmnPath } from "./_shared.js";
+
+/** The primary language subtag of a BCP47 tag, lowercased. */
+export function primaryLanguageSubtag(tag: string): string {
+  return (tag.split("-")[0] ?? "").toLowerCase();
+}
+
+/**
+ * 12.2 — a tag whose primary language subtag is an ISO 639-5
+ * collective code (a language GROUP code like `aus`, not an
+ * individual language) → one finding naming the tags.
+ */
+export function checkIso6395Collective(
+  tags: readonly string[],
+  keyboardId: string,
+): LintFinding[] {
+  const offenders = [
+    ...new Set(
+      tags.filter((t) =>
+        ISO_639_5_COLLECTIVE_CODES.has(primaryLanguageSubtag(t)),
+      ),
+    ),
+  ];
+  if (offenders.length === 0) return [];
+  return [
+    criteriaFinding({
+      code: "KM_LINT_ISO_639_5_LANG_CODE",
+      file: kmnPath(keyboardId),
+      message: `BCP47 tag(s) use an ISO 639-5 collective (language-group) code as the language: ${offenders.join(", ")}.`,
+      hint: "Replace the collective code with the specific language's ISO 639 code.",
+    }),
+  ];
+}
+
+/**
+ * 12.3 — a 3-digit region subtag is allowed only where the numeric
+ * region is explicitly contrastive with the alpha-2 region (the
+ * criterion's exception clause). Mechanical detection is
+ * tagUsesNumericRegion; the exception arrives as the author's
+ * contrastive-region attestation (criteriaRecordStore, authored
+ * mode). Numeric + unattested → finding; numeric + attested → pass;
+ * no numeric region → pass. In foreign mode no attestation exists, so
+ * a numeric region is always a finding there.
+ */
+export function checkNumericRegionContrastive(
+  tags: readonly string[],
+  keyboardId: string,
+  attested: boolean,
+): LintFinding[] {
+  const offenders = [...new Set(tags.filter(tagUsesNumericRegion))];
+  if (offenders.length === 0 || attested) return [];
+  return [
+    criteriaFinding({
+      code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
+      file: kmnPath(keyboardId),
+      message: `BCP47 tag(s) use a numeric region subtag that is not attested as explicitly contrastive: ${offenders.join(", ")}.`,
+      hint: "Use the alpha-2 region code, or — if the numeric region is deliberate and contrastive — attest it on the criteria page.",
+    }),
+  ];
+}
 
 /** True when a BCP47 tag uses region subtag 001. */
 export function tagUsesRegion001(tag: string): boolean {

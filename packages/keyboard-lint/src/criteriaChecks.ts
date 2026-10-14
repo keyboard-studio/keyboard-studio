@@ -37,9 +37,13 @@ import {
   touchLayoutPath,
 } from "./parsers/parseTouchLayout.js";
 import {
+  checkIso6395Collective,
+  checkNumericRegionContrastive,
   checkNumericRegionTag,
   checkRegion001,
 } from "./checks/criteria/check-bcp47.js";
+import { checkMandatedCurrencyChars } from "./checks/criteria/check-currency.js";
+import { checkKpsFontMissing } from "./checks/criteria/check-kps-fonts.js";
 import { checkBitmapPlaceholder } from "./checks/criteria/check-bitmap.js";
 import { checkDuplicateSourceFiles } from "./checks/criteria/check-duplicate-files.js";
 import {
@@ -201,6 +205,45 @@ export function runCriteriaChecks(
     // 10.6 — any 3-digit M.49 region subtag across the same tag set.
     findings.push(
       ...checkNumericRegionTag(
+        [...keyboardIR.header.bcp47, ...input.kpsLanguages],
+        keyboardId,
+      ),
+    );
+
+    // 12.2 — ISO 639-5 collective code as a tag's language subtag.
+    findings.push(
+      ...checkIso6395Collective(
+        [...keyboardIR.header.bcp47, ...input.kpsLanguages],
+        keyboardId,
+      ),
+    );
+
+    // 12.3 — numeric region without the contrastive attestation.
+    findings.push(
+      ...checkNumericRegionContrastive(
+        [...keyboardIR.header.bcp47, ...input.kpsLanguages],
+        keyboardId,
+        input.contrastiveRegionAttested,
+      ),
+    );
+
+    // 8.7 — a font family the keyboard uses with no bundled font of
+    // that family (bundled families extracted at assembly time).
+    findings.push(
+      ...checkKpsFontMissing({
+        ...(input.kvks !== undefined ? { kvks: input.kvks } : {}),
+        ...(touchLayout !== undefined ? { touchLayout } : {}),
+        bundledFamilies: input.kpsFontFamilies,
+        keyboardId,
+      }),
+    );
+
+    // 18.7 — mandated currency characters for the tags' regions must
+    // be producible (regions without CLDR data are named
+    // context-missing by the assembly, never guessed here).
+    findings.push(
+      ...checkMandatedCurrencyChars(
+        keyboardIR,
         [...keyboardIR.header.bcp47, ...input.kpsLanguages],
         keyboardId,
       ),

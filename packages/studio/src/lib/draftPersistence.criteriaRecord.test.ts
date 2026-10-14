@@ -125,7 +125,11 @@ describe("spec 084 — a draft written without a criteria record", () => {
     seedRecordFreeDraft();
     loadDraft(PROJECT);
     expect(getCriteriaRecordSnapshot()).toEqual(EMPTY_CRITERIA_RECORD);
-    expect(getCriteriaRecordSnapshot()).toEqual({ attestations: {}, confirmations: {} });
+    expect(getCriteriaRecordSnapshot()).toEqual({
+      attestations: {},
+      confirmations: {},
+      contrastiveAttestation: null,
+    });
   });
 
   it("is not discarded from storage on load", () => {

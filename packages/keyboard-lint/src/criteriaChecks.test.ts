@@ -35,6 +35,8 @@ function fixtureInput(
     kpsFontRefs: [],
     kpsLanguages: [],
     kpsTargets: [],
+    kpsFontFamilies: [],
+    contrastiveRegionAttested: false,
     placement: "release",
     deprecationInPlay: false,
     scratchScan: false,

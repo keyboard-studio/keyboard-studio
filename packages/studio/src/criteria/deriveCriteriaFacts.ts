@@ -21,11 +21,19 @@ import type { CriteriaFacts } from "./criteriaTypes.ts";
 
 const FONT_EXTENSIONS: readonly string[] = [".ttf", ".otf", ".woff", ".woff2"];
 
-export function deriveCriteriaFacts(vfs: VirtualFS): CriteriaFacts {
+export function deriveCriteriaFacts(
+  vfs: VirtualFS,
+  instantiationMode?: "adapt-existing" | "new-from-base",
+): CriteriaFacts {
   const fontBundled = vfs
     .list()
     .some((path) =>
       FONT_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(ext)),
     );
-  return { fontBundled, deprecated: false, partnerPackage: false };
+  return {
+    fontBundled,
+    deprecated: false,
+    partnerPackage: false,
+    ...(instantiationMode !== undefined ? { instantiationMode } : {}),
+  };
 }

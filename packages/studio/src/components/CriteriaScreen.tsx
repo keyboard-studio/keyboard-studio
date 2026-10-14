@@ -48,6 +48,12 @@ export function CriteriaScreen() {
   const clearAttestation = useCriteriaRecordStore((s) => s.clearAttestation);
   const confirm = useCriteriaRecordStore((s) => s.confirm);
   const unconfirm = useCriteriaRecordStore((s) => s.unconfirm);
+  const attestContrastiveRegion = useCriteriaRecordStore(
+    (s) => s.attestContrastiveRegion,
+  );
+  const clearContrastiveRegion = useCriteriaRecordStore(
+    (s) => s.clearContrastiveRegion,
+  );
 
   if (result === null) {
     return (
@@ -88,6 +94,8 @@ export function CriteriaScreen() {
       onClearAttestation={clearAttestation}
       onConfirm={confirm}
       onUnconfirm={unconfirm}
+      onAttestContrastive={attestContrastiveRegion}
+      onClearContrastive={clearContrastiveRegion}
     />
   );
 }
