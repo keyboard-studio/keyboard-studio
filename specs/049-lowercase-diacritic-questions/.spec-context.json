@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "lowercase diacritic questions",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:30.695Z"
+    }
+  ],
+  "telemetryInstanceId": "13698b13-3d8e-4775-a9ce-772190dd0abb"
+}

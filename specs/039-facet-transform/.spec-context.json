@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "facet transform",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:18.548Z"
+    }
+  ],
+  "telemetryInstanceId": "6f67af60-fff8-466c-9ecd-3d6ada54a259"
+}

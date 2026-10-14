@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "desktop base layout fallthrough",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:19.957Z"
+    }
+  ],
+  "telemetryInstanceId": "06a96337-dc09-43f2-b725-fac7ba0d0212"
+}

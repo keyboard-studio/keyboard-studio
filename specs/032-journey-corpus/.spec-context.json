@@ -3,8 +3,8 @@
   "specName": "032-journey-corpus",
   "branch": "032-journey-corpus",
   "selectedAt": "2026-07-15T21:02:41.181Z",
-  "currentStep": "tasks",
-  "status": "implementing",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -61,6 +61,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:36:39.644Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:09.629Z"
     }
   ],
   "decisions": [
@@ -94,5 +101,6 @@
     "tasks": {
       "summary": "21 tasks across 6 phases (Setup, Foundational schema, US1 harness+4 fixtures, US2 coverage gate, US3 persona metadata, Polish)"
     }
-  }
+  },
+  "telemetryInstanceId": "356f60ec-7794-469c-a420-83f8032c8bcb"
 }

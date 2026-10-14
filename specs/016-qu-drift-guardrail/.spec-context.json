@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "qu drift guardrail",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:56:52.463Z"
+    }
+  ],
+  "telemetryInstanceId": "e3b31f50-155c-4fbb-9fad-bcead741f838"
+}

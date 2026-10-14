@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "crash reporting",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:40.173Z"
+    }
+  ],
+  "telemetryInstanceId": "2d280dde-4798-4137-8e5a-3c5060aa3fb4"
+}

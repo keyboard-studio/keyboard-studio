@@ -3,8 +3,8 @@
   "specName": "048-base-facets-in-ir",
   "branch": "048-base-facets-in-ir",
   "selectedAt": "2026-07-24T01:27:59.685Z",
-  "currentStep": "tasks",
-  "status": "implementing",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -61,6 +61,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:38:26.088Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:29.550Z"
     }
   ],
   "decisions": [
@@ -74,5 +81,6 @@
     "tasks": {
       "summary": "23 tasks across 6 phases (Setup, Foundational hoist, US1 available, US2 overridable, US3 provenance, Polish); casing-only first increment"
     }
-  }
+  },
+  "telemetryInstanceId": "23f8520a-696e-4e5a-aaf8-38a9275c0ced"
 }

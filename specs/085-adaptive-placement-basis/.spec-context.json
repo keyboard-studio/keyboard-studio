@@ -1,0 +1,18 @@
+{
+  "workflow": "companion",
+  "specName": "085-adaptive-placement-basis",
+  "branch": "085-adaptive-placement-basis",
+  "selectedAt": "2026-10-14T19:56:46.387Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:58:04.467Z"
+    }
+  ],
+  "telemetryInstanceId": "31b09687-cb21-4c27-b86c-f28aae6951ed"
+}

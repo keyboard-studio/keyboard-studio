@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "legible decision trail",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:35.539Z"
+    }
+  ],
+  "telemetryInstanceId": "5e06b7a6-457b-4c78-97f9-4308f6af2894"
+}

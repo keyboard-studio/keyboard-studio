@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "step model gates",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:51.121Z"
+    }
+  ],
+  "telemetryInstanceId": "e89af5ed-6117-4f75-8183-353a53a819bc"
+}

@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "store range notation",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:23.555Z"
+    }
+  ],
+  "telemetryInstanceId": "c47b9638-bedb-421f-8ed7-f6c41a5c3878"
+}
