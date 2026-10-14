@@ -5002,7 +5002,7 @@ export function MechanismGallery({
           retry={artifactRetry}
         />
       ) : loading ? (
-        <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT }}>
+        <p style={{ color: TEXT_DIM, fontSize: 13, fontFamily: FONT, padding: "0 20px" }}>
           <Trans id="editor.assignLoop.loadingPatterns">
             Loading patterns...
           </Trans>
@@ -5065,7 +5065,21 @@ export function MechanismGallery({
           // the shell moves it into the PreviewSheet and the sequence
           // builder renders as a fullscreen modal (showSequenceModal) instead
           // of swapping the pane.
-          narrow ? previewContent : <>{previewContent}{sequencePanel}</>
+          //
+          // The sequence builder keeps the shell pane's former 20px side
+          // inset via the wrapper below: AssignLoopShell's right pane no
+          // longer pads horizontally (#1898 — the preview's OSK is
+          // full-bleed), and each pane content owns its inset.
+          narrow ? (
+            previewContent
+          ) : (
+            <>
+              {previewContent}
+              {sequencePanel !== null && (
+                <div style={{ padding: "0 20px" }}>{sequencePanel}</div>
+              )}
+            </>
+          )
         }
       />
       {showSequenceModal && (

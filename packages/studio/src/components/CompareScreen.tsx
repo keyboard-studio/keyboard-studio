@@ -210,7 +210,10 @@ export function CompareScreen() {
           gap: 12,
           minHeight: 0,
           overflow: "auto",
-          padding: 24,
+          // No side gutter: the OSK spans the full width of the pane
+          // (#1898, same treatment as the survey preview pane); the text
+          // rows below inset themselves by the former 24px pane padding.
+          padding: "24px 0",
           boxSizing: "border-box",
         }}
       >
@@ -221,6 +224,7 @@ export function CompareScreen() {
             alignItems: "center",
             gap: 12,
             flexWrap: "wrap",
+            padding: "0 24px",
           }}
         >
           <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
@@ -234,9 +238,12 @@ export function CompareScreen() {
           oskMode={artifact.oskMode}
           stage={artifact.stage}
           retry={artifact.retry}
+          fullBleed
         />
         {artifact.startKeyboard !== null && (
-          <DiagnosticsPanel diagnostics={artifact.diagnostics} />
+          <div style={{ padding: "0 24px" }}>
+            <DiagnosticsPanel diagnostics={artifact.diagnostics} />
+          </div>
         )}
       </section>
     </div>
