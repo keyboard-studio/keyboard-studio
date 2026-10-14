@@ -342,9 +342,9 @@ function detectRangeAt(toks: string[], i: number): RangeDetection | null {
 /**
  * Parse the value list of a store declaration. Always returns the parsed
  * `items`; `opaqueReason` is non-null when the body carries a construct the
- * typed IR can't represent (named deadkey, SMP literal, malformed/descending
- * range), in which case the caller wraps the whole store as a RawKmnFragment
- * with that reason.
+ * typed IR can't represent (named deadkey, SMP literal, bracketed menu-store
+ * literal, malformed/descending range), in which case the caller wraps the
+ * whole store as a RawKmnFragment with that reason.
  */
 function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: OpaqueReason | null } {
   const toks = splitTokens(rawValue);
@@ -383,6 +383,13 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
     // quoted string — expand to individual chars
     if (isQuoted(tok)) {
       const str = unquote(tok);
+      // Bracketed menu-store literal ('[1ae 2a …]') — old-style multi-tap
+      // menu syntax: the bracketed entries are key sequences, not literal
+      // characters, so expanding char-by-char would lose the menu semantics.
+      // Preserve the whole store opaque instead.
+      if (str.startsWith("[")) {
+        return { items, opaqueReason: OPAQUE_REASONS.MENU_STORE_SYNTAX };
+      }
       for (const ch of str) {
         items.push({ kind: "char", value: ch });
       }
@@ -481,7 +488,14 @@ function sketchStoreItems(
       out.push({ kind: "char", value: String.fromCodePoint(parseInt(m?.[1] ?? "0", 16)) });
       continue;
     }
-    if (isQuoted(tok)) { for (const ch of unquote(tok)) out.push({ kind: "char", value: ch }); if (out.length > MAX_SKETCH_ITEMS) return undefined; continue; }
+    if (isQuoted(tok)) {
+      // Bracketed menu-store literal: its entries are key sequences, not
+      // chars — contribute nothing rather than fabricating char items.
+      if (unquote(tok).startsWith("[")) continue;
+      for (const ch of unquote(tok)) out.push({ kind: "char", value: ch });
+      if (out.length > MAX_SKETCH_ITEMS) return undefined;
+      continue;
+    }
     if (isNamedDk(tok)) {
       const name = (/^dk\s*\(\s*([^)]+?)\s*\)$/i.exec(tok)?.[1] ?? "").toLowerCase();
       let id = namedDk.get(name);
