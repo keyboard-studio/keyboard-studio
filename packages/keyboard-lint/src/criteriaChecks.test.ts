@@ -157,6 +157,53 @@ describe("runCriteriaChecks via lintWithContext", () => {
     expect(codes).toContain("KM_LINT_PUA_FONT_NO_DISPLAYMAP");
   });
 
+  it("KPJ pair: an older .kpj format fires only 1.10b through the real runner", async () => {
+    const findings = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput({
+        kpjPath: `${ID}.kpj`,
+        kpjText:
+          "<KeymanDeveloperProject><Options><Version>1.0</Version></Options></KeymanDeveloperProject>",
+      }),
+    });
+    const codes = findings.map((f) => f.code);
+    expect(codes).toContain("KM_LINT_KPJ_FORMAT_OUTDATED");
+    expect(codes).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
+  });
+
+  it("KPJ pair: a bumped .kpj format fires only 2.7; 2.0 fires neither; no .kpj supplied fires neither", async () => {
+    const bumped = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput({
+        kpjPath: `${ID}.kpj`,
+        kpjText:
+          "<KeymanDeveloperProject><Options><Version>3.0</Version></Options></KeymanDeveloperProject>",
+      }),
+    });
+    expect(bumped.map((f) => f.code)).toContain("KM_LINT_KPJ_VERSION_BUMPED");
+    expect(bumped.map((f) => f.code)).not.toContain(
+      "KM_LINT_KPJ_FORMAT_OUTDATED",
+    );
+
+    const current = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput({
+        kpjPath: `${ID}.kpj`,
+        kpjText:
+          "<KeymanDeveloperProject><Options><Version>2.0</Version></Options></KeymanDeveloperProject>",
+      }),
+    });
+    expect(current.map((f) => f.code)).not.toContain(
+      "KM_LINT_KPJ_FORMAT_OUTDATED",
+    );
+    expect(current.map((f) => f.code)).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
+
+    const absent = await lintWithContext(fixtureVfs(), ID, {
+      criteriaInput: fixtureInput(),
+    });
+    expect(absent.map((f) => f.code)).not.toContain(
+      "KM_LINT_KPJ_FORMAT_OUTDATED",
+    );
+    expect(absent.map((f) => f.code)).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
+  });
+
   it("runs the scratch scan only when the input asks for it (foreign arm)", async () => {
     const vfs = createVirtualFS([
       { path: `source/${ID}.kmn`, content: KMN, isBinary: false },
