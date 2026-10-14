@@ -290,7 +290,7 @@ describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
     // projectWorkingCopyVfs step 0 writes the touch layout directly into the VFS.
     const entry = vfs.get("source/basic_kbdus.keyman-touch-layout");
     expect(entry).toBeDefined();
-    expect(entry?.content).toBe(touchJson);
+    expect(entry?.content).toBe(JSON.stringify(JSON.parse(touchJson), null, 2));
   });
 
   it("does NOT create .keyman-touch-layout when touchLayoutJson is null in the store", async () => {

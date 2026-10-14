@@ -265,9 +265,9 @@ describe("BuildListView — end-to-end onComplete", () => {
       fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
 
-    // Click Done.
+    // Click Continue.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
 
     expect(onComplete).toHaveBeenCalledOnce();
@@ -544,7 +544,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
       inventoryOps("characters").setAll(["a", "b", "c"]);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     const inv = onComplete.mock.calls[0]![0].confirmedInventory ?? [];
     for (const ch of ["a", "b", "c", "A", "B", "C"]) {
@@ -562,7 +562,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
       inventoryOps("characters").setAll(["i"]);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     const inv = onComplete.mock.calls[0]![0].confirmedInventory ?? [];
     // Under "tr", i → İ (U+0130 dotted capital I), not plain "I".
@@ -651,7 +651,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(getCharacterInventoryValue().chars).toEqual(["q"]);
     // Both cases still reach the recorded IR on Done.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     const inv = onComplete.mock.calls[0]![0].confirmedInventory ?? [];
     expect(inv).toContain("q");
@@ -703,7 +703,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     // Kept as entered (not folded away, no synthesized uppercase in the UI).
     expect(getCharacterInventoryValue().chars).toEqual(["ĸ"]);
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     // No uppercase counterpart is forced into the recorded inventory.
     expect(onComplete.mock.calls[0]![0].confirmedInventory).toEqual(["ĸ"]);
