@@ -208,9 +208,10 @@ const stepPool: readonly Step[] = [
 
   // --- Invisible characters (spec 075 US3) ---
   // Format characters — ZWJ, ZWNJ, ZWSP, SOFT HYPHEN, WORD JOINER and the
-  // bidi controls — have no glyph, so no character map can show them and no
-  // exemplar tier attests them. This step offers each BY NAME with a need
-  // statement; the author's yes/no per character is a recorded decision.
+  // bidi controls — have no glyph, so no exemplar tier attests them. The
+  // right-pane gallery (#1794) offers each BY NAME with a need statement,
+  // block-grouped like the other character maps; the author's yes/no per
+  // character is a recorded decision.
   // ALWAYS renders (FR-020): no computed gate, no null return, unlike the
   // marks series and the convenience question on either side of it. Declares
   // inputs/writes empty (spec 066 FR-006): confirming an inventory is a survey
@@ -224,6 +225,10 @@ const stepPool: readonly Step[] = [
     inputs: [],
     writes: [],
     component: InvisiblesStepHost,
+    // Right pane swaps to the interactive gallery, as on the punctuation
+    // step — unconditionally: this step has no discovery fork, so the map
+    // shows for every author (scope "invisibles", the non-glyph variant).
+    rightPane: "character-map",
     specRef: ["specs/075-punctuation-defaults"],
     evidence: { inputs: ["the invisible-character candidates offered"], keyFn: "invisibles" },
     // The invisibles-inventory decision (spec 090); no answer-store
