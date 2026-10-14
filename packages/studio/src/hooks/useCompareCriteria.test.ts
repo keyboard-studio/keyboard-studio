@@ -9,8 +9,16 @@
 // in the hook header: no reliable deprecation/partner signal exists for
 // a foreign keyboard, so they must NOT resolve Not applicable).
 
-import { describe, expect, it } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
+
+// Explicit cleanup is required: vitest runs with globals off, so React
+// Testing Library's auto-cleanup never registers. Without it the hook
+// roots stay mounted past the file's jsdom teardown and a late React
+// commit lands after `window` is gone — vitest reports that as an
+// unhandled "window is not defined" error and fails the whole suite
+// even though every test passed (CI on 537de794).
+afterEach(cleanup);
 
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { VirtualFS } from "@keyboard-studio/contracts";

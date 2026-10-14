@@ -13,7 +13,7 @@
 // useSourcedExemplars.test.tsx sets), and §18.6 produces real findings.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { VirtualFS } from "@keyboard-studio/contracts";
@@ -36,6 +36,12 @@ import type { Stage } from "./useKeyboardArtifact.ts";
 const initialWorkingCopy = useWorkingCopyStore.getState();
 
 afterEach(() => {
+  // Unmount the hook roots while jsdom is still alive (see
+  // useCompareCriteria.test.ts: no RTL auto-cleanup with globals off,
+  // and a late commit after teardown fails the suite as an unhandled
+  // error). Runs first so effect cleanups cancel in-flight runs before
+  // the store reset below.
+  cleanup();
   useWorkingCopyStore.setState(initialWorkingCopy, true);
   exemplarLookup.mockReset();
 });
