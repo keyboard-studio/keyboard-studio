@@ -24,18 +24,21 @@
 // this hook only READS the stage it is handed. Exactly one artifact
 // pipeline instance exists per screen, as before.
 //
-// INVENTORY: no production builder turns the author's alphabet decisions
-// into a structured LinguistInventory. The studio's confirmed inventory
-// is a flat character list (workingCopyStore session.confirmedInventory);
-// the LinguistInventory shape additionally requires a language, a script
-// and a cased core alphabet, none of which can be derived from that list
-// without inventing facts. (The engine's CharacterDiscoveryService can
-// synthesise one, but it is an async discovery flow the author confirms
-// in Phase B — it is not a pure projection of the current decisions, and
-// no studio code calls it for this purpose.) This hook therefore passes
-// NO inventory: assembleLintContext names the missing inventory in
-// contextMissing and §18.6 resolves Not yet checkable — visible
-// degradation, never a fake inventory and never a silent pass.
+// INVENTORY (§18.6, spec 084 Batch 4): this hook builds the structured
+// LinguistInventory the check needs, via buildCriteriaInventory — the
+// author's confirmed decisions (workingCopyStore session.alphabet +
+// session.confirmedInventory) unioned with the CLDR/SLDR exemplar
+// baseline for each of the keyboard's language targets (the identity's
+// tag, the decision-derived tag, and the judged package's declared
+// languages), resolved through the engine's single sourcing path
+// (services.sourcedExemplars — the same path Phase B proposes from).
+// The outcome is folded into the assembled context with
+// applyInventoryOutcome: a skipped build (a target with no CLDR/SLDR
+// entry) or a fragment-bearing re-parse leaves §18.6 Not yet checkable
+// with the reason named — visible degradation, never a guessed verdict
+// and never a silent pass. Foreign mode builds NO inventory (the
+// Compare assembly never calls this hook's build), so §18.6 stays Not
+// yet checkable there.
 
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -45,7 +48,15 @@ import type {
 } from "@keyboard-studio/contracts";
 import { KeyboardLintEngine } from "@keymanapp/keyboard-lint";
 
-import { assembleLintContext } from "../criteria/assembleLintContext.ts";
+import {
+  applyInventoryOutcome,
+  assembleLintContext,
+} from "../criteria/assembleLintContext.ts";
+import { buildCriteriaInventory } from "../criteria/buildCriteriaInventory.ts";
+import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
+import { sourcedExemplars, type SourcedInventory } from "../lib/services.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { Stage } from "./useKeyboardArtifact.ts";
 import { useDocumentationFindings } from "./useDocumentationFindings.ts";
 
@@ -102,6 +113,14 @@ interface EngineRun {
 export function useCriteriaFindings(stage: Stage): CriteriaFindings {
   const docFindings = useDocumentationFindings();
 
+  // The inventory build's author-side inputs (Batch 4): the confirmed
+  // decisions from the working-copy session, and the author's language
+  // facts (identity patch + decision-derived survey context). Subscribed
+  // (not snapshotted) so a changed confirmation re-judges §18.6.
+  const session = useWorkingCopyStore((s) => s.session);
+  const identity = useWorkingCopyStore((s) => s.identity);
+  const decisions = useDecisionStore((s) => s.decisions);
+
   const readyStage = stage.kind === "ready" ? stage : null;
   const vfs = readyStage?.vfs ?? null;
   const keyboardId = readyStage?.keyboardId ?? null;
@@ -111,23 +130,82 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
   useEffect(() => {
     if (vfs === null || keyboardId === null) return;
     let cancelled = false;
-    const { ctx, contextMissing } = assembleLintContext({ vfs, keyboardId });
-    void new KeyboardLintEngine()
-      .lintWithContext(vfs, keyboardId, ctx)
-      .then((findings) => {
+
+    void (async () => {
+      const assembled = assembleLintContext({ vfs, keyboardId });
+
+      // The keyboard's language targets: the author's tags first (the
+      // identity patch, then the decision-derived tag), then the judged
+      // package's declared languages. For a generated output package
+      // these coincide (the descriptor writes the author's tag); the
+      // union keeps every declared target baselined.
+      const surveyContext = deriveSurveyContext(decisions);
+      const languageTags = [
+        ...new Set(
+          [
+            identity?.bcp47,
+            surveyContext.bcp47_tag,
+            ...(assembled.ctx.criteriaInput?.kpsLanguages ?? []),
+          ]
+            .map((t) => (t ?? "").trim())
+            .filter((t) => t.length > 0),
+        ),
+      ];
+
+      // Resolve the exemplar baseline per target through the single
+      // sourcing path. A failed load degrades to "no entry" for that
+      // tag (the Phase B precedent): the build then skips with the tag
+      // named, rather than wedging the page.
+      const sourcedByTag = new Map<string, SourcedInventory | null>();
+      await Promise.all(
+        languageTags.map(async (tag) => {
+          try {
+            sourcedByTag.set(tag, await sourcedExemplars(tag));
+          } catch {
+            sourcedByTag.set(tag, null);
+          }
+        }),
+      );
+      if (cancelled) return;
+
+      const build = buildCriteriaInventory({
+        languageTags,
+        script: surveyContext.script_family ?? assembled.script,
+        confirmed: {
+          ...(session.alphabet !== undefined
+            ? { alphabet: session.alphabet }
+            : {}),
+          confirmedInventory: session.confirmedInventory,
+        },
+        sourcedByTag,
+      });
+      const { ctx, contextMissing } = applyInventoryOutcome(
+        assembled,
+        build.kind === "built"
+          ? { kind: "built", inventory: build.inventory }
+          : { kind: "skipped", missingTag: build.missingTag },
+      );
+
+      try {
+        const findings = await new KeyboardLintEngine().lintWithContext(
+          vfs,
+          keyboardId,
+          ctx,
+        );
         if (!cancelled) setEngineRun({ forVfs: vfs, findings, contextMissing });
-      })
-      .catch(() => {
+      } catch {
         // A failed engine run must not wedge the page: report no engine
         // findings for this artifact, but keep the contextMissing map so
         // checks that could not run still resolve Not yet checkable.
         if (!cancelled)
           setEngineRun({ forVfs: vfs, findings: [], contextMissing });
-      });
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [vfs, keyboardId]);
+  }, [vfs, keyboardId, session, identity, decisions]);
 
   const runIsCurrent = engineRun !== null && engineRun.forVfs === vfs;
 

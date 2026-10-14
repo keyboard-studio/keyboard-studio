@@ -39,6 +39,20 @@
 // parse (their checks cannot run without an IR) and to §7.16 when the
 // package has no .kvks at all: a missing file is not a blank file, so
 // absence is a named missing input, never a finding and never a pass.
+//
+// Batch 4: the authored host builds the inventory with
+// buildCriteriaInventory (the author's confirmed decisions unioned with
+// the per-target CLDR/SLDR exemplar baseline) and folds the outcome in
+// via applyInventoryOutcome below. Two §18.6 states are named here
+// rather than left to read as a pass, because in both the engine check
+// runs (or not) without producing a finding:
+//   - the build was skipped (a target has no CLDR/SLDR entry, or no
+//     language target is recorded): the reason names the tag;
+//   - the re-parsed IR carries raw fragments: since Batch 4 deleted
+//     the check's origin guard, the fragment skip inside the check is
+//     the one remaining silent exit, so the assembly names it — the
+//     check must not resolve Met on a keyboard whose opaque content it
+//     could not see through.
 
 import type {
   CriteriaLintInput,
@@ -95,13 +109,12 @@ export interface AssembleLintContextInput {
   vfs: VirtualFS;
   keyboardId: string;
   /**
-   * The author's confirmed structured linguist inventory, when one exists.
-   * Optional: no production code in the studio builds a LinguistInventory
-   * from the author's (flat) alphabet decisions today — the working copy
-   * holds only a flat confirmed character list, and synthesising the
-   * structured shape (language / script / cased core alphabet) from it
-   * would invent facts. Callers therefore normally omit this, and §18.6
-   * degrades visibly via `contextMissing` instead.
+   * A structured linguist inventory, when the caller already has one.
+   * The authored host does NOT pass it here: it builds the inventory
+   * from the author's confirmed decisions plus the CLDR/SLDR baseline
+   * (buildCriteriaInventory) once the artifact is assembled, and folds
+   * it in via applyInventoryOutcome — exemplar resolution is async and
+   * this assembly is sync. Direct callers (tests, tooling) may pass one.
    */
   inventory?: LinguistInventory;
   /**
@@ -129,6 +142,75 @@ export interface AssembledLintContext {
   ctx: LintContext;
   /** Keyed by lintRuleId; consumable directly as CriteriaInput.contextMissing. */
   contextMissing: Record<string, string>;
+  /**
+   * The judged package's script (ISO 15924 code from its .kps, the
+   * parser's "Latn" default when undeclared). The inventory builder
+   * uses it as the record's script label when the survey recorded no
+   * script family.
+   */
+  script: string;
+}
+
+/** §18.6 named-missing text when the re-parsed IR carries raw fragments. */
+function rawFragmentsMissing(fragmentCount: number): string {
+  return `a fragment-free parse of the keyboard source (${fragmentCount} raw fragment${fragmentCount === 1 ? "" : "s"} present — opaque content the coverage analysis cannot see through)`;
+}
+
+/** §18.6 named-missing text when the exemplar baseline cannot be formed. */
+function exemplarBaselineMissing(missingTag: string | null): string {
+  return missingTag === null
+    ? "an exemplar baseline (no language target is recorded, so no CLDR/SLDR entry can be selected)"
+    : `an exemplar baseline (no CLDR/SLDR entry for ${missingTag})`;
+}
+
+/**
+ * The outcome of the authored host's inventory build
+ * (buildCriteriaInventory), folded into an assembled context.
+ */
+export type InventoryOutcome =
+  | { kind: "built"; inventory: LinguistInventory }
+  | { kind: "skipped"; missingTag: string | null };
+
+/**
+ * Fold an inventory-build outcome into an assembled lint context
+ * (Batch 4). The §18.6 row's honesty lives here:
+ *   - No parsed IR: the assembly's existing missing reason already
+ *     names the missing source; the inventory cannot change that, so
+ *     the assembly is returned untouched.
+ *   - Built + fragment-free IR: the inventory joins the context and
+ *     §18.6's missing entry is cleared — the check will really run.
+ *   - Built + raw fragments: the inventory joins the context (the
+ *     check itself skips fragment-bearing IRs), but §18.6 stays named
+ *     missing with the fragment reason — never a silent Met.
+ *   - Skipped: §18.6 is named missing with the baseline reason (the
+ *     tag with no CLDR/SLDR entry, or no recorded target).
+ */
+export function applyInventoryOutcome(
+  assembled: AssembledLintContext,
+  outcome: InventoryOutcome,
+): AssembledLintContext {
+  const ir = assembled.ctx.keyboardIR;
+  if (ir === undefined) return assembled;
+
+  const contextMissing: Record<string, string> = {
+    ...assembled.contextMissing,
+  };
+  if (outcome.kind === "skipped") {
+    contextMissing[INVENTORY_UNCOVERED_CODE] = exemplarBaselineMissing(
+      outcome.missingTag,
+    );
+    return { ...assembled, contextMissing };
+  }
+
+  const ctx: LintContext = { ...assembled.ctx, inventory: outcome.inventory };
+  if (ir.raw.length > 0) {
+    contextMissing[INVENTORY_UNCOVERED_CODE] = rawFragmentsMissing(
+      ir.raw.length,
+    );
+  } else {
+    delete contextMissing[INVENTORY_UNCOVERED_CODE];
+  }
+  return { ...assembled, ctx, contextMissing };
 }
 
 export function assembleLintContext(
@@ -175,11 +257,13 @@ export function assembleLintContext(
   let kpsFontRefs: string[] = [];
   let kpsLanguages: string[] = [];
   let kpsDisplayName: string | undefined;
+  let script = "Latn";
   if (kpsText !== undefined) {
     try {
       const meta = parseKps(kpsText);
       kpsLanguages = meta.languages;
       kpsDisplayName = meta.displayName;
+      script = meta.script;
       kpsFileNames = parseKpsFiles(kpsText).map((f) => f.name);
       const refs = parseKpsFontRefs(kpsText);
       kpsFontRefs = [...refs.oskFonts, ...refs.fileFonts];
@@ -218,6 +302,18 @@ export function assembleLintContext(
     ];
     contextMissing[INVENTORY_UNCOVERED_CODE] = missing.join(" and ");
   }
+  if (
+    keyboardIR !== undefined &&
+    inventory !== undefined &&
+    keyboardIR.raw.length > 0
+  ) {
+    // Both inputs are present, but the check skips fragment-bearing IRs
+    // (its one surviving skip): name it, or §18.6 would read as Met on a
+    // keyboard whose opaque content was never analysed.
+    contextMissing[INVENTORY_UNCOVERED_CODE] = rawFragmentsMissing(
+      keyboardIR.raw.length,
+    );
+  }
   if (keyboardIR === undefined) {
     for (const code of IR_DEPENDENT_CRITERIA_CODES) {
       contextMissing[code] = MISSING_IR;
@@ -227,5 +323,5 @@ export function assembleLintContext(
     contextMissing[KVKS_BLANK_CODE] = MISSING_KVKS;
   }
 
-  return { ctx, contextMissing };
+  return { ctx, contextMissing, script };
 }

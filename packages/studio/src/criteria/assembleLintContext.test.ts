@@ -20,6 +20,7 @@ import type { LinguistInventory, VirtualFS } from "@keyboard-studio/contracts";
 import { KeyboardLintEngine } from "@keymanapp/keyboard-lint";
 
 import {
+  applyInventoryOutcome,
   assembleLintContext,
   INVENTORY_UNCOVERED_CODE,
 } from "./assembleLintContext.ts";
@@ -278,11 +279,15 @@ describe("engine run over the assembled context (fixture VFS)", () => {
     );
     // The touch finding still runs alongside.
     expect(findings.map((f) => f.code)).toContain("KM_WARN_TOUCH_ROW_COUNT");
-    // Note: no KM_LINT_INVENTORY_UNCOVERED is asserted either way here —
-    // the §18.6 check scope-guards to scaffolded IRs and parseKmn yields
-    // an imported IR, so on this fixture it emits nothing. What Phase 2
-    // owns is the assembly contract: both inputs present, nothing named
-    // missing.
+    // §18.6 RUNS on this fixture now (spec 084 Batch 4 deleted the
+    // origin guard that made it unreachable for any parseKmn-produced
+    // IR): the inventory requires a, b, z, A, B, Z and the fixture .kmn
+    // produces only a and b, so the four uncovered characters report.
+    const uncovered = findings.filter(
+      (f) => f.code === INVENTORY_UNCOVERED_CODE,
+    );
+    expect(uncovered).toHaveLength(4);
+    expect(uncovered.map((f) => f.message).join("\n")).toContain('"z"');
   });
 });
 
@@ -319,5 +324,110 @@ describe("mergeLintFindings (doc + engine dedupe)", () => {
       message: "A different problem.",
     };
     expect(mergeLintFindings([docFinding], [other])).toHaveLength(2);
+  });
+});
+
+describe("applyInventoryOutcome (§18.6 Batch 4)", () => {
+  // The fixture .kmn plus one opaque `if(...)` rule: the codec keeps the
+  // rule as a raw fragment, which is the check's surviving skip.
+  const KMN_WITH_RAW = [
+    KMN.replace(
+      "+ [K_B] > 'b'",
+      "+ [K_B] > 'b'\nif(&VERSION > '1.0') + [K_C] > 'c'",
+    ),
+  ].join("\n");
+
+  function rawVfs(): VirtualFS {
+    return createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN_WITH_RAW, isBinary: false },
+      {
+        path: `source/${KEYBOARD_ID}.keyman-touch-layout`,
+        content: TOUCH_LAYOUT,
+        isBinary: false,
+      },
+    ]);
+  }
+
+  it("built + fragment-free: inventory joins the context and §18.6 is no longer missing", () => {
+    const assembled = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+    });
+    const inventory = fixtureInventory();
+    const result = applyInventoryOutcome(assembled, {
+      kind: "built",
+      inventory,
+    });
+    expect(result.ctx.inventory).toBe(inventory);
+    expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toBeUndefined();
+  });
+
+  it("built + raw fragments: §18.6 stays missing, naming the raw fragments", () => {
+    const assembled = assembleLintContext({
+      vfs: rawVfs(),
+      keyboardId: KEYBOARD_ID,
+    });
+    expect(assembled.ctx.keyboardIR?.raw.length).toBeGreaterThan(0);
+    const result = applyInventoryOutcome(assembled, {
+      kind: "built",
+      inventory: fixtureInventory(),
+    });
+    expect(result.ctx.inventory).toBeDefined();
+    expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
+      "raw fragment",
+    );
+  });
+
+  it("a directly-passed inventory over a fragment-bearing IR is likewise named missing", () => {
+    const { contextMissing } = assembleLintContext({
+      vfs: rawVfs(),
+      keyboardId: KEYBOARD_ID,
+      inventory: fixtureInventory(),
+    });
+    expect(contextMissing[INVENTORY_UNCOVERED_CODE]).toContain("raw fragment");
+  });
+
+  it("skipped: the reason names the target with no CLDR/SLDR entry", () => {
+    const assembled = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+    });
+    const result = applyInventoryOutcome(assembled, {
+      kind: "skipped",
+      missingTag: "ewo",
+    });
+    expect(result.ctx.inventory).toBeUndefined();
+    expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
+      "no CLDR/SLDR entry for ewo",
+    );
+  });
+
+  it("skipped with no target: the reason says so", () => {
+    const assembled = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+    });
+    const result = applyInventoryOutcome(assembled, {
+      kind: "skipped",
+      missingTag: null,
+    });
+    expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
+      "no language target is recorded",
+    );
+  });
+
+  it("no parsed IR: the assembly is returned untouched (missing source dominates)", () => {
+    const vfs = createVirtualFS([
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const assembled = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    const result = applyInventoryOutcome(assembled, {
+      kind: "built",
+      inventory: fixtureInventory(),
+    });
+    expect(result).toBe(assembled);
+    expect(result.contextMissing[INVENTORY_UNCOVERED_CODE]).toContain(
+      "parsed keyboard source",
+    );
   });
 });
