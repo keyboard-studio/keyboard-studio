@@ -47,11 +47,12 @@ the register row.
   metadata (Postgres) together**, including the legacy `default`
   draft, and reports the count deleted.
 - **Owner purge** (for requests arriving by any channel): run the
-  purge path (`deleteAllDrafts`, `utilities/oauth-backend`
-  draft-handlers) for the requester's verified `github_user_id`. The
-  purge emits a completion record (identity key, count, timestamp,
-  outcome); file it against the register row. Verify by re-listing the
-  drafts for that identity: zero rows, zero blobs.
+  operator tool `api/drafts/_purge-cli.ts` (which executes
+  `purgeUserDrafts` over the same store the endpoints use) for the
+  requester's verified `github_user_id`. The purge prints a completion
+  record (identity key, count, timestamp, outcome) as JSON; file it
+  against the register row. Verify by re-listing the drafts for that
+  identity: zero rows, zero blobs.
 - **Crash reports**: if a report is ever found to contain personal
   data despite the spec-060 redaction, remediate the issue (edit/remove
   the content via the crash-reports repo controls) and record it; the
