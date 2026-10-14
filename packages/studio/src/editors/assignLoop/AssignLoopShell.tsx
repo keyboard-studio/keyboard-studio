@@ -276,13 +276,16 @@ export function AssignLoopShell({
           {leftContent}
         </div>
 
-        {/* RIGHT pane */}
+        {/* RIGHT pane — no side gutter: the preview's OSK spans the full
+            width of the pane (#1898), so the pane's contents own their
+            own side insets (GalleryPreviewPane's text rows, the sequence
+            builder's wrapper in MechanismGallery). */}
         {hasRightPane && (
           <div
             style={{
               flexGrow: 1,
               overflowY: "auto",
-              padding: `24px 20px calc(24px + ${FOOTER_CLEARANCE})`,
+              padding: `24px 0 calc(24px + ${FOOTER_CLEARANCE})`,
               boxSizing: "border-box",
             }}
           >

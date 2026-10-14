@@ -43,11 +43,13 @@ export function GalleryPreviewPane({
   const { t } = useLingui();
   const resolvedWarningLabel = warningLabel ?? t({ id: "editor.assignLoop.preview.defaultWarningsLabel", message: "Warnings:" });
   const [oskMode, setOskMode] = useState<OskMode>(defaultOskMode);
-  // Narrow viewports render this pane in AssignLoopShell's flush PreviewSheet:
-  // the keyboard spans the sheet edge to edge, so the text blocks carry their
-  // own 12px side inset (the SurveyPreviewPane `compact` convention).
+  // The keyboard spans the full width of the pane at every width (#1898):
+  // AssignLoopShell's right pane carries no side gutter, so the text blocks
+  // carry their own side inset — 12px in the narrow PreviewSheet (the
+  // SurveyPreviewPane `compact` convention), 20px on desktop (the shell
+  // pane's former side padding, so desktop text alignment is unchanged).
   const narrow = useIsNarrow();
-  const inset = narrow ? "0 12px" : 0;
+  const inset = narrow ? "0 12px" : "0 20px";
 
   const applyWarnings =
     stage.kind === "ready" && stage.scaffoldWarnings.length > 0
@@ -220,6 +222,9 @@ export function GalleryPreviewPane({
           retry={retry}
           // Narrow = the PreviewSheet the author just opened.
           autoFocus={narrow}
+          // Full width of the pane at every width (#1898); the text
+          // blocks above/below inset themselves instead.
+          fullBleed
         />
       </div>
 

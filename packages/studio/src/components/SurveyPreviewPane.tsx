@@ -7,7 +7,11 @@
 // this pane: on desktop the pane is always beside the questions; on narrow
 // viewports it is rendered inside a PreviewSheet, so it (and its OSK iframe)
 // is mounted only while the author has the sheet open. `compact` is that
-// sheet layout: no side gutter, so the keyboard spans the full width.
+// sheet layout. At every width the keyboard spans the full width of the
+// pane (#1898, the mobile treatment applied to desktop): the pane carries
+// no side gutter of its own, and the text rows inset themselves — 12px in
+// the compact sheet, 24px on desktop (the pane's former side padding, so
+// desktop text alignment is unchanged).
 
 import type { CSSProperties } from "react";
 import { Trans } from "@lingui/react/macro";
@@ -46,8 +50,9 @@ export function SurveyPreviewPane({
   compact = false,
   style,
 }: SurveyPreviewPaneProps) {
-  // Compact: text rows keep a 12px inset; the keyboard itself does not.
-  const inset = compact ? "0 12px" : 0;
+  // Text rows keep an inset (12px compact, 24px desktop); the keyboard
+  // itself does not — it spans the pane edge to edge at every width.
+  const inset = compact ? "0 12px" : "0 24px";
   return (
     <section
       aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
@@ -57,7 +62,7 @@ export function SurveyPreviewPane({
         gap: 12,
         minHeight: 0,
         overflow: "auto",
-        padding: compact ? 0 : 24,
+        padding: compact ? 0 : "24px 0",
         boxSizing: "border-box",
         color: TEXT_MAIN,
         fontFamily: FONT,
@@ -79,6 +84,7 @@ export function SurveyPreviewPane({
             justifyContent: "center",
             flexDirection: "column",
             gap: 12,
+            padding: inset,
             color: "var(--app-text-subtle)",
             fontSize: 14,
             textAlign: "center",
@@ -142,6 +148,9 @@ export function SurveyPreviewPane({
             retry={retry}
             // Compact = the narrow PreviewSheet the author just opened.
             autoFocus={compact}
+            // The OSK spans the full width of the pane at every width
+            // (#1898); the rows above inset themselves instead.
+            fullBleed
           />
         </>
       )}

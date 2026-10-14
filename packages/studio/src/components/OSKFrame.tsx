@@ -40,6 +40,18 @@ export interface OSKFrameProps {
    * (every edit recompiles) leave focus where the author put it.
    */
   autoFocus?: boolean;
+  /**
+   * Full-bleed chrome (#1898): the grey box spans the full width of the
+   * host pane/column, edge to edge — top/bottom borders only, no rounded
+   * card, no side borders — at every viewport width. Hosts that lay the
+   * OSK out in a pane/column (survey preview pane, Compare right pane,
+   * assign-loop preview pane) pass this, and own the side inset of their
+   * text rows themselves. The default (card chrome on desktop widths)
+   * remains for hosts that embed the OSK inside a card of their own
+   * (e.g. TouchSeedSourcePanel's preview card). Narrow viewports are
+   * full-bleed with or without the prop, as before.
+   */
+  fullBleed?: boolean;
 }
 
 /**
@@ -69,6 +81,7 @@ export function OSKFrame({
   retry,
   onTextChange,
   autoFocus = false,
+  fullBleed = false,
 }: OSKFrameProps) {
   const { t } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -215,8 +228,11 @@ export function OSKFrame({
         minHeight:
           contentHeight !== null ? undefined : compactHeight ? OSK_MIN_HEIGHT_PX : 380,
         overflow: "hidden",
-        // Phone widths: edge to edge like a real keyboard — no rounded card.
-        ...(viewport.isNarrow
+        // Edge to edge like a real keyboard — no rounded card — on phone
+        // widths, and at every width when the host pane asks for the
+        // full-bleed treatment (#1898: one styling path for pane hosts,
+        // not a narrow-bleed / desktop-card divergence).
+        ...(viewport.isNarrow || fullBleed
           ? {
               borderTop: "1px solid var(--app-border)",
               borderBottom: "1px solid var(--app-border)",
