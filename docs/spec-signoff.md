@@ -1,5 +1,7 @@
 # Keyboard Studio Spec — Review Sign-Off
 
+> **Historical record (as of 2026-10-14).** This is the review log of the June 2026 draft described below. Under [Constitution v2.0.0](../.specify/memory/constitution.md) it governs nothing; it remains evidence of *why* the text it reviewed read the way it did, and later amendments recorded here are read the same way.
+
 **Spec version:** 1.3.1 (original sign-off: 1.0, 2026-06-02)
 **Date:** 2026-06-15
 **Spec file:** keyboard-studio-spec-draft.md (1044 lines, 19 sections)
