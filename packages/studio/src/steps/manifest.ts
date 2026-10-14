@@ -477,4 +477,15 @@ export function validateManifestShape(): void {
       );
     }
   }
+
+  // Right-pane guard: rightPane, when declared, must be one of the
+  // allowed values. "none" hides the preview pane (identity/layout).
+  const ALLOWED_RIGHT_PANES = new Set(["preview", "character-map", "none"]);
+  for (const step of manifest) {
+    if (step.rightPane !== undefined && !ALLOWED_RIGHT_PANES.has(step.rightPane)) {
+      throw new Error(
+        `[manifest] step "${step.id}" declares invalid rightPane "${step.rightPane}" — expected "preview", "character-map", or "none"`,
+      );
+    }
+  }
 }

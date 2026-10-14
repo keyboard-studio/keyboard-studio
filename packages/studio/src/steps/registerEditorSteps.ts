@@ -76,6 +76,7 @@ export const identityStep: EditorStep = step({
   id: "identity",
   title: "Keyboard Identity",
   component: IdentityLiteAdapter,
+  rightPane: "none",
   specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
   persistence: "answer-store",
 });
@@ -91,6 +92,7 @@ export const layoutStep: EditorStep = step({
   id: "layout",
   title: "Keyboard Layout",
   component: LayoutStepHost,
+  rightPane: "none",
   specRef: ["specs/076-rule-behaviours"],
   persistence: "answer-store",
 });
