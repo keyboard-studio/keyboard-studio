@@ -89,13 +89,13 @@ test.describe("Context tolerance — US1 diagnosis (spec 078)", () => {
 /** Phase B with one marked letter, then walk the marks series up to the station. */
 async function reachStation(page: Page): Promise<void> {
   await adapt(page, "sil_yoruba8");
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="charlist-continue"]');
   await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
   await page.fill('[aria-label="Character to add"]', "ẹ");
   await page.getByRole("button", { name: "+ Add" }).click();
-  await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-  await page.click('[data-testid="phase-b-done"]');
+  await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+  await page.click('[data-testid="charlist-done"]');
 
   const station = page.getByTestId("context-tolerance-station");
   for (let i = 0; i < 8; i++) {

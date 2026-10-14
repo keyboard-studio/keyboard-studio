@@ -137,8 +137,8 @@ function attach(page: Page, scenario: string, level: string, probe: string): Har
         basePicker: await vis(() => p.getByTestId("base-picker")),
         baseConfirm: await vis(() => p.getByTestId("base-confirm")),
         trackAdapt: await vis(() => p.getByTestId("track-adapt")),
-        prefillConfirm: await vis(() => p.getByTestId("prefill-confirm")),
-        phaseBIntro: await vis(() => p.getByTestId("phase-b-intro-next")),
+        prefillConfirm: await vis(() => p.getByTestId("prefill-continue")),
+        phaseBIntro: await vis(() => p.getByTestId("charlist-continue")),
         carveGallery: await vis(() => p.getByTestId("carve-gallery")),
         surveyBack: await vis(() => p.getByTestId("survey-back")),
         surveyAdvance: await vis(() => p.getByTestId("survey-advance")),
@@ -305,12 +305,12 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
 
   await chooseAdaptTrack(page);
   await driveAttributionStep(page);
-  await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 30_000 });
+  await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 30_000 });
   h.note("track chosen (adapt); at prefill confirmation");
   if (level === "L4-track-chosen") return;
 
   await confirmPrefill(page);
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 30_000 });
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 30_000 });
   h.note("prefill confirmed; at Phase B intro");
   if (level === "L5-prefill-confirmed") return;
 

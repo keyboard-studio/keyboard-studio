@@ -67,7 +67,7 @@ test.describe("browser Back mid-survey (F7)", () => {
     // matter for this test: the browser-history entry pushed for "characters"
     // is ONE entry regardless of the prefill -> B intra-step substage
     // transition (that substage never touches surveySessionStore.history).
-    await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 20_000 });
+    await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 20_000 });
 
     // Spec 057 FR-017 / SC-014: run the native Back sequence below against a
     // PRESERVED position, not a fresh one. Before the D-1 fix, leaving #survey
@@ -78,7 +78,7 @@ test.describe("browser Back mid-survey (F7)", () => {
     // case that used to be broken is never covered.
     await switchTab(page, "preview");
     await switchTab(page, "survey");
-    await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 20_000 });
 
     // Unwind the two untagged entries the round trip pushed. Each hash-route
     // change is a browser entry carrying no ksStep of ours (state === null),
@@ -90,7 +90,7 @@ test.describe("browser Back mid-survey (F7)", () => {
     // run against.
     await page.goBack();
     await page.goBack();
-    await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 20_000 });
 
     // One physical Back: characters -> attribution. The attribution
     // step's first question reappears (with the asked author name
