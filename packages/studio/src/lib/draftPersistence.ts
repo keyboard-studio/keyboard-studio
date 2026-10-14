@@ -71,6 +71,11 @@ import {
   peekDecision,
   useDecisionStore,
 } from "../stores/decisionStore.ts";
+import {
+  applyCriteriaRecordSnapshot,
+  getCriteriaRecordSnapshot,
+  EMPTY_CRITERIA_RECORD,
+} from "../stores/criteriaRecordStore.ts";
 import { deriveIdentityResult, deriveScaffoldSpec } from "../decisions/identitySelectors.ts";
 import { stepHasSettles } from "../decisions/screenSettles.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
@@ -849,6 +854,9 @@ export function saveDraft(projectKey: string): void {
     decisions: getDecisionSnapshot(),
     // spec 094: test builds and tester reports. Omitted until there is one.
     ...testingField(useTestingStore.getState().snapshot()),
+    // spec 084 D5: the author's criteria attestations and confirmations,
+    // keyed by criterion id.
+    criteriaRecord: getCriteriaRecordSnapshot(),
   };
 
   try {
@@ -1609,6 +1617,11 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     // the only copy and migrates into the values, with unmappable
     // entries surfaced as decision-trail orphans, never dropped.
     applyDecisionSnapshot(envelope.decisions ?? {});
+    // criteriaRecord (spec 084 D5): optional/additive, restored the same
+    // way — applied even when absent (the empty record), so a pre-084
+    // draft (or a project switch) starts from an empty record rather than
+    // inheriting another project's attestations or confirmations.
+    applyCriteriaRecordSnapshot(envelope.criteriaRecord ?? EMPTY_CRITERIA_RECORD);
     const decisionsCarryInventory =
       envelope.decisions?.["character-inventory"] !== undefined ||
       envelope.decisions?.["invisibles-inventory"] !== undefined;

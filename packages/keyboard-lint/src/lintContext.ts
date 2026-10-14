@@ -4,8 +4,21 @@
 // package-internal function that accepts optional context so 18.6 can run when
 // the compile gate provides both a KeyboardIR and a LinguistInventory.
 
-import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, ToleranceReport, TouchLayoutIR, DocLintInput } from "@keyboard-studio/contracts";
-import { parseTouchLayout, touchLayoutPath } from "./parsers/parseTouchLayout.js";
+import type {
+  VirtualFS,
+  LintFinding,
+  KeyboardIR,
+  LinguistInventory,
+  ToleranceReport,
+  TouchLayoutIR,
+  DocLintInput,
+  CriteriaLintInput,
+} from "@keyboard-studio/contracts";
+import { runCriteriaChecks } from "./criteriaChecks.js";
+import {
+  parseTouchLayout,
+  touchLayoutPath,
+} from "./parsers/parseTouchLayout.js";
 import { checkLongpress } from "./checks/check-18-1-longpress.js";
 import { checkTouchRows } from "./checks/check-18-2-touch-rows.js";
 import { checkKeysPerRow } from "./checks/check-18-3-keys-per-row.js";
@@ -35,14 +48,16 @@ import { checkHistoryStaleFileRefs } from "./checks/docs/check-3-7-history-stale
 import { checkCopyrightHolder } from "./checks/docs/check-4-7-copyright-holder.js";
 import { checkReadmeTargets } from "./checks/docs/check-5-7-readme-targets.js";
 import { checkHtmlWellFormed } from "./checks/docs/check-11-5-html-wellformed.js";
+import { checkOskLayersListed } from "./checks/docs/check-11-2-osk-layers.js";
 import { checkDataStatesComplete } from "./checks/docs/check-11-6-data-states.js";
 import { checkPagenameFormat } from "./checks/docs/check-11-7-pagename-format.js";
 import { checkBodyParity } from "./checks/docs/check-11-9-body-parity.js";
 import { checkStyleParity } from "./checks/docs/check-11-10-style-parity.js";
 
 /**
- * Run the twelve US7/FR-019 documentation checks (thirteen codes; 3.6/7.1
- * share one module) in criteria order, returning every finding they produce.
+ * Run the US7/FR-019 documentation checks (thirteen codes; 3.6/7.1 share
+ * one module) plus spec 084 Batch 1's 11.2 OSK-layers check, in criteria
+ * order, returning every finding they produce.
  * Pure and total: each check returns `[]` on absent input members.
  */
 export function runDocChecks(input: DocLintInput): LintFinding[] {
@@ -55,6 +70,7 @@ export function runDocChecks(input: DocLintInput): LintFinding[] {
     ...checkCopyrightHolder(input),
     ...checkReadmeTargets(input),
     ...checkHtmlWellFormed(input),
+    ...checkOskLayersListed(input),
     ...checkDataStatesComplete(input),
     ...checkPagenameFormat(input),
     ...checkBodyParity(input),
@@ -110,6 +126,15 @@ export interface LintContext {
    * optional inputs above.
    */
   docLintInput?: DocLintInput;
+  /**
+   * Engine-parsed .kvks/.kps facts plus mode flags (contracts
+   * CriteriaLintInput); required for the spec 084 Batch 1 criteria
+   * checks in criteriaChecks.ts. Absent -> silently skipped, same
+   * gating shape as the other optional inputs above. Only the criteria
+   * assembly assembles this — the locked phase-gate lint() path never
+   * sets it, so no other surface's findings change.
+   */
+  criteriaInput?: CriteriaLintInput;
 }
 
 /**
@@ -120,7 +145,7 @@ export interface LintContext {
 export async function lintWithContext(
   fs: VirtualFS,
   keyboardId: string,
-  ctx: LintContext
+  ctx: LintContext,
 ): Promise<LintFinding[]> {
   const tlPath = touchLayoutPath(keyboardId);
   const kmnPath = `source/${keyboardId}.kmn`;
@@ -144,21 +169,32 @@ export async function lintWithContext(
 
   // 18.6 desktop: inventory coverage — only when both inputs are present
   if (ctx.keyboardIR && ctx.inventory) {
-    findings.push(...checkInventoryCoverage(ctx.keyboardIR, ctx.inventory, kmnPath));
+    findings.push(
+      ...checkInventoryCoverage(ctx.keyboardIR, ctx.inventory, kmnPath),
+    );
   }
 
   // Spec 063: the JOINED checks need rules AND layout together. One resolver
   // states the layout precedence once (IR first, then context, then a VFS parse)
   // and gates on a keyboard IR being present, exactly as the desktop inventory
   // check above is gated. No new LintContext field is required.
-  const joined = resolveJoinedCheckInputs(ctx.keyboardIR, ctx.touchLayout, ir ?? undefined);
+  const joined = resolveJoinedCheckInputs(
+    ctx.keyboardIR,
+    ctx.touchLayout,
+    ir ?? undefined,
+  );
 
   // 18.6 touch: coverage guard (spec 035 FR-008) — only when both inputs are
   // present. The rule index is threaded when available (spec 063 FR-007), so a
   // `T_*` key whose output lives in a rule is credited here too.
   if (ctx.touchLayout && ctx.touchInventory) {
     findings.push(
-      ...checkTouchCoverage(ctx.touchLayout, ctx.touchInventory, tlPath, joined?.ruleIndex),
+      ...checkTouchCoverage(
+        ctx.touchLayout,
+        ctx.touchInventory,
+        tlPath,
+        joined?.ruleIndex,
+      ),
     );
   }
 
@@ -174,7 +210,9 @@ export async function lintWithContext(
   // unused today (every finding already carries its own location) but kept
   // for parity with the other compile-gate checks.
   if (ctx.keyboardIR && ctx.toleranceReport) {
-    findings.push(...checkContextTolerance(ctx.keyboardIR, ctx.toleranceReport));
+    findings.push(
+      ...checkContextTolerance(ctx.keyboardIR, ctx.toleranceReport),
+    );
   }
 
   // spec 080 US7/FR-019: the twelve documentation checks — only when the
@@ -182,6 +220,14 @@ export async function lintWithContext(
   // gating shape as every optional input above).
   if (ctx.docLintInput) {
     findings.push(...runDocChecks(ctx.docLintInput));
+  }
+
+  // spec 084 Batch 1: the criteria checks — only when the criteria
+  // assembly has assembled a CriteriaLintInput (same gating shape).
+  if (ctx.criteriaInput) {
+    findings.push(
+      ...runCriteriaChecks(fs, keyboardId, ctx.keyboardIR, ctx.criteriaInput),
+    );
   }
 
   return findings;
@@ -194,6 +240,9 @@ export async function lintWithContext(
  * exactly the `KM_WARN_CONTEXT_NOT_TOLERANT` / `KM_HINT_CONTEXT_NOT_ANALYSED`
  * findings and nothing else. Still engine-free: the caller supplies the report.
  */
-export function lintContextTolerance(ir: KeyboardIR, report: ToleranceReport): LintFinding[] {
+export function lintContextTolerance(
+  ir: KeyboardIR,
+  report: ToleranceReport,
+): LintFinding[] {
   return checkContextTolerance(ir, report);
 }

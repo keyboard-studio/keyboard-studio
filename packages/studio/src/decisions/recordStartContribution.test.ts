@@ -44,7 +44,7 @@ function group(nodeId: string, rules: IRRule[]): IRGroup {
 /** Minimal KeyboardIR fixture — a group of plain char rules, no patterns/stores. */
 function makeIr(groups: IRGroup[]): KeyboardIR {
   return makeTestIR(groups, [], [], {
-    origin: "scaffolded",
+    origin: "synthesized",
     header: { keyboardId: "", name: "", version: "" },
   });
 }

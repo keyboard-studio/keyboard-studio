@@ -279,6 +279,21 @@ export {
   classifyStartDocumentation,
   extractUsableBaseDescription,
 } from "./start-browser/index.js";
+
+// spec 084 Batch 1 — .kps metadata extraction for the criteria assembly
+// (the studio parses the judged .kps with these and hands the facts to
+// keyboard-lint via contracts' CriteriaLintInput; keyboard-lint itself
+// must not import the engine).
+export {
+  parseKps,
+  parseKpsFiles,
+  parseKpsFontRefs,
+} from "./start-browser/kps-parser.js";
+export type {
+  KpsMetadata,
+  KpsFileEntry,
+  KpsFontRefs,
+} from "./start-browser/kps-parser.js";
 export type { StartBrowserServiceWithDocProfile } from "./start-browser/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).

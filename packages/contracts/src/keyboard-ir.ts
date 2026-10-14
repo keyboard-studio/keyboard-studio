@@ -9,8 +9,20 @@ import type { RemovalCapability } from "./removalCapability";
 // Origin and node references
 // ---------------------------------------------------------------------------
 
-/** How this IR came to exist in the studio. */
-export type IROrigin = "scaffolded" | "imported" | "synthesized";
+/**
+ * How this IR came to exist in the studio: "imported" (parsed from an
+ * existing .kmn by the codec) or "synthesized" (constructed in memory by
+ * the studio — scaffolder output, working-copy derivation, synthesis
+ * helpers).
+ *
+ * There is deliberately no third value for scaffolder-built IRs: the
+ * retired "scaffolded" value was never stamped by any production code
+ * (every IR birth goes through the parser), and its only consumer — the
+ * §18.6 inventory check's origin guard — was deleted with it (spec 084
+ * Batch 4, Matthew's streamline ruling 2026-10-13). Origin is provenance
+ * metadata; no check gates on it.
+ */
+export type IROrigin = "imported" | "synthesized";
 
 /** A typed reference to a single node in the IR, used for back-references. */
 export interface IRNodeRef {
@@ -257,7 +269,7 @@ export interface IRHeader {
   /**
    * KMN begin-directive encoding type, set by the parser from `begin Unicode`
    * or `begin ANSI`.  Absent when the keyboard was constructed in-memory
-   * (scaffolded) rather than imported.  Used by isMnemonicKeyboard() to detect
+   * (synthesized) rather than imported.  Used by isMnemonicKeyboard() to detect
    * ANSI keyboards at import time without altering the stores array.
    */
   encoding?: "Unicode" | "ANSI";
@@ -271,7 +283,7 @@ export interface IRHeader {
    * {@link IRHeader.encoding} this is the full entry-point set.
    * `NewContext` and `PostKeystroke` groups are `readonly` and MUST NOT be
    * used as reorder hooks — they are modelled for fidelity only.
-   * Absent when the keyboard was constructed in-memory (scaffolded).
+   * Absent when the keyboard was constructed in-memory (synthesized).
    */
   entryPoints?: {
     /** Group named in `begin <encoding> > use(<group>)`. */
@@ -315,7 +327,7 @@ export interface IRStore {
    * 1-based source line number from the original .kmn file, set by the parser.
    * Used by the position-faithful emit path to interleave stores with fragments
    * and rules in their original source order when `ir.raw.length > 0`.
-   * Absent for in-memory (scaffolded/synthesized) stores.
+   * Absent for in-memory (synthesized) stores.
    */
   sourceLine?: number;
   /**
@@ -346,7 +358,7 @@ export interface IRGroup {
    * 1-based source line number of the `group(...)` header token, set by the parser.
    * Used by the position-faithful emit path to attribute user stores to their owning
    * group by position (a store belongs to the group whose header sourceLine is the
-   * greatest one <= the store's sourceLine). Absent for in-memory (scaffolded) groups.
+   * greatest one <= the store's sourceLine). Absent for in-memory (synthesized) groups.
    */
   sourceLine?: number;
 }
@@ -389,7 +401,7 @@ export interface IRRule {
    * 1-based source line number from the original .kmn file, set by the parser.
    * Used by the position-faithful emit path to interleave rules with stores and
    * fragments in their original source order when `ir.raw.length > 0`.
-   * Absent for in-memory (scaffolded/synthesized) rules.
+   * Absent for in-memory (synthesized) rules.
    */
   sourceLine?: number;
   /**
@@ -416,7 +428,7 @@ export interface IRComment {
    * 1-based source line number from the original .kmn file, set by the parser
    * (for a trailing comment, the anchor rule's own line). Used by the
    * text-splice carve path to remove a comment that cascades out with its
-   * deleted anchor node. Absent for in-memory (scaffolded/synthesized)
+   * deleted anchor node. Absent for in-memory (synthesized)
    * comments and for IRs parsed before this field existed.
    */
   sourceLine?: number;

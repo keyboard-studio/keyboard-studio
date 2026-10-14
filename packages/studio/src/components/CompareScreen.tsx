@@ -18,6 +18,12 @@
 //   - Any `onInstantiate`. See `useCompareArtifact`, which is where that
 //     absence lives.
 //
+// Spec 084 Phase 5 adds one read-only surface here: the "Check criteria"
+// button and its inline foreign-mode panel (useCompareCriteria +
+// CriteriaPage with no record callbacks). It judges the loaded keyboard's
+// preview VFS and writes nothing but its own open flag in viewStateStore —
+// the absences above are unchanged.
+//
 // The route TOKEN stays `preview` (contract §1): renaming it would break every
 // existing bookmark and every e2e hash assertion for no requirement's sake.
 // FR-026 scopes the rename to labels, aria names, headings, message ids, tests
@@ -26,6 +32,8 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { useCompareArtifact } from "../hooks/useCompareArtifact.ts";
+import { useCompareCriteria } from "../hooks/useCompareCriteria.ts";
+import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
 import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { OskModeToggle } from "./OskModeToggle.tsx";
 import { OSKFrame } from "./OSKFrame.tsx";
@@ -42,6 +50,16 @@ import { readPaneSplitPct, useViewStateStore } from "../stores/viewStateStore.ts
 export function CompareScreen() {
   const { t } = useLingui();
   const artifact = useCompareArtifact();
+
+  // Spec 084 T5.4: the foreign criteria judgment over the loaded
+  // keyboard's preview VFS. Read-only by construction — the hook imports
+  // no authoring store, the panel below passes CriteriaPage NO record
+  // callbacks (foreign rows carry controls: null already), and the only
+  // state written here is the panel's open flag in viewStateStore.
+  const compareCriteria = useCompareCriteria(artifact);
+  const criteriaOpen = useViewStateStore((s) => s.compareCriteriaOpen);
+  const setCriteriaOpen = useViewStateStore((s) => s.setCompareCriteriaOpen);
+  const criteriaReady = artifact.stage.kind === "ready";
 
   // Pane split is view state (US5): it survives a tab switch and is clamped on
   // read, so a value stored under a different layout cannot produce an
@@ -105,6 +123,73 @@ export function CompareScreen() {
         />
 
         {artifact.startKeyboard !== null && <MetadataCard kb={artifact.startKeyboard} />}
+
+        {/* Spec 084 T5.4: "Check criteria" — rendered only once a keyboard
+            is selected; disabled with a stated reason until the preview
+            stage is ready, because there is no VFS to judge before then.
+            The panel expands inline below the button (plan §5). */}
+        {artifact.startKeyboard !== null && (
+          <div data-testid="compare-criteria">
+            <button
+              type="button"
+              data-testid="compare-check-criteria"
+              disabled={!criteriaReady}
+              aria-expanded={criteriaOpen}
+              title={
+                criteriaReady
+                  ? undefined
+                  : t({
+                      id: "criteria.compare.notReadyReason",
+                      message: "Criteria can be checked once the keyboard has loaded and compiled.",
+                    })
+              }
+              onClick={() => setCriteriaOpen(!criteriaOpen)}
+              style={{
+                background: "none",
+                border: "1px solid var(--app-border)",
+                borderRadius: 6,
+                padding: "4px 10px",
+                color: "var(--app-text-subtle)",
+                cursor: criteriaReady ? "pointer" : "not-allowed",
+                fontSize: 12,
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+              }}
+            >
+              <Trans id="criteria.compare.button">Check criteria</Trans>
+            </button>
+            {!criteriaReady && (
+              <p
+                data-testid="compare-criteria-not-ready"
+                style={{ margin: "4px 0 0", fontSize: 12, color: "var(--app-text-subtle)" }}
+              >
+                <Trans id="criteria.compare.notReadyReason">
+                  Criteria can be checked once the keyboard has loaded and compiled.
+                </Trans>
+              </p>
+            )}
+            {criteriaOpen && criteriaReady && (
+              compareCriteria.ready && compareCriteria.result !== null ? (
+                <CriteriaPage
+                  mode="foreign"
+                  result={compareCriteria.result}
+                  keyboardLabel={artifact.startKeyboard.displayName}
+                  judgedNote={t({
+                    id: "criteria.compare.judgedNote",
+                    message:
+                      "This check judges the loaded keyboard as previewed here — the same source the preview compiled.",
+                  })}
+                />
+              ) : (
+                <p
+                  data-testid="compare-criteria-loading"
+                  style={{ margin: "8px 0 0", fontSize: 12, color: "var(--app-text-subtle)" }}
+                >
+                  <Trans id="criteria.compare.loading">Checking criteria…</Trans>
+                </p>
+              )
+            )}
+          </div>
+        )}
 
         {artifact.stage.kind === "ready" && <KmnSourceView vfs={artifact.stage.vfs} />}
       </section>

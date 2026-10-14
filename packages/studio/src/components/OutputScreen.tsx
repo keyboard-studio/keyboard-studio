@@ -44,6 +44,7 @@ import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
+import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -116,6 +117,11 @@ export function OutputScreen() {
   // SurveyView owns the draft autosave and is unmounted on this route; keep
   // saving while Output is open (test builds, reports, source edits).
   useOutputAutosave();
+  // Spec 084: the criteria summary card's counts. Judged off THIS screen's
+  // own artifact stage (the shared useAuthoredCriteria assembly) — no
+  // second pipeline instance, and the card is informational only: like
+  // DocumentationChecklist it never gates download or submit.
+  const criteriaResult = useAuthoredCriteria(artifact.stage);
   const narrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
@@ -238,6 +244,22 @@ export function OutputScreen() {
       : ghLogin !== null
         ? { displayName: ghLogin }
         : {};
+
+  // Criteria card counts line — the SAME message the criteria page's own
+  // summary header renders (criteria.summary.resolved), so the card and
+  // the page can never state two different verdicts. Computed only when a
+  // result exists; the card states the pending case separately below.
+  // Placeholder names `resolved`/`total` deliberately match CriteriaSummary's
+  // call site for this shared id — Lingui requires one default message per id.
+  const resolved = criteriaResult?.resolvedCount;
+  const total = criteriaResult?.total;
+  const criteriaCountsLine =
+    resolved !== undefined && total !== undefined
+      ? t({
+          id: "criteria.summary.resolved",
+          message: `${resolved} of ${total} criteria resolved`,
+        })
+      : null;
 
   const rightPct = 100 - leftPct;
 
@@ -815,6 +837,61 @@ export function OutputScreen() {
                 nothing (FR-018); placeholder rows link back to the step that
                 fills them. */}
             <DocumentationChecklist />
+
+            {/* spec 084: criteria summary card — counts from the shared
+                authored result over this screen's own stage, plus the way
+                to the full page. Informational only, like the checklist
+                above: it reads state and gates nothing. */}
+            <section
+              aria-label={t({ id: "output.criteria.regionAriaLabel", message: "Criteria summary" })}
+              data-testid="output-criteria-card"
+              style={{
+                marginTop: 10,
+                padding: "8px 12px",
+                border: "1px solid var(--app-border)",
+                borderRadius: 6,
+                background: "var(--app-surface)",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                fontSize: 12,
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 13, color: "var(--app-text)" }}>
+                <Trans id="output.criteria.title">Criteria</Trans>
+              </div>
+              {criteriaCountsLine === null ? (
+                <p style={{ margin: "4px 0 0", color: "var(--app-text-muted)", lineHeight: 1.5 }}>
+                  <Trans id="output.criteria.pending">
+                    Criteria will appear here once the keyboard has compiled.
+                  </Trans>
+                </p>
+              ) : (
+                <>
+                  <p
+                    data-testid="output-criteria-counts"
+                    style={{ margin: "4px 0 8px", color: "var(--app-text-muted)", lineHeight: 1.5 }}
+                  >
+                    {criteriaCountsLine}
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="output-criteria-view"
+                    onClick={() => navigateTo({ route: "criteria" })}
+                    style={{
+                      background: "none",
+                      border: "1px solid var(--app-border)",
+                      borderRadius: 6,
+                      padding: "4px 10px",
+                      color: "var(--app-text-subtle)",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                    }}
+                  >
+                    <Trans id="output.criteria.view">View criteria</Trans>
+                  </button>
+                </>
+              )}
+            </section>
 
             {/* Option B (org-mediated PR) submit — PRIMARY submit action per
                 docs/github-integration.md §1a. Calls the backend proxy; the

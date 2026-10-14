@@ -130,6 +130,22 @@ module.exports = {
       to:   { path: '^packages/studio/src/(dashboard|editors|stores|components)/' },
     },
     {
+      name: 'criteria-layer',
+      comment:
+        'criteria/ hosts the spec 084 criteria compliance surface: the pure ' +
+        'resolver, the catalog-order presentation (page, rows, summary), and the ' +
+        'lint-context assembly. It may depend on contracts, ui/, flags/, and lib/ ' +
+        '(assembleLintContext reads the VFS text helpers and findKmnPath from lib/). ' +
+        'Forbidden: criteria/ -> dashboard/, editors/, stores/, components/ ' +
+        '(the page components read no store — the result and the record callbacks ' +
+        'are passed down as plain props from the host, StudioShell/CriteriaScreen ' +
+        'for the authored route and CompareScreen for the foreign panel, ' +
+        'the DecisionTrailView contract).',
+      severity: 'error',
+      from: { path: '^packages/studio/src/criteria/' },
+      to:   { path: '^packages/studio/src/(dashboard|editors|stores|components)/' },
+    },
+    {
       name: 'question-modules-no-bypass-mutate-seam',
       comment:
         'survey/questions/ modules must be PURE descriptors: they declare ' +

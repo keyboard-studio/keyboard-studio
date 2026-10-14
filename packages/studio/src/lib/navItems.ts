@@ -41,6 +41,12 @@ export const NAV_ITEMS: NavItem[] = [
     id: "trail",
     label: msg({ id: "nav.decisionTrail", message: "Decisions" }),
   },
+  // Spec 084: unconditional and ungated, like Decisions beside it — the
+  // page must be reachable before Output is unblocked (plan D1).
+  {
+    id: "criteria",
+    label: msg({ id: "nav.criteria", message: "Criteria" }),
+  },
   ...(SHOW_FLOWMAP
     ? [
         {
