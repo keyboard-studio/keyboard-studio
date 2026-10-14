@@ -156,7 +156,14 @@ are author-influenced), not file-inventory properties.
    class is real but bounded (opaque store content can make
    reachable characters look uncovered; the check's own header and
    hint already document this). **This is Matthew's call, not a
-   silent fix.**
+   silent fix.** — **RULED 2026-10-13 and sharpened past this
+   proposal:** Matthew deleted the mechanism rather than relaxing
+   it (the `"scaffolded"` value and the guard are gone; the fragment
+   condition is the only skip). Verification behind the ruling:
+   nothing in production ever stamped an IR `"scaffolded"`, so the
+   guard's precondition was unsatisfiable outside its own tests.
+   Full record: `decision-18-6-origin-streamline.md`; landed in
+   Batch 4 (below).
 
 ## Batch 1 landed (2026-10-13, PR #2048)
 
@@ -193,6 +200,37 @@ when its `.ico` is dangling, so 7.9 is the single named
 pristine-vs-mutated divergence (Not met → Met) — both verdicts honest
 about the VFS judged.
 
+## Batch 4 landed (2026-10-13, PR #2048)
+
+Batch 4 (§18.6, 1 row) is implemented on this branch: the production
+inventory builder + authored wiring (Part A) and the origin
+streamline (Part B). §18.6 was already counted implemented
+(`IMPLEMENTED_LINT_CODES` unchanged at 41) but could never fire; it
+now produces real verdicts in authored mode.
+
+- **Builder** (`studio/src/criteria/buildCriteriaInventory.ts`):
+  confirmed decisions ∪ per-target CLDR/SLDR exemplar baseline, per
+  Matthew's construction ruling; skips only when a target has no
+  CLDR/SLDR entry, surfacing Not yet checkable with the tag named.
+  Foreign mode builds no inventory (§18.6 stays Not yet checkable
+  there, pinned).
+- **Streamline:** `"scaffolded"` deleted from `IROrigin` + zod;
+  check-18-6's origin guard deleted. Run condition: inventory
+  supplied AND no raw fragments; a fragment-bearing keyboard shows
+  Not yet checkable with the raw-fragment reason. Every fixture/test
+  literal migrated; persisted legacy draft fixtures deliberately
+  left (inert — see the decision note).
+- **Ewondo verification** (real `sil_cameroon_qwerty`, authored,
+  target `ewo`): re-parsed IR has **0 raw fragments**; the build
+  produced an 85-character inventory; **§18.6 = Not met** with 22
+  uncovered characters — 19 precomposed tone stacks the keyboard
+  produces as base + combining-mark sequences (the check's
+  documented strict-precomposed limit; its marks ARE credited) and
+  3 exemplar characters it does not emit (U+2010, U+2011, U+2030).
+  §18.6 therefore leaves Not yet checkable for Ewondo-class
+  keyboards: the Batch 1 count of 22 falls to **21**, the verdict now
+  an honest Not met rather than a resolution.
+
 ## Recommended implementation batches
 
 - **Batch 1 — plumb + scan (all S, inputs in hand; 22 rows):**
@@ -206,8 +244,9 @@ about the VFS judged.
   experimental/legacy), 2.1/2.2/2.6 (adapt-track version diff),
   8.7 (font name-table extraction), 12.2 (ISO 639-5 list),
   12.3 (contrastive attestation), 18.7 (CLDR currency data).
-- **Batch 4 — §18.6 (1 row):** inventory builder + origin-guard
-  decision (above).
+- **Batch 4 — §18.6 (1 row): LANDED 2026-10-13** (above): inventory
+  builder + the origin streamline Matthew ruled in place of the
+  guard-relaxation proposed here.
 - **Batch 5 — confirm conversions (2 rows):** 9.1, 9.2 become
   per-font attestations (they leave Not yet checkable for
   Needs human, where they honestly belong).

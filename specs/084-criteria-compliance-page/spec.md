@@ -214,6 +214,33 @@ mode** against the loaded keyboard's VFS:
    keyboard (the existing Compare isolation tests must still pass,
    extended to cover the click).
 
+## Amendment 2026-10-13 (2) — §18.6 inventory construction + origin streamline (Batch 4)
+
+Owner rulings 2026-10-13, implemented as Batch 4 on PR #2048; full
+record in `decision-18-6-origin-streamline.md` in this directory.
+
+1. **The §18.6 inventory is constructible in-studio for an Adapt
+   case**: the author's confirmed inventory (alphabet / marks /
+   punctuation decisions, including carve adds/deletes) unioned with
+   the CLDR exemplar baseline for EACH of the keyboard's language
+   targets (SLDR fallback), built by a production builder
+   (`buildCriteriaInventory`) and wired into the authored criteria
+   assembly. The check skips only when a target has no CLDR/SLDR
+   entry; the resolver then shows §18.6 Not yet checkable with the
+   reason naming that tag — never a guessed verdict. Foreign
+   (Compare) mode builds no inventory: §18.6 stays Not yet checkable
+   there.
+2. **The IR origin mechanism is deleted, not relaxed**: the
+   `"scaffolded"` value is removed from `IROrigin` and its zod
+   schema, and check-18-6's origin guard is deleted entirely. The
+   check's run condition is now: an inventory was supplied AND the
+   IR carries no raw fragments. A fragment-bearing keyboard surfaces
+   §18.6 as Not yet checkable with the reason naming the raw
+   fragments. (Verification behind the ruling: no production code
+   ever stamped an IR `"scaffolded"` — every IR birth goes through
+   `parseKmn`, which stamps `"imported"` — so the guard's
+   precondition was unsatisfiable outside its own unit tests.)
+
 This is a single-keyboard read, not the automatic comparison view
 the Non-goals defer; the shared resolver keeps that future view
 possible.
