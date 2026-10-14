@@ -1,6 +1,7 @@
 // runCriteriaChecks — the spec 084 criteria checks (Batch 1:
 // §§1/2/7/8/9/12/13/15; Batch 2: cross-file reconciliation — 1.9, 7.4,
-// 7.12, 7.14, 7.19, 8.13), run as one gated group.
+// 7.12, 7.14, 7.19, 8.13; Batch 3 wiring; the KPJ pair — 1.10b, 2.7),
+// run as one gated group.
 //
 // Gating shape matches every other optional LintContext input: the
 // checks run only when the caller assembled a CriteriaLintInput (the
@@ -81,6 +82,10 @@ import {
   checkVersionVPrefix,
 } from "./checks/criteria/check-version.js";
 import { checkDeprecatedKpsLinkage } from "./checks/criteria/check-deprecated-kps.js";
+import {
+  checkKpjFormatOutdated,
+  checkKpjVersionBumped,
+} from "./checks/criteria/check-kpj.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
@@ -171,6 +176,19 @@ export function runCriteriaChecks(
       kpsPath,
     ),
   );
+
+  // 1.10b / 2.7 — the KPJ pair: the root .kpj's <Options><Version>
+  // against criterion 1.10's pinned current format (2.0). Runs only
+  // when a .kpj is present; the absent case is the assembly's
+  // contextMissing, not a finding.
+  if (input.kpjPath !== undefined) {
+    const kpjFacts = {
+      ...(input.kpjText !== undefined ? { kpjText: input.kpjText } : {}),
+      kpjPath: input.kpjPath,
+    };
+    findings.push(...checkKpjFormatOutdated(kpjFacts));
+    findings.push(...checkKpjVersionBumped(kpjFacts));
+  }
 
   if (keyboardIR !== undefined) {
     // §§2/1/7 identity, version, targets — IR header facts.

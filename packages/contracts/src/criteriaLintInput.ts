@@ -93,4 +93,19 @@ export interface CriteriaLintInput {
    * mode 1.13 is precertified by generation and is never scanned for.
    */
   scratchScan: boolean;
+  /**
+   * VFS path of the judged .kpj project file (`<keyboardId>.kpj` at the
+   * VFS root), present iff a .kpj file exists in the judged VFS at all
+   * (KPJ pair, criteria 1.10b / 2.7). Like `kvksPath`, presence is the
+   * signal: an absent .kpj is a named missing input in the assembly,
+   * never a verdict; a present one is judged on its text.
+   */
+  kpjPath?: string;
+  /**
+   * Raw text of the judged .kpj project file, when one exists. The
+   * KPJ-pair checks in keyboard-lint read the `<Options><Version>`
+   * element from it (the parseKpjFlags regex style) — the same raw-text
+   * handoff as `kpsText` for criterion 15.3.
+   */
+  kpjText?: string;
 }

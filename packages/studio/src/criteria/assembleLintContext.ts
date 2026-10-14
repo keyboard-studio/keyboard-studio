@@ -28,6 +28,12 @@
 // 2026-10-13): precertification is resolved separately, in the resolver,
 // for authored mode only.
 //
+// KPJ pair (1.10b / 2.7, landed after Matthew's 2026-10-14 ruling
+// re-pinned the current .kpj format to 2.0): the root .kpj's raw text
+// joins the CriteriaLintInput (kpjText/kpjPath); the checks read its
+// <Options><Version> in keyboard-lint. A judged VFS with no readable
+// .kpj names both codes in contextMissing below.
+//
 // Inventory: the caller may pass a structured LinguistInventory when one
 // is genuinely available. §18.6 (KM_LINT_INVENTORY_UNCOVERED) needs BOTH
 // the parsed IR and the inventory; when either is unavailable the check
@@ -95,9 +101,16 @@ export const INVENTORY_UNCOVERED_CODE = "KM_LINT_INVENTORY_UNCOVERED";
 /** §7.16's code: named here because its absent-file case is a missing input. */
 export const KVKS_BLANK_CODE = "KM_LINT_KVKS_BLANK";
 
+/** §1.10b's code: named here because its absent-.kpj case is a missing input. */
+export const KPJ_FORMAT_OUTDATED_CODE = "KM_LINT_KPJ_FORMAT_OUTDATED";
+
+/** §2.7's code: same missing input as 1.10b — the pair shares one reader. */
+export const KPJ_VERSION_BUMPED_CODE = "KM_LINT_KPJ_VERSION_BUMPED";
+
 const MISSING_IR = "the parsed keyboard source for this keyboard";
 const MISSING_INVENTORY = "the linguist inventory for this keyboard";
 const MISSING_KVKS = "the .kvks visual keyboard file";
+const MISSING_KPJ = "the .kpj project file";
 
 /**
  * Batch 1 codes whose checks read the parsed keyboard IR. When the .kmn
@@ -348,10 +361,19 @@ export function assembleLintContext(
     }
   }
 
+  // KPJ pair facts (1.10b / 2.7): the root .kpj's raw text, handed to
+  // keyboard-lint like the .kps text for 15.3. The file lives at the
+  // VFS root as <keyboardId>.kpj (the scaffolder's rename keeps it
+  // there); a VFS with no .kpj at all is the named-missing case below.
+  const kpjPath = paths.find((p) => p.toLowerCase().endsWith(".kpj"));
+  const kpjText = kpjPath !== undefined ? readVfsText(vfs, kpjPath) : undefined;
+
   const criteriaInput: CriteriaLintInput = {
     ...(kvks !== undefined ? { kvks } : {}),
     ...(kvksPath !== undefined ? { kvksPath } : {}),
     ...(kpsText !== undefined ? { kpsText } : {}),
+    ...(kpjPath !== undefined ? { kpjPath } : {}),
+    ...(kpjText !== undefined ? { kpjText } : {}),
     kpsFileNames,
     kpsFontRefs,
     kpsLanguages,
@@ -397,6 +419,13 @@ export function assembleLintContext(
   }
   if (kvksPath === undefined) {
     contextMissing[KVKS_BLANK_CODE] = MISSING_KVKS;
+  }
+  if (kpjPath === undefined || kpjText === undefined) {
+    // No .kpj in the judged VFS (or none readable as text): neither
+    // KPJ-pair row can be judged — name the missing file for both
+    // rather than letting either pass on an unread file.
+    contextMissing[KPJ_FORMAT_OUTDATED_CODE] = MISSING_KPJ;
+    contextMissing[KPJ_VERSION_BUMPED_CODE] = MISSING_KPJ;
   }
   if (keyboardIR !== undefined && kpsTargets.length === 0) {
     // §8.13 has nothing to compare without a declared .kps target list

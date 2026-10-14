@@ -112,6 +112,13 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
   "KM_LINT_KPS_FONT_MISSING",
   "KM_LINT_MANDATED_CHAR_MISSING",
+  // Spec 084 KPJ pair — one reader (check-kpj) pins the judged .kpj's
+  // <Options><Version> to criterion 1.10's current format from both
+  // directions. The constant was settled by Matthew's 2026-10-14
+  // ruling: 2.0 (the catalog's earlier 10.0 was a data defect; the
+  // corpus carries 2.0) and 1.10's pin was corrected in the same change.
+  "KM_LINT_KPJ_FORMAT_OUTDATED",
+  "KM_LINT_KPJ_VERSION_BUMPED",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
   // instantiation-state verdicts (assemblyVerdicts.ts).
