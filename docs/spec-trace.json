@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-13",
+  "lastUpdated": "2026-10-14",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:362d5502ef0862b8",
+      "hash": "sha256:6c03b52eb4a39dae",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:7724d18d3effa223",
+      "hash": "sha256:aa2077f1c896b9b5",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -621,7 +621,7 @@
     },
     "specs/046-i18n-localization": {
       "title": "Feature Specification: Studio UI & Content Localization (i18n)",
-      "hash": "sha256:7d3e922dcbd891e3",
+      "hash": "sha256:178c34b04fdbc35d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -869,7 +869,7 @@
     },
     "specs/079-survey-answer-persistence": {
       "title": "Feature Specification: Survey answers persist per question — navigation never undoes a decision",
-      "hash": "sha256:42def115042e801e",
+      "hash": "sha256:10a02206ae6378b7",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -885,7 +885,7 @@
     },
     "specs/081-footer-step-nav": {
       "title": "Feature Specification: Survey progress buttons live in the footer",
-      "hash": "sha256:e386c7bf1b5064d1",
+      "hash": "sha256:1d5e205456f2628d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -925,7 +925,7 @@
     },
     "specs/084-criteria-compliance-page": {
       "title": "Feature Specification: Criteria compliance page — per-keyboard approval-criteria status in the decisions-tab pattern",
-      "hash": "sha256:fa6d650ed0aed094",
+      "hash": "sha256:6f2a76b8c8628b70",
       "status": "implemented",
       "implements": [
         "packages/studio/src/criteria/resolveCriteria.ts",
