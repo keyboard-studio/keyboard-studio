@@ -41,7 +41,7 @@ describe("NavBar", () => {
     });
   });
 
-  it("desktop: the bar carries the frosted-chrome class", () => {
+  it("desktop: the bar carries the solid-chrome class", () => {
     setViewportWidth(DESKTOP_WIDTH);
     render(<NavBar {...BASE_PROPS} />);
     expect(screen.getByRole("navigation").className).toContain(

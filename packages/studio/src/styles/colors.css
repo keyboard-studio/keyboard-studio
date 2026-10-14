@@ -15,12 +15,12 @@
   --app-surface:          #FFFFFF;
   --app-surface-2:        #F8FAFB;
   --app-overlay:          #FFFFFF;
-  /* Frosted-chrome surface: the translucent material for the persistent
-     floating bars (top nav, journey footer). Built on --app-surface so it
-     tracks the theme with no per-theme override — page content shows through
-     softly under backdrop blur. Legibility comes from the blur plus the fill,
-     never from stacking chrome on chrome. */
-  --app-chrome-surface:   color-mix(in srgb, var(--app-surface) 72%, transparent);
+  /* Hard divider for the solid chrome bars (top nav, journey footer): the
+     "black line" where each bar meets the content. Pure black on the light
+     theme (21:1); on navy it reads as a dark seam (1.5:1 against the bar
+     surface — nothing darker exists, and a grey would not be the asked-for
+     black line). A decorative 1px rule, not text, so no AA target applies. */
+  --app-chrome-divider:    #000000;
   --app-border:           #E3E7EB;
   --app-border-strong:    #CFD6DC;
   --app-text:             #18242E;
