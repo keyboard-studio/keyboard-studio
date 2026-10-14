@@ -8,7 +8,7 @@
 //                    18.5 KM_WARN_LAYER_SWITCH_NO_RETURN
 //   Compile gate  -> 18.6 KM_LINT_INVENTORY_UNCOVERED (also needs keyboardIR + inventory — use lintWithContext)
 //   Submit        -> all of the above
-//   18.7 KM_LINT_MANDATED_CHAR_MISSING -> DEFERRED; not implemented
+//   18.7 KM_LINT_MANDATED_CHAR_MISSING (implemented — see checks/criteria/check-currency.ts)
 //   1.10b KM_LINT_KPJ_FORMAT_OUTDATED -> DEFERRED; not implemented (catalog row only —
 //        would compare an adapted .kpj's root `version` against the scaffolder's pinned value)
 //
