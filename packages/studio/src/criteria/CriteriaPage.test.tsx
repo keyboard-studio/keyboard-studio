@@ -167,7 +167,11 @@ describe("CriteriaPage — header and rows agree", () => {
 
     expect(screen.getAllByTestId("criteria-row")).toHaveLength(149);
     expect(screen.getByTestId("criteria-summary-resolved").textContent).toContain(
-      "91 of 149 criteria resolved",
+      // 93 = the pre-KPJ-pair 91 plus 1.10b/2.7, implemented once
+      // criterion 1.10's format constant was re-pinned to 2.0
+      // (Matthew's 2026-10-14 ruling): with no findings supplied,
+      // each implemented layer-c row resolves Met.
+      "93 of 149 criteria resolved",
     );
     const counted = Object.entries(result.counts).reduce((a, [, n]) => a + n, 0);
     expect(counted).toBe(149);
