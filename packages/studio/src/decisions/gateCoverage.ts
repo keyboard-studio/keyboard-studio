@@ -114,6 +114,7 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "7.19-redundant-touch-layouts", code: "KM_LINT_REDUNDANT_TOUCH_LAYOUTS", criteria: "Identical phone and tablet touch layouts are deduplicated.", why: "touch layout structure; no DecisionId" },
   { id: "8.13-kps-targets-mismatch", code: "KM_LINT_KPS_TARGETS_MISMATCH", criteria: "Targets declared in .kmn match compiled files listed in the .kps.", why: "platform targets are not a DecisionId" },
   { id: "11.8-php-osk-image", code: "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED", criteria: "OSK graphics either use Keyman-generated form or custom images have width constraints.", why: "generated documentation markup; no DecisionId" },
+  { id: "10.6-kps-numeric-region-tag", code: "KM_LINT_KPS_NUMERIC_REGION_TAG", criteria: "The .kps does not use numeric region codes in language tags.", why: "language-tag hygiene; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {

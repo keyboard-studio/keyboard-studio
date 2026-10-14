@@ -36,7 +36,10 @@ import {
   parseTouchLayout,
   touchLayoutPath,
 } from "./parsers/parseTouchLayout.js";
-import { checkRegion001 } from "./checks/criteria/check-bcp47.js";
+import {
+  checkNumericRegionTag,
+  checkRegion001,
+} from "./checks/criteria/check-bcp47.js";
 import { checkBitmapPlaceholder } from "./checks/criteria/check-bitmap.js";
 import { checkDuplicateSourceFiles } from "./checks/criteria/check-duplicate-files.js";
 import {
@@ -190,6 +193,14 @@ export function runCriteriaChecks(
     // 12.4 — region 001 across IR tags + the .kps language list.
     findings.push(
       ...checkRegion001(
+        [...keyboardIR.header.bcp47, ...input.kpsLanguages],
+        keyboardId,
+      ),
+    );
+
+    // 10.6 — any 3-digit M.49 region subtag across the same tag set.
+    findings.push(
+      ...checkNumericRegionTag(
         [...keyboardIR.header.bcp47, ...input.kpsLanguages],
         keyboardId,
       ),

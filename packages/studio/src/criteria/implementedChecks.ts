@@ -89,6 +89,9 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_REDUNDANT_TOUCH_LAYOUTS",
   "KM_LINT_KPS_TARGETS_MISMATCH",
   "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED",
+  // Spec 084 catch-up — 10.6 fell between the Batch 1/2 enumerations;
+  // it is the same tag-parsing family as 12.4 in check-bcp47.
+  "KM_LINT_KPS_NUMERIC_REGION_TAG",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping, compileMapping.ts.
   "KM_LINT_COMPILE_HAS_WARNINGS",
