@@ -129,6 +129,20 @@ describe("fontSupport — real-measurement comparison logic (fake canvas context
     expect(isGlyphSupported("𞤀", "'Noto Sans', system-ui, sans-serif")).toBe(true);
     expect(isGlyphSupported("𞤀", "'Charis SIL', serif")).toBe(false);
   });
+
+  it("measures the Andika stack independently from the other font stacks", async () => {
+    const ctx = makeFakeCtx((font) => {
+      if (font.includes("Andika")) return 28; // distinct glyph width
+      if (font.includes("monospace")) return 20;
+      if (font.includes("serif")) return 22;
+      return 10;
+    });
+    installFakeCanvas(ctx);
+    const { isGlyphSupported } = await import("./fontSupport.ts");
+
+    expect(isGlyphSupported("a", "'Andika', sans-serif")).toBe(true);
+    expect(isGlyphSupported("𞤀", "'Andika', sans-serif")).toBe(true);
+  });
 });
 
 describe("fontSupport — onFontsReady", () => {
