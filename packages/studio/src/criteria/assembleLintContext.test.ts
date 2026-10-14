@@ -246,6 +246,60 @@ describe("assembleLintContext", () => {
     expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBeUndefined();
   });
 
+  it("KPJ pair: a root .kpj crosses into the criteria input and names nothing missing", () => {
+    const kpj =
+      "<KeymanDeveloperProject><Options><Version>2.0</Version></Options></KeymanDeveloperProject>";
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `${KEYBOARD_ID}.kpj`, content: kpj, isBinary: false },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx, contextMissing } = assembleLintContext({
+      vfs,
+      keyboardId: KEYBOARD_ID,
+    });
+    expect(ctx.criteriaInput?.kpjPath).toBe(`${KEYBOARD_ID}.kpj`);
+    expect(ctx.criteriaInput?.kpjText).toBe(kpj);
+    expect(contextMissing.KM_LINT_KPJ_FORMAT_OUTDATED).toBeUndefined();
+    expect(contextMissing.KM_LINT_KPJ_VERSION_BUMPED).toBeUndefined();
+  });
+
+  it("KPJ pair: a VFS with no .kpj names both codes context-missing (never a silent pass)", () => {
+    const { ctx, contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+    });
+    expect(ctx.criteriaInput?.kpjPath).toBeUndefined();
+    expect(contextMissing.KM_LINT_KPJ_FORMAT_OUTDATED).toBe(
+      "the .kpj project file",
+    );
+    expect(contextMissing.KM_LINT_KPJ_VERSION_BUMPED).toBe(
+      "the .kpj project file",
+    );
+  });
+
+  it("KPJ pair: an outdated .kpj produces the 1.10b finding through the engine run, not 2.7", async () => {
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      {
+        path: `${KEYBOARD_ID}.kpj`,
+        content:
+          "<KeymanDeveloperProject><Options><Version>1.0</Version></Options></KeymanDeveloperProject>",
+        isBinary: false,
+      },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    const findings = await new KeyboardLintEngine().lintWithContext(
+      vfs,
+      KEYBOARD_ID,
+      ctx,
+    );
+    const codes = findings.map((f) => f.code);
+    expect(codes).toContain("KM_LINT_KPJ_FORMAT_OUTDATED");
+    expect(codes).not.toContain("KM_LINT_KPJ_VERSION_BUMPED");
+  });
+
   it("never sets docLintInput (doc findings arrive via the existing path)", () => {
     const { ctx } = assembleLintContext({
       vfs: fixtureVfs(),
@@ -279,6 +333,10 @@ describe("assembleLintContext", () => {
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
         "the .kps package file's declared target list",
+      // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
+      // honestly named missing (spec 084 KPJ pair).
+      KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
+      KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
     });
   });
 
@@ -389,6 +447,10 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
         "the .kps package file's declared target list",
+      // The fixture VFS carries no .kpj, so both KPJ-pair inputs are
+      // honestly named missing (spec 084 KPJ pair).
+      KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
+      KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
     });
 
     const findings = await new KeyboardLintEngine().lintWithContext(
