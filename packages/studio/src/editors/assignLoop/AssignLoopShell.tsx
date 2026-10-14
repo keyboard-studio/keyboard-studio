@@ -28,7 +28,6 @@ import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { PreviewSheet } from "../../components/PreviewSheet.tsx";
 import {
   PreviewButton,
-  FOOTER_CLEARANCE,
   PREVIEW_BUTTON_CLEARANCE,
 } from "../../components/PreviewButton.tsx";
 
@@ -235,11 +234,10 @@ export function AssignLoopShell({
     >
       {header}
 
-      {/* Two-pane row. Both panes pad their bottom by the footer's height:
-          the journey footer overlaps the bottom of the column, so without
-          it the last control in a pane sits under the bar, unclickable. A
-          child that scrolls itself (height: 100%) then ends at the footer's
-          top edge instead. */}
+      {/* Two-pane row. The journey footer sits in the shell's normal flow
+          below the column, so the panes need no clearance padding: each pane
+          simply ends at the footer's top edge. A child that scrolls itself
+          (height: 100%) ends there too. */}
       <div
         style={{
           flex: 1,
@@ -258,7 +256,6 @@ export function AssignLoopShell({
                   borderRight: `1px solid ${BORDER}`,
                   overflowY: "auto",
                   boxSizing: "border-box",
-                  paddingBottom: FOOTER_CLEARANCE,
                 }
               : {
                   // No basis, no border, no shrink cap: the single pane simply
@@ -269,7 +266,6 @@ export function AssignLoopShell({
                   flexGrow: 1,
                   overflowY: "auto",
                   boxSizing: "border-box",
-                  paddingBottom: FOOTER_CLEARANCE,
                 }
           }
         >
@@ -285,7 +281,7 @@ export function AssignLoopShell({
             style={{
               flexGrow: 1,
               overflowY: "auto",
-              padding: `24px 0 calc(24px + ${FOOTER_CLEARANCE})`,
+              padding: "24px 0",
               boxSizing: "border-box",
             }}
           >
