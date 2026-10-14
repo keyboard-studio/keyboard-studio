@@ -55,6 +55,7 @@ import {
   FONT,
 } from "../lib/galleryTheme.ts";
 import { GitHubMark, GoogleMark } from "./ProviderMarks.tsx";
+import { PrivacyLink } from "./PrivacyScreen.tsx";
 
 const providerButtonBase: React.CSSProperties = {
   display: "inline-flex",
@@ -356,6 +357,15 @@ export function WelcomeScreen() {
                 another computer, loses it. You can sign in at any time and we&rsquo;ll bring your
                 work with you.
               </Trans>
+            </p>
+
+            {/* Spec 095 FR-003: the privacy notice is reachable before
+                sign-in, from the sign-in surface itself. markVisited
+                lifts the first-visit gate so the #privacy hash is not
+                rewritten back here (PrivacyLink's onBeforeNavigate). */}
+            <p style={{ ...bodyTextStyle, fontSize: 12 }}>
+              <Trans id="welcome.privacy.lead">How we handle your data:</Trans>{" "}
+              <PrivacyLink onBeforeNavigate={markVisited} />
             </p>
           </div>
 

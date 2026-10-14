@@ -13,9 +13,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Keyboard Studio</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lora:ital@0;1&family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Charis+SIL:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Fonts are self-hosted (spec 095 FR-005): the studio discloses
+         nothing to Google Fonts on page load. The vendored set in
+         public/fonts/ is byte-for-byte the families/weights/subsets the
+         Google Fonts stylesheet used to serve (Lora ital, Playfair
+         Display 500;600, Source Sans 3 400;500;600;700, Noto Sans
+         400;500;600;700, Charis SIL 400;700). -->
+    <link href="/fonts/fonts.css" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
