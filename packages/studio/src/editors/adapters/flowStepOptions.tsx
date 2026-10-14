@@ -14,7 +14,7 @@
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import type { DecisionProposalSource, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engine";
+import { historyEntryHeading, resolvePublishVersion } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -27,6 +27,7 @@ import {
 } from "../../lib/adaptiveDescription.ts";
 import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
+import { hasTestBuilds } from "../../stores/testingStore.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../../decisions/extractContext.ts";
@@ -391,7 +392,7 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
 
 /**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
- * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`bumpKeyboardVersion`
+ * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`resolvePublishVersion`
  * derivation exactly (`startIr.header.version?.trim() || "1.0"`, bumped only
  * on an adaptation) so the survey-time proposal and the final output-time
  * heading never disagree about which version they're for.
@@ -399,7 +400,11 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
 function deriveHistoryVersion(): string {
   const state = useWorkingCopyStore.getState();
   const rawVersion = state.startIr?.header.version?.trim() || "1.0";
-  return state.instantiationMode === "adapt-existing" ? bumpKeyboardVersion(rawVersion) : rawVersion;
+  return resolvePublishVersion({
+    mode: state.instantiationMode === "adapt-existing" ? "adapt-existing" : "new-from-base",
+    rawVersion,
+    hasTestBuilds: hasTestBuilds(),
+  });
 }
 
 export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {

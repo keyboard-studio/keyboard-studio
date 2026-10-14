@@ -31,7 +31,7 @@
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
@@ -64,8 +64,20 @@ import { navigateTo } from "../lib/navigate.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
 import { JumpContext, type JumpToScreen } from "../lib/jumpContext.ts";
 import { StepNavContext } from "../hooks/usePublishStepNav.ts";
-import { peekPendingJump, clearPendingJump, jumpToLocation } from "../lib/jumpToLocation.ts";
+import {
+  peekPendingJump,
+  clearPendingJump,
+  jumpToLocation,
+  restoreTraversalPosition,
+  type TraversalPosition,
+} from "../lib/jumpToLocation.ts";
 import type { Location } from "../lib/location.ts";
+import {
+  captureRevisionSnapshot,
+  restoreRevisionSnapshot,
+  type RevisionSnapshot,
+} from "../lib/draftPersistence.ts";
+import { useStepNavStore } from "../stores/stepNavStore.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 import type { SurveyContext } from "../steps/types.ts";
 import { ACCENT, ERROR_RED, TEXT_DIM, BORDER } from "../ui/theme.ts";
@@ -126,6 +138,18 @@ export interface StepHostProps {
 interface DeepLinkArrival {
   readonly targetStepId: ActiveStepId;
   readonly returnTo: Location;
+  /** Where the walk stood before the jump (spec 094; restored on an Output return). */
+  readonly returnPosition?: TraversalPosition;
+}
+
+/**
+ * Back to Output after a revision (spec 094). The walk goes back to where it
+ * stood before the jump: completing the revised step advanced it, and a
+ * revision is not a reason to move the Studio tab's place.
+ */
+function returnToOutput(arrival: DeepLinkArrival): void {
+  if (arrival.returnPosition !== undefined) restoreTraversalPosition(arrival.returnPosition);
+  jumpToLocation(arrival.returnTo);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,13 +328,26 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   const [deepLinkArrival] = useState<DeepLinkArrival | null>(() => {
     const pending = peekPendingJump();
     return pending?.returnTo !== undefined
-      ? { targetStepId: activeStepId, returnTo: pending.returnTo }
+      ? {
+          targetStepId: activeStepId,
+          returnTo: pending.returnTo,
+          ...(pending.returnPosition !== undefined ? { returnPosition: pending.returnPosition } : {}),
+        }
       : null;
   });
 
   useEffect(() => {
     clearPendingJump();
   }, []);
+
+  // spec 094 (research R3): a revision opened from Output can be abandoned.
+  // Everything it could change is snapshotted on arrival, in memory, so
+  // "Discard changes and go back" rolls the one working copy back rather than
+  // keeping a second one. Taken in the same lazy initializer idiom as
+  // `deepLinkArrival` above; a StrictMode double call just snapshots twice.
+  const [revisionSnapshot] = useState<RevisionSnapshot | null>(() =>
+    deepLinkArrival?.returnTo.route === "output" ? captureRevisionSnapshot() : null,
+  );
 
   // FR-034: the choice is explicit, not a prompt on every revision — the
   // banner stays up until the author either confirms (returning them, per
@@ -323,6 +360,30 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // this mount".
   const isDeepLinkTarget =
     deepLinkArrival !== null && activeStepId === deepLinkArrival.targetStepId;
+
+  // spec 094: the arrival came from Output's section list, a blocker's Open
+  // button or a tester report — not from the decision trail.
+  const fromOutput = isDeepLinkTarget && deepLinkArrival?.returnTo.route === "output";
+  const revisingFromOutput = fromOutput && !continueFromHere;
+  const activeLayout = manifest.find((s) => s.id === activeStepId && s.kind === "editor-step")?.layout;
+
+  const discardRevision = useCallback(() => {
+    if (revisionSnapshot === null || deepLinkArrival === null) return;
+    // Restores the working copy, answers and decision record as they stood on
+    // arrival, so nothing from this visit is recorded (Story 1 scenario 3).
+    restoreRevisionSnapshot(revisionSnapshot);
+    returnToOutput(deepLinkArrival);
+  }, [revisionSnapshot, deepLinkArrival]);
+
+  // A full-page editor owns its footer nav slots, so its revision actions ride
+  // the separate stepNavStore channel instead (StepNavCluster renders both).
+  // Pane steps carry theirs in the banner below.
+  useLayoutEffect(() => {
+    if (!revisingFromOutput || activeLayout !== "full") return undefined;
+    const stepId = activeStepId;
+    useStepNavStore.getState().publishRevision({ stepId, onDiscard: discardRevision });
+    return () => useStepNavStore.getState().clearRevision(stepId);
+  }, [revisingFromOutput, activeLayout, activeStepId, discardRevision]);
 
   // ---------------------------------------------------------------------------
   // Terminal: done — survey-complete panel
@@ -427,7 +488,12 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // forward walk instead, same as arriving any other way. A survey-answer
   // deep link (the common case) is unaffected — no manifest question step is
   // `layout:"full"`.
-  const revisableViaDeepLink = isDeepLinkTarget && resolvedStep.layout !== "full";
+  //
+  // spec 094 lifts the suppression for an arrival FROM OUTPUT only: its return
+  // affordances ride the footer (StepNavCluster, outside the full-screen
+  // chrome div), so nothing is interposed and the contract above still holds.
+  // A decision-trail arrival on a full-layout step is unchanged.
+  const revisableViaDeepLink = isDeepLinkTarget && (resolvedStep.layout !== "full" || fromOutput);
 
   // ---------------------------------------------------------------------------
   // Centralized onComplete — the generic completion path (contract §2).
@@ -534,7 +600,11 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     // NOTHING about the record or about staleness — only where the author
     // lands next, which is the one thing FR-034 asks this component to add.
     if (revisableViaDeepLink && deepLinkArrival !== null && !continueFromHere) {
-      jumpToLocation(deepLinkArrival.returnTo);
+      if (deepLinkArrival.returnTo.route === "output") {
+        returnToOutput(deepLinkArrival);
+      } else {
+        jumpToLocation(deepLinkArrival.returnTo);
+      }
       return;
     }
 
@@ -613,14 +683,30 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // Never rendered on a `layout:"full"` step — see `revisableViaDeepLink`'s
   // own comment above for why.
   const deepLinkReturnBanner =
-    revisableViaDeepLink && !continueFromHere ? (
+    revisableViaDeepLink && !continueFromHere && resolvedStep.layout !== "full" ? (
       <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>
         <p style={DEEP_LINK_BANNER_TEXT_STYLE}>
-          <Trans id="step.deepLinkReturn.notice">
-            You jumped here from Decisions to revise this answer. Confirming
-            will take you back there.
-          </Trans>
+          {fromOutput ? (
+            <Trans id="step.revision.notice">
+              You opened this from Output. Confirming will take you back to testing.
+            </Trans>
+          ) : (
+            <Trans id="step.deepLinkReturn.notice">
+              You jumped here from Decisions to revise this answer. Confirming
+              will take you back there.
+            </Trans>
+          )}
         </p>
+        {fromOutput && (
+          <button
+            type="button"
+            data-testid="step-revision-discard"
+            style={DEEP_LINK_CONTINUE_BUTTON_STYLE}
+            onClick={discardRevision}
+          >
+            <Trans id="step.revision.discard">Discard changes and go back</Trans>
+          </button>
+        )}
         <button
           type="button"
           data-testid="step-deep-link-continue-instead"
@@ -636,9 +722,9 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     // UNCHANGED from before this feature — deliberately. The step
     // component's DIRECT parent stays this exact div (contract:
     // tests/steps/stepHost.renderSmoke.test.tsx's chrome-by-layout guard);
-    // `revisableViaDeepLink` is already false here (its own gate excludes
-    // "full"), so `deepLinkReturnBanner` above is always null on this path
-    // and there is nothing to interpose.
+    // `deepLinkReturnBanner` above is always null on this path (its own gate
+    // excludes "full"), so there is nothing to interpose; an Output-origin
+    // revision's actions render in the footer instead (spec 094).
     return <div style={{ height: "100%", overflow: "hidden" }}>{content}</div>;
   }
 

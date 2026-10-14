@@ -1,0 +1,476 @@
+{
+  "workflow": "speckit",
+  "specName": "Test-and-revise loop before publishing",
+  "branch": "094-test-and-revise",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-09T23:39:10.210Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T00:04:16.437Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T00:19:02.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T01:15:47.463Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:22:36.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:35:52.257Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:35:52.257Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T02:35:52.257Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-10T03:13:11.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-12T18:02:56.995Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-12T18:02:56.995Z"
+    }
+  ],
+  "currentTask": "T044",
+  "decisions": [
+    {
+      "decision": "Scripted Playwright walk accepted as the T045 manual quickstart",
+      "why": "owner ruling 2026-10-12"
+    },
+    {
+      "decision": "Revise a section lists every finished step, including ones finished without changes",
+      "why": "owner ruling 2026-10-12; FR-001 says any completed section"
+    },
+    {
+      "decision": "Dropped branch-local adoptTrack in favour of main spec 092 T013 deferred instantiation",
+      "why": "main fixes the adapt-track mode at the source; verified in the app after merge"
+    },
+    {
+      "decision": "km-lead review: CONDITIONAL approval; P1s fixed before PR, P2s deferred to follow-up",
+      "why": "no P0; P1s cheap and user-facing (a11y, FR-011)"
+    }
+  ],
+  "verified": [
+    {
+      "what": "studio vitest suite after main merge",
+      "result": "9149 passed, 1 failed (referenceBaseLayouts.codegen: ../keyboards corpus drift, pre-existing)",
+      "command": "pnpm --filter @keyboard-studio/studio test"
+    },
+    {
+      "what": "engine vitest suite after main merge",
+      "result": "pass except recognizer/integration basic_kbdfr (corpus drift, pre-existing)",
+      "command": "pnpm --filter @keyboard-studio/engine test"
+    },
+    {
+      "what": "pnpm lint after main merge",
+      "result": "0 errors, i18n catalogs in sync, French complete",
+      "command": "pnpm lint"
+    },
+    {
+      "what": "copy-edit Playwright incl. T042",
+      "result": "15/15 when run alone (2 failed only while vitest ran concurrently; both pass alone and on main)",
+      "command": "npx playwright test e2e/copy-edit.spec.ts --project=desktop"
+    },
+    {
+      "what": "T045 scripted quickstart walk",
+      "result": "steps 1-7,10 pass; step 8 adapt versions 1.1->1.1.1/1.1.2/1.2 and 1.1.1->1.1.2/1.1.3/1.2.0 on merged code; step 9 unit-tested only; no Keyman install"
+    },
+    {
+      "what": "km-lead post-implement review (km-qc, km-synthesis, km-output, km-frontend)",
+      "result": "no P0; P1s fixed in 7ce560c0; studio 9164 pass / 1 known corpus fail; lint 0 errors"
+    },
+    {
+      "what": "km-output VFS/projection invariants",
+      "result": "all PASS: no testBuild/stableForFingerprint on zip/PR paths, valid test versions below publish, .kps/.kmn/HISTORY agree, default projection unchanged"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "12 pre-existing Playwright failures (carve, journey-strip, light-theme, switch-base, touch) fail identically at the branch point; need their own bug issue",
+      "kind": "out-of-scope"
+    },
+    {
+      "note": "P2: a new test build while the submit panel is open unmounts ManagedPRSubmitPanel (PublishHandover keys on the last build) and could drop an in-flight submit",
+      "kind": "follow-up"
+    },
+    {
+      "note": "P2: Back (performManifestBack) off a revision target hides the Discard banner; the arrival snapshot is then unreachable",
+      "kind": "follow-up"
+    },
+    {
+      "note": "P2: OutputSectionList does not check frozen; a submitted project can still open sections for revision",
+      "kind": "follow-up"
+    },
+    {
+      "note": "P2: StepNavCluster spread lets stepAction.ariaLabel override the Back to testing label",
+      "kind": "follow-up"
+    },
+    {
+      "note": "P2: kmp error strings in usePreviewArtifact (incl. the new frozen message) are hard-coded English, matching the hook existing idiom",
+      "kind": "follow-up"
+    }
+  ]
+}

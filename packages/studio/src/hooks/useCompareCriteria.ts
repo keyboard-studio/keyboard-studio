@@ -54,12 +54,14 @@ import { KeyboardLintEngine, runDocChecks } from "@keymanapp/keyboard-lint";
 
 import { assembleLintContext } from "../criteria/assembleLintContext.ts";
 import { deriveCriteriaFacts } from "../criteria/deriveCriteriaFacts.ts";
+import { licenseTextHints } from "../criteria/fontLicense.ts";
 import { resolveCriteria } from "../criteria/resolveCriteria.ts";
 import {
   EMPTY_CRITERIA_RECORD,
   type CriteriaResult,
 } from "../criteria/criteriaTypes.ts";
 import { collectDocLintInputFromVfs } from "../lib/collectDocLintInputFromVfs.ts";
+import { readVfsText } from "../lib/vfsText.ts";
 import type { CompareArtifact } from "./useCompareArtifact.ts";
 import { mergeLintFindings } from "./useCriteriaFindings.ts";
 
@@ -146,6 +148,8 @@ export async function judgeForeignKeyboard(
     facts,
     contextMissing,
     compileResult: options.compileResult ?? null,
+    // §9.2 supporting evidence only (never decides the row).
+    licenseTextHints: licenseTextHints(readVfsText(vfs, "LICENSE.md")),
   });
 }
 

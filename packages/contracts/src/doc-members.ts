@@ -186,6 +186,14 @@ export interface DocLintInput {
   copyrightHolders: DocLintCopyrightHolders;
   /** Rendered / current member texts. */
   members: Partial<Record<DocMemberId, string>>;
+  /**
+   * Texts of the package's bundled stylesheets (every `.css` under
+   * `source/`), for criterion 11.8 (spec 084 Batch 2): a custom help
+   * image's width constraint may live in a CSS class rule rather than
+   * on the tag. Optional — collectors that cannot see the stylesheets
+   * omit it, and 11.8 then judges tag-level constraints only.
+   */
+  cssTexts?: readonly string[];
   /** For criterion 3.7. */
   deletedFilenames: string[];
   /** For criterion 3.4 (entries present at instantiation). */

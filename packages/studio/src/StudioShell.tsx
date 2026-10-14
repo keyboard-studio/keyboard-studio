@@ -43,6 +43,7 @@ import {
   useWorkingCopyStore,
   bindManifest,
 } from "./stores/workingCopyStore.ts";
+import { useTestingStore } from "./stores/testingStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import {
   instantiateFromStartIfConfirmed,
@@ -1403,6 +1404,8 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     // Saved answers and within-step positions belong to the abandoned project
     // (spec 080 FR-033: one of the only two reset sites).
     useSurveyAnswerStore.getState().reset();
+    // spec 094 FR-015: start-over discards the draft's test builds and reports.
+    useTestingStore.getState().reset();
     // Spec 088 FR-007: the decision records belong to the abandoned project
     // too — reset in the same start-over path as the answer store.
     useDecisionStore.getState().reset();

@@ -59,7 +59,7 @@ import {
 } from "./headline.ts";
 import { createLookupDecisionLabel, createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
 import { decisionValueLines, type DecisionValueLine } from "./decisionValueText.ts";
-import { formatClauseList, stageActionLabel } from "./stageText.ts";
+import { formatClauseList, stageActionLabel, dimensionLabel as dimensionLabelText } from "./stageText.ts";
 import { DiffHunkList } from "../ui/DiffHunkList.tsx";
 import { useEntryImpact } from "./useEntryImpact.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
@@ -433,44 +433,8 @@ export function DecisionEntryRow({
     }
   };
 
-  // One dimension's ICU-pluralized text (FR-011/FR-012). `count` is destructured
-  // to a plain local so the Lingui macro derives the named placeholder `count`
-  // rather than a positional one.
-  const dimensionLabel = (dimension: HeadlineDimension): string => {
-    const { count } = dimension;
-    switch (dimension.kind) {
-      case "keysRemoved":
-        return t({
-          id: "trail.entry.headline.dimension.keysRemoved",
-          message: plural(count, { one: "# key removed", other: "# keys removed" }),
-        });
-      case "keysAdded":
-        return t({
-          id: "trail.entry.headline.dimension.keysAdded",
-          message: plural(count, { one: "# key added", other: "# keys added" }),
-        });
-      case "mechanismsAssigned":
-        return t({
-          id: "trail.entry.headline.dimension.mechanismsAssigned",
-          message: plural(count, {
-            one: "# mechanism assigned",
-            other: "# mechanisms assigned",
-          }),
-        });
-      case "touchKeysAffected":
-        return t({
-          id: "trail.entry.headline.dimension.touchKeysAffected",
-          message: plural(count, {
-            one: "# touch key affected",
-            other: "# touch keys affected",
-          }),
-        });
-      default: {
-        const _exhaustive: never = dimension.kind;
-        return _exhaustive;
-      }
-    }
-  };
+  // Shared with the stage roll-ups and Output's section list (stageText.ts).
+  const dimensionLabel = (dimension: HeadlineDimension): string => dimensionLabelText(dimension, i18n);
 
   // A derived-axis id, as author-facing prose (FR-008). The ids are the
   // `DiscoveryAxisVector` keys `recordStartContribution.ts` reads off the

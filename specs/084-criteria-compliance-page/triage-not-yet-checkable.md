@@ -260,3 +260,173 @@ now produces real verdicts in authored mode.
 Effect on an Ewondo-class keyboard: Not yet checkable falls from
 44 to **1** (9.4) once Batches 1–5 and the constant fix land, with
 9.1/9.2 moving to Needs human rather than resolving silently.
+
+## Batches 2, 3, 5 + the 10.6 catch-up landed (2026-10-14, PR #2048)
+
+Four commits on `km/084-criteria-page`, one per batch plus one for
+the catch-up row that fell between the Batch 1/2 enumerations:
+
+- **Batch 2 — cross-file reconciliation (7 rows):** checks in
+  `packages/keyboard-lint/src/checks/criteria/`, gated on
+  `CriteriaLintInput` as Batch 1 established (11.8 is a `runDocChecks`
+  doc check). 1.9's definition is pinned in the check: same basename
+  at 2+ VFS paths with byte-identical content. 7.4's deliverable
+  includes the vocabulary-normalization map (KMN tokens / KVKS
+  compact codes / touch layer-id words → family + side; NCAPS is a
+  negation and deliberately unmapped). 8.13 compares only a
+  *declared* `.kps` `<Targets>` list — `parseKps` defaults an absent
+  element to `["windows"]`, so the assembly passes targets only when
+  the element is present and names the input context-missing
+  otherwise. `IMPLEMENTED_LINT_CODES` 41 → 48.
+- **Catch-up — 10.6:** `KM_LINT_KPS_NUMERIC_REGION_TAG` had only a
+  `lintToQuestion` mapping and no producing check despite its
+  CHECK-NOW class; it now sits beside 12.4 in `check-bcp47.ts`
+  (shared `regionSubtagOf`). Codes 48 → 49.
+- **Batch 3 — wiring (8 rows):** 1.5 and 2.1/2.2/2.6 are **assembly
+  verdicts** (`criteria/assemblyVerdicts.ts`), a named synthesis
+  beside the compile mapping — no lint producer exists for
+  instantiation state. 1.5 compares the output ID against the
+  start-keyboard catalog (both builders — the vite plugin and the
+  index script — now enumerate `release/`, `experimental/`, and
+  `legacy/`), self-excluding the base keyboard's own ID; the verdict
+  is withheld while the catalog has not loaded. Version semantics
+  per the triage: previous = `startIr.header.version`, output = the
+  generator's own bump derivation (`bumpKeyboardVersion`, the same
+  one HISTORY rendering uses); 2.1 proves the bump, 2.2 is vacuous
+  on adapt, 2.6 is a strict numeric dot-compare. New-from-base
+  resolves all three Not applicable via `facts.instantiationMode`;
+  foreign receives no verdicts and stays Not yet checkable with the
+  reason named. 8.7 extracts TTF/OTF family names (name IDs 16 else
+  1) with a small self-contained reader in the studio assembly — no
+  new dependency. 12.2's ISO 639-5 list (114 codes, Library of
+  Congress Registration Authority list) and 18.7's CLDR currency
+  table (CLDR 48, 255 territories) are contracts check data with
+  provenance headers. 12.3 consumes one new attestation
+  (`criteriaRecordStore.contrastiveAttestation`) with an in-page
+  control on the §12.3 row. 18.7 degrades to Not yet checkable
+  naming the region when CLDR has no entry for it. Codes 49 → 57
+  (4 checks + 4 synthesized verdicts; the synthesized set is pinned
+  exactly in `criteriaCatalog.test.ts`).
+- **Batch 5 — confirm conversions (2 rows):** 9.1/9.2 resolve
+  through per-font license attestations in `criteriaRecordStore`
+  (font file name → asserted license + open confirmation), with a
+  per-font editor in the §9 rows' expanded evidence. Fonts bundled
+  + all attested ⇒ Met; fonts + any unattested ⇒ **Needs human**
+  (authored and foreign alike — not Not yet checkable); no fonts ⇒
+  Not applicable (the existing §9 predicate). A LICENSE.md scan for
+  OFL/GPL/CC mentions is shown on 9.2 as supporting evidence only
+  and never decides the row. Their codes join **neither**
+  `IMPLEMENTED_LINT_CODES` **nor** `ASSEMBLY_SYNTHESIZED_CODES` —
+  no check and no synthesis emits them; the exclusion and its
+  reason are documented in `implementedChecks.ts`.
+
+## Full 49-row accounting (after Batches 1–5 + catch-up)
+
+| Row | Criterion (short) | Disposition |
+|---|---|---|
+| 1.1 | No files outside the keyboard folder | LANDED — Batch 1 (precertify) |
+| 1.5 | Keyboard ID not already used | LANDED — Batch 3 (assembly verdict) |
+| 1.6 | ID does not contain "keyboard" | LANDED — Batch 1 |
+| 1.9 | No duplicate source files | LANDED — Batch 2 |
+| 1.10b | .kpj format when adapted from a base | **BLOCKED — KPJ format constant** (1.10 pins `10.0`; corpus carries `2.0`) |
+| 1.13 | No stray/scratch files | LANDED — Batch 1 (precertify + foreign scan) |
+| 2.1 | Version bumped if package changed | LANDED — Batch 3 (assembly verdict) |
+| 2.2 | No bump for non-package-only changes | LANDED — Batch 3 (assembly verdict) |
+| 2.3 | Version numeric dot-separated | LANDED — Batch 1 |
+| 2.4 | No leading zero in version | LANDED — Batch 1 |
+| 2.5 | No v-prefix or labels | LANDED — Batch 1 |
+| 2.6 | New version strictly greater | LANDED — Batch 3 (assembly verdict) |
+| 2.7 | .kpj version not bumped | **BLOCKED — KPJ format constant** |
+| 7.2 | &TARGETS any not alone | LANDED — Batch 1 |
+| 7.3 | No unsupported mobile targets | LANDED — Batch 1 |
+| 7.4 | Modifier names consistent | LANDED — Batch 2 |
+| 7.5 | RALT → usealtgr | LANDED — Batch 1 |
+| 7.6 | Compiles, no errors/warnings | LANDED — Batch 1 (compile mapping) |
+| 7.7a | Display name, no underscores (lint arm) | LANDED — Batch 1 |
+| 7.9 | &BITMAP not template placeholder | LANDED — Batch 1 |
+| 7.10 | KMN stores balanced syntax | LANDED — Batch 1 |
+| 7.12 | PUA keyboard in experimental/ | LANDED — Batch 2 |
+| 7.14 | PUA font has display map | LANDED — Batch 2 |
+| 7.16 | .kvks not blank | LANDED — Batch 1 |
+| 7.19 | Identical phone/tablet layouts deduplicated | LANDED — Batch 2 |
+| 7.20 | Same font/size phone & tablet | LANDED — Batch 1 |
+| 7.21 | Compiles with no errors | LANDED — Batch 1 (compile mapping) |
+| 8.7 | .kps includes required fonts | LANDED — Batch 3 |
+| 8.12 | No industry fonts | LANDED — Batch 1 |
+| 8.13 | .kps targets match compiled files | LANDED — Batch 2 |
+| 10.6 | .kps numeric region tags flagged | LANDED — catch-up commit |
+| 9.1 | Font license specified (non-empty) | LANDED — Batch 5 (attestation path; no lint code registered) |
+| 9.2 | Font license is open | LANDED — Batch 5 (attestation path; no lint code registered) |
+| 9.4 | Shared font is in the shared folder | **REMAINS Not yet checkable — EXTERNAL** (repo-tree state) |
+| 9.6 | No WOFF fonts in package | LANDED — Batch 1 |
+| 11.2 | Help OSK shows all layers | LANDED — Batch 1 (doc check) |
+| 11.8 | OSK images width-constrained | LANDED — Batch 2 (doc check) |
+| 12.2 | No ISO 639-5 collective codes | LANDED — Batch 3 |
+| 12.3 | Numeric region only if contrastive | LANDED — Batch 3 (check + attestation) |
+| 12.4 | No region 001 | LANDED — Batch 1 |
+| 13.1 | PUA keyboard in experimental/ | LANDED — Batch 1 |
+| 13.4 | No math Latin look-alikes | LANDED — Batch 1 |
+| 15.2 | Deprecated keyboard's copy handled in release/ | **REMAINS Not yet checkable — EXTERNAL** (common authored case: Not applicable — not deprecated) |
+| 15.3 | Legacy listed as deprecated in .kps | LANDED — Batch 1 |
+| 15.4 | deprecated.md created | **REMAINS Not yet checkable — EXTERNAL** (common case: Not applicable) |
+| 15.5 | Help title includes "(deprecated)" | **REMAINS Not yet checkable — EXTERNAL** (common case: Not applicable) |
+| 16.2 | Partner keyboards.csv updated | **REMAINS Not yet checkable — EXTERNAL** (common case: Not applicable — not a partner package) |
+| 18.6 | Inventory fully covered | LANDED — Batch 4 (inventory builder) |
+| 18.7 | Mandated currency characters present | LANDED — Batch 3 |
+
+**Remainder: 7 of 49** — the KPJ pair (1.10b, 2.7), blocked on
+settling the format constant, and the five EXTERNAL rows (9.4,
+15.2, 15.4, 15.5, 16.2), which judge repository-tree state outside
+the judged bundle; of those, only 9.4 is live in the common
+authored case, the other four already resolving Not applicable.
+
+## Ewondo reconciliation (2026-10-14, real sil_cameroon_qwerty folder, authored mode)
+
+Full authored resolution over the corpus folder (the Batch 4
+harness shape: real assembly + inventory build + engine + doc
+checks + resolver). Counts: **Met 83 · Not met 6 · Not applicable
+14 · Needs author 29 · Needs human 8 · Not yet checkable 9**
+(Batch 4 state: Not yet checkable 21).
+
+Rows that moved out of Not yet checkable in this run:
+
+- **1.9 → Not met** — 11 byte-identical duplicate groups
+  (`Cameroon.ico` in three places, `kb.css` and 9 images in both
+  `source/help/` and `source/welcome/`).
+- **7.4 → Not met** — Ctrl naming: the .kmn uses `LCTRL`/`RCTRL`,
+  the .kvks encodes only `LC`.
+- **7.12 → Met**, **7.14 → Met** — no PUA in the produced set.
+- **7.19 → Met** — tablet-only touch layout; nothing to dedupe.
+- **11.8 → Not met** — 12 custom-image instances with no width
+  constraint (height-only and bare images; the `class="full"` image
+  is constrained by its CSS rule and passes).
+- **10.6 → Met**, **12.2 → Met**, **12.3 → Met** — none of the 278
+  declared tags uses a numeric region or a collective code.
+- **18.7 → Met** — CM → XAF "FCFA", all producible.
+- **8.7 → Not met** — "Andika Afr" is required (touch font) but no
+  bundled font family could be extracted in this environment: this
+  VM's corpus checkout has no `release/shared/` tree, so the staged
+  font binary never enters the VFS. On a complete corpus the same
+  run reads the staged font's name table.
+- **9.1/9.2 → Not applicable here** — the §9 predicate keys on
+  font binaries in the judged VFS, and this folder (as loaded in
+  this VM, shared tree absent) contains none. Where fonts are
+  bundled (the app surface stages them), the rows present Needs
+  human until the author attests each font's license.
+
+Rows that remain Not yet checkable in this run, and why:
+
+- **1.5, 2.1, 2.2, 2.6** — the corpus-folder fixture has no
+  workingCopyStore instantiation context (no base/adaptation
+  state), so no verdicts are assembled; they resolve in the app,
+  where the working copy exists. Reported as they present, not
+  forced.
+- **8.13** — the package's `.kps` declares no `<Targets>` element;
+  the missing input is named rather than defaulted.
+- **7.6, 7.21** — no compile result exists in this harness (the
+  app supplies the stage's compile result; Batch 1's fixture run
+  showed both resolving against a real clean compile).
+- **1.10b, 2.7** — the KPJ pair, blocked on the format constant.
+
+§18.6 is unchanged: **Not met — 22 uncovered characters** against
+the Ewondo exemplar inventory, matching Batch 4's first verdict.

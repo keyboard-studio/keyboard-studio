@@ -1,11 +1,13 @@
 // Catalog counts tests for the criteria resolver (spec 084, Phase 1).
 //
 // The resolver's honesty rests on two pinned numbers: the real catalog is
-// 149 criteria in the 40/67/32/10 band split, and exactly 41 of its
+// 149 criteria in the 40/67/32/10 band split, and exactly 57 of its
 // layer-c lintRuleIds have a real mechanism behind them (the original
 // 19 — §18 touch/inventory + the doc band — plus spec 084 Batch 1's 20
 // criteria checks in keyboard-lint's checks/criteria/ and docs/, plus
-// the 2 compile-result mappings synthesized in the criteria assembly).
+// the 2 compile-result mappings synthesized in the criteria assembly,
+// plus Batch 2's 7 cross-file reconciliation checks, plus the 10.6
+// catch-up, plus Batch 3's 4 checks and 4 assembly verdicts).
 // The implemented set is re-derived here from its two named sources —
 // the keyboard-lint producer scan (the gateCoverage.test.ts method) and
 // ASSEMBLY_SYNTHESIZED_CODES — so adding a lint check fails this test
@@ -84,18 +86,22 @@ describe("criteria catalog", () => {
 });
 
 describe("IMPLEMENTED_LINT_CODES", () => {
-  it("has exactly 41 codes, every one a lintRuleId present in the catalog", () => {
-    expect(IMPLEMENTED_LINT_CODES.size).toBe(41);
+  it("has exactly 57 codes, every one a lintRuleId present in the catalog", () => {
+    expect(IMPLEMENTED_LINT_CODES.size).toBe(57);
     const catalogIds = catalogLintRuleIds();
     for (const code of IMPLEMENTED_LINT_CODES) {
       expect(catalogIds.has(code)).toBe(true);
     }
   });
 
-  it("names its assembly-synthesized codes exactly: the two compile mappings", () => {
+  it("names its assembly-synthesized codes exactly: the compile mappings + the Batch 3 verdicts", () => {
     expect([...ASSEMBLY_SYNTHESIZED_CODES].sort()).toEqual([
       "KM_LINT_COMPILE_ERRORS",
       "KM_LINT_COMPILE_HAS_WARNINGS",
+      "KM_LINT_DUPLICATE_KEYBOARD_ID",
+      "KM_LINT_SPURIOUS_VERSION_BUMP",
+      "KM_LINT_VERSION_NOT_BUMPED",
+      "KM_LINT_VERSION_NOT_INCREMENTED",
     ]);
     for (const code of ASSEMBLY_SYNTHESIZED_CODES) {
       expect(IMPLEMENTED_LINT_CODES.has(code)).toBe(true);

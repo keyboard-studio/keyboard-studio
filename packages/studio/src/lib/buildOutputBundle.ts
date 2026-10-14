@@ -25,7 +25,7 @@
 // download click and emits no live diagnostics into the editor.
 
 import type { CompilerDiagnostic, VirtualFS } from "@keyboard-studio/contracts";
-import { projectWorkingCopyForOutput, zipProjectedVfs } from "./serializeWorkingCopy.ts";
+import { projectWorkingCopyForOutput, zipProjectedVfs, type ProjectForOutputOptions } from "./serializeWorkingCopy.ts";
 import { getBuildKmp, getCompile } from "./services.ts";
 
 /** The compiled artifacts, keyed the way `buildKmp` expects them. */
@@ -73,9 +73,12 @@ export class OutputBundleError extends Error {
  * Throws {@link OutputBundleError} when the projection succeeded but the compile
  * produced no `.kmx`. That is a real failure with a real cause (a dangling asset
  * reference, a syntax error), and the diagnostics say which.
+ *
+ * `opts` is forwarded to the projection; only the test-build download passes
+ * any (spec 094 contracts C3), so the source zip is always the publish tree.
  */
-export async function buildOutputBundle(): Promise<OutputBundle | null> {
-  const projected = await projectWorkingCopyForOutput();
+export async function buildOutputBundle(opts?: ProjectForOutputOptions): Promise<OutputBundle | null> {
+  const projected = await projectWorkingCopyForOutput(opts);
   if (projected === null) return null;
 
   const { vfs, keyboardId, displayName, version } = projected;
@@ -149,7 +152,35 @@ export interface DownloadResult {
 export async function buildKmpForDownload(): Promise<DownloadResult | null> {
   const bundle = await buildOutputBundle();
   if (bundle === null) return null;
+  const kmp = await packageBundle(bundle);
+  // Deliberately unversioned, matching how Keyman packages are distributed:
+  // the version lives inside kmp.json, and Keyman shows it at install time.
+  return { bytes: kmp.bytes, filename: kmp.filename, warnings: bundle.warnings };
+}
 
+/**
+ * Build test build `testBuild.number` as an installable `.kmp` (spec 094 FR-006,
+ * contracts C3): the same projection, compile and packaging as the primary
+ * download, with the test version and "Test build N" labels applied. Named
+ * `<id>-test-build-<N>.kmp` so the file itself says which build it is (FR-008).
+ *
+ * Returns `null` when nothing is instantiated; throws {@link OutputBundleError}
+ * exactly as {@link buildKmpForDownload} does. The caller records the build only
+ * after this resolves (FR-011).
+ */
+export async function buildTestBuildKmp(testBuild: { number: number; version: string }): Promise<DownloadResult | null> {
+  const bundle = await buildOutputBundle({ testBuild });
+  if (bundle === null) return null;
+  const kmp = await packageBundle(bundle);
+  return {
+    bytes: kmp.bytes,
+    filename: `${bundle.keyboardId}-test-build-${testBuild.number}.kmp`,
+    warnings: bundle.warnings,
+  };
+}
+
+/** Package a compiled bundle, or throw with the diagnostics that explain why not. */
+async function packageBundle(bundle: OutputBundle): Promise<{ bytes: Uint8Array; filename: string }> {
   const buildKmp = await getBuildKmp();
   const result = await buildKmp(bundle.vfs, bundle.keyboardId, bundle.artifacts);
 
@@ -162,13 +193,7 @@ export async function buildKmpForDownload(): Promise<DownloadResult | null> {
     ]);
   }
 
-  return {
-    bytes: result.bytes,
-    // Deliberately unversioned, matching how Keyman packages are distributed:
-    // the version lives inside kmp.json, and Keyman shows it at install time.
-    filename: result.filename,
-    warnings: bundle.warnings,
-  };
+  return { bytes: result.bytes, filename: result.filename };
 }
 
 /**

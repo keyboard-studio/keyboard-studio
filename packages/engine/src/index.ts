@@ -86,6 +86,8 @@ export {
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
 export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
 export type { ConformTouchLayoutResult } from "./codec/index.js";
+// The studio's working-copy fingerprint (spec 094 R7) hashes with the same helper.
+export { computeSha256Hex } from "./codec/index.js";
 
 // Issue #239 — .kmn.imported sidecar + import-attribution.
 export {
@@ -97,6 +99,9 @@ export type { ImportAttributionInput } from "./output/index.js";
 
 // Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
 export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
+// The one place the output release version is decided (spec 094).
+export { resolvePublishVersion, resolveTestBuildVersion } from "./output/index.js";
+export type { OutputVersionMode, TestBuildVersionResult } from "./output/index.js";
 // Installable package (.kmp) — the primary download (spec §12). `buildKmp`
 // lazily imports @keymanapp/kmc-package on first call, so naming it here does
 // not pull jszip/marked into a consumer's entry chunk.

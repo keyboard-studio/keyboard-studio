@@ -28,6 +28,8 @@ import {
   snapshotWorkingCopyData,
 } from "./persistWorkingCopy.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
+import { useTestingStore, mergeTestingRecords } from "../stores/testingStore.ts";
 import type { WorkingCopyData } from "../stores/workingCopyStore.ts";
 import {
   applyTraversalSnapshot,
@@ -86,7 +88,7 @@ import type { MigrationOrphan } from "./draftTypes.ts";
 // that module's header for why `DurableDraft` moved out of this file (a
 // depcruise-flagged type-only cycle through serverDraftStore.ts).
 export type { DurableDraft, ProjectIndexEntry, DraftMeta } from "./draftTypes.ts";
-import type { DurableDraft, ProjectIndexEntry, DraftMeta } from "./draftTypes.ts";
+import type { DurableDraft, ProjectIndexEntry, DraftMeta, TestingRecord } from "./draftTypes.ts";
 import {
   saveServerDraft,
   saveServerDraftBeacon,
@@ -330,6 +332,23 @@ function strongestStatusOverrides(
  */
 function isProjectFrozen(projectKey: string): boolean {
   return readProjectIndex().some((e) => e.projectKey === projectKey && e.status === "submitted");
+}
+
+/** `{ testing }` when there is a record, `{}` otherwise (exactOptionalPropertyTypes). */
+function testingField(record: TestingRecord | undefined): { testing?: TestingRecord } {
+  return record !== undefined ? { testing: record } : {};
+}
+
+/** The testing record stored locally under `projectKey`, without applying anything (spec 094 R6). */
+function readStoredTestingRecord(projectKey: string): TestingRecord | undefined {
+  try {
+    const raw = localStorage.getItem(draftKey(projectKey));
+    if (raw === null) return undefined;
+    const testing = (JSON.parse(raw) as Partial<DurableDraft>).testing;
+    return testing !== null && typeof testing === "object" ? testing : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Build the ProjectIndexEntry mirror of a DurableDraft for a given project key. */
@@ -833,6 +852,8 @@ export function saveDraft(projectKey: string): void {
     surveyAnswers: filterSurveyAnswersForDraft(getSurveyAnswerSnapshot()),
     // spec 088 FR-007: the live decision set, keyed by decision id.
     decisions: getDecisionSnapshot(),
+    // spec 094: test builds and tester reports. Omitted until there is one.
+    ...testingField(useTestingStore.getState().snapshot()),
     // spec 084 D5: the author's criteria attestations and confirmations,
     // keyed by criterion id.
     criteriaRecord: getCriteriaRecordSnapshot(),
@@ -1510,6 +1531,7 @@ type ApplyEnvelopeOutcome =
  * the `wasDraftRestoredThisBoot()` / `restoredDraftSavedAt()` boot flags —
  * those are `loadDraft`-only side effects layered on top by its caller.
  */
+// Keep in step with RevisionSnapshot: a store restored here must also be captured and restored there, and vice versa.
 function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): ApplyEnvelopeOutcome {
   // Spec 088 (C-4.2): a v1 envelope is migrated BEFORE any version gate
   // runs, so the VR-1 check below only ever sees current-version envelopes
@@ -1642,6 +1664,10 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
       }
     }
 
+    // testing (spec 094 R6): optional/additive, applied even when absent so a
+    // project switch never inherits another project's builds. A submitted
+    // project's record restores read-only.
+    useTestingStore.getState().hydrate(envelope.testing, { frozen: isProjectFrozen(pendingSlotKey) });
     // migrationOrphans → the decision trail (spec 088 T030; OPEN-088-1
     // ruled by the owner 2026-10-06, km-lead proposals Q1: the trail is
     // the surface) — see appendMigrationOrphans. The legacy phase-B
@@ -1655,6 +1681,60 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     // `prepareWorkingCopySnapshot` BEFORE any store was touched).
     return { ok: false, reason: "corrupt" };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Revision snapshot — "Discard changes and go back" (spec 094 research R3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything a revision from Output can change, taken in memory when the
+ * author arrives at the step: the same stores a draft restore covers, minus
+ * the traversal (the return jump owns where the author lands). A pane step
+ * writes its decisions, survey answers and the decision record as well as the
+ * working copy, so a working-copy-only snapshot would leave those behind on
+ * Discard. Since spec 090 the decision store also holds what the phase-B draft
+ * used to (the character and invisibles inventories).
+ *
+ * Never persisted. It is the same in-memory form the autosave already takes,
+ * restored into the SAME stores — a rollback of the one working copy, not a
+ * second copy (Article III).
+ */
+// Keep in step with applyEnvelopeToStores: a store captured here must also be restored by the draft restore, and vice versa.
+export interface RevisionSnapshot {
+  workingCopy: DurableDraft["workingCopy"];
+  decisions: DecisionSet;
+  surveyAnswers: SurveyAnswerSnapshot;
+  decisionRecord: NonNullable<DurableDraft["decisionRecord"]>;
+}
+
+export function captureRevisionSnapshot(): RevisionSnapshot {
+  // Cloned so a later in-place mutation of a live object can never reach the
+  // snapshot it is meant to roll back to.
+  return structuredClone({
+    workingCopy: snapshotWorkingCopyData(),
+    decisions: getDecisionSnapshot(),
+    surveyAnswers: getSurveyAnswerSnapshot(),
+    decisionRecord: snapshotDecisionRecord(),
+  });
+}
+
+/**
+ * Put every store back as `captureRevisionSnapshot` found it. The one fallible
+ * step (`prepareWorkingCopySnapshot`) runs before any store is touched, the
+ * same atomic order `applyEnvelopeToStores` uses. Records no decision.
+ */
+export function restoreRevisionSnapshot(snapshot: RevisionSnapshot): void {
+  const workingCopyState = prepareWorkingCopySnapshot(snapshot.workingCopy);
+  useWorkingCopyStore.setState(workingCopyState);
+  useGuardIntentStore.setState({
+    keptGuardRuleIds: new Set(snapshot.workingCopy.keptGuardRuleIds ?? []),
+    dismissedMissingGroups: new Set(snapshot.workingCopy.dismissedMissingGroups ?? []),
+    narrowedGuardQuestions: new Set(snapshot.workingCopy.narrowedGuardQuestions ?? []),
+  });
+  applyDecisionSnapshot(snapshot.decisions);
+  applySurveyAnswerSnapshot(snapshot.surveyAnswers);
+  applyDecisionRecordSnapshot(snapshot.decisionRecord);
 }
 
 /**
@@ -1731,7 +1811,18 @@ export function loadDraft(projectKey: string): boolean {
  */
 export function applyRemoteDraft(envelope: DurableDraft | null): boolean {
   if (envelope === null || typeof envelope !== "object") return false;
-  return applyEnvelopeToStores(envelope, envelope.projectKey).ok;
+  // spec 094 R6: sync is last-write-wins on the whole envelope, so a remote
+  // record could drop builds made on this device. Merge with the LOCAL record
+  // stored under the same project key — never with the live testing store,
+  // which may hold a different project when the cloud-restore banner fires.
+  const local = readStoredTestingRecord(envelope.projectKey);
+  const merged =
+    local === undefined
+      ? envelope.testing
+      : envelope.testing === undefined
+        ? local
+        : mergeTestingRecords(local, envelope.testing);
+  return applyEnvelopeToStores({ ...envelope, ...testingField(merged) }, envelope.projectKey).ok;
 }
 
 /**
@@ -1997,6 +2088,8 @@ export function installDraftAutosave(projectKey: string): () => void {
   const unsubscribePhaseBDraft = useDecisionStore.subscribe(scheduleSave);
   // spec 079 FR-034: saved answers ride this same timer — no second one.
   const unsubscribeSurveyAnswers = useSurveyAnswerStore.subscribe(scheduleSave);
+  // spec 094: test builds and reports ride this same timer — no second one.
+  const unsubscribeTesting = useTestingStore.subscribe(scheduleSave);
 
   // spec 079 FR-030: a reload or tab close inside the debounce window would
   // drop the last answer. `pagehide` flushes a PENDING save only — no new
@@ -2015,6 +2108,7 @@ export function installDraftAutosave(projectKey: string): () => void {
     unsubscribeSurveySession();
     unsubscribePhaseBDraft();
     unsubscribeSurveyAnswers();
+    unsubscribeTesting();
     if (typeof window !== "undefined") window.removeEventListener("pagehide", flushPending);
     if (timer !== null) {
       clearTimeout(timer);
@@ -2154,6 +2248,8 @@ export async function recordProjectSubmission(prUrl: string, token: string | nul
 
   const overrides = { status: "submitted" as const, prUrl };
   upsertIndexEntry(buildIndexEntry(projectKey, envelope, overrides));
+  // spec 094: test builds and reports become read-only with the project.
+  useTestingStore.getState().markFrozen();
 
   if (token !== null && token !== "") {
     const meta = buildServerMeta(envelope, projectKey, overrides);

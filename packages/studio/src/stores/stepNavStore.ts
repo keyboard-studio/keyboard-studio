@@ -49,6 +49,19 @@ export interface StepNavEntry {
 /** The step id a publisher uses when no StepHost provides one (standalone tests). */
 export const STANDALONE_STEP_ID = "__standalone__";
 
+/**
+ * A revision opened from Output (spec 094 research R3). A full-page editor
+ * owns its step's nav slots (one publisher per step), so StepHost cannot add
+ * "Back to testing" / "Discard" there — it publishes them on this separate
+ * channel instead, and StepNavCluster renders them beside the editor's own.
+ * "Back to testing" reuses the editor's forward action, which completes the
+ * step through its normal adapter; StepHost then returns to Output.
+ */
+export interface RevisionNav {
+  stepId: string;
+  onDiscard: () => void;
+}
+
 const SLOTS = ["back", "secondary", "forward"] as const;
 
 function sameAction(a: NavAction | undefined, b: NavAction | undefined): boolean {
@@ -77,6 +90,12 @@ export function hasSlots(spec: StepNavSpec | undefined): boolean {
 
 export interface StepNavState {
   entries: Readonly<Record<string, StepNavEntry>>;
+  /** The active revision-from-Output actions, if any (spec 094). */
+  revision: RevisionNav | null;
+  /** Set the revision actions for `nav.stepId`. */
+  publishRevision: (nav: RevisionNav) => void;
+  /** Drop the revision actions, but only if they belong to `stepId`. */
+  clearRevision: (stepId: string) => void;
   /** Insert or replace `stepId`'s spec. A no-op when nothing descriptive changed. */
   publish: (stepId: string, owner: string, spec: StepNavSpec) => void;
   /** Forget `stepId`'s spec, but only if `owner` published it. */
@@ -87,6 +106,14 @@ export interface StepNavState {
 
 export const useStepNavStore = create<StepNavState>((set) => ({
   entries: {},
+  revision: null,
+
+  publishRevision: (nav) =>
+    set((s) =>
+      s.revision?.stepId === nav.stepId && s.revision.onDiscard === nav.onDiscard ? s : { revision: nav },
+    ),
+
+  clearRevision: (stepId) => set((s) => (s.revision?.stepId === stepId ? { revision: null } : s)),
 
   publish: (stepId, owner, spec) =>
     set((s) => {
@@ -112,5 +139,5 @@ export const useStepNavStore = create<StepNavState>((set) => ({
       return { entries };
     }),
 
-  reset: () => set({ entries: {} }),
+  reset: () => set({ entries: {}, revision: null }),
 }));
