@@ -137,6 +137,35 @@ describe("assembleLintContext", () => {
     expect(ctx.keyboardIR?.header.name).toBe("Criteria Fixture");
   });
 
+  it("Batch 2 §8.13: a .kps with no <Targets> element contributes no declared targets and names the gap", () => {
+    const { ctx, contextMissing } = assembleLintContext({
+      vfs: fixtureVfs(),
+      keyboardId: KEYBOARD_ID,
+    });
+    expect(ctx.criteriaInput?.kpsTargets).toEqual([]);
+    expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBe(
+      "the .kps package file's declared target list",
+    );
+  });
+
+  it("Batch 2 §8.13: a declared <Targets> list crosses into the criteria input and clears the gap", () => {
+    const withTargets = KPS.replace(
+      "</Keyboards>",
+      "  <Targets>windows web</Targets>\n  </Keyboards>",
+    );
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `source/${KEYBOARD_ID}.kps`, content: withTargets, isBinary: false },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx, contextMissing } = assembleLintContext({
+      vfs,
+      keyboardId: KEYBOARD_ID,
+    });
+    expect(ctx.criteriaInput?.kpsTargets).toEqual(["windows", "web"]);
+    expect(contextMissing.KM_LINT_KPS_TARGETS_MISMATCH).toBeUndefined();
+  });
+
   it("never sets docLintInput (doc findings arrive via the existing path)", () => {
     const { ctx } = assembleLintContext({
       vfs: fixtureVfs(),
@@ -165,7 +194,12 @@ describe("assembleLintContext", () => {
       inventory,
     });
     expect(ctx.inventory).toBe(inventory);
-    expect(contextMissing).toEqual({});
+    expect(contextMissing).toEqual({
+      // The fixture .kps declares no <Targets> element, so §8.13's
+      // input is honestly named missing (spec 084 Batch 2).
+      KM_LINT_KPS_TARGETS_MISMATCH:
+        "the .kps package file's declared target list",
+    });
   });
 
   it("without a .kmn, degrades: no IR and the missing input is named", () => {
@@ -270,7 +304,12 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       keyboardId: KEYBOARD_ID,
       inventory: fixtureInventory(),
     });
-    expect(contextMissing).toEqual({});
+    expect(contextMissing).toEqual({
+      // The fixture .kps declares no <Targets> element, so §8.13's
+      // input is honestly named missing (spec 084 Batch 2).
+      KM_LINT_KPS_TARGETS_MISMATCH:
+        "the .kps package file's declared target list",
+    });
 
     const findings = await new KeyboardLintEngine().lintWithContext(
       vfs,

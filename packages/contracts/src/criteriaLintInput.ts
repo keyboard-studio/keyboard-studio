@@ -43,6 +43,13 @@ export interface CriteriaLintInput {
   kpsFontRefs: readonly string[];
   /** BCP47 language tags declared by the .kps (engine parseKps). */
   kpsLanguages: readonly string[];
+  /**
+   * Platform targets declared by the .kps (engine parseKps), e.g.
+   * ["windows", "web"]. Batch 2 (criterion 8.13): compared against the
+   * .kmn IR header targets and the compiled members in the .kps file
+   * list. Empty when the .kps is absent or unparseable.
+   */
+  kpsTargets: readonly string[];
   /** Display name declared by the .kps (engine parseKps), when present. */
   kpsDisplayName?: string;
   /**

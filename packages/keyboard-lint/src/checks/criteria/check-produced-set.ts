@@ -1,12 +1,16 @@
-// Checks 13.1 / 13.4 — produced-output character scans (spec 084
-// Batch 1). The scan itself is written once and shared: Batch 2's 7.12
-// (PUA not in experimental, source-review angle) consumes the same
-// scanProducedRanges() result as 13.1.
+// Checks 13.1 / 13.4 / 7.12 / 7.14 — produced-output character scans
+// (spec 084 Batches 1–2). The scan itself is written once and shared:
+// every check below consumes the same scanProducedRanges() result.
 //
 //   13.1 KM_LINT_PUA_KEYBOARD_PLACEMENT — PUA codepoint use means the
 //        keyboard must be in experimental/
 //   13.4 KM_LINT_MATH_LATIN_LOOKALIKE — no mathematical Latin
 //        look-alike characters (U+1D400–U+1D7FF) in the output
+//   7.12 KM_LINT_PUA_NOT_IN_EXPERIMENTAL — the same placement
+//        condition as 13.1, from the source-review angle (the catalog
+//        carries both rows; each resolves on its own check)
+//   7.14 KM_LINT_PUA_FONT_NO_DISPLAYMAP — a PUA-encoded bundled font
+//        requires a store(&DISPLAYMAP) in the .kmn
 //
 // Source: buildProducedSet (contracts) over the judged IR — every
 // character the keyboard's rules can emit.
@@ -65,6 +69,77 @@ export function checkPuaPlacement(
       file: kmnPath(ir.header.keyboardId),
       message: `The keyboard outputs Private Use Area codepoint(s) ${ranges.pua.join(", ")} but is not in the experimental/ folder.`,
       hint: "Keyboards using PUA codepoints belong in experimental/, or the output should use assigned Unicode codepoints.",
+    }),
+  ];
+}
+
+/**
+ * 7.12 — the source-review twin of 13.1: PUA output outside
+ * experimental/ → finding. The two catalog rows state the same
+ * condition from two review angles (7.12 in the .kmn source pass,
+ * 13.1 in the encoding/script pass), so both checks run and each row
+ * resolves on its own code.
+ */
+export function checkPuaNotInExperimental(
+  ir: KeyboardIR,
+  placement: CriteriaPlacement,
+  ranges: ProducedRanges = scanProducedRanges(ir),
+): LintFinding[] {
+  if (ranges.pua.length === 0 || placement === "experimental") return [];
+  return [
+    criteriaFinding({
+      code: "KM_LINT_PUA_NOT_IN_EXPERIMENTAL",
+      file: kmnPath(ir.header.keyboardId),
+      message: `The keyboard outputs Private Use Area codepoint(s) ${ranges.pua.join(", ")}, so it belongs in experimental/ rather than release/.`,
+      hint: "Move the keyboard to experimental/, or replace the PUA output with assigned Unicode codepoints.",
+    }),
+  ];
+}
+
+/** The &DISPLAYMAP reference as a single string, when the .kmn declares one. */
+export function displayMapReference(ir: KeyboardIR): string | undefined {
+  for (const store of ir.stores) {
+    if (!store.isSystem || store.name.toUpperCase() !== "DISPLAYMAP") continue;
+    const value = store.items
+      .map((item) =>
+        item.kind === "char" ? item.value : item.kind === "raw" ? item.text : "",
+      )
+      .join("")
+      .trim();
+    if (value !== "") return value;
+  }
+  for (const body of ir.header.storeDirectives) {
+    const m = /&?DISPLAYMAP\b[^'"]*['"]([^'"]+)['"]/i.exec(body);
+    if (m?.[1]) return m[1].trim();
+  }
+  return undefined;
+}
+
+/**
+ * 7.14 — the keyboard produces PUA output AND bundles a font, but the
+ * .kmn declares no store(&DISPLAYMAP) → finding.
+ *
+ * Proxy, stated plainly: the strict reading ("the bundled font is
+ * PUA-encoded") needs a font cmap parser, which does not exist in this
+ * repo. The trigger used here — PUA codepoints in the produced set
+ * plus a bundled font — is the decidable form: a keyboard emitting
+ * PUA characters through a bundled font is exactly the case the
+ * display map exists for (it tells Keyman how to render the PUA
+ * glyphs when the font's cmap does not map them).
+ */
+export function checkPuaFontDisplayMap(
+  ir: KeyboardIR,
+  input: { hasBundledFont: boolean },
+  ranges: ProducedRanges = scanProducedRanges(ir),
+): LintFinding[] {
+  if (ranges.pua.length === 0 || !input.hasBundledFont) return [];
+  if (displayMapReference(ir) !== undefined) return [];
+  return [
+    criteriaFinding({
+      code: "KM_LINT_PUA_FONT_NO_DISPLAYMAP",
+      file: kmnPath(ir.header.keyboardId),
+      message: `The keyboard outputs Private Use Area codepoint(s) ${ranges.pua.join(", ")} and bundles a font, but the .kmn declares no store(&DISPLAYMAP).`,
+      hint: "Add a store(&DISPLAYMAP) referencing the display-map file so the PUA glyphs render with the bundled font.",
     }),
   ];
 }

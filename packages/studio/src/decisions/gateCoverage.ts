@@ -103,6 +103,17 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "13.1-pua-placement", code: "KM_LINT_PUA_KEYBOARD_PLACEMENT", criteria: "PUA codepoint use means the keyboard is in experimental/.", why: "encoding placement; no DecisionId" },
   { id: "13.4-math-latin-lookalikes", code: "KM_LINT_MATH_LATIN_LOOKALIKE", criteria: "No mathematical Latin look-alike characters in keyboard output.", why: "output character hygiene; no DecisionId" },
   { id: "15.3-deprecated-kps-linkage", code: "KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING", criteria: "Legacy package ID is listed in the new keyboard's .kps Related packages as Deprecated.", why: "deprecation bookkeeping; no DecisionId" },
+  // Spec 084 Batch 2 (cross-file reconciliation checks in
+  // keyboard-lint's checks/criteria/ and docs/check-11-8): same status
+  // as the Batch 1 entries — the criteria resolver is their consumer,
+  // and no DecisionId captures what they validate.
+  { id: "1.9-duplicate-source-files", code: "KM_LINT_DUPLICATE_SOURCE_FILES", criteria: "No duplicate copies of the same source file inside the keyboard folder.", why: "repository file hygiene; no DecisionId" },
+  { id: "7.4-modifier-name-inconsistent", code: "KM_LINT_MODIFIER_NAME_INCONSISTENT", criteria: "Modifier key names are consistent across .kmn, .kvks, and .keyman-touch-layout.", why: "modifier naming across source files; no DecisionId" },
+  { id: "7.12-pua-not-in-experimental", code: "KM_LINT_PUA_NOT_IN_EXPERIMENTAL", criteria: "A keyboard using PUA codepoints is in experimental/.", why: "encoding placement; no DecisionId" },
+  { id: "7.14-pua-font-no-displaymap", code: "KM_LINT_PUA_FONT_NO_DISPLAYMAP", criteria: "A keyboard shipping a PUA-encoded font declares store(&DISPLAYMAP).", why: "display-map declaration; no DecisionId" },
+  { id: "7.19-redundant-touch-layouts", code: "KM_LINT_REDUNDANT_TOUCH_LAYOUTS", criteria: "Identical phone and tablet touch layouts are deduplicated.", why: "touch layout structure; no DecisionId" },
+  { id: "8.13-kps-targets-mismatch", code: "KM_LINT_KPS_TARGETS_MISMATCH", criteria: "Targets declared in .kmn match compiled files listed in the .kps.", why: "platform targets are not a DecisionId" },
+  { id: "11.8-php-osk-image", code: "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED", criteria: "OSK graphics either use Keyman-generated form or custom images have width constraints.", why: "generated documentation markup; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {

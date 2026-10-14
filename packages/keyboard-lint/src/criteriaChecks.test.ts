@@ -34,6 +34,7 @@ function fixtureInput(
     kpsFileNames: [],
     kpsFontRefs: [],
     kpsLanguages: [],
+    kpsTargets: [],
     placement: "release",
     deprecationInPlay: false,
     scratchScan: false,
@@ -69,6 +70,89 @@ describe("runCriteriaChecks via lintWithContext", () => {
     expect(codes).toContain("KM_LINT_VERSION_V_PREFIX");
     // The .woff in the VFS inventory is caught by 9.6.
     expect(codes).toContain("KM_LINT_WOFF_FONT_IN_PACKAGE");
+  });
+
+  it("Batch 2: 1.9 fires on duplicate files only with a CriteriaLintInput", async () => {
+    const vfs = createVirtualFS([
+      { path: `source/${ID}.kmn`, content: KMN, isBinary: false },
+      { path: "source/help/kb.css", content: "img { width: 100%; }", isBinary: false },
+      { path: "source/welcome/kb.css", content: "img { width: 100%; }", isBinary: false },
+    ]);
+    const withInput = await lintWithContext(vfs, ID, {
+      keyboardIR: fixtureIR(),
+      criteriaInput: fixtureInput(),
+    });
+    expect(withInput.map((f) => f.code)).toContain(
+      "KM_LINT_DUPLICATE_SOURCE_FILES",
+    );
+    const without = await lintWithContext(vfs, ID, { keyboardIR: fixtureIR() });
+    expect(without.map((f) => f.code)).not.toContain(
+      "KM_LINT_DUPLICATE_SOURCE_FILES",
+    );
+  });
+
+  it("Batch 2: 8.13 fires when declared .kps targets disagree with the IR, and stays silent with none supplied", async () => {
+    const ir = makeTestIR({
+      header: { keyboardId: ID, targets: ["windows", "web"] },
+    });
+    const fired = await lintWithContext(fixtureVfs(), ID, {
+      keyboardIR: ir,
+      criteriaInput: fixtureInput({ kpsTargets: ["windows"] }),
+    });
+    expect(fired.map((f) => f.code)).toContain("KM_LINT_KPS_TARGETS_MISMATCH");
+    const silent = await lintWithContext(fixtureVfs(), ID, {
+      keyboardIR: ir,
+      criteriaInput: fixtureInput({ kpsTargets: [] }),
+    });
+    expect(silent.map((f) => f.code)).not.toContain(
+      "KM_LINT_KPS_TARGETS_MISMATCH",
+    );
+  });
+
+  it("Batch 2: 7.19 fires on identical phone and tablet touch layouts", async () => {
+    const layout = JSON.stringify({
+      phone: { layer: [{ id: "default", row: [{ key: [{ id: "K_A", text: "a" }] }] }] },
+      tablet: { layer: [{ id: "default", row: [{ key: [{ id: "K_A", text: "a" }] }] }] },
+    });
+    const vfs = createVirtualFS([
+      { path: `source/${ID}.kmn`, content: KMN, isBinary: false },
+      { path: `source/${ID}.keyman-touch-layout`, content: layout, isBinary: false },
+    ]);
+    const findings = await lintWithContext(vfs, ID, {
+      keyboardIR: fixtureIR(),
+      criteriaInput: fixtureInput(),
+    });
+    expect(findings.map((f) => f.code)).toContain(
+      "KM_LINT_REDUNDANT_TOUCH_LAYOUTS",
+    );
+  });
+
+  it("Batch 2: 7.12 and 7.14 fire on PUA output in release placement with a bundled font", async () => {
+    const ir = makeTestIR({
+      header: { keyboardId: ID },
+      groups: [
+        {
+          nodeId: "g1",
+          name: "main",
+          usingKeys: true,
+          readonly: false,
+          rules: [
+            {
+              nodeId: "r1",
+              context: [],
+              output: [{ kind: "char", value: "\u{E001}" }],
+            },
+          ],
+        },
+      ],
+    });
+    const findings = await lintWithContext(fixtureVfs(), ID, {
+      keyboardIR: ir,
+      criteriaInput: fixtureInput({ kpsFontRefs: ["..\\shared\\F.ttf"] }),
+    });
+    const codes = findings.map((f) => f.code);
+    expect(codes).toContain("KM_LINT_PUA_NOT_IN_EXPERIMENTAL");
+    expect(codes).toContain("KM_LINT_PUA_FONT_NO_DISPLAYMAP");
   });
 
   it("runs the scratch scan only when the input asks for it (foreign arm)", async () => {

@@ -103,7 +103,18 @@ export const IR_DEPENDENT_CRITERIA_CODES: readonly string[] = [
   "KM_LINT_REGION_001_TAG",
   "KM_LINT_PUA_KEYBOARD_PLACEMENT",
   "KM_LINT_MATH_LATIN_LOOKALIKE",
+  // Batch 2: modifier consistency, .kps target agreement, and the two
+  // produced-set PUA checks all read the parsed IR.
+  "KM_LINT_MODIFIER_NAME_INCONSISTENT",
+  "KM_LINT_KPS_TARGETS_MISMATCH",
+  "KM_LINT_PUA_NOT_IN_EXPERIMENTAL",
+  "KM_LINT_PUA_FONT_NO_DISPLAYMAP",
 ];
+
+/** §8.13's code: named here because an undeclared .kps target list is a missing input. */
+export const KPS_TARGETS_MISMATCH_CODE = "KM_LINT_KPS_TARGETS_MISMATCH";
+
+const MISSING_KPS_TARGETS = "the .kps package file's declared target list";
 
 export interface AssembleLintContextInput {
   vfs: VirtualFS;
@@ -256,6 +267,7 @@ export function assembleLintContext(
   let kpsFileNames: string[] = [];
   let kpsFontRefs: string[] = [];
   let kpsLanguages: string[] = [];
+  let kpsTargets: string[] = [];
   let kpsDisplayName: string | undefined;
   let script = "Latn";
   if (kpsText !== undefined) {
@@ -264,6 +276,12 @@ export function assembleLintContext(
       kpsLanguages = meta.languages;
       kpsDisplayName = meta.displayName;
       script = meta.script;
+      // §8.13 compares DECLARED targets. parseKps defaults an absent
+      // <Targets> element to ["windows"]; passing that default through
+      // would manufacture a disagreement the package never declared,
+      // so only a present <Targets> element contributes its list (the
+      // absent case is named in contextMissing below).
+      kpsTargets = /<Targets[\s>]/i.test(kpsText) ? [...meta.targets] : [];
       kpsFileNames = parseKpsFiles(kpsText).map((f) => f.name);
       const refs = parseKpsFontRefs(kpsText);
       kpsFontRefs = [...refs.oskFonts, ...refs.fileFonts];
@@ -271,6 +289,7 @@ export function assembleLintContext(
       kpsFileNames = [];
       kpsFontRefs = [];
       kpsLanguages = [];
+      kpsTargets = [];
       kpsDisplayName = undefined;
     }
   }
@@ -282,6 +301,7 @@ export function assembleLintContext(
     kpsFileNames,
     kpsFontRefs,
     kpsLanguages,
+    kpsTargets,
     ...(kpsDisplayName !== undefined ? { kpsDisplayName } : {}),
     placement: input.placement ?? "release",
     deprecationInPlay: input.deprecationInPlay ?? false,
@@ -321,6 +341,12 @@ export function assembleLintContext(
   }
   if (kvksPath === undefined) {
     contextMissing[KVKS_BLANK_CODE] = MISSING_KVKS;
+  }
+  if (keyboardIR !== undefined && kpsTargets.length === 0) {
+    // §8.13 has nothing to compare without a declared .kps target list
+    // (no .kps, or a .kps with no <Targets> element): name the missing
+    // input rather than letting the row pass on an empty comparison.
+    contextMissing[KPS_TARGETS_MISMATCH_CODE] = MISSING_KPS_TARGETS;
   }
 
   return { ctx, contextMissing, script };

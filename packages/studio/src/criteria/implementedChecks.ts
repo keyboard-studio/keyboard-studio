@@ -78,6 +78,17 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   // .kps text in runCriteriaChecks.
   "KM_LINT_PHP_OSK_LAYERS_INCOMPLETE",
   "KM_LINT_DEPRECATED_KPS_LINKAGE_MISSING",
+  // Spec 084 Batch 2 — cross-file reconciliation checks in
+  // checks/criteria/ (1.9 VFS duplicates, 7.4 modifier-name map, 7.12 /
+  // 7.14 produced-set PUA checks, 7.19 touch-layout compare, 8.13
+  // three-way target agreement) plus 11.8 in runDocChecks.
+  "KM_LINT_DUPLICATE_SOURCE_FILES",
+  "KM_LINT_MODIFIER_NAME_INCONSISTENT",
+  "KM_LINT_PUA_NOT_IN_EXPERIMENTAL",
+  "KM_LINT_PUA_FONT_NO_DISPLAYMAP",
+  "KM_LINT_REDUNDANT_TOUCH_LAYOUTS",
+  "KM_LINT_KPS_TARGETS_MISMATCH",
+  "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping, compileMapping.ts.
   "KM_LINT_COMPILE_HAS_WARNINGS",

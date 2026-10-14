@@ -42,6 +42,13 @@ export interface CollectDocLintInputArgs {
   members: Partial<Record<DocMemberId, string>>;
   /** The base's HISTORY at instantiation (criterion 3.4); omit on a copy. */
   startHistoryMdText?: string | null;
+  /**
+   * Texts of the package's bundled stylesheets (criterion 11.8, spec
+   * 084 Batch 2): a custom help image's width constraint may live in a
+   * CSS class rule. Omit when the caller cannot see the stylesheets —
+   * 11.8 then judges tag-level constraints only.
+   */
+  cssTexts?: readonly string[];
 }
 
 /**
@@ -156,6 +163,7 @@ export function collectDocLintInput(args: CollectDocLintInputArgs): DocLintInput
     members,
     deletedFilenames: [],
     ...(startHistory !== undefined && startHistory !== null ? { startHistoryMdText: startHistory } : {}),
+    ...(args.cssTexts !== undefined ? { cssTexts: args.cssTexts } : {}),
   };
 }
 

@@ -1,11 +1,12 @@
 // Catalog counts tests for the criteria resolver (spec 084, Phase 1).
 //
 // The resolver's honesty rests on two pinned numbers: the real catalog is
-// 149 criteria in the 40/67/32/10 band split, and exactly 41 of its
+// 149 criteria in the 40/67/32/10 band split, and exactly 48 of its
 // layer-c lintRuleIds have a real mechanism behind them (the original
 // 19 — §18 touch/inventory + the doc band — plus spec 084 Batch 1's 20
 // criteria checks in keyboard-lint's checks/criteria/ and docs/, plus
-// the 2 compile-result mappings synthesized in the criteria assembly).
+// the 2 compile-result mappings synthesized in the criteria assembly,
+// plus Batch 2's 7 cross-file reconciliation checks).
 // The implemented set is re-derived here from its two named sources —
 // the keyboard-lint producer scan (the gateCoverage.test.ts method) and
 // ASSEMBLY_SYNTHESIZED_CODES — so adding a lint check fails this test
@@ -84,8 +85,8 @@ describe("criteria catalog", () => {
 });
 
 describe("IMPLEMENTED_LINT_CODES", () => {
-  it("has exactly 41 codes, every one a lintRuleId present in the catalog", () => {
-    expect(IMPLEMENTED_LINT_CODES.size).toBe(41);
+  it("has exactly 48 codes, every one a lintRuleId present in the catalog", () => {
+    expect(IMPLEMENTED_LINT_CODES.size).toBe(48);
     const catalogIds = catalogLintRuleIds();
     for (const code of IMPLEMENTED_LINT_CODES) {
       expect(catalogIds.has(code)).toBe(true);

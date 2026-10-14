@@ -1,5 +1,6 @@
-// runCriteriaChecks — the spec 084 Batch 1 criteria checks (§§1/2/7/8/
-// 9/12/13/15), run as one gated group.
+// runCriteriaChecks — the spec 084 criteria checks (Batch 1:
+// §§1/2/7/8/9/12/13/15; Batch 2: cross-file reconciliation — 1.9, 7.4,
+// 7.12, 7.14, 7.19, 8.13), run as one gated group.
 //
 // Gating shape matches every other optional LintContext input: the
 // checks run only when the caller assembled a CriteriaLintInput (the
@@ -21,6 +22,9 @@
 //     lint check emits KM_LINT_FILES_OUTSIDE_FOLDER anywhere.
 //   - 7.6 / 7.21 are NOT here: they map the host's compile result in
 //     the criteria resolver, not a lint finding.
+//   - 11.8 is NOT here either: like 11.2 it is a documentation check
+//     and lives in runDocChecks (checks/docs/check-11-8-osk-image.ts);
+//     its inputs (help-php text + bundled CSS texts) are DocLintInput.
 
 import type {
   CriteriaLintInput,
@@ -34,23 +38,29 @@ import {
 } from "./parsers/parseTouchLayout.js";
 import { checkRegion001 } from "./checks/criteria/check-bcp47.js";
 import { checkBitmapPlaceholder } from "./checks/criteria/check-bitmap.js";
+import { checkDuplicateSourceFiles } from "./checks/criteria/check-duplicate-files.js";
 import {
   checkDisplayNameUnderscore,
   checkIdContainsKeyboard,
 } from "./checks/criteria/check-identity.js";
+import { checkKpsTargetsMatch } from "./checks/criteria/check-kps-targets.js";
 import {
   checkKvksBlank,
   checkRaltMissingUsealtgr,
 } from "./checks/criteria/check-kvks.js";
+import { checkModifierNamesConsistent } from "./checks/criteria/check-modifiers.js";
 import {
   checkIndustryFonts,
   checkWoffInPackage,
 } from "./checks/criteria/check-package-fonts.js";
 import {
   checkMathLatinLookalikes,
+  checkPuaFontDisplayMap,
+  checkPuaNotInExperimental,
   checkPuaPlacement,
   scanProducedRanges,
 } from "./checks/criteria/check-produced-set.js";
+import { checkRedundantTouchLayouts } from "./checks/criteria/check-touch-layouts.js";
 import { checkStrayScratchFiles } from "./checks/criteria/check-scratch-files.js";
 import { checkStoreSyntax } from "./checks/criteria/check-store-syntax.js";
 import {
@@ -101,6 +111,10 @@ export function runCriteriaChecks(
     findings.push(...checkStrayScratchFiles(filePaths));
   }
 
+  // 1.9 — duplicate source files (same basename, identical content)
+  // anywhere in the judged folder.
+  findings.push(...checkDuplicateSourceFiles(fs));
+
   // 7.10 — raw .kmn text scan; runs even when the IR failed to parse.
   const kmnText = readText(fs, kmnPath(keyboardId));
   if (kmnText !== undefined) {
@@ -114,9 +128,13 @@ export function runCriteriaChecks(
   }
 
   // 7.20 — phone vs tablet font, from this package's touch-layout parse.
+  // 7.19 — phone vs tablet layouts identical (same parse).
   if (touchLayout !== undefined) {
     findings.push(
       ...checkTouchLayoutFontMismatch(touchLayout, touchLayoutPath(keyboardId)),
+    );
+    findings.push(
+      ...checkRedundantTouchLayouts(touchLayout, touchLayoutPath(keyboardId)),
     );
   }
 
@@ -177,10 +195,44 @@ export function runCriteriaChecks(
       ),
     );
 
-    // 13.1 / 13.4 — one produced-set scan, both range checks.
+    // 7.4 — modifier-name consistency across .kmn / .kvks / touch.
+    findings.push(
+      ...checkModifierNamesConsistent({
+        ir: keyboardIR,
+        ...(input.kvks !== undefined ? { kvks: input.kvks } : {}),
+        ...(touchLayout !== undefined ? { touchLayout } : {}),
+      }),
+    );
+
+    // 8.13 — .kmn targets vs .kps targets vs shipped compiled files.
+    // Only when the .kps actually declares targets: parseKps defaults
+    // an absent <Targets> to ["windows"], and the assembly passes []
+    // for that case — an undeclared list is not a disagreement (the
+    // assembly names it context-missing instead).
+    if (input.kpsTargets.length > 0) {
+      findings.push(
+        ...checkKpsTargetsMatch({
+          ir: keyboardIR,
+          kpsTargets: input.kpsTargets,
+          kpsFileNames: input.kpsFileNames,
+          kpsPath,
+        }),
+      );
+    }
+
+    // 13.1 / 13.4 / 7.12 / 7.14 — one produced-set scan, all four checks.
     const ranges = scanProducedRanges(keyboardIR);
     findings.push(...checkPuaPlacement(keyboardIR, input.placement, ranges));
     findings.push(...checkMathLatinLookalikes(keyboardIR, ranges));
+    findings.push(
+      ...checkPuaNotInExperimental(keyboardIR, input.placement, ranges),
+    );
+    const hasBundledFont =
+      input.kpsFontRefs.length > 0 ||
+      filePaths.some((p) => /\.(ttf|otf)$/i.test(p));
+    findings.push(
+      ...checkPuaFontDisplayMap(keyboardIR, { hasBundledFont }, ranges),
+    );
   }
 
   return findings;

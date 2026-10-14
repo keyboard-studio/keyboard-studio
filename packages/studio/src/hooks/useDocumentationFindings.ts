@@ -83,6 +83,14 @@ export function useDocumentationFindings(): LintFinding[] {
       ...(licenseText !== null ? { "license-md": licenseText } : {}),
     };
 
+    // Criterion 11.8: the base package's bundled stylesheets (image
+    // width constraints may live in their class rules).
+    const cssTexts = startVfs
+      .list("source/")
+      .filter((p) => p.toLowerCase().endsWith(".css"))
+      .map((p) => readVfsText(startVfs, p))
+      .filter((t): t is string => t !== undefined);
+
     const findings = runDocChecks(
       collectDocLintInput({
         keyboardId,
@@ -93,6 +101,7 @@ export function useDocumentationFindings(): LintFinding[] {
         kvksText,
         touchLayoutJson: touchJson,
         members,
+        cssTexts,
         ...(isAdaptation ? { startHistoryMdText } : {}),
       }),
     );
