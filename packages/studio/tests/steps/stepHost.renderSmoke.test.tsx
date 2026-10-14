@@ -95,14 +95,6 @@ vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
   ),
 }));
 
-vi.mock("../../src/editors/panels/TrackStep.tsx", () => ({
-  TrackStep: () => <div data-testid="stub-TrackStep" />,
-}));
-
-vi.mock("../../src/editors/panels/ProjectNameStep.tsx", () => ({
-  ProjectNameStep: () => <div data-testid="stub-ProjectNameStep" />,
-}));
-
 vi.mock("../../src/editors/panels/TrackOneIdentityPanel.tsx", () => ({
   TrackOneIdentityPanel: () => <div data-testid="stub-TrackOneIdentityPanel" />,
 }));
