@@ -367,3 +367,29 @@ describe("runDraftsHandler — storage failure mapping", () => {
     expect((await res.json()) as { error: string }).toEqual({ error: "draft_unavailable" });
   });
 });
+
+describe("runDraftsHandler — DELETE ?all=true (spec 098 erasure)", () => {
+  it("erases every draft and returns the count; plain DELETE still clears one", async () => {
+    const config = stubConfig();
+    await runDraftsHandler(req("PUT", { body: putBody() }), config);
+    await runDraftsHandler(
+      req("PUT", { body: putBody({ ...META, draftId: "ojibwe" }, { b: 2 }) }),
+      config,
+    );
+
+    const res = await runDraftsHandler(req("DELETE", { search: "?all=true" }), config);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ deleted: 2 });
+
+    const list = await runDraftsHandler(req("GET"), config);
+    expect(((await list.json()) as { drafts: unknown[] }).drafts).toEqual([]);
+  });
+
+  it("401s ?all=true with an unverifiable token and deletes nothing", async () => {
+    const config = stubConfig();
+    await config.store.putDraft(USER.id, USER.login, META, { a: 1 });
+    const res = await runDraftsHandler(req("DELETE", { search: "?all=true" }), stubConfig(null));
+    expect(res.status).toBe(401);
+    expect(await config.store.listMeta(USER.id)).toHaveLength(1);
+  });
+});

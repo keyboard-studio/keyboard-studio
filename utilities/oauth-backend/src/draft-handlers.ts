@@ -15,7 +15,9 @@ import {
   DraftIdSchema,
   MAX_DRAFT_BYTES,
   PutDraftBodySchema,
+  type DeleteAllDraftsResponse,
   type DraftMeta,
+  type ExportDraftsResponse,
   type GetDraftContentResponse,
   type GetDraftListResponse,
   type GetDraftMetaResponse,
@@ -178,4 +180,88 @@ export async function deleteDraft(
 
   await config.store.deleteDraft(user.id, draftId);
   return { ok: true, status: 200, data: { ok: true } };
+}
+
+// ---------------------------------------------------------------------------
+// GET /drafts/export — DSAR self-service export (spec 097)
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything the server holds for the caller: their identity key and
+ * every draft (payload + metadata). Authenticated exactly like every
+ * other draft operation — the export is keyed to the verified identity,
+ * never to a client-supplied id.
+ */
+export async function exportDrafts(
+  authHeader: string | null | undefined,
+  config: DraftHandlerConfig,
+): Promise<DraftResult<ExportDraftsResponse>> {
+  const user = await authenticate(authHeader, config);
+  if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+
+  const stored = await config.store.getAllDrafts(user.id);
+  return {
+    ok: true,
+    status: 200,
+    data: {
+      exportedAt: new Date().toISOString(),
+      identity: { githubUserId: user.id, login: user.login },
+      drafts: stored.map((row) => ({ meta: row.meta, draft: row.draft })),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /drafts?all=true — self-service erasure (spec 098)
+// ---------------------------------------------------------------------------
+
+/**
+ * Delete every draft the caller has — payloads and metadata together,
+ * no soft delete. Returns the count actually removed.
+ */
+export async function deleteAllDrafts(
+  authHeader: string | null | undefined,
+  config: DraftHandlerConfig,
+): Promise<DraftResult<DeleteAllDraftsResponse>> {
+  const user = await authenticate(authHeader, config);
+  if (user === null) return { ok: false, status: 401, error: "unauthorized" };
+
+  const deleted = await config.store.deleteAllDrafts(user.id);
+  return { ok: true, status: 200, data: { deleted } };
+}
+
+// ---------------------------------------------------------------------------
+// Owner purge — erasure by verified identity (spec 098, FR-002)
+// ---------------------------------------------------------------------------
+
+/**
+ * The completion record an owner purge emits for the request register:
+ * the minimum that proves the act (identity key, count, time, outcome)
+ * and never a copy of the data removed.
+ */
+export interface PurgeCompletionRecord {
+  githubUserId: number;
+  deleted: number;
+  purgedAt: string;
+  outcome: "purged";
+}
+
+/**
+ * Purge every draft held for `userId`, for erasure requests that arrive
+ * through any channel (spec 098). Identity verification happens in the
+ * procedure (account control, spec 097) before this is invoked — this
+ * function is the execution step, callable only from operator tooling,
+ * never from an HTTP route.
+ */
+export async function purgeUserDrafts(
+  userId: number,
+  config: DraftHandlerConfig,
+): Promise<PurgeCompletionRecord> {
+  const deleted = await config.store.deleteAllDrafts(userId);
+  return {
+    githubUserId: userId,
+    deleted,
+    purgedAt: new Date().toISOString(),
+    outcome: "purged",
+  };
 }

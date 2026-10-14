@@ -135,4 +135,33 @@ export class VercelDraftStore implements DraftStore {
     `;
     return rows.map(rowToMeta);
   }
+
+  /** DSAR export read path (spec 097): every draft, payload + metadata. */
+  async getAllDrafts(userId: number): Promise<StoredDraft[]> {
+    const metas = await this.listMeta(userId);
+    const drafts: StoredDraft[] = [];
+    for (const meta of metas) {
+      const stored = await this.getDraft(userId, meta.draftId);
+      // A metadata row whose blob vanished is skipped here (getDraft's
+      // half-state rule) — the metadata itself is still exported via the
+      // meta the caller already holds, so nothing is silently dropped:
+      // getDraft returns null only when the payload is unreadable.
+      if (stored !== null) drafts.push(stored);
+      else drafts.push({ meta, draft: null });
+    }
+    return drafts;
+  }
+
+  /**
+   * Erasure path (spec 098): delete every draft — row + blob together,
+   * via the same per-draft operation, so no second deletion semantic
+   * exists. Returns the number of drafts removed.
+   */
+  async deleteAllDrafts(userId: number): Promise<number> {
+    const metas = await this.listMeta(userId);
+    for (const meta of metas) {
+      await this.deleteDraft(userId, meta.draftId);
+    }
+    return metas.length;
+  }
 }
