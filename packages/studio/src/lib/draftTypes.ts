@@ -136,6 +136,15 @@ export interface DurableDraft {
    */
   surveyAnswers?: SurveyAnswerSnapshot;
   /**
+   * The project's test builds and the author's notes on tester reports (spec
+   * 094, stores/testingStore.ts). Optional and additive with no
+   * `DRAFT_VERSION` bump, following the `phaseBDraft` / `decisionRecord` /
+   * `surveyAnswers` precedent: a draft without it simply has no testing yet.
+   * The cloud draft stores the envelope as an opaque blob, so it syncs with no
+   * server change.
+   */
+  testing?: TestingRecord;
+  /**
    * Spec 088 FR-007: the decision store's snapshot — the ONLY saved record
    * of survey-question answers from draft version 2 on. Optional in the type
    * so the v1→v2 migration output and partial envelopes type-check; every
@@ -159,6 +168,46 @@ export interface DurableDraft {
    * never persisted past the load (the v2 writer does not write this field).
    */
   migrationOrphans?: MigrationOrphan[];
+}
+
+/** One installable package made for testing (spec 094 data-model.md). */
+export interface TestBuild {
+  /** Random 16-hex id; the two-device merge key. */
+  buildId: string;
+  /** The N in "Test build N". Shared by two builds only after a two-device collision. */
+  number: number;
+  /** The test version it was built at (research R1). */
+  version: string;
+  /** ISO-8601, client clock; display only. */
+  createdAt: string;
+  /** SHA-256 of the stable publish projection (research R7). */
+  fingerprint: string;
+  /** Decision-record entry count when the build was made. */
+  decisionCursor: number;
+  /** Stage ids changed since the previous build; may contain "source". */
+  changedSections: string[];
+  /** The previous build's number when the fingerprints match. */
+  identicalTo?: number;
+}
+
+/** The author's own note of one problem a tester reported (spec 094 FR-012). */
+export interface TesterReport {
+  reportId: string;
+  text: string;
+  foundInBuild: number;
+  sectionId?: string;
+  status: "open" | "fixed";
+  /** Decision cursor when it was marked fixed. */
+  markedFixedAt?: number;
+  /** The first build made after it was marked fixed (FR-014). */
+  fixedInBuild?: number;
+}
+
+export interface TestingRecord {
+  /** Advanced only after a build succeeds (FR-011); the maximum of both sides on a merge. */
+  nextBuildNumber: number;
+  builds: TestBuild[];
+  reports: TesterReport[];
 }
 
 /** One unmappable v1 answer, kept by the migration for surfacing (C-4.3). */

@@ -103,3 +103,34 @@ describe("sameSpec", () => {
     expect(sameSpec(b, spec())).toBe(false);
   });
 });
+
+describe("stepNavStore — revision channel (spec 094)", () => {
+  afterEach(() => {
+    useStepNavStore.getState().reset();
+  });
+
+  it("holds one revision, separate from the step's own entry", () => {
+    useStepNavStore.getState().publish("rules", "editor", spec());
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    const s = useStepNavStore.getState();
+    expect(s.revision?.stepId).toBe("rules");
+    expect(s.entries["rules"]?.owner).toBe("editor");
+  });
+
+  it("clearRevision only clears the named step's revision", () => {
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    useStepNavStore.getState().clearRevision("touch");
+    expect(useStepNavStore.getState().revision?.stepId).toBe("rules");
+    useStepNavStore.getState().clearRevision("rules");
+    expect(useStepNavStore.getState().revision).toBeNull();
+  });
+
+  it("re-publishing the same revision is a no-op; reset clears it", () => {
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    const before = useStepNavStore.getState();
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    expect(useStepNavStore.getState()).toBe(before);
+    useStepNavStore.getState().reset();
+    expect(useStepNavStore.getState().revision).toBeNull();
+  });
+});

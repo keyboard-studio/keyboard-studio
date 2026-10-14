@@ -35,6 +35,7 @@
 // same explanatory pattern PhaseFGate uses, reusing the identical shared
 // selector (lib/unimplementedInventory.ts via usePreviewArtifact).
 
+import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
@@ -42,6 +43,7 @@ import { useIsNarrow } from "../hooks/useViewport.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
+import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
@@ -50,6 +52,13 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer.ts";
+import { outputBlockers } from "../lib/outputBlockers.ts";
+import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import { unreachableReasonLabel } from "../decisions/progressDots.ts";
+import type { ActiveStepId } from "../stores/surveySessionStore.ts";
+import { OutputSectionList } from "./OutputSectionList.tsx";
+import { TestBuildPanel } from "./TestBuildPanel.tsx";
+import { PublishHandover } from "./PublishHandover.tsx";
 import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
 import { KmnEditor } from "./KmnEditor.tsx";
@@ -71,6 +80,17 @@ import {
 // and the download-projection-warnings banner below. Only the genuinely
 // shared visual properties live here — per-banner text color / layout
 // differences stay as local overrides at each call site.
+/** An inline link-styled button inside a status banner (spec 094 "Open" controls). */
+const BANNER_LINK_STYLE: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  color: "inherit",
+  textDecoration: "underline",
+  cursor: "pointer",
+  font: "inherit",
+};
+
 const warningBannerStyle: React.CSSProperties = {
   marginTop: 4,
   padding: "8px 12px",
@@ -88,12 +108,15 @@ const warningBannerStyle: React.CSSProperties = {
 const KMP_DIAGNOSTIC_LIMIT = 5;
 
 export function OutputScreen() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   // The identity-warning "go to" button smooth-scrolls to the keyboard id
   // field; reduced motion takes the instant jump instead.
   const reducedMotion = usePrefersReducedMotion();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
   const artifact = usePreviewArtifact();
+  // SurveyView owns the draft autosave and is unmounted on this route; keep
+  // saving while Output is open (test builds, reports, source edits).
+  useOutputAutosave();
   // Spec 084: the criteria summary card's counts. Judged off THIS screen's
   // own artifact stage (the shared useAuthoredCriteria assembly) — no
   // second pipeline instance, and the card is informational only: like
@@ -252,48 +275,48 @@ export function OutputScreen() {
   // that landed was "dagbanli-<version>.zip" — WCAG 2.2 AA 2.5.3 / 4.1.2. Do not
   // reintroduce a second derivation of this id; extend the shared helper.
   const downloadKeyboardId = resolveOutputKeyboardId(identity, startKeyboard);
-  const downloadAriaLabel = touchStale
-    ? t({
-        id: "output.download.aria.touchStale",
-        message:
-          "Download unavailable — the touch layout is out of date. Return to the Touch step and re-complete it before downloading.",
-      })
-    : coverageBlocked
-      ? t({
-          id: "output.download.aria.coverageBlocked",
-          message:
-            "Download unavailable — finish every inventory character before downloading. See the banner below for details.",
-        })
-      : // spec 064 D5 before D6: an unreadable base notice is the more specific
-        // problem, and its banner is the one carrying the control that fixes it.
-        licenseUnparseable !== null
-        ? t({
-            id: "output.download.aria.startingLicenseUnreadable",
-            // Names the field the author is being sent to ("Original copyright
-            // holder" in the banner below) rather than paraphrasing it, so the
-            // announcement and the control it points at use the same words.
-            message:
-              "Download unavailable — the starting keyboard's original copyright holder could not be read. Confirm it in the banner below.",
-          })
-        : attributionMissing
-          ? t({
-              id: "output.download.aria.attributionMissing",
-              message:
-                "Download unavailable — the keyboard needs an author and a copyright holder.",
-            })
-          : canDownload
-            ? t({
-                id: "output.download.aria.ready",
-                message: `Download keyboard ${downloadKeyboardId} as zip`,
-              })
-            : t({
-                id: "output.download.aria.notReady",
-                message: "Download unavailable until compile completes",
-              });
+  // spec 094 C6: one ordered blocker list feeds the download aria-labels, the
+  // action flags and the PR panel's reason, so they cannot disagree.
+  const gateInput = {
+    touchStale,
+    coverageBlocked,
+    licenseUnparseable: licenseUnparseable !== null,
+    attributionMissing,
+    stageReady: artifact.stage.kind === "ready" && startKeyboard !== null,
+  };
+  const outputGate = outputBlockers(gateInput);
+  const firstBlocker = outputGate.blockers[0];
+  const downloadAriaLabel = firstBlocker !== undefined
+    ? i18n.t(firstBlocker.downloadAria)
+    : t({
+        id: "output.download.aria.ready",
+        message: `Download keyboard ${downloadKeyboardId} as zip`,
+      });
+  // The first blocker the PR panel itself does not already explain ("compile
+  // not complete" is its own text). Before C6 an attribution or licence block
+  // fell through to that text.
+  const submitBlocker = outputGate.blockers.find((b) => b.reason !== undefined);
+
+  // spec 094 FR-004: a blocker that names a step gets an "Open" control that
+  // revises it and comes straight back here. The step id comes from the
+  // blocker itself, so the banner and the gate cannot point at different steps.
+  const blockerStepId = (kind: "touchStale" | "attribution"): string | undefined =>
+    outputGate.blockers.find((b) => b.kind === kind)?.stepId;
+  // A refused jump says why in the one polite status line beside the banners.
+  const [jumpStatus, setJumpStatus] = useState<string | null>(null);
+  const openBlockerStep = (stepId: string) => {
+    const outcome = jumpToLocation(
+      { route: "survey", step: stepId as ActiveStepId },
+      { returnTo: { route: "output" } },
+    );
+    setJumpStatus(outcome.kind === "refused" ? unreachableReasonLabel(outcome.reason, i18n) : null);
+  };
+  const touchBlockerStep = blockerStepId("touchStale");
+  const attributionBlockerStep = blockerStepId("attribution");
 
   // The .kmp shares every gate with the .zip, so it reuses the same
   // unavailability reasons and only differs in the ready case.
-  const kmpAriaLabel = canDownload && !touchStale
+  const kmpAriaLabel = !outputGate.blocked
     ? t({
         id: "output.download.aria.kmp",
         message: `Download keyboard ${downloadKeyboardId} as an installable Keyman package`,
@@ -302,8 +325,8 @@ export function OutputScreen() {
 
   // Both buttons disable while EITHER download is in flight: they share one
   // projection + compile, so overlapping clicks would do the same work twice.
-  const kmpActionable = canDownload && !buildingKmp && !downloading && !touchStale;
-  const zipActionable = canDownload && !downloading && !buildingKmp && !touchStale;
+  const kmpActionable = !outputGate.blocked && !buildingKmp && !downloading;
+  const zipActionable = !outputGate.blocked && !downloading && !buildingKmp;
 
   // Left pane (desktop) / collapsed disclosure after the Output pane (narrow).
   // Shipping details once instantiated, else the cold-arrival picker — see
@@ -407,6 +430,8 @@ export function OutputScreen() {
         )}
         {startKeyboard !== null && (
           <>
+            {/* spec 094 FR-001: revise any completed section and come back. */}
+            <OutputSectionList />
             {/* PRIMARY download: the installable package. A user double-clicks
                 this and the keyboard installs on Keyman for Windows, macOS,
                 Linux, iOS, or Android — no Keyman Developer, no unzipping, no
@@ -415,7 +440,7 @@ export function OutputScreen() {
             <button
               type="button"
               data-testid="emit-download-kmp"
-              disabled={!canDownload || buildingKmp || downloading || touchStale}
+              disabled={!kmpActionable}
               onClick={() => { void handleDownloadKmp(); }}
               aria-label={kmpAriaLabel}
               style={{
@@ -495,7 +520,7 @@ export function OutputScreen() {
             <button
               type="button"
               data-testid="emit-download"
-              disabled={!canDownload || downloading || buildingKmp || touchStale}
+              disabled={!zipActionable}
               onClick={() => { void handleDownload(); }}
               aria-label={downloadAriaLabel}
               style={{
@@ -531,6 +556,14 @@ export function OutputScreen() {
                 contributing upstream.
               </Trans>
             </p>
+            {/* spec 094 FR-006: a labelled, numbered build for testers, from the
+                same working copy and behind the same gates as the package. */}
+            <TestBuildPanel
+              gate={gateInput}
+              nextTestVersion={artifact.nextTestVersion}
+              busy={buildingKmp || downloading}
+              onMakeTestBuild={artifact.handleMakeTestBuild}
+            />
             {touchStale && (
               <div
                 role="alert"
@@ -544,6 +577,19 @@ export function OutputScreen() {
                   submitting — otherwise the shipped keyboard would include a
                   stale touch layout.
                 </Trans>
+                {touchBlockerStep !== undefined && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      data-testid="output-open-touch"
+                      onClick={() => openBlockerStep(touchBlockerStep)}
+                      style={BANNER_LINK_STYLE}
+                    >
+                      <Trans id="output.blocker.openTouch">Open Touch layout</Trans>
+                    </button>
+                  </>
+                )}
               </div>
             )}
             {/* Coverage-blocked explanation (P0 fix) — WHY download/submit is
@@ -686,8 +732,29 @@ export function OutputScreen() {
                   This keyboard needs an author and a copyright holder before it can be
                   downloaded. Go back to the language step to add them.
                 </Trans>
+                {attributionBlockerStep !== undefined && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      data-testid="output-open-identity"
+                      onClick={() => openBlockerStep(attributionBlockerStep)}
+                      style={BANNER_LINK_STYLE}
+                    >
+                      <Trans id="output.blocker.openIdentity">Open language step</Trans>
+                    </button>
+                  </>
+                )}
               </div>
             )}
+            <span
+              role="status"
+              aria-live="polite"
+              data-testid="output-jump-status"
+              style={{ display: "block", fontSize: 11, marginTop: 4 }}
+            >
+              {jumpStatus}
+            </span>
             {downloadError !== null && (
               <div role="alert" style={{ fontSize: 11, color: "var(--app-danger-text)", marginTop: 4 }}>
                 {downloadError}
@@ -835,24 +902,17 @@ export function OutputScreen() {
                 explanatory aria-label (canSubmit already forbids the
                 emission either way). Attribution prefill from whichever
                 identity provider is active. */}
-            <ManagedPRSubmitPanel
-              canSubmit={canDownload}
-              outputBlocked={touchStale || coverageBlocked}
-              outputBlockedReason={
-                touchStale
-                  ? t({
-                      id: "output.submit.outputBlockedReason.touchStale",
-                      message:
-                        "the touch layout is out of date — return to the Touch step and re-complete it",
-                    })
-                  : t({
-                      id: "output.submit.outputBlockedReason.coverageBlocked",
-                      message:
-                        "some inventory characters still need an implementation — see the banner above",
-                    })
-              }
-              prefill={submitPrefill}
-            />
+            {/* spec 094 FR-016: after test builds, one "Testing done, publish"
+                step says what changed since the last build and lists open
+                reports before the unchanged submit panel appears. */}
+            <PublishHandover>
+              <ManagedPRSubmitPanel
+                canSubmit={canDownload}
+                outputBlocked={submitBlocker !== undefined}
+                {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
+                prefill={submitPrefill}
+              />
+            </PublishHandover>
 
             {/* Decoupled "Sign up with GitHub / Google" identity step (docs/github-integration.md
                 §1a). Establishes who the user is — NOT a submit/PR action, and not

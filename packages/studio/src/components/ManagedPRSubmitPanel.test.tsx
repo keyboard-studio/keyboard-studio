@@ -492,6 +492,10 @@ describe("ManagedPRSubmitPanel — error states", () => {
     expect(mockedProject).toHaveBeenCalledTimes(1);
     // The submitted VFS is the very object the projector returned (not a re-derived copy).
     expect(svc.publishManagedPR.mock.calls[0]?.[0]).toBe(projectResult.vfs);
+    // spec 094 FR-010: the publish projection — never a test-build or
+    // fingerprint projection. Its content is covered in
+    // serializeWorkingCopy.testBuild.test.ts.
+    expect(mockedProject.mock.calls[0]).toEqual([]);
   });
 
   it("null projectWorkingCopyForOutput shows a form-level error", async () => {
