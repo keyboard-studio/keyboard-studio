@@ -90,6 +90,7 @@ import { isSpacerKeyClass, type TouchKeyFinding } from "@keyboard-studio/contrac
 import { useIsCoarsePointer } from "../../../hooks/useViewport.ts";
 import { codepointLabel } from "../../../survey/codepointLabel.ts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
+import { buzz } from "../../../lib/haptics.ts";
 import { BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED, FONT_MONO, WARNING } from "../../../ui/theme.ts";
 import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
@@ -458,19 +459,12 @@ export function KeyGridCell({
   }
 
   /**
-   * Commit-point haptic, fired on the same frame as the visual commit.
-   * Kept local and guarded — never a shared module (owned elsewhere), never
+   * Commit-point haptic, fired on the same frame as the visual commit,
+   * through the shared primitive (lib/haptics.ts) — guarded and never
    * throwing: on a device without vibrate support this is a silent no-op.
    */
   function fireCommitHaptic(): void {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate(15);
-      }
-    } catch {
-      // Haptics are feedback only — a failing vibrate must never break the
-      // menu opening underneath it.
-    }
+    buzz(15);
   }
 
   /**
