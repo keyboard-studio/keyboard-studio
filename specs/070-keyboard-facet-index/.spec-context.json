@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "keyboard facet index",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:52.378Z"
+    }
+  ],
+  "telemetryInstanceId": "48d6b443-50b5-48fd-ad48-de8c6faf22fa"
+}

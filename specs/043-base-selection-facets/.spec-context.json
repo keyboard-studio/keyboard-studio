@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "base selection facets",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:24.866Z"
+    }
+  ],
+  "telemetryInstanceId": "d7df1b43-70b0-472a-9065-ec3afb834e06"
+}

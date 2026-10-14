@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "qu generic step host",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:04.708Z"
+    }
+  ],
+  "telemetryInstanceId": "c112f2f0-810c-48e7-9261-b2035cbe3292"
+}

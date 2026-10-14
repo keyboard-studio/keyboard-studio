@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "output screen picker scope",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:37.820Z"
+    }
+  ],
+  "telemetryInstanceId": "c7350de4-922d-4756-9bf9-a3e203e09a60"
+}

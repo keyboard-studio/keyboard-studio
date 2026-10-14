@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "qu survey session store",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:01.844Z"
+    }
+  ],
+  "telemetryInstanceId": "f9c56d58-f46e-4a8d-953c-c720dba5c2b9"
+}

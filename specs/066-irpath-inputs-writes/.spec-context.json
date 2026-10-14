@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "irpath inputs writes",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:47.429Z"
+    }
+  ],
+  "telemetryInstanceId": "83a5107d-f495-4c42-9549-f2a44fa6c27d"
+}

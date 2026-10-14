@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "decision audit",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:34.336Z"
+    }
+  ],
+  "telemetryInstanceId": "2ea0a1f5-63e1-4eb3-9566-ed781295514e"
+}

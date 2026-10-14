@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "mutate seam touch propagation",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:56:49.780Z"
+    }
+  ],
+  "telemetryInstanceId": "f8c2e863-a261-4554-827d-3a016df2aa81"
+}

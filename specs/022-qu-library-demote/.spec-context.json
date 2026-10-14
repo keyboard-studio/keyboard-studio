@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "qu library demote",
+  "branch": "main",
+  "status": "completed",
+  "currentStep": "implement",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-14T19:57:00.127Z"
+    }
+  ],
+  "telemetryInstanceId": "c7fac5f0-b172-457d-aa81-825ef606a418"
+}

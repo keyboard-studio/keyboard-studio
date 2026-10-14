@@ -3,7 +3,7 @@
   "specName": "Decision store — one record per decision",
   "branch": "km/modular-decisions",
   "currentStep": "implement",
-  "status": "ready-to-implement",
+  "status": "completed",
   "history": [
     {
       "step": "plan",
@@ -33,5 +33,6 @@
       "by": "claude",
       "at": "2026-10-07T03:20:03.845Z"
     }
-  ]
+  ],
+  "telemetryInstanceId": "737c90bd-122c-42fd-abd0-5264de69be79"
 }
