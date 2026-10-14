@@ -1,0 +1,18 @@
+{
+  "workflow": "companion",
+  "specName": "024-option-a-github-app",
+  "branch": "024-option-a-github-app",
+  "selectedAt": "2026-10-14T20:00:13.224Z",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-14T20:47:21.331Z"
+    }
+  ],
+  "telemetryInstanceId": "89ebfdd0-4baf-4558-baff-c536d2d694cb"
+}
