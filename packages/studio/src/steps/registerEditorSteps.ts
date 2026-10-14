@@ -112,7 +112,7 @@ export const chooseStartStep: EditorStep = step({
 });
 
 /**
- * Track step: TrackStep (copy vs adapt choice).
+ * Track step: TrackStepFactoryComponent (copy vs adapt choice).
  * Every author chooses a track.
  * Reads session-derived header.bcp47 + resolved base display name (header.name).
  * DEC-D2: branch selection only — no IR leaf in Phase 1, so writes is [].
@@ -146,7 +146,7 @@ export const attributionStep: EditorStep = step({
 });
 
 /**
- * Project name step: ProjectNameStep (copy-track only).
+ * Project name step: ProjectNameStepFactoryComponent (copy-track only).
  * Its declared screen gate (registry.ts) makes it a side trail: copy
  * takes it, adapt bypasses it, and both rejoin at the next ungated step.
  * Collects scaffold params displayName + keyboardId — no separate scaffold step.

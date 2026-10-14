@@ -2,7 +2,7 @@
 //
 // Three steps previously hand-rolled the same "Enter submits this step" guard —
 // SurveyRunner's container handler, Prefill's confirmation-screen handler, and
-// ProjectNameStep's input handler — each with a slightly different shape. This
+// a since-deleted legacy panel's input handler — each with a slightly different shape. This
 // centralises the guard logic so the shared-conventions goal of #536 holds for
 // keyboard behaviour too, not just styling.
 //
