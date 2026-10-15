@@ -843,7 +843,7 @@ describe("Casing facet gate — caseless base", () => {
     expect(letters).toContain("U+0041"); // A — shown, not hidden behind a
   });
 
-  it("Done records exactly the chosen characters — no derived uppercase", async () => {
+  it("Continue records exactly the chosen characters — no derived uppercase", async () => {
     seedCaselessBase();
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "he" }, onComplete);
@@ -851,7 +851,7 @@ describe("Casing facet gate — caseless base", () => {
       inventoryOps("characters").setAll(["q"]);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     expect(onComplete.mock.calls[0]![0].confirmedInventory).toEqual(["q"]);
   });
