@@ -662,6 +662,34 @@ const GENERATED: GeneratedDocSlots = {
   characterInventory: "<ul><li>ŋ</li></ul>",
 };
 
+describe("helpDocsRender — spec 102 README links", () => {
+  it("keeps a homepage link when there is no help-site page", () => {
+    const readme = renderReadmeMd(baseInput({ answers: answersWith({ projectHomeUrl: "https://example.org/kb" }) }));
+    expect(readme).toBe("# Piaroa\n\nA keyboard for Piaroa.\n\n## Links\n- Keyboard homepage: https://example.org/kb\n");
+  });
+
+  it("lists homepage then help page under one Links heading", () => {
+    const readme = renderReadmeMd(
+      baseInput({ keyboardId: "piaroa", answers: answersWith({ projectHomeUrl: "https://example.org/kb" }) }),
+    );
+    expect(readme).toContain(
+      "## Links\n- Keyboard homepage: https://example.org/kb\n- Online help: https://help.keyman.com/keyboard/piaroa\n",
+    );
+    expect(readme.match(/## Links/g)).toHaveLength(1);
+  });
+
+  it("drops an author URL that is not plain http(s) or mailto, in README.md and readme.htm", () => {
+    const input = baseInput({
+      answers: answersWith({ projectHomeUrl: "javascript:alert(1)", projectHelpUrl: "https://x.org/a b" }),
+    });
+    expect(renderReadmeMd(input)).not.toContain("## Links");
+    expect(renderReadmeHtm(input)).not.toContain("href");
+    expect(renderReadmeHtm(baseInput({ keyboardId: "piaroa", answers: answersWith({ projectHelpUrl: "javascript:x" }) }))).toContain(
+      'href="https://help.keyman.com/keyboard/piaroa"',
+    );
+  });
+});
+
 describe("helpDocsRender — spec 102 forms", () => {
   it("renders the derived sections on welcome and help with no answers, and drops an empty section with its heading", () => {
     const input = baseInput({ generated: GENERATED });

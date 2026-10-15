@@ -25,6 +25,8 @@ export interface DocSlotModel {
   year: string;
   docLang: string;
   helpPageUrl: string;
+  /** Non-empty when the README has at least one link (homepage or help page), so the Links heading appears once. */
+  hasLinks: string;
   /** helpSiteHeader(displayName); help form only. */
   helpHeader: string;
   // history
@@ -69,6 +71,7 @@ const SLOT_ID_RECORD: Record<DocSlotId, true> = {
   year: true,
   docLang: true,
   helpPageUrl: true,
+  hasLinks: true,
   helpHeader: true,
   version: true,
   date: true,
