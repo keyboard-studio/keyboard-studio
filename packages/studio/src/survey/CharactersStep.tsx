@@ -17,8 +17,10 @@
 //
 // placementMap is intentionally omitted from PhaseB props (D-INT-2, v1).
 
-import { useEffect, useRef, type ComponentType } from "react";
-import type { LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { useEffect, useRef, useState, type ComponentType } from "react";
+import type { ConfirmedAlphabet, LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
+import { marksLackingPairingEvidence } from "@keyboard-studio/engine";
 import type { SurveyContext } from "./types.ts";
 import type { DecisionRendererProps } from "../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../steps/galleryHost.tsx";
@@ -39,6 +41,7 @@ import { useStepWalkStore, peekStepCursor } from "../stores/stepWalkStore.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import { ADDITION_ANSWER_PREFIX } from "./characterFlags.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
+import { MarksTextSamplePrompt } from "./MarksTextSamplePrompt.tsx";
 // The substage views (Prefill, PhaseB) arrive through the gallery
 // host's step-context extras, supplied by CharactersStepHost — NOT by
 // import. Both views transitively import the question registry
@@ -73,6 +76,11 @@ export interface CharactersStepExtras {
     findingsByQuestionId?: Record<string, LintFinding[]>;
   }>;
 }
+// The survey-answer id recording a #1784 text-sample-prompt dismissal. The
+// value is `skipped:<alphabet key>` — keyed by alphabet content so a
+// genuinely changed alphabet re-arms the prompt.
+const TEXT_SAMPLE_PROMPT_ANSWER_ID = "characters.textSamplePrompt";
+
 // Manifest step id — matches steps/manifest.ts's "characters" entry.
 //
 // SINGLE WRITER (spec 079 T035/T081/FR-004): this component is the ONLY place
@@ -207,6 +215,82 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
 
   const findingsByQuestionId = useValidatorFindings();
 
+  // #1784: completing character discovery while marks lack letter+mark
+  // pairing evidence defers the real completion behind the text-sample
+  // prompt. The PhaseB result waits here until the harvest covers the
+  // marks (predicate clears) or the designer skips.
+  const [deferredResult, setDeferredResult] = useState<SurveyPhaseResult | null>(null);
+  const draftValue = useCharacterInventoryValue();
+
+  /** The pre-existing completion path: attach the confirmed alphabet and advance. */
+  function completeCharacters(result: SurveyPhaseResult): void {
+    // Commit the three-store ConfirmedAlphabet alongside the flat
+    // confirmedInventory (spec 071 US5): the character-inventory
+    // decision value is canonical for it; a manual-flow completion
+    // leaves the draft empty, so the field stays absent there
+    // (additive optional). Read the draft NOW so pairs harvested in
+    // the #1784 prompt land in the attached alphabet.
+    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
+    const hasStores =
+      alphabet.bases.length > 0 ||
+      alphabet.marks.length > 0 ||
+      alphabet.attestedStacks.length > 0;
+    onComplete(hasStores ? { ...result, alphabet } : result);
+  }
+
+  /** The #1784 prompt was dismissed for this exact alphabet already. */
+  function textSamplePromptDismissed(alphabet: ConfirmedAlphabet): boolean {
+    const saved =
+      useSurveyAnswerStore.getState().steps[CHARACTERS_STEP_ID]?.answers[
+        TEXT_SAMPLE_PROMPT_ANSWER_ID
+      ];
+    return saved?.value === `skipped:${confirmedAlphabetKey(alphabet)}`;
+  }
+
+  function handlePhaseBComplete(result: SurveyPhaseResult): void {
+    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
+    if (
+      marksLackingPairingEvidence(alphabet).length > 0 &&
+      !textSamplePromptDismissed(alphabet)
+    ) {
+      setDeferredResult(result);
+      return;
+    }
+    completeCharacters(result);
+  }
+
+  function handlePromptSkip(): void {
+    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
+    const key = confirmedAlphabetKey(alphabet);
+    useSurveyAnswerStore.getState().saveAnswer(
+      CHARACTERS_STEP_ID,
+      TEXT_SAMPLE_PROMPT_ANSWER_ID,
+      {
+        value: `skipped:${key}`,
+        answerType: "select",
+        origin: "confirmed",
+        stage: "confirmed",
+        evidenceKey: key,
+        screenId: "text-sample-prompt",
+      },
+    );
+    const done = deferredResult;
+    setDeferredResult(null);
+    if (done !== null) completeCharacters(done);
+  }
+
+  // A harvest inside the prompt re-derives the draft through the shared
+  // inventory ops; once every mark has pairing evidence, fire the
+  // deferred completion with the enriched alphabet.
+  useEffect(() => {
+    if (deferredResult === null) return;
+    if (marksLackingPairingEvidence(draftConfirmedAlphabet(draftValue)).length === 0) {
+      setDeferredResult(null);
+      completeCharacters(deferredResult);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- completeCharacters closes over stable store accessors
+  }, [deferredResult, draftValue]);
+
   // Restore, once, on a fresh mount: if charactersSubStage is still at its
   // default "prefill" but a finer position was saved for this step, the
   // author had reached "B" before — land there rather than replaying prefill
@@ -258,7 +342,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
   // The build list is done once it holds letters — not when every optional
   // box on it has been filled.
-  const hasDraftLetters = useCharacterInventoryValue().chars.length > 0;
+  const hasDraftLetters = draftValue.chars.length > 0;
   useEffect(() => {
     if (discoveryMethod === "manual") return;
     const stops: StepWalkPositions =
@@ -271,6 +355,27 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
           ];
     publishStepWalk(CHARACTERS_STEP_ID, stops);
   }, [publishStepWalk, charactersSubStage, discoveryMethod, hasDraftLetters]);
+
+  // #1784 prompt: a deferred completion renders the text-sample prompt in
+  // place of PhaseB until the harvest covers the marks or the designer
+  // skips. Back returns to the build list (Done re-fires the prompt).
+  if (deferredResult !== null) {
+    const alphabet = draftConfirmedAlphabet(draftValue);
+    const lacking = marksLackingPairingEvidence(alphabet);
+    if (lacking.length > 0) {
+      const hadTextSample = alphabet.attestedStacks.some((s) => s.source === "text");
+      return (
+        <MarksTextSamplePrompt
+          lackingMarks={lacking}
+          hadTextSample={hadTextSample}
+          onBack={() => setDeferredResult(null)}
+          onSkip={handlePromptSkip}
+        />
+      );
+    }
+    // Raced the harvest-resolution effect above; fall through and let it
+    // fire the deferred completion on this render's commit.
+  }
 
   // Guard: prefill requires both identity and base (unreachable once the step
   // is properly entered, but matches today's null fallback).
@@ -307,20 +412,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
     <Suspense fallback={null}>
     <PhaseB
       context={surveyContext}
-      onComplete={(result) => {
-        // Commit the three-store ConfirmedAlphabet alongside the flat
-        // confirmedInventory (spec 071 US5): the character-inventory
-        // decision value is canonical for it; a manual-flow completion
-        // leaves the draft empty, so the field stays absent there
-        // (additive optional).
-        const phaseResult = result as SurveyPhaseResult;
-        const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
-        const hasStores =
-          alphabet.bases.length > 0 ||
-          alphabet.marks.length > 0 ||
-          alphabet.attestedStacks.length > 0;
-        onComplete(hasStores ? { ...phaseResult, alphabet } : phaseResult);
-      }}
+      onComplete={handlePhaseBComplete}
       onBack={() => setCharactersSubStage("prefill")}
       findingsByQuestionId={findingsByQuestionId}
     />

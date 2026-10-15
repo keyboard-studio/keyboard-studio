@@ -83,7 +83,7 @@ describe("MarksSeriesStep — S5 stacking from a text sample", () => {
   it("attests a two-mark letter from an NFC sample and proposes yes with it pre-ticked", async () => {
     // Yoruba: ẹ́ is e + dot below + acute.
     const alphabet = await alphabetFromSample("Ó wá ní ẹ́ bẹ́ẹ̀ ni");
-    expect(alphabet.attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE] });
+    expect(alphabet.attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE], source: "text" });
 
     renderSeries(alphabet);
     const station = walkToStacking();
@@ -97,7 +97,7 @@ describe("MarksSeriesStep — S5 stacking from a text sample", () => {
 
   it("gives the same stack for an NFD sample", async () => {
     const alphabet = await alphabetFromSample(`be${DOT_BELOW}${ACUTE} ta`.normalize("NFD"));
-    expect(alphabet.attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE] });
+    expect(alphabet.attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE], source: "text" });
   });
 
   it("gives the same stack whichever order marks of different combining class were typed in", async () => {
@@ -105,13 +105,13 @@ describe("MarksSeriesStep — S5 stacking from a text sample", () => {
     // to the other order, so it is the same letter, not a second spelling.
     const alphabet = await alphabetFromSample(`e${ACUTE}${DOT_BELOW}`);
     const multi = alphabet.attestedStacks.filter((s) => s.marks.length >= 2);
-    expect(multi).toEqual([{ base: "e", marks: [DOT_BELOW, ACUTE] }]);
+    expect(multi).toEqual([{ base: "e", marks: [DOT_BELOW, ACUTE], source: "text" }]);
   });
 
   it("proposes yes for Vietnamese ệ (circumflex + dot below)", async () => {
     const alphabet = await alphabetFromSample("Tiếng Việt");
     expect(alphabet.attestedStacks.some((s) => s.base === "e" && s.marks.length >= 2)).toBe(true);
-    expect(alphabet.attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, CIRCUMFLEX] });
+    expect(alphabet.attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, CIRCUMFLEX], source: "text" });
 
     renderSeries(alphabet);
     const station = walkToStacking();
@@ -123,6 +123,6 @@ describe("MarksSeriesStep — S5 stacking from a text sample", () => {
   it("keeps the stack when the single-mark sibling is removed from the draft", async () => {
     await alphabetFromSample("ẹ́ é");
     inventoryOps("characters").remove("é");
-    expect(draftConfirmedAlphabet(getCharacterInventoryValue()).attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE] });
+    expect(draftConfirmedAlphabet(getCharacterInventoryValue()).attestedStacks).toContainEqual({ base: "e", marks: [DOT_BELOW, ACUTE], source: "text" });
   });
 });

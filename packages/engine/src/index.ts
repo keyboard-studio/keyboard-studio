@@ -509,6 +509,7 @@ export {
   attestedBasesOf,
   attestedLetterCount,
   buildAttestationFold,
+  marksLackingPairingEvidence,
   ATTACHMENT_SIMILARITY_THRESHOLD,
 } from "./marks/mark-classes.js";
 export type { AttestationCaseFold, MarkClass } from "./marks/mark-classes.js";

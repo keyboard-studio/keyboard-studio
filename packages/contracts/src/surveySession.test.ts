@@ -399,6 +399,36 @@ describe("mergePhaseResults() — alphabet + marksWorklist (spec 071)", () => {
     ]);
   });
 
+  it("preserves a stack's source provenance through the merge", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["e"],
+          marks: [ACUTE],
+          attestedStacks: [{ base: "e", marks: [ACUTE], source: "text" }],
+          declaredRoles: {},
+        },
+      },
+      {
+        phase: "C",
+        answers: [],
+        alphabet: {
+          bases: ["a"],
+          marks: [GRAVE],
+          attestedStacks: [{ base: "a", marks: [GRAVE] }],
+          declaredRoles: {},
+        },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.alphabet?.attestedStacks).toEqual([
+      { base: "e", marks: [ACUTE], source: "text" },
+      { base: "a", marks: [GRAVE] },
+    ]);
+  });
+
   it("keeps stacks with the same marks in a different order as distinct", () => {
     const phases: SurveyPhaseResult[] = [
       {
