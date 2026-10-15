@@ -145,6 +145,120 @@ describe("fontSupport — real-measurement comparison logic (fake canvas context
   });
 });
 
+// ---------------------------------------------------------------------------
+// Script-face ready gate — a vendored script face (scriptFonts.ts) that is
+// still loading must defer measurement of characters in its range, and the
+// deferred answer must NOT be cached: once the face settles, the same call
+// measures for real.
+// ---------------------------------------------------------------------------
+
+class GateFakeFontFace {
+  constructor(
+    public family: string,
+    public source: string,
+    public descriptors: Record<string, string>,
+  ) {}
+}
+
+/** Settles the pending FontFaceSet.load() promise installed by the gate
+ * environment below — assigned per install, called by the test when the
+ * face should "arrive". */
+let settleGateLoad: (() => void) | null = null;
+
+const ARAB_STACK = "'Noto Sans', system-ui, 'Noto Naskh Arabic', sans-serif";
+
+describe("fontSupport — script-face ready gate", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    settleGateLoad = null;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(document, "fonts");
+  });
+
+  function installGateEnvironment(): void {
+    // Widths make the Arabic char measure as UNSUPPORTED whenever a real
+    // measurement happens: the target stack falls back to the monospace
+    // baseline width exactly.
+    const ctx = makeFakeCtx((font) => {
+      if (font.includes("monospace")) return 20;
+      if (font.includes("Noto Naskh Arabic")) return 20;
+      if (font.includes("serif")) return 22;
+      return 10;
+    });
+    installFakeCanvas(ctx);
+    vi.stubGlobal("FontFace", GateFakeFontFace);
+    // document.fonts WITHOUT `ready`: fontSupport's own fonts-ready gate
+    // latches "ready" immediately, isolating the script-face gate under test.
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: {
+        add: () => {},
+        load: () =>
+          new Promise<unknown[]>((resolve) => {
+            settleGateLoad = () => resolve([{}]);
+          }),
+      },
+    });
+  }
+
+  it("defers measurement while the covering face loads, then measures for real after it settles (deferred answer is not cached)", async () => {
+    installGateEnvironment();
+    const { isGlyphSupported } = await import("./fontSupport.ts");
+    const scriptFonts = await import("./scriptFonts.ts");
+
+    scriptFonts.ensureScriptFontsLoaded(["Arab"]);
+    expect(scriptFonts.getScriptFontLoadState("Arab")).toBe("loading");
+
+    // While pending: reported supported (glyph shown), and crucially NOT
+    // measured — a measurement now would conclude "unsupported".
+    expect(isGlyphSupported("ا", ARAB_STACK)).toBe(true);
+
+    expect(settleGateLoad).not.toBeNull();
+    settleGateLoad!();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(scriptFonts.getScriptFontLoadState("Arab")).toBe("loaded");
+
+    // After settle: the real measurement runs and its answer wins — proof
+    // the deferred `true` above never entered the cache.
+    expect(isGlyphSupported("ا", ARAB_STACK)).toBe(false);
+  });
+
+  it("does not gate a character whose stack does not name the script family", async () => {
+    // Counting canvas: if the gate (wrongly) applied to this stack, no
+    // measurement would happen at all and the count would stay 0. Widths
+    // differ per family so a real measurement concludes "supported".
+    let measureCalls = 0;
+    const ctx = makeFakeCtx((font) => {
+      measureCalls++;
+      if (font.includes("monospace")) return 20;
+      // "Noto Sans" before "serif": the stack text "sans-serif" itself
+      // contains the substring "serif".
+      if (font.includes("Noto Sans")) return 30;
+      if (font.includes("serif")) return 22;
+      return 10;
+    });
+    installFakeCanvas(ctx);
+    vi.stubGlobal("FontFace", GateFakeFontFace);
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      // load() never settles: the face stays "loading" for this whole test.
+      value: { add: () => {}, load: () => new Promise<unknown[]>(() => {}) },
+    });
+    const { isGlyphSupported } = await import("./fontSupport.ts");
+    const scriptFonts = await import("./scriptFonts.ts");
+
+    scriptFonts.ensureScriptFontsLoaded(["Arab"]);
+    expect(scriptFonts.getScriptFontLoadState("Arab")).toBe("loading");
+    expect(scriptFonts.pendingScriptFontFor("ا", "'Noto Sans', sans-serif")).toBeUndefined();
+    expect(isGlyphSupported("ا", "'Noto Sans', sans-serif")).toBe(true);
+    expect(measureCalls).toBeGreaterThan(0);
+  });
+});
+
 describe("fontSupport — onFontsReady", () => {
   beforeEach(() => {
     vi.resetModules();
