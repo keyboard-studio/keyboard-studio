@@ -107,17 +107,20 @@ export function useDocumentationFindings(): LintFinding[] {
         .filter((p) => p.toLowerCase().endsWith(".css"))
         .map((p) => readVfsText(startVfs, p))
         .filter((t): t is string => t !== undefined),
-      ...(startDocCssTexts ?? []),
+      ...(startDocCssTexts ?? []).map((entry) => entry.text),
     ];
     // Issue 1908: an ACCEPTED image-width proposal amends the shipped
     // kb.css (serializeWorkingCopy step 5c), so the check sees the same
     // stylesheet the output will carry — the finding clears here exactly
     // when it clears in the shipped package. Only when a kb.css is
-    // actually in the working copy (its presence depends on issue 2139).
+    // actually in the working copy: resident in the VFS, or carried by
+    // the startDocCssTexts slice (the loader's fetch-don't-write path,
+    // issue 2139) at a kb.css path.
     if (
       isAdaptation &&
       docFixProposals?.imageWidth === "accepted" &&
-      startVfs.list("source/").some((p) => /^source\/(?:help|welcome)\/kb\.css$/i.test(p))
+      (startVfs.list("source/").some((p) => /^source\/(?:help|welcome)\/kb\.css$/i.test(p)) ||
+        (startDocCssTexts ?? []).some((entry) => /^source\/(?:help|welcome)\/kb\.css$/i.test(entry.path)))
     ) {
       cssTexts.push("img { max-width: 100%; }");
     }

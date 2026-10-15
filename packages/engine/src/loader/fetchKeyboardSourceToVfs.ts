@@ -45,6 +45,17 @@ export interface FetchKeyboardSourceOptions {
 // get the types.
 export type { KpsFontEntry, KpsStylesheetEntry };
 
+/**
+ * One fetched welcome/help stylesheet: the repo path it was fetched from
+ * (`source/…`) and its text. The path rides along so a consumer can write
+ * the stylesheet back at its own location; the fetch order alone cannot
+ * say which text belongs to which page once a fetch has been skipped.
+ */
+export interface StartDocCssText {
+  path: string;
+  text: string;
+}
+
 export interface FetchKeyboardSourceResult {
   /** CompilerOptions derived from the .kpj (or defaults if .kpj absent). */
   options: Required<CompilerOptions>;
@@ -127,10 +138,11 @@ export interface FetchKeyboardSourceResult {
    */
   startHistoryMdText?: string;
   /**
-   * The texts of the stylesheets the base's welcome / help pages use
+   * The stylesheets the base's welcome / help pages use
    * (`source/welcome/*.css`, `source/help/*.css` — conventionally both are
-   * `kb.css`), in page order (welcome first, then help), or undefined when
-   * neither page names one that could be fetched (issue #2139).
+   * `kb.css`), each with the path it was fetched from, in page order
+   * (welcome first, then help), or undefined when neither page names one
+   * that could be fetched (issue #2139).
    *
    * Fetched for criterion 11.8 only: a custom help image's width constraint
    * may live in a class rule in these files, and the KMW stylesheet in the
@@ -139,7 +151,7 @@ export interface FetchKeyboardSourceResult {
    * `.full { width: 98% }`) as unconstrained. Fetch-don't-write, like
    * {@link startWelcomeHtmText}: the rendered pages are what ships.
    */
-  startDocCssTexts?: string[];
+  startDocCssTexts?: StartDocCssText[];
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -484,14 +496,14 @@ export async function fetchKeyboardSourceToVfs(
   // Issue #2139 (criterion 11.8): the stylesheets the base's welcome / help
   // pages use — see the result field's doc for why the check needs them.
   // Absence is non-fatal and NOT a warning, same tolerance as the pages.
-  const startDocCssTexts: string[] = [];
+  const startDocCssTexts: StartDocCssText[] = [];
   for (const cssPath of docStylesheetPaths({
     welcomeText: startWelcomeHtmText,
     welcomeConvention: startWelcomeConvention,
     helpText: startHelpPhpText,
   })) {
     const cssResp = await getText(`${baseUrl}/${cssPath}`, fetchImpl);
-    if (cssResp.ok && cssResp.text !== undefined) startDocCssTexts.push(cssResp.text);
+    if (cssResp.ok && cssResp.text !== undefined) startDocCssTexts.push({ path: cssPath, text: cssResp.text });
   }
 
   // spec 080 FR-006: the base's README.md / HISTORY.md, for inheritance at

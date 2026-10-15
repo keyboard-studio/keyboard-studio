@@ -82,6 +82,23 @@ describe("DocumentationFixProposals (issue #1908)", () => {
     expect(useWorkingCopyStore.getState().docFixProposals).toEqual({ bodySync: "help" });
   });
 
+  it("offers the image-width proposal when kb.css rides only in the startDocCssTexts slice, naming its path", () => {
+    instantiateAdaptation();
+    const wc = useWorkingCopyStore.getState();
+    const helpWithImage =
+      "<?php\n  $pagename = 'Cameroon QWERTY (SIL) Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Copyright SIL Cameroon</p><p><img src=\"globe.png\"></p></body></html>";
+    wc.setStartHelpPhpText(helpWithImage);
+    // The loader's real adapt path: kb.css is fetch-don't-write, carried by
+    // the slice and never present in the start VFS.
+    wc.setStartDocCssTexts([{ path: "source/help/kb.css", text: ".full { width: 98%; }" }]);
+    render(<DocumentationFixProposals />);
+
+    const row = screen.getByTestId("doc-fix-image-width");
+    expect(row.textContent).toContain("source/help/kb.css");
+    fireEvent.click(within(row).getByText("Add the width rule"));
+    expect(useWorkingCopyStore.getState().docFixProposals).toEqual({ imageWidth: "accepted" });
+  });
+
   it("renders nothing on the copy track, even with the same store texts set", () => {
     const ir = makeTestIR([]);
     ir.header.version = "1.0";
