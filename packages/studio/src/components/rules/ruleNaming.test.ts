@@ -141,6 +141,18 @@ describe("describeRuleShape", () => {
     const rule = makeRule({ output: [{ kind: "deadkey", id: 3 }] });
     expect(describeRuleShape(rule)).toContain("deadkey(3)");
   });
+
+  it("renders a typed if() guard in the rule shape (spec 103)", () => {
+    const rule = makeRule({
+      context: [
+        { kind: "if", store: "&layer", value: "symbols" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_A", modifiers: [] },
+      ],
+      output: [{ kind: "char", value: "a" }],
+    });
+    expect(describeRuleShape(rule)).toContain("if(&layer = 'symbols')");
+  });
 });
 
 describe("humanizeId", () => {

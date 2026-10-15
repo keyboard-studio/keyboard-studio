@@ -72,14 +72,14 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
     expect(nextButton().disabled).toBe(false);
 
     // The confirm half: one click, no edit, and the flow advances past
-    // pf_welcome_paragraph onto pf_usage_tip_1 (the next question's own
+    // pf_welcome_paragraph onto pf_font_guidance (the next question's own
     // prompt renders; pf_welcome_paragraph's prompt is gone).
     act(() => {
       fireEvent.click(nextButton());
     });
     expect(screen.queryByText(/what is this keyboard for/i)).toBeNull();
     expect(
-      screen.getByText(/anything users need to know to type with this keyboard/i),
+      screen.getByText(/which fonts display this keyboard's characters correctly/i),
     ).toBeTruthy();
   });
 

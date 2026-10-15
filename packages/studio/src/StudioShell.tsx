@@ -1629,8 +1629,21 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // trigger at all. Steps declaring rightPane:"none" (identity/layout)
   // never show a preview pane, divider, or mobile trigger, even when a
   // base already exists (e.g. a resumed draft).
+  //
+  // #1911: the trigger must not depend on fragile state sync. `showCharacterMap`
+  // requires discoveryMethod === "build-list" in the session store, and
+  // `localStart` requires the startKeyboard-prop sync effect to have fired.
+  // Either can lag the actual UI (the build-list page renders from the same
+  // store, but the effect ordering isn't guaranteed). The character map is
+  // available whenever the step declares rightPane:"character-map", and the
+  // OSK preview is available whenever the startKeyboard prop is set — so
+  // gate on those directly, not on the derived/synced values.
   const hasPreviewContent =
-    showPreviewPane && (showCharacterMap || localStart !== null);
+    showPreviewPane &&
+    (activeRightPane === "character-map" ||
+      showCharacterMap ||
+      localStart !== null ||
+      startKeyboard !== null);
   // The sheet never reopens by itself: when its content goes away (a step
   // without a preview), forget that it was open.
   if (previewSheetOpen && (!isNarrow || !hasPreviewContent)) {

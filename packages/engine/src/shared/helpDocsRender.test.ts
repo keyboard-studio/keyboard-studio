@@ -14,7 +14,7 @@ import {
   type GeneratedDocSlots,
   type HelpDocsRenderInput,
 } from "./helpDocsRender.js";
-import { welcomeHtm, readmeHtm } from "./packageDocs.js";
+import { DOC_PAGE_STYLE, welcomeHtm, readmeHtm } from "./packageDocs.js";
 import { DOC_GENERATED_END, DOC_GENERATED_START } from "./docSlots.js";
 
 const HAUSA_HEADER =
@@ -80,16 +80,21 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
 
   // spec 102 FR-030: with no answers the help page is the shared body form
   // (the same fallback sentence welcome.htm opens with), no longer the
-  // scaffolder's bare placeholder comment.
+  // scaffolder's bare placeholder comment. The shared inline style leads the
+  // fragment (element spec §1), and the body opens with the page heading.
   it("renderHelpPhp renders the shared body form when answers is null, not the scaffolder stub", () => {
     const rendered = renderHelpPhp(baseInput(), null);
-    expect(rendered).toBe(`${helpSiteHeader("Piaroa")}<p>Welcome to Piaroa</p>`);
+    expect(rendered).toBe(
+      `${helpSiteHeader("Piaroa")}<style>${DOC_PAGE_STYLE}</style>\n<h1>Piaroa</h1>\n<p>Welcome to Piaroa</p>`,
+    );
     expect(rendered).not.toBe(helpPhpStub("Piaroa"));
   });
 
   it("renderHelpPhp HTML-escapes the display name in the no-answer body", () => {
     const input = baseInput({ displayName: "A<&>B" });
-    expect(renderHelpPhp(input, null)).toBe(`${helpSiteHeader("A<&>B")}<p>Welcome to A&lt;&amp;&gt;B</p>`);
+    expect(renderHelpPhp(input, null)).toBe(
+      `${helpSiteHeader("A<&>B")}<style>${DOC_PAGE_STYLE}</style>\n<h1>A&lt;&amp;&gt;B</h1>\n<p>Welcome to A&lt;&amp;&gt;B</p>`,
+    );
   });
 });
 
@@ -115,11 +120,12 @@ describe("helpDocsRender — spec 080 FR-003 standard help-site header (US1)", (
     const input = baseInput({ displayName: "Hausa Basic", answers: answersWith(), primaryBcp47: "ha" });
     const help = renderHelpPhp(input, null);
     expect(help.startsWith(HAUSA_HEADER)).toBe(true);
-    // Body equals welcome.htm's inner body — not a nested <html><body> document
-    // (criteria.md §11.4: help.php must not close </body></html>).
+    // After the header: the shared inline style, then welcome.htm's inner
+    // body — not a nested <html><body> document (criteria.md §11.4: help.php
+    // must not close </body></html>).
     const welcome = renderWelcomeHtm(input, null);
-    const welcomeBody = welcome.replace(/^<html[^>]*><body>/, "").replace(/<\/body><\/html>$/, "");
-    expect(help.slice(HAUSA_HEADER.length)).toBe(welcomeBody);
+    const welcomeBody = welcome.replace(/^[\s\S]*?<body>\n/, "").replace(/<\/body>\n<\/html>$/, "");
+    expect(help.slice(HAUSA_HEADER.length)).toBe(`<style>${DOC_PAGE_STYLE}</style>\n${welcomeBody}`);
     expect(help).not.toMatch(/<\/body>/i);
     expect(help).not.toMatch(/<\/html>/i);
     expect(help.match(/\$pagename =/g)).toHaveLength(1);
@@ -209,7 +215,7 @@ describe("helpDocsRender — buildDocSections (FR-003/FR-011/SC-003)", () => {
     ]);
   });
 
-  it("renders all eleven opt-in fields when every one is answered (FR-014)", () => {
+  it("renders all ten opt-in fields when every one is answered (FR-014)", () => {
     const sections = buildDocSections(
       answersWith({
         designRationale: "a",
@@ -225,9 +231,10 @@ describe("helpDocsRender — buildDocSections (FR-003/FR-011/SC-003)", () => {
         furtherReading: "k",
       }),
     );
+    // Font guidance is absent here on purpose: it is intro matter (element
+    // spec §2), rendered through the fontNote slot — see the §2 tests below.
     expect(sections.map((s) => s.heading)).toEqual([
       "Design Rationale",
-      "Font Guidance",
       "Canonical Order",
       "Script Glossary",
       "Example Words",
@@ -316,8 +323,90 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
     const welcome = renderWelcomeHtm(input, null);
     const header = helpSiteHeader("Piaroa");
     expect(help.startsWith(header)).toBe(true);
-    const welcomeBody = welcome.replace(/^<html[^>]*><body>/, "").replace(/<\/body><\/html>$/, "");
-    expect(help.slice(header.length)).toBe(welcomeBody);
+    const welcomeBody = welcome.replace(/^[\s\S]*?<body>\n/, "").replace(/<\/body>\n<\/html>$/, "");
+    expect(help.slice(header.length)).toBe(`<style>${DOC_PAGE_STYLE}</style>\n${welcomeBody}`);
+  });
+});
+
+describe("helpDocsRender — element spec §1 shell and §2 intro", () => {
+  it("a fresh welcome page carries the full §1 shell: doctype, head, charset, Start Using title, shared style, h1", () => {
+    const welcome = renderWelcomeHtm(baseInput({ answers: answersWith() }), null);
+    expect(welcome.startsWith("<!DOCTYPE html>\n<html>")).toBe(true);
+    expect(welcome).toContain("<meta charset=\"utf-8\">");
+    expect(welcome).toContain("<title>Start Using Piaroa</title>");
+    expect(welcome).toContain(`<style>${DOC_PAGE_STYLE}</style>`);
+    expect(welcome).toContain("<h1>Piaroa</h1>");
+    expect(welcome.endsWith("</body>\n</html>")).toBe(true);
+  });
+
+  it("the fresh help page carries the same style block as the welcome page (criterion 11.10 by construction)", () => {
+    const input = baseInput({ answers: answersWith() });
+    const styleOf = (page: string) => /<style>([\s\S]*?)<\/style>/.exec(page)?.[1];
+    expect(styleOf(renderWelcomeHtm(input, null))).toBe(DOC_PAGE_STYLE);
+    expect(styleOf(renderHelpPhp(input, null))).toBe(DOC_PAGE_STYLE);
+  });
+
+  it("the nothing-answered page still conforms to §1: lang falls back to the primary tag (Q3 ruling)", () => {
+    const input = baseInput({ primaryBcp47: "pid" });
+    expect(renderWelcomeHtm(input, null)).toContain('<html lang="pid">');
+    expect(renderWelcomeHtm(input, null)).toContain("<title>Start Using Piaroa</title>");
+  });
+
+  it("the intro language line names the confirmed language and the tag's script", () => {
+    const input = baseInput({
+      answers: answersWith(),
+      primaryBcp47: "ha-Latn",
+      languageName: "Hausa",
+    });
+    const welcome = renderWelcomeHtm(input, null);
+    expect(welcome).toContain("<p>This keyboard is for typing Hausa in the Latin script.</p>");
+    // After the description, before every section.
+    expect(welcome.indexOf("A keyboard for Piaroa.")).toBeLessThan(
+      welcome.indexOf("This keyboard is for typing Hausa"),
+    );
+    expect(renderHelpPhp(input, null)).toContain("This keyboard is for typing Hausa in the Latin script.");
+    // The README keeps its narrower shape — no intro line there.
+    expect(renderReadmeMd(input)).not.toContain("This keyboard is for typing");
+  });
+
+  it("the language line names the language alone when the tag carries no script subtag", () => {
+    const input = baseInput({ answers: answersWith(), primaryBcp47: "pid", languageName: "Piaroa" });
+    expect(renderWelcomeHtm(input, null)).toContain("<p>This keyboard is for typing Piaroa.</p>");
+  });
+
+  it("no language name confirmed means no language line — never a guessed one", () => {
+    const input = baseInput({ answers: answersWith(), primaryBcp47: "ha-Latn" });
+    expect(renderWelcomeHtm(input, null)).not.toContain("This keyboard is for typing");
+  });
+
+  it("the language line never forces a generated block onto an inherited page (FR-006)", () => {
+    const base = "<html><body><h1>Hand-authored</h1></body></html>";
+    const input = baseInput({ primaryBcp47: "ha-Latn", languageName: "Hausa" });
+    expect(renderWelcomeHtm(input, base)).toBe(base);
+  });
+
+  it("the font note renders in the intro, after the language line, never under Additional Detail", () => {
+    const input = baseInput({
+      answers: answersWith({ fontGuidance: "Use the Andika font.", designRationale: "Chosen for ergonomics." }),
+      primaryBcp47: "ha-Latn",
+      languageName: "Hausa",
+    });
+    for (const page of [renderWelcomeHtm(input, null), renderHelpPhp(input, null)]) {
+      expect(page).toContain("<p>Use the Andika font.</p>");
+      expect(page).not.toContain("Font Guidance");
+      expect(page.indexOf("This keyboard is for typing Hausa")).toBeLessThan(
+        page.indexOf("Use the Andika font."),
+      );
+      expect(page.indexOf("Use the Andika font.")).toBeLessThan(page.indexOf("Additional Detail"));
+    }
+  });
+
+  it("an inherited page gains no second h1 from the generated block", () => {
+    const base = "<html><body><h1>Hand-authored</h1><p>Base prose.</p></body></html>";
+    const input = baseInput({ answers: answersWith({ description: "New answer content." }) });
+    const merged = renderWelcomeHtm(input, base);
+    expect(merged.match(/<h1>/g)).toHaveLength(1);
+    expect(merged).toContain("<h1>Hand-authored</h1>");
   });
 });
 
@@ -410,10 +499,18 @@ describe("helpDocsRender — cross-file parity (FR-005/SC-005)", () => {
   // permitted difference on the help side (spec 080 FR-004), so strip it too.
   // Fresh help.php is a body fragment (criterion 11.4); welcome.htm is a full
   // document — strip the chrome so the shared inner body compares equal.
+  // This mirrors the Layer C 11.9 normalization: doctype, the whole <head>
+  // and every <style> block are chrome (style parity is 11.10's own check),
+  // and whitespace at the chrome boundary is not body content. The <h1> is
+  // body content and stays — it must match on both sides.
   const stripDoc = (html: string): string =>
     html
       .replace(/^<\?php\n[\s\S]*?\?>\n/, "")
-      .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
+      .replace(/<!DOCTYPE[^>]*>/gi, "")
+      .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "")
+      .trim();
   // A sampled set of answer combinations, not just one — FR-005 is a
   // structural guarantee (buildDocSections shared by both callers), so this
   // is a regression net against a future edit that special-cases one caller.
@@ -465,17 +562,44 @@ describe("helpDocsRender — cross-file parity (FR-005/SC-005)", () => {
 describe("helpDocsRender — welcome layout section (spec 080 FR-004 / R9 / T051)", () => {
   // "desktop_layout_default.png" carries no reserved chart prefix, so it
   // groups as "Other"; "ks-layout-phone-shift.svg" is a generated chart, so
-  // it groups as "Phone" — ahead of "Other" per the desktop/phone/tablet/other
-  // group order, regardless of each file's position in the input array.
+  // it appears as the phone Shift layer's subsection — ahead of "Other" per
+  // the desktop/phone/tablet/other group order, regardless of each file's
+  // position in the input array.
   const IMAGES = ["desktop_layout_default.png", "ks-layout-phone-shift.svg"];
 
-  it("renders every carried file under a Keyboard Layout heading, grouped by platform with a programmatic alt", () => {
+  it("renders every carried file under a Keyboard Layout heading, grouped by layer with a programmatic alt", () => {
     expect(renderWelcomeLayoutSection(IMAGES)).toBe(
       "<h2>Keyboard Layout</h2>" +
-        "<h3>Phone</h3>" +
+        "<h3>Phone Shift</h3>" +
         '<p><img src="ks-layout-phone-shift.svg" alt="phone shift"></p>' +
         "<h3>Other</h3>" +
         '<p><img src="desktop_layout_default.png" alt="desktop layout default"></p>',
+    );
+  });
+
+  it("orders desktop layers under the corpus heading names, then touch layers (element spec §3)", () => {
+    const section = renderWelcomeLayoutSection([
+      "ks-layout-desktop-rightalt-shift.svg",
+      "ks-layout-phone-default.svg",
+      "ks-layout-desktop-shift.svg",
+      "ks-layout-desktop-default.svg",
+      "ks-layout-desktop-rightalt.svg",
+      "ks-layout-desktop-caps.svg",
+    ]);
+    expect(section).toBe(
+      "<h2>Keyboard Layout</h2>" +
+        "<h3>Default (unshifted)</h3>" +
+        '<p><img src="ks-layout-desktop-default.svg" alt="desktop default"></p>' +
+        "<h3>Shift</h3>" +
+        '<p><img src="ks-layout-desktop-shift.svg" alt="desktop shift"></p>' +
+        "<h3>Right ALT (unshifted)</h3>" +
+        '<p><img src="ks-layout-desktop-rightalt.svg" alt="desktop rightalt"></p>' +
+        "<h3>Right ALT Shift</h3>" +
+        '<p><img src="ks-layout-desktop-rightalt-shift.svg" alt="desktop rightalt shift"></p>' +
+        "<h3>Caps</h3>" +
+        '<p><img src="ks-layout-desktop-caps.svg" alt="desktop caps"></p>' +
+        "<h3>Phone Default</h3>" +
+        '<p><img src="ks-layout-phone-default.svg" alt="phone default"></p>',
     );
   });
 
@@ -509,12 +633,15 @@ describe("helpDocsRender — welcome layout section (spec 080 FR-004 / R9 / T051
   it("the placeholder page (no description yet) still references carried images, so none is orphaned", () => {
     const input = baseInput({ answers: null, displayName: "Hausa Basic" });
     expect(renderWelcomeHtm(input, null, IMAGES)).toBe(
-      "<html><body><p>Welcome to Hausa Basic</p>\n<h2>Keyboard Layout</h2>" +
-        "<h3>Phone</h3>" +
+      "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n" +
+        "<title>Start Using Hausa Basic</title>\n" +
+        `<style>${DOC_PAGE_STYLE}</style>\n</head>\n<body>\n` +
+        "<h1>Hausa Basic</h1>\n<p>Welcome to Hausa Basic</p>\n<h2>Keyboard Layout</h2>" +
+        "<h3>Phone Shift</h3>" +
         '<p><img src="ks-layout-phone-shift.svg" alt="phone shift"></p>' +
         "<h3>Other</h3>" +
         '<p><img src="desktop_layout_default.png" alt="desktop layout default"></p>' +
-        "</body></html>",
+        "</body>\n</html>",
     );
     expect(renderWelcomeHtm(input, null, [])).toBe(welcomeHtm("Hausa Basic"));
   });
@@ -667,15 +794,19 @@ describe("helpDocsRender — spec 102 forms", () => {
     const input = baseInput({ generated: GENERATED });
     const welcome = renderWelcomeHtm(input, null);
     expect(welcome).toBe(
-      "<html><body><p>Welcome to Piaroa</p>\n" +
+      "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n" +
+        "<title>Start Using Piaroa</title>\n" +
+        `<style>${DOC_PAGE_STYLE}</style>\n</head>\n<body>\n` +
+        "<h1>Piaroa</h1>\n<p>Welcome to Piaroa</p>\n" +
         "<h2>Typing Guide</h2><table><tr><td>ŋ</td></tr></table>\n" +
         "<h2>How This Keyboard Works</h2><p>Deadkeys.</p>\n" +
-        "<h2>Characters on This Keyboard</h2><ul><li>ŋ</li></ul></body></html>",
+        "<h2>Characters on This Keyboard</h2><ul><li>ŋ</li></ul></body>\n</html>",
     );
     expect(welcome).not.toContain("On Phones and Tablets");
     const help = renderHelpPhp(input, null);
     expect(help.slice(helpSiteHeader("Piaroa").length)).toBe(
-      welcome.replace(/^<html><body>/, "").replace(/<\/body><\/html>$/, ""),
+      `<style>${DOC_PAGE_STYLE}</style>\n` +
+        welcome.replace(/^[\s\S]*?<body>\n/, "").replace(/<\/body>\n<\/html>$/, ""),
     );
   });
 

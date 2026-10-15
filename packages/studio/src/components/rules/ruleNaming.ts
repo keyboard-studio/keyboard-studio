@@ -80,6 +80,8 @@ function contextElementText(el: ContextElement): string {
       return `index(${el.storeRef}, ${el.offset})`;
     case "baselayout":
       return `baselayout(${el.value})`;
+    case "if":
+      return `if(${el.store} = '${el.value}')`;
     case "raw":
       return el.text;
   }

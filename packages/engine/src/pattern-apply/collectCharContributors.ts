@@ -539,6 +539,11 @@ function contextElementTokenDisplay(
     case 'context':
     case 'index':
     case 'baselayout':
+    case 'if':
+      // A guard produces no character, so it has no contributor token —
+      // explicitly invisible here, never a dropped condition: this switch
+      // only renders characters a context element contributes.
+      return undefined;
     case 'raw':
       return undefined;
     default: {

@@ -136,11 +136,17 @@ function buildOps(): KeyEditOperation[] {
 }
 
 // ---------------------------------------------------------------------------
-// Normalization — modulo node ids ONLY (see module docstring above).
+// Normalization — modulo node ids and wire-encoding hints ONLY (see module
+// docstring above).
 // ---------------------------------------------------------------------------
 
 function stripNodeId(key: TouchKeyIR): Record<string, unknown> {
-  const { nodeId: _nodeId, sk, multitap, flick, ...rest } = key;
+  // `nodeId` is per-parse bookkeeping; `spWire`/`widthWire`/`padWire` are
+  // serialization hints recording the source encoding (#2083) — a key
+  // synthesized by an applier has no source, so it carries no hint, while the
+  // same key round-tripped through raw JSON re-parse does. Neither is semantic
+  // content, so both are stripped for the equivalence comparison.
+  const { nodeId: _nodeId, spWire: _spWire, widthWire: _widthWire, padWire: _padWire, sk, multitap, flick, ...rest } = key;
   const stripped: Record<string, unknown> = { ...rest };
   if (sk !== undefined) stripped["sk"] = sk.map(stripNodeId);
   if (multitap !== undefined) stripped["multitap"] = multitap.map(stripNodeId);
@@ -155,11 +161,12 @@ function stripNodeId(key: TouchKeyIR): Record<string, unknown> {
 }
 
 /**
- * Drop `nodeId` (every key/sub-entry) and the top-level `nodeIds` index —
- * the ONLY two things the contract excuses from the comparison. Everything
- * else — field values, key order, presence/absence of a field — is left
- * exactly as each applier produced it, so an undocumented divergence fails
- * loudly instead of being silently absorbed.
+ * Drop `nodeId` (every key/sub-entry), the wire-encoding hints (#2083), and
+ * the top-level `nodeIds` index — the ONLY things the contract excuses from
+ * the comparison. Everything else — field values, key order, row ids,
+ * presence/absence of a field — is left exactly as each applier produced it,
+ * so an undocumented divergence fails loudly instead of being silently
+ * absorbed.
  */
 function normalizeForComparison(layout: TouchLayoutIR) {
   return {
@@ -169,6 +176,7 @@ function normalizeForComparison(layout: TouchLayoutIR) {
       layers: platform.layers.map((layer) => ({
         id: layer.id,
         rows: layer.rows.map((row) => ({
+          ...(row.id !== undefined ? { id: row.id } : {}),
           keys: row.keys.map(stripNodeId),
         })),
       })),

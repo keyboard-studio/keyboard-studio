@@ -120,7 +120,7 @@ interface LayerWorkState {
   layerIndex: number;
   /** Shallow-cloned rows whose `keys` array we splice/replace as ops land.
    *  Rows/keys we never touch stay structurally shared with the input. */
-  workingRows: Array<{ keys: TouchKeyIR[] }>;
+  workingRows: Array<{ id?: number; keys: TouchKeyIR[] }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,10 @@ export function applyKeyEditsToLayout(
     if (existing) return existing;
 
     const layer = layout.platforms[platformIndex]!.layers[layerIndex]!;
-    const workingRows: Array<{ keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+    // #2083: preserve the source row id — dropping it would make the emitter
+    // regenerate `rowIdx + 1`, losing the source fidelity the codec now keeps.
+    const workingRows: Array<{ id?: number; keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+      ...(row.id !== undefined ? { id: row.id } : {}),
       keys: [...row.keys],
     }));
     const state: LayerWorkState = { platformIndex, layerIndex, workingRows };

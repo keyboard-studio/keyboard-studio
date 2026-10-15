@@ -3,10 +3,14 @@
 // NEW (Phase F documentation revision). Fonts are the single most-documented
 // topic in the shipped corpus after the layout chart itself: 297 of 934 help
 // pages (31.8%) and 316 of 868 welcome pages discuss fonts, and 38 link to a
-// download. The package's OWN bundled fonts are derivable from the .kps
-// (OSKFont / DisplayFont / bundled .ttf), so this question deliberately asks
-// only what the data cannot answer: which fonts a user must obtain, and which
-// characters need a specialty font.
+// download. The welcome element spec (§2) puts a font note in the page
+// introduction, so this question sits in the core docs flow, right after the
+// welcome paragraph — it is not part of the opt-in battery, and its answer
+// renders in the intro (the renderer's fontNote slot), never under
+// "Additional Detail". Nothing lists the package's fonts in the documentation
+// automatically — no renderer reads OSKFont / DisplayFont / bundled fonts —
+// so the note is entirely the author's to write: which fonts a user must
+// obtain, and which characters need a specialty font.
 //
 // Corpus examples:
 //   release/sil/sil_euro_latin — "Most of the characters are included in the
@@ -24,15 +28,18 @@ export const definition = {
   help_text:
     "Name the fonts you know render your alphabet properly, and say where users " +
     "can get them if they are not already installed. If some characters only " +
-    "appear in a specialty font, say which characters and which font. Fonts " +
-    "bundled inside this keyboard package are listed automatically, so you do " +
-    "not need to repeat them here. For example: \"Most characters work in " +
+    "appear in a specialty font, say which characters and which font. What you " +
+    "write here appears in the introduction of the welcome and help pages, " +
+    "with the description. For example: \"Most characters work in " +
     "Calibri, Arial, and Times New Roman. The tone marks only render correctly " +
     "in Charis SIL, available free from software.sil.org/charis.\" Leave blank " +
     "if common system fonts are sufficient.",
   type: "text" as const,
   required: false,
-  next: "pf_usage_tip_2",
+  // Routing: core flow — pf_welcome_paragraph points here, and this converges
+  // on pf_usage_tip_1. The opt-in battery no longer routes through this
+  // question (pf_doc_language_second now goes straight to pf_usage_tip_2).
+  next: "pf_usage_tip_1",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validation: required: false; free-text font guidance.
@@ -55,5 +62,5 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-font-guidance"], requires: ["help-more-detail"] };
+const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-font-guidance"] };
 export default mod;

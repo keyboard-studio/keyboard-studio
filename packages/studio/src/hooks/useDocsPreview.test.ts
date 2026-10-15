@@ -27,8 +27,18 @@ describe("useDocsPreview", () => {
     expect(result.current.readmeMd).toBe(
       `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${basicKbdus.id}\n`,
     );
+    // The no-answer welcome page is the element-spec §1 shell around the
+    // fallback body — the same bytes the engine's welcomeHtm stub pins.
     expect(result.current.welcomeHtm).toBe(
-      `<html><body><p>Welcome to ${basicKbdus.displayName}</p></body></html>`,
+      "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n" +
+        `<title>Start Using ${basicKbdus.displayName}</title>\n` +
+        "<style>body { font-family: sans-serif; line-height: 1.4; margin: 1em; }\n" +
+        "img { max-width: 100%; }\n" +
+        "table { border-collapse: collapse; }\n" +
+        "th, td { border: 1px solid #999; padding: 0.2em 0.5em; text-align: left; }\n" +
+        "kbd { background: #eee; border: 1px solid #ccc; border-radius: 3px; padding: 0 0.3em; }</style>\n" +
+        "</head>\n<body>\n" +
+        `<h1>${basicKbdus.displayName}</h1>\n<p>Welcome to ${basicKbdus.displayName}</p></body>\n</html>`,
     );
   });
 
