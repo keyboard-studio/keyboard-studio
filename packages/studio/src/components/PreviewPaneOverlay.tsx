@@ -4,73 +4,95 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
+import {
+  plainDiagnosticMessage,
+  plainEngineErrorMessage,
+} from "../lib/plainDiagnosticMessage.ts";
 
 export interface PreviewPaneOverlayProps {
   stage: Stage;
   onRetry: () => void;
 }
 
-function diagnosticHead(stage: Extract<Stage, { kind: "error" }>): string {
-  const top = stage.compileResult?.diagnostics?.[0];
-  if (top) return `${top.code}: ${top.message}`;
-  return stage.message;
+interface PlainStageError {
+  whatHappened: string;
+  whatToTry: string;
+  technicalDetail: string;
+}
+
+function plainStageError(
+  stage: Extract<Stage, { kind: "error" }>,
+  i18n: Parameters<typeof plainDiagnosticMessage>[1],
+): PlainStageError {
+  if (stage.step === "compile") {
+    const top = stage.compileResult?.diagnostics?.[0];
+    const plain =
+      top !== undefined
+        ? plainDiagnosticMessage(top, i18n)
+        : plainDiagnosticMessage(
+            { code: "KM_ERROR_UNKNOWN", severity: "error", layer: "A", message: stage.message },
+            i18n,
+          );
+    return plain;
+  }
+  return plainEngineErrorMessage(stage.message, i18n);
 }
 
 export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   if (stage.kind === "idle" || stage.kind === "ready") return null;
 
   let title: string;
   let detail: string | null = null;
+  let technicalDetail: string | null = null;
   let showRetry = false;
   let isError = false;
 
   switch (stage.kind) {
     case "fetching":
-      title = t({ id: "preview.overlay.fetching.title", message: "Loading keyboard source..." });
+      title = t({ id: "preview.overlay.fetching.title", message: "Loading your keyboard..." });
       detail = t({
         id: "preview.overlay.fetching.detail",
-        message: "fetching .kmn + siblings via /kbd-proxy",
+        message: "Getting the files that describe your keyboard...",
       });
       break;
     case "vfs-loading":
       title = t({
         id: "preview.overlay.vfsLoading.title",
-        message: "Loading into VirtualFS...",
+        message: "Getting your keyboard ready...",
       });
       break;
     case "compiling":
-      title = stage.isWarmCompile
-        ? t({ id: "preview.overlay.compiling.title", message: "Compiling..." })
-        : t({ id: "preview.overlay.compilingCold.title", message: "Compiler warming up..." });
+      title = t({ id: "preview.overlay.compiling.title", message: "Building your keyboard..." });
       detail = stage.isWarmCompile
-        ? t({
-            id: "preview.overlay.compiling.detail",
-            message: "kmcmplib running over VFS snapshot",
-          })
+        ? null
         : t({
             id: "preview.overlay.compilingCold.detail",
-            message: "first call pays the WASM cold-start cost (~1-3s)",
+            message: "The first build takes a little longer.",
           });
       break;
     case "error":
       isError = true;
       showRetry = true;
-      if (stage.step === "fetch") {
-        title = t({
-          id: "preview.overlay.error.fetch.title",
-          message: "Could not fetch keyboard source",
-        });
-        detail = t({
-          id: "preview.overlay.error.fetch.detail",
-          message: `${stage.message} — check network or proxy config`,
-        });
-      } else if (stage.step === "compile") {
-        title = t({ id: "preview.overlay.error.compile.title", message: "Compile failed" });
-        detail = diagnosticHead(stage);
-      } else {
-        title = t({ id: "preview.overlay.error.vfs.title", message: "VFS load failed" });
-        detail = stage.message;
+      {
+        const plain = plainStageError(stage, i18n);
+        technicalDetail = plain.technicalDetail;
+        if (stage.step === "fetch") {
+          title = t({
+            id: "preview.overlay.error.fetch.title",
+            message: "Could not load your keyboard",
+          });
+          detail = plain.whatToTry;
+        } else if (stage.step === "compile") {
+          title = plain.whatHappened;
+          detail = plain.whatToTry;
+        } else {
+          title = t({
+            id: "preview.overlay.error.vfs.title",
+            message: "Your keyboard couldn't be loaded",
+          });
+          detail = plain.whatToTry;
+        }
       }
       break;
   }
@@ -111,12 +133,27 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
           style={{
             fontSize: 12,
             color: "var(--app-text-subtle)",
-            fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
             maxWidth: 480,
           }}
         >
           {detail}
         </div>
+      )}
+      {technicalDetail !== null && (
+        <details style={{ fontSize: 12, color: "var(--app-text-subtle)", maxWidth: 480 }}>
+          <summary style={{ cursor: "pointer" }}>
+            <Trans id="diagnostics.plain.technicalDetails">Technical details</Trans>
+          </summary>
+          <div
+            style={{
+              fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+              marginTop: 6,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {technicalDetail}
+          </div>
+        </details>
       )}
       {showRetry && (
         <button
