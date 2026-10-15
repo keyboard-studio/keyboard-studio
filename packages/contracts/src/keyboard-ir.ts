@@ -56,6 +56,18 @@ export type ContextElement =
    * It must not contain single-quote characters. Case is preserved here but the Keyman compiler compares case-insensitively.
    */
   | { kind: "baselayout"; value: string }
+  /**
+   * A KMN `if(store = 'value')` guard in context position (spec 103).
+   * `store` is the store name verbatim, including the `&` prefix for system
+   * stores; case is preserved as written (Keyman compares store names
+   * case-insensitively). `value` is the compared literal, unquoted — the
+   * codec owns quoting on emit. A guard produces no context character, but
+   * it DOES occupy an element position: Keyman `index()` offsets count it
+   * (the sil_ipa guarded shape `if(...) any(s) + "k" > index(t,2)` points
+   * at the `any()` in element position 2). Equality only — a `<>` guard
+   * stays an opaque fragment, never this variant.
+   */
+  | { kind: "if"; store: string; value: string }
   | { kind: "raw"; text: string };
 
 /** An element in a KMN rule's output (RHS). */

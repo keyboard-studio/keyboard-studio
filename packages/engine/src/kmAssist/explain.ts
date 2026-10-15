@@ -107,6 +107,8 @@ function describeContextElement(el: ContextElement): string {
       return `the ${ordinal(el.offset)} character of the "${el.storeRef}" store`;
     case "baselayout":
       return `the "${el.value}" base layout`;
+    case "if":
+      return `the "${el.store}" store is set to "${el.value}"`;
     case "raw":
       return el.text;
   }

@@ -5,7 +5,10 @@ import { OPAQUE_REASONS } from "./opaque-reasons.js";
 
 // Covers the RawKmnFragment.producedOutput sketch: the lenient output-side
 // extraction attached to rule-opaque fragments so buildProducedSet can count
-// characters produced only by opaque rules (e.g. if()-guarded ones).
+// characters produced only by opaque rules. Since spec 103 a head-position
+// equality if() guard parses typed, so the guarded cases below assert the
+// typed outcome; the sketch assertions remain for rules opaque for other
+// reasons (including a guarded rule whose output is itself untypeable).
 
 function parseKmn(rules: string, stores = "") {
   const kmn = `store(&VERSION) '10.0'
@@ -25,25 +28,29 @@ store(C_efc) U+140C U+140E U+1410
 `;
 
 describe("parse — producedOutput sketch on rule-opaque fragments", () => {
-  it("if()-guarded rule with index() RHS: sketch holds the store ref, never guard-side content (bj_cree_woods shape)", () => {
+  it("if()-guarded rule with index() RHS parses typed: output holds the store ref, guard stays in context (bj_cree_woods shape)", () => {
     const { ir } = parseKmn(
       `if(option_key = '') U+1427 any(C_ef) > index(C_efc,3)`,
       CREE_STORES,
     );
-    expect(ir.raw).toHaveLength(1);
-    const frag = ir.raw[0]!;
-    expect(frag.reason).toBe(OPAQUE_REASONS.IF_OPTION_STORE);
-    expect(frag.producedOutput).toEqual([
+    expect(ir.raw).toHaveLength(0);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.context[0]).toEqual({
+      kind: "if",
+      store: "option_key",
+      value: "",
+    });
+    expect(rule.output).toEqual([
       { kind: "index", storeRef: "C_efc", offset: 3 },
     ]);
   });
 
-  it("guard literal must not leak: if(opt = 'Z') rule sketch contains only the RHS char", () => {
+  it("guard literal must not leak: if(opt = 'Z') rule output contains only the RHS char", () => {
     const { ir } = parseKmn(`if(opt = 'Z') + [K_A] > U+1401`);
-    expect(ir.raw).toHaveLength(1);
-    expect(ir.raw[0]!.producedOutput).toEqual([
-      { kind: "char", value: "ᐁ" },
-    ]);
+    expect(ir.raw).toHaveLength(0);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.output).toEqual([{ kind: "char", value: "ᐁ" }]);
+    expect(buildProducedSet(ir).has("Z")).toBe(false);
   });
 
   it("SMP literal RHS decodes to a single astral char element", () => {
@@ -69,8 +76,9 @@ describe("parse — producedOutput sketch on rule-opaque fragments", () => {
 
   it("quoted-string RHS expands per character", () => {
     const { ir } = parseKmn(`if(opt = '1') + [K_A] > 'abc'`);
-    expect(ir.raw).toHaveLength(1);
-    expect(ir.raw[0]!.producedOutput).toEqual([
+    expect(ir.raw).toHaveLength(0);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.output).toEqual([
       { kind: "char", value: "a" },
       { kind: "char", value: "b" },
       { kind: "char", value: "c" },
@@ -84,10 +92,12 @@ describe("parse — producedOutput sketch on rule-opaque fragments", () => {
     expect(ir.raw[0]!.producedOutput).toBeUndefined();
   });
 
-  it("nul RHS carries no producible content: no producedOutput", () => {
+  it("nul RHS carries no producible content: typed nul output, produced set unchanged", () => {
     const { ir } = parseKmn(`if(opt = '1') + [K_E] > nul`);
-    expect(ir.raw).toHaveLength(1);
-    expect(ir.raw[0]!.producedOutput).toBeUndefined();
+    expect(ir.raw).toHaveLength(0);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.output).toEqual([{ kind: "nul" }]);
+    expect(buildProducedSet(ir).size).toBe(0);
   });
 
   it("outs() RHS becomes a typed outs element in the sketch", () => {
@@ -108,8 +118,9 @@ describe("parse — producedOutput sketch on rule-opaque fragments", () => {
       `if(opt = '1') + [K_F] > U+1401 \\
 U+1402`,
     );
-    expect(ir.raw).toHaveLength(1);
-    expect(ir.raw[0]!.producedOutput).toEqual([
+    expect(ir.raw).toHaveLength(0);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.output).toEqual([
       { kind: "char", value: "ᐁ" },
       { kind: "char", value: "ᐂ" },
     ]);
