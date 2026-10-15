@@ -58,7 +58,10 @@ function extractVkey(
       case "notany":
       case "index":
       case "context":
+      case "if":
         // Conditional/store-driven context — not a simple direct rule.
+        // A guard makes the rule conditional by definition, so a guarded
+        // rule is never extracted as an unconditional placement.
         return null;
       case "char":
       case "deadkey":
