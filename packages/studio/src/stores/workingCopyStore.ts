@@ -507,6 +507,15 @@ export interface WorkingCopyState {
    */
   startHistoryMdText: string | null;
   /**
+   * The texts of the stylesheets the base's welcome / help pages use
+   * (conventionally `kb.css` in each page's folder), or null when the base
+   * ships none or on Track 1 (a copy's pages are fresh renders, so the
+   * base's page stylesheets do not govern them). Fetch-don't-write like
+   * {@link startReadmeMdText}; read only by the documentation findings
+   * (criterion 11.8, issue #2139) and the FR-020 baseline computation.
+   */
+  startDocCssTexts: string[] | null;
+  /**
    * The base's `source/welcome/` image files (spec 079 FR-006), or null when
    * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
    * images and the welcome page's skeleton, never its prose (research R9).
@@ -1264,6 +1273,9 @@ export interface WorkingCopyState {
   /** Retain the base's verbatim HISTORY.md (spec 079 FR-006 / criterion 3.4). */
   setStartHistoryMdText: (text: string | null) => void;
 
+  /** Retain the base's welcome/help stylesheet texts (criterion 11.8, issue #2139). */
+  setStartDocCssTexts: (texts: string[] | null) => void;
+
   /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */
   setStartWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
 
@@ -1538,6 +1550,7 @@ export type WorkingCopyData = Omit<
   | "setStartHelpPhpText"
   | "setStartReadmeMdText"
   | "setStartHistoryMdText"
+  | "setStartDocCssTexts"
   | "setStartWelcomeImages"
   | "setStartWelcomeConvention"
   | "setHistoryEntryState"
@@ -1575,6 +1588,7 @@ const INITIAL_STATE: WorkingCopyData = {
   startHelpPhpText: null,
   startReadmeMdText: null,
   startHistoryMdText: null,
+  startDocCssTexts: null,
   startWelcomeImages: null,
   startWelcomeConvention: null,
   startWelcomeImagesDropped: false,
@@ -2255,6 +2269,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       chartPreference: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
       baselineDocFindings: null,
+      startDocCssTexts: null,
       startKeyboard: base,
       startVfs: vfs,
       startIr: ir,
@@ -2330,6 +2345,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       historyEntryState: null,
       chartPreference: null,
       baselineDocFindings: null,
+      startDocCssTexts: null,
       startKeyboard: keyboard,
       startVfs: vfs,
       startIr: ir,
@@ -2406,6 +2422,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setStartReadmeMdText: (text) => set({ startReadmeMdText: text }),
 
   setStartHistoryMdText: (text) => set({ startHistoryMdText: text }),
+
+  setStartDocCssTexts: (texts) => set({ startDocCssTexts: texts }),
 
   // A fresh carry supersedes any earlier "dropped on reload" state.
   setStartWelcomeImages: (images) =>
