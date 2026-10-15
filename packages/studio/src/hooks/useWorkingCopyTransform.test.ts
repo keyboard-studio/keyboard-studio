@@ -290,7 +290,23 @@ describe("useWorkingCopyTransform — touch layout injection (step 0)", () => {
     // projectWorkingCopyVfs step 0 writes the touch layout directly into the VFS.
     const entry = vfs.get("source/basic_kbdus.keyman-touch-layout");
     expect(entry).toBeDefined();
-    expect(entry?.content).toBe(touchJson);
+    // A one-line layout (e.g. restored from a draft saved before every writer
+    // tabulated its output) is re-indented by step 0 (#2070): Keyman
+    // Developer cannot open single-line .keyman-touch-layout JSON.
+    expect(entry?.content).toBe(JSON.stringify(JSON.parse(touchJson), null, 2));
+  });
+
+  it("leaves an already-tabulated touchLayoutJson byte-identical", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedStart();
+    const touchJson = '{\n  "phone": {\n    "displayUnderlying": false,\n    "layer": []\n  }\n}';
+    useWorkingCopyStore.getState().setTouchLayoutJson(touchJson);
+    const { result } = renderHook(() => useWorkingCopyTransform());
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    result.current!(vfs, "basic_kbdus");
+    expect(vfs.get("source/basic_kbdus.keyman-touch-layout")?.content).toBe(touchJson);
   });
 
   it("does NOT create .keyman-touch-layout when touchLayoutJson is null in the store", async () => {

@@ -317,11 +317,11 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:aa2077f1c896b9b5",
+      "hash": "sha256:7ea710972d4856f4",
       "status": "reference",
       "implements": [],
       "decisions": [],
-      "notes": "Architecture / meta-flow composition layer — the system view spec-kit omits. An index over the spec architecture-core sections + the extracted feature specs; not code. Content change acknowledged 2026-10-11 (Path C): the change rode in with merged PRs #1984/#1956 and matches the code; no implementing files affected."
+      "notes": "Architecture / meta-flow composition layer — the system view spec-kit omits. Replaced by Architecture v2 in the Constitution v2 ratification (2026-10-14): as-built composition (decision spine, draft envelope, extraction-as-proposals, criteria, dual-path delivery); the constitution's precedence-by-topic table governs conflicts. Not code."
     },
     "specs/014-mutate-seam-touch-propagation": {
       "title": "Feature Specification: KeyboardIR `mutate` seam + touch propagation",

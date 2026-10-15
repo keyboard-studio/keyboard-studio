@@ -343,9 +343,10 @@ with `tsx` (see each tool's tsconfig) — except the plain-node ones (`spec-trac
 `crowdin-diagnose`, `content-i18n-normalize`, and the `*-lint` checkers), which run under bare
 `node`. Do not treat them as built workspace packages.
 
-Inventory: kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, hermes,
+Inventory: kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app,
 Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint,
-welcome-sweep, nfd-tolerance-corpus.
+welcome-sweep, nfd-tolerance-corpus. (hermes was archived out of tree 2026-10-14:
+`~/workspace/archives/keyboard-studio-utilities-2026-10-14/`.)
 
 ### spec-trace
 
@@ -450,13 +451,24 @@ resolution, the descriptor `<Files>` list, or the projection's welcome-folder wr
 
 ### kbgen
 
-**Prototype**, lives in `utilities/kbgen/`. A standalone Node CLI that derives data-driven
-character placement (which key, which mechanism) from pinned Unicode/CLDR signals and emits a
-`placement-map.json`. Intended to become an engine deliverable (a seeder ahead of the survey,
-§8 Phase B), but it is CommonJS/plain-JS, does not conform to the `packages/contracts` types,
-and implements only S-01/S-08 of the §7.3 catalog. Conformance path + open joint-session
-questions: [utilities/kbgen/INTEGRATION.md](../utilities/kbgen/INTEGRATION.md). Do not treat it
-as a built package.
+**Frozen reference implementation** of the first-principles placement seeder, lives in
+`utilities/kbgen/`. A standalone TypeScript/ESM CLI (ported from the original CommonJS
+prototype, #132) that derives data-driven character placement (which key, which mechanism)
+from pinned Unicode/CLDR signals and emits a placement map that conforms to the
+`packages/contracts` `PlacementMap` type via its `toPlacementMap` adapter.
+
+Classification (km-lead ruling, 2026-10-14): kbgen is the intended filler of contracts'
+non-corpus `PriorSource` seam (`unicode-decomp` / `confusable` / `phonetic`) — its landing
+zone is a future Phase C placement step, **not** pending integration work. The integration
+epic (#130–#135) is closed: the #131 gate ratified D-INT-1…4 (PlacementMap as a contracts
+type, corpus extraction as an engine post-pass, kbgen's scope fixed at S-01/S-08 of the
+§7.3 catalog, `data/supplement.json` content-owned). It is also a **CI canary**: CI runs
+`pnpm run test:kbgen` explicitly because kbgen imports engine `src/` internals by relative
+path (spec 044 FR-015: one exemplar path repo-wide) and nothing else typechecks it — an
+engine rename would otherwise break it silently. Its Unicode pin (16.0.0) deliberately
+differs from `lib/ucd/` (17.0.0); do not repoint it — a bump must not silently move
+placements. Design record: [utilities/kbgen/INTEGRATION.md](../utilities/kbgen/INTEGRATION.md).
+Do not treat it as a built package.
 
 ## Searching the corpus
 

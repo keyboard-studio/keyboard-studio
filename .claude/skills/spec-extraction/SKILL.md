@@ -7,14 +7,15 @@ description: Rules for extracting a spec.md section into specs/NNN-<slug>/ or cr
 
 The monolithic `spec.md` is migrating into `specs/NNN-<slug>/` folders one numbered section at a
 time, where `NNN` mirrors the spec.md section number (e.g. `specs/007-strategy-selection/` for
-§7). **The extracted folder is authoritative for its section once landed; `spec.md` keeps a stub
-pointer.** Sections not yet extracted remain authoritative in `spec.md`. Extracted so far: §7
+§7). **The extracted folder is authoritative for its section while the feature is live; once
+shipped, its AS-BUILT + the code are authoritative (Constitution v2 precedence).** `spec.md`
+is the historical design document and keeps stub pointers. Extracted so far: §7
 (pilot), §8, §5 (Pattern schema).
 
 Only *feature / contract* sections extract. The **architecture-core** sections — §4 (system
 overview), §5a (KeyboardIR spine), §9 (routing), §10 (validator layering), §11 (criteria model),
 §12/§13 (output + team boundaries) — describe how the whole tool composes; they are **not**
-features and stay authoritative in `spec.md`, composed in
+features and are governed by the constitution's Articles, composed in
 [docs/architecture.md](../../../docs/architecture.md). (§8 Data flow was extracted before this
 rule; it is the meta-flow and is treated as architecture-core wherever its text lives.) The
 reference-only sections (§14, §17, §18, §19) are not planned for extraction.
@@ -23,7 +24,7 @@ When deciding whether to extract: *feature/contract → `specs/NNN`; architectur
 composed in `docs/architecture.md`; reference → stays.*
 
 **New features still get their own `specs/NNN-<slug>/`** with a creation-order `NNN`, and **cite
-the governing `spec.md §X`** (or its extracted folder) rather than re-deriving scope. The
+the governing authority (Constitution v2 precedence table)** rather than re-deriving scope. The
 mirror-numbering convention applies only to sections being extracted; new features pick the next
 free `NNN` above the extracted-section range.
 

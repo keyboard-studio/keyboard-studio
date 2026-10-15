@@ -66,11 +66,18 @@ validation lives in `engine/src/validator`.
 
 ## Source of truth
 
-- **[spec.md](spec.md)** — the v2.0.0 spec. Authoritative for scope, schema, validator layering,
-  team boundaries, and resolved decisions. Its amendment history is in spec.md itself; the hybrid
+- **[.specify/memory/constitution.md](.specify/memory/constitution.md)** — Constitution v2.0.0
+  (ratified 2026-10-14). Authority is **by topic** (its precedence table): pattern contract =
+  the contracts type + spec 005; state/storage/order = Constitution Arts III/IX; a feature's
+  behaviour = its spec, once shipped its AS-BUILT + the code; criteria = the data in
+  `packages/contracts/data/criteria.json`; product rulings = the recorded ruling.
+- **[spec.md](spec.md)** — the v2.0.0 design document, now **historical**: superseded as an
+  authority by the constitution's precedence table. Its still-load-bearing sections are cited
+  from [docs/architecture.md](docs/architecture.md) and the specs that implement them; the hybrid
   workflow is composed in [docs/workflow-model.md](docs/workflow-model.md).
-- **[docs/spec-signoff.md](docs/spec-signoff.md)** — review-cycle log and decision summary
-  (D1–D9). Read this to see *why* a spec section reads the way it does before proposing changes.
+- **[docs/spec-signoff.md](docs/spec-signoff.md)** — historical review-cycle log and decision
+  summary (D1–D9); it governs nothing. Read it to see *why* a spec section reads the way it
+  does before proposing changes.
 - **[README.md](README.md)** — external-facing description. Keep it accurate and lean; the
   package inventory and build commands live in `docs/`, not there.
 - **`strategy tree/strategies.md`** — **superseded**, now a stub pointer. Do not edit it or treat
@@ -122,8 +129,8 @@ author — see the "Keep this current" recipe in that file). Treat a stale phone
 
 ## Architecture invariants
 
-[spec.md](spec.md) is authoritative for *intended* design and
-[docs/architecture.md](docs/architecture.md) composes it against the code. These are the
+Authority is by topic (Constitution v2 precedence table);
+[docs/architecture.md](docs/architecture.md) composes the as-built system against the code. These are the
 cross-cutting invariants you cannot see by reading any single file — honour them, and surface
 deviations rather than inventing new ones.
 
@@ -266,9 +273,10 @@ only after deliberately bumping that pin.
 tasks. `/speckit-analyze` runs as a `km-doc`/`km-synthesis` review check before
 `/speckit-implement`.
 
-`.specify/memory/constitution.md` restates the locked gates so `/speckit-plan`'s Constitution
-Check enforces them mechanically. It does **not** amend the spec — on conflict `spec.md` +
-[docs/spec-signoff.md](docs/spec-signoff.md) win.
+`.specify/memory/constitution.md` (v2.0.0) states the locked gates so `/speckit-plan`'s
+Constitution Check enforces them mechanically. On any conflict its **precedence-by-topic**
+table decides; [spec.md](spec.md) and [docs/spec-signoff.md](docs/spec-signoff.md) are
+historical and govern nothing.
 
 ### Commit and push cadence for multi-phase specs
 
@@ -312,10 +320,12 @@ The branch-and-PR pair is therefore the failsafe: pushing a feature branch canno
 
 ### Section extraction — don't shred the architecture
 
-**The extracted `specs/NNN-<slug>/` folder is authoritative for its section once landed; `spec.md`
-keeps a stub pointer.** Only *feature / contract* sections extract — the **architecture-core**
-sections (§4, §5a, §9, §10, §11, §12/§13) stay authoritative in `spec.md`, composed in
-[docs/architecture.md](docs/architecture.md). Numbering rules, the extracted-so-far list, and the
+**Once a feature ships, its AS-BUILT + the code are authoritative for its behaviour
+(Constitution v2 precedence); an extracted `specs/NNN-<slug>/` folder governs its section
+while the feature is live.** Only *feature / contract* sections extract — the
+**architecture-core** topics (§4, §5a, §9, §10, §11, §12/§13) are governed by the
+constitution's Articles and composed in [docs/architecture.md](docs/architecture.md), not
+by [spec.md](spec.md). Numbering rules, the extracted-so-far list, and the
 spec-trace vs. `/speckit-analyze` drift split are in the `spec-extraction` skill — load it before
 extracting a section or creating a new `specs/NNN`.
 

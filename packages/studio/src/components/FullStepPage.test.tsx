@@ -39,14 +39,17 @@ describe("FullStepPage", () => {
     expectScrollContainer(screen.getByTestId("page"));
   });
 
-  it("pads the content column clear of the journey footer", () => {
+  it("pads the content column without footer clearance", () => {
+    // The journey footer sits in the shell's normal flow below the page, so
+    // the column needs no extra bottom padding to clear it.
     render(
       <FullStepPage testId="page">
         <p>content</p>
       </FullStepPage>,
     );
     const column = screen.getByTestId("page").firstElementChild as HTMLElement;
-    expect(column.style.padding).toContain("--studio-footer-h");
+    expect(column.style.padding).toBe("32px 16px 48px");
+    expect(column.style.padding).not.toContain("--studio-footer-h");
   });
 });
 

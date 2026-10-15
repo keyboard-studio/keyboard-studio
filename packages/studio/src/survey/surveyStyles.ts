@@ -259,9 +259,9 @@ export function chipGlyphMissingBox(checked: boolean, scale = 1): CSSProperties 
  *
  * Intentionally independent of the `--ui`/`--serif` tokens (src/index.css)
  * and `FONT`/`FONT_MONO` (src/ui/theme.ts) — those govern UI chrome
- * typography, while Noto Sans / Charis SIL are chosen for glyph coverage of
+ * typography, while Noto Sans / Charis SIL / Andika are chosen for glyph coverage of
  * the characters being added, not chrome consistency. Do not consolidate. */
-export type PhaseBFontValue = "noto-sans" | "charis-sil";
+export type PhaseBFontValue = "noto-sans" | "charis-sil" | "andika";
 
 export interface PhaseBFontOption {
   value: PhaseBFontValue;
@@ -273,6 +273,7 @@ export interface PhaseBFontOption {
 export const FONT_OPTIONS: PhaseBFontOption[] = [
   { value: "noto-sans", label: "Noto Sans", stack: "'Noto Sans', system-ui, sans-serif" },
   { value: "charis-sil", label: "Charis SIL", stack: "'Charis SIL', serif" },
+  { value: "andika", label: "Andika", stack: "'Andika', sans-serif" },
 ];
 
 /** Default font selection — Noto Sans. */

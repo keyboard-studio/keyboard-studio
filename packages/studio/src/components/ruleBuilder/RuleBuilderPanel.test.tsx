@@ -219,22 +219,38 @@ describe("RuleBuilderPanel 3-step flow", () => {
     expect(screen.queryByLabelText("Bundle ID")).toBeNull();
   });
 
-  it("auto-drafts the description from the family explanation with an edit toggle", () => {
+  it("auto-drafts the description as one summary sentence per rule kind with counts added up", () => {
     renderPanel();
-    // Both selected families contribute their kmAssist explanation to the draft.
+    // Both selected families are "blocking" kind, so they merge into a single
+    // sentence with the counts added up — no repeated family explanations.
     const fullDraft =
-      "“Swallows combining marks after space, digit or punctuation — hardware keys. " +
-      "Swallows combining marks after space, digit or punctuation — touch layer.”";
+      "“4 rules where the key is blocked under specific conditions — it produces nothing.”";
     expect(screen.getByText(fullDraft)).toBeTruthy();
     fireEvent.click(screen.getByText("edit"));
     const area = screen.getByLabelText("Bundle description") as HTMLTextAreaElement;
     fireEvent.change(area, { target: { value: "Custom description." } });
     fireEvent.click(screen.getByText("Done"));
     expect(screen.getByText("“Custom description.”")).toBeTruthy();
-    // Restore draft brings the family explanation back.
+    // Restore draft brings the summary back.
     fireEvent.click(screen.getByText("edit"));
     fireEvent.click(screen.getByText("Restore draft"));
     expect(screen.getByText(fullDraft)).toBeTruthy();
+  });
+
+  it("re-summarizes the draft when the selection changes", () => {
+    renderPanel();
+    // Unbundle the hardware family: the draft shrinks to the touch family's
+    // 2 blocking rules.
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /Bundle all 2 rules in “Diacritic blocking \(hardware\)”/,
+      }),
+    );
+    expect(
+      screen.getByText(
+        "“2 rules where the key is blocked under specific conditions — it produces nothing.”",
+      ),
+    ).toBeTruthy();
   });
 
   it("blocks saving until a verified pair exists; manual pairs do not count", async () => {

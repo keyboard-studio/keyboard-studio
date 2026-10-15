@@ -6,13 +6,11 @@
 // whose body is a plain document — the Rules and Deadkeys steps — therefore
 // needs its own `height: 100%; overflowY: auto` root, or content taller than
 // the viewport is clipped. This is that root, plus the page chrome the
-// survey steps share: theme background/text/font tokens, a centred readable
-// column, and bottom padding so the last control scrolls clear of the
-// journey footer (FOOTER_CLEARANCE, as StudioShell's questions pane does).
+// survey steps share: theme background/text/font tokens and a centred
+// readable column.
 
 import type { CSSProperties, ReactNode } from "react";
 import { BG_PAGE, TEXT_MAIN, FONT } from "../ui/theme.ts";
-import { FOOTER_CLEARANCE } from "./PreviewButton.tsx";
 
 const scrollStyle: CSSProperties = {
   height: "100%",
@@ -35,7 +33,7 @@ export function FullStepPage({ children, testId, maxWidth = 960 }: FullStepPageP
   const columnStyle: CSSProperties = {
     maxWidth,
     margin: "0 auto",
-    padding: `32px 16px calc(48px + ${FOOTER_CLEARANCE})`,
+    padding: "32px 16px 48px",
     boxSizing: "border-box",
   };
   return (
