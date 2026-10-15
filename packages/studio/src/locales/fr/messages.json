@@ -945,6 +945,8 @@
   "journeyContents.label": "Sommaire",
   "journeyContents.menuItem": "Sommaire",
   "journeyContents.open": "Sommaire",
+  "kmnEditor.advancedCaution": "Modifier la source directement contourne le parcours guidé — les modifications apportées ici ne se reflètent pas dans les réponses données aux étapes précédentes.",
+  "kmnEditor.advancedToggle": "Avancé : afficher la source",
   "kmnEditor.debounceHint": "Les modifications sont compilées après une pause de {DEBOUNCE_MS} ms.",
   "kmnEditor.heading": "Éditeur — {kmnPath}",
   "kmnEditor.noFile": "Aucun fichier .kmn trouvé dans le VFS de la session.",

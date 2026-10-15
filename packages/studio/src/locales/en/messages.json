@@ -945,6 +945,8 @@
   "journeyContents.label": "Contents",
   "journeyContents.menuItem": "Contents",
   "journeyContents.open": "Contents",
+  "kmnEditor.advancedCaution": "Editing the source directly bypasses the guided flow — changes made here are not reflected in the answers you gave in the earlier steps.",
+  "kmnEditor.advancedToggle": "Advanced: view source",
   "kmnEditor.debounceHint": "Changes compile after {DEBOUNCE_MS} ms pause.",
   "kmnEditor.heading": "Editor — {kmnPath}",
   "kmnEditor.noFile": "No .kmn file found in the session VFS.",
