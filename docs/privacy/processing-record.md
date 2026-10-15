@@ -45,8 +45,12 @@ location · processor · retention rule · deletion mechanism · DSAR hint.
 - **Processor**: Vercel (Blob).
 - **Retention**: **until the user deletes it** (per-draft delete, the
   delete-all surface of spec 098, or the owner purge). No automatic
-  expiry exists today; an inactivity purge is an open ruling recorded in
-  spec 096, not current practice, and this row changes if it is ruled.
+  expiry. An inactivity purge was considered and NOT adopted (ruled
+  2026-10-14): its warning cannot reach an inactive author — no
+  contact channel is held for GitHub-signed-in authors, so a warning
+  would be in-app only — and drafts may be the sole copy of a language
+  community's work. Re-ask the question if a contact channel or an
+  account-closure lifecycle ever exists.
 - **Deletion**: `DELETE` draft (Blob object + metadata row, both, in
   that operation); delete-all; owner purge
   (`deleteAllDrafts` in `utilities/oauth-backend`).
