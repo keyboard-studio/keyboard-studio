@@ -125,6 +125,13 @@ function pasteAndSubmit(text: string): void {
   fireEvent.click(screen.getByTestId("text-sample-submit"));
 }
 
+/** Paste, submit, wait for the proposal, then confirm it (#2063 propose-then-confirm). */
+async function pasteSubmitAndConfirm(text: string): Promise<void> {
+  pasteAndSubmit(text);
+  const confirm = await screen.findByTestId("text-sample-confirm");
+  fireEvent.click(confirm);
+}
+
 // ---------------------------------------------------------------------------
 // US1 — paste a paragraph and get an alphabet
 // ---------------------------------------------------------------------------
@@ -135,6 +142,13 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     await reachPage2();
     pasteAndSubmit("aab ŋɛ");
 
+    // FR-005: the proposal appears BEFORE anything is recorded — the draft
+    // is still empty while the proposal is pending.
+    const proposal = await screen.findByTestId("text-sample-proposal");
+    expect(getCharacterInventoryValue().chars).not.toContain("a");
+    expect(proposal.textContent).toContain("from your text sample");
+
+    fireEvent.click(screen.getByTestId("text-sample-confirm"));
     await waitFor(() => {
       expect(getCharacterInventoryValue().chars).toContain("a");
     });
@@ -147,13 +161,25 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     expect(state.chars).not.toContain(" ");
   });
 
+  it("cancelling the proposal records nothing (FR-005 'nothing recorded until the author confirms')", async () => {
+    renderPhaseB();
+    await reachPage2();
+    pasteAndSubmit("abc");
+    await screen.findByTestId("text-sample-proposal");
+    fireEvent.click(screen.getByTestId("text-sample-cancel"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("text-sample-proposal")).toBeNull();
+    });
+    expect(getCharacterInventoryValue().chars).not.toContain("a");
+  });
+
   it("swaps the heading to 'Confirm your alphabet' once a text sample has proposed something", async () => {
     renderPhaseB();
     await reachPage2();
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
       "Add your whole alphabet",
     );
-    pasteAndSubmit("abc");
+    await pasteSubmitAndConfirm("abc");
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
         "Confirm your alphabet",
@@ -164,7 +190,7 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
   it("a removed proposed character stays removed after the step resets (AS2, SC-003)", async () => {
     renderPhaseB();
     await reachPage2();
-    pasteAndSubmit("abc");
+    await pasteSubmitAndConfirm("abc");
     await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
 
     inventoryOps("characters").remove("a");
@@ -175,6 +201,8 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     expect(getCharacterInventoryValue().rejected).toContain("a");
 
     pasteAndSubmit("abc");
+    await screen.findByTestId("text-sample-confirm");
+    fireEvent.click(screen.getByTestId("text-sample-confirm"));
     await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("b"));
     expect(getCharacterInventoryValue().chars).not.toContain("a");
   });
@@ -211,7 +239,7 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
 
     // Recovers on a subsequent successful attempt.
     extractionShouldFail.set(false);
-    pasteAndSubmit("abc");
+    await pasteSubmitAndConfirm("abc");
     await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
     expect(screen.queryByTestId("text-sample-upload-error")).toBeNull();
   });
@@ -228,7 +256,7 @@ describe("US2 — upload a .txt file (FR-003)", () => {
     // Paste path, in its own render.
     renderPhaseB();
     await reachPage2();
-    pasteAndSubmit(sampleText);
+    await pasteSubmitAndConfirm(sampleText);
     await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
     const pastedChars = [...getCharacterInventoryValue().chars].sort();
     cleanup();
@@ -249,6 +277,8 @@ describe("US2 — upload a .txt file (FR-003)", () => {
     const input = screen.getByTestId("text-sample-file-input") as HTMLInputElement;
     await user.upload(input, file);
 
+    await screen.findByTestId("text-sample-confirm");
+    fireEvent.click(screen.getByTestId("text-sample-confirm"));
     await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("a"));
     const uploadedChars = [...getCharacterInventoryValue().chars].sort();
     expect(uploadedChars).toEqual(pastedChars);
@@ -291,7 +321,7 @@ describe("US3 — union with exemplar coverage (FR-007, research R5)", () => {
 
     // A text sample with one extra character ("q") plus one already covered
     // by the exemplar offer ("a").
-    pasteAndSubmit("a q");
+    await pasteSubmitAndConfirm("a q");
 
     await waitFor(() => {
       expect(getCharacterInventoryValue().chars).toContain("q");
@@ -315,7 +345,7 @@ describe("US3 — union with exemplar coverage (FR-007, research R5)", () => {
     await acceptExemplarsAndReachPage2();
     await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("ŋ"));
 
-    pasteAndSubmit("a ŋ q");
+    await pasteSubmitAndConfirm("a ŋ q");
     await waitFor(() => expect(getCharacterInventoryValue().chars).toContain("q"));
 
     // Both previously-exemplar-attributed characters kept their attribution.

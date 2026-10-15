@@ -31,6 +31,7 @@ import {
   type ExemplarTier,
   type SourcedCharacter,
   type SourcedInventory,
+  type ExemplarInventory,
 } from "./exemplarTypes.js";
 
 export { exemplarLocaleCandidates } from "./cldr.js";
@@ -40,6 +41,7 @@ export type {
   ExemplarTier,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
 } from "./exemplarTypes.js";
 
 const KEY_FOR_TIER: Record<ExemplarTier, keyof IndexTierSets> = {
@@ -199,7 +201,7 @@ export async function loadExemplarSource(): Promise<void> {
  * Synchronous and offline. Returns `null` if the index chunk has not loaded
  * yet — await `loadExemplarSource()` first.
  */
-export function sourceExemplars(bcp47: string): SourcedInventory | null {
+export function sourceExemplars(bcp47: string): ExemplarInventory | null {
   if (typeof bcp47 !== "string") return null;
 
   for (const candidate of exemplarLocaleCandidates(bcp47)) {

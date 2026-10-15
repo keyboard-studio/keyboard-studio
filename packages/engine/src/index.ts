@@ -398,8 +398,6 @@ export { defaultFillAxes } from "./strategy-selector/default-fill.js";
 export type { DefaultFillResult } from "./strategy-selector/default-fill.js";
 // §7.2 rule 3a — base-derived A3a detection on the Track 2 import path.
 export { detectMarkInputOrderFromImport } from "./strategy-selector/import-mark-order.js";
-// §7.2 rule 8 — derived A7a (remap posture) detection from target identity + base IR.
-export { deriveRemapPosture } from "./strategy-selector/derive-remap-posture.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
 export { applyIdentityStubMutation } from "./stub-mutator/index.js";
@@ -439,9 +437,11 @@ export {
 export type {
   ExemplarTier,
   ExemplarSource,
+  TextSampleSource,
   ExemplarConfidence,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
 } from "./character-discovery/exemplarTypes.js";
 // Phase B high-confidence missing-character suggestions, now CLDR+SLDR-grounded.
 export {
