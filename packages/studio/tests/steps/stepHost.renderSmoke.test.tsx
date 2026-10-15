@@ -131,6 +131,8 @@ vi.mock("../../src/lib/buildTouchLayoutJson.ts", () => ({
 
 vi.mock("../../src/lint/lintToQuestion.ts", () => ({
   buildFindingsByQuestionId: () => ({}),
+  buildStepWarningCounts: () => ({}),
+  selectUnmappedFindings: () => [],
 }));
 
 // ---------------------------------------------------------------------------

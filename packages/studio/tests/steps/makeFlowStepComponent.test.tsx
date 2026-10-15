@@ -143,6 +143,8 @@ vi.mock("../../src/stores/workingCopyStore.ts", () => {
 
 vi.mock("../../src/lint/lintToQuestion.ts", () => ({
   buildFindingsByQuestionId: () => ({}),
+  buildStepWarningCounts: () => ({}),
+  selectUnmappedFindings: () => [],
 }));
 
 // ---------------------------------------------------------------------------
