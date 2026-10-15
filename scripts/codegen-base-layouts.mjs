@@ -23,8 +23,9 @@
  *
  * The keyboards checkout defaults to the sibling `../keyboards` (the same path
  * CI places the pinned corpus at). The output is COMMITTED — Vercel builds have
- * no corpus — so this script is not in the prebuild chain. Re-run it after a
- * corpus bump that touches one of the source keyboards; the studio test
+ * no corpus. This script is in the root prebuild chain for local runs against
+ * a full corpus checkout; CI and Vercel do not invoke prebuild. Re-run it
+ * after a corpus bump that touches one of the source keyboards; the studio test
  * `referenceBaseLayouts.codegen.test.ts` fails when the committed file no
  * longer matches the corpus.
  *
