@@ -237,16 +237,22 @@ describe("checkHeaderPreservation (I3)", () => {
     expect(findings.find((f) => f.message.includes("keyboardId"))).toBeDefined();
   });
 
-  it("KM_WARN_HEADER_FIELD_MISSING when bcp47 is empty array", () => {
+  it("no bcp47 finding when bcp47 is empty array", () => {
+    // Language tags live in the package descriptor, not the .kmn, and the
+    // parser leaves header.bcp47 empty until the survey identity composes
+    // it — I3 must not report it. With every real .kmn store populated,
+    // an empty bcp47 yields no findings at all.
     const ir = makeCleanIR({ bcp47: [] });
     const findings = checkHeaderPreservation(ir, EMITTED_WITH_ALL_HEADERS);
-    expect(findings.find((f) => f.message.includes("bcp47"))).toBeDefined();
+    expect(findings.find((f) => f.message.includes("bcp47"))).toBeUndefined();
+    expect(findings).toHaveLength(0);
   });
 
-  it("KM_WARN_HEADER_FIELD_MISSING when all bcp47 entries are blank", () => {
+  it("no bcp47 finding when all bcp47 entries are blank", () => {
     const ir = makeCleanIR({ bcp47: ["", "  "] });
     const findings = checkHeaderPreservation(ir, EMITTED_WITH_ALL_HEADERS);
-    expect(findings.find((f) => f.message.includes("bcp47"))).toBeDefined();
+    expect(findings.find((f) => f.message.includes("bcp47"))).toBeUndefined();
+    expect(findings).toHaveLength(0);
   });
 
   it("no bcp47 finding when bcp47 has at least one non-empty tag", () => {
@@ -302,7 +308,7 @@ describe("headerFieldLabel (I3 extractor)", () => {
   it("recovers every field label emitted by checkHeaderPreservation", () => {
     // Drive the real check with everything missing (empty IR header + empty
     // emitted text), then confirm each finding's label round-trips.
-    const ir = makeCleanIR({ keyboardId: "", bcp47: [] });
+    const ir = makeCleanIR({ keyboardId: "" });
     const findings = checkHeaderPreservation(ir, "");
     expect(findings.length).toBeGreaterThan(0);
     for (const f of findings) {
@@ -312,11 +318,12 @@ describe("headerFieldLabel (I3 extractor)", () => {
       expect(label).not.toBeNull();
       expect(f.message).toContain(`"${label}"`);
     }
-    // The known label set is recovered intact (guards the scanner's bcp47 filter).
+    // The known label set is recovered intact. There is no bcp47 label:
+    // language tags are not a .kmn header field and I3 does not check them.
     const labels = findings.map(headerFieldLabel);
     expect(labels).toContain("keyboardId");
     expect(labels).toContain("name (&NAME)");
-    expect(labels).toContain("bcp47 (language tags)");
+    expect(labels).not.toContain("bcp47 (language tags)");
     expect(labels).toContain("copyright (&COPYRIGHT)");
     expect(labels).toContain("version (&KEYBOARDVERSION / &VERSION)");
   });

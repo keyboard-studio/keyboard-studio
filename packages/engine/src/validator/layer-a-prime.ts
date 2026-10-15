@@ -127,9 +127,16 @@ export function headerFieldLabel(finding: LintFinding): string | null {
 /**
  * I3: Verify that key header fields are non-empty in the emitted .kmn.
  *
- * Checks keyboardId, name, BCP47 tags, copyright, and version. Identity
+ * Checks keyboardId, name, copyright, and version. Identity
  * propagation (values changed vs. the import) is intentional and not checked
  * here — only emptiness is a failure.
+ *
+ * Language tags (bcp47) are deliberately NOT checked here: they live in the
+ * package descriptor (.kps), never in a .kmn store, and the parser leaves
+ * ir.header.bcp47 empty until the survey identity composes it. An emptiness
+ * check at this stage fired on essentially every real import. Whether the
+ * finished keyboard carries a language is judged at output, where the
+ * descriptor is written.
  */
 export function checkHeaderPreservation(
   ir: KeyboardIR,
@@ -164,11 +171,6 @@ export function checkHeaderPreservation(
   const nameVal = emittedStoreValue("NAME");
   if (!nameVal) {
     findings.push(missing("name (&NAME)"));
-  }
-
-  // BCP47: the IR header carries bcp47[]; we verify the IR side.
-  if (ir.header.bcp47.length === 0 || ir.header.bcp47.every((t) => !t.trim())) {
-    findings.push(missing("bcp47 (language tags)"));
   }
 
   // copyright

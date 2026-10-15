@@ -16,8 +16,10 @@
 //   2. Neither stage re-fires on recompile() — fidelity is import-time only,
 //      outside the debounce cycle.
 //   3. A real I3 finding (KM_WARN_HEADER_FIELD_MISSING — the seeded .kmn has
-//      no &COPYRIGHT store and no language tags) reaches runtimeWarnings
-//      prefixed "[import-fidelity]".
+//      no &COPYRIGHT store) reaches runtimeWarnings prefixed
+//      "[import-fidelity]". No bcp47 finding surfaces: a .kmn carries no
+//      language store (tags live in the package descriptor), so I3 does
+//      not check for one.
 //   4. The always-on info/hint findings (I4 inventory, I2 stub) do NOT
 //      surface — they are ImportReport metadata, not author diagnostics.
 //   5. Instantiation still proceeds (onInstantiate fires, ir non-null):
@@ -40,8 +42,9 @@ import type { OnInstantiateCallback } from "./useKeyboardArtifact";
 // implementations (spread via importOriginal in the vi.mock factory below).
 // ---------------------------------------------------------------------------
 
-// A well-formed minimal keyboard whose header is missing &COPYRIGHT and any
-// language tag — the exact shape I3 (header preservation) reports on.
+// A well-formed minimal keyboard whose header is missing &COPYRIGHT — the
+// shape I3 (header preservation) reports on. Like every real .kmn it has
+// no language store; language tags live in the package descriptor.
 const PROBE_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'Fidelity Probe'
 store(&TARGETS) 'any'
@@ -141,7 +144,8 @@ describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
     expect(fidelityParseSpy).toHaveBeenCalledTimes(1);
     expect(fidelityEmitSpy).toHaveBeenCalledTimes(1);
 
-    // The real I3 finding reached the runtime-warning channel.
+    // The real I3 finding reached the runtime-warning channel — the missing
+    // copyright store, specifically.
     const readyStage = result.current.stage;
     if (readyStage.kind !== "ready") throw new Error("expected ready stage");
     const warnings = readyStage.runtimeWarnings ?? [];
@@ -149,6 +153,11 @@ describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
     expect(
       fidelityWarnings.some((w) => w.includes("KM_WARN_HEADER_FIELD_MISSING")),
     ).toBe(true);
+    expect(fidelityWarnings.some((w) => w.includes("copyright"))).toBe(true);
+
+    // No bcp47 finding reaches the channel: the probe .kmn has no language
+    // store (no real .kmn does), and I3 no longer treats that as missing.
+    expect(fidelityWarnings.some((w) => w.includes("bcp47"))).toBe(false);
 
     // The always-on info/hint findings stay off the channel.
     expect(warnings.some((w) => w.includes("KM_INFO_OPAQUE_FEATURE_INVENTORY"))).toBe(false);

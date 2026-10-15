@@ -18,7 +18,7 @@ Layer A' (#236) landed, and the checks runnable over a `release/` corpus are now
 | `ImportStatus` | `Clean` / `CleanWithOpaque` / `ParseFailure` are exact from `parse()`. `RoundTripDivergence` is derived from a **structural** round-trip. | — |
 | `I2 (structural)` | `parse → emit → parse`, deep-equal of the normalised IR (mirrors the codec's `roundtrip.test.ts`). | proxy for **I2** |
 | `layerAPrime.i1ParseComplete` | `checkParseCompleteness` — `false` if ≥1 source token has no IR node. | **I1** |
-| `layerAPrime.i3HeaderMissing` | `checkHeaderPreservation` — name / copyright / version fields absent/empty in the emitted `.kmn` (short labels recovered via layer-a-prime's lock-tested `headerFieldLabel` extractor). The check's **bcp47** dimension is excluded in this scan: language tags live in the `.kps` / `.keyboard_info`, not the `.kmn`, so it would false-positive on every keyboard. (bcp47 stays in scope on the import path, where package metadata populates it.) | **I3** |
+| `layerAPrime.i3HeaderMissing` | `checkHeaderPreservation` — keyboardId / name / copyright / version fields absent/empty in the emitted `.kmn` (short labels recovered via layer-a-prime's lock-tested `headerFieldLabel` extractor). Language tags are not part of the check: they live in the `.kps` / `.keyboard_info`, not the `.kmn`. | **I3** |
 | opaque inventory | the codec's `opaqueFeatures`; also the documented surface of `checkOpaqueFeatureInventory`. | **I4** |
 | `recognizedRatio` | the pattern recognizer ([#234](../../packages/engine/src/recognizer/index.ts)). | — |
 
