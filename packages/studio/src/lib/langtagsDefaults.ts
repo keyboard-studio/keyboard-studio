@@ -7,6 +7,7 @@
 //
 // Exports:
 //   loadLangtags()         — idempotent lazy load; resolves the module once.
+//   onLangtagsLoaded(cb)   — passive subscription for render-time readers.
 //   searchLanguages(query) — search by code/name/autonym; empty query → [].
 //   defaultsFor(code)      — look up a language code; returns null if unknown.
 //   scriptToTargetOption() — map ISO-15924 → il_target_script option value.
@@ -33,6 +34,7 @@ let _modulePromise: Promise<LangtagsModule> | null = null;
 // a load (e.g. the name picker, which cannot show a selectable row until the
 // module is loaded) can seed downstream state without a microtask hop.
 let _loadedModule: LangtagsModule | null = null;
+const _loadedSubscribers = new Set<() => void>();
 
 /**
  * Lazily import the engine langtags module.
@@ -45,6 +47,9 @@ export function loadLangtags(): Promise<LangtagsModule> {
     _modulePromise = (import("@keyboard-studio/engine/langtags") as Promise<LangtagsModule>)
       .then((mod) => {
         _loadedModule = mod;
+        // Copy before iterating: a subscriber may unsubscribe during its call.
+        for (const cb of [..._loadedSubscribers]) cb();
+        _loadedSubscribers.clear();
         return mod;
       })
       .catch((err: unknown) => {
@@ -55,6 +60,29 @@ export function loadLangtags(): Promise<LangtagsModule> {
       });
   }
   return _modulePromise;
+}
+
+/**
+ * Register `cb` to run once the langtags module has loaded (immediately,
+ * synchronously, if it already has). Returns an unsubscribe function.
+ *
+ * For consumers that READ the module opportunistically during render
+ * (getLoadedLangtags) and must recompute when it lands, but must not be a
+ * load trigger themselves: several render-path composers change their
+ * output once the module is available (e.g. buildTargetBcp47's script
+ * suppression), so a new loader appearing on a surface that mounts late
+ * could flip composed values mid-session. Subscribing is passive — the
+ * load stays owned by the flows that already trigger it.
+ */
+export function onLangtagsLoaded(cb: () => void): () => void {
+  if (_loadedModule !== null) {
+    cb();
+    return () => {};
+  }
+  _loadedSubscribers.add(cb);
+  return () => {
+    _loadedSubscribers.delete(cb);
+  };
 }
 
 /**

@@ -1,8 +1,9 @@
 // Tests for useGlyphFontStack — the base Phase B stack plus the session's
 // vendored script families (scriptFonts.ts). The langtags chunk loads for
 // real here (it is a checked-in generated artifact), so the default-script
-// resolution path is exercised end to end; tests await loadLangtags() to
-// flush the hook's own lazy-load effect deterministically.
+// resolution path is exercised end to end; tests await loadLangtags()
+// (standing in for the identity flow's load — the hook itself never
+// triggers it) and the hook's passive subscription recomputes the stack.
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";

@@ -23,7 +23,7 @@ import { useEffect, useMemo, useReducer } from "react";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
-import { getLoadedLangtags, loadLangtags } from "../lib/langtagsDefaults.ts";
+import { getLoadedLangtags, onLangtagsLoaded } from "../lib/langtagsDefaults.ts";
 import type { CharacterInventoryValue } from "./phaseBDraftOps.ts";
 import { DEFAULT_PHASE_B_FONT, phaseBFontStack } from "./surveyStyles.ts";
 import {
@@ -49,27 +49,18 @@ export function useGlyphFontStack(): string {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
 
   // Script resolution needs the langtags defaults (a bare language tag
-  // carries no script subtag). The chunk is lazy (FR-011): if it has not
-  // landed yet, start the load and recompute when it resolves. By the
-  // characters step the identity flow has normally loaded it already.
+  // carries no script subtag). The chunk is lazy (FR-011) and this hook
+  // deliberately does NOT trigger its load: render-path composers change
+  // their output once the module lands (buildTargetBcp47's script
+  // suppression), so a new load trigger on a late-mounting glyph surface
+  // could flip composed values mid-session. The identity flow loads the
+  // chunk as part of picking a language (the picker cannot render options
+  // without it), so by the time a target language exists the module is
+  // there; until then the hook subscribes passively and recomputes when
+  // it lands for whatever reason.
   const [, forceRerender] = useReducer((c: number) => c + 1, 0);
   const langtags = getLoadedLangtags();
-  useEffect(() => {
-    if (langtags !== null) return;
-    let live = true;
-    void loadLangtags().then(
-      () => {
-        if (live) forceRerender();
-      },
-      () => {
-        // A failed chunk load degrades to the base stack alone — glyphs
-        // fall back to OS fonts exactly as they did before script fonts.
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [langtags]);
+  useEffect(() => onLangtagsLoaded(forceRerender), []);
 
   const targetBcp47 =
     identityBcp47 !== undefined && identityBcp47.trim() !== ""
