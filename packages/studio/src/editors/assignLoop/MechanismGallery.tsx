@@ -1946,11 +1946,32 @@ export function MechanismGallery({
             },
           ]
         : [];
+    // remapPosture="full-remap" reaching `axes` is likewise always derived:
+    // the script-class prior structurally never emits it (same invariant)
+    // and the survey elicits it nowhere — it is derived from the target
+    // identity + base IR and reconciled onto irAxes when the identity
+    // lands (spec §7.2 rule 8). The author's characters-step confirmation
+    // records the same value as a tier-1 answer when kept, or "addition"
+    // when changed (in which case no fill is reconstructed here).
+    // defaultFillAxes() leaves an already-present axis out of its own
+    // axisFills, so reconstruct the ir-derived provenance here too,
+    // alongside its import-derived twin above.
+    const irDerivedFills: AxisFill[] =
+      axes.remapPosture === "full-remap"
+        ? [
+            {
+              axis: "remapPosture",
+              value: "full-remap",
+              source: "ir-derived",
+            },
+          ]
+        : [];
     // Publish provenance for the current keyboard; clear any stale fills from a
     // prior keyboard/run when scale/scriptClass aren't answered yet, so the
     // Flow Map never shows provenance that doesn't belong to this selection.
     setAxisFills([
       ...importDerivedFills,
+      ...irDerivedFills,
       ...(prefilled !== null ? prefilled.axisFills : []),
     ]);
     const candidateAxes = prefilled !== null ? prefilled.axes : axes;

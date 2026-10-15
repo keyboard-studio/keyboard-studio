@@ -1,0 +1,119 @@
+# Journey fixture — Armenian, Track 1 (copy), alpha-nonlatin branch.
+#
+# The spec 007 §7.5 armenian_mnemonic_r shape walked end to end: an
+# alphabetic non-Latin target (Armn) over the Latin basic_kbdus base. This
+# is the population the derived A7a producer serves (spec §7.2 rule 8):
+# deriveRemapPosture fires on this persona + base pair, the characters-step
+# prefill presents "full-remap" as a pre-filled, changeable answer, and the
+# confirmed value routes rule 8 -> S-06 (+S-04, +S-08).
+#
+# Per this harness's documented convention (journey-runner.ts module
+# header), expected_outcomes.axes DECLARES the axis vector rather than
+# deriving it from the walk — the declared remapPosture below is the value
+# the derived producer computes for this exact persona/base pair, pinned
+# by the engine, store, and characters-step tests; this fixture pins that
+# the declared vector still resolves through fillAxisDefaults +
+# selectStrategy to the §7.5 exemplar outcome, unchanged.
+#
+# Phase B events follow the alpha-nonlatin route: pb_routing_branch is
+# engine-resolved (ctx.routing_group == 'non-roman') to
+# pb_non_roman_branch, whose "alpha-nonlatin" answer routes to
+# pb_special_letters.
+
+journey_id: armenian-alpha-nonlatin
+
+persona:
+  language: Armenian
+  script: Armn
+  routing_group: non-roman
+
+events:
+  # --- identity (identity_lite flow) ---
+  - { stepId: identity, questionId: il_language_english, value: "Armenian" }
+  - { stepId: identity, questionId: il_language_autonym, value: "Հայերեն" }
+  - { stepId: identity, questionId: il_language_code, value: "hy" }
+  - { stepId: identity, questionId: il_target_script, value: "Armn" }
+
+  # --- choose_base (Track 1: copy from basic_kbdus, a Latin letter base) ---
+  - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
+
+  # --- track (track flow) ---
+  - { stepId: track, questionId: track_choice, value: "copy" }
+
+  # --- attribution (attribution flow) ---
+  - { stepId: attribution, questionId: il_author_name, value: "Armenian Language Committee" }
+  - { stepId: attribution, questionId: il_author_email, value: "armenian.keyboard@example.org" }
+  - { stepId: attribution, questionId: il_copyright_holder, value: "" }
+
+  # --- project_name (project_name flow, copy-track only) ---
+  - { stepId: project_name, questionId: project_display_name, value: "Armenian Mnemonic" }
+  - { stepId: project_name, questionId: project_keyboard_id, value: "armenian_mnemonic" }
+
+  # --- characters (phase_b_characters flow, alpha-nonlatin branch) ---
+  - { stepId: characters, questionId: pb_existing_keyboards, value: "" }
+  - { stepId: characters, questionId: pb_co_installed_keyboards, value: "" }
+  - { stepId: characters, questionId: pb_discovery_intro, value: "manual" }
+  # pb_routing_branch is engine-resolved (ctx.routing_group == 'non-roman')
+  # -- never rendered, so no event for it.
+  - { stepId: characters, questionId: pb_non_roman_branch, value: "alpha-nonlatin" }
+  # No special letters beyond the Armenian alphabet itself: the whole
+  # alphabet arrives by remapping the Latin letter keys (the derived A7a
+  # confirmation on the characters prefill, accepted as pre-filled).
+  - { stepId: characters, questionId: pb_special_letters, value: "false" }
+  - { stepId: characters, questionId: pb_punctuation_gate, value: "false" }
+  - { stepId: characters, questionId: pb_digit_set, value: "western" }
+  - { stepId: characters, questionId: pb_char_count, value: "medium" }
+  - { stepId: characters, questionId: pb_contact_language, value: "Russian" }
+  - { stepId: characters, questionId: pb_legacy_encoding, value: "not-sure" }
+  - { stepId: characters, questionId: pb_use_case, value: "general" }
+  - { stepId: characters, questionId: pb_additional_methods, value: "done" }
+
+  # --- marks / punctuation: no fixture events (auto-skip; see
+  #     journey-runner.ts's module header) ---
+
+  # --- convenience (spec 079): the gate opens because basic_kbdus produces
+  #     Latin letters the Armenian alphabet does not need; under a full
+  #     remap the author retains none of them as a convenience set — the
+  #     letter keys themselves are being reused for Armenian letters. ---
+  - { stepId: convenience, questionId: convenience_retain, value: "" }
+
+  # --- carve (Phase D — gallery loop, recorded verbatim) ---
+  - { stepId: carve, action_type: gallery_edit, summary: "reviewed carve gallery; the Latin letter assignments stay as the remap sources for the Armenian letters (S-06) — no characters removed" }
+
+  # --- mechanisms (Phase C — gallery loop, recorded verbatim) ---
+  - { stepId: mechanisms, action_type: mechanism_edit, summary: "remapped the Latin letter keys to the Armenian alphabet in matching positions (S-06); capital letters on the shifted layer and long-press alternates per S-08; chained marks per S-04" }
+
+  # --- touch_seed_source (side-trail fork) ---
+  - { stepId: touch_seed_source, questionId: touch_seed_source, value: "import-adapt" }
+
+  # --- touch (Phase E — gallery loop, recorded verbatim) ---
+  - { stepId: touch, action_type: touch_edit, summary: "seeded touch layout from the desktop assignments; no manual touch-only edits" }
+
+  # --- help (phase_f_helpdocs flow, default 5-screen path) ---
+  - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Armenian (Հայերեն) on any computer, using the letter keys in the same positions as the Armenian letters they sound like." }
+  - { stepId: help, questionId: pf_usage_tip_1, value: "Type the Latin letter key that sounds like the Armenian letter you want." }
+  - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
+  - { stepId: help, questionId: pf_credits, value: "Armenian Language Committee. Keyboard layout by the Armenian Literacy Project." }
+  - { stepId: help, questionId: pf_contact_info, value: "armenian.keyboard@example.org" }
+
+# The "characters" step's confirmed alphabet: the Armenian lowercase
+# letters. Drives the real needed-set the convenience event above and
+# carve both see (no overlap with basic_kbdus's Latin produced set).
+confirmed_alphabet_bases:
+  [ա, բ, գ, դ, ե, զ, է, ը, թ, ժ, ի, լ, խ, ծ, կ, հ, ձ, ղ, ճ, մ, յ, ն, շ, ո, չ, պ, ջ, ռ, ս, վ, տ, ր, ց, ւ, փ, ք, օ, ֆ]
+
+expected_outcomes:
+  routing_group: non-roman
+  # §7.5 armenian_mnemonic_r: rule 8 (A2=alphabetic AND A7a=full-remap)
+  # -> S-06 primary, S-04 + S-08 secondaries.
+  strategy: S-06
+  secondary_strategies: [S-04, S-08]
+  axes:
+    scale: medium
+    scriptClass: alphabetic
+    phoneticIntuition: weak
+    diacriticBehavior: combining-echo
+    multiMode: single
+    constraintEnforcement: none
+    spareKeyAvailability: RAlt only
+    remapPosture: full-remap

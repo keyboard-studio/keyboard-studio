@@ -20,7 +20,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
 import { getCharacterInventoryValue, inventoryOps, resetInventoryDecisions, resetInventoryDraft } from "../survey/useInventoryDraft.ts";
-import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
+import { makeTestIR, makeCharStore, irGroup, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
@@ -2407,5 +2407,77 @@ describe("workingCopyStore — carveChars (issue #1809, ruling §1)", () => {
     delete (snapshot as { carveChars?: string[] }).carveChars;
     const partial = prepareWorkingCopySnapshot(snapshot);
     expect(partial.carveChars).toEqual(new Set());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A7a remap-posture derivation (spec §7.2 rule 8) — the derived baseline
+// lands on irAxes when the target identity lands, via
+// syncRemapPostureFromIdentity, and a recorded phase answer outranks it.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — syncRemapPostureFromIdentity (A7a)", () => {
+  const latinLetterIr = () =>
+    makeTestIR([
+      irGroup({
+        rules: [
+          vkeyRule({ vkey: "K_A", output: "a" }),
+          vkeyRule({ vkey: "K_B", output: "b" }),
+          vkeyRule({ vkey: "K_C", output: "c" }),
+        ],
+      }),
+    ]);
+
+  beforeEach(() => {
+    useWorkingCopyStore.getState().reset();
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromStart(basicKbdus, { vfs: createVirtualFS(), ir: latinLetterIr() });
+  });
+
+  it("seeds remapPosture=full-remap onto irAxes and the session when the derivation fires", () => {
+    useWorkingCopyStore
+      .getState()
+      .syncRemapPostureFromIdentity({ scriptClass: "alphabetic", targetScript: "Cyrl" });
+    const s = useWorkingCopyStore.getState();
+    expect(s.irAxes.remapPosture).toBe("full-remap");
+    expect(s.session.axes.remapPosture).toBe("full-remap");
+  });
+
+  it("leaves irAxes untouched for a Latin target (the guardrail)", () => {
+    useWorkingCopyStore
+      .getState()
+      .syncRemapPostureFromIdentity({ scriptClass: "alphabetic", targetScript: "Latn" });
+    expect(useWorkingCopyStore.getState().irAxes.remapPosture).toBeUndefined();
+  });
+
+  it("leaves irAxes untouched for a non-alphabetic script class", () => {
+    useWorkingCopyStore
+      .getState()
+      .syncRemapPostureFromIdentity({ scriptClass: "abugida", targetScript: "Cyrl" });
+    expect(useWorkingCopyStore.getState().irAxes.remapPosture).toBeUndefined();
+  });
+
+  it("clears a previously derived posture when the target changes to a Latin script", () => {
+    const store = useWorkingCopyStore.getState();
+    store.syncRemapPostureFromIdentity({ scriptClass: "alphabetic", targetScript: "Armn" });
+    expect(useWorkingCopyStore.getState().irAxes.remapPosture).toBe("full-remap");
+    store.syncRemapPostureFromIdentity({ scriptClass: "alphabetic", targetScript: "Latn" });
+    const s = useWorkingCopyStore.getState();
+    expect(s.irAxes.remapPosture).toBeUndefined();
+    expect(s.session.axes.remapPosture).toBeUndefined();
+  });
+
+  it("a recorded tier-1 phase answer outranks the derived baseline", () => {
+    const store = useWorkingCopyStore.getState();
+    store.syncRemapPostureFromIdentity({ scriptClass: "alphabetic", targetScript: "Cyrl" });
+    store.recordPhase({
+      phase: "B",
+      answers: [],
+      computedAxes: { remapPosture: "addition" },
+    });
+    const s = useWorkingCopyStore.getState();
+    expect(s.irAxes.remapPosture).toBe("full-remap");
+    expect(s.session.axes.remapPosture).toBe("addition");
   });
 });

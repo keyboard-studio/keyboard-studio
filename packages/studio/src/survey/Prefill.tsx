@@ -10,7 +10,7 @@ import type { KeyboardEvent } from "react";
 import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { StartKeyboard } from "@keyboard-studio/contracts";
+import type { RemapPosture, StartKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
 import {
@@ -111,14 +111,54 @@ export function buildPrefillRows(
   ];
 }
 
+/**
+ * The A7a remap-posture confirmation (spec §7.2 rule 8): present only when
+ * the derived producer fired — the target is an alphabetic non-Latin script
+ * and the chosen base types Latin letters on its letter keys. The derived
+ * "full-remap" is the pre-filled value; the author may change it to
+ * "addition" here, and the recorded choice is what the characters step
+ * emits as its tier-1 axis. This is the confirmation channel for the
+ * derived fill (the A3a station-prefill pattern), not a new elicited
+ * question: nothing renders when the derivation did not fire.
+ */
+export interface RemapPostureConfirmation {
+  /** The author's current choice (the derived prefill until changed). */
+  value: RemapPosture;
+  onChange: (next: RemapPosture) => void;
+}
+
 export interface PrefillProps {
   identity: IdentityLiteResult;
   base: StartKeyboard;
   onConfirm: () => void;
   onBack?: () => void;
+  remapConfirmation?: RemapPostureConfirmation;
 }
 
-export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
+const REMAP_OPTIONS: ReadonlyArray<{
+  value: RemapPosture;
+  label: MessageDescriptor;
+  testId: string;
+}> = [
+  {
+    value: "full-remap",
+    label: msg({
+      id: "survey.prefill.remap.option.fullRemap",
+      message: "Reuse the letter keys for my script’s letters",
+    }),
+    testId: "prefill-remap-full-remap",
+  },
+  {
+    value: "addition",
+    label: msg({
+      id: "survey.prefill.remap.option.addition",
+      message: "Keep the Latin letters and add my script’s letters on other keys",
+    }),
+    testId: "prefill-remap-addition",
+  },
+];
+
+export function Prefill({ identity, base, onConfirm, onBack, remapConfirmation }: PrefillProps) {
   const { t, i18n } = useLingui();
   const rows = buildPrefillRows(identity, base, i18n);
 
@@ -206,6 +246,51 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
           </Trans>
         </p>
       </div>
+
+      {remapConfirmation !== undefined && (
+        <div style={{ ...surveyCard, marginTop: 16 }}>
+          <h3 style={{ fontSize: 14, color: TEXT_MAIN, margin: "0 0 8px" }}>
+            <Trans id="survey.prefill.remap.heading">How your letters will be typed</Trans>
+          </h3>
+          <p style={{ ...leadParagraph, margin: "0 0 12px" }}>
+            <Trans id="survey.prefill.remap.intro">
+              Your starting keyboard types Latin letters on the letter keys, and your
+              language uses a different script. We suggest reusing those letter keys
+              for your script’s letters, in the same positions — the way mnemonic
+              keyboards for Armenian or Russian work.
+            </Trans>
+          </p>
+          <div role="radiogroup" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {REMAP_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "baseline",
+                  fontSize: 14,
+                  color: TEXT_MAIN,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="prefill-remap-posture"
+                  data-testid={option.testId}
+                  checked={remapConfirmation.value === option.value}
+                  onChange={() => remapConfirmation.onChange(option.value)}
+                />
+                <span>{resolveMessage(i18n, option.label)}</span>
+              </label>
+            ))}
+          </div>
+          <p style={{ margin: "12px 0 0", fontSize: 12, color: CSS_TEXT_SUBTLE, lineHeight: 1.5 }}>
+            <Trans id="survey.prefill.remap.note">
+              Suggested from your starting keyboard and your script. You can change this.
+            </Trans>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

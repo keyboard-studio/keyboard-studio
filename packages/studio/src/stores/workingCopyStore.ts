@@ -46,6 +46,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
+  deriveRemapPosture,
   renameTouchKey,
   deriveFacets,
 } from "@keyboard-studio/engine";
@@ -65,6 +66,7 @@ import {
   type DiscoveryAxisVector,
   type MarkInputOrder,
   type MechanismAssignment,
+  type ScriptClass,
   type SurveyPhaseResult,
   type SurveySession,
   type TouchAssignment,
@@ -1064,6 +1066,17 @@ export interface WorkingCopyState {
   recordAssignments: (assignments: MechanismAssignment[]) => void;
   /** Update the IR-derived axis baseline and re-derive the session. */
   setIrAxes: (irAxes: Partial<DiscoveryAxisVector>) => void;
+  /**
+   * Run the A7a remap-posture derivation (spec §7.2 rule 8) for the
+   * identity that has just landed and reconcile the `remapPosture` slot
+   * of `irAxes` with its outcome. Called from the characters step, the
+   * first surface where the recorded target script and the base IR
+   * coexist. No-op when no base IR is instantiated yet.
+   */
+  syncRemapPostureFromIdentity: (identity: {
+    scriptClass: ScriptClass;
+    targetScript: string;
+  }) => void;
   /** Lock the desktop layout (prevents MechanismGallery edits). */
   lockDesktop: () => void;
   /** Unlock the desktop layout (restores MechanismGallery editing). */
@@ -1430,6 +1443,44 @@ function seedIrAxesFromStartIr(
 }
 
 /**
+ * Reconcile the `remapPosture` slot of `irAxes` with the A7a derivation for
+ * the identity that has just landed (spec §7.2 rule 8). Unlike A3a, this
+ * derivation cannot run at instantiation — its evidence is the mismatch
+ * between the TARGET script (recorded by the identity step, after base
+ * selection) and the base IR's letter keys — so it runs when the target
+ * script lands, via {@link WorkingCopyState.syncRemapPostureFromIdentity}.
+ *
+ * The slot is detector-owned: authors never write `irAxes` (their answers
+ * live in phase results and outrank this baseline in mergePhaseResults),
+ * so reconciling — setting the slot on a fire, clearing it when the
+ * derivation stops firing — cannot overwrite an author decision. The
+ * clearing half is load-bearing for the detector's guardrail: if the
+ * author goes back and changes the target to a Latin script, a stale
+ * "full-remap" left on the baseline would route rule 8 for a Latin
+ * target, which must never happen.
+ */
+function reconcileRemapPosture(
+  irAxes: Partial<DiscoveryAxisVector>,
+  identity: { scriptClass: ScriptClass; targetScript: string },
+  startIr: KeyboardIR | null,
+): Partial<DiscoveryAxisVector> {
+  if (startIr === null) return irAxes;
+  const derived = deriveRemapPosture({
+    scriptClass: identity.scriptClass,
+    targetScript: identity.targetScript,
+    baseIr: startIr,
+  });
+  if (derived === irAxes.remapPosture) return irAxes;
+  const next = { ...irAxes };
+  if (derived === undefined) {
+    delete next.remapPosture;
+  } else {
+    next.remapPosture = derived;
+  }
+  return next;
+}
+
+/**
  * Shared three-case resolution for instantiateFromStart / instantiateFromExisting.
  *
  * Three cases, in order:
@@ -1546,6 +1597,7 @@ export type WorkingCopyData = Omit<
   | "recordPhase"
   | "recordAssignments"
   | "setIrAxes"
+  | "syncRemapPostureFromIdentity"
   | "lockDesktop"
   | "unlockDesktop"
   | "setTouchLayoutJson"
@@ -2072,6 +2124,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   },
 
   setIrAxes: (irAxes) => set(remerge(irAxes, get().phaseResults)),
+
+  syncRemapPostureFromIdentity: (identity) => {
+    const next = reconcileRemapPosture(get().irAxes, identity, get().startIr);
+    if (next !== get().irAxes) {
+      set(remerge(next, get().phaseResults));
+    }
+  },
 
   lockDesktop: () => set({ desktopLocked: true }),
 
