@@ -124,6 +124,7 @@ export * from "./utils/bcp47";
 // re-export as typed `readonly` arrays / records.
 // ---------------------------------------------------------------------------
 export * from "./axisPriors";
+export * from "./docForms";
 export * from "./criteriaData";
 export * from "./fontEntry";
 export * from "./langtags";

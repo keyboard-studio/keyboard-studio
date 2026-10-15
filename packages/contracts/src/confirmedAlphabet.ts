@@ -16,6 +16,21 @@
 export type DeclaredRole = "letter" | "mark";
 
 /**
+ * Where an attested stack's pairing evidence came from (#1784 — the
+ * pair-level version of spec 050 FR-007's exemplar-vs-text attribution).
+ * Additive optional: absent means the pairing was attested by non-text
+ * means (exemplar list, author addition, …) — only text-sample evidence is
+ * recorded explicitly, as `"text"`. Attribution is first-origin, mirroring
+ * the character-level provenance rule (spec 044 T053): the pick that first
+ * attested the pairing decides, so a pairing first attested by an exemplar
+ * and later re-attested by a text sample keeps its absent attribution.
+ * There is deliberately no `"both"` (or `"exemplar"`) state: picks are
+ * NFC-deduped to a single provenance before stacks derive, so no producer
+ * could ever emit one, and no consumer distinguishes it.
+ */
+export type AttestedStackSource = "text";
+
+/**
  * One attested base+marks combination, exactly as confirmed present in the
  * language's orthography. Order-preserving: `marks` lists marks closest to the
  * base first, so the same two marks in the other order are a distinct stack.
@@ -25,6 +40,8 @@ export interface AttestedStack {
   base: string;
   /** One or more marks (lone combining characters), order preserved (closest to base first). */
   marks: string[];
+  /** Pair-level provenance; absent = attested by non-text means (see {@link AttestedStackSource}). */
+  source?: AttestedStackSource;
 }
 
 /**

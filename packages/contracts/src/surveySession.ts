@@ -331,7 +331,7 @@ function mergeAlphabets(
       const key = `${s.base} ${s.marks.join(" ")}`;
       if (!stackSeen.has(key)) {
         stackSeen.add(key);
-        merged.attestedStacks.push({ base: s.base, marks: [...s.marks] });
+        merged.attestedStacks.push({ base: s.base, marks: [...s.marks], ...(s.source !== undefined ? { source: s.source } : {}) });
       }
     }
     Object.assign(merged.declaredRoles, a.declaredRoles);

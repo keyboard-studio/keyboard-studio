@@ -241,8 +241,22 @@ export {
 } from "./shared/helpDocsRender.js";
 export type {
   DocSection,
+  GeneratedDocSlots,
   HelpDocsRenderInput,
 } from "./shared/helpDocsRender.js";
+
+// spec 102 — documentation forms: the renderer, the slot vocabulary, the
+// per-file escapers and the markers around Track 2's generated sections.
+export { renderDocForm, parseDocForm, DocFormParseError } from "./shared/renderDocForm.js";
+export {
+  DOC_SLOT_IDS,
+  DOC_GENERATED_START,
+  DOC_GENERATED_END,
+  stripGeneratedBlocks,
+  escapeDocHtml,
+  escapeDocMarkdown,
+} from "./shared/docSlots.js";
+export type { DocSlotModel, DocSlotId } from "./shared/docSlots.js";
 
 // spec 080 FR-022 — the one derivation of each documentation member's source
 // tier + placeholder state (research R5); the Output checklist and the
@@ -267,9 +281,10 @@ export {
   renderHistoryMd,
   HISTORY_INITIAL_RELEASE_BULLET,
   adaptedFromBullet,
+  createdFromBullet,
   splitHistoryPreamble,
 } from "./shared/renderHistoryMd.js";
-export type { RenderHistoryMdOptions } from "./shared/renderHistoryMd.js";
+export type { HistoryLineage, RenderHistoryMdOptions } from "./shared/renderHistoryMd.js";
 
 // spec 080 FR-013..016 — deterministic SVG layout charts (research R1/R2).
 export {
@@ -510,6 +525,7 @@ export {
   attestedBasesOf,
   attestedLetterCount,
   buildAttestationFold,
+  marksLackingPairingEvidence,
   ATTACHMENT_SIMILARITY_THRESHOLD,
 } from "./marks/mark-classes.js";
 export type { AttestationCaseFold, MarkClass } from "./marks/mark-classes.js";

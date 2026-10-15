@@ -24,10 +24,6 @@ const ROOT_RENDERS = [
   // Dashboard/profile tab (#1477 FR-009 audit — unscanned by any walk spec,
   // which all stay on the survey/preview/output/trail tabs).
   { name: "profile tab", url: "/#profile", axe: true, seed: true },
-  // Dev-only demo route (/?demo=lint) — not production UI (same scoping as
-  // the lingui unlocalized-string scan in eslint.config.mjs); the spec 056
-  // accessibility gate covers shipped screens only.
-  { name: "lint demo", url: "/?demo=lint", axe: false, seed: true },
 ];
 
 for (const { name, url, axe, seed } of ROOT_RENDERS) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeConfirmedAlphabet } from "@keyboard-studio/contracts";
-import { groupMarkClasses, attestedBasesOf } from "./mark-classes.js";
+import { groupMarkClasses, attestedBasesOf, marksLackingPairingEvidence } from "./mark-classes.js";
 import { proposeAttachments, deriveCaseCounterparts } from "./attachment-proposals.js";
 import {
   dominantTreatment,
@@ -32,6 +32,55 @@ describe("attestedBasesOf", () => {
       ],
     });
     expect([...(attestedBasesOf(a).get(ACUTE) ?? [])]).toEqual(["a", "e"]);
+  });
+});
+
+describe("marksLackingPairingEvidence (#1784)", () => {
+  const CIRCUMFLEX = "̂"; // U+0302
+  const CARON = "̌"; // U+030C
+
+  it("flags every mark when the exemplar lists bare combining marks with no stacks (Bafut bfd)", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "b", "d", "e"],
+      marks: [GRAVE, CIRCUMFLEX, CARON],
+      attestedStacks: [],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([GRAVE, CIRCUMFLEX, CARON]);
+  });
+
+  it("flags only the marks with zero attested bases, in first-appearance order", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "e"],
+      marks: [ACUTE, GRAVE],
+      attestedStacks: [{ base: "e", marks: [ACUTE] }],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([GRAVE]);
+  });
+
+  it("is satisfied by a single attested base (the text-sample harvest case)", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "e"],
+      marks: [GRAVE],
+      attestedStacks: [{ base: "a", marks: [GRAVE] }],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([]);
+  });
+
+  it("never fires for alphabets whose exemplars already pair marks with letters", () => {
+    const a = makeConfirmedAlphabet({
+      bases: ["a", "e"],
+      marks: [ACUTE],
+      attestedStacks: [
+        { base: "a", marks: [ACUTE] },
+        { base: "e", marks: [ACUTE] },
+      ],
+    });
+    expect(marksLackingPairingEvidence(a)).toEqual([]);
+  });
+
+  it("never fires when there are no marks at all", () => {
+    const a = makeConfirmedAlphabet({ bases: ["a", "b"], marks: [], attestedStacks: [] });
+    expect(marksLackingPairingEvidence(a)).toEqual([]);
   });
 });
 

@@ -704,13 +704,14 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Id-rename (Track-1 copy) preserves the base keyboard release version.
-// Regression: resetIdentity previously defaulted &KEYBOARDVERSION to "1.0" on
-// the copy path while the .kps <Version> and zip filename kept the base
-// version, leaving the package internally inconsistent.
+// Id-rename (Track-1 copy) takes the overlay's release version, or 1.0.
+// Spec 102 FR-004: a copy is a new keyboard and ships at 1.0. The serializer
+// resolves that version and passes it in the identity overlay, so the .kmn,
+// .kps and file name agree by construction; with no overlay version the
+// rename falls back to resetIdentity's own 1.0 default.
 // ---------------------------------------------------------------------------
 
-describe("projectWorkingCopyVfs — id rename preserves base version", () => {
+describe("projectWorkingCopyVfs — id rename resets the release version", () => {
   const BASE_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'Base KB'
 store(&TARGETS) 'any'
@@ -722,7 +723,7 @@ group(main) using keys
 + [K_A] > U+0061
 `;
 
-  it("keeps &KEYBOARDVERSION from the base when renaming to a new id", async () => {
+  it("resets &KEYBOARDVERSION to 1.0 when renaming to a new id with no overlay version", async () => {
     const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
     const vfs = createVirtualFS([
       { path: "source/base_kb.kmn", content: BASE_KMN, isBinary: false },
@@ -742,8 +743,8 @@ group(main) using keys
     const renamed = vfs.entries().find((e) => e.path === "source/new_kb.kmn");
     expect(renamed).toBeDefined();
     const kmn = renamed?.content as string;
-    expect(kmn).toContain("store(&KEYBOARDVERSION) '2.3'");
-    expect(kmn).not.toContain("store(&KEYBOARDVERSION) '1.0'");
+    expect(kmn).toContain("store(&KEYBOARDVERSION) '1.0'");
+    expect(kmn).not.toContain("store(&KEYBOARDVERSION) '2.3'");
   });
 });
 

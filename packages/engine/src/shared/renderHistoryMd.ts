@@ -16,6 +16,11 @@
 // output-only. Both must stay byte-identical to what this module renders —
 // keep the three in sync if the ATX heading convention ever changes.
 //
+// The newest entry's text comes from the content-owned `history` form
+// (spec 102, contracts DOC_FORMS); this module computes its slots. History
+// bullets are inserted verbatim, not Markdown-escaped, so Track 2 output stays
+// byte-identical to the pre-form renderer (FR-007).
+//
 // New entries always use ATX (`## <version> (<date>)`) — the tool's own
 // generator convention. Inherited bases may use setext/hyphen-underline
 // headings (criteria.md §3.5 / corpus); those are preserved verbatim below
@@ -26,7 +31,8 @@
 // separate seam that builds the proposal an author is shown; this module
 // only renders a stored decision (or its absence) into file text.
 
-import type { HistoryEntryState } from "@keyboard-studio/contracts";
+import { DOC_FORMS, type HistoryEntryState } from "@keyboard-studio/contracts";
+import { renderDocForm } from "./renderDocForm.js";
 
 /** Track 1's unedited-stub bullet — unchanged since the scaffolder's stub. */
 export const HISTORY_INITIAL_RELEASE_BULLET = "Initial release.";
@@ -36,13 +42,37 @@ export function adaptedFromBullet(id: string, version: string): string {
   return `Adapted from ${id} v${version} via keyboard-studio.`;
 }
 
-function heading(version: string, dateIso: string): string {
-  return `## ${version} (${dateIso})`;
+/** The Copy (Track 1) lineage bullet's exact text (spec 102 FR-011). */
+export function createdFromBullet(id: string, version: string): string {
+  return `Created from ${id} v${version} via keyboard-studio.`;
 }
 
-/** One entry's text: heading line, then one `* ` bullet line per bullet. */
-function renderEntry(version: string, dateIso: string, bullets: readonly string[]): string {
-  return `${heading(version, dateIso)}\n${bullets.map((b) => `* ${b}\n`).join("")}`;
+/** Where the keyboard came from: Copy (`created`, Track 1) or Adapt (`adapted`, Track 2). */
+export interface HistoryLineage {
+  kind: "created" | "adapted";
+  /** The start keyboard's id. */
+  id: string;
+  /** The start keyboard's raw version, not the resolved one. */
+  version: string;
+}
+
+function lineageBullet(lineage: HistoryLineage): string {
+  return lineage.kind === "created"
+    ? createdFromBullet(lineage.id, lineage.version)
+    : adaptedFromBullet(lineage.id, lineage.version);
+}
+
+/**
+ * One entry's text through the `history` form: heading line, the lineage
+ * bullet when non-empty, then one `* ` bullet line per remaining bullet.
+ */
+function renderEntry(version: string, dateIso: string, lineage: string, bullets: readonly string[]): string {
+  return renderDocForm(DOC_FORMS.forms.history, {
+    version,
+    date: dateIso,
+    lineage,
+    historyEntries: bullets.map((b) => `* ${b}\n`).join(""),
+  });
 }
 
 /**
@@ -122,8 +152,8 @@ export interface RenderHistoryMdOptions {
   version: string;
   /** Fallback heading date, used only when there is no entry to read `proposal.dateIso` from. */
   dateIso: string;
-  /** Set when this production is a Track 2 adaptation; drives the injected attribution bullet. */
-  adaptedFrom: { id: string; version: string } | null;
+  /** Replaces `adaptedFrom`: `created` on Track 1 (Copy), `adapted` on Track 2 (Adapt), `null` for none. Drives the injected lineage bullet. */
+  lineage: HistoryLineage | null;
   /** The base's own HISTORY.md text (Track 2), preserved below the new entry (after any preamble). `null` when there is none. */
   startHistoryText: string | null;
 }
@@ -133,40 +163,38 @@ export interface RenderHistoryMdOptions {
  * projection seam).
  *
  * - `entry` is `null`, `"proposed"` (shown but not yet decided), or
- *   `"dismissed"`: the existing stub, unchanged — Track 1's bare
- *   "Initial release." entry, or Track 2's "Adapted from" entry (today's
+ *   `"dismissed"`: the existing stub — Track 1's bare "Initial release."
+ *   entry (preceded by the "Created from" bullet when `lineage` is
+ *   `created`), or Track 2's "Adapted from" entry (today's
  *   `stageAdaptHistory` shape) followed by the base text. Nothing the author
  *   has not confirmed or edited ships (FR-011).
  * - `entry` is `"confirmed"` or `"edited"`: the confirmed/edited bullets
  *   render at the top (edited bullets win over the original proposal
  *   bullets) under a heading using `opts.version` (re-derived on a version
- *   change) paired with the entry's own stored `proposal.dateIso` (R12); the
- *   "Adapted from" bullet is injected first whenever `opts.adaptedFrom` is
- *   set, unless the bullets already contain it verbatim (FR-012 / criterion
- *   19.2, no duplication); the base text is preserved below
- *   (criterion 3.4), with any leading title kept above the new entry.
+ *   change) paired with the entry's own stored `proposal.dateIso` (R12).
+ *
+ * In both cases the lineage bullet ("Created from" / "Adapted from") is
+ * injected first whenever `opts.lineage` is set, unless the bullets already
+ * contain it verbatim (FR-012 / criterion 19.2, no duplication); the base
+ * text is preserved below (criterion 3.4), with any leading title kept above
+ * the new entry.
  */
 export function renderHistoryMd(
   entry: HistoryEntryState | null,
   opts: RenderHistoryMdOptions,
 ): string {
-  const { version, dateIso, adaptedFrom, startHistoryText } = opts;
+  const { version, dateIso, lineage, startHistoryText } = opts;
   const decided = entry !== null && (entry.status === "confirmed" || entry.status === "edited");
+  const attribution = lineage !== null ? lineageBullet(lineage) : "";
 
   if (!decided) {
-    const bullets =
-      adaptedFrom !== null
-        ? [adaptedFromBullet(adaptedFrom.id, adaptedFrom.version)]
-        : [HISTORY_INITIAL_RELEASE_BULLET];
-    return withStartText(renderEntry(version, dateIso, bullets), startHistoryText);
+    // Today's Adapt stub is the attribution alone; Copy and no-lineage keep "Initial release.".
+    const bullets = lineage?.kind === "adapted" ? [] : [HISTORY_INITIAL_RELEASE_BULLET];
+    return withStartText(renderEntry(version, dateIso, attribution, bullets), startHistoryText);
   }
 
   const authoredBullets = entry.editedBullets ?? entry.proposal.bullets;
-  const attribution = adaptedFrom !== null ? adaptedFromBullet(adaptedFrom.id, adaptedFrom.version) : null;
-  const bullets =
-    attribution !== null && !authoredBullets.includes(attribution)
-      ? [attribution, ...authoredBullets]
-      : authoredBullets;
+  const injected = authoredBullets.includes(attribution) ? "" : attribution;
 
-  return withStartText(renderEntry(version, entry.proposal.dateIso, bullets), startHistoryText);
+  return withStartText(renderEntry(version, entry.proposal.dateIso, injected, authoredBullets), startHistoryText);
 }

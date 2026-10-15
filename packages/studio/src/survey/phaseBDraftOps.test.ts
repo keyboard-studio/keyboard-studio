@@ -355,6 +355,69 @@ describe("phase B inventory draft — three-store split (spec 071)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Pair-level text-sample attribution (#1784): stacks harvested from a text
+// sample carry source "text"; exemplar/author pairs carry no source.
+// Attribution is first-origin: a pairing re-attested by a later source
+// keeps the first origin's attribution (no "both" state).
+// ---------------------------------------------------------------------------
+
+describe("phase B inventory draft — attested stack text attribution (#1784)", () => {
+  const ACUTE = "́";
+  const GRAVE = "̀";
+
+  it("a text-sample pick attributes its stack as text", () => {
+    draft().addProposed("è", "text");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+
+  it("an exemplar pick leaves the stack unattributed", () => {
+    draft().addProposed("é", "cldr");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+  });
+
+  it("an author pick leaves the stack unattributed", () => {
+    draft().add("é");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+  });
+
+  it("re-attesting an exemplar pair from a text sample keeps the first origin (proposal sources union)", () => {
+    draft().addProposed("é", "cldr");
+    draft().addProposed("é", "text");
+    // Same NFC grapheme dedupes to the one pick; the first origin wins,
+    // mirroring the character-level provenance rule (spec 044 T053).
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [ACUTE] }]);
+    expect(draft().provenance["é"]).toBe("cldr");
+  });
+
+  it("upgrading a text pick to author re-derives the stack without text attribution", () => {
+    draft().addProposed("è", "text");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+    draft().add("è");
+    expect(draft().provenance["è"]).toBe("author");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE] }]);
+  });
+
+  it("text attribution survives a remove/re-derive cycle of an unrelated pick", () => {
+    draft().addProposed("è", "text");
+    draft().add("k");
+    draft().remove("k");
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+
+  it("setAll keeps text attribution for retained text picks", () => {
+    draft().addProposed("è", "text");
+    draft().setAll(["è", "k"]);
+    expect(draft().attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+
+  it("draftConfirmedAlphabet carries the attribution through to the ConfirmedAlphabet", () => {
+    draft().addProposed("è", "text");
+    const alphabet = draftConfirmedAlphabet(getCharacterInventoryValue());
+    expect(alphabet.attestedStacks).toEqual([{ base: "e", marks: [GRAVE], source: "text" }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Category split (spec 047): deriveStores routes non-letters to derived
 // numbers/punctuation/symbols/separators/controls arrays; letters stay in
 // `bases`; `chars`/confirmed inventory stays COMPLETE (FR-004/005/013).
