@@ -639,7 +639,7 @@ export async function projectWorkingCopyForOutput(
     renderHistoryMd(historyEntryState, {
       version: historyVersion,
       dateIso,
-      adaptedFrom: isAdaptation ? { id: keyboardId, version: rawVersion } : null,
+      lineage: isAdaptation ? { kind: "adapted", id: keyboardId, version: rawVersion } : null,
       startHistoryText: isAdaptation ? (startHistoryMdText ?? existingHistoryMd) : null,
     }),
     false,

@@ -1,11 +1,11 @@
-// Tests for renderHistoryMd (spec 080 T040/T041).
+// Tests for renderHistoryMd (spec 080 T040/T041; spec 095 T006 lineage).
 //
 // Coverage:
-//   1. null entry, Track 1 (no adaptedFrom) -> byte-identical to the
-//      scaffolder's Track-1 stub (generateStubs, scaffolder/index.ts).
-//   2. null entry, Track 2 (adaptedFrom set) -> byte-identical to today's
-//      stageAdaptHistory output (output/adapt-staging.ts), for both a fresh
-//      and a pre-existing base HISTORY.md.
+//   1. null entry, no lineage -> byte-identical to the scaffolder's Track-1
+//      stub (generateStubs, scaffolder/index.ts).
+//   2. null entry, `adapted` lineage -> byte-identical to the pre-095
+//      `adaptedFrom` output (today's stageAdaptHistory shape), pinned as
+//      literals, for both a fresh and a pre-existing base HISTORY.md (FR-007).
 //   3. "proposed" status (shown, not yet decided) renders the same stub as
 //      null/dismissed — nothing not yet author-endorsed ships (FR-011).
 //   4. "dismissed" status renders the same stub as null.
@@ -21,16 +21,19 @@
 //   10. Version-change edge case: heading uses opts.version even though the
 //       entry's proposal.version was derived for an earlier version; the
 //       date and editedBullets are kept from the stored entry.
-//   11. HISTORY_INITIAL_RELEASE_BULLET / adaptedFromBullet text.
+//   11. HISTORY_INITIAL_RELEASE_BULLET / adaptedFromBullet / createdFromBullet text.
+//   12. `created` lineage (Copy, FR-011): undecided -> created-from bullet then
+//       "Initial release."; decided -> injected first; a verbatim bullet is
+//       not duplicated; history bullets are not Markdown-escaped.
 
 import { describe, it, expect } from "vitest";
-import { createVirtualFS, type HistoryEntryState } from "@keyboard-studio/contracts";
+import type { HistoryEntryState } from "@keyboard-studio/contracts";
 import {
   renderHistoryMd,
   HISTORY_INITIAL_RELEASE_BULLET,
   adaptedFromBullet,
+  createdFromBullet,
 } from "./renderHistoryMd.js";
-import { stageAdaptHistory } from "../output/adapt-staging.js";
 
 function confirmedEntry(bullets: string[], overrides: Partial<HistoryEntryState> = {}): HistoryEntryState {
   return {
@@ -46,36 +49,33 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
     const rendered = renderHistoryMd(null, {
       version: "1.0",
       dateIso: "2026-06-18",
-      adaptedFrom: null,
+      lineage: null,
       startHistoryText: null,
     });
     expect(rendered).toBe(`## 1.0 (2026-06-18)\n* Initial release.\n`);
   });
 
-  it("null entry, Track 2 (fresh base HISTORY): byte-identical to stageAdaptHistory", () => {
-    const vfs = createVirtualFS();
-    stageAdaptHistory(vfs, "my_kbd", "basic_kbdus", "1.0", "1.1", "2026-06-18");
-    const expected = vfs.get("HISTORY.md")!.content as string;
+  it("null entry, adapted lineage (fresh base HISTORY): exactly the pre-095 adaptedFrom output", () => {
+    const expected = "## 1.1 (2026-06-18)\n* Adapted from basic_kbdus v1.0 via keyboard-studio.\n";
 
     const rendered = renderHistoryMd(null, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: { id: "basic_kbdus", version: "1.0" },
+      lineage: { kind: "adapted", id: "basic_kbdus", version: "1.0" },
       startHistoryText: null,
     });
     expect(rendered).toBe(expected);
   });
 
-  it("null entry, Track 2 (pre-existing base HISTORY): byte-identical to stageAdaptHistory", () => {
+  it("null entry, adapted lineage (pre-existing base HISTORY): exactly the pre-095 adaptedFrom output", () => {
     const startHistory = "## 1.0 (2025-01-01)\n* Initial release.\n";
-    const vfs = createVirtualFS([{ path: "HISTORY.md", content: startHistory, isBinary: false }]);
-    stageAdaptHistory(vfs, "my_kbd", "basic_kbdus", "1.0", "1.1", "2026-06-18");
-    const expected = vfs.get("HISTORY.md")!.content as string;
+    const expected =
+      "## 1.1 (2026-06-18)\n* Adapted from basic_kbdus v1.0 via keyboard-studio.\n\n" + startHistory;
 
     const rendered = renderHistoryMd(null, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: { id: "basic_kbdus", version: "1.0" },
+      lineage: { kind: "adapted", id: "basic_kbdus", version: "1.0" },
       startHistoryText: startHistory,
     });
     expect(rendered).toBe(expected);
@@ -87,7 +87,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
       proposal: { version: "1.0", dateIso: "2026-06-18", bullets: ["Initial release."] },
       editedBullets: null,
     };
-    const opts = { version: "1.0", dateIso: "2026-06-18", adaptedFrom: null, startHistoryText: null };
+    const opts = { version: "1.0", dateIso: "2026-06-18", lineage: null, startHistoryText: null };
     expect(renderHistoryMd(entry, opts)).toBe(renderHistoryMd(null, opts));
   });
 
@@ -97,7 +97,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
       proposal: { version: "1.0", dateIso: "2026-06-18", bullets: ["Added 2 characters: a, b"] },
       editedBullets: null,
     };
-    const opts = { version: "1.0", dateIso: "2026-06-18", adaptedFrom: null, startHistoryText: null };
+    const opts = { version: "1.0", dateIso: "2026-06-18", lineage: null, startHistoryText: null };
     expect(renderHistoryMd(entry, opts)).toBe(renderHistoryMd(null, opts));
   });
 });
@@ -108,7 +108,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2099-01-01", // must be ignored in favor of entry.proposal.dateIso
-      adaptedFrom: null,
+      lineage: null,
       startHistoryText: null,
     });
     expect(rendered).toBe(`## 1.1 (2026-06-18)\n* Added 2 characters: é, è\n`);
@@ -122,7 +122,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: null,
+      lineage: null,
       startHistoryText: null,
     });
     expect(rendered).toBe(`## 1.1 (2026-06-18)\n* Added accented vowels for French.\n`);
@@ -134,7 +134,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: null,
+      lineage: null,
       startHistoryText,
     });
     expect(rendered).toBe(
@@ -148,7 +148,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: null,
+      lineage: null,
       startHistoryText,
     });
     expect(rendered).toBe(
@@ -163,7 +163,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: null,
+      lineage: null,
       startHistoryText,
     });
     expect(rendered).toBe(
@@ -179,7 +179,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: { id: "basic_kbdfr", version: "1.3" },
+      lineage: { kind: "adapted", id: "basic_kbdfr", version: "1.3" },
       startHistoryText: null,
     });
     expect(rendered).toBe(
@@ -198,7 +198,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.1",
       dateIso: "2026-06-18",
-      adaptedFrom: { id: "basic_kbdfr", version: "1.3" },
+      lineage: { kind: "adapted", id: "basic_kbdfr", version: "1.3" },
       startHistoryText: null,
     });
     expect(rendered).toBe(
@@ -216,7 +216,7 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     const rendered = renderHistoryMd(entry, {
       version: "1.2",
       dateIso: "2099-01-01",
-      adaptedFrom: null,
+      lineage: null,
       startHistoryText: null,
     });
     expect(rendered).toBe(
@@ -233,6 +233,82 @@ describe("renderHistoryMd — exported bullet-text helpers", () => {
   it("adaptedFromBullet matches the criterion 19.2 / stageAdaptHistory text", () => {
     expect(adaptedFromBullet("basic_kbdfr", "1.3")).toBe(
       "Adapted from basic_kbdfr v1.3 via keyboard-studio.",
+    );
+  });
+
+  it("createdFromBullet matches the FR-011 text", () => {
+    expect(createdFromBullet("basic_kbdfr", "2.3")).toBe(
+      "Created from basic_kbdfr v2.3 via keyboard-studio.",
+    );
+  });
+});
+
+describe("renderHistoryMd — created lineage (Copy, spec 095 FR-011)", () => {
+  const lineage = { kind: "created", id: "basic_kbdfr", version: "2.3" } as const;
+
+  it("no decided entry: the created-from bullet, then 'Initial release.'", () => {
+    const rendered = renderHistoryMd(null, {
+      version: "1.0",
+      dateIso: "2026-06-18",
+      lineage,
+      startHistoryText: null,
+    });
+    expect(rendered).toBe(
+      "## 1.0 (2026-06-18)\n* Created from basic_kbdfr v2.3 via keyboard-studio.\n* Initial release.\n",
+    );
+  });
+
+  it("'proposed' and 'dismissed' entries render the same created stub as null", () => {
+    const opts = { version: "1.0", dateIso: "2026-06-18", lineage, startHistoryText: null };
+    for (const status of ["proposed", "dismissed"] as const) {
+      const entry: HistoryEntryState = {
+        status,
+        proposal: { version: "1.0", dateIso: "2026-06-18", bullets: ["Added 2 characters: a, b"] },
+        editedBullets: null,
+      };
+      expect(renderHistoryMd(entry, opts)).toBe(renderHistoryMd(null, opts));
+    }
+  });
+
+  it("decided entry: the created-from bullet is injected first", () => {
+    const entry = confirmedEntry(["Added 2 characters: é, è"]);
+    const rendered = renderHistoryMd(entry, {
+      version: "1.0",
+      dateIso: "2099-01-01",
+      lineage,
+      startHistoryText: null,
+    });
+    expect(rendered).toBe(
+      "## 1.0 (2026-06-18)\n* Created from basic_kbdfr v2.3 via keyboard-studio.\n* Added 2 characters: é, è\n",
+    );
+  });
+
+  it("does not duplicate the created-from bullet when the edited bullets already contain it verbatim", () => {
+    const entry = confirmedEntry([], {
+      status: "edited",
+      editedBullets: ["Reworked the layout.", "Created from basic_kbdfr v2.3 via keyboard-studio."],
+    });
+    const rendered = renderHistoryMd(entry, {
+      version: "1.0",
+      dateIso: "2026-06-18",
+      lineage,
+      startHistoryText: null,
+    });
+    expect(rendered).toBe(
+      "## 1.0 (2026-06-18)\n* Reworked the layout.\n* Created from basic_kbdfr v2.3 via keyboard-studio.\n",
+    );
+  });
+
+  it("history bullets are inserted verbatim, not Markdown-escaped", () => {
+    const entry = confirmedEntry(["Added *bold* and my_kbd <tags>"]);
+    const rendered = renderHistoryMd(entry, {
+      version: "1.0",
+      dateIso: "2026-06-18",
+      lineage: { kind: "created", id: "my_kbd", version: "1.0" },
+      startHistoryText: null,
+    });
+    expect(rendered).toBe(
+      "## 1.0 (2026-06-18)\n* Created from my_kbd v1.0 via keyboard-studio.\n* Added *bold* and my_kbd <tags>\n",
     );
   });
 });

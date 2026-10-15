@@ -132,7 +132,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     );
   });
 
-  it("falls back to today's exact placeholders when helpDocs is null (FR-002)", async () => {
+  it("renders the no-answer forms when helpDocs is null (FR-002, spec 095 FR-030)", async () => {
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
@@ -146,14 +146,16 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     // layout charts (a net-new keyboard has no base images), so the pre-076
     // bare placeholder is now placeholder + layout section.
     const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
-    expect(welcome.startsWith(`<html><body><p>Welcome to ${basicKbdus.displayName}</p><h2>Keyboard Layout</h2>`)).toBe(true);
+    expect(welcome.startsWith(`<html><body><p>Welcome to ${basicKbdus.displayName}</p>
+<h2>Keyboard Layout</h2>`)).toBe(true);
     expect(welcome).toContain('<img src="ks-layout-desktop-');
     expect(welcome.endsWith("</body></html>")).toBe(true);
     // spec 079 FR-003 / US1-3: even an early production's help page opens with
-    // the standard help-site header, above the unchanged placeholder comment.
+    // the standard help-site header. Spec 095 FR-030: the body form follows it,
+    // the same body the welcome page carries, instead of a placeholder comment.
     const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`);
     expect(help).toBe(
-      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<?php /* ${basicKbdus.displayName} help */ ?>`,
+      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<p>Welcome to ${basicKbdus.displayName}</p>`,
     );
   });
 

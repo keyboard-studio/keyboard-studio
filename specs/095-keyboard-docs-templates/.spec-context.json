@@ -1,0 +1,535 @@
+{
+  "workflow": "companion",
+  "specName": "095-keyboard-docs-templates",
+  "branch": "095-keyboard-docs-templates",
+  "selectedAt": "2026-10-15T01:28:08.352Z",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:28:21.618Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-15T01:30:44.277Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:30:44.299Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:44:08.531Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:47:39.849Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:47:44.543Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:49:36.833Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:53:28.491Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:53:30.778Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:56:12.822Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:02:40.049Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:05:55.427Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:06:29.830Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:07:32.075Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:08:26.279Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:09:29.283Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:10:22.822Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:11:32.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:17:06.949Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:17:07.335Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:17:07.649Z"
+    }
+  ],
+  "telemetryInstanceId": "8782d5f1-b6c3-42a7-aac0-44a5387009cf",
+  "assistant": "claude",
+  "decisions": [
+    {
+      "decision": "No new question: Copy/Adapt comes from the existing authoring-track answer (Track 1/Track 2)",
+      "why": "User ruling 2026-10-14; a second Copy/Adapt question would give Adapt two meanings",
+      "rejected": "new start-relationship decision; three-way track question"
+    },
+    {
+      "decision": "Fix Copy version at resolvePublishVersion/resolveTestBuildVersion (new-from-base -> 1.0, tests 0.N); keep OutputVersionMode literals",
+      "why": "All callers already route through the resolver; new-from-base is a persisted DecisionRecord value",
+      "rejected": "copy/adapt-variant/adapt-existing mode rename"
+    },
+    {
+      "decision": "Always carry the resolved version on the identity overlay; delete the copy-version preservation in projectWorkingCopyVfs",
+      "why": "Single descriptor writer then agrees by construction, including an unrenamed copy",
+      "rejected": "regex-patching the .kps on the copy path"
+    },
+    {
+      "decision": "Copy lineage line mirrors the Track 2 line: Created from <id> v<ver> via keyboard-studio.",
+      "why": "Track 2 history must not change and stored edited bullets match it verbatim",
+      "rejected": "design note backticked Keyboard Studio form"
+    },
+    {
+      "decision": "Derived doc content built in studio lib/docContent.ts reusing charProducers",
+      "why": "Keystroke derivation already exists in studio; synchronous keeps preview inside D3",
+      "rejected": "engine buildDocSlotModel driven by the async simulator"
+    },
+    {
+      "decision": "Forms and mechanism paragraphs in one JSON data file packages/contracts/data/doc-forms.json",
+      "why": "JSON imports work in Node, Vitest and Vite with no codegen",
+      "rejected": ".tmpl files plus prebuild codegen"
+    },
+    {
+      "decision": "Generated-block markers plus stripping of existing blocks from inherited prose",
+      "why": "Output renders from pristine base text; the only duplication case is adapting a studio-generated keyboard",
+      "rejected": "markers without stripping"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan, research, data model and contracts for 095 after the no-new-question ruling",
+      "key_finding": "The studio already has a Copy/Adapt track question and a static keystroke derivation (charProducers), so version needs a resolver-level fix and docs need no simulator"
+    },
+    "tasks": {
+      "summary": "32 tasks: Setup(1), Foundational forms pipeline(10, 4 waves), US1 version(6), US2 derived content(5), US3 forms checks(1), US4 inherited docs(5), Polish(4); US2 sequenced after US1 for shared serializeWorkingCopy.ts"
+    }
+  },
+  "approach": "Copy (Track 1) ships 1.0 via a resolver-level change, with Track 2 untouched. A synchronous studio builder derives typing guide, mechanisms, touch notes and inventory from the working-copy IR, and an engine two-construct renderer fills content-owned forms in contracts/data/doc-forms.json for all six documentation files.",
+  "coverage": {
+    "FR-001": {
+      "title": "Version and docs driven by the existing track answer",
+      "tasks": [
+        "T016"
+      ]
+    },
+    "FR-004": {
+      "title": "Copy publishes at 1.0",
+      "tasks": [
+        "T012",
+        "T014"
+      ]
+    },
+    "FR-007": {
+      "title": "Track 2 version behaviour unchanged",
+      "tasks": [
+        "T006",
+        "T012",
+        "T014"
+      ]
+    },
+    "FR-008": {
+      "title": "Test builds sort below publish; Copy build N is 0.N",
+      "tasks": [
+        "T012",
+        "T014"
+      ]
+    },
+    "FR-009": {
+      "title": "Four version sites agree; project format version untouched",
+      "tasks": [
+        "T013",
+        "T015",
+        "T016"
+      ]
+    },
+    "FR-010": {
+      "title": "Strictly-greater criterion N/A for Copy",
+      "tasks": [
+        "T014",
+        "T032"
+      ]
+    },
+    "FR-011": {
+      "title": "Copy history carries Created from lineage line",
+      "tasks": [
+        "T006",
+        "T011",
+        "T013",
+        "T016"
+      ]
+    },
+    "FR-012": {
+      "title": "Derived content from keyboard as built",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-013": {
+      "title": "Typing guide by code point with shortest keystrokes",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-014": {
+      "title": "Grouped summary above 200 characters",
+      "tasks": [
+        "T001",
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-015": {
+      "title": "One paragraph per used input method, fixed order",
+      "tasks": [
+        "T002",
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-016": {
+      "title": "Existing layout pictures included unchanged",
+      "tasks": [
+        "T021",
+        "T022"
+      ]
+    },
+    "FR-017": {
+      "title": "Phone/tablet section only when a touch layout exists",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-018": {
+      "title": "Grouped character inventory",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-019": {
+      "title": "Characters identified by code point, dotted circle, U+XXXX",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-020": {
+      "title": "Deterministic generated docs",
+      "tasks": [
+        "T004",
+        "T018",
+        "T024"
+      ]
+    },
+    "FR-021": {
+      "title": "Preview updates inside existing derivation, no timer",
+      "tasks": [
+        "T019",
+        "T021"
+      ]
+    },
+    "FR-022": {
+      "title": "Each doc file rendered from content-owned form",
+      "tasks": [
+        "T002",
+        "T007"
+      ]
+    },
+    "FR-023": {
+      "title": "Only insert and include-if-non-empty constructs",
+      "tasks": [
+        "T002",
+        "T004"
+      ]
+    },
+    "FR-024": {
+      "title": "Empty section omitted with heading",
+      "tasks": [
+        "T002",
+        "T004",
+        "T023"
+      ]
+    },
+    "FR-025": {
+      "title": "Welcome and help share one body form",
+      "tasks": [
+        "T007",
+        "T023"
+      ]
+    },
+    "FR-026": {
+      "title": "Version only in history, year only in licence, one holder",
+      "tasks": [
+        "T005",
+        "T008",
+        "T023"
+      ]
+    },
+    "FR-027": {
+      "title": "Values escaped for HTML and Markdown",
+      "tasks": [
+        "T003",
+        "T007",
+        "T023"
+      ]
+    },
+    "FR-028": {
+      "title": "Checks fail on unknown blank or parse error",
+      "tasks": [
+        "T005"
+      ]
+    },
+    "FR-029": {
+      "title": "README form content; no typing guide in README",
+      "tasks": [
+        "T002",
+        "T005"
+      ]
+    },
+    "FR-030": {
+      "title": "Complete docs with no answers",
+      "tasks": [
+        "T023"
+      ]
+    },
+    "FR-031": {
+      "title": "Existing answers keep meaning and appear",
+      "tasks": [
+        "T002",
+        "T007",
+        "T032"
+      ]
+    },
+    "FR-032": {
+      "title": "Adapt carries original prose first",
+      "tasks": [
+        "T007",
+        "T024"
+      ]
+    },
+    "FR-033": {
+      "title": "Generated block markers, old block stripped",
+      "tasks": [
+        "T003",
+        "T007",
+        "T024"
+      ]
+    },
+    "FR-034": {
+      "title": "Typing guide suppressed at 50% overlap with checklist note",
+      "tasks": [
+        "T018",
+        "T020",
+        "T024",
+        "T025",
+        "T026",
+        "T027"
+      ]
+    },
+    "FR-035": {
+      "title": "New UI text uses spec 046 message ids",
+      "tasks": [
+        "T026",
+        "T028"
+      ]
+    }
+  },
+  "currentTask": "T011",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Eight inline .kmn fixtures (deadkey store fan-out, ralt, rota, combining, touch, plain, 210-char large) parsed to IR",
+      "files": [
+        "packages/studio/src/lib/docContent.fixtures.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "DocSlotModel, DOC_SLOT_IDS (total-record guarded), generated-block markers, stripGeneratedBlocks, HTML and Markdown escapers, 7 tests",
+      "files": [
+        "packages/engine/src/shared/docSlots.ts",
+        "packages/engine/src/shared/docSlots.test.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "doc-forms.json (7 forms as line arrays + 4 mechanism paragraphs), strict DocFormsSchema, DOC_FORMS loader, barrel export",
+      "files": [
+        "packages/contracts/data/doc-forms.json",
+        "packages/contracts/src/docForms.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "renderDocForm/parseDocForm/DocFormParseError: two constructs, standalone-line tags, dropped block takes its newline; 11 tests",
+      "files": [
+        "packages/engine/src/shared/renderDocForm.ts",
+        "packages/engine/src/shared/renderDocForm.test.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added DOC_FORMS check test: every form parses, references only DOC_SLOT_IDS, version only in history, year only in license, no typingGuide in readmeMd; failures name the form",
+      "files": [
+        "packages/engine/src/shared/docForms.check.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "licenseMd(holder, year) now renders the license form from DOC_FORMS via renderDocForm; signature and output unchanged for null and non-blank holders",
+      "files": [
+        "packages/engine/src/shared/packageDocs.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "renderHistoryMd: adaptedFrom replaced by lineage (created|adapted), createdFromBullet added, entry rendered through the history form; tests cover adapted parity, created stub, dedupe",
+      "files": [
+        "packages/engine/src/shared/renderHistoryMd.ts",
+        "packages/engine/src/shared/renderHistoryMd.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "helpDocsRender rebuilt on renderDocForm: shared body form for welcome/help, input gains generated + keyboardId, per-file escaping, Track 2 marked block with strip; 75 tests (10 updated for FR-030/FR-033)",
+      "files": [
+        "packages/engine/src/shared/helpDocsRender.ts",
+        "packages/engine/src/shared/helpDocsRender.test.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Engine barrel exports renderer, slot vocabulary, markers, escapers, createdFromBullet, HistoryLineage, GeneratedDocSlots",
+      "files": [
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "adapt-staging passes lineage {kind: adapted}",
+      "files": [
+        "packages/engine/src/output/adapt-staging.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Docs-lint history render passes lineage: adapted on Track 2, created with start id and raw version on Track 1",
+      "files": [
+        "packages/studio/src/hooks/useDocumentationFindings.ts"
+      ]
+    }
+  }
+}
