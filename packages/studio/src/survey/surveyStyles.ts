@@ -372,12 +372,16 @@ export const surveyCard: CSSProperties = {
 };
 
 /**
- * Centered column the survey card sits in — keeps a long line length
- * readable on a wide pane instead of stretching the card edge-to-edge.
+ * Left-aligned column the survey card sits in — keeps a long line length
+ * readable on a wide pane instead of stretching the card edge-to-edge,
+ * anchored at the pane's left edge like the rest of the app. This used to
+ * centre (`margin: "0 auto"`), which read as near-left inside the old
+ * two-pane split; on the full-width no-preview pages (#2081: identity,
+ * layout) it floated the content in the middle of the screen.
  */
 export const surveyPageColumn: CSSProperties = {
   maxWidth: 640,
-  margin: "0 auto",
+  margin: 0,
   padding: "40px 24px 64px",
 };
 

@@ -37,6 +37,8 @@ interface EngineModule {
     startHistoryMdText?: string;
     startWelcomeImages?: WelcomeFolderImage[];
     startWelcomeConvention?: WelcomeConvention;
+    // Issue #2139 — the base's welcome/help stylesheet texts (criterion 11.8).
+    startDocCssTexts?: string[];
   }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
@@ -931,6 +933,9 @@ export function useKeyboardArtifact(
         wc.setStartHelpPhpText(null);
         wc.setStartReadmeMdText(null);
         wc.setStartHistoryMdText(null);
+        // Issue #2139: a copy's pages are fresh renders — the base's page
+        // stylesheets do not govern them, so the slice clears with the prose.
+        wc.setStartDocCssTexts(null);
         // spec 080 FR-020: a copy inherits no prose, so nothing can be an
         // upstream finding — an EMPTY baseline (computed), not null (pending).
         wc.setBaselineDocFindings([]);
@@ -967,6 +972,9 @@ export function useKeyboardArtifact(
         wc.setStartHistoryMdText(fetchResult.startHistoryMdText ?? null);
         wc.setStartWelcomeImages(fetchResult.startWelcomeImages ?? null);
         wc.setStartWelcomeConvention(fetchResult.startWelcomeConvention ?? null);
+        // Issue #2139: the base's welcome/help stylesheet texts, so the live
+        // 11.8 check and the baseline below judge images against kb.css.
+        wc.setStartDocCssTexts(fetchResult.startDocCssTexts ?? null);
         // spec 080 FR-020 (research R8): run the documentation checks ONCE
         // over the base's own files as fetched. A later finding on a still-
         // inherited member whose code appears here is the base's, not the
@@ -982,6 +990,9 @@ export function useKeyboardArtifact(
               kpsText: readVfsText(vfs, `source/${kb.id}.kps`) ?? null,
               kvksText: readVfsText(vfs, `source/${kb.id}.kvks`) ?? null,
               touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
+              // Issue #2139: the baseline judges the base's images against the
+              // same kb.css texts the live check uses (FR-020 consistency).
+              ...(fetchResult.startDocCssTexts !== undefined ? { cssTexts: fetchResult.startDocCssTexts } : {}),
               base: {
                 welcomeHtmText: fetchResult.startWelcomeHtmText ?? null,
                 helpPhpText: fetchResult.startHelpPhpText ?? null,

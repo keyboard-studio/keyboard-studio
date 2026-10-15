@@ -102,7 +102,6 @@ import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
 import { LintSummary } from "./lint/index.ts";
-import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
@@ -1228,13 +1227,12 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       analyseContextTolerance: true,
     },
   );
-  const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
-  // never by the marks step; its stale/refused outcomes feed the notice.
-  const contextToleranceApplyNotes = useContextToleranceApply();
-  const showContextTolerance =
-    contextTolerance.status !== "idle" &&
-    contextTolerance.status !== "analysing";
+  // never by the marks step, so the effect stays mounted here even though
+  // its stale/refused notes are no longer rendered: the context-tolerance
+  // finding's only home is the Marks station (warnings-placement model),
+  // not this pane-top region.
+  useContextToleranceApply();
 
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
@@ -1749,15 +1747,13 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
             // to accidental non-override, so a future change to questionsPaneStyle's
             // background doesn't silently drag this along. No border/card fill/
             // padding-as-box — this is text on the character-map surface, not a
-            // card. The context-tolerance notice (spec 078) shares this live
-            // region rather than adding an announcer of its own (FR-014).
+            // card.
             <div
               role="status"
               aria-live="polite"
               style={
                 authoredGlobalWarnings.length > 0 ||
-                docGlobalWarnings.length > 0 ||
-                showContextTolerance
+                docGlobalWarnings.length > 0
                   ? {
                       display: "flex",
                       flexDirection: "column",
@@ -1800,12 +1796,6 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
               ))}
               {docGlobalWarnings.length > 0 && (
                 <DocumentationFindingsSummary findings={docGlobalWarnings} />
-              )}
-              {showContextTolerance && (
-                <ContextToleranceNotice
-                  state={contextTolerance}
-                  applyNotes={contextToleranceApplyNotes}
-                />
               )}
             </div>
           }
@@ -2208,6 +2198,23 @@ export function StudioShell() {
         background: "var(--app-bg)",
       }}
     >
+      {/* Bypass block for keyboard authors: the first focusable element in
+          the shell. The footer step navigation sits after the whole step
+          body in Tab order, so without this link reaching it takes over a
+          hundred Tabs on long steps. A native anchor — not a keyboard
+          shortcut, which could collide with typing in the keyboard test
+          surfaces — moves focus to the footer nav cluster (the element
+          carrying `id="step-navigation"` and `tabIndex={-1}` in
+          StepNavCluster). Visually hidden until focused (`.ks-skip-link`
+          in index.css). Decision recorded in the WCAG tracker's Bypass
+          Blocks row. */}
+      <a
+        href="#step-navigation"
+        className="ks-skip-link ks-focus-ring"
+        data-testid="skip-to-step-navigation"
+      >
+        {t({ id: "shell.skipToStepNavigation", message: "Skip to step navigation" })}
+      </a>
       <NavBar
         active={route}
         outputBlocked={outputNavBlocked}

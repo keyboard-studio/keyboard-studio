@@ -180,6 +180,13 @@ export interface BaselineDocFindingsArgs {
   kpsText: string | null;
   kvksText: string | null;
   touchLayoutJson: string | null;
+  /**
+   * The base's welcome/help stylesheet texts (criterion 11.8, issue #2139):
+   * the baseline must judge the base's images against the same kb.css the
+   * live findings use, or a class-constrained image would be recorded as a
+   * base defect the live check no longer reports (and vice versa).
+   */
+  cssTexts?: readonly string[];
   base: {
     welcomeHtmText: string | null;
     helpPhpText: string | null;
@@ -215,6 +222,7 @@ export function computeBaselineDocFindings(args: BaselineDocFindingsArgs): LintF
       kvksText: args.kvksText,
       touchLayoutJson: args.touchLayoutJson,
       members,
+      ...(args.cssTexts !== undefined ? { cssTexts: args.cssTexts } : {}),
     }),
   );
 }

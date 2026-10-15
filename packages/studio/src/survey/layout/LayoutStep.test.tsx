@@ -39,6 +39,19 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("LayoutStep", () => {
+  it("renders in the shared left-aligned survey page column", () => {
+    mount("en-US");
+    const root = screen.getByTestId("layout-step");
+    // Same column as the identity page (surveyStyles' surveyPageColumn):
+    // 640px measure anchored at the pane's left edge, not this step's old
+    // private 16px inset — the two full-width no-preview pages (#2081)
+    // must match each other and the rest of the app.
+    expect(root.style.maxWidth).toBe("640px");
+    expect(root.style.marginLeft).toBe("0px");
+    expect(root.style.paddingTop).toBe("40px");
+    expect(root.style.paddingLeft).toBe("24px");
+  });
+
   it("preselects the proposal from the language tag and explains why", () => {
     mount("de-DE");
     expect(inputEl().value).toBe("German");
