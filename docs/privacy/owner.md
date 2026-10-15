@@ -69,3 +69,8 @@ written there, not when it was discussed.
 7. **Open actions** — carry every unfinished item from the previous
    review forward by name, with its owner. An item may be closed,
    re-ruled, or carried — never silently dropped.
+8. **Crash-report residue pass** — scan the year's crash issues
+   (`keyboard-studio/crash-reports`) for personal data in free-text
+   fields (error messages, breadcrumbs, decision-log tails); scrub or
+   delete any offender and record the count (spec 096 ruling,
+   2026-10-14).

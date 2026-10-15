@@ -10,7 +10,7 @@
 No document in the repo records what personal data keyboard-studio processes. The inventory had to be reverse-engineered from code for the privacy plan, and it contained a surprise even for the project: the deciding fact about several stores is that **nobody ever decided their retention**:
 
 - Server drafts (Vercel Blob payload + Postgres metadata, `api/drafts/_store.ts`, `api/drafts/schema.sql`) — kept until the user deletes them, by default, not by decision. No TTL, no inactivity rule, no statement.
-- Crash-report issues (`keyboard-studio/crash-reports`) — public and indefinite, again by default.
+- Crash-report issues (`keyboard-studio/crash-reports`) — public; ruled permanent as the project's bug record on 2026-10-14 (see Open rulings).
 - Platform request logs — whatever Vercel's defaults are; never examined.
 
 GDPR Art. 30 requires a record of processing activities; Art. 13 requires the retention period *or the criteria for determining it* to be stated to users. "Until the user deletes it" is a lawful criterion — but only once it is chosen and said (spec 095 says it; this spec chooses and maintains the underlying record). The second failure mode this spec prevents is drift: the next store someone adds (the next `api/` route, the next SDK) silently invalidating the published notice. This repo already knows that failure mode from spec-trace and the gate-coverage registry; the same medicine applies.
@@ -43,9 +43,9 @@ Each row's retention is one of: a period, an event (user deletes; account inacti
 
 ### User Story 3 — Crash-report retention is a decision with a mechanism, not a default (Priority: P2)
 
-Crash issues are the project's bug record, but they are also indefinite public retention of (identity-redacted) user-context data. The ruled rule (see Open rulings) is implemented: e.g. issues closed as fixed are eligible for deletion/anonymisation review after a stated period, executed via the existing label/fingerprint machinery so dedupe keeps working.
+Crash issues are the project's bug record, but they are also indefinite public retention of (identity-redacted) user-context data. The ruled rule (2026-10-14): they are retained permanently as that record, the retention is justified in the processing record, and the annual review (spec 100) includes a residue pass — the year's crash issues scanned for personal data in free-text fields, any offender scrubbed or deleted via the existing label/fingerprint machinery so dedupe keeps working; the retraction endpoint remains the on-request path.
 
-**Independent Test**: Given a crash issue past the ruled threshold in the ruled state, the mechanism (report, script, or manual checklist — as ruled) surfaces it, and acting on it does not break fingerprint dedupe for a recurrence (a recurrence reopens/creates correctly).
+**Independent Test**: Given a crash issue the residue pass (or a retraction request) finds to contain personal data, acting on it (scrub or delete) does not break fingerprint dedupe for a recurrence (a recurrence reopens/creates correctly).
 
 ## Requirements
 
@@ -75,12 +75,12 @@ Crash issues are the project's bug record, but they are also indefinite public r
 
 - **One table, in the repo, in Markdown** — proportionate Art. 30 compliance for a project this size; a register product or a database would be ceremony without a second reader.
 - **Enumeration-diff over honour system** (FR-005): this project's own history (criteria counts, gate coverage) is that hand-maintained lists drift and computed cross-checks don't. The record is prose; its *completeness* is computed.
-- **Retention defaults proposed, rulings flagged**: this spec proposes "drafts: until user deletes (stated), with an inactivity purge as an explicitly separate, later decision" and "crash issues: retained as bug record, reviewable after fix + 24 months" — see Open rulings. The spec does not smuggle either in as settled.
+- **Retention defaults proposed, rulings flagged**: this spec proposed "drafts: until user deletes (stated), with an inactivity purge as an explicitly separate, later decision" and "crash issues: retained as bug record, reviewable after fix + 24 months". Crash retention was RULED 2026-10-14 (permanent bug record + written justification + annual residue review; the fix + 24-month deletion alternative was not taken). The drafts decision remains open — see Open rulings.
 
 ## Open rulings
 
 - **Server-draft retention**: (A) until the user deletes them, stated plainly; (B) plus an inactivity purge (proposed 24 months untouched → notice → delete). A is sufficient and honest; B is better minimisation and more machinery (purge job + warning path).
-- **Crash-issue retention**: keep indefinitely as the public bug record, or the fix + 24-month review proposed above.
+- **Crash-issue retention**: RULED 2026-10-14 — keep permanently as the public bug record, with the justification written into the processing record and an annual personal-data residue review in the spec-100 checklist; the fix + 24-month deletion alternative was not taken.
 
 ## Out of scope
 

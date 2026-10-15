@@ -126,9 +126,14 @@ location · processor · retention rule · deletion mechanism · DSAR hint.
   `keyboard-studio/crash-reports`, filed by a dedicated GitHub App;
   retraction handled by `api/report/crash-retract.ts`.
 - **Processor**: GitHub.
-- **Retention**: retained as a public bug record by default (same as
-  any issue). An alternative (close on fix + 24-month review) is an
-  open ruling in spec 096; this row changes if ruled.
+- **Retention**: **permanent — the public bug record** (ruled
+  2026-10-14). Justification: the content is identity-redacted
+  diagnostics, and the issues are the project's defect history — fix
+  commits and PRs link back to them, duplicates are recognised
+  against them, regressions are diagnosed from them. The retention is
+  reviewed annually (spec 100 checklist): the year's crash issues are
+  scanned for personal-data residue in free-text fields, and any
+  offender is scrubbed or deleted (see Deletion).
 - **Deletion**: retraction endpoint (author-initiated); maintainer
   remediation per spec 098 if personal data is ever found in a report.
 - **DSAR hint**: searchable by content, not by author — there is no
