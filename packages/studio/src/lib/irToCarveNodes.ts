@@ -287,6 +287,11 @@ export function contextToKeys(context: ContextElement[]): string[] {
         break;
       case 'baselayout':
         break;
+      case 'if':
+        // A guard is a condition, not a key — it contributes no key step.
+        // The condition itself is surfaced by precedingContextLabel and
+        // buildCondition, not dropped from the rule.
+        break;
       case 'raw':
         break;
     }
@@ -834,6 +839,7 @@ function precedingContextLabel(elements: ContextElement[]): string {
       case 'index':      parts.push(`indexed char from "${el.storeRef}"`); break;
       case 'context':    parts.push('context'); break;
       case 'baselayout': parts.push('base layout char'); break;
+      case 'if':         parts.push(`when ${el.store} is '${el.value}'`); break;
       case 'raw':
         // Skip structural KMN syntax tokens ('+' separator) — they're codec artifacts, not meaningful context
         if (el.text.trim() !== '+') parts.push('specific input');
@@ -1430,6 +1436,9 @@ type ConditionOutcome =
  *   context() (offset 1 only  -> "after any typed character"
  *     — context(N>1) never reaches here; it's parsed as a RawKmnFragment)
  *   baselayout(value)         -> "only on the '<value>' keyboard layout"
+ *   if(store = 'value')       -> "only when <store> is set to '<value>'"
+ *                                (a sole guard; a guard mixed with other
+ *                                preceding elements stays unrenderable)
  *   index() back-ref, or any  -> unrenderable — the whole producer entry
  *     other/mixed shape          falls back (see charProducers)
  */
@@ -1450,6 +1459,8 @@ function buildCondition(preceding: readonly ContextElement[], ir: KeyboardIR): C
         return { kind: 'text', text: 'after any typed character' };
       case 'baselayout':
         return { kind: 'text', text: `only on the '${el.value}' keyboard layout` };
+      case 'if':
+        return { kind: 'text', text: `only when ${el.store} is set to '${el.value}'` };
       default:
         return { kind: 'unrenderable' };
     }
