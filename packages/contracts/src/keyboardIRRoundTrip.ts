@@ -275,6 +275,7 @@ function contextElementKey(el: ContextElement): string {
     case "context":    return `ctx:${el.offset}`;
     case "index":      return `index:${el.storeRef}:${el.offset}`;
     case "baselayout": return `baselayout:${el.value}`;
+    case "if":         return `if:${el.store}=${el.value}`;
     case "raw":        return `raw:${el.text}`;
     default: {
       const _: never = el;
