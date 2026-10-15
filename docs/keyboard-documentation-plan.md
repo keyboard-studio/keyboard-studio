@@ -45,16 +45,43 @@ coverage table as `U+XXXX`, empty keys with a distinct keycap. When the base shi
 images they are kept and no charts are generated unless the author opts to regenerate (the
 control sits on the checklist's welcome row).
 
-The placeholder text below is strictly a **fallback** — what ships only when Phase F was never
-reached (an early download) or the one required description question is still blank and no
-base content is inherited:
+**Every file is rendered from a form** (spec 102). The six files and the shared welcome/help
+body are fill-in forms in
+[packages/contracts/data/doc-forms.json](../packages/contracts/data/doc-forms.json), owned by the
+content team. A form has two constructs: `{{slot}}` inserts a value and `{{#slot}}…{{/slot}}`
+keeps a section only when its value is non-empty, so an empty section disappears with its
+heading. The slots are listed in
+[packages/engine/src/shared/docSlots.ts](../packages/engine/src/shared/docSlots.ts). To change a
+heading, wording or section order, edit the form: no engine code changes, and `pnpm -r test`
+fails naming the form if it references an unknown slot or does not parse. The version appears
+only in `HISTORY.md` and the year only in `LICENSE.md`.
 
-| File | Placeholder fallback (no Phase F answers yet) |
+**The welcome and help pages explain how the keyboard works**, with no answers needed. They are
+derived from the keyboard as built, including rules inherited from the starting keyboard
+([packages/studio/src/lib/docContent.ts](../packages/studio/src/lib/docContent.ts)):
+
+| Section | Content |
 | --- | --- |
-| `README.md` | `# <displayName>` — a bare heading |
-| `source/readme.htm` | `<name> keyboard` — one line |
-| `source/welcome/welcome.htm` | `Welcome to <name>` — one line, plus the layout-chart section |
-| `source/help/<id>.php` | the help-site header + `<?php /* <name> help */ ?>` |
+| Typing Guide | each produced character outside printable ASCII, its Unicode name and its shortest keystrokes, by code point; a grouped summary above 200 characters |
+| How This Keyboard Works | one paragraph per mechanism the keyboard uses: deadkeys, right-Alt layer, repeat-to-cycle, combining-mark order (wording in `doc-forms.json` under `mechanisms`) |
+| On Phones and Tablets | long-press and flick characters; absent when there is no touch layout |
+| Characters on This Keyboard | every character, grouped as letters, marks, punctuation and symbols, and digits |
+
+Marks sit on a dotted circle and every character carries its Unicode name or `U+XXXX`. With no
+answers at all, the welcome and help pages open with "Welcome to `<name>`" and carry these
+sections; `README.md` has its title, a link to the keyboard's help-site page and the platforms;
+`source/readme.htm` has the name and the help link.
+
+**On an adaptation** the original welcome and help prose comes first and the generated sections
+follow once, between `<!-- ks:generated:start -->` and `<!-- ks:generated:end -->`; an older
+generated block in the original is replaced. If the original already has a table or list
+covering half the typing guide's characters, the guide is left out and the checklist says so.
+
+**Version** (spec 102): a copy (Track 1) is a new keyboard and ships at 1.0, with test builds at
+0.1, 0.2, …; its history opens with "Created from `<id>` v`<version>` via keyboard-studio.". An
+adaptation (Track 2) ships the original's version with its last number increased, as before.
+`&KEYBOARDVERSION`, the `.kps` `<Version>`, the file name and the newest HISTORY heading always
+agree.
 
 **`HISTORY.md` is proposed, not stubbed** (079 FR-010..012): the Phase F `pf_history_entry`
 screen proposes a first entry built from the decision record — the base it started from,
@@ -67,7 +94,7 @@ below (criterion 3.4).
 | File | Auto-generated content |
 | --- | --- |
 | `LICENSE.md` | MIT body + `Copyright © <year> <holder>` line (scaffolder / `ensurePackageFiles`) |
-| `HISTORY.md` | the confirmed proposal, else `## <version> (<date>)\n* Initial release.` (+ the "Adapted from" bullet on an adaptation) |
+| `HISTORY.md` | the confirmed proposal, else `## <version> (<date>)\n* Initial release.`; the "Created from" bullet comes first on a copy, the "Adapted from" bullet alone on an adaptation |
 
 **Thirteen documentation criteria run as Layer C warnings inside the existing validation cycle**
 (079 FR-019; `packages/keyboard-lint/src/checks/docs/`): HISTORY order, cumulativeness, entry

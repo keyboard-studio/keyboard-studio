@@ -8,18 +8,34 @@
 // in-studio preview render from one implementation and cannot visibly disagree
 // (FR-005/FR-010).
 //
-// `welcome.htm` and `help/<id>.php` share ONE rendered body (buildDocSections +
-// renderDocBodyHtml below) — a structural guarantee of FR-005 parity, not a
-// style preference (research D-02). `README.md`/`readme.htm` follow a
-// deliberately narrower shape per docs/keyboard-documentation-plan.md's write
-// order (description, links, platforms only) — the opt-in battery and the
-// default-path extras (usage tips, credits, contact) are welcome/help-page
-// content, never README content.
+// Every file is rendered from its content-owned form (spec 102, `DOC_FORMS`
+// in @keyboard-studio/contracts) by `renderDocForm`; this module computes the
+// slot values, escaped per target file, and owns the Track 2 splice.
+// `welcome.htm` and `help/<id>.php` both render the ONE `body` form — a
+// structural guarantee of FR-005 parity, not a style preference (research
+// D-02). `README.md`/`readme.htm` follow a deliberately narrower shape
+// (description, links, platforms only): the opt-in battery, the default-path
+// extras and the derived sections are welcome/help-page content, never README
+// content.
+//
+// Track 2 (a start keyboard's own page was fetched) keeps that page as the
+// start of the document and adds the generated sections after it, between
+// DOC_GENERATED_START/END. Any earlier generated block in the inherited page
+// is stripped first, so re-rendering never stacks blocks (spec 102 FR-033).
 
-import type { HelpDocsAnswers } from "@keyboard-studio/contracts";
+import { DOC_FORMS, type HelpDocsAnswers } from "@keyboard-studio/contracts";
 import { escapeHtml } from "./escapeHtml.js";
-import { welcomeHtm, readmeHtm, helpSiteHeader, helpPhpStub } from "./packageDocs.js";
+import { helpSiteHeader } from "./packageDocs.js";
 import { layoutChartPlatformFromFilename } from "../layout-chart/filename.js";
+import {
+  DOC_GENERATED_END,
+  DOC_GENERATED_START,
+  escapeDocHtml,
+  escapeDocMarkdown,
+  stripGeneratedBlocks,
+  type DocSlotModel,
+} from "./docSlots.js";
+import { renderDocForm } from "./renderDocForm.js";
 
 export { helpSiteHeader, helpSitePageName, helpPhpStub } from "./packageDocs.js";
 
@@ -29,12 +45,22 @@ export interface DocSection {
   body: string;
 }
 
+/** The derived sections the studio's `buildDocContent` supplies, already escaped for the .htm/.php forms. */
+export type GeneratedDocSlots = Pick<
+  DocSlotModel,
+  "typingGuide" | "mechanisms" | "layoutPictures" | "touchNotes" | "characterInventory"
+>;
+
 export interface HelpDocsRenderInput {
-  /** `null` → placeholder fallback (research D-04); every render path is total. */
+  /** `null` → no answers yet; the forms still render a complete document (spec 102 FR-030). */
   answers: HelpDocsAnswers | null;
   displayName: string;
   primaryBcp47?: string;
   platforms: string[];
+  /** The keyboard id; when set, the README and readme.htm link the keyboard's help-site page. */
+  keyboardId?: string;
+  /** Derived sections from the studio's buildDocContent; absent means none. */
+  generated?: GeneratedDocSlots;
 }
 
 // Opt-in "additional detail" battery (FR-011/FR-014), fixed order per research D-10.
@@ -53,9 +79,8 @@ const OPT_IN_FIELDS: ReadonlyArray<{ key: keyof HelpDocsAnswers; heading: string
 ];
 const OPT_IN_HEADINGS: ReadonlySet<string> = new Set(OPT_IN_FIELDS.map((f) => f.heading));
 const USAGE_TIPS_HEADING = "Usage Tips";
-const ADDITIONAL_DETAIL_HEADING = "Additional Detail";
-const MERGE_BOUNDARY_COMMENT = "<!-- Keyboard Studio additions -->";
-const MERGE_BOUNDARY_HEADING = "Keyboard Studio Additions";
+const CREDITS_HEADING = "Credits";
+const CONTACT_HEADING = "Contact";
 
 function nonBlank(s: string | undefined): string | undefined {
   const t = s?.trim();
@@ -77,9 +102,9 @@ export function buildDocSections(answers: HelpDocsAnswers | null): DocSection[] 
     sections.push({ heading: USAGE_TIPS_HEADING, body: tips.join("\n") });
   }
   const credits = nonBlank(answers.credits);
-  if (credits !== undefined) sections.push({ heading: "Credits", body: credits });
+  if (credits !== undefined) sections.push({ heading: CREDITS_HEADING, body: credits });
   const contactInfo = nonBlank(answers.contactInfo);
-  if (contactInfo !== undefined) sections.push({ heading: "Contact", body: contactInfo });
+  if (contactInfo !== undefined) sections.push({ heading: CONTACT_HEADING, body: contactInfo });
 
   for (const { key, heading } of OPT_IN_FIELDS) {
     const raw = answers[key];
@@ -90,49 +115,78 @@ export function buildDocSections(answers: HelpDocsAnswers | null): DocSection[] 
   return sections;
 }
 
-/** One section's HTML, escaping its free-text body (D-07). Usage tips render as a list. */
-function renderSectionHtml(section: DocSection): string {
-  const heading = `<h2>${escapeHtml(section.heading)}</h2>`;
-  if (section.heading === USAGE_TIPS_HEADING) {
-    const items = section.body
-      .split("\n")
-      .map((line) => `<li>${escapeHtml(line)}</li>`)
-      .join("");
-    return `${heading}<ul>${items}</ul>`;
-  }
-  const paragraphs = section.body
+/** A free-text answer as one `<p>` per non-blank line, escaped (D-07). */
+function paragraphsHtml(body: string): string {
+  return body
     .split("\n")
     .filter((line) => line.trim() !== "")
     .map((line) => `<p>${escapeHtml(line)}</p>`)
     .join("");
-  return `${heading}${paragraphs}`;
 }
 
-/** The full section list's HTML, inserting the "Additional Detail" grouping heading once, before the first opt-in section (T028/D-10) — omitted entirely when no opt-in answer was given. */
-function renderSectionsHtml(sections: DocSection[]): string {
-  const parts: string[] = [];
-  let announcedAdditionalDetail = false;
-  for (const section of sections) {
-    if (OPT_IN_HEADINGS.has(section.heading) && !announcedAdditionalDetail) {
-      parts.push(`<h2>${escapeHtml(ADDITIONAL_DETAIL_HEADING)}</h2>`);
-      announcedAdditionalDetail = true;
+/** The welcome/help author-answer slots, from the one section list: usage tips as a list, the opt-in battery as one slot the form heads with "Additional Detail" (T028/D-10). */
+function answerSlotsHtml(answers: HelpDocsAnswers | null): Partial<DocSlotModel> {
+  const slots: Partial<DocSlotModel> = {};
+  const optIn: string[] = [];
+  for (const section of buildDocSections(answers)) {
+    if (section.heading === USAGE_TIPS_HEADING) {
+      slots.usageTips = `<ul>${section.body
+        .split("\n")
+        .map((line) => `<li>${escapeHtml(line)}</li>`)
+        .join("")}</ul>`;
+    } else if (section.heading === CREDITS_HEADING) {
+      slots.credits = paragraphsHtml(section.body);
+    } else if (section.heading === CONTACT_HEADING) {
+      slots.contactInfo = paragraphsHtml(section.body);
+    } else if (OPT_IN_HEADINGS.has(section.heading)) {
+      optIn.push(`<h2>${escapeHtml(section.heading)}</h2>${paragraphsHtml(section.body)}`);
     }
-    parts.push(renderSectionHtml(section));
   }
-  return parts.join("\n");
+  if (optIn.length > 0) slots.additionalDetail = optIn.join("\n");
+  return slots;
+}
+
+function descriptionOf(input: HelpDocsRenderInput): string | undefined {
+  return input.answers !== null ? nonBlank(input.answers.description) : undefined;
+}
+
+/** The keyboard's help-site page: the author's own help URL, else the keyman.com help page for the id, else none. */
+function helpPageUrl(input: HelpDocsRenderInput): string {
+  const answered = nonBlank(input.answers?.projectHelpUrl);
+  if (answered !== undefined) return answered;
+  const id = nonBlank(input.keyboardId);
+  return id !== undefined ? `https://help.keyman.com/keyboard/${id}` : "";
 }
 
 /**
- * The ONE rendered body shared by welcome.htm and help/<id>.php (FR-005): the
- * description paragraph plus every answered section. Both callers pass this
- * exact string through to their own document/merge wrapper — that identity is
- * the structural parity guarantee, not a byte-comparison after the fact.
+ * The ONE rendered body shared by welcome.htm and help/<id>.php (FR-005,
+ * spec 102 FR-025): the `body` form over the description, every answered
+ * section and the derived sections. `inherited` drops the fallback sentence,
+ * because the inherited prose already introduces the keyboard.
  */
-function renderDocBodyHtml(answers: HelpDocsAnswers | null, description: string): string {
-  const parts = [`<p>${escapeHtml(description)}</p>`];
-  const sectionsHtml = renderSectionsHtml(buildDocSections(answers));
-  if (sectionsHtml !== "") parts.push(sectionsHtml);
-  return parts.join("\n");
+function renderDocBodyHtml(input: HelpDocsRenderInput, inherited: boolean): string {
+  const description = descriptionOf(input);
+  const generated = input.generated;
+  const slots: Partial<DocSlotModel> = {
+    displayName: escapeDocHtml(input.displayName),
+    description: description !== undefined ? escapeDocHtml(description) : "",
+    noDescription: description === undefined && !inherited ? "1" : "",
+    ...answerSlotsHtml(input.answers),
+    ...(generated !== undefined
+      ? {
+          typingGuide: generated.typingGuide,
+          mechanisms: generated.mechanisms,
+          touchNotes: generated.touchNotes,
+          characterInventory: generated.characterInventory,
+        }
+      : {}),
+  };
+  return renderDocForm(DOC_FORMS.forms.body, slots).replace(/\n+$/, "");
+}
+
+/** The generated sections, marked, spliced into an inherited page before `</body>` (FR-033). */
+function spliceGenerated(inheritedPage: string, generated: string): string {
+  return insertBeforeClosingBody(inheritedPage, `${DOC_GENERATED_START}\n${generated}\n${DOC_GENERATED_END}`);
 }
 
 /**
@@ -158,29 +212,14 @@ function setHtmlLang(htmlText: string, lang: string | undefined): string {
   return htmlText.replace(/<html\b/i, `<html lang="${escaped}"`);
 }
 
-/** Insert `addition` just before `</body>` when present, else append below (shared by {@link mergeWithStart} and the FR-006/T051 image-only append path). */
+/** Insert `addition` just before `</body>` when present, else append below. */
 function insertBeforeClosingBody(html: string, addition: string): string {
   const closingBodyIdx = html.toLowerCase().lastIndexOf("</body>");
   if (closingBodyIdx === -1) {
-    return `${html}\n${addition}`;
+    // One newline between page and addition, so re-rendering a stripped page is stable.
+    return html.endsWith("\n") ? `${html}${addition}` : `${html}\n${addition}`;
   }
   return `${html.slice(0, closingBodyIdx)}${addition}\n${html.slice(closingBodyIdx)}`;
-}
-
-/**
- * FR-013: preserve a fetched base's original body verbatim, appending the
- * newly-rendered content below a clearly delineated boundary rather than
- * interleaving into the original prose (research D-05). Inserted just before
- * `</body>` when present, so the base's own document structure survives.
- */
-function mergeWithStart(baseText: string, newBodyHtml: string): string {
-  const addition = `${MERGE_BOUNDARY_COMMENT}\n<h2>${escapeHtml(MERGE_BOUNDARY_HEADING)}</h2>\n${newBodyHtml}`;
-  return insertBeforeClosingBody(baseText, addition);
-}
-
-function buildFreshHtmlDoc(bodyHtml: string, lang: string | undefined): string {
-  const langAttr = nonBlank(lang) !== undefined ? ` lang="${escapeHtml(lang as string)}"` : "";
-  return `<html${langAttr}><body>${bodyHtml}</body></html>`;
 }
 
 const KEYBOARD_LAYOUT_HEADING = "Keyboard Layout";
@@ -281,90 +320,55 @@ function withOneTrailingNewline(s: string): string {
 }
 
 /**
- * The "## Supported Platforms" block rendered from the projected `&TARGETS`
- * tokens — shared by the description path and the no-description fallback
- * (#1906: the generator satisfies its own 5.7 readme-targets check even
- * before the author has written a description). The raw token spellings are
- * kept (`- any`, `- windows`); `expandPlatforms` resolves them the same way
- * it resolves the `.kmn` side, so both sides compare equal. Empty when no
- * platforms are known.
- */
-function supportedPlatformsLines(platforms: readonly string[]): string[] {
-  if (platforms.length === 0) return [];
-  return ["", "## Supported Platforms", ...platforms.map((p) => `- ${p}`)];
-}
-
-/** The description/Links/Supported-Platforms body `renderReadmeMd` shares between the fresh-title path and the FR-006 base-inheritance path, WITHOUT the `# title` heading. */
-function buildReadmeBody(input: HelpDocsRenderInput, description: string): string {
-  const { answers, platforms } = input;
-  const lines: string[] = [description];
-
-  const homeUrl = nonBlank(answers?.projectHomeUrl);
-  const helpUrl = nonBlank(answers?.projectHelpUrl);
-  if (homeUrl !== undefined || helpUrl !== undefined) {
-    lines.push("", "## Links");
-    if (homeUrl !== undefined) lines.push(`- Keyboard homepage: ${homeUrl}`);
-    if (helpUrl !== undefined) lines.push(`- Online help: ${helpUrl}`);
-  }
-
-  if (platforms.length > 0) {
-    lines.push(...supportedPlatformsLines(platforms));
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * `README.md` — package-listing description, links, and supported platforms.
- * No version/copyright (FR-007).
+ * `README.md` — package-listing description, links and supported platforms,
+ * from the `readmeMd` form. No version/copyright (FR-007), no typing guide
+ * (spec 102 FR-029). Platform tokens keep their raw spellings (`- any`), so
+ * the generator satisfies its own 5.7 readme-targets check (#1906) even
+ * before a description is written.
  *
- * @param startReadmeMdText spec 080 FR-006: a fetched base's own `README.md`,
- *   inherited even before the author has answered anything. `null` keeps
- *   the FR-002 fallback shape (the bare `# title` stub, plus the Supported
- *   Platforms section whenever projected `&TARGETS` are known). Non-null: no
- *   description yet -> the base text verbatim (one trailing newline); a
- *   description answered -> the base text, one blank line, then the tool's
- *   own sections WITHOUT a second `# title` heading (the base already has one).
+ * @param startReadmeMdText spec 080 FR-006: a fetched base's own `README.md`.
+ *   No description yet -> the base text verbatim (one trailing newline); a
+ *   description answered -> the base text, one blank line, then the form's
+ *   sections WITHOUT a second `# title` heading (the base already has one).
  */
 export function renderReadmeMd(
   input: HelpDocsRenderInput,
   startReadmeMdText: string | null = null,
 ): string {
-  const { displayName } = input;
-  const description = input.answers !== null ? nonBlank(input.answers.description) : undefined;
-
-  if (startReadmeMdText !== null) {
-    if (description === undefined) return withOneTrailingNewline(startReadmeMdText);
-    return `${startReadmeMdText.replace(/\s+$/, "")}\n\n${buildReadmeBody(input, description)}\n`;
+  const description = descriptionOf(input);
+  if (startReadmeMdText !== null && description === undefined) {
+    return withOneTrailingNewline(startReadmeMdText);
   }
-
-  if (description === undefined) {
-    // FR-002 fallback — byte-identical to the bare scaffolder stub when no
-    // platforms are known; with projected &TARGETS the Supported Platforms
-    // section is appended so the generated README passes the tool's own 5.7
-    // readme-targets check (#1906).
-    const lines = [`# ${displayName}`, ...supportedPlatformsLines(input.platforms)];
-    return `${lines.join("\n")}\n`;
-  }
-
-  return `# ${displayName}\n\n${buildReadmeBody(input, description)}\n`;
+  const rendered = withOneTrailingNewline(
+    renderDocForm(DOC_FORMS.forms.readmeMd, {
+      // An empty title slot drops the `# title` line under an inherited README.
+      displayName: startReadmeMdText === null ? escapeDocMarkdown(input.displayName) : "",
+      description: description !== undefined ? escapeDocMarkdown(description) : "",
+      helpPageUrl: helpPageUrl(input),
+      projectHomeUrl: nonBlank(input.answers?.projectHomeUrl) ?? "",
+      platforms: input.platforms.map((p) => `- ${p}`).join("\n"),
+    }),
+  );
+  return startReadmeMdText === null ? rendered : `${startReadmeMdText.replace(/\s+$/, "")}\n${rendered}`;
 }
 
-/** `source/readme.htm` — the same description, condensed for the package-details popup. */
+/** `source/readme.htm` — the description, condensed for the package-details popup, and a pointer to the help page (spec 102 FR-029). */
 export function renderReadmeHtm(input: HelpDocsRenderInput): string {
-  const { answers, displayName } = input;
-  const description = answers !== null ? nonBlank(answers.description) : undefined;
-  if (description === undefined) {
-    // FR-002 fallback — byte-identical to today's scaffolder/packageDocs stub.
-    return readmeHtm(displayName);
-  }
-  return `<html><body><h1>${escapeHtml(displayName)}</h1><p>${escapeHtml(description)}</p></body></html>`;
+  const description = descriptionOf(input);
+  return renderDocForm(DOC_FORMS.forms.readmeHtm, {
+    displayName: escapeDocHtml(input.displayName),
+    description: description !== undefined ? escapeDocHtml(description) : "",
+    noDescription: description === undefined ? "1" : "",
+    helpPageUrl: escapeDocHtml(helpPageUrl(input)),
+  });
 }
 
 /**
- * `source/welcome/welcome.htm` — the first-run page. Merges with the base's own
- * welcome page when one was fetched (FR-013); inherits it verbatim even before
- * anything is authored (FR-006).
+ * `source/welcome/welcome.htm` — the first-run page, from the `welcome` form
+ * around the shared body. When the base's own welcome page was fetched (Track
+ * 2), that page comes first and the generated sections follow in one marked
+ * block (spec 102 FR-032/FR-033); with nothing generated it ships verbatim
+ * (FR-006).
  *
  * @param welcomeImageFiles bare names of the image files shipped beside the page
  *   (spec 080 FR-004/R9/T051) — rendered as a grouped "Keyboard Layout" section.
@@ -378,36 +382,22 @@ export function renderWelcomeHtm(
   startWelcomeHtmText: string | null,
   welcomeImageFiles: readonly string[] = [],
 ): string {
-  const { answers, displayName, primaryBcp47 } = input;
-  const description = answers !== null ? nonBlank(answers.description) : undefined;
-  const unlistedFiles =
-    startWelcomeHtmText !== null
-      ? filesNotReferencedIn(welcomeImageFiles, startWelcomeHtmText)
-      : welcomeImageFiles;
-  const layoutSection = renderWelcomeLayoutSection(unlistedFiles);
+  const lang = descriptionOf(input) !== undefined ? proseLang(input.answers, input.primaryBcp47) : undefined;
 
-  if (description === undefined) {
-    if (startWelcomeHtmText !== null) {
-      // FR-006: inherit the base page even before anything is authored —
-      // never the tool placeholder once a base welcome page exists.
-      if (layoutSection === "") return startWelcomeHtmText;
-      return insertBeforeClosingBody(startWelcomeHtmText, layoutSection);
-    }
-    // FR-002 fallback — byte-identical to today's placeholder when there are
-    // no images to reference. With images (a Track 1 copy of an illustrated
-    // base, produced before Phase F) the placeholder still references them,
-    // so the carried files are never orphaned.
-    if (layoutSection === "") return welcomeHtm(displayName);
-    return `<html><body><p>Welcome to ${escapeHtml(displayName)}</p>${layoutSection}</body></html>`;
+  if (startWelcomeHtmText !== null) {
+    const inherited = stripGeneratedBlocks(startWelcomeHtmText);
+    const layoutSection = renderWelcomeLayoutSection(filesNotReferencedIn(welcomeImageFiles, inherited));
+    const generated = [renderDocBodyHtml(input, true), layoutSection].filter((part) => part !== "").join("\n");
+    // FR-006: with nothing generated, the inherited page ships as it is.
+    if (generated === "") return inherited;
+    return setHtmlLang(spliceGenerated(inherited, generated), lang);
   }
 
-  const bodyHtml = renderDocBodyHtml(answers, description);
-  const bodyWithLayout = layoutSection === "" ? bodyHtml : `${bodyHtml}\n${layoutSection}`;
-  const doc =
-    startWelcomeHtmText !== null
-      ? mergeWithStart(startWelcomeHtmText, bodyWithLayout)
-      : buildFreshHtmlDoc(bodyWithLayout, proseLang(answers, primaryBcp47));
-  return setHtmlLang(doc, proseLang(answers, primaryBcp47));
+  return renderDocForm(DOC_FORMS.forms.welcome, {
+    docLang: lang !== undefined ? escapeDocHtml(lang) : "",
+    body: renderDocBodyHtml(input, false),
+    layoutPictures: renderWelcomeLayoutSection(welcomeImageFiles),
+  });
 }
 
 /**
@@ -434,10 +424,11 @@ function helpFragmentFromWelcome(welcomeHtml: string): string {
 }
 
 /**
- * `source/help/<id>.php` — the online help page. Merges with the base's own help
- * page when one was fetched (FR-013); a base page keeps its own header and is
- * never given a second one. Inherits the base page verbatim even before
- * anything is authored (FR-006). A FRESH page (no base help text) opens with
+ * `source/help/<id>.php` — the online help page. When the base's own help page
+ * was fetched, it comes first and the generated sections follow in one marked
+ * block, exactly as on the welcome page; a base page keeps its own header and
+ * is never given a second one, and with nothing generated it ships verbatim
+ * (FR-006). A FRESH page (no base help text) opens with
  * the standard help-site header (spec 080 FR-003) above the same *inner* body
  * welcome.htm renders — without wrapping `<html>`/`<body>` tags (criteria.md
  * §11.4 / keymanapp/keyboards#3877: the site's `header.php` owns the document
@@ -463,24 +454,20 @@ export function renderHelpPhp(
       renderWelcomeHtm(input, startWelcomeHtmText),
     )}`;
   }
-  const description = answers !== null ? nonBlank(answers.description) : undefined;
-  if (description === undefined) {
-    // FR-006: inherit the base help page even before anything is authored.
-    if (startHelpPhpText !== null) return startHelpPhpText;
-    // FR-002 fallback — byte-identical to the scaffolder stub: standard header
-    // + the bare placeholder comment (spec 080 US1-3: an early production's
-    // help page still renders on the help site).
-    return helpPhpStub(displayName);
-  }
-
-  const bodyHtml = renderDocBodyHtml(answers, description);
   if (startHelpPhpText !== null) {
-    // Inherited page may already be a full document (older bases) or a
-    // header-plus-fragment (criteria-compliant). setHtmlLang is a no-op when
-    // there is no `<html>` tag.
-    return setHtmlLang(mergeWithStart(startHelpPhpText, bodyHtml), proseLang(answers, primaryBcp47));
+    const inherited = stripGeneratedBlocks(startHelpPhpText);
+    const generated = renderDocBodyHtml(input, true);
+    // FR-006: with nothing generated, the inherited page ships as it is.
+    if (generated === "") return inherited;
+    // An inherited page may be a full document (older bases) or a
+    // header-plus-fragment; setHtmlLang is a no-op without an `<html>` tag.
+    const lang = descriptionOf(input) !== undefined ? proseLang(answers, primaryBcp47) : undefined;
+    return setHtmlLang(spliceGenerated(inherited, generated), lang);
   }
   // Fresh page: header + body fragment only — never nest a document inside
   // the site's `header.php` chrome (criterion 11.4).
-  return `${helpSiteHeader(displayName)}${bodyHtml}`;
+  return renderDocForm(DOC_FORMS.forms.help, {
+    helpHeader: helpSiteHeader(displayName),
+    body: renderDocBodyHtml(input, false),
+  });
 }

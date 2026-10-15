@@ -1,0 +1,1008 @@
+{
+  "workflow": "companion",
+  "specName": "102-keyboard-docs-templates",
+  "branch": "095-keyboard-docs-templates",
+  "selectedAt": "2026-10-15T01:28:08.352Z",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:28:21.618Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-10-15T01:30:44.277Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:30:44.299Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:44:08.531Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:47:39.849Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:47:44.543Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:49:36.833Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:53:28.491Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T01:53:30.778Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-10-15T01:56:12.822Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:02:40.049Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:05:55.427Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:06:29.830Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:07:32.075Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:08:26.279Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:09:29.283Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:10:22.822Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:11:32.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:17:06.949Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:17:07.335Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:17:07.649Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:20:43.785Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:20:44.118Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:22:54.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:24:21.091Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:24:21.419Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:32:25.827Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:39:52.631Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:39:52.974Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:41:50.716Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:41:51.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:41:51.274Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:48:21.970Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:49:40.759Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:49:41.077Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:49:41.328Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:50:48.450Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:52:00.662Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:53:04.584Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:53:40.188Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:53:40.587Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T03:03:53.572Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T03:03:53.706Z"
+    }
+  ],
+  "telemetryInstanceId": "8782d5f1-b6c3-42a7-aac0-44a5387009cf",
+  "assistant": "claude",
+  "decisions": [
+    {
+      "decision": "No new question: Copy/Adapt comes from the existing authoring-track answer (Track 1/Track 2)",
+      "why": "User ruling 2026-10-14; a second Copy/Adapt question would give Adapt two meanings",
+      "rejected": "new start-relationship decision; three-way track question"
+    },
+    {
+      "decision": "Fix Copy version at resolvePublishVersion/resolveTestBuildVersion (new-from-base -> 1.0, tests 0.N); keep OutputVersionMode literals",
+      "why": "All callers already route through the resolver; new-from-base is a persisted DecisionRecord value",
+      "rejected": "copy/adapt-variant/adapt-existing mode rename"
+    },
+    {
+      "decision": "Always carry the resolved version on the identity overlay; delete the copy-version preservation in projectWorkingCopyVfs",
+      "why": "Single descriptor writer then agrees by construction, including an unrenamed copy",
+      "rejected": "regex-patching the .kps on the copy path"
+    },
+    {
+      "decision": "Copy lineage line mirrors the Track 2 line: Created from <id> v<ver> via keyboard-studio.",
+      "why": "Track 2 history must not change and stored edited bullets match it verbatim",
+      "rejected": "design note backticked Keyboard Studio form"
+    },
+    {
+      "decision": "Derived doc content built in studio lib/docContent.ts reusing charProducers",
+      "why": "Keystroke derivation already exists in studio; synchronous keeps preview inside D3",
+      "rejected": "engine buildDocSlotModel driven by the async simulator"
+    },
+    {
+      "decision": "Forms and mechanism paragraphs in one JSON data file packages/contracts/data/doc-forms.json",
+      "why": "JSON imports work in Node, Vitest and Vite with no codegen",
+      "rejected": ".tmpl files plus prebuild codegen"
+    },
+    {
+      "decision": "Generated-block markers plus stripping of existing blocks from inherited prose",
+      "why": "Output renders from pristine base text; the only duplication case is adapting a studio-generated keyboard",
+      "rejected": "markers without stripping"
+    },
+    {
+      "decision": "Track 2 detection is 'start prose present': helpDocsRender splices one ks:generated block into the inherited page before </body>; Track 1 renders the welcome/help forms whole",
+      "why": "start welcome/help text is non-null only on the adapt path, and an inherited page is a full document the welcome form cannot wrap",
+      "rejected": "an inheritedProse slot inside the body form"
+    },
+    {
+      "decision": "Added slots noDescription and the optional HelpDocsRenderInput.keyboardId",
+      "why": "the form needs a content-owned fallback sentence with only two constructs, and FR-029 needs the help-site link",
+      "rejected": "fallback wording in engine code"
+    },
+    {
+      "decision": "Forms check test lives in engine (docForms.check.test.ts)",
+      "why": "contracts cannot import parseDocForm/DOC_SLOT_IDS from the engine",
+      "rejected": "packages/contracts/src/docForms.test.ts as the contract named"
+    },
+    {
+      "decision": "Fixture deadkeys use the corpus store fan-out shape and numeric ids",
+      "why": "named deadkeys parse as opaque fragments and dk(1)+'e' resolves no keystroke path in charProducers",
+      "rejected": "extending keySequenceLabel for the dk + literal shape"
+    },
+    {
+      "decision": "History bullets stay unescaped in the Markdown form",
+      "why": "escaping would change Track 2 HISTORY output (FR-007) and bullets are authored Markdown",
+      "rejected": "escapeDocMarkdown on bullets"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan, research, data model and contracts for 102 after the no-new-question ruling",
+      "key_finding": "The studio already has a Copy/Adapt track question and a static keystroke derivation (charProducers), so version needs a resolver-level fix and docs need no simulator"
+    },
+    "tasks": {
+      "summary": "32 tasks: Setup(1), Foundational forms pipeline(10, 4 waves), US1 version(6), US2 derived content(5), US3 forms checks(1), US4 inherited docs(5), Polish(4); US2 sequenced after US1 for shared serializeWorkingCopy.ts"
+    },
+    "implement": {
+      "summary": "Copy ships at 1.0; docs render through content-owned forms with derived typing guide, mechanisms, touch notes and inventory; adaptations keep original prose with one marked generated block"
+    }
+  },
+  "approach": "Copy (Track 1) ships 1.0 via a resolver-level change, with Track 2 untouched. A synchronous studio builder derives typing guide, mechanisms, touch notes and inventory from the working-copy IR, and an engine two-construct renderer fills content-owned forms in contracts/data/doc-forms.json for all six documentation files.",
+  "coverage": {
+    "FR-001": {
+      "title": "Version and docs driven by the existing track answer",
+      "tasks": [
+        "T016"
+      ]
+    },
+    "FR-004": {
+      "title": "Copy publishes at 1.0",
+      "tasks": [
+        "T012",
+        "T014"
+      ],
+      "tests": [
+        "packages/engine/src/output/output-version.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts",
+        "packages/studio/e2e/copy-version.spec.ts"
+      ]
+    },
+    "FR-007": {
+      "title": "Track 2 version behaviour unchanged",
+      "tasks": [
+        "T006",
+        "T012",
+        "T014"
+      ]
+    },
+    "FR-008": {
+      "title": "Test builds sort below publish; Copy build N is 0.N",
+      "tasks": [
+        "T012",
+        "T014"
+      ]
+    },
+    "FR-009": {
+      "title": "Four version sites agree; project format version untouched",
+      "tasks": [
+        "T013",
+        "T015",
+        "T016"
+      ],
+      "tests": [
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts"
+      ]
+    },
+    "FR-010": {
+      "title": "Strictly-greater criterion N/A for Copy",
+      "tasks": [
+        "T014",
+        "T032"
+      ]
+    },
+    "FR-011": {
+      "title": "Copy history carries Created from lineage line",
+      "tasks": [
+        "T006",
+        "T011",
+        "T013",
+        "T016"
+      ],
+      "tests": [
+        "packages/engine/src/shared/renderHistoryMd.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts"
+      ]
+    },
+    "FR-012": {
+      "title": "Derived content from keyboard as built",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-013": {
+      "title": "Typing guide by code point with shortest keystrokes",
+      "tasks": [
+        "T018",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/lib/docContent.test.ts"
+      ]
+    },
+    "FR-014": {
+      "title": "Grouped summary above 200 characters",
+      "tasks": [
+        "T001",
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-015": {
+      "title": "One paragraph per used input method, fixed order",
+      "tasks": [
+        "T002",
+        "T018",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/lib/docContent.test.ts"
+      ]
+    },
+    "FR-016": {
+      "title": "Existing layout pictures included unchanged",
+      "tasks": [
+        "T021",
+        "T022"
+      ]
+    },
+    "FR-017": {
+      "title": "Phone/tablet section only when a touch layout exists",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-018": {
+      "title": "Grouped character inventory",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-019": {
+      "title": "Characters identified by code point, dotted circle, U+XXXX",
+      "tasks": [
+        "T018",
+        "T020"
+      ]
+    },
+    "FR-020": {
+      "title": "Deterministic generated docs",
+      "tasks": [
+        "T004",
+        "T018",
+        "T024"
+      ]
+    },
+    "FR-021": {
+      "title": "Preview updates inside existing derivation, no timer",
+      "tasks": [
+        "T019",
+        "T021"
+      ],
+      "tests": [
+        "packages/studio/src/hooks/useDocsPreview.test.ts"
+      ]
+    },
+    "FR-022": {
+      "title": "Each doc file rendered from content-owned form",
+      "tasks": [
+        "T002",
+        "T007"
+      ]
+    },
+    "FR-023": {
+      "title": "Only insert and include-if-non-empty constructs",
+      "tasks": [
+        "T002",
+        "T004"
+      ],
+      "tests": [
+        "packages/engine/src/shared/renderDocForm.test.ts"
+      ]
+    },
+    "FR-024": {
+      "title": "Empty section omitted with heading",
+      "tasks": [
+        "T002",
+        "T004",
+        "T023"
+      ]
+    },
+    "FR-025": {
+      "title": "Welcome and help share one body form",
+      "tasks": [
+        "T007",
+        "T023"
+      ],
+      "tests": [
+        "packages/studio/src/lib/serializeWorkingCopy.forms.test.ts"
+      ]
+    },
+    "FR-026": {
+      "title": "Version only in history, year only in licence, one holder",
+      "tasks": [
+        "T005",
+        "T008",
+        "T023"
+      ]
+    },
+    "FR-027": {
+      "title": "Values escaped for HTML and Markdown",
+      "tasks": [
+        "T003",
+        "T007",
+        "T023"
+      ],
+      "tests": [
+        "packages/studio/src/lib/serializeWorkingCopy.forms.test.ts",
+        "packages/engine/src/shared/docSlots.test.ts"
+      ]
+    },
+    "FR-028": {
+      "title": "Checks fail on unknown blank or parse error",
+      "tasks": [
+        "T005"
+      ],
+      "tests": [
+        "packages/engine/src/shared/docForms.check.test.ts"
+      ]
+    },
+    "FR-029": {
+      "title": "README form content; no typing guide in README",
+      "tasks": [
+        "T002",
+        "T005"
+      ]
+    },
+    "FR-030": {
+      "title": "Complete docs with no answers",
+      "tasks": [
+        "T023"
+      ]
+    },
+    "FR-031": {
+      "title": "Existing answers keep meaning and appear",
+      "tasks": [
+        "T002",
+        "T007",
+        "T032"
+      ]
+    },
+    "FR-032": {
+      "title": "Adapt carries original prose first",
+      "tasks": [
+        "T007",
+        "T024"
+      ]
+    },
+    "FR-033": {
+      "title": "Generated block markers, old block stripped",
+      "tasks": [
+        "T003",
+        "T007",
+        "T024"
+      ],
+      "tests": [
+        "packages/studio/src/lib/serializeWorkingCopy.inheritedDocs.test.ts",
+        "packages/engine/src/shared/docSlots.test.ts"
+      ]
+    },
+    "FR-034": {
+      "title": "Typing guide suppressed at 50% overlap with checklist note",
+      "tasks": [
+        "T018",
+        "T020",
+        "T024",
+        "T025",
+        "T026",
+        "T027"
+      ],
+      "tests": [
+        "packages/studio/src/lib/serializeWorkingCopy.inheritedDocs.test.ts",
+        "packages/studio/src/components/DocumentationChecklist.test.tsx"
+      ]
+    },
+    "FR-035": {
+      "title": "New UI text uses spec 046 message ids",
+      "tasks": [
+        "T026",
+        "T028"
+      ]
+    }
+  },
+  "currentTask": "T032",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Eight inline .kmn fixtures (deadkey store fan-out, ralt, rota, combining, touch, plain, 210-char large) parsed to IR",
+      "files": [
+        "packages/studio/src/lib/docContent.fixtures.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "DocSlotModel, DOC_SLOT_IDS (total-record guarded), generated-block markers, stripGeneratedBlocks, HTML and Markdown escapers, 7 tests",
+      "files": [
+        "packages/engine/src/shared/docSlots.ts",
+        "packages/engine/src/shared/docSlots.test.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "doc-forms.json (7 forms as line arrays + 4 mechanism paragraphs), strict DocFormsSchema, DOC_FORMS loader, barrel export",
+      "files": [
+        "packages/contracts/data/doc-forms.json",
+        "packages/contracts/src/docForms.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "renderDocForm/parseDocForm/DocFormParseError: two constructs, standalone-line tags, dropped block takes its newline; 11 tests",
+      "files": [
+        "packages/engine/src/shared/renderDocForm.ts",
+        "packages/engine/src/shared/renderDocForm.test.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added DOC_FORMS check test: every form parses, references only DOC_SLOT_IDS, version only in history, year only in license, no typingGuide in readmeMd; failures name the form",
+      "files": [
+        "packages/engine/src/shared/docForms.check.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "licenseMd(holder, year) now renders the license form from DOC_FORMS via renderDocForm; signature and output unchanged for null and non-blank holders",
+      "files": [
+        "packages/engine/src/shared/packageDocs.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "renderHistoryMd: adaptedFrom replaced by lineage (created|adapted), createdFromBullet added, entry rendered through the history form; tests cover adapted parity, created stub, dedupe",
+      "files": [
+        "packages/engine/src/shared/renderHistoryMd.ts",
+        "packages/engine/src/shared/renderHistoryMd.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "helpDocsRender rebuilt on renderDocForm: shared body form for welcome/help, input gains generated + keyboardId, per-file escaping, Track 2 marked block with strip; 75 tests (10 updated for FR-030/FR-033)",
+      "files": [
+        "packages/engine/src/shared/helpDocsRender.ts",
+        "packages/engine/src/shared/helpDocsRender.test.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Engine barrel exports renderer, slot vocabulary, markers, escapers, createdFromBullet, HistoryLineage, GeneratedDocSlots",
+      "files": [
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "adapt-staging passes lineage {kind: adapted}",
+      "files": [
+        "packages/engine/src/output/adapt-staging.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Docs-lint history render passes lineage: adapted on Track 2, created with start id and raw version on Track 1",
+      "files": [
+        "packages/studio/src/hooks/useDocumentationFindings.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Version table covers both modes, 1/2/3-part, invalid and empty sources; Copy publishes 1.0 and test builds 0.N",
+      "files": [
+        "packages/engine/src/output/output-version.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "resolvePublishVersion returns 1.0 for new-from-base; resolveTestBuildVersion gives 0.N for new-from-base before the invalid-version check",
+      "files": [
+        "packages/engine/src/output/output-version.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Package-consistency cases (real projection): Copy from 2.3 is 1.0 in KEYBOARDVERSION, kps Version, result version and HISTORY heading for renamed and unrenamed ids; FileVersion 7.0 kept; Created-from lineage; Adapt unchanged at 2.4",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Removed copy-path start-version preservation in the id-rename pass; resetIdentity takes the overlay version or its 1.0 default",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "publishVersion from resolvePublishVersion on both tracks; shipped version always on the identity overlay, result version and HISTORY heading; created/adapted lineage passed to renderHistoryMd",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Playwright E2E: Copy of basic_kbdfr (1.1) shows test build 0.1 on Output and downloads <id>-1.0.zip with 1.0 in kmn, kps and HISTORY plus Created-from lineage; passed locally",
+      "files": [
+        "packages/studio/e2e/copy-version.spec.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "docContent.test.ts: 40 per-slot snapshots over 8 fixtures plus coverage, tie-break, threshold, mechanism order, touch, inventory, determinism and suppression cases (29 tests)",
+      "files": [
+        "packages/studio/src/lib/docContent.test.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "buildDocContent: typing guide (fewest-step charProducers, 200-row summary), R7 mechanisms, touch long-press/flick notes, grouped inventory, R11 suppression; pure and synchronous",
+      "files": [
+        "packages/studio/src/lib/docContent.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "useDocsPreview tests: derived sections on welcome and help, IR change updates them, no timer under fake timers, typingGuideSuppressed returned",
+      "files": [
+        "packages/studio/src/hooks/useDocsPreview.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "useDocsPreview feeds buildDocContent (working IR, touch layout, start prose) and keyboardId into the memoised render; returns typingGuideSuppressed",
+      "files": [
+        "packages/studio/src/hooks/useDocsPreview.ts",
+        "packages/studio/src/lib/docContent.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Serializer passes buildDocContent slots and resolvedKeyboardId into docsInput; inherited prose on Track 2 only",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Track 2 output test: prose first, one marked block, >=50% table suppresses guide, stale block replaced, deterministic; Copy has no prose or markers (6 tests)",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.inheritedDocs.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Checklist tests: note shown when typingGuideSuppressed, hidden otherwise",
+      "files": [
+        "packages/studio/src/components/DocumentationChecklist.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "DocumentationChecklist typingGuideSuppressed prop renders output.docs.checklist.typingGuideSuppressed on the welcome row via Trans",
+      "files": [
+        "packages/studio/src/components/DocumentationChecklist.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "OutputScreen passes useDocsPreview().typingGuideSuppressed to DocumentationChecklist",
+      "files": [
+        "packages/studio/src/components/OutputScreen.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Output-level forms test over 8 fixtures: version/year placement, one holder, welcome=help body, empty sections dropped, complete no-answer docs, escaping, body-form heading swap via vi.mock (41 tests)",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.forms.test.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Extracted and compiled catalogs: id in en with source text, fr empty per Crowdin convention; catalog lint OK",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json",
+        "packages/studio/src/locales/en/messages.js",
+        "packages/studio/src/locales/fr/messages.js"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Layer C runDocChecks over all 8 fixtures' projected output (all six members present), no answers and full answers: zero findings (16 tests)",
+      "files": [
+        "packages/studio/src/lib/collectDocLintInput.forms.test.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Documentation plan: forms, derived sections, Track 2 generated block, Copy/Adapt version rule; stale placeholder table replaced",
+      "files": [
+        "docs/keyboard-documentation-plan.md"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Quickstart with hand checks for US1-US4",
+      "files": [
+        "specs/102-keyboard-docs-templates/quickstart.md"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "pnpm build green, pnpm lint 0 errors, pnpm -r test green except 2 pre-existing ../keyboards corpus-drift tests, copy-version e2e passes; SC-001..006 covered by T012/T013/T018/T023/T024/T029, SC-007 contract untouched"
+    }
+  },
+  "verified": [
+    {
+      "what": "build",
+      "command": "pnpm --filter @keyboard-studio/engine build",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 0.5,
+      "result": "> @keyboard-studio/engine@0.2.0 build E:\\Projects\\keyboard-studio\\packages\\engine · > tsc -b"
+    },
+    {
+      "what": "lint",
+      "command": "pnpm lint",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 47.5,
+      "result": "> keyboard-studio@0.1.0 spec-number-lint E:\\Projects\\keyboard-studio · > node utilities/spec-number-lint/index.js · [OK] spec-number-lint: 91 spec folder(s), no number collisions"
+    },
+    {
+      "what": "studio typecheck",
+      "command": "pnpm --filter @keyboard-studio/studio exec tsc --noEmit -p .",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 16.0,
+      "result": "no output"
+    },
+    {
+      "what": "spec 102 tests",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run src/shared src/output/output-version.test.ts",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 1.8,
+      "result": "      Tests  210 passed (210) ·    Start at  22:05:05 ·    Duration  1.06s (transform 2.69s, setup 2.45s, import 2.26s, tests 230ms, environment 0ms)"
+    },
+    {
+      "what": "spec 102 studio tests",
+      "command": "pnpm --filter @keyboard-studio/studio exec vitest run src/lib/docContent.test.ts src/lib/serializeWorkingCopy src/lib/collectDocLintInput.forms.test.ts src/hooks/useDocsPreview.test.ts src/components/DocumentationChecklist.test.tsx src/lib/projectWorkingCopyVfs.test.ts",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 23.5,
+      "result": "[BABEL] Note: The code generator has deoptimised the styling of E:\\Projects\\keyboard-studio\\packages\\contracts\\dist\\unicode\\unicodeData.generated.js as it exceeds the max of 500KB. · [BABEL] Note: The code generator has deoptimised the styling of E:\\Projects\\keyboard-studio\\packages\\engine\\dist\\langtags\\generated\\index.js as it exceeds the max of 500KB. · [BABEL] Note: The code generator has deoptimised the styling of E:\\Projects\\keyboard-studio\\packages\\glottolog\\dist\\generated\\index.js as it exceeds the max of 500KB."
+    },
+    {
+      "what": "full workspace tests",
+      "command": "pnpm -r --no-bail test",
+      "result": "all green except 2 pre-existing corpus tests (engine recognizer basic_kbdfr, studio referenceBaseLayouts codegen)",
+      "warnings": [
+        "../keyboards is on a personal-fork 'bougainville' branch, not the canonical fork master; both failures read that corpus"
+      ]
+    },
+    {
+      "what": "copy-version Playwright e2e",
+      "command": "npx playwright test e2e/copy-version.spec.ts --project=desktop",
+      "result": "1 passed"
+    },
+    {
+      "what": "SC-007 saved answers",
+      "command": "git diff main -- packages/contracts/src/help-docs.ts packages/contracts/src/decisionRecord.ts",
+      "result": "no change to the HelpDocsAnswers or decision contracts"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "A README with only a homepage answer and no keyboardId gets no Links section (the block keys on helpPageUrl). The serializer and preview always pass keyboardId, so only direct callers without an id are affected.",
+      "step": "implement"
+    },
+    {
+      "note": "// simplified: base = printable ASCII in docContent.ts; when another base layout is declared, derive the set from it.",
+      "step": "implement"
+    },
+    {
+      "note": "charProducers resolves no keystroke path for the plain `dk(n) + 'x'` deadkey shape (only a triggerFloor), so such keyboards get a one-step guide row naming the base key only.",
+      "step": "implement"
+    },
+    {
+      "note": "Two pre-existing corpus-drift test failures remain (engine recognizer basic_kbdfr, studio referenceBaseLayouts codegen) because ../keyboards is not on the canonical fork master.",
+      "step": "implement"
+    }
+  ],
+  "last_action": "all 32 tasks done; build, lint, workspace tests green except 2 pre-existing corpus tests; e2e passes"
+}
