@@ -226,14 +226,14 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
         <Trans id="dashboard.strategyTree.postfixStartingNote">
           Note: rule 3a (postfix-preference intercept → {"S-03"}, shown above between rules 3 and 4) is
           implemented in <code style={{ fontFamily: MONO }}>{"selectStrategy()"}</code>. When a starting point is
-          instantiated (either track), its IR is scanned for the unconditional postfix
-          sequence-replace shape and{" "}
+          instantiated (either track), its IR is scanned for the postfix
+          sequence-replace shape — both the unconditional form in its rules and the{" "}
+          <code style={{ fontFamily: MONO }}>{"if()"}</code>-guarded form preserved as raw fragments — and{" "}
           <code style={{ fontFamily: MONO }}>{'markInputOrder="postfix"'}</code> is seeded onto{" "}
           <code style={{ fontFamily: MONO }}>{"irAxes"}</code>{" "}
           (<code style={{ fontFamily: MONO }}>{'source: "import-derived"'}</code> below), so rule
-          3a now fires live for such a starting point — though{" "}
-          <code style={{ fontFamily: MONO }}>{"if()"}</code>-guarded rules are still opaque, so no shipping{" "}
-          <code style={{ fontFamily: MONO }}>{"sil_ipa"}</code> rule reaches it yet. No survey phase elicits
+          3a now fires live for such a starting point, including the shipping{" "}
+          <code style={{ fontFamily: MONO }}>{"sil_ipa"}</code> keyboard's guarded postfix rules. No survey phase elicits
           it end-to-end yet — that half remains deferred.
         </Trans>
       </p>
