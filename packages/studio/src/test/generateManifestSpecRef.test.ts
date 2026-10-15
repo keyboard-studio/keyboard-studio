@@ -11,14 +11,14 @@ import { describe, it, expect } from "vitest";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { manifest } from "./manifest.ts";
+import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { buildManifestSpecRef } from "./generateManifestSpecRef.ts";
-import type { Step } from "./types.ts";
+import type { Step } from "../steps/types.ts";
 import type { QuestionModule } from "../survey/types.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const OUTPUT_PATH = resolve(__dirname, "manifest.specref.json");
+const OUTPUT_PATH = resolve(__dirname, "../steps/manifest.specref.json");
 
 describe("generateManifestSpecRef — manifest.specref.json artifact (spec 031 FR-006/FR-007)", () => {
   it("regenerates the artifact from the live manifest + question registry", () => {

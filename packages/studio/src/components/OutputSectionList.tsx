@@ -25,6 +25,7 @@ import { buildStageGroups, type StageGroup } from "../decisions/stageGroups.ts";
 import { formatClauseList, dimensionLabel } from "../decisions/stageText.ts";
 import { stageLabel, unreachableReasonLabel } from "../decisions/progressDots.ts";
 import { useSurveySessionStore, type ActiveStepId } from "../stores/surveySessionStore.ts";
+import { useTestingStore } from "../stores/testingStore.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
 import { manifest } from "../steps/manifest.ts";
 import { ACCENT, BORDER, TEXT_DIM } from "../ui/theme.ts";
@@ -83,10 +84,15 @@ const MANIFEST_STEP_IDS: ReadonlySet<string> = new Set(manifest.map((s) => s.id)
 export function OutputSectionList() {
   const { t, i18n } = useLingui();
   const sections = useCompletedSections();
+  const frozen = useTestingStore((s) => s.frozen);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const listId = useId();
 
+  // #2050: a submitted project is read-only — its sections are not offered
+  // for revision, the way TestBuildPanel and TesterReports already hide their
+  // mutating affordances when frozen.
+  if (frozen) return null;
   if (sections.length === 0) return null;
 
   const summary = ({ group }: OutputSection): string => {

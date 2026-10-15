@@ -1,14 +1,10 @@
 /**
  * E2E: context tolerance reaches the author (spec 078).
  *
- * The feature is behind VITE_KM_CONTEXT_TOLERANCE until the corpus gate is
- * green (FR-011), so this spec runs only when the dev server was started with
- * the flag. Run it with:
+ * The feature shipped unconditionally when the FR-011 flag was retired (the
+ * FR-012 corpus gate is green), so this spec runs in the normal e2e lane:
  *
- *   VITE_KM_CONTEXT_TOLERANCE=1 npx playwright test e2e/context-tolerance.spec.ts
- *
- * (Playwright's webServer inherits the environment; with reuseExistingServer a
- * server already running WITHOUT the flag will show no finding — stop it first.)
+ *   npx playwright test e2e/context-tolerance.spec.ts
  *
  * US1: adapting sil_yoruba8 surfaces the finding after the preview is ready,
  * the finding expands to cases naming each character by codepoint and Unicode
@@ -36,8 +32,6 @@ import {
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
-const FLAG_ON = process.env["VITE_KM_CONTEXT_TOLERANCE"] === "1";
-
 async function adapt(page: Page, keyboardId: string): Promise<void> {
   await seedReturningVisitor(page);
   await page.goto("/");
@@ -49,8 +43,6 @@ async function adapt(page: Page, keyboardId: string): Promise<void> {
 }
 
 test.describe("Context tolerance — US1 diagnosis (spec 078)", () => {
-  test.skip(!FLAG_ON, "needs a dev server started with VITE_KM_CONTEXT_TOLERANCE=1");
-
   test("sil_yoruba8: the finding appears after the preview, names characters, and blocks nothing", async ({ page }) => {
     await adapt(page, "sil_yoruba8");
 
@@ -89,13 +81,13 @@ test.describe("Context tolerance — US1 diagnosis (spec 078)", () => {
 /** Phase B with one marked letter, then walk the marks series up to the station. */
 async function reachStation(page: Page): Promise<void> {
   await adapt(page, "sil_yoruba8");
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="charlist-continue"]');
   await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
   await page.fill('[aria-label="Character to add"]', "ẹ");
   await page.getByRole("button", { name: "+ Add" }).click();
-  await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-  await page.click('[data-testid="phase-b-done"]');
+  await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+  await page.click('[data-testid="charlist-done"]');
 
   const station = page.getByTestId("context-tolerance-station");
   for (let i = 0; i < 8; i++) {
@@ -112,7 +104,6 @@ async function reachStation(page: Page): Promise<void> {
 }
 
 test.describe("Context tolerance — US2 accept and US3 decline (spec 078)", () => {
-  test.skip(!FLAG_ON, "needs a dev server started with VITE_KM_CONTEXT_TOLERANCE=1");
   // Three compiles follow the decision (verify, recompile, re-analysis) on top
   // of the walk itself.
   test.setTimeout(480_000);

@@ -1,9 +1,9 @@
 // Tests for the corpus mining harness (spec 087 T050).
 
 import { describe, it, expect } from "vitest";
-import { parseKmn } from "@keyboard-studio/engine";
+import { parse as parseKmn } from "../../packages/engine/src/codec/parse.ts";
 import { makeStartKeyboard } from "@keyboard-studio/contracts";
-import type { QuestionModule } from "../survey/types.ts";
+import type { QuestionModule } from "../../packages/studio/src/survey/types.ts";
 import { mineCorpus } from "./corpusMine.ts";
 import type { CorpusSample } from "./corpusMine.ts";
 
@@ -50,7 +50,7 @@ const copyrightModule: QuestionModule = {
   inputs: [],
   writes: [],
   provides: ["copyright-holder"],
-  extract: (ctx) => ctx.ir.header.copyright || undefined,
+  extract: (ctx) => ctx.ir?.header.copyright || undefined,
 };
 
 const modules = [scriptModule, copyrightModule];

@@ -50,11 +50,20 @@ export function PublishHandover({
   const builds = useTestingStore((s) => s.builds);
   const reports = useTestingStore((s) => s.reports);
   const frozen = useTestingStore((s) => s.frozen);
+  const submitInFlight = useTestingStore((s) => s.submitInFlight);
   const last = builds[builds.length - 1];
   const [check, setCheck] = useState<Check>({ kind: "idle" });
   // The confirm belongs to the build it was given against: a newer build asks again.
   const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
   const [checkedFor, setCheckedFor] = useState<string | null>(null);
+
+  // #2050: while a submission is in flight the panel stays mounted — a newer
+  // test build must not unmount it and drop the submission. The newest build
+  // id is adopted so that, once the submit settles, its outcome (success or
+  // error) stays on screen instead of falling back to the confirm step.
+  useEffect(() => {
+    if (submitInFlight && last !== undefined) setConfirmedFor(last.buildId);
+  }, [submitInFlight, last]);
 
   // Each press swaps what is on screen, which would drop focus to the body:
   // the press names where focus goes, and it moves once that element mounts.
@@ -72,7 +81,7 @@ export function PublishHandover({
   });
 
   if (last === undefined) return <>{children}</>;
-  if (frozen || confirmedFor === last.buildId) {
+  if (frozen || submitInFlight || confirmedFor === last.buildId) {
     return (
       <div
         ref={revealedRef}

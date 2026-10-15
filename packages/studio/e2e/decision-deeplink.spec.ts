@@ -95,7 +95,7 @@ test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", 
     // Past "track" now (adapt-track skips project_name; the fork leaves
     // from attribution since #1901 — steps/manifest.ts's track-routing
     // docstring), so the prefill summary is the phase boundary landmark.
-    await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 30_000 });
 
     // ---- Open Decisions and find the early "track" answer ------------------
     await switchTab(page, "trail");

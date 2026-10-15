@@ -441,8 +441,8 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
     recorder.beginStep(step.stepId);
     for (const testId of testIds) {
       // findBy (not getBy): the characters step's Phase B mounts behind a
-      // lazy boundary since spec 090 T021, so phase-b-done can land a tick
-      // after the prefill-confirm click that summons it. Awaiting the
+      // lazy boundary since spec 090 T021, so charlist-done can land a tick
+      // after the prefill-continue click that summons it. Awaiting the
       // element does not change the recorded walk — the recorder window
       // boundaries are the same beginStep/endStep around the same clicks.
       const el = await screen.findByTestId(testId);
@@ -495,9 +495,9 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     // the same answers the identity stub used to).
     { stepId: "attribution", testId: "survey-advance" },
     { stepId: "project_name", testId: "survey-advance" },
-    { stepId: "characters/prefill", testId: "prefill-confirm" },
+    { stepId: "characters/prefill", testId: "prefill-continue" },
     // marks skips transparently inside this window, landing on punctuation.
-    { stepId: "characters/B", testId: "phase-b-done", settleFor: "punctuation-done" },
+    { stepId: "characters/B", testId: "charlist-done", settleFor: "punctuation-done" },
     // The punctuation page (between marks and convenience) has no skip gate —
     // the walk accepts it empty. The convenience skip that follows it is async
     // (see StepAction.settleFor), so wait for carve's own control to exist
@@ -534,9 +534,9 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "attribution", testId: "survey-advance" },
-    { stepId: "characters/prefill", testId: "prefill-confirm" },
+    { stepId: "characters/prefill", testId: "prefill-continue" },
     // marks skips transparently inside this window, landing on punctuation.
-    { stepId: "characters/B", testId: "phase-b-done", settleFor: "punctuation-done" },
+    { stepId: "characters/B", testId: "charlist-done", settleFor: "punctuation-done" },
     // See driveCopyTrack — the ungated punctuation page, accepted empty, whose
     // window absorbs the async convenience skip.
     { stepId: "punctuation", testId: "punctuation-done", settleFor: "invisibles-continue" },

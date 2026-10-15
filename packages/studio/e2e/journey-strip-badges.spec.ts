@@ -23,6 +23,7 @@ import {
   driveInvisiblesStep,
   driveConvenienceStep,
   driveMarksSeries,
+  driveDeadkeysStep,
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
@@ -65,13 +66,13 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
 
     // Phase B: add a mark-bearing letter so the marks series (spec 071) has
     // something to walk (a marks-free alphabet auto-skips the whole series).
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+    await page.click('[data-testid="charlist-continue"]');
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "é");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     // Now on the marks series (its S0 gate passed — "é" carries a mark).
     const marksContinue = page.getByTestId("marks-continue");
@@ -109,13 +110,13 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
   }) => {
     await startToCharacters(page);
 
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+    await page.click('[data-testid="charlist-continue"]');
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "k");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     // "k" carries no mark and no punctuation — the marks series and
     // punctuation step both auto-skip, landing directly on invisibles.
@@ -150,7 +151,9 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // buildOneCharacterList stops on carve; accept it with nothing discarded.
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("carve-continue").click();
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules (#2053).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
     // "é" on basic_kbdfr is a real new character to place (unlike carve.spec's
     // marks-free "᙮" fixture, which empty-diffs) — drive whatever the gallery
@@ -197,13 +200,13 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // marks is reachable in the normal forward walk, which is what the
     // footer's jump mechanism as built today actually supports end to end.
     await startToCharacters(page);
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+    await page.click('[data-testid="charlist-continue"]');
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "é");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     await driveMarksSeries(page);
     await drivePunctuationStep(page);
@@ -222,8 +225,8 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "ü");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     // The walk lands back on marks (its S0 gate re-fires for the new
     // evidence) — the FR-016 notice fires on THIS Next, and marks' own
@@ -283,7 +286,9 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await buildOneCharacterList(page, "é");
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("carve-continue").click();
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules (#2053).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
 
     const mechanismsMark = footer(page).locator('button[aria-label^="Mechanisms"]');

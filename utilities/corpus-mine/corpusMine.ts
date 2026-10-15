@@ -9,12 +9,20 @@
 // This is the mechanism that completes the DecisionId vocabulary with data
 // (plan §"Completing the vocabulary"): as the corpus grows, more decisions
 // stabilize into defaults and fewer need to be asked.
+//
+// Homed in utilities/ (vestigial audit §3): a repeatable offline tool, not
+// shipped studio code. It reaches the studio's decision spine by relative
+// source path (the kbgen/facet-index pattern for standalone utilities);
+// nothing in packages/ imports it.
 
 import type { StartKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
-import type { QuestionModule } from "../survey/types.ts";
-import type { Decision, DecisionId } from "./decisionTypes.ts";
-import { deepEqual } from "./deepEqual.ts";
-import { buildExtractContext } from "./extractContext.ts";
+import type { QuestionModule } from "../../packages/studio/src/survey/types.ts";
+import type {
+  Decision,
+  DecisionId,
+} from "../../packages/studio/src/decisions/decisionTypes.ts";
+import { deepEqual } from "../../packages/studio/src/decisions/deepEqual.ts";
+import { buildExtractContext } from "../../packages/studio/src/decisions/extractContext.ts";
 
 /** One keyboard in the mining sample: the import pipeline's output. */
 export interface CorpusSample {

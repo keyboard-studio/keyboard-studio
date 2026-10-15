@@ -135,7 +135,7 @@ const ghostBtnDisabledStyle: CSSProperties = {
 
 const repairStyle: CSSProperties = {
   background: "var(--app-surface)",
-  border: `1px solid var(--sil-orange-dark, ${BORDER})`,
+  border: `1px solid var(--app-warning-text, ${BORDER})`,
   borderRadius: 8,
   padding: "12px 14px",
   margin: "0 0 12px",

@@ -149,13 +149,6 @@ export function isKmpCompilerReady(): boolean {
   return _ctor !== null;
 }
 
-/** @internal Test seam — resets the sticky loader state between cases. */
-export function __resetKmpCompilerForTests(): void {
-  _modulePromise = null;
-  _ctor = null;
-  _down = false;
-  _downReason = null;
-}
 
 // ---------------------------------------------------------------------------
 // Diagnostic mapping

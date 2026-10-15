@@ -26,6 +26,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { i18nHookWrapper } from "../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, silEuroLatin } from "@keyboard-studio/contracts/fixtures";
 import type { OnInstantiateCallback } from "./useKeyboardArtifact.ts";
@@ -102,7 +103,7 @@ describe("usePreviewArtifact — re-instantiation guard", () => {
     expect(phaseResultsBefore).toBeGreaterThan(0);
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    renderHook(() => usePreviewArtifact());
+    renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 
     const onInstantiate = hoisted.capturedOnInstantiate.current;
     expect(onInstantiate).not.toBeNull();
@@ -121,7 +122,7 @@ describe("usePreviewArtifact — re-instantiation guard", () => {
     seedTrack2Survey();
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    renderHook(() => usePreviewArtifact());
+    renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 
     const onInstantiate = hoisted.capturedOnInstantiate.current;
     expect(onInstantiate).not.toBeNull();

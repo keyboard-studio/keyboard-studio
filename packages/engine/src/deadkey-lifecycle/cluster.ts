@@ -109,15 +109,6 @@ export function matchEscapeRule(rule: IRRule, id: number): boolean {
   );
 }
 
-/** True when the rule is any canonical member of `id`'s entity cluster. */
-export function isEntityRule(rule: IRRule, id: number): boolean {
-  return (
-    matchTriggerRule(rule, id) ||
-    matchFanoutRule(rule, id) !== null ||
-    matchEscapeRule(rule, id)
-  );
-}
-
 /** Every rule with `dk(id)` in its output, located in its group. */
 export function findOutputRules(ir: KeyboardIR, id: number): LocatedRule[] {
   const out: LocatedRule[] = [];
@@ -222,10 +213,3 @@ export function describeRule(group: IRGroup, rule: IRRule, id: number): string {
   return `group "${group.name}" rule "${rule.nodeId}" — dk(${hex}) in ${where}`;
 }
 
-/** The trigger key of a trigger rule (vkey name or literal char). */
-export function triggerKeyOf(rule: IRRule): string | null {
-  const c = singleContextElement(rule);
-  if (c?.kind === "vkey") return c.name;
-  if (c?.kind === "char") return c.value;
-  return null;
-}

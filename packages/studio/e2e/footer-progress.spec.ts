@@ -85,7 +85,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // growth comparison below.
     await driveAttributionStep(page);
 
-    const prefillConfirm = page.getByTestId("prefill-confirm");
+    const prefillConfirm = page.getByTestId("prefill-continue");
     await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });
     const completedAfterTrack = await completedDots(page).count();
     expect(completedAfterTrack).toBeGreaterThan(completedAfterIdentity);
@@ -120,7 +120,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     }
 
     await confirmPrefill(page);
-    await expect(page.getByTestId("phase-b-intro-next")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("charlist-continue")).toBeVisible({ timeout: 20_000 });
 
     await expectNoSeriousAxeViolations(page, "survey (footer present, characters step)", {
       exclude: KNOWN_CONTRAST_DEBT,
