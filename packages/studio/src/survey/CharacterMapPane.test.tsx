@@ -310,7 +310,9 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("hides uppercase letters of a cased script, showing only the lowercase (spec 047)", async () => {
-    seedStartAndLanguage();
+    // The fold is gated on the base's casing facet: seed a base that
+    // produces case pairs so its baked facet reads "cased".
+    seedStartProducing(["a", "b"]);
     getGroupsResult.set([
       {
         block: "Latin",
@@ -339,7 +341,8 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("clicking a cased letter adds BOTH cases to the alphabet; clicking again removes both (spec 047)", async () => {
-    seedStartAndLanguage();
+    // Pair picks sit behind the same casing-facet gate — seed a cased base.
+    seedStartProducing(["a", "b"]);
     getGroupsResult.set([
       {
         block: "Latin",
@@ -365,6 +368,38 @@ describe("CharacterMapPane — data path", () => {
     fireEvent.click(within(group).getByRole("button", { name: /Remove a \(U\+0061\)/ }));
     expect(getCharacterInventoryValue().chars).not.toContain("a");
     expect(getCharacterInventoryValue().chars).not.toContain("A");
+  });
+
+  it("on a caseless base, uppercase cells are offered as-is and a pick adds only the picked char (casing facet gate)", async () => {
+    // Base produces only Hebrew letters → its baked casing facet reads
+    // "caseless", so the gate stays closed even for Latin cells in the map:
+    // no fold hides the uppercase, and no pair joins on a pick.
+    seedStartProducing(["א", "ב"], "he", "Hebrew");
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByStart: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "A", isCombiningMark: false },
+          { char: "b", isCombiningMark: false },
+          { char: "B", isCombiningMark: false },
+        ],
+      },
+    ]);
+    render(<CharacterMapPane />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const group = screen.getByLabelText("Latin characters (main)");
+    // The uppercase is NOT folded away — it is offered as its own cell.
+    const aUpper = within(group).queryByRole("button", { name: /Add A \(U\+0041\)/ });
+    expect(aUpper).toBeTruthy();
+    // Picking it adds exactly "A" — its lowercase is not auto-paired in.
+    fireEvent.click(aUpper!);
+    expect(getCharacterInventoryValue().chars).toEqual(["A"]);
   });
 
   it("tints base-keyboard output glyphs (with an accessible hint) until the author selects them", async () => {
