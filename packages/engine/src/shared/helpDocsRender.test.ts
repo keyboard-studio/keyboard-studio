@@ -749,3 +749,79 @@ describe("helpDocsRender — spec 102 forms", () => {
     expect(renderHelpPhp(input, null)).toBe(renderHelpPhp(input, null));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue #1908: accepted inherited-page fixes (adapt track). Fixtures are
+// sil_cameroon_qwerty-shaped: a "(SIL)"-carrying $pagename and welcome/help
+// bodies that diverge in the copyright line and a French-tab link.
+// ---------------------------------------------------------------------------
+
+describe("helpDocsRender — inherited fixes (issue #1908)", () => {
+  const CAMEROON_HELP =
+    "<?php\n" +
+    "  $pagename = 'Cameroon QWERTY (SIL) Keyboard Help';\n" +
+    "  $pagetitle = $pagename;\n" +
+    "  require_once('header.php');\n" +
+    "?>\n" +
+    "<p>Copyright SIL Cameroon</p>\n" +
+    '<p>See the <a href="guide.php">guide</a>.</p>';
+  const CAMEROON_WELCOME =
+    "<html><head><title>Cameroon QWERTY</title></head><body>\n" +
+    "<p>Copyright 2018-2022 SIL Cameroon</p>\n" +
+    '<p>See the <a href="guide.htm">guide</a>.</p>\n' +
+    "</body></html>";
+  const cameroonInput = (inheritedFixes?: HelpDocsRenderInput["inheritedFixes"]) =>
+    baseInput({ displayName: "Cameroon QWERTY", ...(inheritedFixes ? { inheritedFixes } : {}) });
+
+  it("without accepted fixes the inherited help page ships byte-identical", () => {
+    expect(renderHelpPhp(cameroonInput(), CAMEROON_HELP, CAMEROON_WELCOME)).toBe(CAMEROON_HELP);
+    expect(renderWelcomeHtm(cameroonInput(), CAMEROON_WELCOME)).toBe(CAMEROON_WELCOME);
+  });
+
+  it("pagename fix rewrites $pagename to the expected form and keeps $pagetitle = $pagename", () => {
+    const help = renderHelpPhp(cameroonInput({ pagename: true }), CAMEROON_HELP, CAMEROON_WELCOME);
+    expect(help).toContain("$pagename = 'Cameroon QWERTY Keyboard Help';");
+    expect(help).not.toContain("(SIL)");
+    expect(help).toContain("$pagetitle = $pagename;");
+    expect(help.match(/\$pagename =/g)).toHaveLength(1);
+    // The body is untouched by the header fix.
+    expect(help).toContain("<p>Copyright SIL Cameroon</p>");
+  });
+
+  it("pagename fix also rewrites a literal $pagetitle", () => {
+    const literalTitle = CAMEROON_HELP.replace(
+      "$pagetitle = $pagename;",
+      "$pagetitle = 'Cameroon QWERTY (SIL) Keyboard Help';",
+    );
+    const help = renderHelpPhp(cameroonInput({ pagename: true }), literalTitle, CAMEROON_WELCOME);
+    expect(help).toContain("$pagetitle = 'Cameroon QWERTY Keyboard Help';");
+    expect(help).not.toContain("(SIL)");
+  });
+
+  it("body-sync from welcome: the help page keeps its header and takes the welcome body", () => {
+    const help = renderHelpPhp(
+      cameroonInput({ bodySync: "welcome", pagename: true }),
+      CAMEROON_HELP,
+      CAMEROON_WELCOME,
+    );
+    expect(help).toContain("$pagename = 'Cameroon QWERTY Keyboard Help';");
+    expect(help).toContain("<p>Copyright 2018-2022 SIL Cameroon</p>");
+    expect(help).not.toContain("<p>Copyright SIL Cameroon</p>");
+    // Sibling links take their .php form on the help page.
+    expect(help).toContain('<a href="guide.php">guide</a>');
+  });
+
+  it("body-sync from help: the welcome page takes the help body, links back to .htm", () => {
+    const welcome = renderWelcomeHtm(
+      cameroonInput({ bodySync: "help" }),
+      CAMEROON_WELCOME,
+      [],
+      CAMEROON_HELP,
+    );
+    expect(welcome).toContain("<p>Copyright SIL Cameroon</p>");
+    expect(welcome).not.toContain("Copyright 2018-2022");
+    expect(welcome).toContain('<a href="guide.htm">guide</a>');
+    // The welcome page keeps its own document chrome.
+    expect(welcome).toContain("<title>Cameroon QWERTY</title>");
+  });
+});
