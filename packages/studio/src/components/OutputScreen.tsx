@@ -4,7 +4,8 @@
 // copy exists (spec 058):
 //   - instantiated (the normal end-of-flow arrival) -> "shipping": read-only
 //     base provenance + a "Change starting keyboard" control that routes back to
-//     the survey's choose_base step, plus TrackOneIdentityPanel and KmnEditor.
+//     the survey's choose_base step, plus TrackOneIdentityPanel and the
+//     advanced-gated KmnEditor (AdvancedKmnEditor — hidden by default).
 //     No mode toggle, no picker — nothing on the ship-it screen can re-base
 //     the working copy in place. See PickerPane.tsx's variant notes.
 //   - not instantiated (cold arrival at #output) -> "full": the historical
@@ -66,7 +67,7 @@ import { TestBuildPanel } from "./TestBuildPanel.tsx";
 import { PublishHandover } from "./PublishHandover.tsx";
 import { StartKeyboardPicker } from "./StartKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
-import { KmnEditor } from "./KmnEditor.tsx";
+import { AdvancedKmnEditor } from "./AdvancedKmnEditor.tsx";
 import { TrackOneIdentityPanel } from "../editors/panels/TrackOneIdentityPanel.tsx";
 import { PickerPane } from "./PickerPane.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
@@ -391,7 +392,7 @@ export function OutputScreen() {
         identityPanelSlot={<TrackOneIdentityPanel />}
         kmnEditorSlot={
           artifact.stage.kind === "ready" ? (
-            <KmnEditor vfs={artifact.stage.vfs} onRecompile={artifact.recompile} />
+            <AdvancedKmnEditor vfs={artifact.stage.vfs} onRecompile={artifact.recompile} />
           ) : null
         }
       />
