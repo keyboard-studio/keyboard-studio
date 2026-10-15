@@ -27,6 +27,7 @@ import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
+import { buildDocContent, parseTouchLayoutOrNull } from "./docContent.ts";
 import {
   resolvePublishVersion,
   generateStubs,
@@ -581,11 +582,22 @@ export async function projectWorkingCopyForOutput(
   //     regex the package descriptor already runs (FR-008) — never re-derived
   //     from StartKeyboard, which can disagree with what this build actually emits.
   const projectedKmnText = readVfsText(clonedVfs, `source/${resolvedKeyboardId}.kmn`) ?? "";
+  // spec 095 US2: the derived sections, from the working-copy IR as built (the
+  //     same buildDocContent call useDocsPreview makes). The inherited prose
+  //     is the start keyboard's welcome/help text, which exists on Track 2
+  //     only; it decides whether the typing guide is already covered.
+  const docContent = buildDocContent({
+    ir: workingIr ?? startIr,
+    touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+    inheritedProse: isAdaptation ? (startWelcomeHtmText ?? startHelpPhpText) : null,
+  });
   const docsInput: HelpDocsRenderInput = {
     answers: helpDocs,
     displayName: identity?.displayName ?? startKeyboard.displayName,
     ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
+    keyboardId: resolvedKeyboardId,
     platforms: parseTargetTokens(projectedKmnText),
+    generated: docContent.slots,
   };
   // FR-006: an adaptation inherits the base's README description; a copy never
   // does (FR-007) — the slice is null on Track 1 and the track guard keeps it so.

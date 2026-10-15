@@ -211,6 +211,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-15T02:32:25.827Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:39:52.631Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:39:52.974Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:41:50.716Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:41:51.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:41:51.274Z"
     }
   ],
   "telemetryInstanceId": "8782d5f1-b6c3-42a7-aac0-44a5387009cf",
@@ -494,7 +534,7 @@
       ]
     }
   },
-  "currentTask": "T017",
+  "currentTask": "T022",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -620,6 +660,42 @@
       "did": "Playwright E2E: Copy of basic_kbdfr (1.1) shows test build 0.1 on Output and downloads <id>-1.0.zip with 1.0 in kmn, kps and HISTORY plus Created-from lineage; passed locally",
       "files": [
         "packages/studio/e2e/copy-version.spec.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "docContent.test.ts: 40 per-slot snapshots over 8 fixtures plus coverage, tie-break, threshold, mechanism order, touch, inventory, determinism and suppression cases (29 tests)",
+      "files": [
+        "packages/studio/src/lib/docContent.test.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "buildDocContent: typing guide (fewest-step charProducers, 200-row summary), R7 mechanisms, touch long-press/flick notes, grouped inventory, R11 suppression; pure and synchronous",
+      "files": [
+        "packages/studio/src/lib/docContent.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "useDocsPreview tests: derived sections on welcome and help, IR change updates them, no timer under fake timers, typingGuideSuppressed returned",
+      "files": [
+        "packages/studio/src/hooks/useDocsPreview.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "useDocsPreview feeds buildDocContent (working IR, touch layout, start prose) and keyboardId into the memoised render; returns typingGuideSuppressed",
+      "files": [
+        "packages/studio/src/hooks/useDocsPreview.ts",
+        "packages/studio/src/lib/docContent.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Serializer passes buildDocContent slots and resolvedKeyboardId into docsInput; inherited prose on Track 2 only",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts"
       ]
     }
   }

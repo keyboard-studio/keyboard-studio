@@ -141,7 +141,10 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
 
-    expect(readVfsText(projected!.vfs, "README.md")).toBe(`# ${basicKbdus.displayName}\n`);
+    // spec 095 FR-029: the README links the keyboard's help-site page even before any answer.
+    expect(readVfsText(projected!.vfs, "README.md")).toBe(
+      `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${keyboardId}\n`,
+    );
     // spec 079 FR-013: the placeholder page still references the generated
     // layout charts (a net-new keyboard has no base images), so the pre-076
     // bare placeholder is now placeholder + layout section.
