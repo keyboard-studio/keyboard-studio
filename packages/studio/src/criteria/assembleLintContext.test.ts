@@ -279,6 +279,10 @@ describe("assembleLintContext", () => {
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
         "the .kps package file's declared target list",
+      // The fixture VFS carries no .kpj, so both KPJ checks' input is
+      // honestly named missing (spec 084 KPJ pair, ruling B).
+      KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
+      KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
     });
   });
 
@@ -389,6 +393,10 @@ describe("engine run over the assembled context (fixture VFS)", () => {
       // input is honestly named missing (spec 084 Batch 2).
       KM_LINT_KPS_TARGETS_MISMATCH:
         "the .kps package file's declared target list",
+      // The fixture VFS carries no .kpj, so both KPJ checks' input is
+      // honestly named missing (spec 084 KPJ pair, ruling B).
+      KM_LINT_KPJ_FORMAT_OUTDATED: "the .kpj project file",
+      KM_LINT_KPJ_VERSION_BUMPED: "the .kpj project file",
     });
 
     const findings = await new KeyboardLintEngine().lintWithContext(

@@ -63,6 +63,7 @@ import type {
 import { CLDR_TERRITORY_CURRENCY } from "@keyboard-studio/contracts";
 import {
   parseKmn,
+  parseKpjForm,
   parseKps,
   parseKpsFiles,
   parseKpsFontRefs,
@@ -144,6 +145,16 @@ export const KPS_TARGETS_MISMATCH_CODE = "KM_LINT_KPS_TARGETS_MISMATCH";
 
 const MISSING_KPS_TARGETS = "the .kps package file's declared target list";
 
+/** §1.10b's code: named here because a judged VFS with no .kpj is a missing input. */
+export const KPJ_FORMAT_OUTDATED_CODE = "KM_LINT_KPJ_FORMAT_OUTDATED";
+
+/** §2.7's code: named here because its base↔output comparison needs both .kpj files. */
+export const KPJ_VERSION_BUMPED_CODE = "KM_LINT_KPJ_VERSION_BUMPED";
+
+const MISSING_KPJ = "the .kpj project file";
+const MISSING_BASE_KPJ =
+  "the .kpj project file of the keyboard this was adapted from";
+
 export interface AssembleLintContextInput {
   vfs: VirtualFS;
   keyboardId: string;
@@ -182,6 +193,16 @@ export interface AssembleLintContextInput {
    * it — no attestation exists there).
    */
   contrastiveRegionAttested?: boolean;
+  /**
+   * The raw text of the BASE keyboard's .kpj — the project file the
+   * judged keyboard was adapted from (KPJ pair, §2.7: the output's
+   * format-marker state is compared against the base's). Authored
+   * host only, read from the working copy's startVfs; the foreign
+   * host never passes it (a compared keyboard has no base), so §2.7
+   * is named context-missing there rather than passing on an unrun
+   * comparison.
+   */
+  baseKpjText?: string;
 }
 
 export interface AssembledLintContext {
@@ -348,10 +369,25 @@ export function assembleLintContext(
     }
   }
 
+  // KPJ pair (1.10b / 2.7, ruling B — structural form): parse the
+  // judged VFS's .kpj with the engine's form reader, and the base
+  // keyboard's .kpj text when the authored host supplied it. The
+  // checks judge structure (the <Options><Version> format marker),
+  // never a pinned version constant.
+  const kpjPath = paths.find((p) => p.toLowerCase().endsWith(".kpj"));
+  const kpjText = kpjPath !== undefined ? readVfsText(vfs, kpjPath) : undefined;
+  const kpjFacts = kpjText !== undefined ? parseKpjForm(kpjText) : undefined;
+  const baseKpjFacts =
+    input.baseKpjText !== undefined
+      ? parseKpjForm(input.baseKpjText)
+      : undefined;
+
   const criteriaInput: CriteriaLintInput = {
     ...(kvks !== undefined ? { kvks } : {}),
     ...(kvksPath !== undefined ? { kvksPath } : {}),
     ...(kpsText !== undefined ? { kpsText } : {}),
+    ...(kpjFacts !== undefined ? { kpj: kpjFacts } : {}),
+    ...(baseKpjFacts !== undefined ? { baseKpj: baseKpjFacts } : {}),
     kpsFileNames,
     kpsFontRefs,
     kpsLanguages,
@@ -397,6 +433,16 @@ export function assembleLintContext(
   }
   if (kvksPath === undefined) {
     contextMissing[KVKS_BLANK_CODE] = MISSING_KVKS;
+  }
+  if (kpjFacts === undefined) {
+    // No .kpj in the judged VFS: neither KPJ row can judge — 1.10b
+    // has no form to read, and 2.7 has no output state to compare.
+    contextMissing[KPJ_FORMAT_OUTDATED_CODE] = MISSING_KPJ;
+    contextMissing[KPJ_VERSION_BUMPED_CODE] = MISSING_KPJ;
+  } else if (baseKpjFacts === undefined) {
+    // §2.7 is relational: without the base keyboard's .kpj there is
+    // no comparison to run (every foreign judgment lands here).
+    contextMissing[KPJ_VERSION_BUMPED_CODE] = MISSING_BASE_KPJ;
   }
   if (keyboardIR !== undefined && kpsTargets.length === 0) {
     // §8.13 has nothing to compare without a declared .kps target list

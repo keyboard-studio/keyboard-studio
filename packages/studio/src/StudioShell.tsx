@@ -15,6 +15,8 @@
 //   #criteria           — CriteriaScreen: the criteria compliance page
 //                         (spec 084) — every catalog criterion judged
 //                         against the keyboard Output would ship.
+//   #privacy            — PrivacyScreen: the privacy notice (spec 095),
+//                         reachable signed-out and on first visit.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
@@ -101,7 +103,6 @@ import { findKmnPath } from "./lib/findKmnPath.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
 import { LintSummary } from "./lint/index.ts";
 import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
-import { isContextToleranceEnabled } from "./flags/contextToleranceFlag.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
@@ -117,6 +118,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
+import { PrivacyScreen } from "./components/PrivacyScreen.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, screenTrails, validateManifestShape } from "./steps/manifest.ts";
 import { resolveRightPane, shouldShowPreviewPane } from "./steps/types.ts";
@@ -180,6 +182,7 @@ const VALID_ROUTES = new Set<RouteId>(
       "flowmap",
       "trail",
       "criteria",
+      "privacy",
       "profile",
     ] as const
   ).filter((r) => r !== "flowmap" || SHOW_FLOWMAP),
@@ -1214,26 +1217,22 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
 
   // Use localStart (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
-  // spec 078: only this main-walk preview runs the context-tolerance analysis,
-  // and only behind the flag; every other useKeyboardArtifact caller is unchanged.
-  const contextToleranceEnabled = isContextToleranceEnabled();
+  // spec 078: only this main-walk preview runs the context-tolerance analysis;
+  // every other useKeyboardArtifact caller is unchanged.
   const { stage: artifactStage, retry } = useKeyboardArtifact(
     localStart,
     scaffoldSpec,
     workingCopyTransform,
     onInstantiate,
     {
-      analyseContextTolerance: contextToleranceEnabled,
+      analyseContextTolerance: true,
     },
   );
   const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
   // never by the marks step; its stale/refused outcomes feed the notice.
-  const contextToleranceApplyNotes = useContextToleranceApply(
-    contextToleranceEnabled,
-  );
+  const contextToleranceApplyNotes = useContextToleranceApply();
   const showContextTolerance =
-    contextToleranceEnabled &&
     contextTolerance.status !== "idle" &&
     contextTolerance.status !== "analysing";
 
@@ -1707,7 +1706,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
         flexDirection: isNarrow ? "column" : "row",
         height: "100%",
         width: "100%",
-        background: "var(--bg)",
+        background: "var(--app-bg)",
         overflow: "hidden",
       }}
     >
@@ -1743,10 +1742,10 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
             // Always mounted, so content inserted later is announced (a live
             // region inserted together with its content often is not); it only
             // takes up space when it has something to say.
-            // Rendered flush on "var(--bg)" — the same token the container above
+            // Rendered flush on "var(--app-bg)" — the same token the container above
             // paints and the one CharacterMapPane's own root implicitly sits on
             // (it sets no background of its own, so it shows through to the
-            // container's var(--bg) too). Pinned explicitly here rather than left
+            // container's var(--app-bg) too). Pinned explicitly here rather than left
             // to accidental non-override, so a future change to questionsPaneStyle's
             // background doesn't silently drag this along. No border/card fill/
             // padding-as-box — this is text on the character-map surface, not a
@@ -1764,7 +1763,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
                       flexDirection: "column",
                       gap: 8,
                       marginBottom: 12,
-                      background: "var(--bg)",
+                      background: "var(--app-bg)",
                     }
                   : undefined
               }
@@ -2170,6 +2169,12 @@ export function StudioShell() {
       // CriteriaPage it renders reads no store, per the D8 layer rule.
       content = <CriteriaScreen />;
       break;
+    case "privacy":
+      // Spec 095: the privacy notice — static, store-free, reachable
+      // signed-out (the welcome link marks the visit first so the
+      // first-visit gate does not rewrite the hash).
+      content = <PrivacyScreen />;
+      break;
     case "profile":
       content = <ProfileScreen />;
       break;
@@ -2200,7 +2205,7 @@ export function StudioShell() {
         maxHeight: "100dvh",
         width: "100vw",
         overflow: "hidden",
-        background: "var(--bg)",
+        background: "var(--app-bg)",
       }}
     >
       <NavBar

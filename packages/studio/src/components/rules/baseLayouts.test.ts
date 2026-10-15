@@ -124,9 +124,20 @@ describe("resolveLikelyHosts (A3.1: layout_family primary, bcp47 fallback)", () 
   });
 
   it("puts the layout-step pick first, ahead of family and bcp47", () => {
-    const hosts = resolveLikelyBases({ pickedBase: "azerty", layoutFamily: "qwerty", bcp47: ["en-GB"] });
+    const hosts = resolveLikelyBases({ pickedBases: ["azerty"], layoutFamily: "qwerty", bcp47: ["en-GB"] });
     expect(hosts[0]).toBe("azerty");
     expect(hosts.filter((id) => id === "azerty")).toHaveLength(1);
+    for (const id of DEFAULT_BASE_LAYOUTS) expect(hosts).toContain(id);
+  });
+
+  it("puts every layout-step pick first, in selection order (#1902)", () => {
+    const hosts = resolveLikelyBases({
+      pickedBases: ["qwertz", "azerty", "qwertz"],
+      layoutFamily: "qwerty",
+      bcp47: ["en-GB"],
+    });
+    expect(hosts.slice(0, 2)).toEqual(["qwertz", "azerty"]);
+    expect(hosts.filter((id) => id === "qwertz")).toHaveLength(1);
     for (const id of DEFAULT_BASE_LAYOUTS) expect(hosts).toContain(id);
   });
 

@@ -17,6 +17,24 @@ gaps are normal (001, 003, 004, 006, 054 never existed).
 | [081-footer-step-nav](081-footer-step-nav/) | Step library and footer navigation components |
 | [082-rule-access-tracks](082-rule-access-tracks/) | Rule access tracks (in flight) |
 
+## Proposed — privacy suite (7, drafted 2026-10-14, unreviewed)
+
+A thematic suite from Matthew's directive to implement a privacy policy and
+actually follow it (source plan: keyboard-studio-notes,
+`privacy-gdpr-plan-2026-10-14.md`). Planning-only; each spec carries its own
+open rulings. Sequencing: 096 first (the record), 100 ratified before 101 is
+implemented.
+
+| Spec | Governs |
+|---|---|
+| [095-privacy-notice](095-privacy-notice/) | The Art. 13 privacy page + disclosure at the collection moments (sign-in, first server save, submit permanence, fonts self-hosting) |
+| [096-processing-record-and-retention](096-processing-record-and-retention/) | The Art. 30 processing record as a checked fact (enumeration-diff coverage in CI) + a decided retention rule per store |
+| [097-subject-access-requests](097-subject-access-requests/) | DSAR intake (private GitHub route, ruled 2026-10-14), identity by account control, register, one-month clock, self-service export |
+| [098-erasure](098-erasure/) | Delete-all self-service + owner purge, crash-report remediation, the public-git-history limit worked as Art. 17(2) reasonable steps |
+| [099-breach-response](099-breach-response/) | 72-hour breach runbook, per-store containment cards, private breach log, annual tabletop |
+| [100-privacy-governance](100-privacy-governance/) | Constitution Article XII, privacy owner role, plan-template checkpoint, annual review |
+| [101-analytics-readiness](101-analytics-readiness/) | Readiness design for stuck-point funnel analytics: closed event schema, rotating pseudonym, consent posture, processor scorecard — implementation gated on 100 |
+
 ## Live, held by ruling (3)
 
 - **024** (GitHub delivery consolidation, unbuilt) — kept as the vehicle for

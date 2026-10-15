@@ -217,7 +217,7 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
     const before = useWorkingCopyStore.getState().contextToleranceOverlay;
 
-    const { result } = renderHook(() => useContextToleranceApply(true));
+    const { result } = renderHook(() => useContextToleranceApply());
     expect(result.current).toBeNull();
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBe(before);
   });
@@ -227,17 +227,8 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
     store.reset();
     seedToleranceDecision({ decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" });
     store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
-    renderHook(() => useContextToleranceApply(true));
+    renderHook(() => useContextToleranceApply());
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBeNull();
-  });
-
-  it("with the flag off it touches nothing", () => {
-    const store = useWorkingCopyStore.getState();
-    store.reset();
-    seedToleranceDecision({ decision: "decline", acceptedSiteIds: [], proposedSiteIds: ["k1"], fingerprint: "f1" });
-    store.setContextToleranceOverlay({ fingerprint: "f1", acceptedSiteIds: ["k1"], overlay: { batches: [] } });
-    renderHook(() => useContextToleranceApply(false));
-    expect(useWorkingCopyStore.getState().contextToleranceOverlay).not.toBeNull();
   });
 
   it("drops an applied overlay once the analysis fingerprint no longer matches (key edits)", () => {
@@ -257,7 +248,7 @@ describe("useContextToleranceApply — idempotence (FR-008)", () => {
       siteKeys: { r1: "k1" },
       fingerprint: "f2-after-edit",
     });
-    const { result } = renderHook(() => useContextToleranceApply(true));
+    const { result } = renderHook(() => useContextToleranceApply());
     expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBeNull();
     expect(result.current?.staleRuleIds).toEqual(["k1"]);
   });

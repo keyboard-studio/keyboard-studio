@@ -160,25 +160,7 @@ export async function processOAuthCallback(search: string): Promise<OAuthCallbac
   }
 }
 
-/**
- * Boot-time entry point for the GitHub OAuth callback. When the current
- * pathname is the GitHub OAuth callback, processes the handshake and then
- * redirects to the app root. On failure it carries the safe `reason` enum
- * (NOT the raw backend `message`) in `?oauth_error=`, which useGitHubAuth
- * maps to a static user-facing string — so no backend-sourced text is
- * interpolated into the URL. Returns true if it handled (i.e. the caller
- * should NOT render the app this tick).
- */
-export async function runOAuthCallbackIfPresent(): Promise<boolean> {
-  const provider = detectOAuthCallback();
-  if (provider === null) return false;
-  const result = await processOAuthCallbackForProvider(
-    provider,
-    window.location.search,
-  );
-  window.location.replace(redirectTargetForResult(provider, result));
-  return true;
-}
+
 
 // ---------------------------------------------------------------------------
 // Google OAuth callback

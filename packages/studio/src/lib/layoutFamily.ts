@@ -69,22 +69,64 @@ function pickFamily(pick: WindowsLayout | undefined): LayoutFamilyValue | undefi
   return pick !== undefined && pick.family !== "other" ? pick.family : undefined;
 }
 
-/** The picked layout's catalog id from a decision value, if well-formed. */
-function pickedLayoutId(value: unknown): string | undefined {
-  if (value === null || typeof value !== "object") return undefined;
-  const layoutId = (value as { layoutId?: unknown }).layoutId;
-  return typeof layoutId === "string" ? layoutId : undefined;
+/**
+ * The picked layout ids from a windows-layout decision value (spec 090
+ * T011; multi-select since #1902). The writer always stores
+ * `{ layoutIds: string[] }` in selection order; the pre-#1902 single-id
+ * shape (`{ layoutId: string }`) still loads — its id becomes the
+ * one-element selection. Unknown ids are dropped, duplicates collapsed.
+ * The first element is the primary pick (back-compat with the old single
+ * pick, which downstream readers treat as the primary).
+ */
+export function pickedLayoutIds(value: unknown): string[] {
+  if (value === null || typeof value !== "object") return [];
+  const v = value as { layoutIds?: unknown; layoutId?: unknown };
+  const raw = Array.isArray(v.layoutIds) ? v.layoutIds : v.layoutId !== undefined ? [v.layoutId] : [];
+  const ids: string[] = [];
+  for (const id of raw) {
+    if (typeof id !== "string" || windowsLayoutById(id) === undefined) continue;
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
 }
 
-/** The Windows layout the author picked on the layout step, if any. */
+/** The primary picked layout's catalog id, if well-formed. */
+function pickedLayoutId(value: unknown): string | undefined {
+  return pickedLayoutIds(value)[0];
+}
+
+/** The primary Windows layout the author picked on the layout step, if any. */
 export function getPickedWindowsLayout(): WindowsLayout | undefined {
   return windowsLayoutById(pickedLayoutId(peekDecision("windows-layout")?.value));
+}
+
+/** All picked Windows layouts, in selection order (first is primary). */
+export function getPickedWindowsLayouts(): WindowsLayout[] {
+  return pickedLayoutIds(peekDecision("windows-layout")?.value)
+    .map((id) => windowsLayoutById(id))
+    .filter((l): l is WindowsLayout => l !== undefined);
 }
 
 /** Reactive read of the picked layout (undefined until the author confirms one). */
 export function usePickedWindowsLayout(): WindowsLayout | undefined {
   return useDecisionStore((s) =>
     windowsLayoutById(pickedLayoutId(s.decisions["windows-layout"]?.value)),
+  );
+}
+
+/**
+ * Reactive read of all picked layouts (empty until the author picks).
+ * Memoized on the recorded value's identity so the returned array is
+ * referentially stable across renders (zustand's default Object.is check).
+ */
+export function usePickedWindowsLayouts(): WindowsLayout[] {
+  const value = useDecisionStore((s) => s.decisions["windows-layout"]?.value);
+  return useMemo(
+    () =>
+      pickedLayoutIds(value)
+        .map((id) => windowsLayoutById(id))
+        .filter((l): l is WindowsLayout => l !== undefined),
+    [value],
   );
 }
 
@@ -203,14 +245,16 @@ export function resolveLikelyBaseLayouts(opts: {
   bcp47: string[];
   deps?: LikelyBaseDeps;
   /**
-   * Reference host id of the layout the author picked on the layout step, when
-   * the pick IS one of the five reference hosts: the exact answer, ahead of
-   * any family or language-tag inference (spec 076 A4).
+   * Reference host ids of the layouts the author picked on the layout step,
+   * in selection order, when the picks ARE reference hosts: the exact
+   * answers, ahead of any family or language-tag inference (spec 076 A4;
+   * multi-select since #1902 — order preserved, duplicates collapsed).
    */
-  pickedBase?: BaseLayoutId | undefined;
+  pickedBases?: readonly BaseLayoutId[] | undefined;
 }): LikelyBaseResolution {
-  if (opts.pickedBase !== undefined) {
-    return { hosts: toRefs([opts.pickedBase]), source: "layout-family" };
+  const picked = (opts.pickedBases ?? []).filter((id, i, all) => all.indexOf(id) === i);
+  if (picked.length > 0) {
+    return { hosts: toRefs(picked), source: "layout-family" };
   }
   const deps = opts.deps ?? likelyBaseDepsOverride;
   if (deps === undefined) return resolveWithT011(opts.layoutFamily, opts.bcp47);
@@ -259,19 +303,26 @@ function resolveWithT011(
 /**
  * Reactive likely-host resolution for the carve gallery (and the future
  * closed-keyboard card): the stored layout_family answer is read first, per
- * the FR-023 order, through T011's resolver.
+ * the FR-023 order, through T011's resolver. Every picked reference host
+ * leads, in selection order (#1902).
  */
 export function useLikelyBaseLayouts(bcp47: string | undefined): LikelyBaseResolution {
   const layoutFamily = useLayoutFamilyAnswer();
-  const pick = usePickedWindowsLayout();
-  const pickedBase = pick?.host;
+  const picks = usePickedWindowsLayouts();
+  const pickedBases = useMemo(() => {
+    const out: BaseLayoutId[] = [];
+    for (const pick of picks) {
+      if (pick.host !== undefined && !out.includes(pick.host)) out.push(pick.host);
+    }
+    return out;
+  }, [picks]);
   return useMemo(
     () =>
       resolveLikelyBaseLayouts({
         layoutFamily,
         bcp47: bcp47 === undefined ? [] : [bcp47],
-        pickedBase,
+        pickedBases,
       }),
-    [layoutFamily, pickedBase, bcp47],
+    [layoutFamily, pickedBases, bcp47],
   );
 }

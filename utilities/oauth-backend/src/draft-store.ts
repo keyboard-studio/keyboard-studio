@@ -33,6 +33,17 @@ export interface DraftStore {
   deleteDraft(userId: number, draftId: string): Promise<void>;
   /** List metadata for every draft the user has. Empty array when none. */
   listMeta(userId: number): Promise<DraftMeta[]>;
+  /**
+   * Fetch every full draft the user has (payload + metadata) — the DSAR
+   * export read path (spec 097). Empty array when none.
+   */
+  getAllDrafts(userId: number): Promise<StoredDraft[]>;
+  /**
+   * Remove every draft the user has — payload and metadata together, no
+   * soft delete (spec 098). Returns how many drafts were removed,
+   * including the legacy {@link DEFAULT_DRAFT_ID} slot when present.
+   */
+  deleteAllDrafts(userId: number): Promise<number>;
 }
 
 /**
@@ -69,5 +80,19 @@ export class MemoryDraftStore implements DraftStore {
     const userDrafts = this.rows.get(userId);
     if (userDrafts === undefined) return Promise.resolve([]);
     return Promise.resolve(Array.from(userDrafts.values(), (row) => row.meta));
+  }
+
+  getAllDrafts(userId: number): Promise<StoredDraft[]> {
+    const userDrafts = this.rows.get(userId);
+    if (userDrafts === undefined) return Promise.resolve([]);
+    return Promise.resolve(Array.from(userDrafts.values()));
+  }
+
+  deleteAllDrafts(userId: number): Promise<number> {
+    const userDrafts = this.rows.get(userId);
+    if (userDrafts === undefined) return Promise.resolve(0);
+    const count = userDrafts.size;
+    this.rows.delete(userId);
+    return Promise.resolve(count);
   }
 }

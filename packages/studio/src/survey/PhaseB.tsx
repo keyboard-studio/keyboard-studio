@@ -383,6 +383,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
         />
         <button
           type="button"
+          data-testid="charlist-add"
           disabled={addDisabled}
           onClick={add}
           style={{ ...primaryButton(addDisabled), whiteSpace: "nowrap" }}
@@ -1032,7 +1033,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         }),
       }),
       onClick: handleDone,
-      testId: "phase-b-done",
+      testId: "charlist-done",
       disabled: doneDisabled,
     },
   });
@@ -1678,7 +1679,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
     forward: {
       label: t({ id: "survey.phaseB.intro.continueButton", message: "Continue" }),
       onClick: handleContinue,
-      testId: "phase-b-intro-next",
+      testId: "charlist-continue",
     },
   });
 

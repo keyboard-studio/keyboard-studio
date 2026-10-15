@@ -5,6 +5,8 @@
 //   GET    /drafts?draftId=<id>    → metadata for one draft ({ meta } | { meta: null })
 //   PUT    /drafts                 → upsert a draft ({ meta, draft } → { savedAt }); draftId comes from meta
 //   DELETE /drafts                 → clear a draft (?draftId=<id>, default the single-draft slot)
+//   DELETE /drafts?all=true        → erase every draft the caller has ({ deleted }) — spec 098
+//   GET    /drafts/export          → the caller's full export — see export.ts (spec 097)
 //
 // Every method is gated on a server-verified GitHub identity presented in the
 // Authorization header (Bearer <token>) — see draft-handlers.ts. This is the
@@ -21,6 +23,7 @@
 import { jsonResponse } from "../oauth/_shared.js";
 import {
   buildDraftConfig,
+  deleteAllDrafts,
   deleteDraft,
   getDraftMeta,
   listDrafts,
@@ -98,7 +101,11 @@ export async function runDraftsHandler(
       case "PUT":
         return mapResult(await putDraft(auth, await req.text(), config));
       case "DELETE":
-        return mapResult(await deleteDraft(auth, config, draftIdOf(req)));
+        // ?all=true is the spec-098 erasure path (every draft, count
+        // returned); anything else is the per-draft delete.
+        return new URL(req.url).searchParams.get("all") === "true"
+          ? mapResult(await deleteAllDrafts(auth, config))
+          : mapResult(await deleteDraft(auth, config, draftIdOf(req)));
       default:
         return jsonResponse(
           405,

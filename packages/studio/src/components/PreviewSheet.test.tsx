@@ -302,6 +302,74 @@ describe("PreviewSheet — open chrome", () => {
   });
 });
 
+describe("PreviewSheet — dismiss haptics", () => {
+  // Commit-point haptics (lib/haptics.ts buzz): a dismissal buzzes on the
+  // frame it commits; opening and snap-back (no commit) never buzz.
+  function installVibrate(): ReturnType<typeof vi.fn> {
+    const vibrate = vi.fn().mockReturnValue(true);
+    Object.defineProperty(window.navigator, "vibrate", {
+      value: vibrate,
+      configurable: true,
+    });
+    return vibrate;
+  }
+
+  afterEach(() => {
+    delete (window.navigator as { vibrate?: unknown }).vibrate;
+  });
+
+  it("× button dismiss buzzes once", () => {
+    const vibrate = installVibrate();
+    const onOpenChange = vi.fn();
+    renderOpen(onOpenChange);
+    expect(vibrate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Close preview" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(15);
+  });
+
+  it("backdrop tap dismiss buzzes", () => {
+    const vibrate = installVibrate();
+    renderOpen(vi.fn());
+    fireEvent.click(screen.getByTestId("preview-sheet-backdrop"));
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(15);
+  });
+
+  it("Escape dismiss buzzes", () => {
+    const vibrate = installVibrate();
+    renderOpen(vi.fn());
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(15);
+  });
+
+  it("drag dismiss buzzes; a snap-back drag does not", () => {
+    const vibrate = installVibrate();
+    setViewport(390, 844);
+    const onOpenChange = vi.fn();
+    renderOpen(onOpenChange);
+    settleEnter();
+    // Snap back: slow, short drag — no commit, no buzz.
+    setNow(1000);
+    pressHeader(195, 700);
+    setNow(1300);
+    moveHeader(195, 730);
+    releaseHeader(195, 730);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(vibrate).not.toHaveBeenCalled();
+    // Dismiss: drag past the threshold — the release commits, one buzz.
+    setNow(2000);
+    pressHeader(195, 700);
+    moveHeader(195, 810);
+    releaseHeader(195, 810);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(15);
+  });
+});
+
 describe("PreviewSheet — exit animation", () => {
   it("× animates the exit before unmounting children", () => {
     render(<ToggleWrapper />);

@@ -17,6 +17,11 @@ export const OPAQUE_REASONS = {
   INDEXED_CONTEXT: "indexed-context",
   OUTS_EXPANSION: "outs-expansion",
   SMP_LITERAL: "smp-literal",
+  // Bracketed menu-store literal (`store( a_menu ) '[1ae 2a …]'`) — the
+  // old-style multi-tap menu syntax from the Keyman advanced docs. The
+  // bracketed entries are key sequences, not literal characters, so the
+  // store is preserved opaque rather than expanded character by character.
+  MENU_STORE_SYNTAX: "menu-store-syntax",
   NAMED_DEADKEY: "named-deadkey",
   UNKNOWN_PRE_BEGIN: "unknown-pre-begin",
   // Store-body range notation (`X .. Y`, spec 042). A well-formed range is

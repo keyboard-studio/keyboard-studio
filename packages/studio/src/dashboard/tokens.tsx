@@ -57,13 +57,6 @@ export const COLORS = {
   },
 } as const;
 
-// Common style fragments
-export const STYLES = {
-  border: `1px solid ${COLORS.gray.border}`,
-  borderStrong: `1px solid ${COLORS.gray.borderStrong}`,
-  borderRadius: { small: 4, medium: 6, large: 8 },
-} as const;
-
 // Shared Badge component for chip-style UI elements
 export function Badge({
   text,

@@ -99,7 +99,7 @@ function renderPhaseB(): { onComplete: ReturnType<typeof vi.fn> } {
 /** Wait for the async inventory lookup to settle, then return the radio. */
 async function exemplarRadio(): Promise<HTMLInputElement | null> {
   await waitFor(() => {
-    expect(screen.getByTestId("phase-b-intro-next")).toBeTruthy();
+    expect(screen.getByTestId("charlist-continue")).toBeTruthy();
   });
   return document.querySelector<HTMLInputElement>("#discovery_method-exemplars");
 }
@@ -116,7 +116,7 @@ async function exemplarRadio(): Promise<HTMLInputElement | null> {
 async function acceptExemplarsAndContinue(): Promise<void> {
   const radio = await exemplarRadio();
   await waitFor(() => expect(radio!.checked).toBe(true));
-  fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+  fireEvent.click(screen.getByTestId("charlist-continue"));
 }
 
 beforeEach(() => {
@@ -231,7 +231,7 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
     await acceptExemplarsAndContinue();
 
     await waitFor(() => {
-      expect(screen.getByTestId("phase-b-done")).toBeTruthy();
+      expect(screen.getByTestId("charlist-done")).toBeTruthy();
     });
     const s = getCharacterInventoryValue();
     expect(s.chars).toContain("ŋ");
@@ -254,10 +254,10 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
     renderPhaseB();
     await exemplarRadio();
     fireEvent.click(document.querySelector("#discovery_method-build-list") as HTMLInputElement);
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    fireEvent.click(screen.getByTestId("charlist-continue"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("phase-b-done")).toBeTruthy();
+      expect(screen.getByTestId("charlist-done")).toBeTruthy();
     });
     expect(getCharacterInventoryValue().chars).toEqual([]);
     expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(true);
@@ -267,8 +267,8 @@ describe("Continue branching (obligations P1/P1a, FR-016)", () => {
     getSourcedExemplars.set(null);
     renderPhaseB();
     await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("charlist-continue"));
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
     expect(getCharacterInventoryValue().exemplarMethodDeclined).toBe(false);
   });
 });
@@ -282,8 +282,8 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     getSourcedExemplars.set(null);
     renderPhaseB();
     await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("charlist-continue"));
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
       "Add your whole alphabet",
     );
@@ -293,7 +293,7 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderPhaseB();
     await acceptExemplarsAndContinue();
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
       "Confirm your alphabet",
     );
@@ -303,8 +303,8 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     getSourcedExemplars.set(null);
     renderPhaseB();
     await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("charlist-continue"));
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
     inventoryOps("characters").add("ŋ");
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
@@ -317,9 +317,9 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     const { onComplete } = renderPhaseB();
     await acceptExemplarsAndContinue();
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
     expect(onComplete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByTestId("phase-b-done"));
+    fireEvent.click(screen.getByTestId("charlist-done"));
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
@@ -329,12 +329,12 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     getSourcedExemplars.set(null);
     renderPhaseB();
     await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("charlist-continue"));
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
     expect(getCharacterInventoryValue().chars).toEqual([]);
 
     const group = screen.getByRole("group", { name: "Step navigation" });
-    const doneBtn = screen.getByTestId("phase-b-done");
+    const doneBtn = screen.getByTestId("charlist-done");
     expect(group.contains(doneBtn)).toBe(true);
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
   });
@@ -353,9 +353,9 @@ describe("page-2 fill affordances (obligation P1b, FR-016b)", () => {
       await exemplarRadio();
       const buildList = document.querySelector("#discovery_method-build-list");
       if (buildList !== null) fireEvent.click(buildList as HTMLInputElement);
-      fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+      fireEvent.click(screen.getByTestId("charlist-continue"));
     }
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
   }
 
   it("offers the character box, the paste/upload surface, and the exemplar apply route after declining", async () => {
@@ -406,7 +406,7 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
     getSourcedExemplars.set(inv);
     renderPhaseB();
     await acceptExemplarsAndContinue();
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
   }
 
   it("marks proposed chips distinctly from authored ones", async () => {
@@ -446,8 +446,8 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
     getSourcedExemplars.set(null);
     renderPhaseB();
     await exemplarRadio();
-    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
-    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("charlist-continue"));
+    await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
     inventoryOps("characters").add("q");
     await waitFor(() => {
       expect(screen.getAllByTestId("authored-char-chip").length).toBeGreaterThan(0);
@@ -635,7 +635,7 @@ describe("loanword letters section", () => {
     await acceptExemplarsAndContinue();
 
     fireEvent.click(await screen.findByRole("button", { name: "x X (U+0078)" }));
-    fireEvent.click(screen.getByTestId("phase-b-done"));
+    fireEvent.click(screen.getByTestId("charlist-done"));
 
     const result = onComplete.mock.calls[0]?.[0] as import("@keyboard-studio/contracts").SurveyPhaseResult;
     expect(result.loanwordChars).toEqual(["x", "X"]);
@@ -647,7 +647,7 @@ describe("loanword letters section", () => {
     const { onComplete } = renderPhaseB();
     await acceptExemplarsAndContinue();
 
-    fireEvent.click(await screen.findByTestId("phase-b-done"));
+    fireEvent.click(await screen.findByTestId("charlist-done"));
     const result = onComplete.mock.calls[0]?.[0] as import("@keyboard-studio/contracts").SurveyPhaseResult;
     expect(result.loanwordChars).toEqual([]);
     expect(result.confirmedInventory).not.toContain("x");
@@ -676,7 +676,7 @@ describe("IntroChooser default selection (defaults-first)", () => {
     renderPhaseB();
 
     // Before the lookup settles there is no offer and build-list is the default.
-    await waitFor(() => expect(screen.getByTestId("phase-b-intro-next")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("charlist-continue")).toBeTruthy());
     expect(document.querySelector("#discovery_method-exemplars")).toBeNull();
     expect(
       document.querySelector<HTMLInputElement>("#discovery_method-build-list")?.checked,
@@ -701,7 +701,7 @@ describe("IntroChooser default selection (defaults-first)", () => {
     });
     getSourcedExemplars.set(inventory(["a", "ŋ"]));
     renderPhaseB();
-    await waitFor(() => expect(screen.getByTestId("phase-b-intro-next")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("charlist-continue")).toBeTruthy());
 
     fireEvent.click(document.querySelector("#discovery_method-manual") as HTMLInputElement);
     await act(async () => release());

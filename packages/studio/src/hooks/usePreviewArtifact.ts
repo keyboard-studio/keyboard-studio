@@ -32,6 +32,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLingui } from "@lingui/react/macro";
 import type { StartKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
 import {
   useKeyboardArtifact,
@@ -140,6 +141,7 @@ export interface PreviewArtifact {
 }
 
 export function usePreviewArtifact(): PreviewArtifact {
+  const { t } = useLingui();
   // Lazy-init from the working-copy store's already-instantiated base (if any)
   // rather than always starting null. The default flow can navigate straight
   // to #output (e.g. handlePhaseFComplete) without ever visiting #preview, so
@@ -378,11 +380,19 @@ export function usePreviewArtifact(): PreviewArtifact {
    * D5 before D6: an unreadable base notice is the more specific problem and has
    * a control that fixes it, so name that one when both are true.
    */
+  // #2050: user-facing, so localized — these flow into downloadError/kmpError.
   const emissionBlockReason: string | null =
     licenseUnparseable !== null
-      ? "The starting keyboard's copyright notice could not be read — supply the original holder before downloading."
+      ? t({
+          id: "output.artifact.error.licenseUnreadable",
+          message:
+            "The starting keyboard's copyright notice could not be read — supply the original holder before downloading.",
+        })
       : attributionMissing
-        ? "Add the author and copyright holder before downloading."
+        ? t({
+            id: "output.artifact.error.attributionMissing",
+            message: "Add the author and copyright holder before downloading.",
+          })
         : null;
 
   /**
@@ -410,7 +420,12 @@ export function usePreviewArtifact(): PreviewArtifact {
     // disabled affordance. A caller invoking this outside the normal button
     // click (tests, a future programmatic path) must not bypass it.
     if (coverageGate.blocked) {
-      setDownloadError("Finish every inventory character before downloading.");
+      setDownloadError(
+        t({
+          id: "output.artifact.error.coverageBlocked",
+          message: "Finish every inventory character before downloading.",
+        }),
+      );
       return;
     }
     // Same defense-in-depth for the spec 064 attribution gates: emitting a
@@ -432,7 +447,12 @@ export function usePreviewArtifact(): PreviewArtifact {
       // not instantiated.
       const result = await buildSourceZipForDownload();
       if (result === null) {
-        setDownloadError("Nothing to download — select a keyboard first.");
+        setDownloadError(
+          t({
+            id: "output.artifact.error.nothingToDownload",
+            message: "Nothing to download — select a keyboard first.",
+          }),
+        );
         return;
       }
 
@@ -446,30 +466,47 @@ export function usePreviewArtifact(): PreviewArtifact {
 
       triggerDownload(result.bytes, result.filename, "application/zip");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Download failed";
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t({ id: "output.artifact.error.downloadFailed", message: "Download failed" });
       setDownloadError(msg);
     } finally {
       setDownloading(false);
     }
-  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason]);
+  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason, t]);
 
   // Shared by the .kmp and test-build paths: show the real reason and keep the
   // .zip available — never a silent fallback, and never a dead end.
-  const reportKmpError = useCallback((err: unknown) => {
-    if (err instanceof OutputBundleError) {
-      setKmpError(err.message);
-      setKmpDiagnostics(err.diagnostics);
-    } else {
-      setKmpError(err instanceof Error ? err.message : "Package build failed");
-    }
-  }, []);
+  // #2050: the fallback is user-facing, so localized; a thrown error's own
+  // message (OutputBundleError, compiler) passes through untouched.
+  const reportKmpError = useCallback(
+    (err: unknown) => {
+      if (err instanceof OutputBundleError) {
+        setKmpError(err.message);
+        setKmpDiagnostics(err.diagnostics);
+      } else {
+        setKmpError(
+          err instanceof Error
+            ? err.message
+            : t({ id: "output.artifact.error.packageBuildFailed", message: "Package build failed" }),
+        );
+      }
+    },
+    [t],
+  );
 
   // The installable package — the primary download. Same gates as the zip:
   // .kmp is the default artifact, not a privileged shortcut past them.
   const handleDownloadKmp = useCallback(async () => {
     if (stage.kind !== "ready") return;
     if (coverageGate.blocked) {
-      setKmpError("Finish every inventory character before downloading.");
+      setKmpError(
+        t({
+          id: "output.artifact.error.coverageBlocked",
+          message: "Finish every inventory character before downloading.",
+        }),
+      );
       return;
     }
     // spec 064: the attribution refusals apply to the PRIMARY artifact as much as
@@ -485,7 +522,12 @@ export function usePreviewArtifact(): PreviewArtifact {
     try {
       const result = await buildKmpForDownload();
       if (result === null) {
-        setKmpError("Nothing to download — select a keyboard first.");
+        setKmpError(
+          t({
+            id: "output.artifact.error.nothingToDownload",
+            message: "Nothing to download — select a keyboard first.",
+          }),
+        );
         return;
       }
       if (result.warnings.length > 0) {
@@ -499,7 +541,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setBuildingKmp(false);
     }
-  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason]);
+  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, t]);
 
   // spec 094: the next test build's version, from the same resolver the
   // publish version comes from. Recomputed as builds are recorded.
@@ -524,20 +566,32 @@ export function usePreviewArtifact(): PreviewArtifact {
     try {
       // A frozen project records nothing, so it must not download either.
       if (useTestingStore.getState().frozen) {
-        setKmpError("This project is frozen; test builds are no longer available.");
+        setKmpError(
+          t({
+            id: "output.artifact.error.frozenNoTestBuilds",
+            message: "This project is frozen; test builds are no longer available.",
+          }),
+        );
         return null;
       }
       const number = useTestingStore.getState().nextBuildNumber;
       const result = await buildTestBuildKmp({ number, version: nextTestVersion });
       if (result === null) {
-        setKmpError("Nothing to download — select a keyboard first.");
+        setKmpError(
+          t({
+            id: "output.artifact.error.nothingToDownload",
+            message: "Nothing to download — select a keyboard first.",
+          }),
+        );
         return null;
       }
       // Without a fingerprint the build cannot be compared with the next one,
       // so it is a failed build and uses up no number (FR-011).
       const fingerprint = await computeWorkingCopyFingerprint();
       if (fingerprint === null) {
-        setKmpError("Package build failed");
+        setKmpError(
+          t({ id: "output.artifact.error.packageBuildFailed", message: "Package build failed" }),
+        );
         return null;
       }
       if (result.warnings.length > 0) {
@@ -559,7 +613,12 @@ export function usePreviewArtifact(): PreviewArtifact {
             : changedSectionsSince(entries, previous.decisionCursor, previous.fingerprint !== fingerprint),
       });
       if (build === null) {
-        setKmpError("This project is frozen; test builds are no longer available.");
+        setKmpError(
+          t({
+            id: "output.artifact.error.frozenNoTestBuilds",
+            message: "This project is frozen; test builds are no longer available.",
+          }),
+        );
         return null;
       }
       return build;
@@ -570,7 +629,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       makingTestBuildRef.current = false;
       setBuildingKmp(false);
     }
-  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, nextTestVersion]);
+  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, nextTestVersion, t]);
 
   return {
     startKeyboard,
