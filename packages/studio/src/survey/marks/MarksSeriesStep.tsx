@@ -670,7 +670,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   // --- context tolerance (spec 078) ---
   // The station's proposal, built from the latest analysis. `null` when there
   // is nothing to propose (no analysis yet, failed, or no fixable
-  // rule; could-not-check items stay in the notice, not here).
+  // rule; could-not-check items are never author-facing, not here either).
   const toleranceProposal = useMemo(() => {
     if (tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
     if (tolerance.normalizationStep !== undefined) {
@@ -722,6 +722,16 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       tolerance.status === "ready"
         ? Object.fromEntries(tolerance.report.findings.map((f) => [f.ruleId, f.location.line]))
         : {},
+    [tolerance],
+  );
+  // The gap findings behind the proposal, for the station's worked cases —
+  // the detail the removed global notice used to show (placement model:
+  // the station is the finding's only home).
+  const toleranceGapFindings = useMemo(
+    () =>
+      tolerance.status === "ready"
+        ? tolerance.report.findings.filter((f) => tolerance.classification[f.ruleId] === "gap")
+        : [],
     [tolerance],
   );
   const toleranceFingerprint = tolerance.status === "ready" ? tolerance.fingerprint : undefined;
@@ -1256,6 +1266,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           disclosures={toleranceDisclosures}
           ruleLines={toleranceRuleLines}
           fingerprint={toleranceFingerprint}
+          gapFindings={toleranceGapFindings}
           {...(priorTolerance !== undefined ? { prior: priorTolerance } : {})}
           {...(tolerance.status === "ready" && tolerance.normalizationStep !== undefined
             ? {

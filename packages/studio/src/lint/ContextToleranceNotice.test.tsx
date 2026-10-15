@@ -121,6 +121,48 @@ describe("ContextToleranceNotice — finding", () => {
   });
 });
 
+describe("ContextToleranceNotice — not-analysed on the copy track", () => {
+  const notAnalysedOnly = () =>
+    ready(
+      [
+        {
+          ruleId: "s1",
+          location: LOC,
+          status: "not-analysed",
+          notAnalysedReason: 'compound preceding context (more than one element before "+") not analysed',
+        },
+      ],
+      { s1: "not-analysed" },
+    );
+
+  it("a not-analysed-only result renders no warning on a copy", () => {
+    const { container } = render(<ContextToleranceNotice state={notAnalysedOnly()} hideNotAnalysed />);
+    expect(container.textContent).toBe("");
+    expect(screen.queryByTestId("context-tolerance-not-checked")).toBeNull();
+  });
+
+  it("the same result still renders could-not-check without the copy suppression", () => {
+    render(<ContextToleranceNotice state={notAnalysedOnly()} />);
+    expect(screen.getByTestId("context-tolerance-not-checked")).toBeTruthy();
+    expect(screen.getByText(/1 rule could not be checked/)).toBeTruthy();
+  });
+
+  it("on a copy a gap still renders while its not-analysed part is suppressed", () => {
+    render(
+      <ContextToleranceNotice
+        state={ready(
+          [gap("r1"), { ruleId: "s1", location: LOC, status: "not-analysed", notAnalysedReason: "compound" }],
+          { r1: "gap", s1: "not-analysed" },
+        )}
+        loadNames={loadNames}
+        hideNotAnalysed
+      />,
+    );
+    expect(screen.getByText(/1 rule only works when the diacritic is already joined to the letter/)).toBeTruthy();
+    expect(screen.queryByTestId("context-tolerance-not-checked")).toBeNull();
+  });
+});
+
 describe("ContextToleranceNotice — could not check (FR-004)", () => {
   it("a failed analysis renders as could-not-check with its reason, never as clean", () => {
     render(<ContextToleranceNotice state={{ status: "failed", runId: 2, reason: "worker crashed" }} />);
