@@ -33,7 +33,7 @@ const LINT_CHECKS = resolve(here, "../../../keyboard-lint/src/checks");
  * Every code emitted by a keyboard-lint check module, derived from source
  * (the lint package has no runtime registry). Only codes emitted as a
  * finding's `code:` field count; header comments may mention neighbouring
- * codes. Mirrors decisions/gateCoverage.test.ts's registeredLintCodes().
+ * codes. Mirrors test/gateCoverage.test.ts's registeredLintCodes().
  */
 function registeredLintCodes(): string[] {
   const out = new Set<string>();
