@@ -10,6 +10,7 @@ import { makeStartKeyboard, type StartKeyboard } from "./startKeyboard";
 import {
   StartDocumentationProfileSchema,
   ChartPreferenceSchema,
+  DocFixProposalsSchema,
   DocLintInputSchema,
   DocMemberIdSchema,
   DocMemberStateSchema,
@@ -136,6 +137,19 @@ describe("LayoutChartFileSchema / ChartPreferenceSchema", () => {
     expect(ChartPreferenceSchema.safeParse("keep-base-images").success).toBe(true);
     expect(ChartPreferenceSchema.safeParse("regenerate").success).toBe(true);
     expect(ChartPreferenceSchema.safeParse("always").success).toBe(false);
+  });
+});
+
+describe("DocFixProposalsSchema (issue #1908)", () => {
+  it("accepts each recorded answer and rejects an unknown fix or state", () => {
+    expect(DocFixProposalsSchema.safeParse({}).success).toBe(true);
+    expect(
+      DocFixProposalsSchema.safeParse({ pagename: "accepted", bodySync: "welcome", imageWidth: "declined" }).success,
+    ).toBe(true);
+    expect(DocFixProposalsSchema.safeParse({ bodySync: "help" }).success).toBe(true);
+    expect(DocFixProposalsSchema.safeParse({ bodySync: "declined" }).success).toBe(true);
+    expect(DocFixProposalsSchema.safeParse({ pagename: "later" }).success).toBe(false);
+    expect(DocFixProposalsSchema.safeParse({ bodySync: "both" }).success).toBe(false);
   });
 });
 

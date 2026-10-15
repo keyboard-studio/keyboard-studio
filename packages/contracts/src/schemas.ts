@@ -71,6 +71,7 @@ import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
   StartDocumentationProfile,
   ChartPreference,
+  DocFixProposals,
   DocLintInput,
   DocMemberState,
   HistoryEntryState,
@@ -896,6 +897,14 @@ export const LayoutChartFileSchema = z.object({
 
 export const ChartPreferenceSchema = z.enum(["keep-base-images", "regenerate"]);
 
+export const DocFixProposalStateSchema = z.enum(["accepted", "declined"]);
+
+export const DocFixProposalsSchema = z.object({
+  pagename: DocFixProposalStateSchema.optional(),
+  bodySync: z.enum(["welcome", "help", "declined"]).optional(),
+  imageWidth: DocFixProposalStateSchema.optional(),
+});
+
 export const DocLintInputSchema = z.object({
   keyboardId: z.string(),
   keyboardVersion: z.string(),
@@ -1148,5 +1157,8 @@ type _LayoutChartFileGuard = Expect<
 >;
 type _ChartPreferenceGuard = Expect<
   AssignableTo<z.infer<typeof ChartPreferenceSchema>, ChartPreference>
+>;
+type _DocFixProposalsGuard = Expect<
+  AssignableTo<z.infer<typeof DocFixProposalsSchema>, DocFixProposals>
 >;
 type _DocLintInputGuard = Expect<AssignableTo<z.infer<typeof DocLintInputSchema>, DocLintInput>>;
