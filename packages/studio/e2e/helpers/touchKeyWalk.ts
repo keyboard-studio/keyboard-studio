@@ -90,9 +90,9 @@ async function driveMechanisms(page: Page): Promise<void> {
     await startButton.click();
   }
   await placeMechanismCharacter(page, PLACED_CHAR, PLACED_CHAR_BASE_KEY);
-  await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
+  await page.getByRole("button", { name: /^(Next character|Continue)$/ }).click();
   await placeMechanismCharacter(page, PLACED_CHAR_UPPER, PLACED_CHAR_UPPER_BASE_KEY);
-  await page.getByRole("button", { name: /^(Next character|Done)$/ }).click();
+  await page.getByRole("button", { name: /^(Next character|Continue)$/ }).click();
 }
 
 /**
