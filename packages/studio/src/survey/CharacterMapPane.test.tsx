@@ -435,7 +435,9 @@ describe("CharacterMapPane — data path", () => {
   });
 
   it("shows a loanword letter as selected, and clicking it removes it from the loanword list only", async () => {
-    seedStartAndLanguage();
+    // The seeded loanword pair (q/Q) is removed as a pair by the map toggle —
+    // pair behaviour sits behind the casing-facet gate, so seed a cased base.
+    seedStartProducing(["a"]);
     getGroupsResult.set([
       {
         block: "Latin",
