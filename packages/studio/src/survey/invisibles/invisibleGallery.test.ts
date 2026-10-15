@@ -92,15 +92,24 @@ describe("galleryNeedStatementFor", () => {
 describe("invisibleGalleryGroups", () => {
   it("builds one section per block plus Direction controls, with no cell in two sections", () => {
     const groups = invisibleGalleryGroups();
-    // Arabic Presentation Forms-B has no standalone section: its sole
-    // character (U+FEFF) is a direction control, so it lives in the
-    // Direction controls section instead of an empty block section.
-    expect(groups.map((g) => g.id)).toEqual([
-      "invisible-gallery:Latin-1 Supplement",
-      "invisible-gallery:Arabic",
-      "invisible-gallery:General Punctuation",
+    // The expected section order is derived from the pinned inventory
+    // rather than hardcoded: one section per block that keeps a
+    // standalone cell, in block order, then the Direction controls
+    // section. Arabic Presentation Forms-B has no standalone section:
+    // its sole character (U+FEFF) is a direction control, so it lives in
+    // the Direction controls section instead of an empty block section.
+    const isDirectionControl = (cp: number) =>
+      BIDI_CONTROL_CODE_POINTS.includes(cp) &&
+      !FIXED_INVISIBLE_CODE_POINTS.includes(cp);
+    const expectedIds = [
+      ...new Set(
+        INVISIBLE_GALLERY_INVENTORY.filter(
+          (row) => !isDirectionControl(row.cp),
+        ).map((row) => `invisible-gallery:${row.block}`),
+      ),
       "invisible-gallery:direction",
-    ]);
+    ];
+    expect(groups.map((g) => g.id)).toEqual(expectedIds);
     const seen = new Set<string>();
     for (const g of groups) {
       for (const cell of g.cells) {
