@@ -933,6 +933,9 @@ export {
   applyTouchKeycapRemovalsToRawJson,
   applyTouchKeycapRemovalsToVfs,
   buildSessionProducedSet,
+  findOe2SoleSourceGlyphs,
+  findSessionOe2SoleSourceGlyphs,
+  isOe2VkeyName,
 } from "./pattern-apply/index.js";
 export type {
   SubstituteResult,

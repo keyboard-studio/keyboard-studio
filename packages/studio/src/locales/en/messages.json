@@ -1073,6 +1073,8 @@
   "lint.contextTolerance.summary": "{gapCount, plural, one {# rule only works when the diacritic is already joined to the letter.} other {# rules only work when the diacritic is already joined to the letter.}}",
   "lint.contextTolerance.toggle.hide": "Hide the affected rules",
   "lint.contextTolerance.toggle.show": "Show the affected rules",
+  "lint.oe2SoleSource.hint": "Keyboards made for the US do not have this key, so people using one cannot type this character. Also give it another way to be typed, such as a different key or a deadkey sequence.",
+  "lint.oe2SoleSource.message": "The character \"{glyph}\" (U+{codePoint}) is only on the key next to the left Shift key",
   "lint.summary.findingsListAriaLabel": "Lint findings",
   "lint.summary.liveRegion.issueCount": "{0, plural, one {# lint issue} other {# lint issues}}",
   "lint.summary.noIssuesFound": "No issues found",

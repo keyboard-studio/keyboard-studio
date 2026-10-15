@@ -48,6 +48,13 @@ describe("buildFindingsByQuestionId", () => {
     expect(result["region"]).toEqual([finding]);
     expect(Object.keys(result)).toHaveLength(1);
   });
+
+  it("places a sole-source oe2 finding under physical-layout (the mechanisms decision)", () => {
+    const finding = makeFinding("KM_LINT_OE2_SOLE_SOURCE_GLYPH");
+    const result = buildFindingsByQuestionId([finding]);
+    expect(result["physical-layout"]).toEqual([finding]);
+    expect(Object.keys(result)).toHaveLength(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -161,6 +168,15 @@ describe("buildStepWarningCounts (#2145 owner-step badge counts)", () => {
       makeFinding("KM_LINT_KPS_NUMERIC_REGION_TAG"),
     ]);
     expect(counts).toEqual({ characters: 2, identity: 2 });
+  });
+
+  it("counts a sole-source oe2 finding on the mechanisms step (its owner), and nowhere else", () => {
+    expect(buildStepWarningCounts([makeFinding("KM_LINT_OE2_SOLE_SOURCE_GLYPH")])).toEqual({
+      mechanisms: 1,
+    });
+    // Mapped, so it is NOT part of the unmapped set that accumulates to the
+    // Output screen — the warning lives only where placement is decided.
+    expect(selectUnmappedFindings([makeFinding("KM_LINT_OE2_SOLE_SOURCE_GLYPH")])).toEqual([]);
   });
 
   it("agrees with buildFindingsByQuestionId: the counted findings are exactly the chipped ones", () => {

@@ -16,6 +16,13 @@ const LINT_CODE_TO_QUESTION_IDS: Partial<Record<LintCode, string[]>> = {
   // by changing a survey inventory answer (layer-confusion: Layer C artifact
   // check presented as a survey-remediation chip).
 
+  // Desktop key assignment (physical-layout gallery decision): a glyph
+  // whose only typing route is the oe2 key cannot be typed on ANSI
+  // hardware, and placement is decided in the mechanisms gallery — so the
+  // finding chips on that decision and badges the mechanisms step, never
+  // a pane-top or global notice.
+  KM_LINT_OE2_SOLE_SOURCE_GLYPH: ["physical-layout"],
+
   // Identity (IdentityLite)
   KM_LINT_DISPLAY_NAME_UNDERSCORE:        ["language_name_english"],
   KM_LINT_KPS_NUMERIC_REGION_TAG:         ["region"],
@@ -73,6 +80,8 @@ const QUESTION_ID_TO_STEP_ID: Readonly<Record<string, string>> = {
   language_name_english: "identity",
   region: "identity",
   iso_code: "identity",
+  // The physical-layout gallery decision is the mechanisms step's surface.
+  "physical-layout": "mechanisms",
 };
 
 /**
