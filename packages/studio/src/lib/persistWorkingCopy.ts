@@ -379,6 +379,8 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // spec 080 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
     historyEntryState: s.historyEntryState,
     chartPreference: s.chartPreference,
+    // Issue #1908: the recorded documentation-fix proposal answers.
+    docFixProposals: s.docFixProposals,
     startDocProfile: s.startDocProfile,
     baselineDocFindings: s.baselineDocFindings,
     ir: s.ir,
@@ -511,6 +513,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // Tolerate snapshots saved before the documentation decisions existed.
     historyEntryState: snapshot.historyEntryState ?? null,
     chartPreference: snapshot.chartPreference ?? null,
+    // Tolerate snapshots saved before the #1908 proposal answers existed.
+    docFixProposals: snapshot.docFixProposals ?? null,
     startDocProfile: snapshot.startDocProfile ?? null,
     baselineDocFindings: snapshot.baselineDocFindings ?? null,
     ir: snapshot.ir,
