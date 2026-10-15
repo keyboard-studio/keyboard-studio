@@ -16,6 +16,29 @@ function emptyInput(overrides: Partial<WorkToDoInput> = {}): WorkToDoInput {
 }
 
 describe("selectWorkToDo", () => {
+  it("reports one warnings item per owning step with its count (#2145)", () => {
+    const out = selectWorkToDo(emptyInput({ warnings: { characters: 2, identity: 1 } }));
+    expect(out.characters).toEqual([{ kind: "warnings", stepId: "characters", count: 2 }]);
+    expect(out.identity).toEqual([{ kind: "warnings", stepId: "identity", count: 1 }]);
+  });
+
+  it("omits zero/negative warning counts and tolerates an absent warnings input", () => {
+    expect(selectWorkToDo(emptyInput({ warnings: { characters: 0 } }))).toEqual({});
+    expect(selectWorkToDo(emptyInput())).toEqual({});
+  });
+
+  it("appends the warnings item after a step's other work", () => {
+    const out = selectWorkToDo(
+      emptyInput({
+        flagged: {
+          characters: [{ answerId: "a", screenId: "s", reason: REASON }],
+        },
+        warnings: { characters: 3 },
+      }),
+    );
+    expect(out.characters!.map((i) => i.kind)).toEqual(["reproposed", "warnings"]);
+  });
+
   it("reports a reproposed item per flagged answer", () => {
     const out = selectWorkToDo(
       emptyInput({

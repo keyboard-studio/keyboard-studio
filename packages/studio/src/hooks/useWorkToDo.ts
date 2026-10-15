@@ -37,6 +37,7 @@ import {
 } from "../survey/useInventoryDraft.ts";
 import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
 import { selectWorkToDo, type WorkItem, type NotAskedGateInput, type FlaggedAnswerInput } from "../steps/workToDo.ts";
+import { buildStepWarningCounts } from "../lint/lintToQuestion.ts";
 import type { StepId } from "../steps/answerTypes.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { lowercaseBaseView } from "../survey/charNormUtils.ts";
@@ -73,6 +74,15 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
   const convenienceStatus = useSurveyAnswerStore((s) => s.steps.convenience?.status);
   const accounted = useAccountedForGate();
   const { neededSet, hasSignal } = useCarveNeededSet();
+  // #2145: the validator findings StudioShell publishes to the working-copy
+  // store (the single findings source — no second validator run, D3). The
+  // badge counts derive from the same mapped findings the inline question
+  // chips render, so a step's badge and its in-page flags cannot disagree.
+  const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  const stepWarningCounts = useMemo(
+    () => buildStepWarningCounts(validatorFindings),
+    [validatorFindings],
+  );
 
   const marksFlagged = useMemo<readonly FlaggedAnswerInput[]>(() => {
     if (alphabet === undefined || alphabet.marks.length === 0) return [];
@@ -165,8 +175,9 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
         flagged: { marks: marksFlagged, characters: charactersFlagged, punctuation: punctuationFlagged },
         unaccounted: { mechanisms: accounted.unaccountedDesktop.length, touch: accounted.unaccountedTouch.length },
         notAsked,
+        warnings: stepWarningCounts,
       }),
-    [marksFlagged, charactersFlagged, punctuationFlagged, accounted, notAsked],
+    [marksFlagged, charactersFlagged, punctuationFlagged, accounted, notAsked, stepWarningCounts],
   );
 }
 
@@ -185,6 +196,8 @@ export function useWorkToDo(): Record<StepId, WorkItem[]> {
  *  - `marks` and `characters` `reproposed` flags — both pure reads plus pure
  *    functions (`deriveMarksFlags`/`reconciledAttachmentChecked`,
  *    `deriveCharacterFlags`), no hook needed.
+ *  - per-step `warnings` counts (#2145) — a pure read of the working copy's
+ *    published validator findings, identical to the live hook's source.
  *  - `convenience`'s `not-asked` -> `applies` transition — approximated with
  *    the SYNCHRONOUS half of `useCarveNeededSet`'s needed-set (the tiered
  *    marks-series + confirmed-inventory union via `deriveCarveNeededSet`),
@@ -298,5 +311,8 @@ export function readWorkToDo(): Record<StepId, WorkItem[]> {
     flagged: { marks: marksFlagged, characters: charactersFlagged },
     unaccounted: { mechanisms: 0, touch: 0 },
     notAsked,
+    // #2145: per-step warning counts are a pure read of the published
+    // findings — same source as the live hook, so the snapshot agrees.
+    warnings: buildStepWarningCounts(workingCopy.validatorFindings),
   });
 }

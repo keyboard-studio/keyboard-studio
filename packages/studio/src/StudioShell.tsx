@@ -29,7 +29,6 @@ import {
   type CSSProperties,
 } from "react";
 import { SurveyQuestionsPane } from "./components/SurveyQuestionsPane.tsx";
-import { DocumentationFindingsSummary } from "./components/DocumentationFindingsSummary.tsx";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type {
@@ -100,8 +99,6 @@ import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
-import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
-import { LintSummary } from "./lint/index.ts";
 import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
@@ -112,7 +109,7 @@ import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
@@ -144,7 +141,7 @@ import {
   clearServerDraft,
   serverMetaToDraftMeta,
 } from "./lib/serverDraftStore.ts";
-import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
+import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
 import { useStartPreviewStatusStore, type StartPreviewStatus } from "./stores/startPreviewStatusStore.ts";
 import {
   useRulesDemoArtifactStore,
@@ -1323,45 +1320,14 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   useEffect(() => {
     setValidatorFindings(findings);
   }, [findings, setValidatorFindings]);
-  const globalFindings = useMemo(
-    () => selectUnmappedFindings(findings),
-    [findings],
-  );
-  // Warning-severity global findings render as a bare advisory line above the step content
-  // — no card background/border/code-badge/hint-button/location chrome; see
-  // the survey-pane render below. Non-warning severities keep the existing
-  // boxed LintSummary treatment untouched.
-  const globalWarnings = useMemo(
-    () => globalFindings.filter((f) => f.severity === "warning"),
-    [globalFindings],
-  );
-  // Documentation (Layer C) findings are warning-only by the Layer C
-  // ceiling, so they all land in globalWarnings — but full-weight blocks
-  // above the step content pushed the current question down, and the block
-  // render never consulted origin, so upstream findings (inherited from the
-  // base keyboard) rendered at full weight. Collapse the doc-sourced
-  // subset into one collapsed-by-default summary row instead; everything
-  // else keeps the existing full-block render untouched. Identity survives
-  // the findings pipeline — the findings array is built with spread and
-  // selectUnmappedFindings is an Array.filter, both of which preserve
-  // element references — so a Set over documentationFindings identifies
-  // exactly the doc-sourced warnings.
-  const documentationFindingSet = useMemo(
-    () => new Set(documentationFindings),
-    [documentationFindings],
-  );
-  const docGlobalWarnings = useMemo(
-    () => globalWarnings.filter((f) => documentationFindingSet.has(f)),
-    [globalWarnings, documentationFindingSet],
-  );
-  const authoredGlobalWarnings = useMemo(
-    () => globalWarnings.filter((f) => !documentationFindingSet.has(f)),
-    [globalWarnings, documentationFindingSet],
-  );
-  const globalNonWarnings = useMemo(
-    () => globalFindings.filter((f) => f.severity !== "warning"),
-    [globalFindings],
-  );
+  // Issue #2145 (adopted warnings-placement model): findings are NOT
+  // rendered here any more. A warning lives only where it can be acted
+  // on — mapped findings render as chips at their owning question
+  // (lint/lintToQuestion.ts) with a count badge on the owning step's
+  // journey dot, and the unmapped set (documentation + everything else)
+  // accumulates to the Output screen. The findings array above is still
+  // published to the store (setValidatorFindings) for those surfaces and
+  // for completeness; nothing persistent renders at the top of this pane.
 
   // ---------------------------------------------------------------------------
   // Start over — reset session store first (clears all traversal slots + history),
@@ -1755,8 +1721,6 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
               role="status"
               aria-live="polite"
               style={
-                authoredGlobalWarnings.length > 0 ||
-                docGlobalWarnings.length > 0 ||
                 showContextTolerance
                   ? {
                       display: "flex",
@@ -1768,39 +1732,6 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
                   : undefined
               }
             >
-              {authoredGlobalWarnings.map((f, i) => (
-                <div
-                  key={`${f.code}-${i}`}
-                  style={{ display: "flex", flexDirection: "column", gap: 2 }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      lineHeight: 1.5,
-                      color: TEXT_MAIN,
-                    }}
-                  >
-                    <span aria-hidden="true">⚠</span>{" "}
-                    <Trans id="common.warningLabel">Warning:</Trans> {f.message}
-                  </p>
-                  {f.hint !== undefined && (
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 12,
-                        lineHeight: 1.5,
-                        color: TEXT_DIM,
-                      }}
-                    >
-                      {f.hint}
-                    </p>
-                  )}
-                </div>
-              ))}
-              {docGlobalWarnings.length > 0 && (
-                <DocumentationFindingsSummary findings={docGlobalWarnings} />
-              )}
               {showContextTolerance && (
                 <ContextToleranceNotice
                   state={contextTolerance}
@@ -1809,9 +1740,6 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
               )}
             </div>
           }
-          {globalNonWarnings.length > 0 && (
-            <LintSummary findings={globalNonWarnings} />
-          )}
           {stepHost}
         </SurveyQuestionsPane>
       }

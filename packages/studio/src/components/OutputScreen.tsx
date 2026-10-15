@@ -35,7 +35,7 @@
 // same explanatory pattern PhaseFGate uses, reusing the identical shared
 // selector (lib/unimplementedInventory.ts via usePreviewArtifact).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { formatCoverageBannerParts } from "../lib/unimplementedInventory.ts";
@@ -44,6 +44,10 @@ import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { useDocsPreview } from "../hooks/useDocsPreview.ts";
+import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
+import { DocumentationFindingsSummary } from "./DocumentationFindingsSummary.tsx";
+import { LintSummary } from "../lint/LintSummary.tsx";
+import { selectUnmappedFindings } from "../lint/lintToQuestion.ts";
 import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
@@ -126,6 +130,25 @@ export function OutputScreen() {
   // spec 102 FR-034: the checklist says when the inherited docs made the
   // generated typing guide redundant. A memoised derivation, no timer (D3).
   const docsPreview = useDocsPreview();
+  // Issue #2145 (warnings-placement model): hygiene accumulates here. The
+  // documentation findings render with the checklist below (grouped
+  // authored vs inherited inside DocumentationFindingsSummary), and the
+  // remaining unmapped findings — the ones with no owning question — render
+  // as a plain summary. KM_WARN_* infrastructure findings are never
+  // author-facing, and error-severity findings stay with the Output gate
+  // and the NavBar outputBlocked treatment, so both are filtered out here.
+  // Informational only: like the checklist, none of this gates download.
+  const documentationFindings = useDocumentationFindings();
+  const publishedFindings = useWorkingCopyStore((s) => s.validatorFindings);
+  const otherOutputFindings = useMemo(() => {
+    const docCodes = new Set(documentationFindings.map((f) => f.code));
+    return selectUnmappedFindings(publishedFindings).filter(
+      (f) =>
+        !docCodes.has(f.code) &&
+        !f.code.startsWith("KM_WARN") &&
+        f.severity !== "error",
+    );
+  }, [publishedFindings, documentationFindings]);
   const narrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
@@ -836,6 +859,29 @@ export function OutputScreen() {
                 </button>
               </div>
             )}
+            {/* Issue #2145: the accumulated hygiene set lives here, with
+                the documentation surfaces below — documentation findings
+                grouped authored vs inherited, then any other unmapped
+                findings. Informational only; gates nothing. */}
+            {documentationFindings.length > 0 && (
+              <section
+                aria-label={t({ id: "output.docFindings.regionAriaLabel", message: "Documentation notes" })}
+                data-testid="output-doc-findings"
+                style={{ marginTop: 10 }}
+              >
+                <DocumentationFindingsSummary findings={documentationFindings} />
+              </section>
+            )}
+            {otherOutputFindings.length > 0 && (
+              <section
+                aria-label={t({ id: "output.otherFindings.regionAriaLabel", message: "Other findings" })}
+                data-testid="output-other-findings"
+                style={{ marginTop: 10 }}
+              >
+                <LintSummary findings={otherOutputFindings} />
+              </section>
+            )}
+
             {/* spec 080 FR-017: what documentation ships and where each file's
                 content came from. Informational only — reads state, gates
                 nothing (FR-018); placeholder rows link back to the step that

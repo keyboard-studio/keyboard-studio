@@ -135,6 +135,14 @@ vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
   useWorkingCopyTransform: () => null,
 }));
 
+// #2145: the documentation findings that accumulate to this screen. Hoisted
+// holder so the findings tests below can seed them; defaults to none, which
+// matches what the real hook returns for this file's other seeds.
+const docFindingsHoisted = vi.hoisted(() => ({ current: [] as import("@keyboard-studio/contracts").LintFinding[] }));
+vi.mock("../hooks/useDocumentationFindings.ts", () => ({
+  useDocumentationFindings: () => docFindingsHoisted.current,
+}));
+
 // SignUpPanel pulls heavy deps (useGitHubAuth, useGoogleAuth, services); mock it
 // to a recognisable testid so we can assert its presence/absence without
 // importing the real module.
@@ -732,5 +740,80 @@ describe("OutputScreen — unreadable base copyright notice (D5)", () => {
     mockRetry.mockClear();
     fireEvent.click(screen.getByTestId("resolve-base-holder"));
     expect(mockRetry).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — #2145 warnings placement: the accumulated findings live HERE.
+// Documentation findings render beside the checklist (grouped authored vs
+// inherited by DocumentationFindingsSummary); other unmapped findings render
+// as a summary; KM_WARN_* infrastructure findings and error-severity
+// findings never render in these sections (errors stay with the gate).
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — accumulated findings (#2145)", () => {
+  function renderWithFindings() {
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+    docFindingsHoisted.current = [
+      { code: "KM_LINT_PHP_PAGENAME_FORMAT", severity: "warning", layer: "C", message: "authored doc note text" },
+      { code: "KM_LINT_PHP_HTM_BODY_MISMATCH", severity: "warning", layer: "C", message: "inherited doc note text", origin: "upstream" },
+    ];
+    useWorkingCopyStore.getState().setValidatorFindings([
+      { code: "KM_LINT_PHP_PAGENAME_FORMAT", severity: "warning", layer: "C", message: "authored doc note text" },
+      { code: "KM_LINT_WELCOME_STALE", severity: "warning", layer: "A", message: "other unmapped warning text" },
+      { code: "KM_WARN_VALIDATOR_ERROR", severity: "warning", layer: "A", message: "validator crash text" },
+      { code: "KM_LINT_HARD_ERROR", severity: "error", layer: "A", message: "hard error text" },
+    ]);
+    renderOutputScreen();
+  }
+
+  afterEach(() => {
+    docFindingsHoisted.current = [];
+  });
+
+  it("renders the documentation findings at Output, grouped, next to the checklist", () => {
+    renderWithFindings();
+    const section = screen.getByTestId("output-doc-findings");
+    expect(section).toBeTruthy();
+    const toggle = screen.getByTestId("doc-findings-summary-toggle");
+    expect(toggle.textContent).toContain("2 documentation notes");
+    // Collapsed by default: messages appear only on expand, with the
+    // upstream one under its inherited group.
+    fireEvent.click(toggle);
+    expect(section.textContent).toContain("authored doc note text");
+    expect(section.textContent).toContain("inherited doc note text");
+    expect(screen.getByTestId("doc-findings-summary-upstream-group")).toBeTruthy();
+    // And the checklist itself is still here — findings accumulate WITH it.
+    expect(screen.getByTestId("documentation-checklist")).toBeTruthy();
+  });
+
+  it("renders other unmapped warnings, but never KM_WARN_* or error findings", () => {
+    renderWithFindings();
+    const other = screen.getByTestId("output-other-findings");
+    expect(other.textContent).toContain("KM_LINT_WELCOME_STALE");
+    expect(other.textContent).not.toContain("KM_WARN_VALIDATOR_ERROR");
+    expect(other.textContent).not.toContain("validator crash text");
+    expect(other.textContent).not.toContain("hard error text");
+    // Doc findings are not duplicated into the other-findings list.
+    expect(other.textContent).not.toContain("KM_LINT_PHP_PAGENAME_FORMAT");
+  });
+
+  it("renders neither findings section when there are no findings", () => {
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+    renderOutputScreen();
+    expect(screen.queryByTestId("output-doc-findings")).toBeNull();
+    expect(screen.queryByTestId("output-other-findings")).toBeNull();
   });
 });

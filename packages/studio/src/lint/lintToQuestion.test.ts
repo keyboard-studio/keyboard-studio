@@ -3,7 +3,7 @@ import { screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { createElement } from "react";
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { buildFindingsByQuestionId, selectUnmappedFindings } from "./lintToQuestion";
+import { buildFindingsByQuestionId, buildStepWarningCounts, selectUnmappedFindings } from "./lintToQuestion";
 import { LintSummary } from "./LintSummary";
 import { VALIDATOR_ERROR_FINDING } from "./validationErrorFindings";
 
@@ -138,11 +138,54 @@ describe("selectUnmappedFindings", () => {
 // marginal safety gained over this focused wiring test is low; this test
 // proves the two-piece path directly, with no store setup or stage navigation.
 
+describe("buildStepWarningCounts (#2145 owner-step badge counts)", () => {
+  it("returns empty record for empty input and for unmapped findings", () => {
+    expect(buildStepWarningCounts([])).toEqual({});
+    expect(buildStepWarningCounts([makeFinding("KM_LINT_STRAY_SCRATCH_FILES")])).toEqual({});
+  });
+
+  it("counts a finding once for its owning step even when it maps to two questions on that step", () => {
+    // KM_LINT_INVENTORY_UNCOVERED maps to pb_standard_letters AND
+    // pb_special_letters — both on the characters step, so the step badge
+    // counts the finding once, matching the one in-page flag set.
+    expect(buildStepWarningCounts([makeFinding("KM_LINT_INVENTORY_UNCOVERED")])).toEqual({
+      characters: 1,
+    });
+  });
+
+  it("accumulates counts per step across steps", () => {
+    const counts = buildStepWarningCounts([
+      makeFinding("KM_LINT_INVENTORY_UNCOVERED"),
+      makeFinding("KM_LINT_MANDATED_CHAR_MISSING"),
+      makeFinding("KM_LINT_DISPLAY_NAME_UNDERSCORE"),
+      makeFinding("KM_LINT_KPS_NUMERIC_REGION_TAG"),
+    ]);
+    expect(counts).toEqual({ characters: 2, identity: 2 });
+  });
+
+  it("agrees with buildFindingsByQuestionId: the counted findings are exactly the chipped ones", () => {
+    const findings = [
+      makeFinding("KM_LINT_INVENTORY_UNCOVERED"),
+      makeFinding("KM_LINT_ISO_639_5_LANG_CODE"),
+      makeFinding("KM_LINT_STRAY_SCRATCH_FILES"),
+    ];
+    const chipped = Object.values(buildFindingsByQuestionId(findings)).flat();
+    const counted = Object.values(buildStepWarningCounts(findings)).reduce((a, b) => a + b, 0);
+    // Every chipped finding is counted exactly once (no mapped code spans
+    // two steps today), and the unmapped finding is in neither surface.
+    expect(new Set(chipped).size).toBe(counted);
+    expect(counted).toBe(2);
+  });
+});
+
 describe("selectUnmappedFindings -> LintSummary render (validator error surface)", () => {
   it("renders KM_WARN_VALIDATOR_ERROR in LintSummary when VALIDATOR_ERROR_FINDING passes through selectUnmappedFindings", () => {
-    // Simulate what SurveyView does: useValidator returns [VALIDATOR_ERROR_FINDING]
-    // after runAllChecks throws; selectUnmappedFindings passes it through because
+    // useValidator returns [VALIDATOR_ERROR_FINDING] after runAllChecks
+    // throws; selectUnmappedFindings passes it through because
     // KM_WARN_VALIDATOR_ERROR has no entry in LINT_CODE_TO_QUESTION_IDS.
+    // (#2145: the pane-top render is gone and KM_WARN_* is never
+    // author-facing — the Output surface filters it out. This test keeps
+    // proving the two-piece pass-through + LintSummary render path only.)
     const globalFindings = selectUnmappedFindings([VALIDATOR_ERROR_FINDING]);
 
     // globalFindings must contain exactly the validator error finding.

@@ -37,12 +37,21 @@ export interface WorkToDoInput {
   readonly unaccounted: { readonly mechanisms: number; readonly touch: number };
   /** Steps currently recorded as `not-asked`, keyed by step id. */
   readonly notAsked: Readonly<Record<StepId, NotAskedGateInput>>;
+  /**
+   * Unactioned warning counts per owning step (issue #2145): derived from
+   * the SAME mapped findings the inline question chips render
+   * (`lint/lintToQuestion.ts`'s `buildStepWarningCounts`), so a step's
+   * journey-strip badge can never disagree with its in-page flags.
+   * Optional — absent means no warning badges (older callers/fixtures).
+   */
+  readonly warnings?: Readonly<Record<StepId, number>>;
 }
 
 export type WorkItem =
   | { kind: "reproposed"; stepId: StepId; screenId: string; answerId: string; reason: ReproposalReason }
   | { kind: "unassigned"; stepId: "mechanisms" | "touch"; count: number }
-  | { kind: "now-applicable"; stepId: StepId; reason: ReproposalReason };
+  | { kind: "now-applicable"; stepId: StepId; reason: ReproposalReason }
+  | { kind: "warnings"; stepId: StepId; count: number };
 
 export type WorkKind = WorkItem["kind"];
 
@@ -51,7 +60,8 @@ const TOUCH_STEP_ID = "touch";
 
 /**
  * Combine (a) reproposed/newly-relevant saved answers, (b) unaccounted
- * mechanism/touch counts, and (c) `not-asked` steps whose gate now applies,
+ * mechanism/touch counts, (c) `not-asked` steps whose gate now applies,
+ * and (d) per-step unactioned warning counts (#2145),
  * into one per-step work-to-do map. A step absent from the flagged/notApplied
  * inputs and with nothing unaccounted gets no entry at all — never an empty
  * array — so callers can test "unaffected steps have none" with a plain
@@ -89,6 +99,13 @@ export function selectWorkToDo(input: WorkToDoInput): Record<StepId, WorkItem[]>
     out[stepId] = [...(out[stepId] ?? []), { kind: "now-applicable", stepId, reason: gate.reason }];
   }
 
+  // (d) unactioned warnings owned by a step (#2145) — one aggregated item
+  // per step carrying the count, appended after the step's other work.
+  for (const [stepId, count] of Object.entries(input.warnings ?? {})) {
+    if (count <= 0) continue;
+    out[stepId] = [...(out[stepId] ?? []), { kind: "warnings", stepId, count }];
+  }
+
   return out;
 }
 
@@ -101,6 +118,8 @@ function workItemKey(item: WorkItem): string {
       return `unassigned:${item.stepId}:${item.count}`;
     case "now-applicable":
       return `now-applicable:${item.stepId}`;
+    case "warnings":
+      return `warnings:${item.stepId}:${item.count}`;
     default: {
       const _exhaustive: never = item;
       return _exhaustive;
