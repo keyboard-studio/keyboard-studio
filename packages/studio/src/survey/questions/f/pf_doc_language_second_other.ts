@@ -13,7 +13,7 @@ export const definition = {
   type: "autocomplete" as const,
   options_source: "@langtags_iso639" as const,
   required: false,
-  next: "pf_font_guidance",
+  next: "pf_usage_tip_2",
 } satisfies import("../../types.ts").FlowQuestion;
 
 export const validate = validateDocLanguageTag;

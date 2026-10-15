@@ -8,9 +8,10 @@
 // words.
 //
 // Only questions whose answer the starting point actually states are seeded.
-// Font guidance is not (bundled fonts are already listed automatically, per the
-// question's own help), and nor is anything that would need guessing about the
-// author's community or intentions.
+// Font guidance is not — the starting point does not say which fonts a user
+// must obtain, and nothing lists bundled fonts in the documentation — and nor
+// is anything that would need guessing about the author's community or
+// intentions.
 
 import type { StartKeyboard, VirtualFS } from "@keyboard-studio/contracts";
 import { readVfsText } from "./vfsText.ts";

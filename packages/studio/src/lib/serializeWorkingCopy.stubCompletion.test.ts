@@ -147,18 +147,28 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     );
     // spec 079 FR-013: the placeholder page still references the generated
     // layout charts (a net-new keyboard has no base images), so the pre-076
-    // bare placeholder is now placeholder + layout section.
+    // bare placeholder is now placeholder + layout section. The page opens
+    // with the element-spec §1 shell (doctype, head, Start Using title,
+    // shared inline style) around the fallback body.
     const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
-    expect(welcome.startsWith(`<html><body><p>Welcome to ${basicKbdus.displayName}</p>
-<h2>Keyboard Layout</h2>`)).toBe(true);
+    expect(welcome.startsWith(
+      "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n" +
+        `<title>Start Using ${basicKbdus.displayName}</title>\n<style>`,
+    )).toBe(true);
+    expect(welcome).toContain(
+      `<h1>${basicKbdus.displayName}</h1>\n<p>Welcome to ${basicKbdus.displayName}</p>\n<h2>Keyboard Layout</h2>`,
+    );
     expect(welcome).toContain('<img src="ks-layout-desktop-');
-    expect(welcome.endsWith("</body></html>")).toBe(true);
+    expect(welcome.endsWith("</body>\n</html>")).toBe(true);
     // spec 079 FR-003 / US1-3: even an early production's help page opens with
     // the standard help-site header. Spec 102 FR-030: the body form follows it,
     // the same body the welcome page carries, instead of a placeholder comment.
+    // The shared inline style leads the fragment — the same style block the
+    // welcome page carries in its head (criterion 11.10).
+    const style = /<style>([\s\S]*?)<\/style>/.exec(welcome)?.[1];
     const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`);
     expect(help).toBe(
-      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<p>Welcome to ${basicKbdus.displayName}</p>`,
+      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<style>${style}</style>\n<h1>${basicKbdus.displayName}</h1>\n<p>Welcome to ${basicKbdus.displayName}</p>`,
     );
   });
 
@@ -183,9 +193,12 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
     const welcomeSansLayout = welcome.replace(/\n?<h2>Keyboard Layout<\/h2>[\s\S]*?(?=<\/body>)/, "");
     const welcomeBody = welcomeSansLayout
-      .replace(/^<html[^>]*><body>/, "")
-      .replace(/<\/body><\/html>$/, "");
-    expect(help.slice(header.length)).toBe(welcomeBody);
+      .replace(/^[\s\S]*?<body>\n/, "")
+      .replace(/<\/body>\n<\/html>$/, "");
+    // The help fragment leads with the same shared style block the welcome
+    // page carries in its head, then the identical inner body.
+    const style = /<style>([\s\S]*?)<\/style>/.exec(welcome)?.[1];
+    expect(help.slice(header.length)).toBe(`<style>${style}</style>\n${welcomeBody}`);
     expect(welcomeSansLayout).not.toBe(welcome);
   });
 

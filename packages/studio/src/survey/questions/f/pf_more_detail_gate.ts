@@ -19,8 +19,8 @@ export const definition = {
   help_text:
     "No is a perfectly good answer — you already have a working help page, and " +
     "answering No finishes with just credits and contact details. Say Yes only " +
-    "if you already know things worth writing down: fonts that render your " +
-    "alphabet, the standard the layout follows, example words, known problems, " +
+    "if you already know things worth writing down: the standard the layout " +
+    "follows, example words, known problems, " +
     "or related keyboards. These are for information you already have, not " +
     "research to go and do. You can come back and add them later.",
   type: "bool" as const,
