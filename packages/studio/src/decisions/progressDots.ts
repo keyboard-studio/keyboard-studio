@@ -116,6 +116,11 @@ export interface ProgressDot {
   readonly fill: MarkFill;
   /** §3c: work waiting on this mark (or, for a collapsed section, somewhere inside it). */
   readonly badge?: readonly WorkKind[];
+  /** #2145: per-kind counts for count-carrying work items (`warnings`,
+   * `unassigned`), summed over the mark's items — the badge's accessible
+   * name states the number ("3 warnings to review"). Absent when no
+   * count-carrying item is badged. */
+  readonly badgeCounts?: Readonly<Partial<Record<WorkKind, number>>>;
   /** FR-068: pre-resolved "passed — {reason}" text for a `not-asked` step's mark. */
   readonly passedReason?: string;
   /** The question id for `completed`/`current` (when question-accurate); the
@@ -412,11 +417,13 @@ function collapsedWalkDot(
   const allDone = positions.every((p) => p.done);
   const kind: ProgressDotKind = isActiveStep ? "current" : allDone ? "completed" : "upcoming";
   const badge = badgeKinds(workToDo);
+  const counts = badgeCounts(workToDo);
   return {
     kind,
     tier: "section",
     fill: allDone ? "full" : positions.some((p) => p.done) ? "partial" : "none",
     ...(badge !== undefined ? { badge } : {}),
+    ...(counts !== undefined ? { badgeCounts: counts } : {}),
     id: stepId,
     location,
     label: stageLabel(stepId, i18n),
@@ -472,6 +479,18 @@ function badgeKinds(items: readonly WorkItem[] | undefined): readonly WorkKind[]
   return [...new Set(items.map((item) => item.kind))];
 }
 
+/** Per-kind counts for count-carrying items (#2145: `warnings`; `unassigned`
+ * already carried one), summed across the mark's items. `undefined` when no
+ * badged item carries a count. */
+function badgeCounts(items: readonly WorkItem[] | undefined): Partial<Record<WorkKind, number>> | undefined {
+  if (items === undefined) return undefined;
+  const counts: Partial<Record<WorkKind, number>> = {};
+  for (const item of items) {
+    if ("count" in item) counts[item.kind] = (counts[item.kind] ?? 0) + item.count;
+  }
+  return Object.keys(counts).length > 0 ? counts : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // A non-active step's ONE section mark (§2, §3b, §4).
 // ---------------------------------------------------------------------------
@@ -511,6 +530,7 @@ function buildSectionMark(
   satisfied: boolean,
 ): ProgressDot | null {
   const badge = badgeKinds(workToDo);
+  const counts = badgeCounts(workToDo);
   const passedReason =
     stepStatus?.kind === "not-asked" ? notAskedPassedMessage(stepStatus.reason, i18n) : undefined;
 
@@ -522,6 +542,7 @@ function buildSectionMark(
       tier: "section",
       fill,
       ...(badge !== undefined ? { badge } : {}),
+      ...(counts !== undefined ? { badgeCounts: counts } : {}),
       ...(passedReason !== undefined ? { passedReason } : {}),
       id: stepId,
       location,
@@ -547,6 +568,7 @@ function buildSectionMark(
       tier: "section",
       fill: "full",
       ...(badge !== undefined ? { badge } : {}),
+      ...(counts !== undefined ? { badgeCounts: counts } : {}),
       ...(passedReason !== undefined ? { passedReason } : {}),
       id: stepId,
       location,

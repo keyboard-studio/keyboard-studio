@@ -81,6 +81,32 @@ describe("ProgressDot layout", () => {
     );
   });
 
+  it("warnings badge states its count in the accessible name (#2145)", () => {
+    render(
+      <ProgressDot
+        dot={makeDot({ badge: ["warnings"], badgeCounts: { warnings: 3 } })}
+        layout="row"
+        onActivate={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button").getAttribute("aria-label")).toMatch(
+      /work waiting: 3 warnings to review/,
+    );
+  });
+
+  it("warnings badge without a count falls back to the plain work-waiting suffix", () => {
+    render(
+      <ProgressDot
+        dot={makeDot({ badge: ["warnings"] })}
+        layout="row"
+        onActivate={() => {}}
+      />,
+    );
+    expect(screen.getByRole("button").getAttribute("aria-label")).toMatch(
+      /work waiting: warnings to review/,
+    );
+  });
+
   it("row layout: passedReason wins over the fill state in the name", () => {
     render(
       <ProgressDot

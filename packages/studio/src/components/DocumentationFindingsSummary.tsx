@@ -1,10 +1,10 @@
 // DocumentationFindingsSummary — the Layer C documentation checks, collapsed
-// into ONE compact row instead of full-weight blocks above the step content.
-// The blocks pushed the current question down and never muted upstream
-// findings; these findings are advisory-only by the Layer C ceiling (warning
-// severity, never blocking), so a collapsed-by-default disclosure is the
-// right weight. Mounted inside StudioShell's existing role="status" live
-// region — count changes announce through it, no second live region.
+// into ONE compact row instead of full-weight blocks. These findings are
+// advisory-only by the Layer C ceiling (warning severity, never blocking),
+// so a collapsed-by-default disclosure is the right weight. Since issue
+// #2145 (adopted warnings-placement model) this renders ONLY at its owner
+// surface — the Output screen, beside DocumentationChecklist — never at
+// the top of the survey pane where it used to push the question down.
 // Plain useState disclosure, no timers (constitution D3 / spec 080 FR-019),
 // no resolving or auto-fixing (that is a separate issue, presentation only).
 //

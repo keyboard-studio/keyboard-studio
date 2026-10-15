@@ -662,6 +662,24 @@ describe("badges (§3c) — from selectWorkToDo() fixtures", () => {
     expect(mechanisms?.badge).toEqual(["unassigned"]);
   });
 
+  it("a warnings badge lands on the owning step's mark with its count (#2145)", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({
+        traversal: traversal({
+          activeStepId: "carve",
+          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
+          selectedTrack: "adapt",
+        }),
+      }),
+      lookupQuestionLabel: stubLabel,
+      workToDo: { characters: [{ kind: "warnings", stepId: "characters", count: 2 }] },
+    });
+    const characters = dots.find((d) => d.location.step === "characters" && d.tier === "section");
+    expect(characters?.badge).toEqual(["warnings"]);
+    expect(characters?.badgeCounts).toEqual({ warnings: 2 });
+  });
+
   it("a now-applicable badge on a not-asked step carries the FR-068 passed reason too", () => {
     const dots = buildProgressDots({
       record: recordOf([]),

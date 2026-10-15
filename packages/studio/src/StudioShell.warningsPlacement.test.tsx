@@ -1,24 +1,23 @@
-// StudioShell — Layer C documentation findings are collapsed into ONE summary
-// row inside the existing live region; non-doc warnings keep their full-block
-// render. Wiring tests only: the component's own toggle/group/aria behavior
-// lives in DocumentationFindingsSummary.test.tsx.
+// StudioShell — issue #2145 (adopted warnings-placement model): NO finding
+// renders at the top of the survey pane. A warning lives only where it can
+// be acted on — mapped findings chip at their owning question, doc and
+// other unmapped findings accumulate to the Output screen. These wiring
+// tests pin the ABSENCE here; the owner surfaces have their own tests
+// (DocumentationFindingsSummary.test.tsx, OutputScreen tests).
 //
 // Regression these pin:
-//   - a revert to rendering `globalWarnings` as full blocks would make the
-//     doc message visible without expanding the summary (test 1 fails);
-//   - rendering the summary outside the status live region would break the
-//     count announcement (test 2 fails);
-//   - doc findings leaking into the authored list (or vice versa) breaks the
-//     full-block / summary split (tests 1 and 3 fail).
+//   - re-adding a pane-top render for any finding class (full blocks, the
+//     doc-notes summary, or a LintSummary) makes a message appear here
+//     and fails these tests;
+//   - the role="status" live region itself must stay mounted (transient
+//     announcements still need it), it just carries no persistent findings.
 //
 // The findings pipeline is fed through the two real hook boundaries:
 // `./hooks/useValidator.ts` (the single findings source) and
-// `./hooks/useDocumentationFindings.ts` (the Layer C subset). The doc fixture
-// is the SAME object reference in both mocks — the production wiring matches
-// by identity (`new Set(documentationFindings)`), so the test must too.
+// `./hooks/useDocumentationFindings.ts` (the Layer C subset).
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { screen, fireEvent, cleanup, act } from "@testing-library/react";
+import { screen, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import type { LintFinding } from "@keyboard-studio/contracts";
@@ -131,73 +130,42 @@ afterEach(() => {
   localStorage.clear();
 });
 
-describe("StudioShell — documentation findings summary wiring", () => {
-  it("collapses the doc finding into one summary row; the non-doc warning keeps its full block", async () => {
-    const doc = lintFinding({ message: DOC_MESSAGE });
-    seedFindings(doc);
-    await mountShell();
-
-    // The collapsed summary row carries the count; the doc message itself
-    // stays hidden until the author expands it.
-    const toggle = screen.getByTestId("doc-findings-summary-toggle");
-    expect(toggle.textContent).toContain("1 documentation note");
-    const statusText = () =>
-      toggle.closest('[role="status"]')?.textContent ?? "";
-    // A pre-fix regression (doc findings rendered as full blocks) would put
-    // the doc message in the live region while still collapsed.
-    expect(statusText()).not.toContain(DOC_MESSAGE);
-
-    // The non-doc warning still renders as a full advisory block.
-    expect(statusText()).toContain(NON_DOC_MESSAGE);
-
-    // Expanding reveals the doc message inside the summary.
-    fireEvent.click(toggle);
-    expect(statusText()).toContain(DOC_MESSAGE);
-  });
-
-  it("renders the summary inside the SAME role=status live region (no second announcer)", async () => {
+describe("StudioShell — warnings placement (#2145): nothing at the pane top", () => {
+  it("renders no doc-notes summary and no doc message, even with a doc finding", async () => {
     seedFindings(lintFinding({ message: DOC_MESSAGE }));
     await mountShell();
 
-    const toggle = screen.getByTestId("doc-findings-summary-toggle");
-    const liveRegion = toggle.closest('[role="status"]');
-    expect(liveRegion).not.toBeNull();
-    expect(liveRegion!.getAttribute("aria-live")).toBe("polite");
-
-    // The summary must not sit in a nested live region of its own.
-    expect(toggle.closest('[role="status"] [role="status"]')).toBeNull();
-
-    // The non-doc full block lives in that same live region too.
-    const nonDocBlock = screen.getByText(NON_DOC_MESSAGE, { exact: false });
-    expect(nonDocBlock.closest('[role="status"]')).toBe(liveRegion);
+    expect(screen.queryByTestId("doc-findings-summary-toggle")).toBeNull();
+    expect(screen.queryByText(DOC_MESSAGE, { exact: false })).toBeNull();
   });
 
-  it("shows no summary row when there are no doc findings", async () => {
+  it("renders no authored warning block at the pane top", async () => {
     seedFindings(null);
     await mountShell();
 
-    expect(screen.queryByTestId("doc-findings-summary-toggle")).toBeNull();
-    // Non-doc warnings are unaffected.
-    expect(screen.getByText(NON_DOC_MESSAGE, { exact: false })).toBeTruthy();
+    expect(screen.queryByText(NON_DOC_MESSAGE, { exact: false })).toBeNull();
+    expect(screen.queryByText("Warning:", { exact: false })).toBeNull();
   });
 
-  it("counts an upstream-origin doc finding in the summary", async () => {
-    seedFindings(
-      lintFinding({
-        message: "inherited doc advisory",
-        origin: "upstream",
-      }),
-    );
+  it("renders no LintSummary for a non-warning finding at the pane top", async () => {
+    findingsHoisted.validatorFindings = [
+      lintFinding({ code: "KM_LINT_BROKEN", severity: "error", layer: "A", message: "pane-top error text" }),
+    ];
+    findingsHoisted.documentationFindings = [];
     await mountShell();
 
-    const toggle = screen.getByTestId("doc-findings-summary-toggle");
-    expect(toggle.textContent).toContain("1 documentation note");
-    // The identity match must pick the finding up even with origin set —
-    // it never appears as a full block.
-    expect(
-      (toggle.closest('[role="status"]')?.textContent ?? "").includes(
-        "inherited doc advisory",
-      ),
-    ).toBe(false);
+    expect(screen.queryByText("pane-top error text", { exact: false })).toBeNull();
+  });
+
+  it("keeps the role=status live region mounted for transient announcements", async () => {
+    seedFindings(lintFinding({ message: DOC_MESSAGE }));
+    await mountShell();
+
+    const liveRegion = document.querySelector('[role="status"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion!.getAttribute("aria-live")).toBe("polite");
+    // ... and it carries no persistent finding content.
+    expect(liveRegion!.textContent ?? "").not.toContain(DOC_MESSAGE);
+    expect(liveRegion!.textContent ?? "").not.toContain(NON_DOC_MESSAGE);
   });
 });
