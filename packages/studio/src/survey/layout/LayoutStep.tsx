@@ -28,7 +28,7 @@ import { WindowsLayoutPicker } from "../../components/WindowsLayoutPicker.tsx";
 import { proposeWindowsLayout, windowsLayoutById } from "../../lib/windowsLayouts.ts";
 import type { LayoutProposalBasis } from "../../lib/windowsLayouts.ts";
 import { pickedLayoutIds } from "../../lib/layoutFamily.ts";
-import { phaseHeadingFlush, mutedParaFlush } from "../surveyStyles.ts";
+import { phaseHeadingFlush, mutedParaFlush, surveyPageColumn } from "../surveyStyles.ts";
 
 /**
  * The windows-layout decision value (spec 090 data-model.md; multi-select
@@ -127,7 +127,12 @@ export function WindowsLayoutRenderer({ value, onChange }: DecisionRendererProps
   return (
     <div
       data-testid="layout-step"
-      style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, padding: 16, overflow: "auto" }}
+      // The shared survey page column (surveyStyles.ts) — left-aligned at
+      // the pane edge with the same measure/inset as the identity page and
+      // the other survey steps, instead of this step's own divergent inset.
+      // This step is full-width since #2081 (no preview pane), so a private
+      // column shape is directly visible as a mismatch.
+      style={{ ...surveyPageColumn, display: "flex", flexDirection: "column", gap: 16, overflow: "auto" }}
     >
       <h2 id={HEADING_ID} style={phaseHeadingFlush}>
         <Trans id="layout.step.heading">Which keyboard layout do your typists use?</Trans>
