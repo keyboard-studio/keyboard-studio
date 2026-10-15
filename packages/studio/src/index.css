@@ -20,6 +20,20 @@ body {
   font-family: var(--ui);
 }
 
+/* Themed placeholder text (issue #1985) -----------------------------------
+ * No stylesheet set ::placeholder, so every input fell back to Chrome's
+ * fixed #757575 default grey: visibly dim on navy, but on light nearly as
+ * dark as label text — an empty field read as filled in. The token keeps
+ * placeholders visibly dimmer than typed text on both themes while clearing
+ * WCAG 1.4.3 where a placeholder carries meaning. opacity: 1 defeats
+ * Firefox's default placeholder dimming so the token value is what renders.
+ * A class cannot express a pseudo-element, hence a global element rule. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--app-placeholder);
+  opacity: 1;
+}
+
 /* Shared control conventions (issue #536) ---------------------------------
  * .ks-control      — single-line inputs/selects are sized to --control-h.
  * .ks-focus-ring   — consistent keyboard-focus indicator across every
