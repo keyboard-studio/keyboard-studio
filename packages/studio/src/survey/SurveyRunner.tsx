@@ -28,7 +28,6 @@ import type {
   SurveyAnswer,
   SurveyPhaseResult,
   LintFinding,
-  LangtagsProvenance,
   LanguageSummary,
 } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
@@ -287,14 +286,17 @@ export interface SurveyRunnerProps {
   getSeedSource?: (questionId: string) => DecisionProposalSource | undefined;
   /**
    * Called when rendering a question to retrieve its provenance label, if any.
-   * Returns a LangtagsProvenance when the question's current value was seeded
-   * from langtags, or undefined when no provenance applies.
+   * Returns a provenance caption when the question's current value was seeded
+   * from a proposal, or undefined when no provenance applies. The shape is
+   * the caption only — the runner renders it and reads nothing else; a
+   * langtags seed's provenance (LangtagsProvenance) satisfies it, as does
+   * any other proposer's one-line reason.
    *
    * SurveyRunner renders the provenance caption beneath the field when a
    * non-undefined provenance is returned (FR-007). The caption indicates the
    * value is a suggestion — the author can edit it freely (FR-008).
    */
-  getSeedProvenance?: (questionId: string) => LangtagsProvenance | undefined;
+  getSeedProvenance?: (questionId: string) => { caption: string } | undefined;
   /**
    * Called at render with the current question id and its LIVE value (the
    * same value passed to QuestionField, including uncommitted typing — not
