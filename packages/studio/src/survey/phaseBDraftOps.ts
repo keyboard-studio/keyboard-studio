@@ -121,6 +121,13 @@ export interface LastPickContribution {
 interface DraftPick {
   grapheme: string;
   role?: DeclaredRole;
+  /**
+   * The pick's provenance (#1784): carried so `deriveStores` can attribute
+   * attested stacks to the text sample. Restored from the value's provenance
+   * map by `picksOf`, so re-derivations (remove/replace/restore) keep the
+   * attribution instead of flattening it.
+   */
+  provenance?: DraftProvenance;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +238,9 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
       stackSeen.add(key);
       attestedStacks.push(s);
     }
+    // No merge step: picks are NFC-deduped and decomposition is
+    // deterministic, so one stack shape always comes from one pick —
+    // the source recorded at first sighting stands.
   };
 
   for (const pick of picks) {
@@ -252,7 +262,13 @@ function deriveStores(picks: DraftPick[]): DerivedStores {
     if (decomposition !== null) {
       pushStart(decomposition.base);
       for (const m of decomposition.marks) pushMark(m);
-      pushStack({ base: decomposition.base, marks: decomposition.marks });
+      // #1784: only text-sample evidence is recorded explicitly on the
+      // stack; absent = attested by non-text means (exemplar/author/…).
+      pushStack({
+        base: decomposition.base,
+        marks: decomposition.marks,
+        ...(pick.provenance === "text" ? { source: "text" as const } : {}),
+      });
       continue;
     }
     switch (glyphCategory(nfc)) {
@@ -317,7 +333,14 @@ function contribution(
 function picksOf(value: CharacterInventoryValue): DraftPick[] {
   return value.chars.map((grapheme) => {
     const role = value.declaredRoles[grapheme];
-    return role !== undefined ? { grapheme, role } : { grapheme };
+    // #1784: restore the pick's provenance so re-derivations keep the
+    // text-sample attribution on attested stacks.
+    const provenance = value.provenance[grapheme];
+    return {
+      grapheme,
+      ...(role !== undefined ? { role } : {}),
+      ...(provenance !== undefined ? { provenance } : {}),
+    };
   });
 }
 
@@ -368,13 +391,25 @@ function addWithProvenance(
     const before = deriveStores(picks);
     const nextPicks = [
       ...picks,
-      { grapheme: nfc, ...(opts?.role !== undefined ? { role: opts.role } : {}) },
+      {
+        grapheme: nfc,
+        ...(opts?.role !== undefined ? { role: opts.role } : {}),
+        provenance: nextOrigin,
+      },
     ];
     const after = deriveStores(nextPicks);
     return {
       value: { ...value, ...after, chars, provenance },
       lastPick: contribution(before, after, nfc),
     };
+  }
+  // #1784: the pick already exists, but its provenance may have upgraded
+  // (a text-harvested pick the author then confirms becomes "author").
+  // Pair attribution derives from pick provenance, so a changed origin
+  // re-derives the stacks instead of leaving a stale "text" behind.
+  if (nextOrigin !== existing) {
+    const rederived = deriveStores(picksOf({ ...value, provenance }));
+    return { value: { ...value, ...rederived, chars, provenance }, lastPick: null };
   }
   return { value: { ...value, chars, provenance }, lastPick: null };
 }
@@ -445,13 +480,21 @@ export function setAllChars(
 ): CharacterInventoryValue {
   const deduped = nfcDedup([], next);
   const roles = { ...value.declaredRoles };
-  const picks: DraftPick[] = deduped.map((grapheme) => {
-    const role = roles[grapheme];
-    return role !== undefined ? { grapheme, role } : { grapheme };
-  });
   const prior = value.provenance;
   const provenance: Record<string, DraftProvenance> = {};
   for (const g of deduped) provenance[g] = prior[g] ?? "author";
+  // #1784: carry the provenance onto the picks so attested stacks keep
+  // their text-sample attribution through the wholesale replace.
+  const picks: DraftPick[] = deduped.map((grapheme) => {
+    const role = roles[grapheme];
+    // The loop above guarantees an entry for every deduped grapheme.
+    const origin = provenance[grapheme] ?? "author";
+    return {
+      grapheme,
+      ...(role !== undefined ? { role } : {}),
+      provenance: origin,
+    };
+  });
   return { ...withDerived(value, picks, {}), chars: next, provenance };
 }
 

@@ -16,6 +16,18 @@
 export type DeclaredRole = "letter" | "mark";
 
 /**
+ * Where an attested stack's pairing evidence came from (#1784 — the
+ * pair-level version of spec 050 FR-007's exemplar-vs-text attribution).
+ * Additive optional: absent means the pairing was attested by non-text
+ * means (exemplar list, author addition, …) — only text-sample evidence is
+ * recorded explicitly, as `"text"` (the sample alone attests the pairing)
+ * or `"both"` (non-text evidence AND a text sample attest the same
+ * pairing; the union the studio forms when a harvest re-attests an
+ * exemplar pair).
+ */
+export type AttestedStackSource = "exemplar" | "text" | "both";
+
+/**
  * One attested base+marks combination, exactly as confirmed present in the
  * language's orthography. Order-preserving: `marks` lists marks closest to the
  * base first, so the same two marks in the other order are a distinct stack.
@@ -25,6 +37,8 @@ export interface AttestedStack {
   base: string;
   /** One or more marks (lone combining characters), order preserved (closest to base first). */
   marks: string[];
+  /** Pair-level provenance; absent = attested by non-text means (see {@link AttestedStackSource}). */
+  source?: AttestedStackSource;
 }
 
 /**
