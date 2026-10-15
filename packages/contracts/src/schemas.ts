@@ -296,6 +296,16 @@ export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() 
     sp: z.number().optional(),
     width: z.number().optional(),
     pad: z.number().optional(),
+    // Per-key display fields (standard wire members; #2083).
+    font: z.string().optional(),
+    fontsize: z.string().optional(),
+    dk: z.string().optional(),
+    // Wire-format encoding preservation for sp/width/pad (#2083): the source
+    // form (string vs number) so the emitter writes it back without
+    // re-encoding. Absent on synthesized keys.
+    spWire: z.union([z.string(), z.number()]).optional(),
+    widthWire: z.union([z.string(), z.number()]).optional(),
+    padWire: z.union([z.string(), z.number()]).optional(),
   }),
 );
 
@@ -304,10 +314,17 @@ export const TouchLayoutIRSchema = z.object({
     z.object({
       id: z.enum(["phone", "tablet", "desktop"]),
       font: z.string().optional(),
+      // Platform-level display fields (standard wire members; #2083).
+      // defaultHint is preserved verbatim, never defaulted.
+      fontsize: z.string().optional(),
+      displayUnderlying: z.boolean().optional(),
+      defaultHint: z.string().optional(),
       layers: z.array(
         z.object({
           id: z.string(),
-          rows: z.array(z.object({ keys: z.array(TouchKeyIRSchema) })),
+          // Source row id, preserved so the emitter writes it back instead of
+          // regenerating `rowIdx + 1` (#2083). Absent on synthesized rows.
+          rows: z.array(z.object({ id: z.number().optional(), keys: z.array(TouchKeyIRSchema) })),
         }),
       ),
     }),

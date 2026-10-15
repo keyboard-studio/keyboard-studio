@@ -261,7 +261,9 @@ function applyPlacements(
     const layer = phonePlatform.layers[layerIndex]!;
     // Shallow-clone rows up-front; replace individual key slots as
     // placements are processed (same idiom as applyTouchAssignments).
-    const workingRows: Array<{ keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+    // #2083: preserve the source row id.
+    const workingRows: Array<{ id?: number; keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+      ...(row.id !== undefined ? { id: row.id } : {}),
       keys: [...row.keys],
     }));
 

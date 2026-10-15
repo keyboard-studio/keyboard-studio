@@ -114,8 +114,9 @@ export function applyTouchAssignments(
     const layer = phonePlatform.layers[layerIndex]!;
     // Shallow-clone all rows up-front (array of arrays), then replace
     // individual key slots as mechanisms are processed. Keys we never touch
-    // stay structurally shared.
-    const workingRows: Array<{ keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+    // stay structurally shared. #2083: preserve the source row id.
+    const workingRows: Array<{ id?: number; keys: TouchKeyIR[] }> = layer.rows.map((row) => ({
+      ...(row.id !== undefined ? { id: row.id } : {}),
       keys: [...row.keys],
     }));
 
