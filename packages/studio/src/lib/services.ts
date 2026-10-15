@@ -342,6 +342,22 @@ export async function sourcedExemplars(bcp47: string): Promise<SourcedInventory 
   return sourceExemplars(bcp47);
 }
 
+/**
+ * Both CLDR and SLDR inventories for a tag (#1369 union action).
+ * Returns null when neither side covers the tag. Either side may be null
+ * when it doesn't cover the tag or its gate fires.
+ */
+export async function sourcedExemplarsBoth(bcp47: string): Promise<{
+  resolvedTag: string;
+  cldr: SourcedInventory | null;
+  sldr: SourcedInventory | null;
+} | null> {
+  if (!USE_REAL) return null;
+  const { loadExemplarSource, sourceExemplarsBoth } = await importEngine();
+  await loadExemplarSource();
+  return sourceExemplarsBoth(bcp47);
+}
+
 export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier };
 export { charactersInTier };
 

@@ -432,6 +432,7 @@ export {
 export {
   loadExemplarSource,
   sourceExemplars,
+  sourceExemplarsBoth,
   exemplarLocaleCandidates,
   isGatedTag,
   charactersInTier,
