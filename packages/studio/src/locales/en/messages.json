@@ -1107,6 +1107,7 @@
   "output.docs.checklist.tier.authored": "authored",
   "output.docs.checklist.tier.derived": "derived",
   "output.docs.checklist.tier.inherited": "inherited",
+  "output.docs.checklist.typingGuideSuppressed": "Typing guide not generated: the original docs already include one.",
   "output.download.aria.attributionMissing": "Download unavailable — the keyboard needs an author and a copyright holder.",
   "output.download.aria.coverageBlocked": "Download unavailable — finish every inventory character before downloading. See the banner below for details.",
   "output.download.aria.kmp": "Download keyboard {downloadKeyboardId} as an installable Keyman package",

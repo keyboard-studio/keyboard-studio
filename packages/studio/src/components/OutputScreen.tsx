@@ -43,6 +43,7 @@ import { useIsNarrow } from "../hooks/useViewport.ts";
 import { useResizablePanes } from "../hooks/useResizablePanes.ts";
 import { usePrefersReducedMotion } from "../ui/motion.ts";
 import { usePreviewArtifact } from "../hooks/usePreviewArtifact.ts";
+import { useDocsPreview } from "../hooks/useDocsPreview.ts";
 import { useOutputAutosave } from "../hooks/useOutputAutosave.ts";
 import { useAuthoredCriteria } from "../hooks/useAuthoredCriteria.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
@@ -122,6 +123,9 @@ export function OutputScreen() {
   // second pipeline instance, and the card is informational only: like
   // DocumentationChecklist it never gates download or submit.
   const criteriaResult = useAuthoredCriteria(artifact.stage);
+  // spec 095 FR-034: the checklist says when the inherited docs made the
+  // generated typing guide redundant. A memoised derivation, no timer (D3).
+  const docsPreview = useDocsPreview();
   const narrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } =
     useResizablePanes({ minPct: LEFT_MIN_PCT, maxPct: LEFT_MAX_PCT, initPct: LEFT_INIT_PCT });
@@ -836,7 +840,7 @@ export function OutputScreen() {
                 content came from. Informational only — reads state, gates
                 nothing (FR-018); placeholder rows link back to the step that
                 fills them. */}
-            <DocumentationChecklist />
+            <DocumentationChecklist typingGuideSuppressed={docsPreview.typingGuideSuppressed} />
 
             {/* spec 084: criteria summary card — counts from the shared
                 authored result over this screen's own stage, plus the way

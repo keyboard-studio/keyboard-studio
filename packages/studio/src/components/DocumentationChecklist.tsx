@@ -91,7 +91,12 @@ const SMALL_BUTTON: React.CSSProperties = {
   padding: "3px 9px",
 };
 
-export function DocumentationChecklist() {
+export interface DocumentationChecklistProps {
+  /** The welcome/help typing guide was left out because the inherited docs already hold one (spec 095 FR-034). */
+  typingGuideSuppressed?: boolean;
+}
+
+export function DocumentationChecklist({ typingGuideSuppressed = false }: DocumentationChecklistProps = {}) {
   const { t } = useLingui();
   const [open, setOpen] = useState(true);
   const states = useDocMemberStates();
@@ -229,6 +234,13 @@ export function DocumentationChecklist() {
                     <li key={w}>{"[WARN] "}{w}</li>
                   ))}
                 </ul>
+              )}
+              {s.member === "welcome-htm" && typingGuideSuppressed && (
+                <p style={{ gridColumn: "1 / -1", margin: 0, color: "var(--app-text-subtle)" }}>
+                  <Trans id="output.docs.checklist.typingGuideSuppressed">
+                    Typing guide not generated: the original docs already include one.
+                  </Trans>
+                </p>
               )}
               {s.member === "welcome-htm" && baseShipsImages && (
                 <div
