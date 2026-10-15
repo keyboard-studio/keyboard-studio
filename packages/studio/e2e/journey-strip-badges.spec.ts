@@ -23,6 +23,7 @@ import {
   driveInvisiblesStep,
   driveConvenienceStep,
   driveMarksSeries,
+  driveDeadkeysStep,
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
@@ -150,7 +151,9 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // buildOneCharacterList stops on carve; accept it with nothing discarded.
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("carve-continue").click();
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules (#2053).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
     // "é" on basic_kbdfr is a real new character to place (unlike carve.spec's
     // marks-free "᙮" fixture, which empty-diffs) — drive whatever the gallery
@@ -283,7 +286,9 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await buildOneCharacterList(page, "é");
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await page.getByTestId("carve-continue").click();
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules (#2053).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
 
     const mechanismsMark = footer(page).locator('button[aria-label^="Mechanisms"]');

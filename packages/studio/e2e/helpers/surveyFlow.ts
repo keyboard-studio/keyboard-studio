@@ -625,6 +625,39 @@ export async function carveCharacter(page: Page, ch: string): Promise<void> {
 }
 
 /**
+ * Deadkeys step (spec 083) — sits on the spine between carve and rules
+ * (steps/manifest.ts derived order: carve → deadkeys → rules →
+ * mechanisms). The walks define no deadkeys, so this is a pass-through:
+ * wait for the step, then click its Continue.
+ *
+ * Race-proof by construction, like driveConvenienceStep / driveMarksSeries
+ * above: races the step's own control against the landmark that follows
+ * it (rules-continue). The step renders unconditionally for every fixture
+ * walked so far (verified live, #2053 — bj_cree_woods, bambara,
+ * pid_piaroa), but if a future gate ever completes it without a screen
+ * for some fixture, the walk must carry on to rules rather than park here
+ * until the test timeout — the exact failure mode #2053 fixed, where
+ * specs that clicked rules-continue directly after carve sat on this
+ * step for the full 240s. Only clicks Continue if the deadkeys screen is
+ * the one that actually showed.
+ */
+export async function driveDeadkeysStep(page: Page): Promise<void> {
+  const deadkeysContinue = page.getByTestId("deadkeys-continue");
+  const rulesContinue = page.getByTestId("rules-continue");
+  await Promise.race([
+    deadkeysContinue.waitFor({ state: "visible", timeout: 30_000 }),
+    rulesContinue.waitFor({ state: "visible", timeout: 30_000 }),
+  ]).catch(() => {
+    // Neither landmark showed within the combined window — fall through
+    // to the direct check below; a genuinely stuck walk still fails
+    // loudly at the caller's own subsequent wait for rules-continue.
+  });
+  if (await deadkeysContinue.isVisible().catch(() => false)) {
+    await deadkeysContinue.click();
+  }
+}
+
+/**
  * Mechanisms step — handle the empty-diff exit when no new characters
  * remain after base-inventory comparison.
  *

@@ -42,6 +42,7 @@ import {
   drivePunctuationStep,
   driveInvisiblesStep,
   driveConvenienceStep,
+  driveDeadkeysStep,
 } from "./helpers/surveyFlow";
 
 const START_KEYBOARD_ID = "basic_kbdus";
@@ -137,7 +138,9 @@ test.describe("Convenience letters: loanword-only letters", () => {
     await page.getByTestId("convenience-continue").click();
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 20_000 });
     await page.getByTestId("carve-continue").click();
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules (#2053).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
     await page.getByRole("button", { name: "Start the mechanism gallery" }).click({ timeout: 30_000 });
     await expect(page.getByTestId("char-scroll-loanword-0071")).toBeVisible({ timeout: 30_000 });
