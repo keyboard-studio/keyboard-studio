@@ -501,6 +501,29 @@ export function ManagedPRSubmitPanel({
         </label>
       </div>
 
+      {/* Spec 095 FR-004: the permanence disclosure sits at the confirm
+          step itself, not behind a link — submitting publishes the
+          author's name and email into public git history, and that fact
+          must be in the same view as the button that does it. */}
+      <p
+        style={{
+          margin: 0,
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: "var(--app-text-subtle)",
+          border: "1px solid var(--app-border)",
+          borderRadius: 6,
+          padding: "8px 10px",
+        }}
+      >
+        <Trans id="output.submit.permanence">
+          Submitting publishes your keyboard as a public pull request. Your name and
+          email address become part of that submission, and once it is merged they
+          are part of the repository&rsquo;s permanent public history — they cannot
+          be removed from it later.
+        </Trans>
+      </p>
+
       {/* Submit button */}
       <button
         type="button"

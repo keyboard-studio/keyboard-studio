@@ -15,6 +15,8 @@
 //   #criteria           — CriteriaScreen: the criteria compliance page
 //                         (spec 084) — every catalog criterion judged
 //                         against the keyboard Output would ship.
+//   #privacy            — PrivacyScreen: the privacy notice (spec 095),
+//                         reachable signed-out and on first visit.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
@@ -117,6 +119,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
+import { PrivacyScreen } from "./components/PrivacyScreen.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, screenTrails, validateManifestShape } from "./steps/manifest.ts";
 import { resolveRightPane, shouldShowPreviewPane } from "./steps/types.ts";
@@ -180,6 +183,7 @@ const VALID_ROUTES = new Set<RouteId>(
       "flowmap",
       "trail",
       "criteria",
+      "privacy",
       "profile",
     ] as const
   ).filter((r) => r !== "flowmap" || SHOW_FLOWMAP),
@@ -2169,6 +2173,12 @@ export function StudioShell() {
       // record-store callbacks (see CriteriaScreen's header) — the pure
       // CriteriaPage it renders reads no store, per the D8 layer rule.
       content = <CriteriaScreen />;
+      break;
+    case "privacy":
+      // Spec 095: the privacy notice — static, store-free, reachable
+      // signed-out (the welcome link marks the visit first so the
+      // first-visit gate does not rewrite the hash).
+      content = <PrivacyScreen />;
       break;
     case "profile":
       content = <ProfileScreen />;

@@ -52,6 +52,11 @@ export type RouteId =
   // 'trail': it judges the author's own keyboard and must be reachable
   // before Output is unblocked, so it never sits behind a gate either.
   | "criteria"
+  // The privacy notice (spec 095). Unconditionally valid: an author must
+  // be able to read it before signing in — including on first visit,
+  // where the welcome gate would otherwise rewrite the hash away; the
+  // welcome screen's privacy link marks the visit before navigating.
+  | "privacy"
   | "profile";
 
 /**
