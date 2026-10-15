@@ -47,9 +47,9 @@ function typeInto(value: string): void {
 /**
  * Walk the default path to pf_contact_info and return its rendered value.
  *
- * Default path (6 screens): pf_welcome_paragraph -> pf_usage_tip_1 ->
- * pf_history_entry (spec 080 US5, left undecided) -> pf_more_detail_gate
- * (No) -> pf_credits -> pf_contact_info.
+ * Default path (7 screens): pf_welcome_paragraph -> pf_font_guidance ->
+ * pf_usage_tip_1 -> pf_history_entry (spec 080 US5, left undecided) ->
+ * pf_more_detail_gate (No) -> pf_credits -> pf_contact_info.
  */
 function walkToContactField(ctx: Record<string, string | undefined>): string {
   // Spec 089: the factory derives its context from the decision store —
@@ -73,23 +73,26 @@ function walkToContactField(ctx: Record<string, string | undefined>): string {
   typeInto("A keyboard for typing Bafut.");
   next();
 
-  // 2. pf_usage_tip_1 — optional, leave blank.
+  // 2. pf_font_guidance — optional, leave blank.
   next();
 
-  // 3. pf_history_entry — optional, leave undecided (stays "proposed").
+  // 3. pf_usage_tip_1 — optional, leave blank.
   next();
 
-  // 4. pf_more_detail_gate — answer No to take the minimum path.
+  // 4. pf_history_entry — optional, leave undecided (stays "proposed").
+  next();
+
+  // 5. pf_more_detail_gate — answer No to take the minimum path.
   const no = screen.getByRole("radio", { name: /^no$/i });
   act(() => {
     fireEvent.click(no);
   });
   next();
 
-  // 5. pf_credits — optional, leave blank.
+  // 6. pf_credits — optional, leave blank.
   next();
 
-  // 6. pf_contact_info — the field under test.
+  // 7. pf_contact_info — the field under test.
   const contactBox = screen.getAllByRole("textbox")[0]!;
   return (contactBox as HTMLInputElement | HTMLTextAreaElement).value;
 }
@@ -132,6 +135,7 @@ describe("Phase F — pf_contact_info pre-fill (end to end)", () => {
 
     typeInto("A keyboard for typing Bafut.");
     next(); // pf_welcome_paragraph
+    next(); // pf_font_guidance
     next(); // pf_usage_tip_1
     next(); // pf_history_entry (spec 080 US5, left undecided)
     const no = screen.getByRole("radio", { name: /^no$/i });

@@ -63,9 +63,12 @@ function welcomeBody(welcome: string): string {
   return inner.replace(/\n<h2>Keyboard Layout<\/h2>[\s\S]*$/, "");
 }
 
-/** The help page's body: the help-site header set aside. */
+/**
+ * The help page's body: the help-site header set aside, and the shared page
+ * style it leads with (the welcome page carries that style in its head).
+ */
 function helpBody(help: string): string {
-  return help.replace(/^<\?php[\s\S]*?\?>\n/, "");
+  return help.replace(/^<\?php[\s\S]*?\?>\n/, "").replace(/^<style>[\s\S]*?<\/style>/, "");
 }
 
 /** A rough well-formedness check for the generated pages: no raw `<` or `&` outside a tag or entity. */

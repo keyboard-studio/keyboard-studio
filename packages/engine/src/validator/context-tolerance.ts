@@ -393,7 +393,25 @@ function resolveRuleStatically(
     // match/nomatch group-transition rules have no textual context at all.
     return { finding: { ...base, status: 'tolerant' } };
   }
-  const { before, keyPart } = split;
+  // Guards (spec 103): an `if` element constrains WHEN a rule applies
+  // based on runtime store state this diagnostic does not model, and it
+  // produces no preceding character to resolve. A guarded rule is refused
+  // by name — the same FR-010 refusal posture as platform()/baselayout()
+  // preceding elements — never silently analysed as if unconditional, and
+  // never dropped from the accounting: the finding below is how the rule
+  // is counted.
+  const guardEl = split.before.find((el) => el.kind === "if");
+  if (guardEl !== undefined && guardEl.kind === "if") {
+    return {
+      finding: {
+        ...base,
+        status: 'not-analysed',
+        notAnalysedReason: `preceding context carries an if() guard (${guardEl.store} = '${guardEl.value}'); conditional rules are not analysed`,
+      },
+    };
+  }
+  const { keyPart } = split;
+  const before = split.before;
 
   // Context-indexed output (FR-010): a rule whose OWN output indexes into a
   // store the pairing analysis could not resolve to one of THIS rule's
