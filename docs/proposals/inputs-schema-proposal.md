@@ -5,7 +5,7 @@
 > Produced by the `/km-lead` crew (km-programmer + km-synthesis design probes,
 > synthesized by the KM Team Lead). This proposal explores the `inputs` half of
 > the §3.3 question contract. It does **not** edit
-> `docs/survey-modularity-cyoa-plan.md` §3.3 — that remains Matt's call. Treat
+> `docs/archive/survey-modularity-cyoa-plan.md` §3.3 — that remains Matt's call. Treat
 > every type below as a concrete *starting point* to argue with, not a contract.
 
 ---
@@ -15,7 +15,7 @@
 §3.3 of the plan introduces a net-new question contract:
 
 ```ts
-// docs/survey-modularity-cyoa-plan.md:306-313
+// docs/archive/survey-modularity-cyoa-plan.md:306-313
 inputs?: IRPath[];   // answers / IR state read to decide routing or content
 writes?: IRPath[];   // KeyboardIR paths this question will populate
 ```

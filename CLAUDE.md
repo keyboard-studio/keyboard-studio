@@ -80,14 +80,13 @@ validation lives in `engine/src/validator`.
   does before proposing changes.
 - **[README.md](README.md)** — external-facing description. Keep it accurate and lean; the
   package inventory and build commands live in `docs/`, not there.
-- **`strategy tree/strategies.md`** — **superseded**, now a stub pointer. Do not edit it or treat
-  it as a source. Its content merged into **spec.md §7** (extracted to
+- **`strategy tree/strategies.md`** — **deleted** (it was a superseded stub pointer). Its content merged into **spec.md §7** (extracted to
   [specs/007-strategy-selection/](specs/007-strategy-selection/)). §7.1/§7.2/§7.3 and the §7.5
   validation table are mutually consistent by design — keep them that way across any edit; the
   table is a self-consistency regression suite with two documented v1.1 gaps (EuroLatin, IPA).
 
 The spec embeds external docs by reference (§19): `docs/KM-Questionnaire.md`, `docs/lint.md`,
-`docs/criteria.md`, `docs/making-a-template.md`.
+`docs/criteria.md`, `docs/archive/making-a-template.md`.
 
 ### Contract source-of-truth chain
 
@@ -217,8 +216,7 @@ not silently empty the gallery.
 
 A specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in
 `.claude/agents/km-*.md`. The only slash commands are `/km-lead`, `/km-triage`, and
-`/km-archivist` (`.claude/commands/`); the per-role commands are archived under
-`.claude/archive/commands/`. **The full
+`/km-archivist` (`.claude/commands/`). **The full
 roster — who does what, when to invoke each — is
 [.claude/agents/km-README.md](.claude/agents/km-README.md).**
 

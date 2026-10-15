@@ -89,7 +89,7 @@ notes: >                            # optional working notes
 
 ### The `source/` family extension: transform-ready fields
 
-`source/` records (see [docs/source-facets-design.md](../../docs/source-facets-design.md)
+`source/` records (see [docs/archive/source-facets-design.md](../../docs/archive/source-facets-design.md)
 for the design brief) carry the same base schema above, plus additional fields
 that make a facet's value **actionable**, not just descriptive — a base's
 construction decisions may eventually be switched, and these fields carry what

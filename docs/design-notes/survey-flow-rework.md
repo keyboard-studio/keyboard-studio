@@ -191,7 +191,7 @@ the strategy selector.
 A second common blocker runs through everything in BIG: `QuestionModule.mutate()`
 is a deliberate stub (`survey/types.ts`), deferred to P5 and gated on the
 engine mutation seam — see
-[docs/survey-modularity-cyoa-plan.md](../survey-modularity-cyoa-plan.md).
+[docs/archive/survey-modularity-cyoa-plan.md](../archive/survey-modularity-cyoa-plan.md).
 Declaring real `inputs`/`writes` for a question is cheap; making the question
 actually populate `KeyboardIR` is not available until P5 lands.
 
@@ -407,7 +407,7 @@ The safe phased path for the rest, in order:
    without changing what gets written where, guarded by a future Phase-B
    golden snapshot (the same kind of harness `flow-parity.test.ts` already
    runs for Phase A/F/identity-lite, per
-   [docs/survey-modularity-cyoa-plan.md](../survey-modularity-cyoa-plan.md)).
+   [docs/archive/survey-modularity-cyoa-plan.md](../archive/survey-modularity-cyoa-plan.md)).
 2. **Cards on top** — build the Act 5 strategy-card UI against the
    now-real Discovery/Inventory split, using the (d)(2) ledger as the
    authoring guide.

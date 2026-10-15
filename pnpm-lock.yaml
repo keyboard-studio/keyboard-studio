@@ -239,9 +239,6 @@ importers:
       '@octokit/auth-app':
         specifier: ^7.1.1
         version: 7.2.2
-      '@vercel/blob':
-        specifier: ^2.0.0
-        version: 2.6.1
       '@vercel/postgres':
         specifier: ^0.10.0
         version: 0.10.0

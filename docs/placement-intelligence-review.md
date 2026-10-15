@@ -173,7 +173,7 @@ All prose-only; none touches the locked `Pattern` schema.
 ## 5. Interview additions (Phase A/B/C survey)
 
 Questions a keyboard-design linguist asks that the survey currently does not.
-Checked against [survey-gap-analysis.md](survey-gap-analysis.md) (which covered
+Checked against [survey-gap-analysis.md](archive/survey-gap-analysis.md) (which covered
 intake/provenance, not placement habits) and the Phase B inventory-gap work
 (digraphs/nukta/etc.) — these are complementary, not duplicates:
 

@@ -346,7 +346,7 @@ with `tsx` (see each tool's tsconfig) — except the plain-node ones (`spec-trac
 
 Inventory: kbgen, corpus-mine, supportability-scanner, smoke-artifact, spec-trace, km-triage-app,
 Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint,
-welcome-sweep, nfd-tolerance-corpus. (hermes was archived out of tree 2026-10-14:
+welcome-sweep, nfd-tolerance-corpus, roundtrip-probe. (hermes was archived out of tree 2026-10-14:
 `~/workspace/archives/keyboard-studio-utilities-2026-10-14/`.)
 
 ### smoke-artifact
@@ -361,7 +361,7 @@ pipeline against the local `../keyboards` clone).
 Two halves over the same corpus:
 
 - **Drift** — `node utilities/spec-trace check | report | acknowledge <id>` hashes each tracked
-  unit (`spec.md` sections, `specs/NNN/spec.md`, `docs/architecture.md`, `docs/lens-model.md`)
+  unit (`spec.md` sections, `specs/NNN/spec.md`, `docs/architecture.md`, `docs/archive/lens-model.md`)
   and flags un-acknowledged changes. `check` never exits non-zero; drift is a backlog item.
   Both `check` (auto-filed issue bodies) and `report` (a "Steps covered" coverage summary) join
   a drifted/tracked unit to the manifest steps and question modules that declare it as a

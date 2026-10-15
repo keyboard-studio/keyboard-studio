@@ -124,4 +124,4 @@ The following five fields are optional; omit any that do not apply to the script
 - **Grounding (open).** Whether the agent is given retrieved CLDR/orthography text
   as grounding context, or relies on tool access, is an engine + content decision
   (the "grounding context (Keyman reference index build)" of spec §13). Track in
-  [survey-gap-analysis.md](../survey-gap-analysis.md).
+  [survey-gap-analysis.md](../archive/survey-gap-analysis.md).

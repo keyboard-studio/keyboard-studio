@@ -54,7 +54,7 @@ there until it survives a full evaluation round.
 ## Construction (`source.*`) facets
 
 A further batch of keyboard-facet definitions — the **construction facets**
-(design brief: [docs/source-facets-design.md](../../docs/source-facets-design.md))
+(design brief: [docs/archive/source-facets-design.md](../../docs/archive/source-facets-design.md))
 — measure how a base's source was *built* (encoding style, combo mechanism,
 normalization posture, reordering, caps handling, fall-through posture,
 rule/store compaction, mnemonic-vs-positional) rather than what orthography it

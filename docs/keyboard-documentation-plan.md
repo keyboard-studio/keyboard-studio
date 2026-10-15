@@ -3,7 +3,7 @@
 A generic, reusable checklist for writing the human-facing documentation of a keyboard produced
 by the studio (or authored by hand following the same layout). Distilled from the corpus at
 `../keyboards`, [docs/criteria.md](criteria.md)'s PR-review checklist, and
-[docs/making-a-template.md](making-a-template.md). Complements those two — this doc is the
+[docs/archive/making-a-template.md](archive/making-a-template.md). Complements those two — this doc is the
 authoring *plan*; criteria.md is the review *checklist* the result gets held to.
 
 ## What the tool already gives you

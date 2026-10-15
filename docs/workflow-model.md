@@ -20,8 +20,8 @@ serialized only at output. No intermediate disk writes occur during authoring.
 Before the hybrid ordering was adopted (2026-06-13), two earlier models were
 documented: the "as-built two-island" state of the SPA (Model 1, existing) and the
 intermediate intended model derived from spec §8 before the hybrid ordering was
-ratified (Model 2, intended). Both are retained for provenance in
-[docs/archive/workflow-models-pre-hybrid.md](archive/workflow-models-pre-hybrid.md).
+ratified (Model 2, intended). Both were documented in a pre-hybrid models note,
+since removed as an archive-within-archive; it remains in git history.
 
 ---
 
