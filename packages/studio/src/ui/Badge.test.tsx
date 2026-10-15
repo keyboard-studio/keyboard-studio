@@ -37,10 +37,10 @@ describe("Badge — tone colors (CSS vars preserved in jsdom)", () => {
     expect(el.style.color).toBe("var(--app-accent)");
   });
 
-  it("tone='warn' → CSS_SIL_ORANGE_DARK (var(--sil-orange-dark))", () => {
+  it("tone='warn' → CSS_WARNING_TEXT (var(--app-warning-text))", () => {
     const { container } = render(<Badge tone="warn">cross-script</Badge>);
     const el = container.querySelector("span") as HTMLElement;
-    expect(el.style.color).toBe("var(--sil-orange-dark)");
+    expect(el.style.color).toBe("var(--app-warning-text)");
   });
 
   it("tone='subtle' → CSS_TEXT_SUBTLE (var(--app-text-subtle))", () => {

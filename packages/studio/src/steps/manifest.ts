@@ -29,7 +29,6 @@ import type { Step } from "./types.ts";
 import {
   decisionModules,
   declaredScreenGates,
-  galleryModules,
 } from "../survey/questions/registry.ts";
 import { deriveScreens, type DerivedScreen } from "../decisions/deriveScreens.ts";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
@@ -381,25 +380,6 @@ export const screenTrails: ReadonlyMap<string, StepTrail> = new Map<string, Step
   ["package", { spine: true }],
 ]);
 
-/**
- * Gallery-hosted steps (spec 090 T005): screen id → the gallery module
- * that settles the screen's gallery decision. Derived from screen
- * membership (spec 091 T014): a screen appears here exactly when one of
- * its member decisions is provided by a registered gallery module. Step
- * wrappers and StepHost resolve their module through this map and render
- * it via the gallery host (steps/galleryHost.tsx). A screen settling two
- * gallery decisions would be ambiguous — the coverage test
- * (decisions/galleryModules.coverage.test.ts) pins one provider per
- * settles id, and no screen settles more than one.
- */
-export const galleryModuleByStep: ReadonlyMap<string, QuestionModule> = new Map(
-  derivedScreens.flatMap((screen) => {
-    const mod = galleryModules.find((m) =>
-      (m.provides ?? []).some((id) => screen.decisionIds.includes(id)),
-    );
-    return mod === undefined ? [] : [[screen.id, mod] as const];
-  }),
-);
 
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M3, M5, layout).

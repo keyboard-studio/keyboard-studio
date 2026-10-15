@@ -60,13 +60,13 @@ const GROUP_HINTS: Record<string, string> = {
 // tint (epic #533). Mirrors KindBadge.tsx's KIND_COLOR palette family.
 const GROUP_DOT: Record<string, string> = {
   'basic-letter': 'var(--app-accent)',
-  'special-letter': 'var(--sil-orange)',
+  'special-letter': 'var(--app-warning)',
   'accented-letter': 'var(--sil-violet)',
   digit: 'var(--sil-light-blue)',
   'punctuation-symbol': 'var(--app-text-subtle)',
   'direct-key': 'var(--app-accent)',
   'deadkey-sequence': 'var(--sil-violet)',
-  store: 'var(--sil-orange)',
+  store: 'var(--app-warning)',
   'advanced-rule': 'var(--app-text-subtle)',
   'touch-only-key': 'var(--sil-light-blue)',
   'blocked-candidate': 'var(--app-text-subtle)',
