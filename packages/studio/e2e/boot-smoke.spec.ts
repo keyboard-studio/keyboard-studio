@@ -19,8 +19,8 @@ const ROOT_RENDERS = [
   { name: "app", url: "/", axe: true, seed: true },
   // Bogus code/state: the exchange fails, which is fine — we only care that
   // the screen renders (it shows its error state) instead of throwing.
-  { name: "github oauth callback", url: "/oauth/callback?code=bogus&state=bogus", axe: true, seed: true },
-  { name: "google oauth callback", url: "/oauth/google/callback?code=bogus&state=bogus", axe: true, seed: true },
+  { name: "github oauth callback", url: "/oauth/callback?code=bogus&state=bogus", axe: true, seed: true, oauth: true },
+  { name: "google oauth callback", url: "/oauth/google/callback?code=bogus&state=bogus", axe: true, seed: true, oauth: true },
   // Dashboard/profile tab (#1477 FR-009 audit — unscanned by any walk spec,
   // which all stay on the survey/preview/output/trail tabs).
   { name: "profile tab", url: "/#profile", axe: true, seed: true },
@@ -30,7 +30,7 @@ const ROOT_RENDERS = [
   { name: "lint demo", url: "/?demo=lint", axe: false, seed: true },
 ];
 
-for (const { name, url, axe, seed } of ROOT_RENDERS) {
+for (const { name, url, axe, seed, oauth } of ROOT_RENDERS) {
   test(`${name} boots without an uncaught error`, async ({ page }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -40,7 +40,23 @@ for (const { name, url, axe, seed } of ROOT_RENDERS) {
     }
     await page.goto(url);
 
-    await expect(page.locator("#root")).not.toBeEmpty();
+    // 30s per paint, not the 5s default. These boots load the full module
+    // graph from the dev server, and the OAuth-callback entries boot TWICE:
+    // the callback screen mounts and paints, the bogus exchange fails fast
+    // (~1s), and location.replace() redirects into a complete second app
+    // boot. A single 5s window spanning that navigation regularly closed
+    // while the second boot was still painting — failure snapshots show
+    // the full shell rendered moments later with zero page errors, and
+    // whichever OAuth case ran slower flaked. Each paint therefore gets
+    // its own budget: the callback screen first, then — once the redirect
+    // has actually fired — the app it lands in.
+    await expect(page.locator("#root")).not.toBeEmpty({ timeout: 30_000 });
+    if (oauth) {
+      await page.waitForURL((u) => !u.pathname.startsWith("/oauth/"), {
+        timeout: 30_000,
+      });
+      await expect(page.locator("#root")).not.toBeEmpty({ timeout: 30_000 });
+    }
     expect(pageErrors).toEqual([]);
 
     // Accessibility gate (spec 056 FR-003): every production screen this
