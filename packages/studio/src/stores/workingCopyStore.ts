@@ -260,7 +260,8 @@ export type TouchEditorMode = "character" | "key";
  * path; `runId` is the compile run it belongs to, so a superseded run's result
  * is discarded. Derived UI state: not persisted.
  *
- * - `idle`: the flag is off, or no compile has finished yet.
+ * - `idle`: this preview does not run the analysis, or no compile has
+ *   finished yet.
  * - `ready`: `findings` are the 19.x Layer C findings; `fixableRuleIds` are the
  *   gap rules the generator produced a fix for (FR-010 refusals excluded);
  *   `fingerprint` digests those rules (research D7); `classification` is

@@ -103,7 +103,6 @@ import { findKmnPath } from "./lib/findKmnPath.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
 import { LintSummary } from "./lint/index.ts";
 import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
-import { isContextToleranceEnabled } from "./flags/contextToleranceFlag.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
@@ -1218,26 +1217,22 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
 
   // Use localStart (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
-  // spec 078: only this main-walk preview runs the context-tolerance analysis,
-  // and only behind the flag; every other useKeyboardArtifact caller is unchanged.
-  const contextToleranceEnabled = isContextToleranceEnabled();
+  // spec 078: only this main-walk preview runs the context-tolerance analysis;
+  // every other useKeyboardArtifact caller is unchanged.
   const { stage: artifactStage, retry } = useKeyboardArtifact(
     localStart,
     scaffoldSpec,
     workingCopyTransform,
     onInstantiate,
     {
-      analyseContextTolerance: contextToleranceEnabled,
+      analyseContextTolerance: true,
     },
   );
   const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
   // never by the marks step; its stale/refused outcomes feed the notice.
-  const contextToleranceApplyNotes = useContextToleranceApply(
-    contextToleranceEnabled,
-  );
+  const contextToleranceApplyNotes = useContextToleranceApply();
   const showContextTolerance =
-    contextToleranceEnabled &&
     contextTolerance.status !== "idle" &&
     contextTolerance.status !== "analysing";
 
