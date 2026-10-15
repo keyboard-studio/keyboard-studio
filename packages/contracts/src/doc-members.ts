@@ -160,6 +160,35 @@ export interface LayoutChartInput {
 /** Defaults to "keep-base-images" when the base ships images, else "regenerate" (FR-015). */
 export type ChartPreference = "keep-base-images" | "regenerate";
 
+/**
+ * The author's answer to one deterministic documentation-fix proposal
+ * (issue #1908, the #504 posture): a proposal is only ever applied after
+ * the author accepts it, and a decline is recorded too — so the same
+ * finding is not re-proposed as if never seen, and either answer can be
+ * revisited (the record is a whole-value working-copy slice, replaced on
+ * every change).
+ */
+export type DocFixProposalState = "accepted" | "declined";
+
+/** Which inherited page's body a body-parity fix copies to the other (issue #1908). */
+export type DocBodySyncSource = "welcome" | "help";
+
+/**
+ * The recorded documentation-fix proposals for an adaptation (issue
+ * #1908): the deterministic Layer C fixes for the inherited welcome/help
+ * members, each present only once the author has answered its proposal.
+ * Absent fields mean "not answered yet" — the inherited bytes and their
+ * findings are then exactly as they were.
+ */
+export interface DocFixProposals {
+  /** Criterion 11.7: rewrite the help page's $pagename/$pagetitle to the expected form. */
+  pagename?: DocFixProposalState;
+  /** Criterion 11.9: sync the welcome/help bodies from the named canonical side, or declined. */
+  bodySync?: DocBodySyncSource | "declined";
+  /** Criterion 11.8: add an `img { max-width: 100%; }` rule to the shipped kb.css. */
+  imageWidth?: DocFixProposalState;
+}
+
 // ---------------------------------------------------------------------------
 // §7 Layer C documentation check input
 // ---------------------------------------------------------------------------

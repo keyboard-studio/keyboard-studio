@@ -245,7 +245,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { startVfs, startIr, startKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
+  const { startVfs, startIr, startKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, docFixProposals, ir: workingIr, contextToleranceOverlay } = state;
 
   // Not-instantiated guard.
   if (startVfs === null || startIr === null || startKeyboard === null) {
@@ -591,6 +591,16 @@ export async function projectWorkingCopyForOutput(
     touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
     inheritedProse: isAdaptation ? (startWelcomeHtmText ?? startHelpPhpText) : null,
   });
+  // Issue 1908: the author's ACCEPTED documentation-fix proposals become
+  // render fixes here exactly as in useDocsPreview — adapt track only; the
+  // copy track's fresh renders never see them.
+  const inheritedFixes = {
+    ...(isAdaptation && docFixProposals?.pagename === "accepted" ? { pagename: true } : {}),
+    ...(isAdaptation &&
+    (docFixProposals?.bodySync === "welcome" || docFixProposals?.bodySync === "help")
+      ? { bodySync: docFixProposals.bodySync }
+      : {}),
+  };
   const docsInput: HelpDocsRenderInput = {
     answers: helpDocs,
     displayName: identity?.displayName ?? startKeyboard.displayName,
@@ -598,6 +608,7 @@ export async function projectWorkingCopyForOutput(
     keyboardId: resolvedKeyboardId,
     platforms: parseTargetTokens(projectedKmnText),
     generated: docContent.slots,
+    ...(Object.keys(inheritedFixes).length > 0 ? { inheritedFixes } : {}),
   };
   // FR-006: an adaptation inherits the base's README description; a copy never
   // does (FR-007) — the slice is null on Track 1 and the track guard keeps it so.
@@ -611,7 +622,7 @@ export async function projectWorkingCopyForOutput(
   clonedVfs.delete(FLAT_WELCOME_PATH);
   clonedVfs.set(
     WELCOME_PAGE_PATH,
-    renderWelcomeHtm(docsInput, startWelcomeHtmText, welcomeFolderFiles),
+    renderWelcomeHtm(docsInput, startWelcomeHtmText, welcomeFolderFiles, startHelpPhpText),
     false,
   );
   // FR-006: every carried base image, beside the page under its own name.
@@ -623,6 +634,23 @@ export async function projectWorkingCopyForOutput(
     clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
   }
   clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, startHelpPhpText, startWelcomeHtmText), false);
+
+  // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
+  // kb.css gains the constraining rule. This engages only when a kb.css is
+  // actually in the working copy — on the adapt path that depends on the
+  // loader carrying it (issue 2139); when no kb.css is present there is
+  // nothing to amend and the proposal stays visibly unlanded rather than
+  // pretending otherwise. Idempotent: a stylesheet already carrying an
+  // img max-width rule is left alone.
+  if (isAdaptation && docFixProposals?.imageWidth === "accepted") {
+    for (const path of clonedVfs.list()) {
+      if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(path)) continue;
+      const css = readVfsText(clonedVfs, path);
+      if (css === undefined) continue;
+      if (/\bimg\s*\{[^}]*\bmax-width\s*:/i.test(css)) continue;
+      clonedVfs.set(path, `${css.replace(/\s+$/, "")}\nimg { max-width: 100%; }\n`, false);
+    }
+  }
 
   // spec 079 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
   // production from the author's proposal decision — a confirmed or edited

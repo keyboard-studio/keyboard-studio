@@ -41,6 +41,7 @@ import type {
   WelcomeFolderImage,
   HistoryEntryState,
   ChartPreference,
+  DocFixProposals,
   StartDocumentationProfile,
 } from "@keyboard-studio/contracts";
 import {
@@ -558,6 +559,16 @@ export interface WorkingCopyState {
    * AFTER this slice was seeded still gets the right default. Persisted.
    */
   chartPreference: ChartPreference | null;
+  /**
+   * The author's recorded answers to the deterministic documentation-fix
+   * proposals for an adaptation's inherited welcome/help pages (issue
+   * #1908): null until a proposal is answered. An accepted fix is applied
+   * by the render/projection from this record; a declined one leaves the
+   * inherited bytes and their findings untouched. Clearing the record (or
+   * one field) is the undo. Only ever populated on the adapt track.
+   * Persisted.
+   */
+  docFixProposals: DocFixProposals | null;
   /**
    * The selected base's documentation profile (spec 079 FR-008), computed by
    * the base browser for the focused base and recorded at selection; null
@@ -1288,6 +1299,9 @@ export interface WorkingCopyState {
   /** Record the author's keep-base-images / regenerate choice (spec 079 FR-015). */
   setChartPreference: (preference: ChartPreference | null) => void;
 
+  /** Record the author's documentation-fix proposal answers (issue #1908). Whole-value replace; null clears (undo). */
+  setDocFixProposals: (proposals: DocFixProposals | null) => void;
+
   /** Record the selected base's documentation profile (spec 079 FR-008). */
   setStartDocProfile: (profile: StartDocumentationProfile | null) => void;
 
@@ -1555,6 +1569,7 @@ export type WorkingCopyData = Omit<
   | "setStartWelcomeConvention"
   | "setHistoryEntryState"
   | "setChartPreference"
+  | "setDocFixProposals"
   | "setStartDocProfile"
   | "setBaselineDocFindings"
   | "markStale"
@@ -1594,6 +1609,7 @@ const INITIAL_STATE: WorkingCopyData = {
   startWelcomeImagesDropped: false,
   historyEntryState: null,
   chartPreference: null,
+  docFixProposals: null,
   startDocProfile: null,
   baselineDocFindings: null,
   // carve IR slots
@@ -2267,6 +2283,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // choice falls back to the FR-015 default.
       historyEntryState: null,
       chartPreference: null,
+      docFixProposals: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
       baselineDocFindings: null,
       startDocCssTexts: null,
@@ -2344,6 +2361,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // See instantiateFromStart: documentation decisions are per working copy.
       historyEntryState: null,
       chartPreference: null,
+      docFixProposals: null,
       baselineDocFindings: null,
       startDocCssTexts: null,
       startKeyboard: keyboard,
@@ -2435,6 +2453,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setHistoryEntryState: (state) => set({ historyEntryState: state }),
 
   setChartPreference: (preference) => set({ chartPreference: preference }),
+
+  setDocFixProposals: (proposals) => set({ docFixProposals: proposals }),
 
   setStartDocProfile: (profile) => set({ startDocProfile: profile }),
 

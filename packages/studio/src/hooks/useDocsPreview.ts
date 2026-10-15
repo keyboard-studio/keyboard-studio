@@ -47,6 +47,12 @@ export function useDocsPreview(): DocsPreview {
   const startReadmeMdText = useWorkingCopyStore((s) =>
     s.instantiationMode === "adapt-existing" ? s.startReadmeMdText : null,
   );
+  // Issue #1908: the recorded documentation-fix proposals. Read under the
+  // same adapt guard as the README inheritance — the copy track never
+  // carries inherited prose, so its fixes can never engage there.
+  const docFixProposals = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.docFixProposals : null,
+  );
 
   return useMemo(() => {
     const displayName = identity?.displayName ?? startKeyboard?.displayName ?? "";
@@ -66,6 +72,14 @@ export function useDocsPreview(): DocsPreview {
             inheritedProse: startWelcomeHtmText ?? startHelpPhpText,
           })
         : null;
+    // Only ACCEPTED proposals become render fixes; a declined or unanswered
+    // proposal leaves the inherited pages byte-identical (issue #1908).
+    const inheritedFixes = {
+      ...(docFixProposals?.pagename === "accepted" ? { pagename: true } : {}),
+      ...(docFixProposals?.bodySync === "welcome" || docFixProposals?.bodySync === "help"
+        ? { bodySync: docFixProposals.bodySync }
+        : {}),
+    };
     const input: HelpDocsRenderInput = {
       answers: helpDocs,
       displayName,
@@ -73,13 +87,14 @@ export function useDocsPreview(): DocsPreview {
       ...(startKeyboard !== null ? { keyboardId: resolveOutputKeyboardId(identity, startKeyboard) } : {}),
       platforms,
       ...(docContent !== null ? { generated: docContent.slots } : {}),
+      ...(Object.keys(inheritedFixes).length > 0 ? { inheritedFixes } : {}),
     };
     return {
       readmeMd: renderReadmeMd(input, startReadmeMdText),
       readmeHtm: renderReadmeHtm(input),
-      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText),
+      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
       helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
       typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals]);
 }

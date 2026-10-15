@@ -24,8 +24,8 @@
 // is stripped first, so re-rendering never stacks blocks (spec 102 FR-033).
 
 import { DOC_FORMS, type HelpDocsAnswers } from "@keyboard-studio/contracts";
-import { escapeHtml } from "./escapeHtml.js";
-import { helpSiteHeader } from "./packageDocs.js";
+import { escapeHtml, phpSingleQuoteEscape } from "./escapeHtml.js";
+import { helpSiteHeader, helpSitePageName } from "./packageDocs.js";
 import { layoutChartPlatformFromFilename } from "../layout-chart/filename.js";
 import {
   DOC_GENERATED_END,
@@ -61,6 +61,18 @@ export interface HelpDocsRenderInput {
   keyboardId?: string;
   /** Derived sections from the studio's buildDocContent; absent means none. */
   generated?: GeneratedDocSlots;
+  /**
+   * Accepted documentation-fix proposals for an adaptation (issue #1908).
+   * Populated only by the adapt path, only from the author's recorded
+   * answers — never by the copy path and never as a default. Absent means
+   * the inherited pages render exactly as they always have.
+   */
+  inheritedFixes?: {
+    /** Rewrite the inherited help header's $pagename/$pagetitle (criterion 11.7). */
+    pagename?: boolean;
+    /** Sync the welcome/help bodies from the named canonical side (criterion 11.9). */
+    bodySync?: "welcome" | "help";
+  };
 }
 
 // Opt-in "additional detail" battery (FR-011/FR-014), fixed order per research D-10.
@@ -319,6 +331,66 @@ function withOneTrailingNewline(s: string): string {
   return `${s.replace(/\s+$/, "")}\n`;
 }
 
+// ---------------------------------------------------------------------------
+// Accepted inherited-page fixes (issue #1908) — applied only when the input
+// carries the author's recorded acceptance; see HelpDocsRenderInput.
+// ---------------------------------------------------------------------------
+
+const PHP_STRING_LITERAL = String.raw`'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"`;
+
+function rewriteInheritedPagename(helpPhpText: string, displayName: string): string {
+  const expected = phpSingleQuoteEscape(helpSitePageName(displayName));
+  const pagenameRe = new RegExp(String.raw`(\$pagename\s*=\s*)(?:${PHP_STRING_LITERAL})`);
+  const pagetitleRe = new RegExp(
+    String.raw`(\$pagetitle\s*=\s*)(?!\$pagename\b)(?:${PHP_STRING_LITERAL})`,
+  );
+  return helpPhpText
+    .replace(pagenameRe, (_m, prefix: string) => `${prefix}'${expected}'`)
+    .replace(pagetitleRe, (_m, prefix: string) => `${prefix}'${expected}'`);
+}
+
+const LEADING_PHP_BLOCK_RE = /^(\uFEFF?\s*(?:<\?php[\s\S]*?\?>\s*)+)/;
+
+/** The page's leading `<?php … ?>` header block (the help-site header), or "" when it has none. */
+function leadingPhpBlock(page: string): string {
+  return LEADING_PHP_BLOCK_RE.exec(page)?.[1] ?? "";
+}
+
+/**
+ * A page's body content with its document chrome removed: any leading PHP
+ * header and `<head>` go, and — for the welcome page's form — relative
+ * sibling links point at `.htm` pages rather than their `.php` twins.
+ */
+function bodyContentOfPage(page: string): string {
+  const withoutPhp = page.replace(LEADING_PHP_BLOCK_RE, "");
+  const bodyMatch = /<body\b[^>]*>([\s\S]*?)<\/body>/i.exec(withoutPhp);
+  const body = (
+    bodyMatch?.[1] ??
+    withoutPhp
+      .replace(/<!DOCTYPE[^>]*>/gi, "")
+      .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "")
+      .replace(/<\/?(?:html|body)\b[^>]*>/gi, "")
+  )
+    .replace(/(\bhref\s*=\s*["'])(?![a-z][a-z0-9+.-]*:|\/\/)([^"'#]*?)\.php(?=["'#])/gi, "$1$2.htm")
+    .trim();
+  return body;
+}
+
+/** `page` with its `<body>` content replaced by `body` (a body element is added when the page has none). */
+function replaceBodyContent(page: string, body: string): string {
+  if (/<body\b[^>]*>[\s\S]*?<\/body>/i.test(page)) {
+    return page.replace(
+      /(<body\b[^>]*>)[\s\S]*?(<\/body>)/i,
+      (_m, open: string, close: string) => `${open}\n${body}\n${close}`,
+    );
+  }
+  const closingHtmlIdx = page.toLowerCase().lastIndexOf("</html>");
+  if (closingHtmlIdx !== -1) {
+    return `${page.slice(0, closingHtmlIdx)}<body>\n${body}\n</body>\n${page.slice(closingHtmlIdx)}`;
+  }
+  return `${page}\n<body>\n${body}\n</body>\n`;
+}
+
 /**
  * `README.md` — package-listing description, links and supported platforms,
  * from the `readmeMd` form. No version/copyright (FR-007), no typing guide
@@ -381,11 +453,26 @@ export function renderWelcomeHtm(
   input: HelpDocsRenderInput,
   startWelcomeHtmText: string | null,
   welcomeImageFiles: readonly string[] = [],
+  startHelpPhpText: string | null = null,
 ): string {
   const lang = descriptionOf(input) !== undefined ? proseLang(input.answers, input.primaryBcp47) : undefined;
 
   if (startWelcomeHtmText !== null) {
     const inherited = stripGeneratedBlocks(startWelcomeHtmText);
+    // Issue #1908, accepted body-sync with the HELP page canonical: the
+    // welcome body becomes the help page's body (sibling links back to
+    // their .htm form), under the welcome page's own chrome. The welcome
+    // layout section still follows for carried images the canonical body
+    // does not already show — the one permitted welcome-side extra.
+    if (input.inheritedFixes?.bodySync === "help" && startHelpPhpText !== null) {
+      const inheritedHelp = stripGeneratedBlocks(startHelpPhpText);
+      const generated = renderDocBodyHtml(input, true);
+      const canonicalHelp = generated === "" ? inheritedHelp : spliceGenerated(inheritedHelp, generated);
+      const canonicalBody = bodyContentOfPage(canonicalHelp);
+      const layoutSection = renderWelcomeLayoutSection(filesNotReferencedIn(welcomeImageFiles, canonicalBody));
+      const body = [canonicalBody, layoutSection].filter((part) => part !== "").join("\n");
+      return setHtmlLang(replaceBodyContent(inherited, body), lang);
+    }
     const layoutSection = renderWelcomeLayoutSection(filesNotReferencedIn(welcomeImageFiles, inherited));
     const generated = [renderDocBodyHtml(input, true), layoutSection].filter((part) => part !== "").join("\n");
     // FR-006: with nothing generated, the inherited page ships as it is.
@@ -455,7 +542,21 @@ export function renderHelpPhp(
     )}`;
   }
   if (startHelpPhpText !== null) {
-    const inherited = stripGeneratedBlocks(startHelpPhpText);
+    let inherited = stripGeneratedBlocks(startHelpPhpText);
+    // Issue #1908, accepted pagename fix: the inherited header stays, with
+    // only its $pagename (and a literal $pagetitle) rewritten to the
+    // expected form for this keyboard's display name (criterion 11.7).
+    if (input.inheritedFixes?.pagename === true) {
+      inherited = rewriteInheritedPagename(inherited, displayName);
+    }
+    // Issue #1908, accepted body-sync with the WELCOME page canonical: the
+    // help page keeps its own (possibly just-rewritten) header and takes
+    // the rendered welcome page's body, exactly as a base with no help page
+    // of its own derives one — so the two bodies match (criterion 11.9).
+    if (input.inheritedFixes?.bodySync === "welcome" && startWelcomeHtmText !== null) {
+      const header = leadingPhpBlock(inherited);
+      return `${header}${helpFragmentFromWelcome(renderWelcomeHtm(input, startWelcomeHtmText))}`;
+    }
     const generated = renderDocBodyHtml(input, true);
     // FR-006: with nothing generated, the inherited page ships as it is.
     if (generated === "") return inherited;

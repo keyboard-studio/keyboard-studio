@@ -37,6 +37,7 @@ import { formatCoverageBannerParts } from "../../lib/unimplementedInventory.ts";
 import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
 import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
 import { DocsPreviewPanel } from "../../components/DocsPreviewPanel.tsx";
+import { DocumentationFixProposals } from "../../components/DocumentationFixProposals.tsx";
 import { composeHelpDocsValue } from "../../survey/questions/gallery/helpDocs.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 
@@ -119,6 +120,11 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
   return (
     <>
       <PhaseFStepFactoryComponent {...props} onComplete={handleComplete} />
+      {/* Issue #1908: the docs step is the owner surface for the adapt
+          track's inherited-page findings (warnings-placement model, rule
+          1) — the deterministic fixes are proposed here, never applied
+          silently. Renders nothing on the copy track. */}
+      <DocumentationFixProposals />
       <DocsPreviewPanel />
       <ConfirmDialog
         open={blocked}

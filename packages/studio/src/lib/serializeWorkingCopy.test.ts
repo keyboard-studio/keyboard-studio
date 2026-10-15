@@ -606,6 +606,65 @@ describe("serializeWorkingCopy — adapt-existing path (Track 2)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Issue #1908: accepted doc-fix proposals reach the shipped output
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — doc-fix proposals (issue #1908)", () => {
+  const CAMEROON_HELP =
+    "<?php\n  $pagename = 'Cameroon QWERTY (SIL) Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Copyright SIL Cameroon</p></body></html>";
+  const CAMEROON_WELCOME = "<html><body><p>Copyright 2018-2022 SIL Cameroon</p></body></html>";
+  const KB_CSS = ".full {\n  width: 98%;\n}\n";
+
+  function seedCameroonAdapt(proposals: Parameters<
+    ReturnType<typeof useWorkingCopyStore.getState>["setDocFixProposals"]
+  >[0]) {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+      { path: "source/help/kb.css", content: KB_CSS, isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    ir.header.version = "1.0";
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    const wc = useWorkingCopyStore.getState();
+    wc.setStartWelcomeHtmText(CAMEROON_WELCOME);
+    wc.setStartHelpPhpText(CAMEROON_HELP);
+    wc.setDocFixProposals(proposals);
+  }
+
+  it("accepted proposals ship: rewritten $pagename, synced body, kb.css width rule", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdapt({ pagename: "accepted", bodySync: "welcome", imageWidth: "accepted" });
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const vfs = projected!.vfs;
+
+    const help = vfs.get("source/help/basic_kbdus.php")?.content as string;
+    expect(help).toContain("$pagename = 'US English (Basic) Keyboard Help';");
+    expect(help).not.toContain("(SIL)");
+    expect(help).toContain("<p>Copyright 2018-2022 SIL Cameroon</p>");
+
+    const kbCss = vfs.get("source/help/kb.css")?.content as string;
+    expect(kbCss).toContain("img { max-width: 100%; }");
+    expect(kbCss).toContain(".full {");
+  });
+
+  it("declined proposals ship the inherited bytes untouched", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdapt({ pagename: "declined", bodySync: "declined", imageWidth: "declined" });
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const vfs = projected!.vfs;
+
+    const help = vfs.get("source/help/basic_kbdus.php")?.content as string;
+    expect(help).toContain("Cameroon QWERTY (SIL) Keyboard Help");
+    expect(help).toContain("<p>Copyright SIL Cameroon</p>");
+
+    const kbCss = vfs.get("source/help/kb.css")?.content as string;
+    expect(kbCss).toBe(KB_CSS);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // spec 079 US2 (T019): Track 1 copy — images and skeleton inherited, never prose
 // ---------------------------------------------------------------------------
 

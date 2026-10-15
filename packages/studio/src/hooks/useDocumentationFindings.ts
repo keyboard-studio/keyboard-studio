@@ -50,6 +50,10 @@ export function useDocumentationFindings(): LintFinding[] {
   const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const baselineDocFindings = useWorkingCopyStore((s) => s.baselineDocFindings);
+  // Issue #1908: the recorded documentation-fix proposals (adapt track only).
+  const docFixProposals = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.docFixProposals : null,
+  );
   const docs = useDocsPreview();
   const memberStates = useDocMemberStates();
   // spec 094: a tested three-part adapt base publishes at a.(b+1).0.
@@ -95,7 +99,7 @@ export function useDocumentationFindings(): LintFinding[] {
     // width constraints may live in their class rules). The VFS carries
     // the KMW stylesheet; the welcome/help pages' own stylesheets
     // (kb.css) are fetch-don't-write and ride the startDocCssTexts slice
-    // (issue #2139) — without them, class-constrained help images are
+    // (issue 2139) — without them, class-constrained help images are
     // false positives.
     const cssTexts = [
       ...startVfs
@@ -105,6 +109,18 @@ export function useDocumentationFindings(): LintFinding[] {
         .filter((t): t is string => t !== undefined),
       ...(startDocCssTexts ?? []),
     ];
+    // Issue 1908: an ACCEPTED image-width proposal amends the shipped
+    // kb.css (serializeWorkingCopy step 5c), so the check sees the same
+    // stylesheet the output will carry — the finding clears here exactly
+    // when it clears in the shipped package. Only when a kb.css is
+    // actually in the working copy (its presence depends on issue 2139).
+    if (
+      isAdaptation &&
+      docFixProposals?.imageWidth === "accepted" &&
+      startVfs.list("source/").some((p) => /^source\/(?:help|welcome)\/kb\.css$/i.test(p))
+    ) {
+      cssTexts.push("img { max-width: 100%; }");
+    }
 
     const findings = runDocChecks(
       collectDocLintInput({
@@ -143,6 +159,7 @@ export function useDocumentationFindings(): LintFinding[] {
     startLicenseText,
     touchLayoutJson,
     baselineDocFindings,
+    docFixProposals,
     docs,
     memberStates,
     testBuildsExist,

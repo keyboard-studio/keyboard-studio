@@ -998,6 +998,36 @@ describe("persistWorkingCopy", () => {
       expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
     });
 
+    it("round-trips docFixProposals through snapshot/rehydrate (issue #1908)", () => {
+      instantiate();
+      const proposals = { pagename: "accepted", bodySync: "help", imageWidth: "declined" } as const;
+      useWorkingCopyStore.getState().setDocFixProposals(proposals);
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().docFixProposals).toBeNull();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().docFixProposals).toEqual(proposals);
+    });
+
+    it("tolerates a snapshot written before docFixProposals existed, restoring null (issue #1908)", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.docFixProposals;
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.docFixProposals).toBeNull();
+    });
+
+    it("a fresh instantiation clears recorded doc-fix proposals (issue #1908)", () => {
+      instantiate();
+      useWorkingCopyStore.getState().setDocFixProposals({ pagename: "accepted" });
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "other", displayName: "Other", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
+      );
+      expect(useWorkingCopyStore.getState().docFixProposals).toBeNull();
+    });
+
     // spec 082 FR-020/FR-022: Keep/dismiss dispositions are durable — the
     // author is never re-asked after a draft resume.
     it("round-trips guard-intent dispositions through snapshot/rehydrate", () => {
