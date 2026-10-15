@@ -269,9 +269,13 @@ export function InvisiblesGalleryPane() {
       data-testid="invisible-gallery"
       style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", minHeight: 0 }}
     >
-      <h2 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
+      {/* h3, not h2: the pane is subordinate to the step's own h2
+          ("Invisible characters", invisibles-heading). Two identical h2s on
+          the step screen double-announce to screen readers and break
+          role-based heading lookup (e2e copy-edit T028 strict violation). */}
+      <h3 style={{ margin: 0, fontSize: "1.1rem", color: ACCENT }}>
         <Trans id="survey.characterMapPane.titleInvisibles">Invisible characters</Trans>
-      </h2>
+      </h3>
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
         <Trans id="survey.characterMapPane.subtitleInvisibles">
           Browse and click to toggle invisible characters into your list — the
