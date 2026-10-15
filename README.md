@@ -49,9 +49,8 @@ Run `pnpm build` before `pnpm typecheck` or `pnpm test` on a clean checkout — 
 | [`packages/studio/`](packages/studio/) | `@keyboard-studio/studio` — the React + Vite authoring SPA (three-pane gallery / editor / preview over a single working copy). |
 | [`api/`](api/) | Vercel serverless functions (OAuth exchange, managed PR submission, draft sync, crash reports). Outside the pnpm workspace; bundled separately and kept bundle-safe by [`api/bundle-safety.test.ts`](api/bundle-safety.test.ts). |
 | [`content/`](content/) | Content-team assets: pattern library YAML, facet records, survey flows and journeys, adaptation questions, recognizer rules, i18n source catalogs. |
-| [`utilities/`](utilities/) | Standalone tools deliberately kept out of `packages/*`: `spec-trace` (corpus search and drift tracking), the lint checkers chained by `pnpm lint`, `facet-index`, `kbgen`, the OAuth backend, the Python template-cleanup pipeline. |
+| [`utilities/`](utilities/) | Standalone tools deliberately kept out of `packages/*`: `spec-trace` (corpus search and drift tracking), the lint checkers chained by `pnpm lint`, `facet-index`, `kbgen`, the OAuth backend. |
 | [`.claude/`](.claude/) | Claude Code agents, slash commands, and skills for the **KM crew** — the specialist pipeline coordinated by `/km-lead`. Roster: [`.claude/agents/km-README.md`](.claude/agents/km-README.md). |
-| [`strategy tree/`](strategy%20tree/) | The original standalone `.kmn` strategy reference — **merged into spec §7** and retained only as a stub. |
 | [`CLAUDE.md`](CLAUDE.md) | Orientation for working in this repo with Claude Code: the gates, cross-cutting invariants, and where everything else lives. |
 
 ## Scope (v1)

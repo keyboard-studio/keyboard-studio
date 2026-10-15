@@ -176,8 +176,8 @@ function checkNoSelfLineRefs() {
 // Check 5 — km-qc rubric consistency across agent + command
 // ---------------------------------------------------------------------------
 function checkQcConsistency() {
-  // The agent rubric is required; the /km-qc command is optional (role
-  // commands may be archived under .claude/archive/commands/).
+  // The agent rubric is required; the /km-qc command is optional (the
+  // per-role commands were removed with .claude/archive/commands/).
   const qcCommand = path.join(CLAUDE, "commands", "km-qc.md");
   const targets = [path.join(CLAUDE, "agents", "km-qc.md"), ...(existsSync(qcCommand) ? [qcCommand] : [])];
 

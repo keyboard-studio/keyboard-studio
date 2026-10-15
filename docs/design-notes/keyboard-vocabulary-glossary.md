@@ -62,7 +62,7 @@ is a project.
 
 **Template** — *no such Keyman concept.* Never used for the copied keyboard.
 It survives only for pattern/scaffold templates
-([making-a-template.md](../making-a-template.md)).
+([making-a-template.md](../archive/making-a-template.md)).
 
 ## Layouts of your keyboard
 
