@@ -46,6 +46,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useViewport } from "../hooks/useViewport.ts";
 import { useModalFocus } from "../hooks/useModalFocus.ts";
 import { useInertOutside } from "../hooks/useInertOutside.ts";
+import { buzz } from "../lib/haptics.ts";
 import { BREAKPOINTS } from "../ui/breakpoints.ts";
 import {
   MOTION_SPRING_DEFAULT,
@@ -379,6 +380,9 @@ export function PreviewSheet({
   const requestClose = useCallback((): void => {
     exitVelocityRef.current = activeSpringRef.current?.velocity ?? 0;
     exitMomentumRef.current = false;
+    // Commit-point haptic (lib/haptics.ts): the dismissal is decided on
+    // this frame; the exit flight starts with it.
+    buzz(15);
     onOpenChange(false);
   }, [onOpenChange]);
 
@@ -462,6 +466,9 @@ export function PreviewSheet({
       // default.
       exitVelocityRef.current = velocity;
       exitMomentumRef.current = velocity > FLICK_DISMISS_PX_S;
+      // Commit-point haptic (lib/haptics.ts): the release just committed
+      // to dismiss; the exit flight starts on this frame.
+      buzz(15);
       onOpenChange(false);
       return;
     }
