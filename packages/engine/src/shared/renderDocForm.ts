@@ -38,7 +38,7 @@ function parse(form: string, formId: string | undefined): { nodes: DocNode[]; id
   const stack: Array<{ id: string; children: DocNode[] }> = [];
   const ids: string[] = [];
   const seen = new Set<string>();
-  const use = (id: string): void => {
+  const noteId = (id: string): void => {
     if (!seen.has(id)) {
       seen.add(id);
       ids.push(id);
@@ -67,7 +67,7 @@ function parse(form: string, formId: string | undefined): { nodes: DocNode[]; id
     const match = TAG_BODY.exec(form.slice(open + 2, close));
     if (match === null) return fail(`unknown construct ${tag}`);
     const [, sigil, id] = match as unknown as [string, string, string];
-    use(id);
+    noteId(id);
     const alone = sigil !== "" && standsAlone(form, open, end);
     pos = alone && form[end] === "\n" ? end + 1 : end;
 

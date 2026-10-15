@@ -113,7 +113,7 @@ Files: `packages/studio/src/lib/docContent.ts`, `packages/studio/src/lib/docCont
 
 Files: `packages/studio/src/lib/serializeWorkingCopy.forms.test.ts`
 
-- [ ] **T023** [US3] Write an output-level forms test over the T001 fixtures. Each fixture checks the following. The version appears only in HISTORY.md and the year only in LICENSE.md. Every file that names a copyright holder names the same one. The welcome and help bodies are equal once the help header and the welcome layout section are set aside. With no answers, an empty usage-tips section and its heading are absent, and every file is a complete document, not today's one-line placeholder. An answer containing `<` and `&` gives a well-formed page that shows the text literally. A `DOC_FORMS.forms.body` heading swapped in through `vi.mock` of the contracts module appears on welcome and help and nowhere else (FR-024, FR-025, FR-026, FR-027, FR-030, SC-006) · `packages/studio/src/lib/serializeWorkingCopy.forms.test.ts`
+- [x] **T023** [US3] Write an output-level forms test over the T001 fixtures. Each fixture checks the following. The version appears only in HISTORY.md and the year only in LICENSE.md. Every file that names a copyright holder names the same one. The welcome and help bodies are equal once the help header and the welcome layout section are set aside. With no answers, an empty usage-tips section and its heading are absent, and every file is a complete document, not today's one-line placeholder. An answer containing `<` and `&` gives a well-formed page that shows the text literally. A `DOC_FORMS.forms.body` heading swapped in through `vi.mock` of the contracts module appears on welcome and help and nowhere else (FR-024, FR-025, FR-026, FR-027, FR-030, SC-006) · `packages/studio/src/lib/serializeWorkingCopy.forms.test.ts`
 
 **Checkpoint**: US3 is verified. A failure here is fixed in its Phase 2 owner file (`doc-forms.json` or `helpDocsRender.ts`).
 
@@ -129,19 +129,19 @@ Files: `packages/studio/src/components/DocumentationChecklist.tsx`, `packages/st
 
 **Wave 1: independent (different files):**
 
-- [ ] **T024** [P] [US4] Write a Track 2 output test. The original welcome/help prose comes first and the generated sections follow inside the markers. Copy carries none of the original prose but keeps its images and skeleton. With a typing table covering ≥ 50 % of the guide's characters, the guide is omitted and the other sections stay. An original that already holds a `ks:generated` block gives exactly one block. Two downloads give byte-identical files (FR-032, FR-033, FR-034, SC-005) · `packages/studio/src/lib/serializeWorkingCopy.inheritedDocs.test.ts`
-- [ ] **T025** [P] [US4] Add a test that the checklist shows "Typing guide not generated: the original docs already include one." when `typingGuideSuppressed` is true and hides it otherwise · `packages/studio/src/components/DocumentationChecklist.test.tsx`
+- [x] **T024** [P] [US4] Write a Track 2 output test. The original welcome/help prose comes first and the generated sections follow inside the markers. Copy carries none of the original prose but keeps its images and skeleton. With a typing table covering ≥ 50 % of the guide's characters, the guide is omitted and the other sections stay. An original that already holds a `ks:generated` block gives exactly one block. Two downloads give byte-identical files (FR-032, FR-033, FR-034, SC-005) · `packages/studio/src/lib/serializeWorkingCopy.inheritedDocs.test.ts`
+- [x] **T025** [P] [US4] Add a test that the checklist shows "Typing guide not generated: the original docs already include one." when `typingGuideSuppressed` is true and hides it otherwise · `packages/studio/src/components/DocumentationChecklist.test.tsx`
 
 ### Implementation
 
 **⟶ Wait for the tests, then (Wave 2, independent):**
 
-- [ ] **T026** [P] [US4] Add a `typingGuideSuppressed` prop and render `output.docs.checklist.typingGuideSuppressed` through the Lingui `t`/`<Trans>` macro per spec 046 · `packages/studio/src/components/DocumentationChecklist.tsx`
-- [ ] **T027** [P] [US4] Pass `typingGuideSuppressed` from `useDocsPreview` into `DocumentationChecklist` · `packages/studio/src/components/OutputScreen.tsx`
+- [x] **T026** [P] [US4] Add a `typingGuideSuppressed` prop and render `output.docs.checklist.typingGuideSuppressed` through the Lingui `t`/`<Trans>` macro per spec 046 · `packages/studio/src/components/DocumentationChecklist.tsx`
+- [x] **T027** [P] [US4] Pass `typingGuideSuppressed` from `useDocsPreview` into `DocumentationChecklist` · `packages/studio/src/components/OutputScreen.tsx`
 
 **⟶ Wait for Wave 2, then:**
 
-- [ ] **T028** [US4] Extract and compile the catalogs so `output.docs.checklist.typingGuideSuppressed` lands in `en` and `fr` (FR-035) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/en/messages.js`, `packages/studio/src/locales/fr/messages.json`, `packages/studio/src/locales/fr/messages.js`
+- [x] **T028** [US4] Extract and compile the catalogs so `output.docs.checklist.typingGuideSuppressed` lands in `en` and `fr` (FR-035) · `packages/studio/src/locales/en/messages.json`, `packages/studio/src/locales/en/messages.js`, `packages/studio/src/locales/fr/messages.json`, `packages/studio/src/locales/fr/messages.js`
 
 **Checkpoint**: US4 is independently functional. T024 and T025 pass.
 
@@ -151,13 +151,13 @@ Files: `packages/studio/src/lib/collectDocLintInput.forms.test.ts`, `docs/keyboa
 
 **Wave 1: independent (different files):**
 
-- [ ] **T029** [P] Write a Layer C test. `runDocChecks` (13 codes) over the projected output of every T001 fixture, with no answers and with full answers, reports zero form-attributable findings (SC-004) · `packages/studio/src/lib/collectDocLintInput.forms.test.ts`
-- [ ] **T030** [P] Add a "What the tool gives you" section listing the derived sections, the version rule for Copy and Adapt, and where content edits the forms · `docs/keyboard-documentation-plan.md`
-- [ ] **T031** [P] Write the quickstart: how to verify each story by hand in the studio (Copy at 1.0, a no-answer download, a form-edit round trip, an Adapt with a typing table) · `specs/095-keyboard-docs-templates/quickstart.md`
+- [x] **T029** [P] Write a Layer C test. `runDocChecks` (13 codes) over the projected output of every T001 fixture, with no answers and with full answers, reports zero form-attributable findings (SC-004) · `packages/studio/src/lib/collectDocLintInput.forms.test.ts`
+- [x] **T030** [P] Add a "What the tool gives you" section listing the derived sections, the version rule for Copy and Adapt, and where content edits the forms · `docs/keyboard-documentation-plan.md`
+- [x] **T031** [P] Write the quickstart: how to verify each story by hand in the studio (Copy at 1.0, a no-answer download, a form-edit round trip, an Adapt with a typing table) · `specs/095-keyboard-docs-templates/quickstart.md`
 
 **⟶ Wait for Wave 1, then:**
 
-- [ ] **T032** Validate against the Success Criteria. Run `pnpm build`, `pnpm lint` (ESLint, depcruise, the i18n tiers), `pnpm -r test`, and the `copy-version` Playwright spec. Check SC-001 to SC-006 against T012, T013, T018, T023, T024 and T029. Check SC-007 with the existing draft-persistence tests (no `HelpDocsAnswers` field changed). Confirm that no keyboard outside [docs/keyboard-index.md](../../docs/keyboard-index.md) was referenced (the fixtures are inline) · (no file)
+- [x] **T032** Validate against the Success Criteria. Run `pnpm build`, `pnpm lint` (ESLint, depcruise, the i18n tiers), `pnpm -r test`, and the `copy-version` Playwright spec. Check SC-001 to SC-006 against T012, T013, T018, T023, T024 and T029. Check SC-007 with the existing draft-persistence tests (no `HelpDocsAnswers` field changed). Confirm that no keyboard outside [docs/keyboard-index.md](../../docs/keyboard-index.md) was referenced (the fixtures are inline) · (no file)
 
 ## Dependencies & Execution Order
 
