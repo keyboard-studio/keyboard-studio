@@ -8,7 +8,8 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { CompilerDiagnostic } from "@keyboard-studio/contracts";
-import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
+import { plainDiagnosticMessage } from "../lib/plainDiagnosticMessage.ts";
+import { BG_CARD, CARD_BORDER, FONT, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
 
 // ---------------------------------------------------------------------------
 // Severity label colours
@@ -27,7 +28,7 @@ export const SEVERITY_COLOR: Record<string, string> = {
 const WARNING_GLYPH = "⚠";
 
 export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnostic[] }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   if (diagnostics.length === 0) {
     return (
       <div
@@ -86,8 +87,32 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
         role="list"
       >
         {diagnostics.map((d, i) => {
-          const location =
-            d.location !== undefined ? `${d.location.file}:${d.location.line} — ` : "";
+          const plain = plainDiagnosticMessage(d, i18n);
+          const plainBlock = (
+            <span style={{ fontFamily: FONT }}>
+              <span style={{ display: "block" }}>{plain.whatHappened}</span>
+              <span
+                style={{ display: "block", color: "var(--app-text-subtle)", marginTop: 2 }}
+              >
+                {plain.whatToTry}
+              </span>
+              <details style={{ marginTop: 4 }}>
+                <summary style={{ cursor: "pointer", color: "var(--app-text-subtle)" }}>
+                  <Trans id="diagnostics.plain.technicalDetails">Technical details</Trans>
+                </summary>
+                <span
+                  style={{
+                    display: "block",
+                    fontFamily: FONT_MONO,
+                    marginTop: 4,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {plain.technicalDetail}
+                </span>
+              </details>
+            </span>
+          );
           if (d.severity === "warning") {
             // Calm, low-alarm treatment: no colour box, no border — just the
             // panel's own default foreground text with a leading glyph.
@@ -116,8 +141,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
                     message: `Severity: ${d.severity}`,
                   })}
                 >
-                  <Trans id="common.warningLabel">Warning:</Trans> {location}
-                  {d.message}
+                  <Trans id="common.warningLabel">Warning:</Trans> {plainBlock}
                 </span>
               </li>
             );
@@ -148,10 +172,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
               >
                 [{d.severity.toUpperCase()}]
               </span>
-              <span style={{ color: TEXT_MAIN }}>
-                {location}
-                {d.message}
-              </span>
+              <span style={{ color: TEXT_MAIN }}>{plainBlock}</span>
             </li>
           );
         })}
