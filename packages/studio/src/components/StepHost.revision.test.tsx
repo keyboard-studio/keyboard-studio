@@ -75,6 +75,7 @@ vi.mock("../steps/manifest.ts", async () => {
 
 import { StepHost } from "./StepHost.tsx";
 import { StepNavCluster } from "./StepNavCluster.tsx";
+import { performManifestBack } from "../stores/surveySessionStore.ts";
 
 const deps: ReducerDeps = {
   lockDesktop: vi.fn(),
@@ -205,6 +206,22 @@ describe("full-layout step opened from Output", () => {
     view.unmount();
     expect(useStepNavStore.getState().revision).toBeNull();
   });
+
+  it("Back off the targeted full-layout step drops the footer actions and shows the slim banner (#2050)", () => {
+    seedInstantiatedWorkingCopy([]);
+    arriveAt("rules", { route: "output" });
+    renderHostWithFooter("rules");
+    expect(screen.getByTestId("step-revision-back-to-testing")).toBeTruthy();
+
+    act(() => {
+      useSurveySessionStore.setState({ history: ["punctuation"] });
+      performManifestBack("rules");
+    });
+
+    expect(useStepNavStore.getState().revision).toBeNull();
+    expect(screen.getByTestId("step-deep-link-return-banner").textContent).toMatch(/You left the step/);
+    expect(screen.getByTestId("step-revision-discard")).toBeTruthy();
+  });
 });
 
 describe("pane step opened from Output", () => {
@@ -234,5 +251,68 @@ describe("pane step opened from Output", () => {
 
     fireEvent.click(screen.getByTestId("pane-complete"));
     expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+  });
+
+  it("says plainly on the banner that leaving the step keeps the changes (#2050)", () => {
+    seedInstantiatedWorkingCopy([]);
+    arriveAt("punctuation", { route: "output" });
+    renderHostWithFooter("punctuation");
+
+    expect(screen.getByTestId("step-deep-link-return-banner").textContent).toMatch(
+      /If you leave this step, your changes are kept/,
+    );
+  });
+
+  it("Back off the targeted step swaps the banner for a slim one that keeps Discard reachable (#2050)", () => {
+    seedInstantiatedWorkingCopy([]);
+    arriveAt("punctuation", { route: "output" });
+    renderHostWithFooter("punctuation");
+
+    act(() => {
+      useSurveySessionStore.setState({ history: ["identity"] });
+      performManifestBack("punctuation");
+    });
+
+    const banner = screen.getByTestId("step-deep-link-return-banner");
+    expect(banner.textContent).toMatch(/You left the step you opened from Output/);
+    expect(banner.textContent).toMatch(/your changes were kept/);
+    expect(screen.queryByTestId("step-deep-link-continue-instead")).toBeNull();
+    expect(screen.getByTestId("step-revision-discard").textContent).toBe("Discard changes and go back");
+  });
+
+  it("discarding from the slim banner restores the arrival snapshot and returns to Output (#2050)", () => {
+    seedInstantiatedWorkingCopy([]);
+    useWorkingCopyStore.getState().setTouchLayoutJson('{"before":true}');
+    arriveAt("punctuation", { route: "output" });
+    renderHostWithFooter("punctuation");
+    const entriesBefore = useDecisionLogStore.getState().record.entries.length;
+
+    act(() => {
+      useWorkingCopyStore.getState().setTouchLayoutJson('{"after":true}');
+    });
+    act(() => {
+      useSurveySessionStore.setState({ history: ["identity"] });
+      performManifestBack("punctuation");
+    });
+
+    fireEvent.click(screen.getByTestId("step-revision-discard"));
+
+    expect(useWorkingCopyStore.getState().touchLayoutJson).toBe('{"before":true}');
+    expect(useDecisionLogStore.getState().record.entries).toHaveLength(entriesBefore);
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+  });
+
+  it("a decision-trail arrival shows no slim banner off the targeted step (#2050)", () => {
+    seedInstantiatedWorkingCopy([]);
+    arriveAt("punctuation", { route: "trail" });
+    renderHostWithFooter("punctuation");
+
+    act(() => {
+      useSurveySessionStore.setState({ history: ["identity"] });
+      performManifestBack("punctuation");
+    });
+
+    expect(screen.queryByTestId("step-deep-link-return-banner")).toBeNull();
+    expect(screen.queryByTestId("step-revision-discard")).toBeNull();
   });
 });

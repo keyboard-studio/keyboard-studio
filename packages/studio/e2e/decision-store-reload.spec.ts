@@ -13,7 +13,7 @@
  *   2. Reload the page: the draft is restored (the app resumes the project
  *      at the step the walk reached — the characters step's prefill
  *      confirmation, "Confirm the basics", whose forward control is
- *      `prefill-confirm`, not a SurveyRunner `survey-advance`) instead of
+ *      `prefill-continue`, not a SurveyRunner `survey-advance`) instead of
  *      restarting at identity, and the decisions are unchanged.
  *
  * The store-level half of SC-001 (records restored with value + provenance
@@ -61,7 +61,7 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
 
   // The walk now sits on the characters step's prefill confirmation — the
   // surface the reload below must return to.
-  await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 15_000 });
 
   // The autosave lands shortly after the project_name completion.
   await page.waitForTimeout(1_500);
@@ -92,7 +92,7 @@ test("spec 088 SC-001: answers survive a reload, stored only in decisions", asyn
   // The restored draft resumes the project at the same surface (the
   // prefill confirmation, showing the restored base keyboard), and the
   // draft on disk still carries the same decisions.
-  await expect(page.getByTestId("prefill-confirm")).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByTestId("prefill-continue")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText("French Basic (basic_kbdfr)")).toBeVisible();
   const after = await readSavedDraft(page);
   expect(after.decisions?.["language-code"]?.value).toBe("fr");

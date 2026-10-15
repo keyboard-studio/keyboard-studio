@@ -11,10 +11,10 @@ import { loadExemplars, scriptBlockChars } from "./cldr.js";
 /**
  * Injectable LLM backend — returns raw response text for a given prompt.
  *
- * Node-side composition: wrap the @keyboard-studio/llm client as
- * `(p) => createLLMClient(config).complete(p)`. The engine package must NOT
- * import @keyboard-studio/llm directly — that package is Node.js-only and
- * would break browser bundling of the engine.
+ * Node-side composition: wrap any Node-side LLM client as
+ * `(p) => client.complete(p)` and inject it here. The engine package must
+ * NOT import an LLM client directly — that would be Node.js-only and would
+ * break browser bundling of the engine.
  */
 export type LLMCompleter = (prompt: string) => Promise<string>;
 

@@ -111,14 +111,14 @@ describe("stepNavStore — revision channel (spec 094)", () => {
 
   it("holds one revision, separate from the step's own entry", () => {
     useStepNavStore.getState().publish("rules", "editor", spec());
-    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop, renameForward: true });
     const s = useStepNavStore.getState();
     expect(s.revision?.stepId).toBe("rules");
     expect(s.entries["rules"]?.owner).toBe("editor");
   });
 
   it("clearRevision only clears the named step's revision", () => {
-    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop, renameForward: true });
     useStepNavStore.getState().clearRevision("touch");
     expect(useStepNavStore.getState().revision?.stepId).toBe("rules");
     useStepNavStore.getState().clearRevision("rules");
@@ -126,11 +126,19 @@ describe("stepNavStore — revision channel (spec 094)", () => {
   });
 
   it("re-publishing the same revision is a no-op; reset clears it", () => {
-    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop, renameForward: true });
     const before = useStepNavStore.getState();
-    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop });
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop, renameForward: true });
     expect(useStepNavStore.getState()).toBe(before);
     useStepNavStore.getState().reset();
     expect(useStepNavStore.getState().revision).toBeNull();
+  });
+
+  it("a changed renameForward flag re-publishes (#2050)", () => {
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop, renameForward: true });
+    const before = useStepNavStore.getState();
+    useStepNavStore.getState().publishRevision({ stepId: "rules", onDiscard: noop, renameForward: false });
+    expect(useStepNavStore.getState()).not.toBe(before);
+    expect(useStepNavStore.getState().revision?.renameForward).toBe(false);
   });
 });

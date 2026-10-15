@@ -392,6 +392,7 @@ describe('invisibleCharLabel — spec 075 additions', () => {
   });
 
   it('falls back to a FORMAT CHARACTER label for a Cf character the map does not name', () => {
-    expect(invisibleCharLabel('\u2061')).toBe('FORMAT CHARACTER (U+2061)');
+    // U+206A is deprecated and deliberately excluded from the gallery map.
+    expect(invisibleCharLabel('\u206A')).toBe('FORMAT CHARACTER (U+206A)');
   });
 });

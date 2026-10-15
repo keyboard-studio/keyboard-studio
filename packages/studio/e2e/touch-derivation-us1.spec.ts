@@ -64,6 +64,7 @@ import {
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
+  driveDeadkeysStep,
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
@@ -174,7 +175,9 @@ async function carveCharacters(page: Page, chars: readonly string[]): Promise<vo
   await expect(survivor).toHaveAttribute("aria-pressed", "false");
 
   await page.getByTestId("carve-continue").click();
-  // Spec 082: the rules step sits between carve and mechanisms.
+  // Spec 083: the deadkeys step sits between carve and rules — walk through it.
+  await driveDeadkeysStep(page);
+  // Spec 082: the rules step sits between deadkeys and mechanisms.
   await page.getByTestId("rules-continue").click();
 }
 

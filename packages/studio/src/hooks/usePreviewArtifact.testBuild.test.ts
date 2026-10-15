@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { i18nHookWrapper } from "../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -67,7 +68,7 @@ afterEach(() => {
 
 async function mount() {
   const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-  return renderHook(() => usePreviewArtifact());
+  return renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 }
 
 describe("usePreviewArtifact.handleMakeTestBuild", () => {
@@ -135,5 +136,18 @@ describe("usePreviewArtifact.handleMakeTestBuild", () => {
       await first;
     });
     expect(useTestingStore.getState().builds).toHaveLength(1);
+  });
+
+  it("reports the frozen refusal through the localized catalog (#2050)", async () => {
+    useTestingStore.getState().markFrozen();
+    const { result } = await mount();
+    let build: unknown = "unset";
+    await act(async () => {
+      build = await result.current.handleMakeTestBuild();
+    });
+    expect(build).toBeNull();
+    expect(result.current.kmpError).toBe(
+      "This project is frozen; test builds are no longer available.",
+    );
   });
 });

@@ -125,3 +125,26 @@ export const GetDraftListResponseSchema = z.object({
   drafts: z.array(DraftMetaSchema),
 });
 export type GetDraftListResponse = z.infer<typeof GetDraftListResponseSchema>;
+
+/**
+ * GET /drafts/export — the DSAR self-service export (spec 097): the
+ * caller's server-held identity key plus every draft, payload and
+ * metadata together. `draft` is null only when a metadata row exists
+ * whose payload could not be read (a half-state the export names rather
+ * than hides).
+ */
+export const ExportDraftsResponseSchema = z.object({
+  exportedAt: z.string(),
+  identity: z.object({
+    githubUserId: z.number().int(),
+    login: z.string(),
+  }),
+  drafts: z.array(z.object({ meta: DraftMetaSchema, draft: z.unknown().nullable() })),
+});
+export type ExportDraftsResponse = z.infer<typeof ExportDraftsResponseSchema>;
+
+/** DELETE /drafts?all=true — the erasure count (spec 098). */
+export const DeleteAllDraftsResponseSchema = z.object({
+  deleted: z.number().int().nonnegative(),
+});
+export type DeleteAllDraftsResponse = z.infer<typeof DeleteAllDraftsResponseSchema>;

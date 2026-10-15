@@ -268,15 +268,6 @@ export type KeyEditOperation =
   | SetSubKeyOp
   | RemoveSubKeyOp;
 
-/**
- * True when a `scope: "family"` fan-out is a programming error for this
- * operation. Stated once here so both appliers report it identically rather
- * than each deciding for itself — see {@link MoveKeyOp}'s doc for why a move is
- * the one kind with no shared referent across a layer family.
- */
-export function rejectsFamilyScope(op: KeyEditOperation): boolean {
-  return op.kind === "move";
-}
 
 // ---------------------------------------------------------------------------
 // Declared output (spec 063 T060 / FR-033b)

@@ -11,7 +11,7 @@
 // traversal target and the hash are set together, or neither is. That is why
 // the resolve step runs to completion before anything is written.
 
-import { formatLocation, locationsEqual, type Location } from "./location.ts";
+import { formatLocation, type Location } from "./location.ts";
 import { navigateTo } from "./navigate.ts";
 import { resolveLocation, type ResolveContext, type UnreachableReason } from "./resolveLocation.ts";
 import { manifest, screenGates } from "../steps/manifest.ts";
@@ -244,11 +244,3 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
     : { kind: "degraded", at: target, reason: resolution.reason };
 }
 
-/**
- * Whether a jump to `loc` would land the author exactly where they already
- * are. The current-position dot uses this to refuse to be a jump target to
- * itself (FR-061) without duplicating the resolver's rules.
- */
-export function isCurrentLocation(loc: Location, current: Location): boolean {
-  return locationsEqual(loc, current);
-}

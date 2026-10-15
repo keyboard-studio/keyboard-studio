@@ -16,8 +16,10 @@
  * Usage:
  *   node scripts/codegen-windows-layouts.mjs [--keyboards <path-to-keyboards-checkout>]
  *
- * The output is COMMITTED (CI has no corpus) and this script is NOT in the
- * prebuild chain. Re-run after a corpus bump.
+ * The output is COMMITTED (CI has no corpus). This script is in the root
+ * prebuild chain for local runs against a full corpus checkout; CI and
+ * Vercel do not invoke prebuild, so the committed output is what ships.
+ * Re-run after a corpus bump.
  *
  * Output:
  *   packages/studio/src/lib/generated/windowsLayouts.generated.json

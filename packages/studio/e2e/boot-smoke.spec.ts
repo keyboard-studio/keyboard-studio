@@ -40,7 +40,19 @@ for (const { name, url, axe, seed } of ROOT_RENDERS) {
     }
     await page.goto(url);
 
-    await expect(page.locator("#root")).not.toBeEmpty();
+    // 30s paint budget per paint (was: the 5s expect default). The OAuth
+    // callbacks boot TWICE — the callback screen paints, the bogus-code
+    // exchange fails, and location.replace() lands a full second app boot —
+    // so one window cannot span both paints (#2095).
+    await expect(page.locator("#root")).not.toBeEmpty({ timeout: 30_000 });
+
+    if (url.includes("/oauth/")) {
+      await page.waitForURL((u) => !u.pathname.includes("/oauth/"), {
+        timeout: 30_000,
+      });
+      await expect(page.locator("#root")).not.toBeEmpty({ timeout: 30_000 });
+    }
+
     expect(pageErrors).toEqual([]);
 
     // Accessibility gate (spec 056 FR-003): every production screen this

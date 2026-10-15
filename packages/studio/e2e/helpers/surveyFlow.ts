@@ -403,11 +403,11 @@ export async function acceptProjectName(page: Page): Promise<void> {
  * Confirm the prefill summary and advance to Phase B.
  *
  * The prefill confirmation screen shows derived values (target script,
- * base keyboard, language). Confirm by clicking the prefill-confirm button.
+ * base keyboard, language). Confirm by clicking the prefill-continue button.
  */
 export async function confirmPrefill(page: Page): Promise<void> {
-  await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 15_000 });
-  await page.click('[data-testid="prefill-confirm"]');
+  await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="prefill-continue"]');
 }
 
 /**
@@ -426,19 +426,19 @@ export async function buildOneCharacterList(
   charToAdd: string = "é",
 ): Promise<void> {
   // IntroChooser — click Continue
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="charlist-continue"]');
 
   // BuildListView — type a character and add it
   await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
   await page.fill('[aria-label="Character to add"]', charToAdd);
-  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByTestId("charlist-add").click();
 
   // Click Done
-  await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', {
+  await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', {
     timeout: 5_000,
   });
-  await page.click('[data-testid="phase-b-done"]');
+  await page.click('[data-testid="charlist-done"]');
 
   // The marks series (spec 071) sits immediately after alphabet confirmation,
   // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.
@@ -625,6 +625,39 @@ export async function carveCharacter(page: Page, ch: string): Promise<void> {
 }
 
 /**
+ * Deadkeys step (spec 083) — sits on the spine between carve and rules
+ * (steps/manifest.ts derived order: carve → deadkeys → rules →
+ * mechanisms). The walks define no deadkeys, so this is a pass-through:
+ * wait for the step, then click its Continue.
+ *
+ * Race-proof by construction, like driveConvenienceStep / driveMarksSeries
+ * above: races the step's own control against the landmark that follows
+ * it (rules-continue). The step renders unconditionally for every fixture
+ * walked so far (verified live, #2053 — bj_cree_woods, bambara,
+ * pid_piaroa), but if a future gate ever completes it without a screen
+ * for some fixture, the walk must carry on to rules rather than park here
+ * until the test timeout — the exact failure mode #2053 fixed, where
+ * specs that clicked rules-continue directly after carve sat on this
+ * step for the full 240s. Only clicks Continue if the deadkeys screen is
+ * the one that actually showed.
+ */
+export async function driveDeadkeysStep(page: Page): Promise<void> {
+  const deadkeysContinue = page.getByTestId("deadkeys-continue");
+  const rulesContinue = page.getByTestId("rules-continue");
+  await Promise.race([
+    deadkeysContinue.waitFor({ state: "visible", timeout: 30_000 }),
+    rulesContinue.waitFor({ state: "visible", timeout: 30_000 }),
+  ]).catch(() => {
+    // Neither landmark showed within the combined window — fall through
+    // to the direct check below; a genuinely stuck walk still fails
+    // loudly at the caller's own subsequent wait for rules-continue.
+  });
+  if (await deadkeysContinue.isVisible().catch(() => false)) {
+    await deadkeysContinue.click();
+  }
+}
+
+/**
  * Mechanisms step — handle the empty-diff exit when no new characters
  * remain after base-inventory comparison.
  *
@@ -693,7 +726,7 @@ export interface MechanismPlacement {
  *     same loop, already owns — the synthetic content string embeds the
  *     character's own codepoint, so no two iterations can ever share a
  *     (content, indicator) pair.
- *   - advances via "Next character"/"Done" until the gallery completes.
+ *   - advances via "Next character"/"Continue" until the gallery completes.
  *
  * Does not name or return which character was which — callers that need to
  * prove a SPECIFIC placed letter landed correctly do so from the emitted
@@ -730,7 +763,7 @@ export async function driveMechanismsGallery(
   // the per-character forward button becoming visible resolves the race;
   // then read which one is ACTUALLY present.
   const emptyNotice = page.getByText("No new characters to add.");
-  const forwardButton = page.getByRole("button", { name: /^(Next character|Done)$/ });
+  const forwardButton = page.getByRole("button", { name: /^(Next character|Continue)$/ });
   const applyButton = page.getByRole("button", { name: /^Apply method for / });
   await Promise.race([
     waitVisible(emptyNotice, 15_000),
@@ -826,7 +859,7 @@ async function assignToKey(page: Page, placement: MechanismPlacement): Promise<v
  * "Cannot finish yet" gate forever. Instead this helper actually configures
  * the default "Long-press on a key" method (host key select, aria-label
  * "Host key for long-press") + Apply for every character, then advances via
- * "touch-continue" (which doubles as "Next character"/"Done").
+ * "touch-continue" (which doubles as "Next character"/"Continue").
  *
  * It also has a one-time intro splash ("Start the touch gallery"), dismissed
  * first.

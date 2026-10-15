@@ -53,6 +53,7 @@ import { navigateTo } from "../lib/navigate.ts";
 import { switchActiveProject } from "../lib/switchActiveProject.ts";
 import { BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../lib/galleryTheme.ts";
 import { SUCCESS_ACCENT } from "../ui/theme.ts";
+import { PrivacyLink } from "./PrivacyScreen.tsx";
 import { ErrorText } from "../ui/ErrorText.tsx";
 
 // ---------------------------------------------------------------------------
@@ -422,6 +423,20 @@ export function MyKeyboardsList() {
       <h2 style={headingStyle}>
         <Trans id="profile.myKeyboards.heading">My keyboards</Trans>
       </h2>
+
+      {/* Spec 095 FR-003: the privacy link lives with the server-drafts
+          surface — the profile page is where an author manages what the
+          server holds, and there is no separate first-save confirmation
+          dialog to attach it to (cloud sync saves silently in the
+          background), so this header link is that moment's surface. */}
+      {isSignedIn && (
+        <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM }}>
+          <Trans id="profile.myKeyboards.privacyLead">
+            Signed-in drafts are saved on our servers.
+          </Trans>{" "}
+          <PrivacyLink />
+        </p>
+      )}
 
       {loading && (
         <p role="status" aria-live="polite" style={statusLineStyle} data-testid="my-keyboards-loading">

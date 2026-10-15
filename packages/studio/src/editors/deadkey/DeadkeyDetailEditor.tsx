@@ -102,7 +102,7 @@ const btnStyle: CSSProperties = {
 
 const dangerBtnStyle: CSSProperties = {
   ...btnStyle,
-  border: `1px solid var(--sil-orange-dark, ${BORDER})`,
+  border: `1px solid var(--app-warning-text, ${BORDER})`,
   color: "var(--app-warning-text)",
 };
 

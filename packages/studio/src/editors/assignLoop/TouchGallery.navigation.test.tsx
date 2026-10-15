@@ -166,9 +166,9 @@ describe("TouchGallery — back navigation", () => {
       expectCurrentChar("月");
     });
 
-    // The last character's forward button already reads "Done" (not yet
+    // The last character's forward button already reads "Continue" (not yet
     // configured for "月", so it starts disabled).
-    const doneBtn = screen.getByRole("button", { name: "Done" });
+    const doneBtn = screen.getByRole("button", { name: "Continue" });
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
 
     // --- Back from "月" (idx 2) lands on "日" (idx 1) — configured, not skipped. ---
@@ -220,7 +220,7 @@ describe("TouchGallery — back navigation", () => {
     await changeSelectMenu(screen.getByLabelText(/Host key for long-press/i), "K_C");
     fireEvent.click(screen.getByRole("button", { name: /Apply touch method for/i }));
     await waitFor(() => {
-      const finishBtn = screen.getByRole("button", { name: "Done" });
+      const finishBtn = screen.getByRole("button", { name: "Continue" });
       expect((finishBtn as HTMLButtonElement).disabled).toBe(false);
       fireEvent.click(finishBtn);
     });
