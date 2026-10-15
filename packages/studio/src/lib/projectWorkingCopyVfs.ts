@@ -1013,15 +1013,10 @@ export function projectWorkingCopyVfs(
     if (kmnText !== undefined) {
       try {
         const parsed = parseKmn(kmnText, keyboardId);
-        // Preserve the base keyboard's release version on the copy path. Without
-        // this, resetIdentity() defaults &KEYBOARDVERSION to "1.0" while the .kps
-        // <Version> and the zip filename both keep the base version (serialize-
-        // WorkingCopy uses startIr.header.version) — leaving the three disagreeing
-        // inside one package. An explicit identity.version still wins; an empty
-        // base version falls through so resetIdentity applies its "1.0" default
-        // (matching serializeWorkingCopy's `|| "1.0"`).
-        const copyVersion =
-          identity?.version ?? (parsed.ir.header.version?.trim() || undefined);
+        // The release version is the overlay's (serializeWorkingCopy always sets
+        // it to the shipped version, spec 095 FR-009) or resetIdentity's "1.0"
+        // default; the start keyboard's own version is never carried over.
+        const overlayVersion = identity?.version;
         resetIdentity(parsed.ir, {
           keyboardId: targetKeyboardId,
           displayName:
@@ -1029,7 +1024,7 @@ export function projectWorkingCopyVfs(
           ...(identity?.bcp47 !== undefined && identity.bcp47 !== ""
             ? { bcp47: [identity.bcp47] }
             : {}),
-          ...(copyVersion !== undefined ? { version: copyVersion } : {}),
+          ...(overlayVersion !== undefined ? { version: overlayVersion } : {}),
           ...(identity?.copyright !== undefined
             ? { copyright: identity.copyright }
             : {}),

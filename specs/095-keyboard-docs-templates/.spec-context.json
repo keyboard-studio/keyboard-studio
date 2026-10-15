@@ -163,6 +163,54 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-10-15T02:17:07.649Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:20:43.785Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:20:44.118Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:22:54.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:24:21.091Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:24:21.419Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-10-15T02:32:25.827Z"
     }
   ],
   "telemetryInstanceId": "8782d5f1-b6c3-42a7-aac0-44a5387009cf",
@@ -446,7 +494,7 @@
       ]
     }
   },
-  "currentTask": "T011",
+  "currentTask": "T017",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -529,6 +577,49 @@
       "did": "Docs-lint history render passes lineage: adapted on Track 2, created with start id and raw version on Track 1",
       "files": [
         "packages/studio/src/hooks/useDocumentationFindings.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Version table covers both modes, 1/2/3-part, invalid and empty sources; Copy publishes 1.0 and test builds 0.N",
+      "files": [
+        "packages/engine/src/output/output-version.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "resolvePublishVersion returns 1.0 for new-from-base; resolveTestBuildVersion gives 0.N for new-from-base before the invalid-version check",
+      "files": [
+        "packages/engine/src/output/output-version.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Package-consistency cases (real projection): Copy from 2.3 is 1.0 in KEYBOARDVERSION, kps Version, result version and HISTORY heading for renamed and unrenamed ids; FileVersion 7.0 kept; Created-from lineage; Adapt unchanged at 2.4",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Removed copy-path start-version preservation in the id-rename pass; resetIdentity takes the overlay version or its 1.0 default",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "publishVersion from resolvePublishVersion on both tracks; shipped version always on the identity overlay, result version and HISTORY heading; created/adapted lineage passed to renderHistoryMd",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Playwright E2E: Copy of basic_kbdfr (1.1) shows test build 0.1 on Output and downloads <id>-1.0.zip with 1.0 in kmn, kps and HISTORY plus Created-from lineage; passed locally",
+      "files": [
+        "packages/studio/e2e/copy-version.spec.ts"
       ]
     }
   }

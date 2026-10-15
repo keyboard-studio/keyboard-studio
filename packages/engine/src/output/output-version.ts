@@ -9,10 +9,15 @@
 // release upgrades a tester's install) and, on an adaptation, strictly above
 // the version being replaced. Keyman's package compiler allows at most three
 // parts, so a three-part adapt base has no room between a.b.c and a.b.(c+1):
-// once it has test builds it publishes at a.(b+1).0 instead. Every other case
-// publishes exactly as it did before test builds existed.
+// once it has test builds it publishes at a.(b+1).0 instead. A Copy is a new
+// keyboard, so it always publishes at 1.0 and its test builds at 0.N (spec 095
+// FR-004/FR-007/FR-008). Every adapt case publishes exactly as it did before
+// test builds existed.
 
 import { bumpKeyboardVersion } from "./adapt-staging.js";
+
+/** The version a new keyboard (a Copy) publishes at, whatever it was copied from (spec 095 FR-004). */
+const NEW_KEYBOARD_VERSION = "1.0";
 
 export type OutputVersionMode = "new-from-base" | "adapt-existing";
 
@@ -29,7 +34,7 @@ function plainSegments(version: string): bigint[] | null {
 /**
  * The version a download or submission ships at.
  *
- * - Copy (`new-from-base`): the copied keyboard's own version, unchanged.
+ * - Copy (`new-from-base`): always `1.0`; the copied keyboard's version is lineage, not this one's.
  * - Adapt with no test builds: `bumpKeyboardVersion`, exactly as before.
  * - Adapt with test builds and a plain three-part base a.b.c: a.(b+1).0.
  */
@@ -39,7 +44,7 @@ export function resolvePublishVersion(input: {
   hasTestBuilds: boolean;
 }): string {
   const { mode, rawVersion, hasTestBuilds } = input;
-  if (mode !== "adapt-existing") return rawVersion;
+  if (mode !== "adapt-existing") return NEW_KEYBOARD_VERSION;
   if (hasTestBuilds) {
     const segments = plainSegments(rawVersion);
     if (segments !== null && segments.length === 3) {
@@ -59,10 +64,9 @@ export type TestBuildVersionResult =
  *
  * - Adapt, V of one or two parts: V.N.
  * - Adapt, V = a.b.c: a.b.(c+N).
- * - Copy, P's first segment >= 1: 0.N.
- * - Copy, P = 0.b[.c] with b >= 1: 0.(b-1).N.
- * - Copy, P = 0, 0.0 or 0.0.x, or any version that is not plain dotted
- *   integers of at most three parts: unsupported.
+ * - Copy: P is always 1.0, so 0.N, whatever (even invalid) the source version.
+ * - Adapt, any version that is not plain dotted integers of at most three
+ *   parts: unsupported.
  */
 export function resolveTestBuildVersion(input: {
   mode: OutputVersionMode;
@@ -74,18 +78,14 @@ export function resolveTestBuildVersion(input: {
     throw new RangeError(`test build number must be an integer >= 1, got ${buildNumber}`);
   }
   const n = BigInt(buildNumber);
+  // A Copy publishes at P = 1.0 regardless of the source, so the source
+  // version never enters the answer and cannot make it unsupported.
+  if (mode !== "adapt-existing") return { ok: true, version: `0.${n}` };
+
   const segments = plainSegments(rawVersion);
   if (segments === null) return { ok: false, reason: "versionUnsupported" };
-
-  if (mode === "adapt-existing") {
-    if (segments.length === 3) {
-      return { ok: true, version: `${segments[0]}.${segments[1]}.${segments[2]! + n}` };
-    }
-    return { ok: true, version: `${segments.join(".")}.${n}` };
+  if (segments.length === 3) {
+    return { ok: true, version: `${segments[0]}.${segments[1]}.${segments[2]! + n}` };
   }
-
-  const [major, minor] = segments as [bigint, bigint | undefined];
-  if (major >= 1n) return { ok: true, version: `0.${n}` };
-  if (minor !== undefined && minor >= 1n) return { ok: true, version: `0.${minor - 1n}.${n}` };
-  return { ok: false, reason: "versionUnsupported" };
+  return { ok: true, version: `${segments.join(".")}.${n}` };
 }

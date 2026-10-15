@@ -215,7 +215,7 @@ describe("early production (Track 1, nothing answered yet)", () => {
   it("HISTORY.md is the stub under the keyboard's version, before any proposal decision", async () => {
     instantiate();
     const projected = await projectWorkingCopyForOutput();
-    expect(readVfsText(projected!.vfs, "HISTORY.md")).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+    expect(readVfsText(projected!.vfs, "HISTORY.md")).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Created from basic_kbdus v1\.0 via keyboard-studio\.\n\* Initial release\.\n$/);
   });
 
   it("a dismissed proposal leaves the same stub in place (FR-011)", async () => {
@@ -227,7 +227,7 @@ describe("early production (Track 1, nothing answered yet)", () => {
     });
     const projected = await projectWorkingCopyForOutput();
     const history = readVfsText(projected!.vfs, "HISTORY.md")!;
-    expect(history).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+    expect(history).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Created from basic_kbdus v1\.0 via keyboard-studio\.\n\* Initial release\.\n$/);
     expect(history).not.toContain("Added 3 characters");
   });
 

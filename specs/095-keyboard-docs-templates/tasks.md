@@ -58,20 +58,20 @@ Files: `packages/engine/src/output/output-version.ts`, `packages/engine/src/outp
 
 **Wave 1: independent (different files):**
 
-- [ ] **T012** [P] [US1] Extend the version table in `output-version.test.ts` to cover both modes, one-, two- and three-part sources, with and without test builds, and an invalid or empty source. `new-from-base` always publishes `"1.0"`, test build N is `{ ok: true, version: "0.N" }` even for an invalid source, and every `adapt-existing` row is unchanged (SC-001, FR-004, FR-007, FR-008) · `packages/engine/src/output/output-version.test.ts`
-- [ ] **T013** [P] [US1] Add package-consistency cases. Copy from a 2.3 start keyboard gives `1.0` in `&KEYBOARDVERSION`, the `.kps` `<Version>`, the result `version` (file name) and the newest HISTORY heading, for both a renamed and an unrenamed id. The `.kps` file-format version is unchanged. Copy HISTORY contains "Created from <id> v2.3 via keyboard-studio.". An Adapt case matches today's output (SC-002, FR-009, FR-011) · `packages/studio/src/lib/serializeWorkingCopy.test.ts`
+- [x] **T012** [P] [US1] Extend the version table in `output-version.test.ts` to cover both modes, one-, two- and three-part sources, with and without test builds, and an invalid or empty source. `new-from-base` always publishes `"1.0"`, test build N is `{ ok: true, version: "0.N" }` even for an invalid source, and every `adapt-existing` row is unchanged (SC-001, FR-004, FR-007, FR-008) · `packages/engine/src/output/output-version.test.ts`
+- [x] **T013** [P] [US1] Add package-consistency cases. Copy from a 2.3 start keyboard gives `1.0` in `&KEYBOARDVERSION`, the `.kps` `<Version>`, the result `version` (file name) and the newest HISTORY heading, for both a renamed and an unrenamed id. The `.kps` file-format version is unchanged. Copy HISTORY contains "Created from <id> v2.3 via keyboard-studio.". An Adapt case matches today's output (SC-002, FR-009, FR-011) · `packages/studio/src/lib/serializeWorkingCopy.test.ts`
 
 ### Implementation
 
 **⟶ Wait for the tests, then (Wave 2, independent):**
 
-- [ ] **T014** [P] [US1] `resolvePublishVersion`: `"new-from-base"` returns `"1.0"`. `resolveTestBuildVersion`: `"new-from-base"` computes against P = 1.0, with the invalid-version check moved after that branch. Signatures and `adapt-existing` are unchanged (FR-004, FR-007, FR-008, FR-010) · `packages/engine/src/output/output-version.ts`
-- [ ] **T015** [P] [US1] Delete the copy-path base-version preservation (`copyVersion`, step 4), so `resetIdentity` takes the overlay version or its `1.0` default · `packages/studio/src/lib/projectWorkingCopyVfs.ts`
-- [ ] **T016** [P] [US1] Make `publishVersion` come from `resolvePublishVersion` on both tracks. Always set `identityForProjection.version = shippedVersion`, not only for a test build. Pass `lineage`: `created` (start id plus raw version) on Track 1 and `adapted` on Track 2 (FR-001, FR-009, FR-011) · `packages/studio/src/lib/serializeWorkingCopy.ts`
+- [x] **T014** [P] [US1] `resolvePublishVersion`: `"new-from-base"` returns `"1.0"`. `resolveTestBuildVersion`: `"new-from-base"` computes against P = 1.0, with the invalid-version check moved after that branch. Signatures and `adapt-existing` are unchanged (FR-004, FR-007, FR-008, FR-010) · `packages/engine/src/output/output-version.ts`
+- [x] **T015** [P] [US1] Delete the copy-path base-version preservation (`copyVersion`, step 4), so `resetIdentity` takes the overlay version or its `1.0` default · `packages/studio/src/lib/projectWorkingCopyVfs.ts`
+- [x] **T016** [P] [US1] Make `publishVersion` come from `resolvePublishVersion` on both tracks. Always set `identityForProjection.version = shippedVersion`, not only for a test build. Pass `lineage`: `created` (start id plus raw version) on Track 1 and `adapted` on Track 2 (FR-001, FR-009, FR-011) · `packages/studio/src/lib/serializeWorkingCopy.ts`
 
 **⟶ Wait for Wave 2, then:**
 
-- [ ] **T017** [US1] Write a Playwright E2E. Pick a keyboard whose version is not 1.0 and choose Copy. The Output step's version and the download file name show 1.0 (Constitution Art. XI) · `packages/studio/e2e/copy-version.spec.ts`
+- [x] **T017** [US1] Write a Playwright E2E. Pick a keyboard whose version is not 1.0 and choose Copy. The Output step's version and the download file name show 1.0 (Constitution Art. XI) · `packages/studio/e2e/copy-version.spec.ts`
 
 **Checkpoint**: US1 is independently functional. T012, T013 and T017 pass.
 

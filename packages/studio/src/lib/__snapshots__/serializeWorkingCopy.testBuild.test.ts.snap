@@ -92,7 +92,8 @@ group(main) using keys
 
 exports[`(a) default projection unchanged (FR-010, SC-004) > copy track 1`] = `
 {
-  "HISTORY.md": "## 2.3 (2026-10-09)
+  "HISTORY.md": "## 1.0 (2026-10-09)
+* Created from basic_kbdus v2.3 via keyboard-studio.
 * Initial release.
 ",
   "LICENSE.md": "Copyright © 2026 Alice Example
@@ -139,7 +140,7 @@ Author prose.
 store(&NAME) 'Bambara'
 store(&TARGETS) 'any'
 store(&COPYRIGHT) 
-store(&KEYBOARDVERSION) '2.3'
+store(&KEYBOARDVERSION) '1.0'
 
 begin Unicode > use(main)
 
