@@ -62,6 +62,49 @@ textarea::placeholder {
   }
 }
 
+/* Skip link ---------------------------------------------------------------
+ * .ks-skip-link — the shell's "Skip to step navigation" anchor: visually
+ *                 hidden until it receives keyboard focus, then revealed
+ *                 at the top-left above the chrome. A class rather than
+ *                 inline styles because the reveal depends on `:focus`,
+ *                 which an inline style cannot express. The hidden state
+ *                 uses the standard clip technique; the focused state
+ *                 restores size and position and pairs the surface tokens
+ *                 with the shared focus-ring shadow (`.ks-focus-ring`,
+ *                 applied alongside this class). */
+.ks-skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ks-skip-link:focus,
+.ks-skip-link:focus-visible {
+  top: 8px;
+  left: 8px;
+  width: auto;
+  height: auto;
+  padding: 8px 14px;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  z-index: 300;
+  background: var(--app-surface);
+  color: var(--app-text);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  font-family: var(--app-font);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 /* Press feedback (pointer-down affordance) -----------------------------------
  * .ks-press — a press-and-release scale cue on pointer-down (`:active` fires
  *             on pointer-down, not release): the control dips to a 0.97 scale
