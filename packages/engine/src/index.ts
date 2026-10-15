@@ -7,6 +7,15 @@ export {
   runAllChecks,
 } from "./validator/index.js";
 
+// Layer A′ import-fidelity checks (I1–I6). Deliberately NOT part of the
+// runAllChecks path above: they run once at import time, outside the 300 ms
+// debounce cycle (see validator/index-import-fidelity.ts). The studio's live
+// import path invokes both stages when it parses a base keyboard.
+export {
+  runImportFidelityParseChecks,
+  runImportFidelityEmitChecks,
+} from "./validator/index-import-fidelity.js";
+
 // Issue #20 — base-browser GitHub API client.
 export { createStartBrowser } from "./start-browser/index.js";
 export type { StartBrowserConfig } from "./start-browser/index.js";
@@ -85,6 +94,13 @@ export {
   OPAQUE_REASONS,
 } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
+// Full import orchestrator (parse → recognize → Layer A′ fidelity → emit →
+// ImportReport) and its pure report assembler.
+export { importKeyboard, buildImportReport } from "./codec/index.js";
+export type {
+  ImportKeyboardResult,
+  BuildImportReportParams,
+} from "./codec/index.js";
 export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
 export type { ConformTouchLayoutResult } from "./codec/index.js";
 // The studio's working-copy fingerprint (spec 094 R7) hashes with the same helper.
