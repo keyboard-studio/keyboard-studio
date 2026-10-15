@@ -605,6 +605,9 @@ export async function projectWorkingCopyForOutput(
     answers: helpDocs,
     displayName: identity?.displayName ?? startKeyboard.displayName,
     ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
+    ...(identity?.languageName !== undefined && identity.languageName !== ""
+      ? { languageName: identity.languageName }
+      : {}),
     keyboardId: resolvedKeyboardId,
     platforms: parseTargetTokens(projectedKmnText),
     generated: docContent.slots,

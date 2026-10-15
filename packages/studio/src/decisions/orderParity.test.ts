@@ -86,12 +86,17 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
   // Frozen from the deleted content/flows/phase_f_helpdocs.modular.yaml. The
   // demoted pf_usage_tip_3/4/5 stay registered but are not flow members, so the
   // flow's module list (not the whole registry) is what orders.
+  // Deliberate reorder (2026-10-15, welcome element spec §2): pf_font_guidance
+  // left the opt-in battery for the core flow — it no longer requires
+  // help-more-detail, so the derived order places it right after the welcome
+  // paragraph, matching its routing.
   {
     flowId: "phase_f_helpdocs",
     phase: "F",
     registry: moduleRecord(flowModules.phase_f_helpdocs),
     order: [
       "pf_welcome_paragraph",
+      "pf_font_guidance",
       "pf_usage_tip_1",
       "pf_history_entry",
       "pf_history_entry_bullets",
@@ -100,7 +105,6 @@ const FROZEN_LEGACY_ORDERS: ReadonlyArray<{
       "pf_doc_language_other",
       "pf_doc_language_second",
       "pf_doc_language_second_other",
-      "pf_font_guidance",
       "pf_usage_tip_2",
       "pf_scope_variety",
       "pf_provenance_basis",

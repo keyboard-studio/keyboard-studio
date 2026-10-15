@@ -41,7 +41,10 @@ export const definition = {
   // static default is what a caller that supplies neither override still
   // sees — the value this module's own fixtures/tests exercise directly.
   required: true,
-  next: "pf_usage_tip_1",
+  // Routing: the font note (pf_font_guidance) follows the description — it is
+  // core intro matter (element spec §2), asked of every author, not part of
+  // the opt-in battery. Its own `next` converges back on pf_usage_tip_1.
+  next: "pf_font_guidance",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // ---------------------------------------------------------------------------

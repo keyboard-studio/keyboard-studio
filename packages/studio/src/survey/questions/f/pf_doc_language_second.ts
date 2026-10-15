@@ -27,7 +27,7 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'other'", goto: "pf_doc_language_second_other" },
-    { default: true, goto: "pf_font_guidance" },
+    { default: true, goto: "pf_usage_tip_2" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 

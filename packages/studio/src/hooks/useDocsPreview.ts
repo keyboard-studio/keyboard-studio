@@ -84,6 +84,9 @@ export function useDocsPreview(): DocsPreview {
       answers: helpDocs,
       displayName,
       ...(identity?.bcp47 !== undefined && identity.bcp47 !== "" ? { primaryBcp47: identity.bcp47 } : {}),
+      ...(identity?.languageName !== undefined && identity.languageName !== ""
+        ? { languageName: identity.languageName }
+        : {}),
       ...(startKeyboard !== null ? { keyboardId: resolveOutputKeyboardId(identity, startKeyboard) } : {}),
       platforms,
       ...(docContent !== null ? { generated: docContent.slots } : {}),

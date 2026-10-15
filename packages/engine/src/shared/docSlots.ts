@@ -17,6 +17,7 @@ export interface DocSlotModel {
   // identity
   displayName: string;
   keyboardId: string;
+  /** The intro language/script sentence, derived from the keyboard's identity (author-confirmed language name + the BCP47 script subtag); body form only. */
   languages: string;
   platforms: string;
   /** One source for every file that names a holder. */
@@ -27,6 +28,10 @@ export interface DocSlotModel {
   helpPageUrl: string;
   /** helpSiteHeader(displayName); help form only. */
   helpHeader: string;
+  /** The shared inline style (DOC_PAGE_STYLE); welcome and help forms only, so the two pages carry identical CSS. */
+  pageStyle: string;
+  /** Non-empty exactly on a fresh (non-inherited) render, so the shared body opens with the page's one <h1>. */
+  pageHeading: string;
   // history
   /** History form only. */
   version: string;
@@ -44,6 +49,8 @@ export interface DocSlotModel {
   contactInfo: string;
   projectHomeUrl: string;
   projectHelpUrl: string;
+  /** The author's font note (pf_font_guidance), rendered as intro paragraphs after the language line — never under Additional Detail. */
+  fontNote: string;
   /** The opt-in battery, in its existing order. */
   additionalDetail: string;
   // inherited (Track 2 only)
@@ -70,6 +77,8 @@ const SLOT_ID_RECORD: Record<DocSlotId, true> = {
   docLang: true,
   helpPageUrl: true,
   helpHeader: true,
+  pageStyle: true,
+  pageHeading: true,
   version: true,
   date: true,
   historyEntries: true,
@@ -82,6 +91,7 @@ const SLOT_ID_RECORD: Record<DocSlotId, true> = {
   contactInfo: true,
   projectHomeUrl: true,
   projectHelpUrl: true,
+  fontNote: true,
   additionalDetail: true,
   inheritedProse: true,
   body: true,
