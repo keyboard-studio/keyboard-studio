@@ -340,6 +340,15 @@ function detectRangeAt(toks: string[], i: number): RangeDetection | null {
 }
 
 /**
+ * A quoted store literal is bracketed menu-store syntax only when it is a
+ * complete bracketed group with content ('[1ae 2a …]'). A lone '[' (or an
+ * unterminated group) is a bracket character, not menu syntax.
+ */
+function isBracketedMenuLiteral(str: string): boolean {
+  return str.length > 2 && str.startsWith("[") && str.endsWith("]");
+}
+
+/**
  * Parse the value list of a store declaration. Always returns the parsed
  * `items`; `opaqueReason` is non-null when the body carries a construct the
  * typed IR can't represent (named deadkey, SMP literal, bracketed menu-store
@@ -386,8 +395,11 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
       // Bracketed menu-store literal ('[1ae 2a …]') — old-style multi-tap
       // menu syntax: the bracketed entries are key sequences, not literal
       // characters, so expanding char-by-char would lose the menu semantics.
-      // Preserve the whole store opaque instead.
-      if (str.startsWith("[")) {
+      // Preserve the whole store opaque instead. Only a COMPLETE bracketed
+      // group with content counts: a lone '[' literal is a bracket
+      // CHARACTER store (real keyboards do this — sil_yoruba8's
+      // store(key.grv) '['), not menu syntax.
+      if (isBracketedMenuLiteral(str)) {
         return { items, opaqueReason: OPAQUE_REASONS.MENU_STORE_SYNTAX };
       }
       for (const ch of str) {
@@ -491,7 +503,7 @@ function sketchStoreItems(
     if (isQuoted(tok)) {
       // Bracketed menu-store literal: its entries are key sequences, not
       // chars — contribute nothing rather than fabricating char items.
-      if (unquote(tok).startsWith("[")) continue;
+      if (isBracketedMenuLiteral(unquote(tok))) continue;
       for (const ch of unquote(tok)) out.push({ kind: "char", value: ch });
       if (out.length > MAX_SKETCH_ITEMS) return undefined;
       continue;

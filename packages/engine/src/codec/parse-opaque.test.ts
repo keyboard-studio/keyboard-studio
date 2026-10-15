@@ -320,4 +320,28 @@ group(main) using keys
     ]);
     expect(ir.raw.map((r) => r.reason)).not.toContain(OPAQUE_REASONS.MENU_STORE_SYNTAX);
   });
+
+  it("a lone '[' literal is a bracket-character store, not menu syntax", () => {
+    // Real keyboards store a single bracket character (sil_yoruba8:
+    // store(key.grv) '['). Only a complete bracketed group with content
+    // ('[1ae 2a …]') is menu syntax; swallowing the lone bracket broke
+    // pattern-apply store resolution for such keyboards.
+    const kmn = `store(&NAME) 'Bracket Store'
+store(key.grv) '['
+store(key.all) '[' ']' ';'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+    const { ir } = parse(kmn, "bracket-char-store");
+    expect(ir.raw.map((r) => r.reason)).not.toContain(OPAQUE_REASONS.MENU_STORE_SYNTAX);
+    expect(ir.stores.find((s) => s.name === "key.grv")?.items).toEqual([
+      { kind: "char", value: "[" },
+    ]);
+    expect(ir.stores.find((s) => s.name === "key.all")?.items).toEqual([
+      { kind: "char", value: "[" },
+      { kind: "char", value: "]" },
+      { kind: "char", value: ";" },
+    ]);
+  });
 });
