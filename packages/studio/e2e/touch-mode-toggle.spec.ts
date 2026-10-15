@@ -97,8 +97,19 @@ async function assignCharacterToAKey(page: Page): Promise<void> {
   const MAX_STEPS = 12;
   let found = false;
   for (let step = 0; step < MAX_STEPS; step++) {
-    await page.keyboard.press("Enter");
-    if (await charField.isVisible().catch(() => false)) {
+    // Spec 065 split the two keys (see touch-key-assign.spec.ts's SC-004
+    // walk): F2, pressed from grid focus, jumps straight into the
+    // AssignPanel character field; Enter opens the property panel
+    // instead, and once focus is in the panel F2 reaches nothing.
+    // Probing with Enter (this loop's original shape) therefore never
+    // finds an assignable key (#2053).
+    await page.keyboard.press("F2");
+    if (
+      await charField
+        .waitFor({ state: "visible", timeout: 2_000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
       found = true;
       break;
     }

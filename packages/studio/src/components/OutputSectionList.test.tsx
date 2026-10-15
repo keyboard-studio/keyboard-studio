@@ -7,6 +7,7 @@ import { render } from "../test/renderWithI18n.tsx";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { buildStageGroups } from "../decisions/stageGroups.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useTestingStore } from "../stores/testingStore.ts";
 
 const jumpToLocation = vi.fn((_loc: unknown, _opts?: unknown) => ({ kind: "arrived" as const, at: _loc }));
 vi.mock("../lib/jumpToLocation.ts", async (importOriginal) => ({
@@ -59,6 +60,7 @@ afterEach(() => {
   cleanup();
   useDecisionLogStore.getState().reset();
   useSurveySessionStore.getState().reset();
+  useTestingStore.getState().reset();
 });
 
 const STEP_IDS: ReadonlySet<string> = new Set([
@@ -161,5 +163,14 @@ describe("OutputSectionList", () => {
     fireEvent.click(screen.getByTestId("output-section-rules"));
 
     expect(screen.getByRole("status").textContent).not.toBe("");
+  });
+
+  it("hides the list once the project is submitted (frozen) — sections are not offered for revision (#2050)", () => {
+    seed([surveyEntry("rules")], ["rules"]);
+    useTestingStore.getState().markFrozen();
+    render(<OutputSectionList />);
+
+    expect(screen.queryByTestId("output-section-list")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Revise a section" })).toBeNull();
   });
 });

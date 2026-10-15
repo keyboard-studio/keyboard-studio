@@ -10,7 +10,6 @@ export * from "./keyboard-ir";
 export * from "./ir-builders";
 export * from "./linguistInventories";
 export * from "./placementMaps";
-export * from "./surveySessions";
 // The single reduced Cameroon-derived fixture behind the touch key<->rule join
 // (spec 063). Feeds the role matrix, reachability, and the applier twins — see
 // its module doc for why there is deliberately only one.

@@ -15,7 +15,7 @@ export type { CardKind } from '../../../lib/irToCarveNodes.ts';
 // expected/disclosed trade-off of standardizing on the brand ramp.
 export const KIND_COLOR: Record<CardKind, string> = {
   pattern: 'var(--sil-light-blue-60)',
-  group:   'var(--sil-orange)',
+  group:   'var(--app-warning)',
   store:   'var(--sil-violet)',
   raw:     'var(--sil-red-dark)',
 };

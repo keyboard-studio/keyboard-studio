@@ -386,19 +386,22 @@ export type LayoutFamilyAnswer = "qwerty" | "qwertz" | "azerty" | "non-roman";
  */
 export function resolveLikelyBases(input: {
   /**
-   * The reference host the author picked on the community-layout step
-   * ("Which keyboard layout do your typists use?"), when the pick IS one of
-   * the reference hosts. The exact answer — it leads, ahead of any family or
-   * language-tag inference; the rest follow for contrast.
+   * The reference hosts the author picked on the community-layout step
+   * ("Which keyboard layout do your typists use?"), in selection order, when
+   * the picks ARE reference hosts (#1902). The exact answers — they lead, in
+   * order, ahead of any family or language-tag inference; the rest follow
+   * for contrast.
    */
-  pickedBase?: Exclude<BaseLayoutId, "blocked"> | null;
+  pickedBases?: readonly Exclude<BaseLayoutId, "blocked">[] | null;
   layoutFamily?: LayoutFamilyAnswer | null;
   bcp47?: readonly string[] | null;
 }): BaseLayoutId[] {
-  const { pickedBase, layoutFamily, bcp47 } = input;
-  if (pickedBase !== undefined && pickedBase !== null) {
+  const { pickedBases, layoutFamily, bcp47 } = input;
+  const picked = (pickedBases ?? []).filter((id, i, all) => all.indexOf(id) === i);
+  if (picked.length > 0) {
     const rest = resolveLikelyBases({ layoutFamily: layoutFamily ?? null, bcp47: bcp47 ?? null });
-    return [pickedBase, ...rest.filter((id) => id !== pickedBase)];
+    const pickedSet = new Set<string>(picked);
+    return [...picked, ...rest.filter((id) => !pickedSet.has(id))];
   }
   if (layoutFamily === "qwertz" || layoutFamily === "azerty") {
     return [layoutFamily, ...DEFAULT_BASE_LAYOUTS.filter((id) => id !== layoutFamily)];

@@ -63,10 +63,6 @@ export const useRulesDemoArtifactStore = create<RulesDemoArtifactState>((set) =>
   setArtifact: (artifact) => set({ artifact }),
 }));
 
-/** Test helper — publish an artifact without the SurveyView pipeline. */
-export function setRulesDemoArtifactForTest(artifact: RulesDemoArtifact): void {
-  useRulesDemoArtifactStore.getState().setArtifact(artifact);
-}
 
 /** Build a "ready" artifact value (tests and the SurveyView publisher). */
 export function makeReadyRulesDemoArtifact(

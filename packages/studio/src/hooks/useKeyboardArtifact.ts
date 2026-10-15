@@ -100,26 +100,6 @@ export function takeEngineLoadFailure(): unknown {
   return failure;
 }
 
-/**
- * The original rejection's message text, flattened through `cause` chains.
- *
- * Bundlers commonly wrap the underlying network error, so the matchable text
- * can be one or two `cause` levels down from the rejection itself.
- */
-export function engineLoadFailureMessage(failure: unknown): string {
-  const parts: string[] = [];
-  let current: unknown = failure;
-  for (let depth = 0; depth < 4 && current !== null && current !== undefined; depth += 1) {
-    if (current instanceof Error) {
-      parts.push(current.message);
-      current = current.cause;
-      continue;
-    }
-    if (typeof current === "string") parts.push(current);
-    break;
-  }
-  return parts.join(" | ");
-}
 
 // No `importOrReload` wrapper here, deliberately. This hook has exactly ONE
 // consumer of loadEngine() — the engineReadyPromise below — and its catch

@@ -19,6 +19,24 @@ export type CriteriaPlacement =
   | "legacy"
   | "unknown";
 
+/**
+ * The structural form facts of one .kpj project file (engine
+ * parseKpjForm), behind the KPJ pair (criteria 1.10b / 2.7, ruling B:
+ * structural, no numeric pin). "modern" = the file declares its
+ * format via an `<Options><Version>` element (upstream: the element
+ * is implicit in the legacy form and required from format 2.0
+ * onward); "legacy" = no such element — the implicit classical form,
+ * whose project is driven by its `<Files>` list.
+ */
+export interface KpjFormFacts {
+  /** Trimmed `<Options><Version>` text, or null when the element is absent. */
+  versionElement: string | null;
+  /** Whether the project carries a `<Files>` element. */
+  hasFilesList: boolean;
+  /** "modern" when versionElement is present, otherwise "legacy". */
+  form: "modern" | "legacy";
+}
+
 export interface CriteriaLintInput {
   /**
    * The parsed .kvks visual keyboard (engine parseKvks), when a .kvks
@@ -93,4 +111,20 @@ export interface CriteriaLintInput {
    * mode 1.13 is precertified by generation and is never scanned for.
    */
   scratchScan: boolean;
+  /**
+   * Form facts of the judged keyboard's own .kpj (engine parseKpjForm,
+   * run by the assembly over the judged VFS). Absent when the judged
+   * VFS carries no .kpj at all — the assembly then names the missing
+   * project file for criterion 1.10b rather than letting it pass.
+   */
+  kpj?: KpjFormFacts;
+  /**
+   * Form facts of the BASE keyboard's .kpj — the project file the
+   * judged keyboard was adapted from (criterion 2.7 compares the
+   * format-marker state base ↔ output). Authored host only, folded in
+   * by the assembly from the base's .kpj text; the foreign host never
+   * supplies it (a compared keyboard has no base), so 2.7 resolves
+   * Not yet checkable there with the missing input named.
+   */
+  baseKpj?: KpjFormFacts;
 }

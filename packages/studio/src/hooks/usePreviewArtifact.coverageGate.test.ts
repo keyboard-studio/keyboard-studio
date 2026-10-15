@@ -23,6 +23,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { i18nHookWrapper } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -73,7 +74,7 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
     useWorkingCopyStore.getState().recordAssignments([swapAssignment("á")]);
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    const { result } = renderHook(() => usePreviewArtifact());
+    const { result } = renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 
     expect(result.current.stage.kind).toBe("ready");
     expect(result.current.coverageGate.blocked).toBe(true);
@@ -86,7 +87,7 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
     useWorkingCopyStore.getState().recordAssignments([swapAssignment("á"), swapAssignment("é")]);
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    const { result } = renderHook(() => usePreviewArtifact());
+    const { result } = renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 
     expect(result.current.stage.kind).toBe("ready");
     expect(result.current.coverageGate.blocked).toBe(false);
@@ -98,7 +99,7 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
     useWorkingCopyStore.getState().recordAssignments([swapAssignment("á")]);
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    const { result, rerender } = renderHook(() => usePreviewArtifact());
+    const { result, rerender } = renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 
     expect(result.current.canDownload).toBe(false);
     await result.current.handleDownload();
@@ -127,7 +128,7 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
     expect(useSurveySessionStore.getState().markedForLaterDesktop).toEqual(["é"]);
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
-    const { result } = renderHook(() => usePreviewArtifact());
+    const { result } = renderHook(() => usePreviewArtifact(), { wrapper: i18nHookWrapper });
 
     // The mark is invisible to this hook — "é" is still unimplementedDesktop,
     // the gate is still blocked, and download/submit is still refused.

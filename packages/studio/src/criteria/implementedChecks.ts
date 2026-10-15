@@ -6,7 +6,7 @@
 //
 //   1. The producer scan: scanning packages/keyboard-lint/src/checks
 //      for the codes emitted as a finding's `code:` literal — the same
-//      source-scan method as decisions/gateCoverage.test.ts's
+//      source-scan method as test/gateCoverage.test.ts's
 //      registeredLintCodes() — keeping the scanned codes that are also
 //      a catalog criterion's lintRuleId.
 //   2. ASSEMBLY_SYNTHESIZED_CODES below: codes no lint check emits,
@@ -112,6 +112,13 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
   "KM_LINT_KPS_FONT_MISSING",
   "KM_LINT_MANDATED_CHAR_MISSING",
+  // Spec 084 KPJ pair — checks in checks/criteria/check-kpj.ts
+  // (1.10b legacy .kpj form, 2.7 format-marker state changed vs the
+  // base). Ruling B (2026-10-14): structural form — the reader's
+  // facts are the <Options><Version> marker state, never a pinned
+  // version constant.
+  "KM_LINT_KPJ_FORMAT_OUTDATED",
+  "KM_LINT_KPJ_VERSION_BUMPED",
   // Assembly-synthesized (ASSEMBLY_SYNTHESIZED_CODES above): the
   // compile-result severity mapping (compileMapping.ts) and the
   // instantiation-state verdicts (assemblyVerdicts.ts).

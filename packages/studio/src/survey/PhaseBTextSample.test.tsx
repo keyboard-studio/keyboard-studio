@@ -89,21 +89,21 @@ function renderPhaseB(): { onComplete: ReturnType<typeof vi.fn> } {
 /** Land on the build-list page (page 2) via the default "build-list" choice. */
 async function reachPage2(): Promise<void> {
   await waitFor(() => {
-    expect(screen.getByTestId("phase-b-intro-next")).toBeTruthy();
+    expect(screen.getByTestId("charlist-continue")).toBeTruthy();
   });
-  fireEvent.click(screen.getByTestId("phase-b-intro-next"));
-  await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+  fireEvent.click(screen.getByTestId("charlist-continue"));
+  await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
 }
 
 /** Accept the exemplar offer (when present) and land on page 2. */
 async function acceptExemplarsAndReachPage2(): Promise<void> {
   await waitFor(() => {
-    expect(screen.getByTestId("phase-b-intro-next")).toBeTruthy();
+    expect(screen.getByTestId("charlist-continue")).toBeTruthy();
   });
   const radio = document.querySelector<HTMLInputElement>("#discovery_method-exemplars");
   await waitFor(() => expect(radio!.checked).toBe(true));
-  fireEvent.click(screen.getByTestId("phase-b-intro-next"));
-  await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+  fireEvent.click(screen.getByTestId("charlist-continue"));
+  await waitFor(() => expect(screen.getByTestId("charlist-done")).toBeTruthy());
 }
 
 beforeEach(() => {
@@ -193,7 +193,7 @@ describe("US1 — paste a paragraph (FR-004/FR-005/FR-006)", () => {
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
       "Add your whole alphabet",
     );
-    expect(screen.getByTestId("phase-b-done")).toBeTruthy();
+    expect(screen.getByTestId("charlist-done")).toBeTruthy();
   });
 
   it("surfaces a plain message and stays usable when the extraction service itself fails", async () => {
@@ -238,7 +238,7 @@ describe("US2 — upload a .txt file (FR-003)", () => {
     // it()s. This test simulates two independent test entries within one, so
     // it must also reset discoveryMethod itself — otherwise the second render
     // inherits the first pass's "build-list" choice and skips the intro
-    // chooser entirely, and reachPage2() never finds phase-b-intro-next.
+    // chooser entirely, and reachPage2() never finds charlist-continue.
     useSurveySessionStore.getState().setDiscoveryMethod(null);
 
     // Upload path, in a fresh render.
@@ -272,7 +272,7 @@ describe("US2 — upload a .txt file (FR-003)", () => {
     });
     expect(getCharacterInventoryValue().chars).toEqual([]);
     // The step remains usable.
-    expect(screen.getByTestId("phase-b-done")).toBeTruthy();
+    expect(screen.getByTestId("charlist-done")).toBeTruthy();
   });
 });
 

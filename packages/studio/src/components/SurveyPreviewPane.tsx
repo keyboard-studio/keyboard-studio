@@ -72,7 +72,13 @@ export function SurveyPreviewPane({
       {showCharacterMap ? (
         <div style={{ padding: inset }}>
           <CharacterMapPane
-            scope={activeStepId === "punctuation" ? "punctuation" : "alphabet"}
+            scope={
+              activeStepId === "punctuation"
+                ? "punctuation"
+                : activeStepId === "invisibles"
+                  ? "invisibles"
+                  : "alphabet"
+            }
           />
         </div>
       ) : localStart === null ? (

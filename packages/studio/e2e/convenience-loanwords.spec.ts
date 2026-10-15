@@ -42,6 +42,7 @@ import {
   drivePunctuationStep,
   driveInvisiblesStep,
   driveConvenienceStep,
+  driveDeadkeysStep,
 } from "./helpers/surveyFlow";
 
 const START_KEYBOARD_ID = "basic_kbdus";
@@ -71,7 +72,7 @@ async function reachBafutAlphabet(page: Page): Promise<void> {
   // lookup settles; Continue before that would decline it.
   const exemplars = page.locator("#discovery_method-exemplars");
   await expect(exemplars).toBeChecked({ timeout: 30_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
+  await page.click('[data-testid="charlist-continue"]');
   await expect(page.getByTestId("phase-b-heading")).toContainText("Confirm your alphabet", {
     timeout: 15_000,
   });
@@ -82,7 +83,7 @@ async function continueToConvenience(
   page: Page,
   expectConvenience: "shown" | "skipped" = "shown",
 ): Promise<void> {
-  const done = page.getByTestId("phase-b-done");
+  const done = page.getByTestId("charlist-done");
   await expect(done).toBeEnabled();
   await done.click();
   // Bafut's main tier carries combining tone marks, so the marks series renders.
@@ -137,7 +138,9 @@ test.describe("Convenience letters: loanword-only letters", () => {
     await page.getByTestId("convenience-continue").click();
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 20_000 });
     await page.getByTestId("carve-continue").click();
-    // Spec 082: the rules step sits between carve and mechanisms.
+    // Spec 083: the deadkeys step sits between carve and rules (#2053).
+    await driveDeadkeysStep(page);
+    // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
     await page.getByRole("button", { name: "Start the mechanism gallery" }).click({ timeout: 30_000 });
     await expect(page.getByTestId("char-scroll-loanword-0071")).toBeVisible({ timeout: 30_000 });

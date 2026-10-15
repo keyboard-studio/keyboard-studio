@@ -77,8 +77,8 @@ async function loadCorpus(): Promise<Map<string, string>> {
 // Badge styling per ImportStatus — colored via design-system tokens
 // clean  → var(--sil-green)
 // opaque → var(--app-accent)
-// diverged → var(--sil-orange-dark)
-// parse-err → var(--danger)
+// diverged → var(--app-warning-text)
+// parse-err → var(--app-danger)
 // ---------------------------------------------------------------------------
 
 const STATUS_LABEL: Record<string, string> = {
@@ -91,8 +91,8 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   [ImportStatus.Clean]: "var(--sil-green)",
   [ImportStatus.CleanWithOpaque]: "var(--app-accent)",
-  [ImportStatus.ParseFailure]: "var(--danger)",
-  [ImportStatus.RoundTripDivergence]: "var(--sil-orange-dark)",
+  [ImportStatus.ParseFailure]: "var(--app-danger)",
+  [ImportStatus.RoundTripDivergence]: "var(--app-warning-text)",
 };
 
 function ImportBadge({ status }: { status: string }) {
@@ -485,7 +485,7 @@ export function StartKeyboardPicker({
             style={{
               background: "var(--app-bg)",
               color: "var(--app-text-muted)",
-              border: "1px solid var(--danger)",
+              border: "1px solid var(--app-danger)",
               borderRadius: 6,
               padding: "6px 10px",
               fontSize: 13,
@@ -496,7 +496,7 @@ export function StartKeyboardPicker({
           />
           <div
             role="alert"
-            style={{ fontSize: 12, color: "var(--danger)", lineHeight: 1.4 }}
+            style={{ fontSize: 12, color: "var(--app-danger)", lineHeight: 1.4 }}
           >
             {error}
           </div>

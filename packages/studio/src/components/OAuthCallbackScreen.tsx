@@ -51,17 +51,17 @@ const pageStyle: React.CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   padding: 24,
-  background: "var(--bg)",
-  color: "var(--text)",
-  fontFamily: "var(--ui)",
+  background: "var(--app-bg)",
+  color: "var(--app-text)",
+  fontFamily: "var(--app-font)",
 };
 
 const cardStyle: React.CSSProperties = {
   maxWidth: 420,
   width: "100%",
   textAlign: "center",
-  background: "var(--card)",
-  border: "1px solid var(--border)",
+  background: "var(--app-surface)",
+  border: "1px solid var(--app-border)",
   borderRadius: 12,
   padding: "40px 32px",
 };
@@ -71,8 +71,8 @@ const spinnerStyle: React.CSSProperties = {
   height: 36,
   margin: "0 auto 20px",
   borderRadius: "50%",
-  border: "3px solid var(--border-strong)",
-  borderTopColor: "var(--accent)",
+  border: "3px solid var(--app-border-strong)",
+  borderTopColor: "var(--app-accent)",
   animation: "ks-oauth-spin 0.8s linear infinite",
 };
 
@@ -80,9 +80,9 @@ const primaryBtnStyle: React.CSSProperties = {
   marginTop: 24,
   padding: "10px 20px",
   fontSize: 15,
-  fontFamily: "var(--ui)",
-  color: "var(--text)",
-  background: "var(--primary)",
+  fontFamily: "var(--app-font)",
+  color: "var(--app-text)",
+  background: "var(--app-primary)",
   border: "none",
   borderRadius: 8,
   cursor: "pointer",
@@ -152,7 +152,7 @@ export function OAuthCallbackScreen({ provider }: { provider: OAuthProvider }) {
                 Completing {label} sign-in…
               </Trans>
             </h1>
-            <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
+            <p style={{ fontSize: 14, color: "var(--app-text-muted)", margin: 0 }}>
               <Trans id="oauth.callback.working.detail">
                 Just a moment while we finish connecting your account.
               </Trans>
@@ -165,7 +165,7 @@ export function OAuthCallbackScreen({ provider }: { provider: OAuthProvider }) {
                 {label} sign-in is taking too long
               </Trans>
             </h1>
-            <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>
+            <p style={{ fontSize: 14, color: "var(--app-text-muted)", margin: 0 }}>
               <Trans id="oauth.callback.error.detail">
                 We couldn’t complete the sign-in. This is usually temporary — please
                 return to the studio and try connecting again.

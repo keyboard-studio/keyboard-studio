@@ -90,6 +90,7 @@ import {
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
+  driveDeadkeysStep,
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
@@ -265,7 +266,9 @@ async function carveCharacters(
   await expect(survivorGlyph).toHaveAttribute("aria-pressed", "false");
 
   await page.getByTestId("carve-continue").click();
-  // Spec 082: the rules step sits between carve and mechanisms.
+  // Spec 083: the deadkeys step sits between carve and rules — walk through it.
+  await driveDeadkeysStep(page);
+  // Spec 082: the rules step sits between deadkeys and mechanisms.
   await page.getByTestId("rules-continue").click();
 }
 
@@ -312,7 +315,10 @@ async function confirmReseedDefault(page: Page): Promise<void> {
   const importAdapt = page.getByTestId("seed-source-import-adapt");
   await expect(importAdapt).toHaveAttribute("aria-pressed", "false");
   // Scenario B's precondition, in the copy that replaced the absent-note here.
-  await expect(importAdapt).toContainText("There is no base touch layout to import");
+  // (Copy drift, #2053: the card now reads "starting touch layout" — the
+  // glossary rename of "base" in #2041 — where this asserted "base touch
+  // layout".)
+  await expect(importAdapt).toContainText("There is no starting touch layout to import");
 
   await page.getByTestId("seed-source-confirm").click();
 }
@@ -434,7 +440,7 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     });
 
     // Manifest spine order (StudioShell.tsx): characters -> marks -> carve ->
-    // mechanisms -> touch_seed_source -> touch -> help. The marks series for
+    // deadkeys -> rules -> mechanisms -> touch_seed_source -> touch -> help. The marks series for
     // the accented PLACED_CHAR was driven inside addPlacedCharacterToInventory.
     await carveCharacters(page, PIAROA_CARVED_CHARS, PIAROA_SURVIVOR_CHAR);
     // The mechanism gallery's worklist may hold more than just PLACED_CHAR —

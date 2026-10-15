@@ -45,7 +45,7 @@ import {
 } from "./rulesStyles.ts";
 import { ERROR_BORDER, ERROR_TEXT } from "../../ui/theme.ts";
 import { getPatternLibraryService } from "../../lib/browserPatternLibrary.ts";
-import { useLayoutFamilyAnswer, usePickedWindowsLayout } from "../../lib/layoutFamily.ts";
+import { useLayoutFamilyAnswer, usePickedWindowsLayouts } from "../../lib/layoutFamily.ts";
 import {
   loadDemoSimulate,
   textToDemoKeys,
@@ -101,19 +101,25 @@ export function DemoPane(props: DemoPaneProps = {}) {
     [storeBcp47],
   );
   // Likely-host inputs, strongest first:
-  //   1. the community-layout step's pick ("Which keyboard layout do your
-  //      typists use?", answer `host_layout`) when it IS a reference host;
-  //   2. the layout step's effective family (the pick's derived family, else
-  //      the stored `layout_family` answer) — both via lib/layoutFamily.ts,
-  //      the same reads the carve gallery uses;
+  //   1. the community-layout step's picks ("Which keyboard layout do your
+  //      typists use?") when they ARE reference hosts — in selection order
+  //      (#1902);
+  //   2. the layout step's effective family (the primary pick's derived
+  //      family, else the stored `layout_family` answer) — both via
+  //      lib/layoutFamily.ts, the same reads the carve gallery uses;
   //   3. the legacy identity-phase `layout_family` answer (1802 A3.1);
   //   4. BCP47 inference, then the five reference hosts.
   // Unknown values are ignored — never a crash, never a guess.
-  const pickedLayout = usePickedWindowsLayout();
-  const pickedBase = useMemo(
-    () => (pickedLayout?.host !== undefined ? demoBaseForReferenceBase(pickedLayout.host) : null),
-    [pickedLayout],
-  );
+  const pickedLayouts = usePickedWindowsLayouts();
+  const pickedBases = useMemo(() => {
+    const out: Exclude<BaseLayoutId, "blocked">[] = [];
+    for (const layout of pickedLayouts) {
+      if (layout.host === undefined) continue;
+      const demo = demoBaseForReferenceBase(layout.host);
+      if (!out.includes(demo)) out.push(demo);
+    }
+    return out;
+  }, [pickedLayouts]);
   const layoutStepFamily = useLayoutFamilyAnswer();
   // Spec 089: the identity phase result is rebuilt from the decision store.
   const decisions = useDecisionStore((s) => s.decisions);
@@ -129,13 +135,13 @@ export function DemoPane(props: DemoPaneProps = {}) {
 
   const [text, setText] = useState("");
   // The demo set is per-keyboard likely hosts (1802 A3/A3.1): the layout
-  // pick first, then layout_family, BCP47 region inference, and the five
+  // picks first, then layout_family, BCP47 region inference, and the five
   // reference hosts when nothing signals. Derived silently — no author question for what the data
   // can answer. "blocked" is appended as a demonstration mode. Manual
   // switching stays available via the selector.
   const likelyBases = useMemo(
-    () => resolveLikelyBases({ pickedBase, layoutFamily, bcp47: bcp47Tags }),
-    [pickedBase, layoutFamily, bcp47Tags],
+    () => resolveLikelyBases({ pickedBases, layoutFamily, bcp47: bcp47Tags }),
+    [pickedBases, layoutFamily, bcp47Tags],
   );
   const orderedBases = useMemo<BaseLayoutId[]>(
     () => [...likelyBases, "blocked"],

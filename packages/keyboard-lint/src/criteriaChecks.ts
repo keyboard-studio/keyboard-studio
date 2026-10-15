@@ -1,6 +1,6 @@
 // runCriteriaChecks — the spec 084 criteria checks (Batch 1:
 // §§1/2/7/8/9/12/13/15; Batch 2: cross-file reconciliation — 1.9, 7.4,
-// 7.12, 7.14, 7.19, 8.13), run as one gated group.
+// 7.12, 7.14, 7.19, 8.13; KPJ pair: 1.10b, 2.7), run as one gated group.
 //
 // Gating shape matches every other optional LintContext input: the
 // checks run only when the caller assembled a CriteriaLintInput (the
@@ -81,6 +81,10 @@ import {
   checkVersionVPrefix,
 } from "./checks/criteria/check-version.js";
 import { checkDeprecatedKpsLinkage } from "./checks/criteria/check-deprecated-kps.js";
+import {
+  checkKpjFormatAdapted,
+  checkKpjVersionNotBumped,
+} from "./checks/criteria/check-kpj.js";
 import { kmnPath } from "./checks/criteria/_shared.js";
 
 /** Read a VFS entry's text content, or undefined when absent/binary. */
@@ -121,6 +125,15 @@ export function runCriteriaChecks(
   // 1.9 — duplicate source files (same basename, identical content)
   // anywhere in the judged folder.
   findings.push(...checkDuplicateSourceFiles(fs));
+
+  // 1.10b / 2.7 — the KPJ pair (ruling B: structural form). The facts
+  // arrive pre-parsed in CriteriaLintInput (the engine's parseKpjForm
+  // ran in the assembly); neither check needs the IR. Absent facts
+  // produce no findings — the assembly names the missing input (no
+  // .kpj in this VFS; no base .kpj, which is every foreign judgment).
+  const kpjPath = filePaths.find((p) => p.toLowerCase().endsWith(".kpj")) ?? "";
+  findings.push(...checkKpjFormatAdapted(input.kpj, kpjPath));
+  findings.push(...checkKpjVersionNotBumped(input.kpj, input.baseKpj, kpjPath));
 
   // 7.10 — raw .kmn text scan; runs even when the IR failed to parse.
   const kmnText = readText(fs, kmnPath(keyboardId));
