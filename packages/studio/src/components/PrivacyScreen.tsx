@@ -101,7 +101,7 @@ export function PrivacyScreen() {
       </p>
       <p style={pStyle}>
         <Trans id="privacy.intro">
-          Keyboard Studio is run by the Keyboard Studio project. This page explains what
+          Keyboard Studio is run by the Language Technology Use (LT Use) department of SIL Global, which is the data controller for the information described on this page. This page explains what
           information the studio handles, why, where it sits, and the choices you have. It is
           written from our actual systems, not a template: if a kind of data is not mentioned
           here, we do not collect it.

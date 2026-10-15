@@ -25,8 +25,9 @@ practice, not just existing on paper:
 
 ## Current holder
 
-**Matthew (project maintainer)** — sole maintainer and the project's
-controller decision-maker. Where this suite says "the privacy owner
+**Matthew (project maintainer)** — sole maintainer, and the privacy
+owner acting for the data controller (SIL Global; responsible
+department: Language Technology Use). Where this suite says "the privacy owner
 decides", today that is Matthew. If the project gains maintainers, the
 holder is re-named here in the same change that shares the duties; the
 role is never left pointing at a team alias.

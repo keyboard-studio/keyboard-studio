@@ -7,7 +7,7 @@ does not name must not exist; `pnpm check:privacy-record` (spec 096
 FR-005) mechanically checks the server-side enumeration against this
 file.
 
-**Controller**: Keyboard Studio (project). **Privacy owner**:
+**Controller**: SIL Global (responsible department: Language Technology Use, LT Use) — ruled 2026-10-14, contingent on SIL Global's acceptance of the controller role; the notice does not publish until that acceptance is confirmed (spec 095). **Privacy owner**:
 `docs/privacy/owner.md`. **Record version**: 2026-10-14 (written from a
 code audit of this tree on that date; every row traces to a store,
 endpoint, or pipeline found by search, not to intention).

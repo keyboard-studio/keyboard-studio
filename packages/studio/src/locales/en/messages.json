@@ -1283,7 +1283,7 @@
   "privacy.contact": "Privacy contact: the private reporting route on our GitHub repository — see “Your rights” below for the exact steps. The same route reaches us for any privacy question, not just formal requests.",
   "privacy.device.body": "Used as a guest, the studio works entirely in your browser. Your draft keyboards — including the name, optional email address, and copyright holder you type into the attribution fields — are stored in your browser’s local storage on this device only. We never receive them, cannot see them, and cannot delete them for you; they go away when you delete the draft or clear this site’s data in your browser.",
   "privacy.device.heading": "On your device",
-  "privacy.intro": "Keyboard Studio is run by the Keyboard Studio project. This page explains what information the studio handles, why, where it sits, and the choices you have. It is written from our actual systems, not a template: if a kind of data is not mentioned here, we do not collect it.",
+  "privacy.intro": "Keyboard Studio is run by the Language Technology Use (LT Use) department of SIL Global, which is the data controller for the information described on this page. This page explains what information the studio handles, why, where it sits, and the choices you have. It is written from our actual systems, not a template: if a kind of data is not mentioned here, we do not collect it.",
   "privacy.link": "Privacy",
   "privacy.never.analytics": "We run no analytics or tracking today. If we add privacy-preserving usage statistics later, this page will say so before they start.",
   "privacy.never.cookies": "We set no cookies.",

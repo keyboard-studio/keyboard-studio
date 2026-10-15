@@ -36,7 +36,7 @@ A prospective author opens the studio, finds the privacy page from the welcome s
 **Acceptance Scenarios**:
 
 1. **Given** a signed-out visitor, **When** they open the privacy page, **Then** every processing row of the spec-096 record appears in plain language with purpose and lawful basis — including what sign-in collects (Gmail address/name/picture via Google; the GitHub App connection and id/login via GitHub) stated as collection, not waved at as "session-only" — plus the affirmative statements that are true today: no cookies, no advertising, no sale of data, and no analytics yet (with spec 101's arrival updating this page in the same change, per FR-008).
-2. **Given** the controller identity is not yet ruled (see Open rulings), **When** this spec is implemented, **Then** the page MUST NOT ship with a placeholder identity — the ruling is a gate, not a follow-up.
+2. **Given** the controller identity was ruled on 2026-10-14 (SIL Global; Language Technology Use the responsible department), **When** this spec is implemented, **Then** the page MUST NOT ship until SIL Global's acceptance of the controller role is confirmed — the acceptance is a gate, not a follow-up.
 
 ### User Story 2 — The submission permanence disclosure happens before the submit click (Priority: P1)
 
@@ -94,7 +94,7 @@ The studio stops disclosing visitor IPs to Google Fonts: fonts are self-hosted, 
 
 ## Open rulings (block implementation, not this spec)
 
-- **Controller identity**: who is named — Matthew personally, or the project? The notice cannot ship without this (User Story 1, scenario 2).
+- **Controller identity**: RULED 2026-10-14 — SIL Global is named as controller, Language Technology Use (LT Use) as the responsible department, contingent on SIL Global accepting the role; the fallback if it declines is Matthew personally. The notice cannot ship until the acceptance is confirmed (User Story 1, scenario 2).
 - **Notice placement** is otherwise settled by FR-001/FR-004.
 
 ## Out of scope
