@@ -807,22 +807,6 @@ export function punctuationProjection(
   return { accepted, declined };
 }
 
-/**
- * Capture a declined punctuation item at removal time: the caller (the
- * punctuation step, before it removes the char from the draft) appends
- * the item with the provenance the draft currently records for it.
- */
-export function withDeclinedPunctuation(
-  value: InventoryDecisionValue,
-  char: string,
-  draftProvenance: DraftProvenance | undefined,
-): InventoryDecisionValue {
-  if (value.declined.some((i) => i.char === char)) return value;
-  return {
-    accepted: value.accepted.filter((i) => i.char !== char),
-    declined: [...value.declined, { char, provenance: inventoryProvenanceOf(draftProvenance) }],
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Derived readers (pure over the values)

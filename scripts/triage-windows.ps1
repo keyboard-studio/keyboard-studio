@@ -195,6 +195,19 @@ for ($i = 1; $i -le $maxIterations; $i++) {
   }
   $prs = @($prsJson | ConvertFrom-Json | Sort-Object number)
 
+  # Required status checks for main, fetched live from the branch rulesets
+  # (currently: build, km-triage/review). Gate 6 must NOT rely on
+  # statusCheckRollup[].isRequired - gh returns null for it in some
+  # environments, which silently disables the CI gate (see triage-linux.sh).
+  $requiredChecks = @("build", "km-triage/review")
+  try {
+    $rulesJson = gh api "repos/$repo/rules/branches/main" 2>$null
+    if ($rulesJson) {
+      $contexts = @(($rulesJson | ConvertFrom-Json) | Where-Object { $_.type -eq "required_status_checks" } | ForEach-Object { $_.parameters.required_status_checks } | ForEach-Object { $_.context } | Select-Object -Unique)
+      if ($contexts.Count -gt 0) { $requiredChecks = $contexts }
+    }
+  } catch {}
+
   $total  = $prs.Count
   $prNums = ($prs | ForEach-Object { $_.number }) -join ","
   "[km-triage] $total open PRs: [$prNums]" | Tee-Object -FilePath $log -Append | Write-Host
@@ -290,7 +303,10 @@ Please rebase against ``main`` first; the next sweep will run the full review cr
     $ciBlocking = 0
     if ($pr.statusCheckRollup) {
       foreach ($check in $pr.statusCheckRollup) {
-        if (-not $check.isRequired) { continue }
+        $checkName = $null
+        if ($check.PSObject.Properties["name"] -and $check.name) { $checkName = $check.name }
+        elseif ($check.PSObject.Properties["context"] -and $check.context) { $checkName = $check.context }
+        if (-not $checkName -or $checkName -notin $requiredChecks) { continue }
         $passing = @("SUCCESS","NEUTRAL","SKIPPED")
         $state = if ($check.__typename -eq "CheckRun") {
           if ($check.conclusion) { $check.conclusion } else { $check.status }

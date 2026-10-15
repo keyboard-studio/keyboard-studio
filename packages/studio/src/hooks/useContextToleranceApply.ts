@@ -72,7 +72,7 @@ function markApplied(fingerprint: string): void {
 const decisionKey = (d: { fingerprint: string; acceptedSiteIds: readonly string[] }): string =>
   `${d.fingerprint}|${d.acceptedSiteIds.join(",")}`;
 
-export function useContextToleranceApply(enabled: boolean): ContextToleranceApplyNotes | null {
+export function useContextToleranceApply(): ContextToleranceApplyNotes | null {
   const decision = useDecisionStore((s) => {
     const value = s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined;
     return value?.contextTolerance ?? undefined;
@@ -83,8 +83,6 @@ export function useContextToleranceApply(enabled: boolean): ContextToleranceAppl
   const inFlight = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!enabled) return;
-
     if (decision === undefined || decision.decision === "decline") {
       // FR-009: a decline leaves the keyboard as it is — including undoing a
       // fix an earlier accept applied.
@@ -137,7 +135,7 @@ export function useContextToleranceApply(enabled: boolean): ContextToleranceAppl
     return () => {
       live = false;
     };
-  }, [enabled, decision, analysis, applied]);
+  }, [decision, analysis, applied]);
 
-  return enabled ? notes : null;
+  return notes;
 }

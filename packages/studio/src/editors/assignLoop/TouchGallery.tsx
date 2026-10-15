@@ -53,7 +53,7 @@
 // character cards has been removed; only the FR-008 completion gate remains.
 // FR-008 completion gate: `uncoveredTouchChars`/`unaccountedTouchChars` (see
 // `layoutForLintAndGate` below) re-run touchCoverage LIVE on every render
-// (mechanism-gallery-progression) and disable the Done/Continue control —
+// (mechanism-gallery-progression) and disable the Continue control —
 // proactively, not just on a click attempt — while any inventory char is
 // both uncovered and unmarked.
 //
@@ -3889,7 +3889,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // FR-008 completion gate (mechanism-gallery-progression): names of chars
   // with no reachable touch mechanism on the final layout — computed LIVE
   // (not only on a click attempt) so the completion control can be disabled
-  // PROACTIVELY, matching MechanismGallery's Done gating. Mirrors
+  // PROACTIVELY, matching MechanismGallery's Continue gating. Mirrors
   // handleContinue's own `touchCoverage` call exactly (same inputs — see the
   // T120/key-mode reconciliation note there): `effectiveKeyModeLayout` (which
   // IS `layoutForLintAndGate` whenever the key-edit overlay is empty) +
@@ -3922,14 +3922,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     isDone: isCharConfigured,
   });
 
-  // Mark-aware "still needs an assignment or a mark before Done is offered"
+  // Mark-aware "still needs an assignment or a mark before Continue is offered"
   // list — a SEPARATE derivation layered on top of `uncoveredTouchChars`
   // (implemented-only, UNCHANGED above), never threaded back into it. See
   // lib/accountedForGate.ts's module doc: the Phase F hard gate / export gate
   // read a DIFFERENT hook (hooks/useInventoryCoverageGate.ts) and never this
   // local list, so marks recorded here cannot relax those. This is also the
   // exact set `handleContinue` gates on for the key-mode pane's Continue
-  // control (T120) — a marked character unblocks Done/Continue in EITHER
+  // control (T120) — a marked character unblocks Continue in EITHER
   // touch-editing mode, not just the by-character walk.
   const unaccountedTouchChars = useMemo(
     () => subtractMarked(uncoveredTouchChars, markedTouchSet),
@@ -3986,7 +3986,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Defense-in-depth no-op guard (mechanism-gallery-progression; reconciled
   // with T120 below): no modal, ever — see the "no modal, ever" describe
   // block in TouchGallery.completion.test.tsx and MechanismGallery's matching
-  // "Done-blocked inline hint (no modal)" suite. The by-character pane's
+  // "Continue-blocked inline hint (no modal)" suite. The by-character pane's
   // forward button (`touchForwardButton` below) AND the key-mode pane's
   // Continue button (`touch-key-mode-continue`) are BOTH disabled proactively
   // while `unaccountedTouchChars` (mark-aware; see that memo above — it
@@ -4000,7 +4000,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // T120 (FR-036e) — "either mode MUST be able to complete the step":
   //
   //   * The gate is ONE function, shared by both modes' Continue controls
-  //     (`touch-key-mode-continue` in the key pane, the Done/Skip control in
+  //     (`touch-key-mode-continue` in the key pane, the Continue/Skip control in
   //     the character pane), and it tests coverage (mark-aware) ONLY. It
   //     reads no mode state whatsoever — deliberately, because an author
   //     "MUST never have to switch modes in order to move on".
@@ -4241,7 +4241,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // "replace" action later overwrote with a DIFFERENT character stayed
   // reported covered by that set FOREVER, disagreeing with `handleContinue`'s
   // live gate (`touchCoverage(layoutForLintAndGate, ...)`, which correctly
-  // sees the overwrite) — badge green + Done force-shown, but a click still
+  // sees the overwrite) — badge green + Continue force-shown, but a click still
   // got nagged by the "still unimplemented" warning.
   //
   // `touchOwnDirectTargets.size === 0` (no real touch edit recorded THIS
@@ -4302,7 +4302,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // on the SAME 3-signal getProducerBadge computation the CharScrollStrip
   // badge uses, over the FULL SHOW-ALL `inventory` list (not just
   // touchLettersToAdd — a detected/already-covered char must count as
-  // covered too). Feeds the forward-button JSX below: when true, the Done
+  // covered too). Feeds the forward-button JSX below: when true, the Continue
   // button is always rendered regardless of currentChar/walk membership.
   const allCovered = useMemo(
     () =>
@@ -4757,7 +4757,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     currentChar !== null &&
     (suggestionResolved.has(currentChar) || charTouch.has(currentChar));
 
-  // Forward gate (enables "Next character ->"/"Done"): an untouched
+  // Forward gate (enables "Next character ->"/"Continue"): an untouched
   // character needs EITHER an explicit Apply OR an explicit "Mark for later
   // review" first — but revisiting an already-configured/marked character
   // always re-enables it, so Back-then-Next over a finished (or deferred)
@@ -4769,7 +4769,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // set the "Existing methods" section reads) is also a valid reason to
   // advance — the author needn't do anything to keep an already-present
   // implementation. Without this, every already-implemented character
-  // disabled the primary Next/Done button. Detected chars are never
+  // disabled the primary Next/Continue button. Detected chars are never
   // double-counted with `charTouch` — the two sets come from independent
   // sources (the seed layout vs. the author's own edits) — so this only ever
   // widens, never narrows, the gate.
@@ -5573,12 +5573,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     disabled: boolean;
   }
 
-  const touchDoneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
+  const touchContinueLabel = t({ id: "editor.assignLoop.doneButton", message: "Continue" });
   const touchForwardButton: TouchForwardButtonSpec | null =
     // TOP PRIORITY (bug fix): once every inventory character has count >= 1
     // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
     // use) OR every character is implemented-or-marked (unaccountedTouchChars
-    // — mark-aware, see below), the Done button is ALWAYS rendered —
+    // — mark-aware, see below), the "Continue" button is ALWAYS rendered —
     // regardless of currentChar or its walk (touchLettersToAdd) membership.
     // Previously this button was hidden entirely for a currentChar outside
     // touchLettersToAdd (e.g. an already-detected character reached via the
@@ -5600,14 +5600,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // stays, 0 — marks are authoring metadata, never a `MechanismAssignment`,
     // so they never move the badge), and the per-char branch below is
     // unreachable (currentChar is outside touchLettersToAdd) — so, before
-    // this fix, NO Done button rendered at all, even though every character
+    // this fix, NO Continue button rendered at all, even though every character
     // was genuinely implemented-or-marked. Hence the `||
     // unaccountedTouchChars.length === 0` added below: `unaccountedTouchChars`
     // is mark-aware AND is the exact signal `handleContinue` itself checks
     // before calling `finalizeCompletion` (see that callback above) — so
-    // "Done becomes visible" and "Done, if clicked, actually completes" are
-    // the SAME condition on this path; OR-ing it in adds no case where a
-    // visible enabled Done could still no-op.
+    // "Continue becomes visible" and "Continue, if clicked, actually
+    // completes" are the SAME condition on this path; OR-ing it in adds no
+    // case where a visible enabled Continue could still no-op.
     //
     // `allCovered` is kept as an alternate (not replaced) rather than the
     // sole source of truth: it is derived from LIVE, non-mocked signals in
@@ -5622,8 +5622,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // new marked-character scenario needs the other's signal to be correct.
     (allCovered || unaccountedTouchChars.length === 0)
       ? {
-          label: touchDoneLabel,
-          ariaLabel: touchDoneLabel,
+          label: touchContinueLabel,
+          ariaLabel: touchContinueLabel,
           onClick: handleContinue,
           disabled: false,
         }
@@ -5634,13 +5634,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   id: "editor.assignLoop.nextCharacterButton",
                   message: "Next character →",
                 })
-              : touchDoneLabel,
+              : touchContinueLabel,
             ariaLabel: hasAnotherCharAfterCurrent
               ? t({
                   id: "editor.assignLoop.nextCharacterAriaLabel",
                   message: "Next character",
                 })
-              : touchDoneLabel,
+              : touchContinueLabel,
             onClick: handleNext,
             disabled:
               !canGoNext ||
@@ -5899,23 +5899,23 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           on the seed touch layout (touchLettersToAdd is empty), so the walk
           has nothing to step through and currentChar stays null. Mirrors
           MechanismGallery's "No new characters to add" empty-diff panel, but
-          (unlike that gallery) still needs its OWN Back/Done nav here: the
+          (unlike that gallery) still needs its OWN Back/Continue nav here: the
           per-char block's forward spec below never renders while currentChar
           is null, and handleBack/handleNext are gated on `list.includes`
           (empty touchLettersToAdd), so this panel's published nav calls
           onBack/handleContinue directly rather than going through those.
-          Its Back and Done buttons live in the footer (spec 081).
+          Its Back and Continue buttons live in the footer (spec 081).
           `&& currentChar === null` (pre-existing gap, fixed here): totalChars
           (touchLettersToAdd.length) being 0 does not mean currentChar stays
           null forever — the SHOW-ALL CharScrollStrip can still set it via
           handleSelectDisplayChar (e.g. inspecting a detected-but-walk-excluded
           character), independently of the walk. Without this guard, that
           selection left THIS panel mounted (publishing its own
-          `data-testid="touch-continue"` Done button unconditionally)
+          `data-testid="touch-continue"` Continue button unconditionally)
           alongside the per-char block below's OWN `touchForwardButton`
           (same testid), which can ALSO publish once `currentChar !== null` —
           two publishers for the same step. The per-char block's
-          `touchForwardButton` already reproduces this panel's Done affordance
+          `touchForwardButton` already reproduces this panel's Continue affordance
           whenever `allCovered` is true (see its own doc comment), so gating
           this panel to `currentChar === null` loses no coverage: once a
           selection sets `currentChar`, the per-char block becomes the single
@@ -5934,7 +5934,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 }),
               },
               forward: {
-                label: t({ id: "editor.assignLoop.doneButton", message: "Done" }),
+                label: t({ id: "editor.assignLoop.doneButton", message: "Continue" }),
                 onClick: handleContinue,
                 testId: "touch-continue",
               },
@@ -5980,7 +5980,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               live-but-dead Back would look active but do nothing. The
               forward slot mirrors MechanismGallery's forwardButton gating:
               currentChar can now be a detected/already-covered character
-              selected the same way, and the walk's own Next/Done isn't a
+              selected the same way, and the walk's own Next/Continue isn't a
               "global Next" for that inspection, so `touchForwardButton` (see
               its own doc comment above) is null in exactly that case;
               otherwise (including the TOP-PRIORITY allCovered case) it
@@ -6028,7 +6028,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               orphaned-key-edit notice. The uncovered-chars half is now
               (mechanism-gallery-progression) derived LIVE from the mark-aware
               `unaccountedTouchMessage` rather than set imperatively on a click
-              attempt — so the reason Done/Continue is disabled is visible
+              attempt — so the reason Continue is disabled is visible
               proactively in the character pane, matching MechanismGallery's
               inline hint, and recomputes automatically on every edit or mark
               toggle; see `completionGateNotice`'s own doc comment. */}
@@ -6223,7 +6223,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             modality="touch"
           />
 
-          {/* Mark for later review. Back and Next/Done live in the shared
+          {/* Mark for later review. Back and Next/Continue live in the shared
               top toolbar row above so the forward-advance control is
               spatially separated from these editing actions.
               Apply no longer lives here: it moved into the header of

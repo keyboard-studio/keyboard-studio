@@ -30,6 +30,18 @@ describe("FONT_OPTIONS", () => {
     });
   });
 
+  it("includes Andika as the third entry", () => {
+    expect(FONT_OPTIONS[2]).toEqual({
+      value: "andika",
+      label: "Andika",
+      stack: "'Andika', sans-serif",
+    });
+  });
+
+  it("has exactly three font options", () => {
+    expect(FONT_OPTIONS).toHaveLength(3);
+  });
+
   it("DEFAULT_PHASE_B_FONT is one of FONT_OPTIONS's own values", () => {
     expect(FONT_OPTIONS.some((o) => o.value === DEFAULT_PHASE_B_FONT)).toBe(true);
   });
@@ -42,6 +54,10 @@ describe("phaseBFontStack", () => {
 
   it("resolves 'charis-sil' to the Charis SIL stack", () => {
     expect(phaseBFontStack("charis-sil")).toBe("'Charis SIL', serif");
+  });
+
+  it("resolves 'andika' to the Andika stack", () => {
+    expect(phaseBFontStack("andika")).toBe("'Andika', sans-serif");
   });
 
   it("falls back to the default font's stack for an unknown value", () => {
@@ -60,6 +76,10 @@ describe("isPhaseBFontValue", () => {
 
   it("accepts 'charis-sil'", () => {
     expect(isPhaseBFontValue("charis-sil")).toBe(true);
+  });
+
+  it("accepts 'andika'", () => {
+    expect(isPhaseBFontValue("andika")).toBe(true);
   });
 
   it("rejects an empty string", () => {

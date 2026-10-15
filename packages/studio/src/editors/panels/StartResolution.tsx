@@ -58,7 +58,7 @@ function buildReasonLabel(reason: ResolvedReason, i18n?: I18n): string {
 //   language-match-multilingual → Badge "success" (var(--sil-green)) — covers it too
 //   genealogical                → Badge "accent"  (var(--app-accent))
 //   script-match                → Badge "default" (neutral) — weaker than a relative
-//   language-cross-script       → Badge "warn"    (var(--sil-orange-dark))
+//   language-cross-script       → Badge "warn"    (var(--app-warning-text))
 //   us-qwerty-fallback          → Badge "subtle"  (var(--app-text-subtle))
 const REASON_TONE: Record<ResolvedReason, BadgeTone> = {
   "language-match-monolingual": "success",
@@ -257,7 +257,7 @@ export function StartResolution({
   });
 
   if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="starting.picker.loading">Loading starting keyboards...</Trans></div>;
-  if (error !== null) return <div style={{ color: "var(--danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
+  if (error !== null) return <div style={{ color: "var(--app-danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
   if (bases.length === 0)
     return (
       <div role="status" style={{ color: "var(--app-text-muted)", fontSize: 13, fontFamily: "var(--app-font)" }}>

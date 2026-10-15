@@ -9,8 +9,8 @@
 //   Compile gate  -> 18.6 KM_LINT_INVENTORY_UNCOVERED (also needs keyboardIR + inventory — use lintWithContext)
 //   Submit        -> all of the above
 //   18.7 KM_LINT_MANDATED_CHAR_MISSING (implemented — see checks/criteria/check-currency.ts)
-//   1.10b KM_LINT_KPJ_FORMAT_OUTDATED -> DEFERRED; not implemented (catalog row only —
-//        would compare an adapted .kpj's root `version` against the scaffolder's pinned value)
+//   1.10b KM_LINT_KPJ_FORMAT_OUTDATED + 2.7 KM_LINT_KPJ_VERSION_BUMPED (implemented —
+//        see checks/criteria/check-kpj.ts; structural .kpj form per ruling B, no numeric pin)
 //
 // The locked LintEngineService.lint() interface runs 18.1–18.5 only (no compiled artefacts
 // needed). Callers that have a KeyboardIR + LinguistInventory (e.g. the compile gate)

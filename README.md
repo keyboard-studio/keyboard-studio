@@ -45,7 +45,6 @@ Run `pnpm build` before `pnpm typecheck` or `pnpm test` on a clean checkout — 
 | [`packages/contracts/`](packages/contracts/) | `@keyboard-studio/contracts` — the locked shared TypeScript contract and the dependency root: types, service interfaces, mocks, fixtures, zod schemas, criteria catalog. |
 | [`packages/engine/`](packages/engine/) | `@keyboard-studio/engine` — codec (`.kmn` ↔ `KeyboardIR`), scaffolder, validator (Layer A/A'/B), compiler (`kmcmplib` wrapper), simulator, recognizer, strategy selector, pattern library, layout charts, and output (VirtualFS → `.kmp` / `.zip`). |
 | [`packages/keyboard-lint/`](packages/keyboard-lint/) | `@keymanapp/keyboard-lint` — the Layer C hygiene lint engine, including the documentation checks. |
-| [`packages/llm/`](packages/llm/) | `@keyboard-studio/llm` — pluggable LLM client for prompt-driven assistance. |
 | [`packages/glottolog/`](packages/glottolog/) | `@keyboard-studio/glottolog` — offline, pinned Glottolog classification catalog plus the bridge that ranks candidate base keyboards from close genealogical relatives when a language has none. |
 | [`packages/studio/`](packages/studio/) | `@keyboard-studio/studio` — the React + Vite authoring SPA (three-pane gallery / editor / preview over a single working copy). |
 | [`api/`](api/) | Vercel serverless functions (OAuth exchange, managed PR submission, draft sync, crash reports). Outside the pnpm workspace; bundled separately and kept bundle-safe by [`api/bundle-safety.test.ts`](api/bundle-safety.test.ts). |

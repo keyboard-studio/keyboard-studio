@@ -113,10 +113,3 @@ export function installConsoleBreadcrumbs(): void {
   };
 }
 
-/** Restore the original console methods. Test seam; not used by the app. */
-export function _uninstallConsoleBreadcrumbs(): void {
-  if (originalError !== undefined) console.error = originalError;
-  if (originalWarn !== undefined) console.warn = originalWarn;
-  originalError = undefined;
-  originalWarn = undefined;
-}

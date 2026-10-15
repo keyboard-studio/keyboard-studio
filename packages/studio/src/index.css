@@ -1,12 +1,11 @@
 /* Token-layer import manifest (epic #533). Import order is cascade order:
  * brand (raw palette) -> colors (semantic --app-* light/navy) -> typography
- * -> geometry -> legacy (deprecated aliases, must load last so its
- * naming-collision override in legacy.css wins — see the comment there). */
+ * -> geometry. (The deprecated pre-#533 aliases in styles/legacy.css were
+ * deleted once every call site migrated to the --app-* tokens directly.) */
 @import "./styles/brand.css";
 @import "./styles/colors.css";
 @import "./styles/typography.css";
 @import "./styles/geometry.css";
-@import "./styles/legacy.css";
 
 * {
   box-sizing: border-box;
@@ -15,9 +14,23 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--ui);
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: var(--app-font);
+}
+
+/* Themed placeholder text (issue #1985) -----------------------------------
+ * No stylesheet set ::placeholder, so every input fell back to Chrome's
+ * fixed #757575 default grey: visibly dim on navy, but on light nearly as
+ * dark as label text — an empty field read as filled in. The token keeps
+ * placeholders visibly dimmer than typed text on both themes while clearing
+ * WCAG 1.4.3 where a placeholder carries meaning. opacity: 1 defeats
+ * Firefox's default placeholder dimming so the token value is what renders.
+ * A class cannot express a pseudo-element, hence a global element rule. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--app-placeholder);
+  opacity: 1;
 }
 
 /* Shared control conventions (issue #536) ---------------------------------
@@ -258,12 +271,12 @@ body {
  * which at `--primary` would have measured 4.25:1 and quietly failed. */
 .crash-notice,
 .crash-recovery {
-  background: var(--card);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
+  border: 1px solid var(--app-border-strong);
   border-radius: 8px;
   padding: 12px 16px;
-  font-family: var(--ui);
+  font-family: var(--app-font);
 }
 
 .crash-notice a,
@@ -281,7 +294,7 @@ body {
   min-height: var(--control-h);
   padding: 6px 14px;
   background: var(--app-accent-subtle);
-  color: var(--text);
+  color: var(--app-text);
   border: 1px solid var(--app-accent);
   border-radius: 6px;
   font: inherit;

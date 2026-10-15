@@ -43,6 +43,8 @@ export { parseKmnHeaderStores } from "./compiler/parseKmnHeaderStores.js";
 export type { KmnHeaderStore } from "./compiler/parseKmnHeaderStores.js";
 export { parseKpjFlags } from "./compiler/parseKpjFlags.js";
 export type { CompilerOptions } from "./compiler/parseKpjFlags.js";
+export { parseKpjForm } from "./compiler/parseKpjForm.js";
+export type { KpjFormFacts } from "./compiler/parseKpjForm.js";
 
 // Issue #39 — release-tree source loader (proxy + VFS hydration).
 export { fetchKeyboardSourceToVfs } from "./loader/fetchKeyboardSourceToVfs.js";

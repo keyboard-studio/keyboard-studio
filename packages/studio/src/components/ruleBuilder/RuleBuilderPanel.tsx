@@ -52,6 +52,8 @@ import {
   TEXT_MAIN,
 } from "../../ui/theme.ts";
 import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
+import { plural } from "@lingui/core/macro";
+import { summarizeSelection } from "./bundleSummary.ts";
 
 /* RuleFamily is imported from "@keyboard-studio/engine/kmAssist" above. */
 
@@ -406,6 +408,62 @@ export function RuleBuilderPanel({
 
   // -- Step 1: name + auto-drafted description --------------------------------
 
+  /**
+   * One summary sentence per kind of selected family (#1986), via the
+   * `plural()` macro so counts are real ICU plurals. The ids are string
+   * literals (not built from the kind) so `lingui extract` picks them up.
+   * Counts are summed across families of the same kind; internal names
+   * (store ids, "the assist layer") never appear because the sentences never
+   * quote family explanations.
+   */
+  const describeSegment = (kind: RuleKind, count: number): string => {
+    switch (kind) {
+      case "plain-output":
+        return t({
+          id: "ruleBuilder.summary.kind.plainOutput",
+          message: plural(count, {
+            one: "# rule where each key produces its assigned output — a character or a deadkey.",
+            other:
+              "# rules where each key produces its assigned output — a character or a deadkey.",
+          }),
+        });
+      case "blocking":
+        return t({
+          id: "ruleBuilder.summary.kind.blocking",
+          message: plural(count, {
+            one: "# rule where the key is blocked under specific conditions — it produces nothing.",
+            other:
+              "# rules where the key is blocked under specific conditions — it produces nothing.",
+          }),
+        });
+      case "context":
+        return t({
+          id: "ruleBuilder.summary.kind.context",
+          message: plural(count, {
+            one: "# rule where a preceding character changes what the key types.",
+            other: "# rules where a preceding character changes what the key types.",
+          }),
+        });
+      case "reorder":
+        return t({
+          id: "ruleBuilder.summary.kind.reorder",
+          message: plural(count, {
+            one: "# rule that reorders the matched context, emitting an earlier item in its place.",
+            other:
+              "# rules that reorder the matched context, emitting an earlier item in its place.",
+          }),
+        });
+      case "opaque":
+        return t({
+          id: "ruleBuilder.summary.kind.opaque",
+          message: plural(count, {
+            one: "# rule shown as written.",
+            other: "# rules shown as written.",
+          }),
+        });
+    }
+  };
+
   const bundleId = slugify(bundleName.trim());
 
   const selectedFamilies = groups.filter(group =>
@@ -415,10 +473,15 @@ export function RuleBuilderPanel({
   const fallbackKeyboardName = keyboardMeta.name;
   const draftDescription =
     selectedFamilies.length > 0
-      ? selectedFamilies.map(group => group.family.explanation).join(" ")
+      ? summarizeSelection(groups, ungroupedRules, includedIds)
+          .map(segment => describeSegment(segment.kind, segment.count))
+          .join(" ")
       : t({
           id: "ruleBuilder.description.fallback",
-          message: `${fallbackRuleCount} rules from ${fallbackKeyboardName}.`,
+          message: plural(fallbackRuleCount, {
+            one: `# rule from ${fallbackKeyboardName}.`,
+            other: `# rules from ${fallbackKeyboardName}.`,
+          }),
         });
   const description = descriptionOverride ?? draftDescription;
 
@@ -906,7 +969,7 @@ export function RuleBuilderPanel({
           onChange={event => setBundleName(event.target.value)}
           placeholder={t({
             id: "ruleBuilder.name.placeholder",
-            message: "Cameroon diacritic blocking",
+            message: "e.g. Cameroon diacritic blocking",
           })}
           style={{ ...fieldStyle, marginBottom: 8 }}
         />

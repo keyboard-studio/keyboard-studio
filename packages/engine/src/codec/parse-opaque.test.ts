@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "./parse.js";
+import { emit } from "./emit.js";
 import { OPAQUE_REASONS } from "./opaque-reasons.js";
 
 // KMN with opaque constructs:
@@ -252,5 +253,95 @@ group(main) using keys
 `;
     const { ir } = parse(kmn, "store-if");
     expect(ir.raw.map((r) => r.reason)).toContain(OPAQUE_REASONS.IF_OPTION_STORE);
+  });
+});
+
+// Bracketed menu-store literal inside a STORE BODY: the old-style multi-tap
+// menu syntax from the Keyman advanced docs. The bracketed entries are key
+// sequences, not literal characters, so the store must go opaque rather than
+// being expanded character by character.
+describe("parse opaque — bracketed menu-store literal in a store body", () => {
+  const MENU_KMN = `store(&NAME) 'Menu Store'
+store(a_menu) '[1ae 2a 3a 4a 5a 6a]'
+
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+
+  it("marks the store opaque with reason menu-store-syntax", () => {
+    const { ir } = parse(MENU_KMN, "menu-store");
+    const reasons = ir.raw.map((r) => r.reason);
+    expect(reasons).toContain(OPAQUE_REASONS.MENU_STORE_SYNTAX);
+  });
+
+  it("does NOT emit the menu store into ir.stores (no char-by-char expansion)", () => {
+    const { ir } = parse(MENU_KMN, "menu-store");
+    expect(ir.stores.find((s) => s.name === "a_menu")).toBeUndefined();
+  });
+
+  it("preserves the store source verbatim in the RawKmnFragment", () => {
+    const { ir } = parse(MENU_KMN, "menu-store");
+    const frag = ir.raw.find((r) => r.reason === OPAQUE_REASONS.MENU_STORE_SYNTAX);
+    expect(frag?.sourceText).toContain("store(a_menu)");
+    expect(frag?.sourceText).toContain("'[1ae 2a 3a 4a 5a 6a]'");
+  });
+
+  it("does not fabricate char items in the fragment's storeSketch", () => {
+    const { ir } = parse(MENU_KMN, "menu-store");
+    const frag = ir.raw.find((r) => r.reason === OPAQUE_REASONS.MENU_STORE_SYNTAX);
+    expect(frag?.storeSketch).toBeUndefined();
+  });
+
+  it("opaqueFeatures inventory reflects menu-store-syntax", () => {
+    const { opaqueFeatures } = parse(MENU_KMN, "menu-store");
+    const features = opaqueFeatures.map((f) => f.feature);
+    expect(features).toContain(OPAQUE_REASONS.MENU_STORE_SYNTAX);
+  });
+
+  it("emit leaves the menu store source text byte-identical", () => {
+    const { ir } = parse(MENU_KMN, "menu-store");
+    expect(emit(ir)).toContain("store(a_menu) '[1ae 2a 3a 4a 5a 6a]'");
+  });
+
+  it("a quoted store whose '[' is not at position 0 still expands to char items", () => {
+    const kmn = `store(&NAME) 'Plain Store'
+store(plain) 'a[b'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+    const { ir } = parse(kmn, "menu-store-negative");
+    const store = ir.stores.find((s) => s.name === "plain");
+    expect(store?.items).toEqual([
+      { kind: "char", value: "a" },
+      { kind: "char", value: "[" },
+      { kind: "char", value: "b" },
+    ]);
+    expect(ir.raw.map((r) => r.reason)).not.toContain(OPAQUE_REASONS.MENU_STORE_SYNTAX);
+  });
+
+  it("a lone '[' literal is a bracket-character store, not menu syntax", () => {
+    // Real keyboards store a single bracket character (sil_yoruba8:
+    // store(key.grv) '['). Only a complete bracketed group with content
+    // ('[1ae 2a …]') is menu syntax; swallowing the lone bracket broke
+    // pattern-apply store resolution for such keyboards.
+    const kmn = `store(&NAME) 'Bracket Store'
+store(key.grv) '['
+store(key.all) '[' ']' ';'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+    const { ir } = parse(kmn, "bracket-char-store");
+    expect(ir.raw.map((r) => r.reason)).not.toContain(OPAQUE_REASONS.MENU_STORE_SYNTAX);
+    expect(ir.stores.find((s) => s.name === "key.grv")?.items).toEqual([
+      { kind: "char", value: "[" },
+    ]);
+    expect(ir.stores.find((s) => s.name === "key.all")?.items).toEqual([
+      { kind: "char", value: "[" },
+      { kind: "char", value: "]" },
+      { kind: "char", value: ";" },
+    ]);
   });
 });

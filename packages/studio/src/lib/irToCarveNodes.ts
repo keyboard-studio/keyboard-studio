@@ -188,6 +188,21 @@ const INVISIBLE_CHAR_LABELS: Record<string, string> = {
   '\u2068': 'FIRST STRONG ISOLATE',
   '\u2069': 'POP DIRECTIONAL ISOLATE',
   '\u061C': 'ARABIC LETTER MARK',
+  // #1794 — the invisibles gallery's full format-character inventory: the
+  // Arabic number signs and the invisible math operators have no
+  // "you need this if…" statement, but they still need a real name
+  // (verified against the pinned Unicode table, @keyboard-studio/contracts/unicode).
+  '\u0600': 'ARABIC NUMBER SIGN',
+  '\u0601': 'ARABIC SIGN SANAH',
+  '\u0602': 'ARABIC FOOTNOTE MARKER',
+  '\u0603': 'ARABIC SIGN SAFHA',
+  '\u0604': 'ARABIC SIGN SAMVAT',
+  '\u0605': 'ARABIC NUMBER MARK ABOVE',
+  '\u06DD': 'ARABIC END OF AYAH',
+  '\u2061': 'FUNCTION APPLICATION',
+  '\u2062': 'INVISIBLE TIMES',
+  '\u2063': 'INVISIBLE SEPARATOR',
+  '\u2064': 'INVISIBLE PLUS',
 };
 
 /** Returns a short label if the character is invisible/non-printing, otherwise null. */

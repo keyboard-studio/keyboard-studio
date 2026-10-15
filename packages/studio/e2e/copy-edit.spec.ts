@@ -834,7 +834,10 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
 
     // The invisible-characters step (spec 075) sits between punctuation and
     // convenience and always renders, so it is the next entry on the stack…
-    await expect(page.getByRole("heading", { name: /Invisible characters/i })).toBeVisible({
+    // Target the step heading by testid: the step's gallery pane carries the
+    // same "Invisible characters" text as its own h3, so a role+name query
+    // matches both and strict mode rejects it.
+    await expect(page.getByTestId("invisibles-heading")).toBeVisible({
       timeout: 20_000,
     });
     await page.getByRole("button", { name: "Back", exact: true }).click();
@@ -876,12 +879,12 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 20_000 });
     await page.fill('[aria-label="Character to add"]', FIXTURE.charToAdd);
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 10_000 });
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 10_000 });
 
     // Forward again: Back + Forward round-trips back to Carve — confirms the
     // history/back-nav stayed coherent across the reload+restore (not merely
     // that the CURRENT step survived).
-    await page.click('[data-testid="phase-b-done"]');
+    await page.click('[data-testid="charlist-done"]');
     // The forward path re-traverses the same conditional steps Back walked
     // through; the shared drivers no-op cleanly when a step is skipped.
     await driveMarksSeries(page);

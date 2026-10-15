@@ -57,7 +57,7 @@ vi.mock("./Prefill.tsx", () => ({
     mockPrefillBackRef.current = onBack ?? null;
     return (
       <div data-testid="mock-prefill">
-        <button type="button" data-testid="prefill-confirm" onClick={onConfirm}>
+        <button type="button" data-testid="prefill-continue" onClick={onConfirm}>
           confirm
         </button>
         {onBack !== undefined && (
@@ -199,7 +199,7 @@ describe("CharactersStep — prefill -> PhaseB -> complete", () => {
 
     // Confirm transitions to PhaseB — which mounts behind a lazy boundary
     // since spec 090 T021, so await its mount.
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
 
     expect(screen.queryByTestId("mock-prefill")).toBeNull();
     expect(await screen.findByTestId("mock-phase-b")).toBeTruthy();
@@ -227,7 +227,7 @@ describe("CharactersStep — PhaseB back returns to prefill", () => {
 
     render(<CharactersStepHost onComplete={onComplete} onBack={onBack} />);
 
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("phaseB-back"));
@@ -355,7 +355,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     expect(screen.getByTestId("mock-prefill")).toBeTruthy();
 
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
 
     // Both fit the new evidence's script (Latn), so neither is flagged.
     expect(getCharacterInventoryValue().chars).toEqual(["é", "ŋ"]);
@@ -371,7 +371,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     fireEvent.click(screen.getByTestId("phaseB-back"));
     expect(getCharacterInventoryValue().chars).toEqual(["é"]);
 
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
     expect(getCharacterInventoryValue().chars).toEqual(["é"]);
   });
 
@@ -381,7 +381,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     expect(getCharacterInventoryValue().alphabetEvidenceKey).toBeUndefined();
 
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
 
     // (A draft saved before spec 079 is stamped on restore instead — see
     // draftPersistence.test.ts — so it never reaches this branch.)
@@ -392,7 +392,7 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
   it("a first build (empty alphabet) stamps the current key", () => {
     seedSessionStore();
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
     expect(getCharacterInventoryValue().alphabetEvidenceKey).toBe(CURRENT_KEY);
   });
 });
@@ -417,7 +417,7 @@ describe("CharactersStep — sub-screen position survives a leave-and-return (sp
     expect(useSurveyAnswerStore.getState().steps["characters"]?.position).toBe("prefill");
 
     // Advance to sub-screen 2 (PhaseB / "intro" — discoveryMethod still null).
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
     expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
     expect(useSurveyAnswerStore.getState().steps["characters"]?.position).toBe("intro");
 
@@ -505,7 +505,7 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
 
     render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
 
     expectUnchangedAndOnBuildList(before);
   });
@@ -529,7 +529,7 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
 
       render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
       expect(screen.getByTestId("mock-prefill")).toBeTruthy();
-      fireEvent.click(screen.getByTestId("prefill-confirm"));
+      fireEvent.click(screen.getByTestId("prefill-continue"));
 
       expectUnchangedAndOnBuildList(before);
     },
@@ -553,7 +553,7 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
       render(<CharactersStepHost onComplete={vi.fn()} onBack={vi.fn()} />);
       fireEvent.click(screen.getByTestId("phaseB-back"));
       act(patch);
-      fireEvent.click(screen.getByTestId("prefill-confirm"));
+      fireEvent.click(screen.getByTestId("prefill-continue"));
 
       const s = getCharacterInventoryValue();
       // The proposal chars ("a", "b") are gone with the reset; the author's own
@@ -599,7 +599,7 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     fireEvent.click(screen.getByTestId("phaseB-back"));
     // Base changes (still Latin script) — the addition fits.
     act(() => useSurveySessionStore.setState({ localStart: { ...fakeStart, id: "basic_kbdfr" } }));
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
 
     const s = getCharacterInventoryValue();
     expect(s.chars).toEqual(["ŋ"]);
@@ -618,7 +618,7 @@ describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)",
     // the derived identity composes bcp47 "tl-Cyrl" with prefill.script
     // "Cyrl", the shape this test used to patch into the session store.
     act(() => seedIdentity({ ...fakeIdentity, targetScriptRaw: "Cyrl" }));
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
 
     const s = getCharacterInventoryValue();
     expect(s.chars).toEqual(["ŋ"]); // kept, not dropped

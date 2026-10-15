@@ -1073,6 +1073,21 @@ describe("draftPersistence", () => {
       expect(getCharacterInventoryValue().selectedFont).toBe("charis-sil");
     });
 
+    it("a valid persisted selectedFont ('andika') round-trips intact through save + load", () => {
+      const pk = "phaseb-draft-valid-font-andika";
+      instantiateMinimal(pk);
+      inventoryOps("characters").setSelectedFont("andika");
+      saveDraft(pk);
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      resetInventoryDraft();
+      inventoryOps("characters").setSelectedFont(DEFAULT_PHASE_B_FONT);
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(getCharacterInventoryValue().selectedFont).toBe("andika");
+    });
+
     it("installDraftAutosave also debounce-saves an inventory decision mutation (same 500ms window, no new timer)", () => {
       vi.useFakeTimers();
       const pk = "phaseb-draft-autosave";

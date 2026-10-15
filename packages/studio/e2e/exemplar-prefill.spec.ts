@@ -45,7 +45,7 @@ async function reachPhaseBChooser(page: Page): Promise<void> {
   await chooseAdaptTrack(page);
   await driveAttributionStep(page);
   await confirmPrefill(page);
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 30_000 });
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 30_000 });
 }
 
 /** The exemplar option's radio, or null when no inventory was offered. */
@@ -75,10 +75,10 @@ test.describe("Phase B exemplar prefill", () => {
     await expect(preview).toContainText("ɛ");
 
     // Action 1: Continue.
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.click('[data-testid="charlist-continue"]');
 
     // Page 2 arrives PREFILLED. Nothing has been typed into the character box.
-    const done = page.locator('[data-testid="phase-b-done"]');
+    const done = page.locator('[data-testid="charlist-done"]');
     await expect(done).toBeEnabled({ timeout: 15_000 });
     await expect(page.getByTestId("phase-b-heading")).toContainText("Confirm your alphabet");
     await expect(page.locator('[aria-label="Character to add"]')).toHaveValue("");
@@ -93,7 +93,7 @@ test.describe("Phase B exemplar prefill", () => {
 
     // Action 2: Done. Two actions total, zero characters typed.
     await done.click();
-    await expect(page.locator('[data-testid="phase-b-intro-next"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="charlist-continue"]')).toHaveCount(0);
   });
 
   test("decline: records only what the author typed, and does not re-assert (SC-009)", async ({
@@ -104,12 +104,12 @@ test.describe("Phase B exemplar prefill", () => {
 
     // Choose to build the list by hand instead — a first-class choice.
     await page.click("#discovery_method-build-list");
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.click('[data-testid="charlist-continue"]');
 
     // Page 2 arrives EMPTY.
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 15_000 });
     await expect(page.getByTestId("proposed-char-chip")).toHaveCount(0);
-    await expect(page.locator('[data-testid="phase-b-done"]')).toBeDisabled();
+    await expect(page.locator('[data-testid="charlist-done"]')).toBeDisabled();
     await expect(page.getByTestId("phase-b-heading")).toContainText("Add your whole alphabet");
 
     // Declining is not a dead end: the proposal is still one click away,
@@ -128,7 +128,7 @@ test.describe("Phase B exemplar prefill", () => {
     // Re-entering Phase B does not re-assert the exemplar set as the default
     // (FR-016a) — the decline is remembered.
     await page.getByRole("button", { name: "Back" }).first().click();
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
     await expect(exemplarOption(page)).not.toBeChecked();
     await expect(page.locator("#discovery_method-build-list")).toBeChecked();
     // Still offered, though — declining once is not a permanent removal.

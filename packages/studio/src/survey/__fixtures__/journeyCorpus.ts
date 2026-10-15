@@ -1,6 +1,6 @@
 // The journey corpus (spec 032): every content/journeys/*.yaml fixture, imported
 // once for the suites that replay or measure it (journey-runner.test.ts,
-// dashboard/journeyCoverage.report.test.ts). Add a new journey here and both
+// test/journeyCoverage.report.test.ts). Add a new journey here and both
 // pick it up.
 
 import { parseJourneyFixture, type JourneyFixture } from "../journeyFixture.ts";

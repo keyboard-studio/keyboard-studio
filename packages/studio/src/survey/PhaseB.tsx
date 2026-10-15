@@ -356,6 +356,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
         />
         <button
           type="button"
+          data-testid="charlist-add"
           disabled={addDisabled}
           onClick={add}
           style={{ ...primaryButton(addDisabled), whiteSpace: "nowrap" }}
@@ -971,7 +972,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
     });
   }
 
-  // Back / Done render in the footer (spec 081); this screen is the step's
+  // Back / Continue render in the footer (spec 081); this screen is the step's
   // only publisher while it is shown.
   usePublishStepNav({
     back: {
@@ -983,12 +984,12 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       label: t({
         id: "survey.phaseB.buildList.doneButton",
         message: plural(chars.length, {
-          one: "Done (# character)",
-          other: "Done (# characters)",
+          one: "Continue (# character)",
+          other: "Continue (# characters)",
         }),
       }),
       onClick: handleDone,
-      testId: "phase-b-done",
+      testId: "charlist-done",
       disabled: doneDisabled,
     },
   });
@@ -1429,7 +1430,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
     forward: {
       label: t({ id: "survey.phaseB.intro.continueButton", message: "Continue" }),
       onClick: handleContinue,
-      testId: "phase-b-intro-next",
+      testId: "charlist-continue",
     },
   });
 
