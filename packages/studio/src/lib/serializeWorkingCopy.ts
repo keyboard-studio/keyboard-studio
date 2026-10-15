@@ -245,7 +245,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { startVfs, startIr, startKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, docFixProposals, ir: workingIr, contextToleranceOverlay } = state;
+  const { startVfs, startIr, startKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, startLicenseText, startHolderOverride, helpDocs, startWelcomeHtmText, startHelpPhpText, startDocCssTexts, startWelcomeImages, startWelcomeImagesDropped, startReadmeMdText, startHistoryMdText, historyEntryState, chartPreference, docFixProposals, ir: workingIr, contextToleranceOverlay } = state;
 
   // Not-instantiated guard.
   if (startVfs === null || startIr === null || startKeyboard === null) {
@@ -637,11 +637,13 @@ export async function projectWorkingCopyForOutput(
 
   // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
   // kb.css gains the constraining rule. This engages only when a kb.css is
-  // actually in the working copy — on the adapt path that depends on the
-  // loader carrying it (issue 2139); when no kb.css is present there is
-  // nothing to amend and the proposal stays visibly unlanded rather than
-  // pretending otherwise. Idempotent: a stylesheet already carrying an
-  // img max-width rule is left alone.
+  // actually in the working copy — on the adapt path the loader carries it
+  // fetch-don't-write in the startDocCssTexts slice (issue 2139); when no
+  // kb.css is present there is nothing to amend and the proposal stays
+  // visibly unlanded rather than pretending otherwise. Idempotent: a
+  // stylesheet already carrying an img max-width rule is left alone.
+  // Declined or unanswered writes nothing: the slice stays out of the
+  // output, exactly as the loader left it out of the start VFS.
   if (isAdaptation && docFixProposals?.imageWidth === "accepted") {
     for (const path of clonedVfs.list()) {
       if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(path)) continue;
@@ -649,6 +651,18 @@ export async function projectWorkingCopyForOutput(
       if (css === undefined) continue;
       if (/\bimg\s*\{[^}]*\bmax-width\s*:/i.test(css)) continue;
       clonedVfs.set(path, `${css.replace(/\s+$/, "")}\nimg { max-width: 100%; }\n`, false);
+    }
+    // A slice-carried kb.css is not in the clone yet: write it at its own
+    // path with the rule appended, so the shipped package carries the
+    // stylesheet its pages link. A path the clone already carries was
+    // amended in place above and is not overwritten by the slice text.
+    for (const entry of startDocCssTexts ?? []) {
+      if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(entry.path)) continue;
+      if (readVfsText(clonedVfs, entry.path) !== undefined) continue;
+      const css = /\bimg\s*\{[^}]*\bmax-width\s*:/i.test(entry.text)
+        ? entry.text
+        : `${entry.text.replace(/\s+$/, "")}\nimg { max-width: 100%; }\n`;
+      clonedVfs.set(entry.path, css, false);
     }
   }
 

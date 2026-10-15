@@ -627,8 +627,30 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
       [sourceUrl(euroLatinKb, "help/kb.css")]: ok(".help { width: 90%; }"),
     });
     // Welcome first, then help; the conventional kb.css candidate the link
-    // already named is deduped, not fetched twice.
-    expect(result.startDocCssTexts).toEqual([".full { width: 98%; }", ".help { width: 90%; }"]);
+    // already named is deduped, not fetched twice. Each text carries the
+    // path it was fetched from, so a consumer can write it back at its own
+    // location.
+    expect(result.startDocCssTexts).toEqual([
+      { path: "source/welcome/kb.css", text: ".full { width: 98%; }" },
+      { path: "source/help/kb.css", text: ".help { width: 90%; }" },
+    ]);
+  });
+
+  it("a stylesheet that fails to fetch is skipped and the surviving entry keeps its own path", async () => {
+    const { result } = await run({
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>folder page</body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+      [sourceUrl(euroLatinKb, "help/sil_euro_latin.php")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>help page</body></html>',
+      ),
+      // help/kb.css is not served (404): no entry, and the welcome entry is
+      // not misattributed to the help path.
+    });
+    expect(result.startDocCssTexts).toEqual([
+      { path: "source/welcome/kb.css", text: ".full { width: 98%; }" },
+    ]);
   });
 
   it("startDocCssTexts is undefined when no page names a fetchable stylesheet", async () => {

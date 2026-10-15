@@ -662,6 +662,74 @@ describe("serializeWorkingCopy — doc-fix proposals (issue #1908)", () => {
     const kbCss = vfs.get("source/help/kb.css")?.content as string;
     expect(kbCss).toBe(KB_CSS);
   });
+
+  // The loader's real adapt path: kb.css is fetch-don't-write and rides
+  // the startDocCssTexts slice; it is never in the start VFS.
+  function seedCameroonAdaptSliceOnly(
+    proposals: Parameters<ReturnType<typeof useWorkingCopyStore.getState>["setDocFixProposals"]>[0],
+    entries: Array<{ path: string; text: string }>,
+  ) {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    ir.header.version = "1.0";
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    const wc = useWorkingCopyStore.getState();
+    wc.setStartWelcomeHtmText(CAMEROON_WELCOME);
+    wc.setStartHelpPhpText(CAMEROON_HELP);
+    wc.setStartDocCssTexts(entries);
+    wc.setDocFixProposals(proposals);
+  }
+
+  it("accepted image-width writes each slice kb.css into the output at its own path, with the rule appended", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdaptSliceOnly({ imageWidth: "accepted" }, [
+      { path: "source/welcome/kb.css", text: ".wide {\n  width: 90%;\n}\n" },
+      { path: "source/help/kb.css", text: KB_CSS },
+    ]);
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const vfs = projected!.vfs;
+
+    const helpCss = vfs.get("source/help/kb.css")?.content as string;
+    expect(helpCss).toContain(".full {");
+    expect(helpCss).toContain("img { max-width: 100%; }");
+    const welcomeCss = vfs.get("source/welcome/kb.css")?.content as string;
+    expect(welcomeCss).toContain(".wide {");
+    expect(welcomeCss).toContain("img { max-width: 100%; }");
+
+    // The start VFS itself is never mutated (fetch-don't-write end to end).
+    const startVfs = useWorkingCopyStore.getState().startVfs;
+    expect(startVfs?.get("source/help/kb.css")).toBeUndefined();
+    expect(startVfs?.get("source/welcome/kb.css")).toBeUndefined();
+  });
+
+  it("accepted image-width leaves a slice kb.css that already carries the rule byte-identical", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    const ALREADY = ".full {\n  width: 98%;\n}\nimg { max-width: 100%; }\n";
+    seedCameroonAdaptSliceOnly({ imageWidth: "accepted" }, [
+      { path: "source/help/kb.css", text: ALREADY },
+    ]);
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    expect(projected!.vfs.get("source/help/kb.css")?.content as string).toBe(ALREADY);
+  });
+
+  it("declined or unanswered image-width writes no slice kb.css into the output", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCameroonAdaptSliceOnly({ imageWidth: "declined" }, [
+      { path: "source/help/kb.css", text: KB_CSS },
+    ]);
+    const declined = await projectWorkingCopyForOutput();
+    expect(declined).not.toBeNull();
+    expect(declined!.vfs.get("source/help/kb.css")).toBeUndefined();
+
+    seedCameroonAdaptSliceOnly(null, [{ path: "source/help/kb.css", text: KB_CSS }]);
+    const unanswered = await projectWorkingCopyForOutput();
+    expect(unanswered).not.toBeNull();
+    expect(unanswered!.vfs.get("source/help/kb.css")).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

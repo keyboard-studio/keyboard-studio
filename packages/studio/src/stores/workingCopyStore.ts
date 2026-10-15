@@ -53,6 +53,7 @@ import type {
   ContextToleranceOverlay,
   KeyEditOperation,
   KeyEditOverlay,
+  StartDocCssText,
 } from "@keyboard-studio/engine";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import type {
@@ -508,14 +509,16 @@ export interface WorkingCopyState {
    */
   startHistoryMdText: string | null;
   /**
-   * The texts of the stylesheets the base's welcome / help pages use
-   * (conventionally `kb.css` in each page's folder), or null when the base
-   * ships none or on Track 1 (a copy's pages are fresh renders, so the
-   * base's page stylesheets do not govern them). Fetch-don't-write like
-   * {@link startReadmeMdText}; read only by the documentation findings
-   * (criterion 11.8, issue #2139) and the FR-020 baseline computation.
+   * The stylesheets the base's welcome / help pages use (conventionally
+   * `kb.css` in each page's folder), each with the path it was fetched
+   * from, or null when the base ships none or on Track 1 (a copy's pages
+   * are fresh renders, so the base's page stylesheets do not govern them).
+   * Fetch-don't-write like {@link startReadmeMdText}; read by the
+   * documentation findings (criterion 11.8, issue #2139), the FR-020
+   * baseline computation, and the output projection, which writes an
+   * accepted stylesheet amendment back at the entry's own path.
    */
-  startDocCssTexts: string[] | null;
+  startDocCssTexts: StartDocCssText[] | null;
   /**
    * The base's `source/welcome/` image files (spec 079 FR-006), or null when
    * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
@@ -1284,8 +1287,8 @@ export interface WorkingCopyState {
   /** Retain the base's verbatim HISTORY.md (spec 079 FR-006 / criterion 3.4). */
   setStartHistoryMdText: (text: string | null) => void;
 
-  /** Retain the base's welcome/help stylesheet texts (criterion 11.8, issue #2139). */
-  setStartDocCssTexts: (texts: string[] | null) => void;
+  /** Retain the base's welcome/help stylesheets (criterion 11.8, issue #2139). */
+  setStartDocCssTexts: (texts: StartDocCssText[] | null) => void;
 
   /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */
   setStartWelcomeImages: (images: WelcomeFolderImage[] | null) => void;

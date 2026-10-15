@@ -61,6 +61,7 @@ export function DocumentationFixProposals(): React.ReactElement | null {
   const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
   const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startDocCssTexts = useWorkingCopyStore((s) => s.startDocCssTexts);
   const displayName = useWorkingCopyStore(
     (s) => s.identity?.displayName ?? s.startKeyboard?.displayName ?? "",
   );
@@ -71,12 +72,21 @@ export function DocumentationFixProposals(): React.ReactElement | null {
   if (startWelcomeHtmText === null && startHelpPhpText === null) return null;
 
   const codes = new Set(findings.map((f) => f.code));
-  const kbCssPaths = (startVfs?.list("source/") ?? []).filter((p) => KB_CSS_PATH_RE.test(p));
+  // A kb.css counts as present when it is resident in the start VFS or
+  // carried by the startDocCssTexts slice — on the adapt path the loader
+  // delivers the pages' stylesheets fetch-don't-write through the slice,
+  // so the slice is where presence and the row's naming come from.
+  const kbCssPaths = [
+    ...new Set([
+      ...(startVfs?.list("source/") ?? []).filter((p) => KB_CSS_PATH_RE.test(p)),
+      ...(startDocCssTexts ?? []).map((entry) => entry.path).filter((p) => KB_CSS_PATH_RE.test(p)),
+    ]),
+  ];
   const showPagename = codes.has(PAGENAME_CODE) || proposals?.pagename !== undefined;
   const showBodySync = codes.has(BODY_PARITY_CODE) || proposals?.bodySync !== undefined;
   // The kb.css proposal activates only when a kb.css is actually in the
-  // working copy (its presence on the adapt path depends on issue #2139);
-  // an already-recorded answer keeps its row so it stays reversible.
+  // working copy; an already-recorded answer keeps its row so it stays
+  // reversible.
   const showImageWidth =
     (codes.has(OSK_IMAGE_CODE) && kbCssPaths.length > 0) || proposals?.imageWidth !== undefined;
   if (!showPagename && !showBodySync && !showImageWidth) return null;

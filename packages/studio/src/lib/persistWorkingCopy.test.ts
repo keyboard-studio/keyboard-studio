@@ -1018,6 +1018,47 @@ describe("persistWorkingCopy", () => {
       expect(prepared.docFixProposals).toBeNull();
     });
 
+    it("round-trips startDocCssTexts path/text pairs through snapshot/rehydrate", () => {
+      instantiate();
+      const entries = [
+        { path: "source/welcome/kb.css", text: ".wide { width: 90%; }" },
+        { path: "source/help/kb.css", text: ".full { width: 98%; }" },
+      ];
+      useWorkingCopyStore.getState().setStartDocCssTexts(entries);
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().startDocCssTexts).toBeNull();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().startDocCssTexts).toEqual(entries);
+    });
+
+    it("tolerates a legacy startDocCssTexts snapshot of plain texts, dropping them for null", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = {
+        ...snapshot,
+        startDocCssTexts: [".full { width: 98%; }", ".wide { width: 90%; }"],
+      } as unknown as WorkingCopySnapshot;
+      const prepared = prepareWorkingCopySnapshot(legacy);
+      expect(prepared.startDocCssTexts).toBeNull();
+    });
+
+    it("keeps well-formed pairs from a mixed legacy startDocCssTexts snapshot and drops the plain texts", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const mixed = {
+        ...snapshot,
+        startDocCssTexts: [
+          ".full { width: 98%; }",
+          { path: "source/help/kb.css", text: ".full { width: 98%; }" },
+        ],
+      } as unknown as WorkingCopySnapshot;
+      const prepared = prepareWorkingCopySnapshot(mixed);
+      expect(prepared.startDocCssTexts).toEqual([
+        { path: "source/help/kb.css", text: ".full { width: 98%; }" },
+      ]);
+    });
+
     it("a fresh instantiation clears recorded doc-fix proposals (issue #1908)", () => {
       instantiate();
       useWorkingCopyStore.getState().setDocFixProposals({ pagename: "accepted" });

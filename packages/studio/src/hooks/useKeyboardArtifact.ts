@@ -4,6 +4,7 @@ import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
+import type { StartDocCssText } from "@keyboard-studio/engine";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 // Re-exported so tests can assert the open-base fetch passes this exact proxy
@@ -37,8 +38,8 @@ interface EngineModule {
     startHistoryMdText?: string;
     startWelcomeImages?: WelcomeFolderImage[];
     startWelcomeConvention?: WelcomeConvention;
-    // Issue #2139 — the base's welcome/help stylesheet texts (criterion 11.8).
-    startDocCssTexts?: string[];
+    // Issue #2139 — the base's welcome/help stylesheets (criterion 11.8).
+    startDocCssTexts?: StartDocCssText[];
   }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
@@ -992,7 +993,9 @@ export function useKeyboardArtifact(
               touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
               // Issue #2139: the baseline judges the base's images against the
               // same kb.css texts the live check uses (FR-020 consistency).
-              ...(fetchResult.startDocCssTexts !== undefined ? { cssTexts: fetchResult.startDocCssTexts } : {}),
+              ...(fetchResult.startDocCssTexts !== undefined
+                ? { cssTexts: fetchResult.startDocCssTexts.map((entry) => entry.text) }
+                : {}),
               base: {
                 welcomeHtmText: fetchResult.startWelcomeHtmText ?? null,
                 helpPhpText: fetchResult.startHelpPhpText ?? null,

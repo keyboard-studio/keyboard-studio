@@ -110,7 +110,7 @@ describe("useDocumentationFindings", () => {
     const wc = useWorkingCopyStore.getState();
     wc.setStartWelcomeHtmText(BASE_WELCOME);
     wc.setStartHelpPhpText(HELP_WITH_IMAGES);
-    wc.setStartDocCssTexts([KB_CSS]);
+    wc.setStartDocCssTexts([{ path: "source/help/kb.css", text: KB_CSS }]);
     wc.setBaselineDocFindings(
       computeBaselineDocFindings({
         keyboardId: basicKbdus.id,
@@ -208,6 +208,27 @@ describe("useDocumentationFindings — doc-fix proposals (issue #1908)", () => {
 
   it("11.8: with a kb.css in the working copy, the image finding stays when declined and clears when accepted", () => {
     instantiateCameroon(true);
+    const { result, rerender } = renderHook(() => useDocumentationFindings());
+    const code = "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED";
+    expect(result.current.filter((f) => f.code === code).length).toBeGreaterThan(0);
+
+    useWorkingCopyStore.getState().setDocFixProposals({ imageWidth: "declined" });
+    rerender();
+    expect(result.current.filter((f) => f.code === code).length).toBeGreaterThan(0);
+
+    useWorkingCopyStore.getState().setDocFixProposals({ imageWidth: "accepted" });
+    rerender();
+    expect(result.current.filter((f) => f.code === code)).toHaveLength(0);
+  });
+
+  it("11.8: with kb.css only in the startDocCssTexts slice, the image finding stays when declined and clears when accepted", () => {
+    instantiateCameroon(false);
+    const wc = useWorkingCopyStore.getState();
+    wc.setStartWelcomeHtmText(CAMEROON_WELCOME_WITH_IMAGE);
+    wc.setStartHelpPhpText(CAMEROON_HELP_WITH_IMAGE);
+    // The loader's real adapt path: kb.css arrives fetch-don't-write in the
+    // slice and never enters the VFS.
+    wc.setStartDocCssTexts([{ path: "source/help/kb.css", text: ".full {\n  width: 98%;\n}\n" }]);
     const { result, rerender } = renderHook(() => useDocumentationFindings());
     const code = "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED";
     expect(result.current.filter((f) => f.code === code).length).toBeGreaterThan(0);

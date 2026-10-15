@@ -57,7 +57,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
-import type { KeyEditOverlay } from "@keyboard-studio/engine";
+import type { KeyEditOverlay, StartDocCssText } from "@keyboard-studio/engine";
 import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
@@ -369,8 +369,8 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
     startReadmeMdText: s.startReadmeMdText,
     startHistoryMdText: s.startHistoryMdText,
-    // Issue #2139: plain strings, straight passthrough — a resumed draft must
-    // judge 11.8 against the same kb.css the live session saw.
+    // Issue #2139: plain JSON pairs, straight passthrough — a resumed draft
+    // must judge 11.8 against the same kb.css the live session saw.
     startDocCssTexts: s.startDocCssTexts,
     startWelcomeConvention: s.startWelcomeConvention,
     ...(startWelcomeImages !== undefined ? { startWelcomeImages } : {}),
@@ -477,6 +477,27 @@ function withLegacySnapshotKeys(snapshot: WorkingCopySnapshot): WorkingCopySnaps
   return (patched ?? raw) as unknown as WorkingCopySnapshot;
 }
 
+/**
+ * The `startDocCssTexts` slice entries gained their stylesheet path after
+ * drafts were already being saved with plain texts. A legacy string entry
+ * names no path, so it cannot be written back at serialize time and is
+ * dropped on restore; well-formed `{ path, text }` entries pass through.
+ * An absent or fully-legacy value restores as null.
+ */
+function normalizeStartDocCssTexts(
+  value: StartDocCssText[] | null | undefined,
+): StartDocCssText[] | null {
+  if (value === null || value === undefined) return null;
+  const entries = (value as unknown[]).filter(
+    (entry): entry is StartDocCssText =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as StartDocCssText).path === "string" &&
+      typeof (entry as StartDocCssText).text === "string",
+  );
+  return entries.length > 0 ? entries : null;
+}
+
 export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<WorkingCopyData> {
   const snapshot = withLegacySnapshotKeys(input);
   const startVfs = createVirtualFS(snapshot.startVfsEntries.map(deserializeEntry));
@@ -510,8 +531,11 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // Tolerate pre-080 snapshots the same way: absent restores as null.
     startReadmeMdText: snapshot.startReadmeMdText ?? null,
     startHistoryMdText: snapshot.startHistoryMdText ?? null,
-    // Tolerate snapshots saved before issue #2139 landed: absent restores as null.
-    startDocCssTexts: snapshot.startDocCssTexts ?? null,
+    // Tolerate snapshots saved before issue #2139 landed: absent restores
+    // as null. Snapshots saved while the slice held plain texts (no path)
+    // restore with those entries dropped — a text whose stylesheet path is
+    // unknown cannot be written back, so it is not guessed at.
+    startDocCssTexts: normalizeStartDocCssTexts(snapshot.startDocCssTexts),
     startWelcomeConvention: snapshot.startWelcomeConvention ?? null,
     startWelcomeImages: deserializeWelcomeImages(snapshot.startWelcomeImages),
     startWelcomeImagesDropped: snapshot.startWelcomeImagesDropped === true,
