@@ -107,9 +107,14 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
   // de-fixtured 455 took 449s in that same job. 1200s is ~2x the
   // pace-adjusted estimate for the full route. Tripwire: a death at
   // 1200s with the walk incomplete is NOT pace — treat it as a genuine
-  // stall (the Phase F form failing to render is then the first suspect)
-  // and re-diagnose instead of raising again. The byte-for-byte
-  // comparison below is untouched by this sizing.
+  // stall and re-diagnose instead of raising again. (The recurring
+  // 1200s death was diagnosed 2026-10-15: not the Phase F form — this
+  // walk was missing the deadkeys/rules pass-through every other walk
+  // has, so it stranded on the Deadkeys step while its helpers waited
+  // out their soft timeouts, and the fill at the end was just where the
+  // cap landed. First diagnostic for any recurrence: the retained
+  // error-context snapshot shows which step the app is actually on.)
+  // The byte-for-byte comparison below is untouched by this sizing.
   test.setTimeout(1_200_000);
   await seedReturningVisitor(page);
   await page.goto("/");
@@ -126,6 +131,18 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
   // Carve: discard nothing — the fixed walk keeps the base's full inventory.
   await page.getByTestId("carve-gallery").waitFor({ state: "visible", timeout: 30_000 });
   await page.getByTestId("carve-continue").click();
+  // Deadkeys (spec 083) and rules (spec 082) sit between carve and
+  // mechanisms — walk through both, defining/installing nothing. This
+  // pass-through was missing here (copy-edit and decision-log have it),
+  // which stranded this walk on the Deadkeys step: the gallery helpers'
+  // soft waits expired against a screen with no gallery UI, and the
+  // failure surfaced 20 minutes later as driveHelpPhase's fill waiting
+  // on #pf_welcome_paragraph. Diagnosed from a locally retained
+  // error-context snapshot showing the app still on Deadkeys at the cap.
+  await page.getByTestId("deadkeys-continue").waitFor({ state: "visible", timeout: 30_000 });
+  await page.getByTestId("deadkeys-continue").click();
+  await page.getByTestId("rules-continue").waitFor({ state: "visible", timeout: 30_000 });
+  await page.getByTestId("rules-continue").click();
 
   await driveMechanismsGallery(page);
   await driveTouchGallery(page);
