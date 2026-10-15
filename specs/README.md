@@ -5,7 +5,7 @@ The live corpus, ordered by subsystem (the order of
 stable IDs — code comments, spec-trace, and cross-references cite them, and
 gaps are normal (001, 003, 004, 006, 054 never existed).
 
-## Governing / live (7)
+## Governing / live (8)
 
 | Spec | Governs |
 |---|---|
@@ -16,6 +16,7 @@ gaps are normal (001, 003, 004, 006, 054 never existed).
 | [079-survey-answer-persistence](079-survey-answer-persistence/) | Answer capture and persistence at give-time |
 | [081-footer-step-nav](081-footer-step-nav/) | Step library and footer navigation components |
 | [082-rule-access-tracks](082-rule-access-tracks/) | Rule access tracks (in flight) |
+| [103-first-class-if-guards](103-first-class-if-guards/) | First-class `if()` guards in KeyboardIR (ratified in principle 2026-10-15; implementation in flight) |
 
 ## Proposed — privacy suite (7, drafted 2026-10-14, unreviewed)
 

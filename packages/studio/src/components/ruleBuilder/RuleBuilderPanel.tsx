@@ -122,6 +122,8 @@ function fmtContextElement(el: ContextElement): string {
       return `index(${el.storeRef}, ${el.offset})`;
     case "baselayout":
       return el.value ? `baselayout('${el.value}')` : "baselayout";
+    case "if":
+      return `if(${el.store} = '${el.value}')`;
     case "raw":
       return el.text;
   }

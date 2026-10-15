@@ -136,7 +136,7 @@ describe("FR-010 refusal completeness", () => {
     expect(diacriticVariants).toHaveLength(0);
   }, 30_000);
 
-  it("refuses a rule guarded by if() (the codec opaques it entirely — never reaches a typed rule)", async () => {
+  it("refuses a rule guarded by if() (typed since spec 103 — refused by name, never analysed as unconditional)", async () => {
     const kmn = [
       HEADER,
       "group(main) using keys",
@@ -148,7 +148,19 @@ describe("FR-010 refusal completeness", () => {
     ].join("\n");
     const { ir, report, diacriticVariants } = await analyse(kmn, "refusal_if_guard");
 
-    expect(ir.raw.length).toBeGreaterThan(0);
+    // The guard now reaches the diagnostic as a typed rule (no fragment),
+    // and the refusal is an explicit not-analysed finding naming the guard.
+    expect(ir.raw).toHaveLength(0);
+    const typed = ir.groups.flatMap((g) => g.rules);
+    expect(typed[0]?.context[0]).toEqual({
+      kind: "if",
+      store: "&opt",
+      value: "1",
+    });
+    const finding = report.findings.find((f) => f.notAnalysedReason !== undefined);
+    expect(finding).toBeDefined();
+    expect(finding?.status).toBe("not-analysed");
+    expect(finding?.notAnalysedReason).toContain("if() guard");
     expect(report.findings.length + report.notAnalysedCount).toBe(
       ir.groups.reduce((n, g) => n + g.rules.length, 0) + ir.raw.length,
     );

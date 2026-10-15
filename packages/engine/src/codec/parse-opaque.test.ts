@@ -149,8 +149,23 @@ group(main) using keys
 if(myFlag = 'a') + [K_A] > use(g)
 `;
 
-  it("produces RawKmnFragment with reason if-option-store", () => {
+  it("a head-position equality guard parses typed since spec 103 (no fragment)", () => {
     const { ir } = parse(IF_KMN, "if-test");
+    const reasons = ir.raw.map(r => r.reason);
+    expect(reasons).not.toContain(OPAQUE_REASONS.IF_OPTION_STORE);
+    const rule = ir.groups.flatMap((g) => g.rules)[0];
+    expect(rule?.context[0]).toEqual({
+      kind: "if",
+      store: "myFlag",
+      value: "a",
+    });
+  });
+
+  it("an untypeable guard still produces RawKmnFragment with reason if-option-store", () => {
+    const { ir } = parse(
+      IF_KMN.replace("if(myFlag = 'a')", "if(myFlag <> 'a')"),
+      "if-test-neq",
+    );
     const reasons = ir.raw.map(r => r.reason);
     expect(reasons).toContain(OPAQUE_REASONS.IF_OPTION_STORE);
   });
