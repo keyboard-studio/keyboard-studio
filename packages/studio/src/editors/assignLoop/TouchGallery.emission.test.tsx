@@ -127,10 +127,10 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     ).toBe(false);
 
     // P1 regression guard: a character already detected on the seed layout
-    // must enable the primary forward button (Next/Done) with NO click (spec
+    // must enable the primary forward button (Next/Continue) with NO click (spec
     // v1.3.1 §3c: "you shouldn't have to click anything to keep it"). "a" is
-    // the only inventory char here, so the button reads "Done".
-    const doneBtn = screen.getByRole("button", { name: "Done" });
+    // the only inventory char here, so the button reads "Continue".
+    const doneBtn = screen.getByRole("button", { name: "Continue" });
     expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -153,12 +153,12 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     // actionable character, not on the detected one first.
     expectCurrentChar("中");
     expect(screen.getByText("Character 1 of 1")).toBeTruthy();
-    const doneBtn = screen.getByRole("button", { name: "Done" });
+    const doneBtn = screen.getByRole("button", { name: "Continue" });
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
 
     // "a" is still inspectable via its CharScrollStrip chip (SHOW-ALL
     // display, mirrors MechanismGallery's handleSelectDisplayChar) — but once
-    // selected this way, the forward Next/Done button is HIDDEN entirely
+    // selected this way, the forward Next/Continue button is HIDDEN entirely
     // (not rendered disabled), since it is outside the walk and this isn't a
     // "global Next" for it.
     fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));

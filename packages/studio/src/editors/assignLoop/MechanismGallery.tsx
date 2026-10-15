@@ -20,7 +20,7 @@
 //         separate Base/Shift toggle — see handleApply's method === "swap"
 //         branch, which picks the write path from raltTokens' filled count.
 //   - "Add key" records a MechanismAssignment(scope:"individual"); the user
-//     advances explicitly via "Next character"/"Done".
+//     advances explicitly via "Next character"/"Continue".
 //   - "Mark for later review" (mechanism-gallery-progression) is a per-
 //     character TOGGLE, not navigation — it records the character in
 //     surveySessionStore.markedForLaterDesktop (authoring metadata only,
@@ -35,7 +35,7 @@
 //     character is neither implemented nor marked (see canGoNext /
 //     unaccountedChars below) — there is no more "come back later" confirm
 //     dialog; the inline hint explains why Done is unavailable instead.
-//   - Forward from the LAST character is the phase completion ("Done" calls
+//   - Forward from the LAST character is the phase completion ("Continue" calls
 //     onComplete) rather than landing on a null currentChar.
 //   - Selecting the S-03 sequence method swaps the RIGHT pane's live preview
 //     for SequenceBuilderPanel — a one-character sequence builder that
@@ -1809,7 +1809,7 @@ export function MechanismGallery({
   // on the SAME 3-signal getProducerBadge computation the CharScrollStrip
   // badge uses, over the FULL SHOW-ALL `inventory` list (not just
   // lettersToAdd — a base-produced char must count as covered too). Feeds
-  // the forward-button spec below: when true, the Done button is always
+  // the forward-button spec below: when true, the "Continue" button is always
   // rendered regardless of currentChar/walk membership (see that spec's
   // top-priority branch).
   const allCovered = useMemo(
@@ -2335,7 +2335,7 @@ export function MechanismGallery({
   // Intercepts the forward-completion action (Done/Continue) ONLY — never
   // Back, never per-character Next. Defense-in-depth no-op guard: the
   // per-character `canGoNext` gate above already prevents the walk from
-  // reaching a "Done" click with any character neither implemented nor
+  // reaching a "Continue" click with any character neither implemented nor
   // marked, and the forward-button spec below disables Done/Continue
   // whenever `unaccountedChars` is non-empty — so this should be
   // unreachable in the ordinary walk. Kept as a guard (rather than removed)
@@ -3356,10 +3356,10 @@ export function MechanismGallery({
   // explicit "Mark for later review" before Next/Done is enabled — revisiting
   // an already-covered/marked character always re-enables it, so
   // Back-then-Next over a finished (or deferred) character never traps the
-  // author. This is what "gate the Done button on implemented-OR-marked"
+  // author. This is what "gate the Continue button on implemented-OR-marked"
   // means in practice: because the walk cannot advance forward past an
   // unaccounted character, by the time the LAST character's button reads
-  // "Done", every character in `lettersToAdd` has already been forced through
+  // "Continue", every character in `lettersToAdd` has already been forced through
   // this same check — there is no separate whole-inventory re-check needed at
   // completion (mechanism-gallery-progression; replaces the old
   // "Skip this character" escape, which recorded nothing and let an author
@@ -3848,7 +3848,7 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
   // Forward-button cluster — exactly one of three states applies: the
   // locked-forward-escape ("Continue"), the empty-diff
-  // completion ("Done" when there is nothing to add), or the per-character
+  // completion ("Continue" when there is nothing to add), or the per-character
   // Next/Done advance. Computed once as a single spec so the JSX below
   // renders one <button>, rather than three near-identical button blocks
   // that differ only in label/onClick/testId/style.
@@ -3872,12 +3872,12 @@ export function MechanismGallery({
   // longer disabled while locked (mechanism-gallery-progression auto-unlock —
   // see handleUnlock); this "Continue" escape stays for a locked, still-
   // incomplete gallery where the author wants to move on without editing.
-  const doneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
+  const continueLabel = t({ id: "editor.assignLoop.doneButton", message: "Continue" });
   const forwardButton: ForwardButtonSpec | null =
     // TOP PRIORITY (bug fix): once every inventory character has count >= 1
     // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
     // use) OR every character is implemented-or-marked (unaccountedChars —
-    // mark-aware, see below), the Done button is ALWAYS rendered —
+    // mark-aware, see below), the "Continue" button is ALWAYS rendered —
     // regardless of currentChar or its walk (lettersToAdd) membership.
     // Previously this button was hidden entirely for a currentChar outside
     // lettersToAdd (e.g. an already-produced character reached via the
@@ -3897,14 +3897,14 @@ export function MechanismGallery({
     // stays, 0 — marks are authoring metadata, never a `MechanismAssignment`,
     // so they never move the badge), and the per-char branch below is
     // unreachable (currentChar is outside lettersToAdd) — so, before this
-    // fix, NO Done button rendered at all, even though every character was
+    // fix, NO Continue button rendered at all, even though every character was
     // genuinely implemented-or-marked. Hence the `|| unaccountedChars.length
     // === 0` added below: `unaccountedChars` is mark-aware AND is the exact
     // signal `handleForwardComplete` itself checks before calling
-    // `onComplete` (see that callback above) — so "Done becomes visible" and
-    // "Done, if clicked, actually completes" are the SAME condition on this
-    // path; OR-ing it in adds no case where a visible enabled Done could
-    // still no-op.
+    // `onComplete` (see that callback above) — so "Continue becomes visible" and
+    // "Continue, if clicked, actually completes" are the SAME condition on
+    // this path; OR-ing it in adds no case where a visible enabled Continue
+    // could still no-op.
     //
     // `allCovered` is kept as an alternate (not replaced) rather than the
     // sole source of truth for the same reason TouchGallery's mirrored
@@ -3916,7 +3916,7 @@ export function MechanismGallery({
     // marked-character scenario needs the other's signal to be correct.
     (allCovered || unaccountedChars.length === 0) && onComplete !== undefined
       ? {
-          label: doneLabel,
+          label: continueLabel,
           onClick: handleForwardComplete,
           testId: "mechanisms-continue",
           disabled: false,
@@ -3939,7 +3939,7 @@ export function MechanismGallery({
         }
       : lettersToAdd.length === 0
         ? {
-            label: doneLabel,
+            label: continueLabel,
             onClick: handleForwardComplete,
             testId: "mechanisms-continue",
             disabled: false,
@@ -3964,7 +3964,7 @@ export function MechanismGallery({
           // implemented nor marked.
           currentChar !== null && lettersToAdd.includes(currentChar)
           ? // `!hasAnotherCharAfterCurrent` means this IS the completion
-            // click (label reads "Done") — gate it on `unaccountedChars` too
+            // click (label reads "Continue") — gate it on `unaccountedChars` too
             // (mechanism-gallery-progression), not just `canGoNext` for the
             // CURRENT character: the SHOW-ALL CharScrollStrip
             // (handleSelectDisplayChar) can jump `currentChar` straight to
@@ -3983,7 +3983,7 @@ export function MechanismGallery({
                       id: "editor.assignLoop.nextCharacterButton",
                       message: "Next character →",
                     })
-                  : doneLabel,
+                  : continueLabel,
                 testId: hasAnotherCharAfterCurrent
                   ? "mechanisms-next-char"
                   : "mechanisms-continue",
@@ -3992,7 +3992,7 @@ export function MechanismGallery({
                       id: "editor.assignLoop.nextCharacterAriaLabel",
                       message: "Next character",
                     })
-                  : doneLabel,
+                  : continueLabel,
                 onClick: handleNext,
                 disabled: nextDisabled,
                 style: {
