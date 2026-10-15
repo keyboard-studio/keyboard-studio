@@ -229,6 +229,40 @@ export interface TouchKeyIR {
    * Default when absent: DEFAULT_PAD (15) applied by the KMW polyfill at render time.
    */
   pad?: number;
+  /**
+   * Display font family for this key from `.keyman-touch-layout` `font`
+   * (per-key override of the platform font). A standard wire member the
+   * parser previously dropped (spec 035 R9); carried so the codec round-trip
+   * no longer loses it.
+   */
+  font?: string;
+  /**
+   * Display font size for this key from `.keyman-touch-layout` `fontsize`
+   * (e.g. `".6em"`). A standard wire member the parser previously dropped;
+   * carried as the raw string — Keyman accepts CSS-ish sizes here, so there
+   * is no numeric normalization to preserve.
+   */
+  fontsize?: string;
+  /**
+   * Deadkey identifier from `.keyman-touch-layout` `dk`. A standard wire
+   * member the parser previously dropped; carried opaquely.
+   */
+  dk?: string;
+  /**
+   * Wire-format encoding preservation for {@link sp} / {@link width} /
+   * {@link pad} (#2083). The parser normalizes those fields to numbers for
+   * consumers, but records the source encoding here so the emitter writes
+   * back the source form (string vs number) instead of re-encoding — a
+   * numeric `1` in the source must not become `"1"` on emit, because the
+   * scaffolder's `nextlayer` defaulting reads the raw wire value and treats
+   * the two encodings differently. Absent on synthesized keys; the emitter
+   * then uses the Keyman-canonical string form.
+   */
+  spWire?: string | number;
+  /** Wire-format encoding preservation for {@link width}; see {@link spWire}. */
+  widthWire?: string | number;
+  /** Wire-format encoding preservation for {@link pad}; see {@link spWire}. */
+  padWire?: string | number;
 }
 
 /** Diff produced by the I2 functional-equivalence round-trip check (decision D7, spec §14). */
@@ -493,9 +527,37 @@ export interface TouchLayoutIR {
   platforms: Array<{
     id: "phone" | "tablet" | "desktop";
     font?: string;
+    /**
+     * Platform-level display font size from `.keyman-touch-layout`
+     * `fontsize`. A standard wire member the parser previously dropped;
+     * carried as the raw string (see {@link TouchKeyIR.fontsize}).
+     */
+    fontsize?: string;
+    /**
+     * Whether the underlying desktop layout shows through this platform's
+     * touch layers (Keyman `displayUnderlying`). A standard wire member the
+     * parser previously dropped; preserved so the codec round-trip no longer
+     * loses it (#2083).
+     */
+    displayUnderlying?: boolean;
+    /**
+     * Longpress hint style from `.keyman-touch-layout` `defaultHint` (e.g.
+     * `"dot"`). Preserved verbatim when the source states it; the emitter no
+     * longer materializes `"dot"` onto platforms that omit it (#2083).
+     */
+    defaultHint?: string;
     layers: Array<{
       id: string;
-      rows: Array<{ keys: TouchKeyIR[] }>;
+      rows: Array<{
+        /**
+         * Source row id from `.keyman-touch-layout` (`row.id`, 1-based in
+         * Keyman-authored files). Preserved so the emitter writes back the
+         * source id instead of regenerating `rowIdx + 1` (#2083). Absent on
+         * synthesized rows; the emitter then falls back to 1-based ids.
+         */
+        id?: number;
+        keys: TouchKeyIR[];
+      }>;
     }>;
   }>;
   /**
