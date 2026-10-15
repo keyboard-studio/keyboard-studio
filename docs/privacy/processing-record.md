@@ -208,7 +208,9 @@ location · processor · retention rule · deletion mechanism · DSAR hint.
 - **Product analytics** (spec 101): no analytics collection exists
   today. Spec 101's assessment (lawful basis, posture A, taxonomy,
   retention, processor scorecard) lives in
-  `specs/101-analytics-readiness/`. Activation requires the Art. XII
-  ratification, the posture and retention rulings, and a numbered row
-  here naming the processor — in the same change as the first event
-  ships.
+  `specs/101-analytics-readiness/`. The posture, retention and
+  processor rulings were made 2026-10-14: posture A; raw events 90
+  days, aggregates indefinite; Plausible (Umami self-hosted fallback).
+  Activation still requires the Art. XII ratification and a numbered
+  row here naming the processor — in the same change as the first
+  event ships.

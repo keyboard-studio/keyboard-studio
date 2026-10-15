@@ -83,11 +83,16 @@ The analytics host/tool is selected against a recorded scorecard: EU/EEA hosting
 - **Pseudonymous-and-honest over "anonymous"-and-false**: claiming anonymity we can't sustain would exempt us from rights we're actually able to honour cheaply; the rotating pseudonym keeps the funnel useful and the rights real.
 - **Posture A preferred because it deletes a problem class**: no device storage means no banner, no consent fatigue, and a notice line instead of a consent flow — the same move as spec 095's fonts decision (remove the disclosure's cause where removal is cheap).
 
-## Open rulings (at plan time, not now)
+## Rulings (made 2026-10-14)
 
-- Posture A vs B (recommended A).
-- Raw-event retention: 90 days proposed.
-- Processor selection, via the FR-007 scorecard.
+- **Posture A** — adopted as recommended (cookieless; legitimate
+  interests + opt-out). Posture B (prior consent) was not taken.
+- **Raw-event retention: 90 days** — adopted; aggregates indefinite.
+- **Processor: Plausible** — adopted via the FR-007 scorecard; Umami
+  self-hosted is the named fallback.
+
+Implementation remains gated on Constitution Article XII
+ratification.
 
 ## Out of scope
 

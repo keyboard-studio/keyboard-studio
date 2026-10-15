@@ -66,9 +66,10 @@ purposes. The two postures:
   acceptance. Posture B exists so a tool constraint is admitted and
   priced, never laundered into A.
 
-**Ruling requested**: Posture A. If implementation cannot meet A with
-the chosen processor, the plan returns here for a B ruling before any
-code lands — that return is the gate working, not a failure.
+**Ruled 2026-10-14**: Posture A adopted. If implementation cannot meet
+A with the chosen processor, the plan returns here for a B ruling
+before any code lands — that return is the gate working, not a
+failure.
 
 ## DPIA screening (Art. 35)
 
@@ -95,8 +96,9 @@ says exactly that). If a processor cannot support per-id lookup/deletion,
 that is a scorecard disqualifier (processor-scorecard.md), discovered
 before contract, not after a request.
 
-## Open rulings (for Matthew, at plan time)
+## Rulings (made 2026-10-14)
 
-1. **Posture A** (recommended) vs B.
-2. **Raw-event retention: 90 days** (proposed), aggregates indefinite.
-3. **Processor**: per processor-scorecard.md recommendation.
+1. **Posture A** — adopted (B not taken).
+2. **Raw-event retention: 90 days** — adopted; aggregates indefinite.
+3. **Processor**: Plausible — adopted per processor-scorecard.md;
+   Umami self-hosted is the fallback.

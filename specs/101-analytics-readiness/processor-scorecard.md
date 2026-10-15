@@ -91,6 +91,9 @@ self-host cost.
 
 ## Recommendation
 
+**Ruled 2026-10-14: Plausible adopted; Umami self-hosted is the
+fallback.**
+
 **Plausible, if** the plan accepts its anonymisation model in place of
 per-id DSAR handling (record/notice/procedure rows updated to say so) —
 it is the only candidate whose minimisation is a property of the product
