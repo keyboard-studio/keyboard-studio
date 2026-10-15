@@ -163,7 +163,7 @@ describe("groupMarkClasses (FR-010)", () => {
     expect(classes).toHaveLength(3);
     expect(classes.map((c) => c.id)).toEqual(["fixed-30-1", "fixed-32-1", "fixed-33-1"]);
     expect(classes.map((c) => c.marks)).toEqual([[FATHA], [KASRA], [SHADDA]]);
-    expect(classes[0]?.label).toBe("Fixed-position marks (position class 30)");
+    expect(classes[0]?.label).toBe("Marks in a fixed position");
   });
 
   it("buckets ccc 233 (double breve below) as below — the hand-rolled table got this wrong", () => {
