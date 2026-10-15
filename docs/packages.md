@@ -71,10 +71,6 @@ package stays contracts-only. Its first production caller outside documentation 
 `lintContextTolerance(ir, report)` (spec 078), a narrow entry that runs only check 19.x over a
 report the studio computed; keyboard-lint itself still never imports the engine.
 
-### `@keyboard-studio/llm`
-
-Pluggable LLM client (`backends/`) for prompt-driven assistance.
-
 ### `@keyboard-studio/glottolog`
 
 Offline, pinned copy of Glottolog's language-classification tree (checked-in generated index

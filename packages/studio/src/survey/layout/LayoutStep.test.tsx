@@ -9,7 +9,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import { LayoutStepHost } from "./LayoutStepHost.tsx";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
-import { getPickedWindowsLayout } from "../../lib/layoutFamily.ts";
+import { getPickedWindowsLayout, getPickedWindowsLayouts } from "../../lib/layoutFamily.ts";
 
 function mount(bcp47: string | undefined) {
   // Spec 089: the step reads the tag from the decision-derived context —
@@ -101,5 +101,62 @@ describe("LayoutStep", () => {
     cleanup();
     mount("de-DE");
     expect(inputEl().value).toContain("Greek");
+  });
+});
+
+describe("LayoutStep multi-select (#1902)", () => {
+  it("picking a second layout adds it; the latest pick becomes primary", () => {
+    mount("en-US");
+    fireEvent.change(inputEl(), { target: { value: "greek" } });
+    fireEvent.click(screen.getByTestId("layout-option-basic_kbdhe"));
+    fireEvent.change(inputEl(), { target: { value: "french" } });
+    fireEvent.click(screen.getByTestId("layout-option-basic_kbdfr"));
+
+    const ids = getPickedWindowsLayouts().map((l) => l.id);
+    expect(ids).toEqual(["basic_kbdfr", "basic_kbdhe"]);
+    expect(getPickedWindowsLayout()?.id).toBe("basic_kbdfr");
+    expect(screen.getByTestId("layout-chip-basic_kbdfr")).toBeTruthy();
+    expect(screen.getByTestId("layout-chip-basic_kbdhe")).toBeTruthy();
+    // The why-line names the additional selection.
+    expect(screen.getByTestId("layout-step-why").textContent).toContain("Greek");
+  });
+
+  it("removing a chip drops that layout and keeps the rest", () => {
+    mount("en-US");
+    fireEvent.change(inputEl(), { target: { value: "greek" } });
+    fireEvent.click(screen.getByTestId("layout-option-basic_kbdhe"));
+    fireEvent.change(inputEl(), { target: { value: "french" } });
+    fireEvent.click(screen.getByTestId("layout-option-basic_kbdfr"));
+
+    fireEvent.click(screen.getByTestId("layout-remove-basic_kbdhe"));
+    expect(getPickedWindowsLayouts().map((l) => l.id)).toEqual(["basic_kbdfr"]);
+    expect(screen.queryByTestId("layout-chip-basic_kbdhe")).toBeNull();
+  });
+
+  it("Continue on a multi-selection completes with every pick recorded", () => {
+    const { onComplete } = mount("en-US");
+    fireEvent.change(inputEl(), { target: { value: "greek" } });
+    fireEvent.click(screen.getByTestId("layout-option-basic_kbdhe"));
+    fireEvent.change(inputEl(), { target: { value: "german" } });
+    fireEvent.click(screen.getByTestId("layout-option-basic_kbdgr"));
+    fireEvent.click(screen.getByTestId("layout-continue"));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(
+      (useDecisionStore.getState().decisions["windows-layout"]?.value as { layoutIds: string[] })
+        .layoutIds,
+    ).toEqual(["basic_kbdgr", "basic_kbdhe"]);
+  });
+
+  it("a pre-#1902 single-id draft still loads", () => {
+    useDecisionStore.getState().record({
+      id: "windows-layout",
+      value: { layoutId: "basic_kbdfr", origin: "confirmed" },
+      provenance: "asked",
+      step: "layout",
+    });
+    mount("en-US");
+    expect(inputEl().value).toContain("French");
+    expect(screen.getByTestId("layout-chip-basic_kbdfr")).toBeTruthy();
   });
 });

@@ -1,13 +1,18 @@
 # kbgen — status and integration path
 
-**Status (2026-06-03): prototype, homed in `utilities/` while it matures.**
-Authored as a standalone Node CLI (its own README still refers to `tools/kbgen/...`).
-Moved here out of `packages/*` so it does not break `pnpm -r build` / `typecheck`
-(it has no tsconfig, no build/test wired to the workspace runner, and is CommonJS, not ESM TS).
-
-**Intended end state: a real engine deliverable** — a *placement seeder* that runs ahead of
-the survey to propose data-driven character placements the user then confirms, rather than
-entering them by hand. See spec [§7 Strategy selection](../../spec.md) and [§8 Data flow](../../spec.md).
+**Status (2026-10-14, per km-lead ruling): frozen reference implementation — the
+first-principles placement seeder, and a CI canary. Not a pending integration.**
+Authored 2026-06-03 as a standalone CommonJS prototype in `utilities/`; since ported to
+ESM TypeScript with its own tsconfig and vitest suite (#132), deliberately kept outside
+`packages/*` and the pnpm workspace. The 2026-06-15 gate ratified D-INT-1…4 (decision note
+below): `PlacementMap` is a contracts type, corpus extraction is an engine post-pass, this
+seeder's scope is fixed at S-01 + S-08, and `data/supplement.json` is content-owned. The
+integration epic (#130–#135) is closed; the post-v1 expansion (#135) was closed NOT_PLANNED.
+kbgen remains the intended filler of contracts' non-corpus `PriorSource` seam
+(`unicode-decomp` / `confusable` / `phonetic`), whose landing zone is a future Phase C
+placement step — future work, not an outstanding obligation. CI runs `test:kbgen`
+explicitly because kbgen imports engine `src/` internals by relative path (spec 044
+FR-015) and nothing else typechecks it: it is the engine-rename canary.
 
 ## How it maps onto the spec
 

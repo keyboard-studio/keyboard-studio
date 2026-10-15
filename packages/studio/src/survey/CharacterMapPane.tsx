@@ -1,10 +1,12 @@
-// CharacterMapPane — Phase B right-pane interactive character map.
+// CharacterMapPane — the right-pane interactive character map.
 //
-// Renders ONLY for the Phase B build-list screen: StudioShell's SurveyView
-// swaps the right pane's live OSK preview for this component when the active
-// step declares rightPane:"character-map" (steps/manifest.ts, the "characters"
-// step) AND discoveryMethod === "build-list" (stores/surveySessionStore.ts —
-// the IntroChooser and the manual step-by-step path keep the OSK preview).
+// StudioShell's SurveyView swaps the right pane's live OSK preview for this
+// component when the active step declares rightPane:"character-map"
+// (steps/manifest.ts): the "characters" step (scope "alphabet", additionally
+// gated on discoveryMethod === "build-list"), the "punctuation" step (scope
+// "punctuation", no gate), and the "invisibles" step (scope "invisibles",
+// no gate — dispatched to InvisiblesGalleryPane, whose cells carry names
+// instead of glyphs).
 //
 // Clicking a cell toggles it into the SAME accumulating alphabet the center
 // pane's BuildListView builds (CharChipEditor type-in), via the shared
@@ -56,6 +58,7 @@ import { CharacterInfoPopover } from "./characterMap/CharacterInfoPopover.tsx";
 import { useSearchFiltersPopover } from "./characterMap/useSearchFiltersPopover.ts";
 import { SearchFiltersPopover } from "./characterMap/SearchFiltersPopover.tsx";
 import { CharacterMapGroupSection } from "./characterMap/CharacterMapGroupSection.tsx";
+import { InvisiblesGalleryPane } from "./characterMap/InvisiblesGalleryPane.tsx";
 import { mergeBlocksAcrossTiers } from "./characterMap/mergeBlocks.ts";
 
 // Re-exported so CharacterMapPane.test.tsx's zoom-control block (which derives
@@ -97,14 +100,32 @@ interface CharacterMapPaneProps {
   //                   screen). DEFAULT.
   //   "punctuation" — punctuation only (the punctuation step between marks
   //                   and convenience).
-  // Both scopes toggle the SAME shared inventory draft.
-  scope?: "alphabet" | "punctuation";
+  //   "invisibles"  — format characters only (the Invisible characters
+  //                   step). Rendered by the dedicated InvisiblesGalleryPane
+  //                   below — no glyph cells, no characterMapGroups fetch.
+  // The alphabet/punctuation scopes toggle the SAME shared character-
+  // inventory draft; the invisibles scope toggles the invisibles-inventory
+  // decisions instead.
+  scope?: CharacterMapScope;
 }
 
-export function CharacterMapPane({
+export type CharacterMapScope = "alphabet" | "punctuation" | "invisibles";
+
+export function CharacterMapPane(props: CharacterMapPaneProps = {}) {
+  // The invisibles scope is a different surface (non-glyph cells, static
+  // data) with its own component. Dispatching on component type rather than
+  // an early return inside one component keeps hook order stable when the
+  // shell swaps scopes between steps (a scope change remounts cleanly).
+  if (props.scope === "invisibles") {
+    return <InvisiblesGalleryPane />;
+  }
+  return <CharacterMapPaneInner {...props} />;
+}
+
+function CharacterMapPaneInner({
   maxCellsPerGroup = MAX_CELLS_PER_GROUP,
   scope = "alphabet",
-}: CharacterMapPaneProps = {}) {
+}: CharacterMapPaneProps) {
   const { t } = useLingui();
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);

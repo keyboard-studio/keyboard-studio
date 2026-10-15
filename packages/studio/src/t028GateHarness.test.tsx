@@ -531,11 +531,11 @@ describe("T028 convenience-gate reproduction (union)", () => {
       );
 
       // Prefill -> Phase B (the walk's confirmPrefill).
-      fireEvent.click(await screen.findByTestId("prefill-confirm", {}, { timeout: 30_000 }));
-      await dumpGateState("post-prefill-confirm");
+      fireEvent.click(await screen.findByTestId("prefill-continue", {}, { timeout: 30_000 }));
+      await dumpGateState("post-prefill-continue");
 
       // IntroChooser -> build list (the walk's completePhaseB).
-      fireEvent.click(await screen.findByTestId("phase-b-intro-next", {}, { timeout: 30_000 }));
+      fireEvent.click(await screen.findByTestId("charlist-continue", {}, { timeout: 30_000 }));
 
       // Build list: add the fixture's one character.
       const charInput = await screen.findByLabelText("Character to add", {}, { timeout: 30_000 });
@@ -544,7 +544,7 @@ describe("T028 convenience-gate reproduction (union)", () => {
       await dumpGateState("post-add-é");
 
       // Done -> marks.
-      fireEvent.click(await screen.findByTestId("phase-b-done", {}, { timeout: 30_000 }));
+      fireEvent.click(await screen.findByTestId("charlist-done", {}, { timeout: 30_000 }));
       await dumpGateState("post-characters-done");
 
       // Marks series: accept each station's proposal (the walk's

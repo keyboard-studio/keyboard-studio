@@ -233,7 +233,7 @@ test.describe("F1 — switch-base rebase confirm", () => {
     await buildToBaseAConfirmed(page);
     await chooseAdaptTrack(page);
     await driveAttributionStep(page);
-    await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 30_000 });
+    await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 30_000 });
 
     const before = await hookState(page);
     expect(before.startId).toBe(BASE_A);

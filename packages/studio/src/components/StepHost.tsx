@@ -364,7 +364,11 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // spec 094: the arrival came from Output's section list, a blocker's Open
   // button or a tester report — not from the decision trail.
   const fromOutput = isDeepLinkTarget && deepLinkArrival?.returnTo.route === "output";
-  const revisingFromOutput = fromOutput && !continueFromHere;
+  // #2050: the revision session stays open until the author confirms,
+  // discards, or chooses "Continue from here instead" — Backing off the
+  // targeted step no longer ends it, so Discard stays reachable.
+  const revisionSessionOpen =
+    deepLinkArrival?.returnTo.route === "output" && !continueFromHere;
   const activeLayout = manifest.find((s) => s.id === activeStepId && s.kind === "editor-step")?.layout;
 
   const discardRevision = useCallback(() => {
@@ -377,13 +381,17 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
 
   // A full-page editor owns its footer nav slots, so its revision actions ride
   // the separate stepNavStore channel instead (StepNavCluster renders both).
-  // Pane steps carry theirs in the banner below.
+  // Pane steps carry theirs in the banner below. #2050: while the session is
+  // open every full-layout step republishes Discard, so Back keeps it
+  // reachable; only the targeted step renames forward to "Back to testing".
   useLayoutEffect(() => {
-    if (!revisingFromOutput || activeLayout !== "full") return undefined;
+    if (!revisionSessionOpen || activeLayout !== "full") return undefined;
     const stepId = activeStepId;
-    useStepNavStore.getState().publishRevision({ stepId, onDiscard: discardRevision });
+    useStepNavStore
+      .getState()
+      .publishRevision({ stepId, onDiscard: discardRevision, renameForward: isDeepLinkTarget });
     return () => useStepNavStore.getState().clearRevision(stepId);
-  }, [revisingFromOutput, activeLayout, activeStepId, discardRevision]);
+  }, [revisionSessionOpen, activeLayout, activeStepId, isDeepLinkTarget, discardRevision]);
 
   // ---------------------------------------------------------------------------
   // Terminal: done — survey-complete panel
@@ -682,6 +690,13 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // renders, not an update an assistive-technology user needs announced.
   // Never rendered on a `layout:"full"` step — see `revisableViaDeepLink`'s
   // own comment above for why.
+  //
+  // #2050: Backing off the targeted step no longer strands the author without
+  // a way to discard — a slim banner keeps "Discard changes and go back"
+  // reachable (and says plainly that leaving kept the changes) until the
+  // session ends.
+  const offTargetRevision =
+    revisionSessionOpen && !isDeepLinkTarget && resolvedStep.layout !== "full";
   const deepLinkReturnBanner =
     revisableViaDeepLink && !continueFromHere && resolvedStep.layout !== "full" ? (
       <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>
@@ -697,6 +712,13 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
             </Trans>
           )}
         </p>
+        {fromOutput && (
+          <p style={DEEP_LINK_BANNER_TEXT_STYLE}>
+            <Trans id="step.revision.leavingKeepsChanges">
+              If you leave this step, your changes are kept.
+            </Trans>
+          </p>
+        )}
         {fromOutput && (
           <button
             type="button"
@@ -714,6 +736,22 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
           onClick={() => setContinueFromHere(true)}
         >
           <Trans id="step.deepLinkReturn.continueButton">Continue from here instead</Trans>
+        </button>
+      </div>
+    ) : offTargetRevision ? (
+      <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>
+        <p style={DEEP_LINK_BANNER_TEXT_STYLE}>
+          <Trans id="step.revision.leftTargetNotice">
+            You left the step you opened from Output — your changes were kept.
+          </Trans>
+        </p>
+        <button
+          type="button"
+          data-testid="step-revision-discard"
+          style={DEEP_LINK_CONTINUE_BUTTON_STYLE}
+          onClick={discardRevision}
+        >
+          <Trans id="step.revision.discard">Discard changes and go back</Trans>
         </button>
       </div>
     ) : null;

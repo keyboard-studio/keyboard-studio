@@ -82,6 +82,7 @@ import {
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
+  driveDeadkeysStep,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -304,6 +305,11 @@ async function driveIdentityLite(page: Page): Promise<void> {
 async function skipCarve(page: Page): Promise<void> {
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
   await page.getByTestId("carve-continue").click();
+  // Spec 083 (deadkeys) and spec 082 (rules) both sit between carve and
+  // mechanisms — walk through both (#2053: this copy predated both and
+  // parked the walk on deadkeys, so Mechanisms never rendered).
+  await driveDeadkeysStep(page);
+  await page.getByTestId("rules-continue").click();
 }
 
 async function placeMechanismCharacter(page: Page, char: string, baseKey: string): Promise<void> {

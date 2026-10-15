@@ -187,3 +187,50 @@ export async function clearServerDraft(token: string, draftId: string): Promise<
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Privacy self-service (specs 097/098) — "Your data" on the profile screen.
+// Unlike the sync calls above these do NOT fail soft into silence: the
+// caller is a person exercising a right, so failures surface as a null /
+// -1 the panel shows as an error rather than a false success.
+// ---------------------------------------------------------------------------
+
+/** The export document's shape (api/drafts/export.ts). */
+export interface ServerDataExport {
+  exportedAt: string;
+  identity: { githubUserId: number; login: string };
+  drafts: Array<{ meta: ServerDraftMeta; draft: unknown }>;
+}
+
+/** Fetch everything the server holds for the caller, or null on failure. */
+export async function exportServerData(token: string): Promise<ServerDataExport | null> {
+  try {
+    const res = await fetch(`${getBackendUrl()}/drafts/export`, {
+      method: "GET",
+      headers: authHeaders(token),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ServerDataExport;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Erase every server draft the caller has (spec 098 delete-all). Returns
+ * the number deleted, or -1 on failure — a failed erasure must never be
+ * reported to the author as a successful one.
+ */
+export async function deleteAllServerDrafts(token: string): Promise<number> {
+  try {
+    const res = await fetch(`${getBackendUrl()}/drafts?all=true`, {
+      method: "DELETE",
+      headers: authHeaders(token),
+    });
+    if (!res.ok) return -1;
+    const body = (await res.json()) as { deleted: number };
+    return typeof body.deleted === "number" ? body.deleted : -1;
+  } catch {
+    return -1;
+  }
+}

@@ -10,6 +10,7 @@
     { "source": "/oauth/health", "destination": "/api/oauth/health" },
     { "source": "/submit/managed-pr", "destination": "/api/submit/managed-pr" },
     { "source": "/drafts/content", "destination": "/api/drafts/content" },
+    { "source": "/drafts/export", "destination": "/api/drafts/export" },
     { "source": "/drafts", "destination": "/api/drafts" },
     { "source": "/report/crash/retract", "destination": "/api/report/crash-retract" },
     { "source": "/report/crash", "destination": "/api/report/crash" },

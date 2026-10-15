@@ -94,7 +94,7 @@ test("spec 092 US1 (adapt): copyright question arrives after the track choice, p
   // re-commit to get there.)
   await acceptProjectName(page);
   await confirmPrefill(page);
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
 });
 
 test("spec 092 US1 (copy): holder defaults to the author; the copied notice is not offered", async ({

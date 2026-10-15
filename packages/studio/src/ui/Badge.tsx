@@ -2,7 +2,7 @@ import React from "react";
 import {
   CSS_SIL_GREEN,
   CSS_ACCENT,
-  CSS_SIL_ORANGE_DARK,
+  CSS_WARNING_TEXT,
   CSS_TEXT_SUBTLE,
   CSS_TEXT_MUTED,
 } from "./theme.ts";
@@ -23,7 +23,7 @@ export type BadgeProps = {
 const TONE_COLOR: Record<BadgeTone, string> = {
   success: CSS_SIL_GREEN,
   accent: CSS_ACCENT,
-  warn: CSS_SIL_ORANGE_DARK,
+  warn: CSS_WARNING_TEXT,
   subtle: CSS_TEXT_SUBTLE,
   default: CSS_TEXT_MUTED,
 };

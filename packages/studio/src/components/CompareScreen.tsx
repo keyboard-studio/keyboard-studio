@@ -83,7 +83,7 @@ export function CompareScreen() {
         flexDirection: "row",
         height: "100%",
         width: "100%",
-        background: "var(--bg)",
+        background: "var(--app-bg)",
         color: "var(--app-text)",
         fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         overflow: "hidden",

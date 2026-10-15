@@ -11,8 +11,6 @@
 // the criterion's suggested mechanism (spec 080 research R7). It binds the
 // fact checked, not the API.
 
-import type { DocLintInput, DocMemberId } from "@keyboard-studio/contracts";
-
 // ---------------------------------------------------------------------------
 // Member paths
 // ---------------------------------------------------------------------------
@@ -22,10 +20,6 @@ import type { DocLintInput, DocMemberId } from "@keyboard-studio/contracts";
 // check modules and the barrel.
 export { docMemberPath } from "@keyboard-studio/contracts";
 
-/** Convenience accessor: a member's current text from `DocLintInput`, or `undefined`. */
-export function memberText(input: DocLintInput, member: DocMemberId): string | undefined {
-  return input.members[member];
-}
 
 // ---------------------------------------------------------------------------
 // HISTORY.md parsing (3.3, 3.4, 3.5, 3.6/7.1, 3.7)

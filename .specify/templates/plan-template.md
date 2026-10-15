@@ -42,6 +42,27 @@
 
 [Gates determined based on constitution file]
 
+## Personal Data Check (Constitution Article XII, spec 100)
+
+*GATE: answered in every plan, briefly or at length. "None" is a complete
+answer; silence is not.*
+
+Does this feature create a server-side store, send personal data to a new
+recipient, collect a new category of personal data, or add telemetry of
+any kind?
+
+- **If none**: write exactly — *Personal data: none — no new store,
+  recipient, category, or telemetry.* — and stop here.
+- **If any**: name, before tasks are generated —
+  1. the processing-record rows created or changed
+     (`docs/privacy/processing-record.md`),
+  2. the retention rule for any new store (a period, a criterion, or
+     "until the user deletes it" — chosen, not defaulted),
+  3. the privacy-notice diff, if the change is user-visible,
+  4. the DSAR search-map and erasure-map changes (specs 097/098),
+  5. for telemetry: the spec 101 assessment reference (lawful basis,
+     consent posture, processor) — no assessment, no events.
+
 ## Project Structure
 
 ### Documentation (this feature)

@@ -143,7 +143,7 @@ describe("CharChipEditor", () => {
     await act(async () => {
       fireEvent.change(input, { target: { value: "ẹ" } }); // ẹ
     });
-    const addBtn = screen.getByRole("button", { name: /\+ Add/i });
+    const addBtn = screen.getByTestId("charlist-add");
     await act(async () => {
       fireEvent.click(addBtn);
     });
@@ -216,7 +216,7 @@ describe("CharChipEditor", () => {
 // ---------------------------------------------------------------------------
 
 describe("BuildListView — end-to-end onComplete", () => {
-  it("Done fires onComplete with NFC-normalized, deduped union of typed chars", async () => {
+  it("Continue fires onComplete with NFC-normalized, deduped union of typed chars", async () => {
     useWorkingCopyStore.getState().instantiateFromStart(
       {
         id: "test_kb",
@@ -265,9 +265,9 @@ describe("BuildListView — end-to-end onComplete", () => {
       fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
 
-    // Click Done.
+    // Click Continue.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
 
     expect(onComplete).toHaveBeenCalledOnce();
@@ -400,7 +400,7 @@ describe("US1 — whole-text capture (spec 047)", () => {
     });
     const { chars } = getCharacterInventoryValue();
     // Entered uppercase (N, Y) is folded to lowercase in the alphabet — we never
-    // store a capital without its lowercase (both cases reach the IR on Done).
+    // store a capital without its lowercase (both cases reach the IR on Continue).
     for (const ch of ["n", "a", "ï", "v", "e", "?", "y", "s", "—", "3", "t", "i", "m", "."]) {
       expect(chars).toContain(ch);
     }
@@ -537,14 +537,14 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
     expect(letters).not.toContain("U+0061"); // no synthesized lowercase
   });
 
-  it("on Done the recorded alphabet contains both cases, deduped, locale-correct (AS3.3/FR-009/SC-004)", async () => {
+  it("on Continue the recorded alphabet contains both cases, deduped, locale-correct (AS3.3/FR-009/SC-004)", async () => {
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "en" }, onComplete);
     act(() => {
       inventoryOps("characters").setAll(["a", "b", "c"]);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     const inv = onComplete.mock.calls[0]![0].confirmedInventory ?? [];
     for (const ch of ["a", "b", "c", "A", "B", "C"]) {
@@ -555,14 +555,14 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
     for (const c of inv) expect(c).toBe(c.normalize("NFC"));
   });
 
-  it("Turkish dotted-i casing is respected on Done (FR-009)", async () => {
+  it("Turkish dotted-i casing is respected on Continue (FR-009)", async () => {
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "tr" }, onComplete);
     act(() => {
       inventoryOps("characters").setAll(["i"]);
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     const inv = onComplete.mock.calls[0]![0].confirmedInventory ?? [];
     // Under "tr", i → İ (U+0130 dotted capital I), not plain "I".
@@ -634,7 +634,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(chipBtn).not.toBeNull();
   });
 
-  it("folds an entered uppercase to lowercase in the UI, recording both cases on Done (no capital without a lowercase)", async () => {
+  it("folds an entered uppercase to lowercase in the UI, recording both cases on Continue (no capital without a lowercase)", async () => {
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "en" }, onComplete);
     const input = screen.getByRole("textbox", { name: /Character to add/i });
@@ -649,9 +649,9 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(groupText).toContain("U+0071"); // q
     expect(groupText).not.toContain("U+0051"); // Q not shown
     expect(getCharacterInventoryValue().chars).toEqual(["q"]);
-    // Both cases still reach the recorded IR on Done.
+    // Both cases still reach the recorded IR on Continue.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     const inv = onComplete.mock.calls[0]![0].confirmedInventory ?? [];
     expect(inv).toContain("q");
@@ -703,7 +703,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     // Kept as entered (not folded away, no synthesized uppercase in the UI).
     expect(getCharacterInventoryValue().chars).toEqual(["ĸ"]);
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Done/i }));
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
     });
     // No uppercase counterpart is forced into the recorded inventory.
     expect(onComplete.mock.calls[0]![0].confirmedInventory).toEqual(["ĸ"]);

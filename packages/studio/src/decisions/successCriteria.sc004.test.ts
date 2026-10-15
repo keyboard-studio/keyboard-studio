@@ -23,7 +23,7 @@
 // A failing gate is a product finding: nothing here is weakened to pass.
 //
 // Validator layers NOT covered by this harness (documented, not silent; see also
-// decisions/gateCoverage.ts):
+// test/gateCoverage.ts):
 //   - Layer B (style): no Layer B rule set exists in engine/src/validator yet
 //     (spec Phase 3 "Style mode"); there is nothing to run.
 //   - Layer A' import-fidelity I1-I6 (engine/src/validator/layer-a-prime.ts):

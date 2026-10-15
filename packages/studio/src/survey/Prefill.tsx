@@ -136,7 +136,7 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
     forward: {
       label: t({ id: "survey.prefill.confirmButton", message: "Confirm and continue" }),
       onClick: onConfirm,
-      testId: "prefill-confirm",
+      testId: "prefill-continue",
     },
   });
 

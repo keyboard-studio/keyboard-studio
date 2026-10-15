@@ -17,8 +17,8 @@ import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
-import { proposeWindowsLayout, windowsLayoutById } from "../../lib/windowsLayouts.ts";
-import { LAYOUT_FAMILY_STEP_ID } from "../../lib/layoutFamily.ts";
+import { proposeWindowsLayout } from "../../lib/windowsLayouts.ts";
+import { LAYOUT_FAMILY_STEP_ID, pickedLayoutIds } from "../../lib/layoutFamily.ts";
 import windowsLayoutModule from "../questions/gallery/windowsLayout.ts";
 import type { WindowsLayoutValue } from "../questions/gallery/windowsLayout.ts";
 
@@ -30,15 +30,15 @@ const LayoutStepHost: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
 
   const proposal = useMemo(() => proposeWindowsLayout(bcp47), [bcp47]);
   const value = record?.value as WindowsLayoutValue | undefined;
-  const recordedId =
-    value !== undefined && windowsLayoutById(value.layoutId) !== undefined ? value.layoutId : undefined;
+  // Tolerates the pre-#1902 single-id shape so old drafts still load.
+  const recordedId = pickedLayoutIds(value)[0];
   const isSuggestion = (recordedId ?? proposal.layout.id) === proposal.layout.id;
 
   function confirm(): void {
     if (record === undefined) {
       decideGalleryValue<WindowsLayoutValue>(
         windowsLayoutModule,
-        { layoutId: proposal.layout.id, origin: "confirmed" },
+        { layoutIds: [proposal.layout.id], origin: "confirmed" },
         { provenance: "asked" },
         LAYOUT_FAMILY_STEP_ID,
         deps,

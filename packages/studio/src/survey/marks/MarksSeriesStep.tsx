@@ -123,7 +123,6 @@ import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
 import { buildContextToleranceProposal, buildNormalizationStepProposal } from "./contextToleranceProposal.ts";
-import { isContextToleranceEnabled } from "../../flags/contextToleranceFlag.ts";
 import {
   CONTEXT_TOLERANCE_QUESTION_ID,
   CONTEXT_TOLERANCE_SITES_QUESTION_ID,
@@ -288,7 +287,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   const surveyContext = useMemo(() => deriveSurveyContext(decisions), [decisions]);
   // spec 078: the context-tolerance analysis (published by the compile gate)
   // and the decision a previous pass through this series recorded.
-  const toleranceEnabled = isContextToleranceEnabled();
   const tolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 090 T023: the prior decision's home is the marks-treatment decision
   // value (the apply hook stamps appliedFingerprint onto the value, not the
@@ -671,10 +669,10 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
 
   // --- context tolerance (spec 078) ---
   // The station's proposal, built from the latest analysis. `null` when there
-  // is nothing to propose (flag off, no analysis yet, failed, or no fixable
+  // is nothing to propose (no analysis yet, failed, or no fixable
   // rule; could-not-check items stay in the notice, not here).
   const toleranceProposal = useMemo(() => {
-    if (!toleranceEnabled || tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
+    if (tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
     if (tolerance.normalizationStep !== undefined) {
       const ruleCount = tolerance.normalizationStep.ruleCount;
       // The station's own intro, examples and disclosure carry the wording; the
@@ -701,7 +699,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           }),
       },
     });
-  }, [toleranceEnabled, tolerance, t]);
+  }, [tolerance, t]);
   const toleranceDisclosures = useMemo<Record<string, SiteDisclosure>>(() => {
     if (tolerance.status !== "ready") return {};
     const byMarker = tolerance.proposal.disclosures ?? {};
@@ -733,10 +731,10 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     setToleranceDecision((d) => (d !== null && d.fingerprint !== toleranceFingerprint ? null : d));
   }, [toleranceFingerprint]);
   const showToleranceStation =
-    toleranceEnabled && (tolerance.status === "analysing" || toleranceProposal !== null);
+    tolerance.status === "analysing" || toleranceProposal !== null;
 
   // --- visible stations, in series order (at most FOUR — FR-018/SC-003,
-  // plus spec 078's flag-gated context-tolerance station) ---
+  // plus spec 078's context-tolerance station) ---
   const needsTreatmentScreen = classes.some((c) => classNeedsTreatmentScreen(c, proposals));
   const visibleStations: MarksStationId[] = useMemo(() => {
     const stations: MarksStationId[] = [];
@@ -1021,7 +1019,6 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   function resolvedToleranceDecision(
     override?: ContextToleranceDecisionInput,
   ): MarksContextToleranceDecision | undefined {
-    if (!toleranceEnabled) return undefined;
     // The station completes the series in the same event that records its
     // decision, before the state update lands, so it passes it explicitly.
     const taken = override ?? toleranceDecision;
