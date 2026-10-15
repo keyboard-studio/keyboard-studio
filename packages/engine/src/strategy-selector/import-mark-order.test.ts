@@ -1,7 +1,7 @@
 // Tests for base-derived A3a detection on the Track 2 import path — the
-// deferred production-reachability half of rule 3a.
+// production-reachability half of rule 3a.
 //
-// Two groups:
+// Three groups:
 //   1. detectMarkInputOrderFromImport() unit shape tests, against hand-built
 //      IR fixtures (mirrors recognizer/rules/__fixtures__/recognizerIr.ts's fixture style).
 //   2. An end-to-end lock: parse() a trimmed sil_ipa-shaped .kmn fixture
@@ -10,13 +10,21 @@
 //      + selectStrategy, and confirm rule 3a fires -> S-03 (+S-04). This is
 //      the acceptance criterion "an IPA-shaped imported base routes
 //      end-to-end through rule 3a to S-03+S-04."
+//   3. The same end-to-end lock against the REAL sil_ipa.kmn from the
+//      sibling keyboards checkout (skipped when that checkout is absent,
+//      the same convention as codec/roundtrip.test.ts), whose live postfix
+//      rules are all if()-guarded and reach the detector only via the
+//      ir.raw[] fragment scan.
 
 import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { detectMarkInputOrderFromImport } from "./import-mark-order.js";
 import { defaultFillAxes } from "./default-fill.js";
 import { selectStrategy } from "./index.js";
 import { parse } from "../codec/parse.js";
-import type { IRGroup, IRStore, KeyboardIR } from "@keyboard-studio/contracts";
+import type { IRGroup, IRStore, KeyboardIR, RawKmnFragment } from "@keyboard-studio/contracts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
@@ -327,13 +335,13 @@ describe("detectMarkInputOrderFromImport", () => {
     expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
   });
 
-  it("does NOT see an if()-guarded postfix rule (opaque at parse time — documented scope boundary)", () => {
+  it("detects an if()-guarded postfix rule via the ir.raw[] fragment scan (offset 2, guard at position 1)", () => {
     // The live sil_ipa postfix rules are all if(option_key=…)-guarded; the codec
     // classifies any if(...) context as opaque (IF_OPTION_STORE), so the rule
-    // becomes a RawKmnFragment and never reaches group.rules. Detection of the
-    // guarded shape is deferred until the codec's if()-handling is scoped
-    // separately — this test locks that boundary so a future codec change that
-    // surfaces guarded rules structurally is a deliberate, visible decision.
+    // becomes a RawKmnFragment and never reaches group.rules. The detector's
+    // raw scan recovers the shape from the fragment: the guard occupies
+    // context position 1, so the any() sits at position 2 and the index()
+    // offset that points at it is 2 (not the guard-free offset 1).
     const guardedKmn = `c if()-guarded postfix fixture (offset 2, guard at position 1)
 store(&VERSION) '10.0'
 store(&NAME) 'guarded IPA-shaped test keyboard'
@@ -349,6 +357,102 @@ group(Unicode) using keys
 if(option_key = '') any(equalD) + "=" > index(equalU,2)
 `;
     const { ir } = parse(guardedKmn, "guarded-ipa-shaped-test");
+    // The rule really is opaque — it must NOT be in group.rules; the fill
+    // below can only have come from the raw-fragment scan.
+    expect(ir.raw.some((f) => f.reason === "if-option-store")).toBe(true);
+    expect(detectMarkInputOrderFromImport(ir)).toEqual({
+      axis: "markInputOrder",
+      value: "postfix",
+      source: "import-derived",
+    });
+  });
+
+  it("detects a guarded fragment from sourceText alone when no producedOutput sketch is present", () => {
+    // Older parses (and fragments whose sketch extraction found nothing to
+    // attach) may carry no producedOutput; the sourceText RHS is the
+    // fallback witness for the same single-index() shape.
+    const frag: RawKmnFragment = {
+      nodeId: "raw#guarded-noskech",
+      origin: "imported",
+      sourceText: "if(option_key = '') any(equalD) + \"=\" > index(equalU,2)",
+      reason: "if-option-store",
+    };
+    const ir = makeTestIR([], [], [frag]);
+    expect(detectMarkInputOrderFromImport(ir)).toEqual({
+      axis: "markInputOrder",
+      value: "postfix",
+      source: "import-derived",
+    });
+  });
+
+  it("does NOT match a guarded rule whose index() offset does not point at the any() (guard present, offset 1)", () => {
+    const guardedKmn = `store(&VERSION) '10.0'
+store(&NAME) 'guarded wrong-offset test keyboard'
+store(&TARGETS) 'any'
+
+store(equalD) "b" "d" "g"
+store(equalU) U+0253 U+0257 U+0260
+
+begin Unicode > use(Unicode)
+
+group(Unicode) using keys
+
+if(option_key = '') any(equalD) + "=" > index(equalU,1)
+`;
+    const { ir } = parse(guardedKmn, "guarded-wrong-offset-test");
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match the guarded PREFIX shape (trigger before the any(), offset 3)", () => {
+    // sil_ipa's 'before' rota rules: the trigger is typed first and the
+    // any() last — that is mark-before-base order, not postfix, even though
+    // a guard is present and the offset correctly points at the any().
+    const guardedKmn = `store(&VERSION) '10.0'
+store(&NAME) 'guarded prefix test keyboard'
+store(&TARGETS) 'any'
+
+store(equalD) "b" "d" "g"
+store(equalU) U+0253 U+0257 U+0260
+
+begin Unicode > use(Unicode)
+
+group(Unicode) using keys
+
+if(option_key = 'before') "=" + any(equalD) > index(equalU,3)
+`;
+    const { ir } = parse(guardedKmn, "guarded-prefix-test");
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match a guarded rule with extra output beyond the single index() (rota shape)", () => {
+    const guardedKmn = `store(&VERSION) '10.0'
+store(&NAME) 'guarded extra-output test keyboard'
+store(&TARGETS) 'any'
+
+store(subscriptD) "0" "1"
+store(subscriptU) U+2080 U+2081
+
+begin Unicode > use(Unicode)
+
+group(Unicode) using keys
+
+if(option_key = '') any(subscriptU) + "_" > index(subscriptD,2) U+0320
+`;
+    const { ir } = parse(guardedKmn, "guarded-extra-output-test");
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT scan raw fragments whose reason is not if-option-store", () => {
+    // The guarded scan is scoped to if()-guarded fragments; the same
+    // sourceText under any other opaque reason is not evidence here.
+    const frag: RawKmnFragment = {
+      nodeId: "raw#wrong-reason",
+      origin: "imported",
+      sourceText: "if(option_key = '') any(equalD) + \"=\" > index(equalU,2)",
+      reason: "call-return",
+      producedOutput: [{ kind: "index", storeRef: "equalU", offset: 2 }],
+    };
+    const ir = makeTestIR([], [], [frag]);
     expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
   });
 
@@ -509,5 +613,57 @@ describe("import-path rule 3a reachability (end-to-end)", () => {
     expect(result.triggeredRule).toBe("3a");
     expect(result.primary).toBe("S-03");
     expect(result.secondaries).toContain("S-04");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Group 3 — end-to-end against the REAL sil_ipa.kmn (sibling keyboards
+// checkout; skipped when absent, the codec/roundtrip.test.ts convention)
+// ---------------------------------------------------------------------------
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const SIL_IPA_KMN_PATH = resolve(
+  __dir,
+  "../../../../../keyboards/release/sil/sil_ipa/source/sil_ipa.kmn"
+);
+const silIpaAvailable = existsSync(SIL_IPA_KMN_PATH);
+
+describe("import-path rule 3a reachability — real sil_ipa.kmn", () => {
+  it.skipIf(!silIpaAvailable)(
+    "the real file's if()-guarded postfix rules are detected via ir.raw[] and route rule 3a -> S-03 (+S-04)",
+    () => {
+      const text = readFileSync(SIL_IPA_KMN_PATH, "utf-8");
+      const { ir } = parse(text, "sil_ipa");
+
+      // The live postfix rules are if(option_key = '')-guarded, hence opaque:
+      // they exist only as raw fragments, never as typed group rules, so a
+      // fill here proves the guarded fragment scan reached them.
+      expect(ir.raw.some((f) => f.reason === "if-option-store")).toBe(true);
+
+      const importFill = detectMarkInputOrderFromImport(ir);
+      expect(importFill).toEqual({
+        axis: "markInputOrder",
+        value: "postfix",
+        source: "import-derived",
+      });
+
+      const partial = {
+        scale: "medium" as const,
+        scriptClass: "alphabetic" as const,
+        phoneticIntuition: "strong" as const,
+        markInputOrder: importFill?.value as "postfix",
+      };
+      const { axes } = defaultFillAxes(partial);
+      expect(axes.markInputOrder).toBe("postfix");
+
+      const result = selectStrategy(axes);
+      expect(result.triggeredRule).toBe("3a");
+      expect(result.primary).toBe("S-03");
+      expect(result.secondaries).toContain("S-04");
+    }
+  );
+
+  it.skipIf(silIpaAvailable)("skips the real-file lock when the keyboards checkout is absent", () => {
+    expect(silIpaAvailable).toBe(false);
   });
 });
