@@ -18,7 +18,9 @@
 // welcome.htm", "HTML-escapes & in readme.htm" — the latter asserts the
 // "<name> keyboard" phrasing). Change it deliberately, not incidentally.
 
+import { DOC_FORMS } from "@keyboard-studio/contracts";
 import { escapeHtml, phpCommentEscape, phpSingleQuoteEscape } from "./escapeHtml.js";
+import { renderDocForm } from "./renderDocForm.js";
 
 /**
  * The standard help-site header every published keyboard's `source/help/<id>.php`
@@ -79,8 +81,16 @@ export function readmeHtm(displayName: string): string {
  * wrong notice reads as authoritative (spec 064 FR-004).
  *
  * Not HTML-escaped: LICENSE.md is Markdown/plain text, not markup.
+ *
+ * Rendered through the `license` form (spec 102 FR-026: the copyright year
+ * appears only here). A null holder leaves the `copyrightHolder` slot empty,
+ * so the form drops the notice block. Callers pass null for a blank holder
+ * (ensurePackageFiles trims first); a whitespace-only holder would also drop
+ * the notice, where the old template emitted an empty-named one.
  */
 export function licenseMd(holder: string | null, year: number): string {
-  const notice = holder !== null ? `Copyright © ${year} ${holder}\n\n` : "";
-  return `${notice}MIT License\n`;
+  return renderDocForm(DOC_FORMS.forms.license, {
+    copyrightHolder: holder ?? "",
+    year: String(year),
+  });
 }

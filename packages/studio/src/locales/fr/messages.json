@@ -1107,6 +1107,7 @@
   "output.docs.checklist.tier.authored": "authored",
   "output.docs.checklist.tier.derived": "derived",
   "output.docs.checklist.tier.inherited": "inherited",
+  "output.docs.checklist.typingGuideSuppressed": "",
   "output.download.aria.attributionMissing": "Téléchargement indisponible — le clavier doit avoir un auteur et un titulaire des droits d'auteur.",
   "output.download.aria.coverageBlocked": "Téléchargement indisponible — terminez tous les personnages de l'inventaire avant de lancer le téléchargement. Consultez la bannière ci-dessous pour plus de détails.",
   "output.download.aria.kmp": "Télécharger le clavier « {downloadKeyboardId} » sous forme de package Keyman installable",

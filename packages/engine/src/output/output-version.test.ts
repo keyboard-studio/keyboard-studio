@@ -1,4 +1,5 @@
-// Tests for the output version resolver (spec 094 research R1, contracts C1).
+// Tests for the output version resolver (spec 094 research R1, contracts C1;
+// spec 102 FR-004/FR-007/FR-008: a Copy publishes at 1.0, test builds at 0.N).
 //
 // Coverage:
 //   - every row of the R1 table, for both tracks and every base shape;
@@ -42,25 +43,30 @@ describe("resolveTestBuildVersion — R1 table", () => {
     // Track 2, three parts: a.b.(c+N)
     ["adapt-existing", "1.2.3", 1, "1.2.4"],
     ["adapt-existing", "1.2.3", 2, "1.2.5"],
-    // Track 1, first segment >= 1: 0.N
+    // Track 2, one part with more builds
+    ["adapt-existing", "2", 3, "2.3"],
+    // Track 1 publishes at 1.0 whatever the source (spec 102 FR-004), so
+    // test build N is always 0.N: one-, two- and three-part sources alike.
+    ["new-from-base", "1", 1, "0.1"],
     ["new-from-base", "1.0", 1, "0.1"],
     ["new-from-base", "2.3", 2, "0.2"],
     ["new-from-base", "1.2.3", 3, "0.3"],
-    // Track 1, P = 0.b[.c] with b >= 1: 0.(b-1).N
-    ["new-from-base", "0.5", 1, "0.4.1"],
-    ["new-from-base", "0.1.7", 2, "0.0.2"],
+    ["new-from-base", "0.5", 1, "0.1"],
+    ["new-from-base", "0.1.7", 2, "0.2"],
+    // ... including sources that are not a version kmc-package accepts.
+    ["new-from-base", "0", 1, "0.1"],
+    ["new-from-base", "0.0", 2, "0.2"],
+    ["new-from-base", "0.0.4", 1, "0.1"],
+    ["new-from-base", "1.0a", 1, "0.1"],
+    ["new-from-base", "1.2.3.4", 4, "0.4"],
+    ["new-from-base", "", 1, "0.1"],
   ] as const)("%s %s build %i -> %s", (mode, raw, n, expected) => {
     expect(testVersion(mode, raw, n)).toBe(expected);
   });
 
   it.each([
-    ["new-from-base", "0"],
-    ["new-from-base", "0.0"],
-    ["new-from-base", "0.0.4"],
     ["adapt-existing", "1.0a"],
-    ["new-from-base", "1.0a"],
     ["adapt-existing", "1.2.3.4"],
-    ["new-from-base", "1.2.3.4"],
     ["adapt-existing", "1.02"],
     ["adapt-existing", ""],
   ] as const)("%s %j is unsupported", (mode, raw) => {
@@ -86,10 +92,13 @@ describe("resolvePublishVersion", () => {
     },
   );
 
-  it.each(["1.0", "2.3", "1.2.3", "0.0", "1.0a"])("copy %j passes through, with or without test builds", (raw) => {
-    expect(resolvePublishVersion({ mode: "new-from-base", rawVersion: raw, hasTestBuilds: false })).toBe(raw);
-    expect(resolvePublishVersion({ mode: "new-from-base", rawVersion: raw, hasTestBuilds: true })).toBe(raw);
-  });
+  it.each(["1", "1.0", "2.3", "1.2.3", "0.5", "0.0", "1.0a", "1.2.3.4", ""])(
+    "copy %j publishes at 1.0, with or without test builds",
+    (raw) => {
+      expect(resolvePublishVersion({ mode: "new-from-base", rawVersion: raw, hasTestBuilds: false })).toBe("1.0");
+      expect(resolvePublishVersion({ mode: "new-from-base", rawVersion: raw, hasTestBuilds: true })).toBe("1.0");
+    },
+  );
 
   it("bumps the middle segment of a tested three-part adapt base", () => {
     expect(resolvePublishVersion({ mode: "adapt-existing", rawVersion: "1.2.3", hasTestBuilds: true })).toBe("1.3.0");
@@ -112,6 +121,8 @@ describe("1000 consecutive builds per shape", () => {
     ["new-from-base", "7.4.2"],
     ["new-from-base", "0.3"],
     ["new-from-base", "0.1.7"],
+    ["new-from-base", "0.0"],
+    ["new-from-base", "not-a-version"],
   ];
 
   it.each(shapes)("%s %s: valid, strictly increasing, between V and P", (mode, raw) => {
