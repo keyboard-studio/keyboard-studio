@@ -38,6 +38,8 @@ export interface FlowStepHostProps {
   getSeedValue?: (questionId: string) => string | string[] | undefined;
   /** Where a seed came from. Forwarded to SurveyRunner. */
   getSeedSource?: (questionId: string) => DecisionProposalSource | undefined;
+  /** A seed's one-line reason, shown under the field. Forwarded to SurveyRunner. */
+  getSeedProvenance?: (questionId: string) => { caption: string } | undefined;
   onAnswerCommit?: (questionId: string, value: string | string[] | undefined) => void;
   /**
    * Optional per-question `required` override (spec 079 FR-009's adaptive
@@ -61,6 +63,7 @@ export function FlowStepHost({
   onBack,
   getSeedValue,
   getSeedSource,
+  getSeedProvenance,
   onAnswerCommit,
   findingsByQuestionId,
   getRequiredOverride,
@@ -82,6 +85,7 @@ export function FlowStepHost({
         {...(onBack !== undefined ? { onBack } : {})}
         {...(getSeedValue !== undefined ? { getSeedValue } : {})}
         {...(getSeedSource !== undefined ? { getSeedSource } : {})}
+        {...(getSeedProvenance !== undefined ? { getSeedProvenance } : {})}
         {...(onAnswerCommit !== undefined
           ? { onAnswerCommit }
           : {})}

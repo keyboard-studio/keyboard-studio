@@ -28,6 +28,7 @@ import {
 import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 import { hasTestBuilds } from "../../stores/testingStore.ts";
+import { proposeTrack } from "../../lib/proposeTrack.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../../decisions/extractContext.ts";
@@ -50,10 +51,16 @@ function decisionString(decisions: DecisionSet, id: DecisionId): string | undefi
 //   will produce a null return to match).
 // Seeds: track_choice from the session's currently-recorded selectedTrack, so
 //   arriving at this step by deep link or by walking Back shows the recorded
-//   answer instead of an empty radio group (spec 057 FR-031). `undefined`
-//   before any choice has ever been recorded — SurveyRunner's "seed once, then
-//   the user owns it" contract leaves the field genuinely unset in that case,
-//   same as project_name below.
+//   answer instead of an empty radio group (spec 057 FR-031). A recorded
+//   track always wins and is never re-proposed over. Before any choice has
+//   ever been recorded, the seed is proposeTrack's proposal (lib/proposeTrack.ts):
+//   adapt only when the base's single declared language matches the target
+//   tag's language and script, copy otherwise. SurveyRunner's "seed once,
+//   then the user owns it" contract makes that seed a proposal — the saved
+//   answer records origin "proposed" when the author keeps it and
+//   "overturned" when they change it, with getSeedSource naming where the
+//   proposal came from and getSeedCaption showing its one-line reason under
+//   the radio group.
 // Extract: track_choice answer → "copy" | "adapt" only; else undefined (stay).
 // Effects: none here (spec 089) — the recorded authoring-track decision IS
 //   the effect; routing reads it via selectTrack and the scaffold
@@ -76,7 +83,20 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
   seeds: {
     getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
       if (questionId !== "track_choice") return undefined;
-      return deps.selectedTrack ?? undefined;
+      if (deps.selectedTrack !== null) return deps.selectedTrack;
+      return proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages).track;
+    },
+    getSeedSource(questionId: string, deps: FlowStepDeps): DecisionProposalSource | undefined {
+      if (questionId !== "track_choice") return undefined;
+      // A recorded track is the author's own — it names no proposal source.
+      // The first-arrival proposal is the studio's analysis of the target
+      // tag against the base's declared languages.
+      return deps.selectedTrack !== null ? undefined : "analysis";
+    },
+    getSeedCaption(questionId: string, deps: FlowStepDeps): string | undefined {
+      if (questionId !== "track_choice") return undefined;
+      if (deps.selectedTrack !== null) return undefined;
+      return proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages).reason;
     },
   },
 
