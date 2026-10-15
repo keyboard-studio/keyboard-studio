@@ -906,7 +906,7 @@ export function RuleBuilderPanel({
           onChange={event => setBundleName(event.target.value)}
           placeholder={t({
             id: "ruleBuilder.name.placeholder",
-            message: "Cameroon diacritic blocking",
+            message: "e.g. Cameroon diacritic blocking",
           })}
           style={{ ...fieldStyle, marginBottom: 8 }}
         />

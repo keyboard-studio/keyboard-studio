@@ -1340,7 +1340,7 @@
   "ruleBuilder.footnote": "A bundle is just a named set of rules saved for reuse. Underneath it’s a versioned Behaviour record — auditable, simulatable, removable — so a bundle installed elsewhere behaves exactly like the rules you tested here.",
   "ruleBuilder.name.field": "Bundle name",
   "ruleBuilder.name.label": "Name the bundle",
-  "ruleBuilder.name.placeholder": "Cameroon diacritic blocking",
+  "ruleBuilder.name.placeholder": "e.g. Cameroon diacritic blocking",
   "ruleBuilder.name.step": "1 · What should we call it?",
   "ruleBuilder.prove.add": "Add pair manually",
   "ruleBuilder.prove.input": "Typed input (description)",
