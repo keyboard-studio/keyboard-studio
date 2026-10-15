@@ -28,7 +28,7 @@
 // the codes they emit and fails when one is in neither the mapped nor the gap
 // list, so a newly added check cannot go unaccounted for.
 
-import type { DecisionId } from "./decisionTypes.ts";
+import type { DecisionId } from "../decisions/decisionTypes.ts";
 
 /** A keyboard-lint check a submission is measured against (warning/hint severity). */
 export interface SubmissionGate {

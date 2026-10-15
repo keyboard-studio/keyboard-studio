@@ -213,6 +213,7 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - spec-trace: `pnpm run test:spec-trace`
 - facet-index: `pnpm run test:facet-index`
 - kbgen: `pnpm run test:kbgen` (typecheck + tests; it imports engine `src/` internals by relative path, so this is the only thing that catches an engine rename)
+- corpus-mine: `pnpm run test:corpus-mine` (typecheck + tests; the spec 087 corpus mining harness, relocated out of studio `src/decisions/` — it imports studio/engine `src/` by relative path)
 - nfd-tolerance-corpus: `pnpm run test:nfd-tolerance-corpus`
 - km-triage-app: `pnpm run test:km-triage` (`node:test`, not vitest; the glob is quoted so Node
   expands it — Node 22 does not accept a bare directory argument to `--test`)
@@ -244,7 +245,7 @@ its manifest edge coverage.
   `survey/SurveyRunner.tsx`'s exported `evalCondition`/`resolveNext`/`advanceThrough` for
   intra-step question routing). Run via `pnpm --filter @keyboard-studio/studio test`
   (`src/survey/journey-runner.test.ts`).
-- Coverage gate: `packages/studio/src/dashboard/journeyCoverage.ts`'s `computeCoverageReport()`
+- Coverage gate: `packages/studio/src/test/journeyCoverage.ts`'s `computeCoverageReport()`
   compares the fixtures' declared step ids against `buildManifestStepGraph()`'s full manifest
   step/edge set — report-only (always exits 0; a ratchet/hard-fail mode is a deferred
   follow-up). Generate `docs/journey-coverage.json`:
@@ -258,7 +259,7 @@ its manifest edge coverage.
   The report and `journey-runner.test.ts` read the fixtures through one module,
   `packages/studio/src/survey/__fixtures__/journeyCorpus.ts`, so a new journey is added there.
   The command is a `vitest run` invocation of one spec
-  (`src/dashboard/journeyCoverage.report.test.ts`), not a bare `tsx` script — the manifest's
+  (`src/test/journeyCoverage.report.test.ts`), not a bare `tsx` script — the manifest's
   editor-step components transitively import Vite-only assets (`?raw`, `?lingui`) that
   `tsx`/Node cannot resolve; Vitest already runs on Vite's own transform pipeline, so
   reusing it avoids a second, Vite-unaware code path onto the same manifest. See that file's
@@ -343,7 +344,7 @@ with `tsx` (see each tool's tsconfig) — except the plain-node ones (`spec-trac
 `crowdin-diagnose`, `content-i18n-normalize`, and the `*-lint` checkers), which run under bare
 `node`. Do not treat them as built workspace packages.
 
-Inventory: kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app,
+Inventory: kbgen, corpus-mine, supportability-scanner, smoke-artifact, spec-trace, km-triage-app,
 Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint,
 welcome-sweep, nfd-tolerance-corpus. (hermes was archived out of tree 2026-10-14:
 `~/workspace/archives/keyboard-studio-utilities-2026-10-14/`.)
@@ -359,7 +360,7 @@ Two halves over the same corpus:
   a drifted/tracked unit to the manifest steps and question modules that declare it as a
   `specRef` (spec 031) — read from `packages/studio/src/steps/manifest.specref.json`, a flat
   `{ [stepId | questionId]: string[] }` artifact regenerated on every `pnpm test` run by
-  `packages/studio/src/steps/generateManifestSpecRef.test.ts` (a vitest hook, not a bare
+  `packages/studio/src/test/generateManifestSpecRef.test.ts` (a vitest hook, not a bare
   `tsx` script — `manifest.ts` pulls in editor components that use Lingui `<Trans>` macros,
   which only resolve through Vite's transform pipeline). Missing or stale, spec-trace logs a
   `[WARN]` and continues — the artifact is optional for backward compatibility (FR-010);
