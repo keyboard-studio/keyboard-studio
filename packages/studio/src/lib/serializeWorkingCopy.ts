@@ -591,7 +591,7 @@ export async function projectWorkingCopyForOutput(
     touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
     inheritedProse: isAdaptation ? (startWelcomeHtmText ?? startHelpPhpText) : null,
   });
-  // Issue #1908: the author's ACCEPTED documentation-fix proposals become
+  // Issue 1908: the author's ACCEPTED documentation-fix proposals become
   // render fixes here exactly as in useDocsPreview — adapt track only; the
   // copy track's fresh renders never see them.
   const inheritedFixes = {
@@ -635,10 +635,10 @@ export async function projectWorkingCopyForOutput(
   }
   clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, startHelpPhpText, startWelcomeHtmText), false);
 
-  // Issue #1908 (criterion 11.8), accepted image-width proposal: the shipped
+  // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
   // kb.css gains the constraining rule. This engages only when a kb.css is
   // actually in the working copy — on the adapt path that depends on the
-  // loader carrying it (issue #2139); when no kb.css is present there is
+  // loader carrying it (issue 2139); when no kb.css is present there is
   // nothing to amend and the proposal stays visibly unlanded rather than
   // pretending otherwise. Idempotent: a stylesheet already carrying an
   // img max-width rule is left alone.
