@@ -12,6 +12,12 @@ export type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 
 export { buildSessionProducedSet } from "./sessionProducedSet.js";
 
+export {
+  findOe2SoleSourceGlyphs,
+  findSessionOe2SoleSourceGlyphs,
+  isOe2VkeyName,
+} from "./oe2SoleSource.js";
+
 export { applyAssignmentsToVfs } from "./applyAssignmentsToVfs.js";
 
 export { applyCarveToVfs } from "./applyCarveToVfs.js";

@@ -98,6 +98,7 @@ import type { OskMode } from "./components/OskModeToggle.tsx";
 import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
+import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
@@ -1304,12 +1305,17 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // so they render, publish, and classify exactly like every other finding.
   // Warning-severity by the Layer C ceiling, so they can never block (FR-018).
   const documentationFindings = useDocumentationFindings();
+  // The sole-source oe2 Layer C warning rides the same findings array on
+  // the same terms (memoised synchronous hook, no second timer): it is
+  // owned by the mechanisms step via the lintToQuestion mapping for its
+  // code, so it chips and badges there rather than rendering here.
+  const oe2Findings = useOe2SoleSourceFindings();
   const findings = useMemo(
     () =>
-      documentationFindings.length === 0
+      documentationFindings.length === 0 && oe2Findings.length === 0
         ? validatorFindingsOnly
-        : [...validatorFindingsOnly, ...documentationFindings],
-    [validatorFindingsOnly, documentationFindings],
+        : [...validatorFindingsOnly, ...documentationFindings, ...oe2Findings],
+    [validatorFindingsOnly, documentationFindings, oe2Findings],
   );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability

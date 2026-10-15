@@ -1073,6 +1073,8 @@
   "lint.contextTolerance.summary": "{gapCount, plural, one {# rule only works when the accent is already joined to the letter.} other {# rules only work when the accent is already joined to the letter.}}",
   "lint.contextTolerance.toggle.hide": "Hide the affected rules",
   "lint.contextTolerance.toggle.show": "Show the affected rules",
+  "lint.oe2SoleSource.hint": "Les claviers conçus pour les États-Unis ne possèdent pas cette touche ; les personnes qui en utilisent un ne peuvent donc pas saisir ce caractère. Prévoyez aussi un autre moyen de le saisir, par exemple une autre touche ou une séquence de touche morte.",
+  "lint.oe2SoleSource.message": "Le caractère « {glyph} » (U+{codePoint}) se trouve uniquement sur la touche située à côté de la touche Maj gauche",
   "lint.summary.findingsListAriaLabel": "Résultats du lint",
   "lint.summary.liveRegion.issueCount": "{0, plural, one {# problème de lint} other {# problèmes de lint}}",
   "lint.summary.noIssuesFound": "Aucun problème détecté",
