@@ -381,7 +381,7 @@ case, the other four already resolving Not applicable. With the
 KPJ pair landed below, **44 of 49 rows** have a mechanism; the
 EXTERNAL five remain Not yet checkable by design.
 
-## KPJ pair landed (2026-10-14, follow-on PR off main)
+## KPJ pair landed (2026-10-14, PR #2105)
 
 Matthew's ruling B (2026-10-14) settled the format constant by
 dropping it: criterion 1.10 no longer pins a numeric `.kpj`
