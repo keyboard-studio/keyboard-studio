@@ -116,8 +116,8 @@ async function backToLayoutStep(page: Page): Promise<void> {
 async function forwardToCarve(page: Page): Promise<void> {
   const carveGallery = page.getByTestId("carve-gallery");
   const revisitControls = [
-    "prefill-confirm",
-    "phase-b-done",
+    "prefill-continue",
+    "charlist-done",
     "marks-continue",
     "punctuation-done",
     "invisibles-continue",

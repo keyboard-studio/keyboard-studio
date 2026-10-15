@@ -143,7 +143,7 @@ describe("CharChipEditor", () => {
     await act(async () => {
       fireEvent.change(input, { target: { value: "ẹ" } }); // ẹ
     });
-    const addBtn = screen.getByRole("button", { name: /\+ Add/i });
+    const addBtn = screen.getByTestId("charlist-add");
     await act(async () => {
       fireEvent.click(addBtn);
     });

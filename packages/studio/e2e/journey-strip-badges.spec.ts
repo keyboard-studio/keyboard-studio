@@ -66,13 +66,13 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
 
     // Phase B: add a mark-bearing letter so the marks series (spec 071) has
     // something to walk (a marks-free alphabet auto-skips the whole series).
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+    await page.click('[data-testid="charlist-continue"]');
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "é");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     // Now on the marks series (its S0 gate passed — "é" carries a mark).
     const marksContinue = page.getByTestId("marks-continue");
@@ -110,13 +110,13 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
   }) => {
     await startToCharacters(page);
 
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+    await page.click('[data-testid="charlist-continue"]');
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "k");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     // "k" carries no mark and no punctuation — the marks series and
     // punctuation step both auto-skip, landing directly on invisibles.
@@ -200,13 +200,13 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // marks is reachable in the normal forward walk, which is what the
     // footer's jump mechanism as built today actually supports end to end.
     await startToCharacters(page);
-    await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-    await page.click('[data-testid="phase-b-intro-next"]');
+    await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+    await page.click('[data-testid="charlist-continue"]');
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "é");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     await driveMarksSeries(page);
     await drivePunctuationStep(page);
@@ -225,8 +225,8 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
     await page.fill('[aria-label="Character to add"]', "ü");
     await page.getByRole("button", { name: "+ Add" }).click();
-    await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', { timeout: 5_000 });
-    await page.click('[data-testid="phase-b-done"]');
+    await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', { timeout: 5_000 });
+    await page.click('[data-testid="charlist-done"]');
 
     // The walk lands back on marks (its S0 gate re-fires for the new
     // evidence) — the FR-016 notice fires on THIS Next, and marks' own

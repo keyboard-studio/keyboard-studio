@@ -403,11 +403,11 @@ export async function acceptProjectName(page: Page): Promise<void> {
  * Confirm the prefill summary and advance to Phase B.
  *
  * The prefill confirmation screen shows derived values (target script,
- * base keyboard, language). Confirm by clicking the prefill-confirm button.
+ * base keyboard, language). Confirm by clicking the prefill-continue button.
  */
 export async function confirmPrefill(page: Page): Promise<void> {
-  await page.waitForSelector('[data-testid="prefill-confirm"]', { timeout: 15_000 });
-  await page.click('[data-testid="prefill-confirm"]');
+  await page.waitForSelector('[data-testid="prefill-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="prefill-continue"]');
 }
 
 /**
@@ -426,19 +426,19 @@ export async function buildOneCharacterList(
   charToAdd: string = "é",
 ): Promise<void> {
   // IntroChooser — click Continue
-  await page.waitForSelector('[data-testid="phase-b-intro-next"]', { timeout: 15_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
+  await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 15_000 });
+  await page.click('[data-testid="charlist-continue"]');
 
   // BuildListView — type a character and add it
   await page.waitForSelector('[aria-label="Character to add"]', { timeout: 10_000 });
   await page.fill('[aria-label="Character to add"]', charToAdd);
-  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByTestId("charlist-add").click();
 
   // Click Done
-  await page.waitForSelector('[data-testid="phase-b-done"]:not([disabled])', {
+  await page.waitForSelector('[data-testid="charlist-done"]:not([disabled])', {
     timeout: 5_000,
   });
-  await page.click('[data-testid="phase-b-done"]');
+  await page.click('[data-testid="charlist-done"]');
 
   // The marks series (spec 071) sits immediately after alphabet confirmation,
   // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.

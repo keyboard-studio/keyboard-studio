@@ -72,7 +72,7 @@ async function reachBafutAlphabet(page: Page): Promise<void> {
   // lookup settles; Continue before that would decline it.
   const exemplars = page.locator("#discovery_method-exemplars");
   await expect(exemplars).toBeChecked({ timeout: 30_000 });
-  await page.click('[data-testid="phase-b-intro-next"]');
+  await page.click('[data-testid="charlist-continue"]');
   await expect(page.getByTestId("phase-b-heading")).toContainText("Confirm your alphabet", {
     timeout: 15_000,
   });
@@ -83,7 +83,7 @@ async function continueToConvenience(
   page: Page,
   expectConvenience: "shown" | "skipped" = "shown",
 ): Promise<void> {
-  const done = page.getByTestId("phase-b-done");
+  const done = page.getByTestId("charlist-done");
   await expect(done).toBeEnabled();
   await done.click();
   // Bafut's main tier carries combining tone marks, so the marks series renders.
