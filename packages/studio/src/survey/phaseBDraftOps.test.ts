@@ -356,8 +356,9 @@ describe("phase B inventory draft — three-store split (spec 071)", () => {
 
 // ---------------------------------------------------------------------------
 // Pair-level text-sample attribution (#1784): stacks harvested from a text
-// sample carry source "text"; exemplar/author pairs carry no source; a
-// pairing attested by both unions to "both".
+// sample carry source "text"; exemplar/author pairs carry no source.
+// Attribution is first-origin: a pairing re-attested by a later source
+// keeps the first origin's attribution (no "both" state).
 // ---------------------------------------------------------------------------
 
 describe("phase B inventory draft — attested stack text attribution (#1784)", () => {

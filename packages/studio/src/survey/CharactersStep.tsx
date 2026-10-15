@@ -363,9 +363,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
     const alphabet = draftConfirmedAlphabet(draftValue);
     const lacking = marksLackingPairingEvidence(alphabet);
     if (lacking.length > 0) {
-      const hadTextSample = alphabet.attestedStacks.some(
-        (s) => s.source === "text" || s.source === "both",
-      );
+      const hadTextSample = alphabet.attestedStacks.some((s) => s.source === "text");
       return (
         <MarksTextSamplePrompt
           lackingMarks={lacking}

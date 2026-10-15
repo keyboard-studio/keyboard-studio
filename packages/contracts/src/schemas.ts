@@ -589,7 +589,7 @@ export const AttestedStackSchema = z.object({
   marks: z.array(z.string().min(1)).min(1),
   // Pair-level provenance (#1784): only text-sample evidence is recorded
   // explicitly; absent = attested by non-text means.
-  source: z.enum(["exemplar", "text", "both"]).optional(),
+  source: z.enum(["text"]).optional(),
 });
 
 export const ConfirmedAlphabetSchema = z.object({
