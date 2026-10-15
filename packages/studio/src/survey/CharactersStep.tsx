@@ -18,14 +18,20 @@
 // placementMap is intentionally omitted from PhaseB props (D-INT-2, v1).
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import type { ConfirmedAlphabet, LintFinding, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type {
+  ConfirmedAlphabet,
+  LintFinding,
+  RemapPosture,
+  SurveyPhaseResult,
+} from "@keyboard-studio/contracts";
 import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
-import { marksLackingPairingEvidence } from "@keyboard-studio/engine";
+import { deriveRemapPosture, marksLackingPairingEvidence } from "@keyboard-studio/engine";
 import type { SurveyContext } from "./types.ts";
 import type { DecisionRendererProps } from "../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../steps/galleryHost.tsx";
 import { alphabetKeyOf, graphemeFitsScript } from "../steps/evidence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { deriveIdentityResult, deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { draftConfirmedAlphabet, type CharacterInventoryValue } from "./phaseBDraftOps.ts";
@@ -68,6 +74,10 @@ export interface CharactersStepExtras {
     base: StartKeyboard;
     onConfirm: () => void;
     onBack?: () => void;
+    remapConfirmation?: {
+      value: RemapPosture;
+      onChange: (next: RemapPosture) => void;
+    };
   }>;
   PhaseB: ComponentType<{
     context?: SurveyContext;
@@ -102,6 +112,9 @@ const TEXT_SAMPLE_PROMPT_ANSWER_ID = "characters.textSamplePrompt";
 // ahead of the remount that reads it) or a bare mock (a mocked PhaseB in a
 // unit test) that never reaches PhaseB's own state to restore it.
 const CHARACTERS_STEP_ID = "characters";
+
+/** The survey-answer id the A7a remap-posture confirmation records under. */
+const REMAP_POSTURE_ANSWER_ID = "characters.remapPosture";
 
 /** Seed-key prefixes the punctuation step records (see PunctuationStep's seed effects). */
 const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const;
@@ -222,6 +235,75 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
   const [deferredResult, setDeferredResult] = useState<SurveyPhaseResult | null>(null);
   const draftValue = useCharacterInventoryValue();
 
+  // --- A7a remap-posture confirmation (spec §7.2 rule 8) ---
+  // The derived producer: the target identity (decision spine) crossed with
+  // the base IR (the instantiated start). When it fires, the prefill
+  // surface below presents "full-remap" as a pre-filled, changeable
+  // answer; the recorded choice rides this step's phase result as a
+  // tier-1 computed axis, outranking the irAxes baseline the store
+  // reconciles from the same derivation. Nothing renders and nothing is
+  // recorded when the derivation does not fire.
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const syncRemapPosture = useWorkingCopyStore((s) => s.syncRemapPostureFromIdentity);
+  const identityPrefill = identityResult?.prefill;
+  const derivedRemapPosture =
+    identityPrefill !== undefined && startIr !== null
+      ? deriveRemapPosture({
+          scriptClass: identityPrefill.scriptClass,
+          targetScript: identityPrefill.script,
+          baseIr: startIr,
+        })
+      : undefined;
+
+  // The derivation runs when the target script lands — the identity is
+  // composed before this step renders — reconciling the irAxes baseline.
+  const prefillScript = identityPrefill?.script;
+  const prefillScriptClass = identityPrefill?.scriptClass;
+  useEffect(() => {
+    if (prefillScript !== undefined && prefillScriptClass !== undefined) {
+      syncRemapPosture({ scriptClass: prefillScriptClass, targetScript: prefillScript });
+    }
+  }, [prefillScript, prefillScriptClass, startIr, syncRemapPosture]);
+
+  // The author's recorded choice, stamped with the current evidence key:
+  // a base or script change re-derives the key and the old choice no
+  // longer applies (the derived prefill stands again). A choice made this
+  // session wins over the restored one.
+  const remapEvidenceKey =
+    identityResult !== null && localStart !== null
+      ? alphabetKeyOf(identityResult, localStart)
+      : undefined;
+  const savedRemapAnswer = useSurveyAnswerStore(
+    (s) => s.steps[CHARACTERS_STEP_ID]?.answers[REMAP_POSTURE_ANSWER_ID],
+  );
+  const savedRemapChoice: RemapPosture | undefined =
+    savedRemapAnswer?.evidenceKey === remapEvidenceKey &&
+    (savedRemapAnswer?.value === "addition" || savedRemapAnswer?.value === "full-remap")
+      ? savedRemapAnswer.value
+      : undefined;
+  const [remapChoice, setRemapChoice] = useState<RemapPosture | null>(null);
+  useEffect(() => {
+    setRemapChoice(null);
+  }, [remapEvidenceKey]);
+  const remapAnswer: RemapPosture | undefined =
+    derivedRemapPosture !== undefined
+      ? (remapChoice ?? savedRemapChoice ?? derivedRemapPosture)
+      : undefined;
+
+  function handleRemapChange(next: RemapPosture): void {
+    setRemapChoice(next);
+    if (remapEvidenceKey !== undefined) {
+      useSurveyAnswerStore.getState().saveAnswer(CHARACTERS_STEP_ID, REMAP_POSTURE_ANSWER_ID, {
+        value: next,
+        answerType: "select",
+        origin: "confirmed",
+        stage: "confirmed",
+        evidenceKey: remapEvidenceKey,
+        screenId: "prefill",
+      });
+    }
+  }
+
   /** The pre-existing completion path: attach the confirmed alphabet and advance. */
   function completeCharacters(result: SurveyPhaseResult): void {
     // Commit the three-store ConfirmedAlphabet alongside the flat
@@ -235,7 +317,23 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
       alphabet.bases.length > 0 ||
       alphabet.marks.length > 0 ||
       alphabet.attestedStacks.length > 0;
-    onComplete(hasStores ? { ...result, alphabet } : result);
+    // A7a (spec §7.2 rule 8): when the derivation fired for this evidence,
+    // the confirmed remap posture (the derived prefill, or the author's
+    // change to it) rides the result as a tier-1 computed axis so it
+    // outranks the irAxes baseline. When it no longer fires (the author
+    // went back and changed the target script), strip a stale posture a
+    // previous completion recorded — recordPhase merges over the prior
+    // same-phase entry, so omitting the axis would keep the old value.
+    let computedAxes = result.computedAxes;
+    if (remapAnswer !== undefined) {
+      computedAxes = { ...computedAxes, remapPosture: remapAnswer };
+    } else if (computedAxes?.remapPosture !== undefined) {
+      const { remapPosture: _stalePosture, ...restAxes } = computedAxes;
+      computedAxes = restAxes;
+    }
+    const withAxes =
+      computedAxes === result.computedAxes ? result : { ...result, computedAxes };
+    onComplete(hasStores ? { ...withAxes, alphabet } : withAxes);
   }
 
   /** The #1784 prompt was dismissed for this exact alphabet already. */
@@ -399,6 +497,17 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
         // button (Prefill gates on `onBack !== undefined`) even when StepHost
         // omitted onBack because there is genuinely nothing to back into.
         {...(onBack !== undefined ? { onBack } : {})}
+        // The A7a confirmation renders only when the derivation fired for
+        // this evidence; the recorded choice pre-fills from the author's
+        // saved answer when one exists for this evidence key.
+        {...(remapAnswer !== undefined
+          ? {
+              remapConfirmation: {
+                value: remapAnswer,
+                onChange: handleRemapChange,
+              },
+            }
+          : {})}
       />
     );
   }

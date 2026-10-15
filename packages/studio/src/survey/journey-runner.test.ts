@@ -44,6 +44,25 @@ interface JourneyCase {
 
 const JOURNEYS: readonly JourneyCase[] = [
   {
+    name: "armenian-alpha-nonlatin",
+    summary: "replays the alpha-nonlatin copy-track spine to the §7.5 rule 8 outcome (S-06)",
+    visits: [
+      "identity",
+      "choose_base",
+      "track",
+      "attribution",
+      "project_name",
+      "characters",
+      "carve",
+      "deadkeys",
+      "mechanisms",
+      "touch",
+      "help",
+    ],
+    lastStep: "help",
+    endsAtDone: true,
+  },
+  {
     name: "bafut-end-to-end",
     summary: "replays the full copy-track spine (US1, T012)",
     visits: [

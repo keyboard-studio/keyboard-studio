@@ -5,6 +5,7 @@
 
 import { parseJourneyFixture, type JourneyFixture } from "../journeyFixture.ts";
 
+import armenianRaw from "../../../../../content/journeys/armenian-alpha-nonlatin.yaml?raw";
 import bafutRaw from "../../../../../content/journeys/bafut-end-to-end.yaml?raw";
 import bjCreeWoodsRaw from "../../../../../content/journeys/bj-cree-woods-track2.yaml?raw";
 import minimalDefaultsRaw from "../../../../../content/journeys/minimal-defaults.yaml?raw";
@@ -12,6 +13,7 @@ import backtrackRaw from "../../../../../content/journeys/backtrack-journey.yaml
 
 /** Raw YAML for each journey, keyed by file stem. */
 export const JOURNEY_CORPUS_RAW = {
+  "armenian-alpha-nonlatin": armenianRaw,
   "bafut-end-to-end": bafutRaw,
   "bj-cree-woods-track2": bjCreeWoodsRaw,
   "minimal-defaults": minimalDefaultsRaw,
