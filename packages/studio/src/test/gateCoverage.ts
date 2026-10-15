@@ -126,6 +126,12 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "12.2-iso-639-5-lang-code", code: "KM_LINT_ISO_639_5_LANG_CODE", criteria: "BCP47 tags do not use ISO 639-5 language codes.", why: "language-tag hygiene; no DecisionId" },
   { id: "12.3-numeric-region-non-contrastive", code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", criteria: "A language tag does not include a numerical region code, unless it is explicitly contrastive.", why: "language-tag hygiene; no DecisionId" },
   { id: "18.7-mandated-currency-char", code: "KM_LINT_MANDATED_CHAR_MISSING", criteria: "The keyboard can produce the mandated characters for currency (if applicable).", why: "character coverage; no DecisionId" },
+  // Spec 084 KPJ pair (checks in keyboard-lint's checks/criteria/,
+  // landed by #2105 under ruling B — structural form, not a numeric
+  // pin): same status as the other 084 batches — the criteria resolver
+  // is their consumer, and no DecisionId captures .kpj file form.
+  { id: "1.10b-kpj-format-outdated", code: "KM_LINT_KPJ_FORMAT_OUTDATED", criteria: "Adapted keyboard's .kpj file is in the current project-file form (carries the <Options><Version> format marker).", why: "project-file form is inherited or scaffolded; no DecisionId" },
+  { id: "2.7-kpj-version-bumped", code: "KM_LINT_KPJ_VERSION_BUMPED", criteria: "The .kpj file's <Version> field has not been bumped relative to the base keyboard it was adapted from.", why: "project-file form is inherited or scaffolded; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {
