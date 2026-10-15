@@ -21,7 +21,7 @@
 // Vite's transform is already wired up; this module stays a plain,
 // synchronously-importable builder that test can call and assert against.
 
-import type { Step } from "./types.ts";
+import type { Step } from "../steps/types.ts";
 import type { QuestionModule } from "../survey/types.ts";
 
 function toArray(specRef: string | readonly string[] | undefined): readonly string[] {

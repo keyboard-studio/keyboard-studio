@@ -21,9 +21,9 @@
 // ratchet (CI-failing) mode is an explicitly deferred follow-up once a
 // committed baseline exists to ratchet against (FR-007).
 
-import { buildManifestStepGraph } from "./buildStepGraph.ts";
-import { buildFlowSources, collectRenderedNodeIds } from "./renderedNodeSet.ts";
-import type { StepGraphEdge } from "./model.ts";
+import { buildManifestStepGraph } from "../dashboard/buildStepGraph.ts";
+import { buildFlowSources, collectRenderedNodeIds } from "../dashboard/renderedNodeSet.ts";
+import type { StepGraphEdge } from "../dashboard/model.ts";
 import type { JourneyFixture } from "../survey/journeyFixture.ts";
 
 // ---------------------------------------------------------------------------
