@@ -726,7 +726,7 @@ export interface MechanismPlacement {
  *     same loop, already owns — the synthetic content string embeds the
  *     character's own codepoint, so no two iterations can ever share a
  *     (content, indicator) pair.
- *   - advances via "Next character"/"Done" until the gallery completes.
+ *   - advances via "Next character"/"Continue" until the gallery completes.
  *
  * Does not name or return which character was which — callers that need to
  * prove a SPECIFIC placed letter landed correctly do so from the emitted
@@ -763,7 +763,7 @@ export async function driveMechanismsGallery(
   // the per-character forward button becoming visible resolves the race;
   // then read which one is ACTUALLY present.
   const emptyNotice = page.getByText("No new characters to add.");
-  const forwardButton = page.getByRole("button", { name: /^(Next character|Done)$/ });
+  const forwardButton = page.getByRole("button", { name: /^(Next character|Continue)$/ });
   const applyButton = page.getByRole("button", { name: /^Apply method for / });
   await Promise.race([
     waitVisible(emptyNotice, 15_000),
@@ -859,7 +859,7 @@ async function assignToKey(page: Page, placement: MechanismPlacement): Promise<v
  * "Cannot finish yet" gate forever. Instead this helper actually configures
  * the default "Long-press on a key" method (host key select, aria-label
  * "Host key for long-press") + Apply for every character, then advances via
- * "touch-continue" (which doubles as "Next character"/"Done").
+ * "touch-continue" (which doubles as "Next character"/"Continue").
  *
  * It also has a one-time intro splash ("Start the touch gallery"), dismissed
  * first.
