@@ -17,8 +17,10 @@ import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
   chooseAdaptTrack,
+  driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
+  driveDeadkeysStep,
   seedReturningVisitor,
 } from "./surveyFlow";
 
@@ -51,7 +53,9 @@ async function driveIdentityLite(page: Page): Promise<void> {
 async function skipCarve(page: Page): Promise<void> {
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
   await page.getByTestId("carve-continue").click();
-  // Spec 082: the rules step sits between carve and mechanisms.
+  // Spec 083: the deadkeys step sits between carve and rules (#2053).
+  await driveDeadkeysStep(page);
+  // Spec 082: the rules step sits between deadkeys and mechanisms.
   await page.getByTestId("rules-continue").click();
 }
 
@@ -135,6 +139,9 @@ export async function driveToTouchStep(
   await driveIdentityLite(page);
   await pickStartKeyboard(page, START_KEYBOARD_ID);
   await chooseAdaptTrack(page);
+  // The attribution step (#1901) sits between track and prefill — this
+  // prelude predated it and parked every consumer at confirmPrefill (#2053).
+  await driveAttributionStep(page);
   await confirmPrefill(page);
   await buildOneCharacterList(page, PLACED_CHAR);
   await skipCarve(page);
