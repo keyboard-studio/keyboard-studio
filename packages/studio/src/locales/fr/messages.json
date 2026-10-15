@@ -1589,6 +1589,7 @@
   "survey.characterMapPane.announce.handedOffInvisible": "{cp} est un caractère invisible — il est transféré à l'étape « Caractères invisibles », où il est déjà sélectionné pour vous.",
   "survey.characterMapPane.announce.invisibleAdded": "Ajout de {name} ({cp})",
   "survey.characterMapPane.announce.invisibleRemoved": "Suppression de {name} ({cp})",
+  "survey.characterMapPane.announce.notPreviewedSummary": "{unpreviewedCount, plural, one {# caractère ne peut pas être prévisualisé dans la police sélectionnée} other {# caractères ne peuvent pas être prévisualisés dans la police sélectionnée}}",
   "survey.characterMapPane.announce.puaAddedAsLetter": "Ajout de « {char} » ({cp}) en tant que lettre",
   "survey.characterMapPane.announce.puaAddedAsMark": "Ajout de « {char} » ({cp}) en tant que repère",
   "survey.characterMapPane.announce.removedFull": "Suppression de {char} ({cp})",

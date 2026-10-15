@@ -13,7 +13,7 @@
 // Script families (scriptFonts.ts): when the session's scripts — the target
 // language's effective script UNION the base keyboard's language-tag
 // scripts — include a script the base fonts do not cover deterministically
-// (Arab / Ethi / Syrc / Tibt in Pick 1), that script's vendored family is
+// (the registry scripts in scriptFonts.ts), that script's vendored family is
 // appended to the stack and its face load is actively triggered. The family
 // is a rendering aid resolved from langtags data, never a decision: nothing
 // is recorded, and an unresolved script (langtags chunk not landed yet, or

@@ -1589,6 +1589,7 @@
   "survey.characterMapPane.announce.handedOffInvisible": "{cp} is an invisible character — handed to the Invisible characters step, where it is already selected for you.",
   "survey.characterMapPane.announce.invisibleAdded": "Added {name} ({cp})",
   "survey.characterMapPane.announce.invisibleRemoved": "Removed {name} ({cp})",
+  "survey.characterMapPane.announce.notPreviewedSummary": "{unpreviewedCount, plural, one {# character can't be previewed in the selected font} other {# characters can't be previewed in the selected font}}",
   "survey.characterMapPane.announce.puaAddedAsLetter": "Added {char} ({cp}) as a letter",
   "survey.characterMapPane.announce.puaAddedAsMark": "Added {char} ({cp}) as a mark",
   "survey.characterMapPane.announce.removedFull": "Removed {char} ({cp})",
