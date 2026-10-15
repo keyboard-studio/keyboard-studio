@@ -2,8 +2,8 @@
 //
 // These run against the real catalog (ALL_CRITERIA) with baseline facts
 // that make every criterion applicable, so the counts pin the band logic
-// itself: 40 scaffolder-bake + 51 implemented layer-c checks resolve Met
-// in authored mode with no findings, 16 layer-c criteria are honestly
+// itself: 40 scaffolder-bake + 53 implemented layer-c checks resolve Met
+// in authored mode with no findings, 14 layer-c criteria are honestly
 // Not yet checkable, and the yellow/red bands wait on the author/human.
 
 import { describe, expect, it } from "vitest";
@@ -70,18 +70,18 @@ describe("resolveCriteria — authored baseline", () => {
       ALL_CRITERIA.map((c) => c.id),
     );
 
-    // 40 scaffolder-bake + 51 implemented layer-c checks pass; the other
-    // 16 layer-c criteria have no check yet; yellow waits on the author
+    // 40 scaffolder-bake + 53 implemented layer-c checks pass; the other
+    // 14 layer-c criteria have no check yet; yellow waits on the author
     // and red on a human.
     expect(result.counts).toEqual({
-      met: 91,
+      met: 93,
       "not-met": 0,
       "not-applicable": 0,
       "needs-author": 32,
       "needs-human": 10,
-      "not-yet-checkable": 16,
+      "not-yet-checkable": 14,
     });
-    expect(result.resolvedCount).toBe(91);
+    expect(result.resolvedCount).toBe(93);
   });
 
   it("gives every row exactly one status and bandCounts that agree with counts", () => {
@@ -101,8 +101,8 @@ describe("resolveCriteria — authored baseline", () => {
       expect(bandTotal).toBe(result.counts[status]);
     }
     expect(result.bandCounts["scaffolder-bake"].met).toBe(40);
-    expect(result.bandCounts["layer-c-enforce"].met).toBe(51);
-    expect(result.bandCounts["layer-c-enforce"]["not-yet-checkable"]).toBe(16);
+    expect(result.bandCounts["layer-c-enforce"].met).toBe(53);
+    expect(result.bandCounts["layer-c-enforce"]["not-yet-checkable"]).toBe(14);
     expect(result.bandCounts["yellow-survey"]["needs-author"]).toBe(32);
     expect(result.bandCounts["red-checklist"]["needs-human"]).toBe(10);
   });
@@ -116,20 +116,20 @@ describe("resolveCriteria — authored baseline", () => {
 });
 
 describe("resolveCriteria — foreign baseline", () => {
-  it("resolves only the 51 implemented layer-c checks and offers no controls", () => {
+  it("resolves only the 53 implemented layer-c checks and offers no controls", () => {
     const result = resolveCriteria(makeInput({ mode: "foreign" }));
 
     expect(result.rows).toHaveLength(149);
     expect(result.counts).toEqual({
-      met: 51,
+      met: 53,
       "not-met": 0,
       "not-applicable": 0,
       "needs-author": 32,
       "needs-human": 10,
-      // 40 foreign scaffolder-bake rows join the 16 unimplemented checks.
-      "not-yet-checkable": 56,
+      // 40 foreign scaffolder-bake rows join the 14 unimplemented checks.
+      "not-yet-checkable": 54,
     });
-    expect(result.resolvedCount).toBe(51);
+    expect(result.resolvedCount).toBe(53);
     for (const row of result.rows) {
       expect(row.controls).toBeNull();
     }
@@ -165,9 +165,9 @@ describe("resolveCriteria — layer-c findings", () => {
     expect(evidence.lines).toContain(finding.hint);
 
     const result = resolveCriteria(makeInput({ lintFindings: [finding] }));
-    expect(result.counts.met).toBe(90);
+    expect(result.counts.met).toBe(92);
     expect(result.counts["not-met"]).toBe(1);
-    expect(result.resolvedCount).toBe(91);
+    expect(result.resolvedCount).toBe(93);
   });
 
   it("dedupes an identical finding reported twice (doc + engine)", () => {
@@ -221,8 +221,8 @@ describe("resolveCriteria — missing lint context", () => {
     );
 
     const result = resolveCriteria(input);
-    expect(result.counts.met).toBe(90);
-    expect(result.counts["not-yet-checkable"]).toBe(17);
+    expect(result.counts.met).toBe(92);
+    expect(result.counts["not-yet-checkable"]).toBe(15);
   });
 });
 
