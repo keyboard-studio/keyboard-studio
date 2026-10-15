@@ -3,7 +3,6 @@ import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { AppRoot } from "./AppRoot.tsx";
 import { StudioShell } from "./StudioShell.tsx";
-import { LintDemo } from "./lint/index.ts";
 import { OAuthCallbackScreen } from "./components/OAuthCallbackScreen.tsx";
 import {
   detectOAuthCallback,
@@ -133,9 +132,6 @@ async function mountApp(): Promise<void> {
   // interrupted session does not clobber a freshly-instantiated working copy.
   rehydrateWorkingCopyFromSession();
 
-  const isDemoLint =
-    typeof window !== "undefined" &&
-    window.location.search.includes("demo=lint");
   // Decision-spike demo (km/decisions-spike) — dev-only visualization of the
   // decision primitive. FR-009: DEV-gated so the management UI never renders
   // in a production build.
@@ -158,9 +154,7 @@ async function mountApp(): Promise<void> {
   createRoot(rootEl).render(
     <StrictMode>
       <AppRoot>
-        {isDemoLint ? (
-          <LintDemo />
-        ) : isDemoDecisions && LazyDecisionsDemo ? (
+        {isDemoDecisions && LazyDecisionsDemo ? (
           <Suspense
             fallback={
               <div role="status" aria-live="polite">

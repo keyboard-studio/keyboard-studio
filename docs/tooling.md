@@ -348,6 +348,13 @@ Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-
 welcome-sweep, nfd-tolerance-corpus. (hermes was archived out of tree 2026-10-14:
 `~/workspace/archives/keyboard-studio-utilities-2026-10-14/`.)
 
+### smoke-artifact
+
+Manual pre-submission artifact producer (issue #54); not a CI gate; run when a
+KD-loadable zip from a pinned base is needed outside the browser
+(`pnpm --filter smoke-artifact run gen`, drives the real scaffolder → zip
+pipeline against the local `../keyboards` clone).
+
 ### spec-trace
 
 Two halves over the same corpus:
