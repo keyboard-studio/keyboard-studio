@@ -1259,8 +1259,7 @@ function SldrUnionAction({
   currentInventory: SourcedInventory;
   seedFromProposal: (inventory: SourcedInventory, tag: string) => void;
 }) {
-  const { t } = useLingui();
-  const { cldr, sldr, loading } = useSourcedExemplarsBoth(bcp47);
+  const { sldr, loading } = useSourcedExemplarsBoth(bcp47);
   const [added, setAdded] = useState(false);
 
   if (loading || added || bcp47 === undefined) return null;
