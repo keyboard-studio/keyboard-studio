@@ -196,3 +196,19 @@ describe("DocumentationChecklist — disclosure", () => {
     expect(screen.queryByRole("list", { name: /documentation files/i })).toBeNull();
   });
 });
+
+describe("DocumentationChecklist — typing guide suppressed (spec 102 FR-034)", () => {
+  const NOTE = "Typing guide not generated: the original docs already include one.";
+
+  it("explains the omission when the typing guide was suppressed", () => {
+    instantiateAdaptation();
+    render(<DocumentationChecklist typingGuideSuppressed />);
+    expect(screen.getByText(NOTE)).toBeTruthy();
+  });
+
+  it("says nothing when the typing guide was generated", () => {
+    instantiateAdaptation();
+    render(<DocumentationChecklist typingGuideSuppressed={false} />);
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+});

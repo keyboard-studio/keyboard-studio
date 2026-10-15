@@ -4,7 +4,9 @@ Minimal OAuth token-exchange backend for the keyboard-studio GitHub fork+PR deli
 
 The studio SPA runs the GitHub OAuth web-app flow (PKCE, S256) but cannot hold the OAuth client secret in browser JavaScript. This service performs the server-side code-for-token exchange and returns the raw GitHub access token to the SPA, which stores it in `sessionStorage` (tab-scoped). No token is persisted server-side.
 
-Lives in `utilities/oauth-backend/` — a standalone deployable service kept out of `packages/*` so it does not participate in `pnpm -r build/test/typecheck`.
+Lives in `utilities/oauth-backend/` and is a pnpm workspace member (a scoped include in `pnpm-workspace.yaml`) so the co-located production functions can install and reuse this tested core.
+
+**Deployment shape:** production is the Vercel serverless functions under [`api/`](../../api/) (e.g. `api/oauth/*`, `api/submit/managed-pr.ts`), which reuse this package's handlers and schemas — see [DEPLOY.md](DEPLOY.md), the production deploy runbook (issue #550). The Fastify entrypoint in `src/server.ts` is the local development server: it serves the same routes with full parity — including an in-memory draft store, so the cloud-sync draft path can be exercised locally without Vercel or provisioned storage — and it is **not** a supported production deployment shape.
 
 ## Endpoints
 
@@ -92,7 +94,7 @@ Refresh an expiring token using the `refresh_token` grant. Classic GitHub OAuth 
 
 ### `GET /oauth/health`
 
-Liveness probe. No authentication required. Used by container healthcheck.
+Liveness probe. No authentication required.
 
 **Response `200`:**
 
@@ -147,7 +149,7 @@ bounded by the schema caps above, not by Fastify's 1 MiB default.
 | `GITHUB_APP_INSTALLATION_ID` | no | — | Numeric installation ID of the GitHub App on the org |
 | `GITHUB_ORG_LOGIN` | no | — | GitHub login owning the studio's standing fork of `keymanapp/keyboards`. Must be set together with the three `GITHUB_APP_*` vars; absent → `503` on the managed-PR route |
 | `OAUTH_ALLOWED_ORIGINS` | no | _(none)_ | Comma-separated extra CORS origins e.g. `https://studio.example.com` |
-| `PORT` | no | `8787` | TCP port to listen on |
+| `PORT` | no | `8787` | TCP port the local dev server (`src/server.ts`) listens on |
 
 `http://localhost:5173` (Vite default) is included in the CORS allowlist only when `NODE_ENV` is not `production`. In production, only the origins listed in `OAUTH_ALLOWED_ORIGINS` are accepted. Wildcard `*` is never used.
 
@@ -155,24 +157,26 @@ The service exits at startup with a fatal error if `GITHUB_CLIENT_ID` or `GITHUB
 
 ## Running
 
-**Development (run directly with tsx):**
+**Development (local dev server, run directly with tsx):**
 
 ```sh
 cd utilities/oauth-backend
-npm install
-GITHUB_CLIENT_ID=... GITHUB_CLIENT_SECRET=... npm start
+pnpm install
+GITHUB_CLIENT_ID=... GITHUB_CLIENT_SECRET=... pnpm start
 ```
+
+(`pnpm start` runs `tsx src/server.ts` — the local development / parity server described above, not the production deployment.)
 
 **Typecheck / test (from the utility directory):**
 
 ```sh
 cd utilities/oauth-backend
-npm install
-npm run typecheck
-npm test
+pnpm install
+pnpm run typecheck
+pnpm test
 ```
 
-Note: this utility is not a pnpm workspace member, so use `npm` or `node` directly rather than `pnpm --filter`.
+Note: this utility is a pnpm workspace member (see `pnpm-workspace.yaml`), so use `pnpm` — from the repo root, `pnpm --filter oauth-backend …` works too.
 
 ## Security notes
 

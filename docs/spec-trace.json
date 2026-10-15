@@ -1025,6 +1025,62 @@
       "implements": [],
       "decisions": [],
       "notes": "Implemented and merged in PR #1984 (keyboard derived from decisions). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-11."
+    },
+    "specs/095-privacy-notice": {
+      "title": "Feature Specification: Privacy notice — say what we hold, where it goes, and what becomes public, at the moment it matters",
+      "hash": "sha256:abf8fb6be4eded86",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2100 (privacy notice page, links, self-hosted fonts). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-15. Caveat: spec header still reads Draft/planning-only, and SIL Global acceptance of the controller role (#2100's stated merge gate) is not evidenced in the repo."
+    },
+    "specs/096-processing-record-and-retention": {
+      "title": "Feature Specification: Processing record & retention — one maintained inventory of what we hold, and a decided lifetime for every store",
+      "hash": "sha256:d00eded570f23b02",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2100 (docs/privacy/processing-record.md + check:privacy-record enumeration check in CI). Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-15."
+    },
+    "specs/097-subject-access-requests": {
+      "title": "Feature Specification: Subject access requests — a private intake, a verified identity, a one-month clock, and a complete answer",
+      "hash": "sha256:6a00d6dc4c0449da",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Machinery implemented and merged in PR #2100 (GET /drafts/export, in-app export, docs/privacy/dsar-procedure.md). NOT done per its own FR-010: the end-to-end DSAR dry-run has not been run — it is an open action in docs/privacy/reviews/2026.md. Triaged Path C for drift 2026-10-15; status stays partial until the dry-run is recorded."
+    },
+    "specs/098-erasure": {
+      "title": "Feature Specification: Erasure — delete what we hold, say plainly what we cannot, and prove both",
+      "hash": "sha256:472f274aa2a4bf00",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Machinery implemented and merged in PR #2100 (DELETE /drafts?all=true, purgeUserDrafts + operator CLI, docs/privacy/erasure-procedure.md). SC-001/SC-002 verification rides on the spec 097 dry-run extended with erasure, which has not been run (open action, docs/privacy/reviews/2026.md). Triaged Path C for drift 2026-10-15; status stays partial until then."
+    },
+    "specs/099-breach-response": {
+      "title": "Feature Specification: Breach response — a 72-hour runbook for the stores we actually have, rehearsed before it is needed",
+      "hash": "sha256:1ac6743d2524d88f",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Runbook and SECURITY.md implemented and merged in PR #2100 (docs/privacy/breach-runbook.md). NOT done per its own FR-008: the tabletop rehearsal has not been run — open action in docs/privacy/reviews/2026.md. Triaged Path C for drift 2026-10-15; status stays partial until the tabletop is recorded."
+    },
+    "specs/100-privacy-governance": {
+      "title": "Feature Specification: Privacy governance — Article XII in the constitution, a named owner, and gates that keep 095–099 true",
+      "hash": "sha256:5fa666f157f3e991",
+      "status": "partial",
+      "implements": [],
+      "decisions": [],
+      "notes": "Governance pieces implemented and merged in PR #2100 (privacy owner page, plan-template Personal data checkpoint, annual review #1 in docs/privacy/reviews/2026.md). FR-001 NOT met: Constitution Article XII is not ratified — the constitution on main has no Article XII; canonical text sits in specs/100-privacy-governance/article-xii.md and the local-only branch build/constitution-art12 (74113a02) still needs cherry-picking onto main and a PR. Triaged Path C for drift 2026-10-15; partial until Article XII lands."
+    },
+    "specs/101-analytics-readiness": {
+      "title": "Feature Specification: Analytics readiness — learn where authors get stuck, without becoming a tracker",
+      "hash": "sha256:214ccae4e35a4518",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": "Readiness only, by design: assessment, event taxonomy and processor scorecard landed with PR #2100; no analytics ships and the spec does not authorise it. Implementation is gated on Article XII ratification (spec 100, FR-001, not yet met). Acknowledged to register the section, per the spec 085 planning-spec precedent. Triaged 2026-10-15."
     }
   }
 }

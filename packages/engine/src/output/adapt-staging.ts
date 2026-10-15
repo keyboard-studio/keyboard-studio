@@ -115,7 +115,7 @@ export function stageAdaptHistory(
     renderHistoryMd(null, {
       version: bumpedVersion,
       dateIso,
-      adaptedFrom: { id: originalId, version: originalVersion },
+      lineage: { kind: "adapted", id: originalId, version: originalVersion },
       startHistoryText,
     }),
     false,

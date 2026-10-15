@@ -151,6 +151,23 @@ export function attestedBasesOf(
 }
 
 /**
+ * Marks with no letter+mark pairing evidence: no attested stack pairs the
+ * mark with any base letter (#1784). This is the bare-combining-mark
+ * exemplar symptom — e.g. Bafut (`bfd`) lists U+0300/U+0302/U+030C with no
+ * letter clusters, so every mark lands here and the attachment proposals
+ * have nothing to pre-check. The studio uses this as the trigger to ask for
+ * a large text sample before the marks series' attachment step.
+ *
+ * Pure; marks keep first-appearance order. Case-folding cannot change the
+ * answer (folding only adds counterparts of already-attested bases, and an
+ * empty attested set stays empty), so no fold parameter is needed.
+ */
+export function marksLackingPairingEvidence(alphabet: ConfirmedAlphabet): string[] {
+  const attested = attestedBasesOf(alphabet);
+  return alphabet.marks.filter((mark) => (attested.get(mark) ?? new Set<string>()).size === 0);
+}
+
+/**
  * How many distinct LETTERS a set of attested bases covers: with `caseFold`,
  * one letter in two cases counts once, not twice. Without it, every base is
  * its own letter.
