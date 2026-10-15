@@ -41,7 +41,7 @@ Two things §1's north star left implicit, resolved 2026-06-22:
 
 **"Fork it yourself" is an explicit opt-in for power users.** For users who want to own the contribution end-to-end, the studio offers a button to **fork `keymanapp/keyboards` into their own account and open their own PR** (Option A). This requires a connected GitHub identity with `public_repo` scope, so it is only meaningful for GitHub sign-ups (a Google-only account is prompted to connect GitHub first). It is never the default and never required.
 
-Net effect on Options A/B/C (§2): **B is now the default for all signed-up users; A is an opt-in "more control" button; C is the no-sign-up / offline escape hatch.** This inverts the prior "A if signed in, C if not; B is a future contingency" picker. The Option B server-side pipeline is now implemented (§4a); the remaining gap is wiring the SPA submit screen to it and delivering a Vercel serverless route.
+Net effect on Options A/B/C (§2): **B is now the default for all signed-up users; A is an opt-in "more control" button; C is the no-sign-up / offline escape hatch.** This inverts the prior "A if signed in, C if not; B is a future contingency" picker. The Option B server-side pipeline is now implemented (§4a) and the Vercel `/api/submit/managed-pr` serverless function ([api/submit/managed-pr.ts](../api/submit/managed-pr.ts)) is deployed, reusing the same pipeline core; the remaining gap is wiring the SPA submit screen to it.
 
 ## 2. Three delivery paths (Options A / B / C)
 
