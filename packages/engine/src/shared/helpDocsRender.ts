@@ -23,10 +23,13 @@
 // DOC_GENERATED_START/END. Any earlier generated block in the inherited page
 // is stripped first, so re-rendering never stacks blocks (spec 102 FR-033).
 
-import { DOC_FORMS, type HelpDocsAnswers } from "@keyboard-studio/contracts";
+import { DOC_FORMS, scriptSubtagOf, type HelpDocsAnswers } from "@keyboard-studio/contracts";
 import { escapeHtml, phpSingleQuoteEscape } from "./escapeHtml.js";
-import { helpSiteHeader, helpSitePageName } from "./packageDocs.js";
-import { layoutChartPlatformFromFilename } from "../layout-chart/filename.js";
+import { DOC_PAGE_STYLE, helpSiteHeader, helpSitePageName } from "./packageDocs.js";
+import {
+  layoutChartLayerFromFilename,
+  layoutChartPlatformFromFilename,
+} from "../layout-chart/filename.js";
 import {
   DOC_GENERATED_END,
   DOC_GENERATED_START,
@@ -56,6 +59,13 @@ export interface HelpDocsRenderInput {
   answers: HelpDocsAnswers | null;
   displayName: string;
   primaryBcp47?: string;
+  /**
+   * The language's English name as the author confirmed it at the identity
+   * step (IdentityPatch.languageName). Feeds the intro language/script line
+   * alongside `primaryBcp47`; absent means the line is omitted — the
+   * renderer never guesses a language name.
+   */
+  languageName?: string;
   platforms: string[];
   /** The keyboard id; when set, the README and readme.htm link the keyboard's help-site page. */
   keyboardId?: string;
@@ -76,9 +86,10 @@ export interface HelpDocsRenderInput {
 }
 
 // Opt-in "additional detail" battery (FR-011/FR-014), fixed order per research D-10.
+// Font guidance is NOT in this battery: it is core intro matter (element spec
+// §2) and renders through the fontNote slot instead — see renderDocBodyHtml.
 const OPT_IN_FIELDS: ReadonlyArray<{ key: keyof HelpDocsAnswers; heading: string }> = [
   { key: "designRationale", heading: "Design Rationale" },
-  { key: "fontGuidance", heading: "Font Guidance" },
   { key: "canonicalOrder", heading: "Canonical Order" },
   { key: "scriptGlossary", heading: "Script Glossary" },
   { key: "exampleWords", heading: "Example Words" },
@@ -103,7 +114,8 @@ function nonBlank(s: string | undefined): string | undefined {
  * The welcome-page / help-page section list: usage tips, credits, contact,
  * then the opt-in battery — each independently omitted when blank (FR-003,
  * FR-011). Never includes the description itself (the caller renders that as
- * the lead paragraph) and never anything README-only (links, platforms).
+ * the lead paragraph), never the font note (intro matter, rendered through
+ * its own slot), and never anything README-only (links, platforms).
  */
 export function buildDocSections(answers: HelpDocsAnswers | null): DocSection[] {
   if (answers === null) return [];
@@ -168,6 +180,71 @@ function safeUrl(url: string | undefined): string | undefined {
   return value !== undefined && /^(?:https?:\/\/|mailto:)[^\s<>"'`]+$/i.test(value) ? value : undefined;
 }
 
+/**
+ * Plain-English display name for the ISO 15924 scripts an intro line is
+ * likely to name — the same curated set the character map qualifies its
+ * block headings with. A script outside the set is not named: the line
+ * falls back to the language alone rather than printing a raw code.
+ */
+const SCRIPT_DISPLAY_NAME: Readonly<Record<string, string>> = {
+  Latn: "Latin",
+  Cyrl: "Cyrillic",
+  Arab: "Arabic",
+  Deva: "Devanagari",
+  Grek: "Greek",
+  Armn: "Armenian",
+  Geor: "Georgian",
+  Hebr: "Hebrew",
+  Thaa: "Thaana",
+  Nkoo: "NKo",
+  Adlm: "Adlam",
+  Cher: "Cherokee",
+  Beng: "Bengali",
+  Taml: "Tamil",
+  Telu: "Telugu",
+  Knda: "Kannada",
+  Mlym: "Malayalam",
+  Sinh: "Sinhala",
+  Thai: "Thai",
+  Laoo: "Lao",
+  Mymr: "Myanmar",
+  Khmr: "Khmer",
+  Tibt: "Tibetan",
+  Ethi: "Ethiopic",
+  Hira: "Hiragana",
+  Kana: "Katakana",
+  Yiii: "Yi",
+  Syrc: "Syriac",
+  Hani: "Han",
+  Hang: "Hangul",
+};
+
+/**
+ * The intro language/script sentence (element spec §2), a fact of the
+ * keyboard itself: the author-confirmed language name plus the script the
+ * keyboard's own BCP47 tag names. No explicit script subtag (the tag relies
+ * on the language's default script) → the sentence names the language only.
+ * No confirmed language name → no sentence; nothing is inferred here.
+ */
+function languageLineOf(input: HelpDocsRenderInput): string {
+  const name = nonBlank(input.languageName);
+  if (name === undefined) return "";
+  const tag = nonBlank(input.primaryBcp47);
+  const script = tag !== undefined ? scriptSubtagOf(tag) : undefined;
+  const scriptName = script !== undefined ? SCRIPT_DISPLAY_NAME[script] : undefined;
+  const sentence =
+    scriptName !== undefined
+      ? `This keyboard is for typing ${name} in the ${scriptName} script.`
+      : `This keyboard is for typing ${name}.`;
+  return escapeDocHtml(sentence);
+}
+
+/** The author's font note as intro paragraphs (element spec §2), or "" when unanswered. */
+function fontNoteHtml(answers: HelpDocsAnswers | null): string {
+  const value = answers !== null ? nonBlank(answers.fontGuidance) : undefined;
+  return value !== undefined ? paragraphsHtml(value) : "";
+}
+
 /** The keyboard's help-site page: the author's own help URL, else the keyman.com help page for the id, else none. */
 function helpPageUrl(input: HelpDocsRenderInput): string {
   const answered = safeUrl(input.answers?.projectHelpUrl);
@@ -180,15 +257,26 @@ function helpPageUrl(input: HelpDocsRenderInput): string {
  * The ONE rendered body shared by welcome.htm and help/<id>.php (FR-005,
  * spec 102 FR-025): the `body` form over the description, every answered
  * section and the derived sections. `inherited` drops the fallback sentence,
- * because the inherited prose already introduces the keyboard.
+ * because the inherited prose already introduces the keyboard — and drops
+ * the page heading with it, so a generated block spliced into an inherited
+ * page never gives that page a second <h1>. A fresh render carries the
+ * heading, so the welcome page and the fresh help page open with the same
+ * one (criterion 11.9 parity compares the bodies, headings included).
  */
 function renderDocBodyHtml(input: HelpDocsRenderInput, inherited: boolean): string {
   const description = descriptionOf(input);
   const generated = input.generated;
   const slots: Partial<DocSlotModel> = {
     displayName: escapeDocHtml(input.displayName),
+    pageHeading: inherited ? "" : "1",
     description: description !== undefined ? escapeDocHtml(description) : "",
     noDescription: description === undefined && !inherited ? "1" : "",
+    // The language line is fresh-page intro matter: an inherited page keeps
+    // its own introduction, so the derived line never forces a generated
+    // block onto a page that would otherwise ship verbatim (FR-006). The
+    // font note is an author answer, so it splices like every other answer.
+    languages: inherited ? "" : languageLineOf(input),
+    fontNote: fontNoteHtml(input.answers),
     ...answerSlotsHtml(input.answers),
     ...(generated !== undefined
       ? {
@@ -257,12 +345,55 @@ function layoutImageAlt(fileName: string): string {
 const LAYOUT_SECTION_GROUPS = ["desktop", "phone", "tablet", "other"] as const;
 type LayoutSectionGroup = (typeof LAYOUT_SECTION_GROUPS)[number];
 
-const LAYOUT_SECTION_GROUP_LABEL: Readonly<Record<LayoutSectionGroup, string>> = {
-  desktop: "Desktop",
-  phone: "Phone",
-  tablet: "Tablet",
-  other: "Other",
+/**
+ * Desktop layer subsections in the corpus's own heading names (element spec
+ * §3: the most common welcome-page headings after "Keyboard Layout" itself),
+ * in reading order. A desktop layer outside this set falls back to a
+ * humanized form of its id, after the named four.
+ */
+const DESKTOP_LAYER_ORDER: readonly string[] = ["default", "shift", "rightalt", "rightalt-shift"];
+const DESKTOP_LAYER_LABEL: Readonly<Record<string, string>> = {
+  default: "Default (unshifted)",
+  shift: "Shift",
+  rightalt: "Right ALT (unshifted)",
+  "rightalt-shift": "Right ALT Shift",
 };
+
+/** Touch layer names: the same layers, without the desktop "(unshifted)" qualifiers. */
+const TOUCH_LAYER_LABEL: Readonly<Record<string, string>> = {
+  default: "Default",
+  shift: "Shift",
+  rightalt: "Right ALT",
+  "rightalt-shift": "Right ALT Shift",
+};
+
+/** Multi-word layer-id tokens whose display form is not simple capitalization. */
+const LAYER_TOKEN_LABEL: Readonly<Record<string, string>> = {
+  rightalt: "Right ALT",
+  leftalt: "Left ALT",
+  rightctrl: "Right Ctrl",
+  leftctrl: "Left Ctrl",
+  alt: "Alt",
+  ctrl: "Ctrl",
+  shift: "Shift",
+  caps: "Caps",
+  default: "Default",
+};
+
+/** A layer id as a display label: `_xNN_` filename escapes decoded, tokens humanized, first letters capitalized. */
+function humanizeLayerId(layer: string): string {
+  const decoded = layer.replace(/_x([0-9a-f]+)_/gi, (_m, hex: string) =>
+    String.fromCodePoint(parseInt(hex, 16)),
+  );
+  return decoded
+    .split(/[-_]+/)
+    .filter((token) => token !== "")
+    .map((token) => {
+      const known = LAYER_TOKEN_LABEL[token];
+      return known ?? token.charAt(0).toUpperCase() + token.slice(1);
+    })
+    .join(" ");
+}
 
 /** Bucket `files` by the platform encoded in a generated chart filename (see `layoutChartPlatformFromFilename`), falling back to `"other"` for a base's free-form image names. Preserves each file's relative order within its own bucket. */
 function groupWelcomeImageFiles(files: readonly string[]): ReadonlyMap<LayoutSectionGroup, string[]> {
@@ -274,31 +405,81 @@ function groupWelcomeImageFiles(files: readonly string[]): ReadonlyMap<LayoutSec
   return groups;
 }
 
+function layoutImageHtml(file: string): string {
+  return `<p><img src="${escapeHtml(file)}" alt="${escapeHtml(layoutImageAlt(file))}"></p>`;
+}
+
+/**
+ * One platform's charts as per-layer subsections (element spec §3): bucketed
+ * by the layer encoded in the chart filename, layers in `order` first (any
+ * remaining layers in input order), each under its own heading. Desktop
+ * layers take the corpus heading names bare; touch layers are prefixed with
+ * the platform, because a phone and a tablet can carry layers with the same
+ * names and the subsections must stay distinguishable.
+ */
+function layoutLayerSubsections(
+  files: readonly string[],
+  labels: Readonly<Record<string, string>>,
+  order: readonly string[],
+  headingPrefix: string,
+): string {
+  const byLayer = new Map<string, string[]>();
+  for (const file of files) {
+    const layer = layoutChartLayerFromFilename(file) ?? "";
+    const bucket = byLayer.get(layer) ?? [];
+    bucket.push(file);
+    byLayer.set(layer, bucket);
+  }
+  const layers = [
+    ...order.filter((layer) => byLayer.has(layer)),
+    ...[...byLayer.keys()].filter((layer) => !order.includes(layer)),
+  ];
+  return layers
+    .map((layer) => {
+      const label = labels[layer] ?? humanizeLayerId(layer);
+      const images = (byLayer.get(layer) ?? []).map(layoutImageHtml).join("");
+      return `<h3>${escapeHtml(headingPrefix + label)}</h3>${images}`;
+    })
+    .join("");
+}
+
 /**
  * The welcome page's "Keyboard Layout" section (spec 080 FR-004/T051, research
- * R9): every file shipped beside the page in `source/welcome/` — the inherited
- * base images on a Track 1 copy, the generated charts otherwise — grouped by
- * platform (desktop, phone, tablet, then any other/base image) with no
- * omission regardless of how many layers/files there are. The `src` is the
- * bare file name because the page and the images share a folder. `""` when
- * there is nothing to show, so a page with no images is byte-identical to the
- * pre-080 render. Welcome-page only: the help page's body never carries it,
- * which is the one permitted welcome/help difference on the welcome side
- * (FR-004).
+ * R9; structure per the welcome element spec §3): every file shipped beside
+ * the page in `source/welcome/` — the inherited base images on a Track 1
+ * copy, the generated charts otherwise — with no omission regardless of how
+ * many layers/files there are. Generated charts appear as one subsection per
+ * layer: the desktop layers first under the corpus heading names, then the
+ * phone and tablet layers. A base's own hand-authored images carry no layer
+ * in their names, so they keep a single "Other" subsection after the charts.
+ * The `src` is the bare file name because the page and the images share a
+ * folder. `""` when there is nothing to show, so a page with no images is
+ * byte-identical to the pre-080 render. Welcome-page only: the help page's
+ * body never carries it, which is the one permitted welcome/help difference
+ * on the welcome side (FR-004).
  */
 export function renderWelcomeLayoutSection(welcomeImageFiles: readonly string[]): string {
   const files = welcomeImageFiles.map((f) => f.trim()).filter((f) => f !== "");
   if (files.length === 0) return "";
   const groups = groupWelcomeImageFiles(files);
-  const groupsHtml = LAYOUT_SECTION_GROUPS.filter((g) => (groups.get(g) ?? []).length > 0)
-    .map((g) => {
-      const images = (groups.get(g) ?? [])
-        .map((f) => `<p><img src="${escapeHtml(f)}" alt="${escapeHtml(layoutImageAlt(f))}"></p>`)
-        .join("");
-      return `<h3>${escapeHtml(LAYOUT_SECTION_GROUP_LABEL[g])}</h3>${images}`;
-    })
-    .join("");
-  return `<h2>${escapeHtml(KEYBOARD_LAYOUT_HEADING)}</h2>${groupsHtml}`;
+  const parts: string[] = [];
+  const desktop = groups.get("desktop") ?? [];
+  if (desktop.length > 0) {
+    parts.push(layoutLayerSubsections(desktop, DESKTOP_LAYER_LABEL, DESKTOP_LAYER_ORDER, ""));
+  }
+  const phone = groups.get("phone") ?? [];
+  if (phone.length > 0) {
+    parts.push(layoutLayerSubsections(phone, TOUCH_LAYER_LABEL, DESKTOP_LAYER_ORDER, "Phone "));
+  }
+  const tablet = groups.get("tablet") ?? [];
+  if (tablet.length > 0) {
+    parts.push(layoutLayerSubsections(tablet, TOUCH_LAYER_LABEL, DESKTOP_LAYER_ORDER, "Tablet "));
+  }
+  const other = groups.get("other") ?? [];
+  if (other.length > 0) {
+    parts.push(`<h3>Other</h3>${other.map(layoutImageHtml).join("")}`);
+  }
+  return `<h2>${escapeHtml(KEYBOARD_LAYOUT_HEADING)}</h2>${parts.join("")}`;
 }
 
 /**
@@ -489,8 +670,16 @@ export function renderWelcomeHtm(
     return setHtmlLang(spliceGenerated(inherited, generated), lang);
   }
 
+  // Fresh page: the element-spec §1 shell names the page language even with
+  // no answers yet — the written language when the author said, else the
+  // keyboard's own primary tag (the proseLang fallback itself). The
+  // inherited paths above keep their description-gated `lang`: retagging a
+  // base page the author has not touched is not this render's business.
+  const freshLang = proseLang(input.answers, input.primaryBcp47);
   return renderDocForm(DOC_FORMS.forms.welcome, {
-    docLang: lang !== undefined ? escapeDocHtml(lang) : "",
+    docLang: freshLang !== undefined ? escapeDocHtml(freshLang) : "",
+    displayName: escapeDocHtml(input.displayName),
+    pageStyle: DOC_PAGE_STYLE,
     body: renderDocBodyHtml(input, false),
     layoutPictures: renderWelcomeLayoutSection(welcomeImageFiles),
   });
@@ -575,9 +764,13 @@ export function renderHelpPhp(
     return setHtmlLang(spliceGenerated(inherited, generated), lang);
   }
   // Fresh page: header + body fragment only — never nest a document inside
-  // the site's `header.php` chrome (criterion 11.4).
+  // the site's `header.php` chrome (criterion 11.4). The shared inline style
+  // leads the fragment, exactly where a derived page's extracted styles sit,
+  // so fresh and derived help pages carry the welcome page's CSS alike
+  // (criterion 11.10).
   return renderDocForm(DOC_FORMS.forms.help, {
     helpHeader: helpSiteHeader(displayName),
+    pageStyle: DOC_PAGE_STYLE,
     body: renderDocBodyHtml(input, false),
   });
 }

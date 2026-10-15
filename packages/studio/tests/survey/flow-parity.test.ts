@@ -99,7 +99,7 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
     expect(required).toEqual(["pf_welcome_paragraph", "pf_more_detail_gate"]);
   });
 
-  it("the default path (gate = No) is 6 screens", () => {
+  it("the default path (gate = No) is 7 screens", () => {
     const index = new Map(modular.questions.map((q) => [q.id, q]));
     const path: string[] = [];
     let cur: string | null = modular.questions[0]!.id;
@@ -120,6 +120,9 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
     }
     expect(path).toEqual([
       "pf_welcome_paragraph",
+      // The welcome element spec (§2) puts the font note in the page intro, so
+      // font guidance is core, right after the description — not opt-in.
+      "pf_font_guidance",
       "pf_usage_tip_1",
       // spec 080 US5: the HISTORY proposal screen sits between the tips and
       // the opt-in gate; confirm is one click, so it stays on the default path.

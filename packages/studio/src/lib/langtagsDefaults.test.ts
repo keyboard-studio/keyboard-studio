@@ -162,4 +162,28 @@ describe("langtagsDefaults lazy helpers", () => {
     const result = await defaultsFor("zzz");
     expect(result).toBeNull();
   });
+
+  it("onLangtagsLoaded fires when the module lands, and synchronously once it has", async () => {
+    const { loadLangtags, onLangtagsLoaded } = await import("./langtagsDefaults.ts");
+    const calls: string[] = [];
+    const unsubEarly = onLangtagsLoaded(() => calls.push("early"));
+    expect(calls).toEqual([]);
+    await loadLangtags();
+    expect(calls).toEqual(["early"]);
+    unsubEarly();
+    // Already loaded: a new subscriber fires synchronously.
+    onLangtagsLoaded(() => calls.push("late"));
+    expect(calls).toEqual(["early", "late"]);
+  });
+
+  it("onLangtagsLoaded unsubscribe before the load suppresses the callback", async () => {
+    const { loadLangtags, onLangtagsLoaded } = await import("./langtagsDefaults.ts");
+    let called = false;
+    const unsub = onLangtagsLoaded(() => {
+      called = true;
+    });
+    unsub();
+    await loadLangtags();
+    expect(called).toBe(false);
+  });
 });

@@ -281,15 +281,31 @@ describe("emitTouchLayout", () => {
     }
   });
 
-  it("emits defaultHint 'dot' on every platform (dot hint — no char revealed)", () => {
+  it("preserves a source defaultHint verbatim and omits it when the source omits it (#2083)", () => {
     // "dot" causes the Keyman runtime to render a generic • on any key with
     // longpress sub-keys, rather than showing the first sub-key character.
-    const ir = parseTouchLayout(MULTI_PLATFORM_TOUCH);
-    const json = emitTouchLayout(ir);
-    const reparsed = JSON.parse(json) as Record<string, { defaultHint?: string }>;
-    for (const [pid, platform] of Object.entries(reparsed)) {
-      expect(platform.defaultHint, `platform "${pid}" must have defaultHint`).toBe("dot");
-    }
+    // The emitter preserves the source value instead of materializing "dot".
+    const withHint = JSON.stringify({
+      phone: {
+        defaultHint: "dot",
+        layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }],
+      },
+    });
+    const withoutHint = JSON.stringify({
+      phone: {
+        layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }],
+      },
+    });
+    const reparsedWith = JSON.parse(emitTouchLayout(parseTouchLayout(withHint))) as Record<
+      string,
+      { defaultHint?: string }
+    >;
+    expect(reparsedWith["phone"]?.defaultHint).toBe("dot");
+    const reparsedWithout = JSON.parse(emitTouchLayout(parseTouchLayout(withoutHint))) as Record<
+      string,
+      { defaultHint?: string }
+    >;
+    expect(reparsedWithout["phone"]?.defaultHint).toBeUndefined();
   });
 
   it("round-trips sp/width/hint: parse → emit → reparse preserves numeric IR and string wire values", () => {
@@ -658,16 +674,19 @@ describe("touch-key provenance round-trip (spec-014 T028)", () => {
     expect(ir.platforms[0]?.layers[0]?.rows[0]?.keys[0]?.provenance).toBe("hand-set");
   });
 
-  it("emits provenance to the 'p' wire property", () => {
+  it("emits provenance to the 'p' wire property only for non-default tags (#2083)", () => {
     const ir = parseTouchLayout(PROVENANCE_TAGGED);
     const emitted = emitTouchLayout(ir);
     const reparsed = JSON.parse(emitted) as Record<string, { layer: Array<{ row: Array<{ key: Array<{ id: string; p?: string }> }> }> }>;
     const wireKeys = reparsed["tablet"]?.layer[0]?.row[0]?.key;
     expect(wireKeys?.[0]?.p).toBe("base-derived");
     expect(wireKeys?.[1]?.p).toBe("physical-suggested");
-    expect(wireKeys?.[2]?.p).toBe("hand-set");
-    // legacy key materialised to hand-set on parse, so it is emitted as hand-set
-    expect(wireKeys?.[3]?.p).toBe("hand-set");
+    // #2083: an explicit "hand-set" tag and a legacy untagged key both parse
+    // as hand-set, and the emitter omits `p` for the default — re-parse
+    // restores hand-set either way, so omitting is semantically lossless and
+    // stops materializing `"p": "hand-set"` onto keys whose source omitted it.
+    expect(wireKeys?.[2]?.p).toBeUndefined();
+    expect(wireKeys?.[3]?.p).toBeUndefined();
   });
 
   it("survives a full parse → emit → reparse cycle with every tag intact (FR-010)", () => {

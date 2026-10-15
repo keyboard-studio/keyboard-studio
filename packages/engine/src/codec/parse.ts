@@ -226,6 +226,36 @@ function parseBaselayout(tok: string): string | null {
 /** Parse outs(storeName) → storeName, or null. */
 const parseOuts = makeStoreParser("outs");
 
+// Compiled once — parseIfGuard runs on every if(...) context token.
+/** Parse `if(store = 'value')` (equality form only) → {store, value}, or null. */
+const IF_GUARD_RE = new RegExp(
+  String.raw`^if\s*\(\s*(${KMN_IDENT})\s*=\s*('[^']*'|"[^"]*")\s*\)$`,
+  "i",
+);
+
+function parseIfGuard(tok: string): { store: string; value: string } | null {
+  const m = IF_GUARD_RE.exec(tok);
+  if (!m) return null;
+  return { store: m[1] ?? "", value: unquote(m[2] ?? "") };
+}
+
+/**
+ * True when every element parsed so far belongs to a rule's head cluster —
+ * the only position a guard may be typed in (spec 103): leading guards
+ * themselves, a `baselayout` head element, or a `platform(...)` head element
+ * (which the codec carries as a raw element). A guard after any content
+ * element or after the `+` keystroke separator (also a raw element) is not
+ * typed; the caller keeps the rule opaque.
+ */
+function isHeadClusterSoFar(elements: ContextElement[]): boolean {
+  return elements.every(
+    (el) =>
+      el.kind === "if" ||
+      el.kind === "baselayout" ||
+      (el.kind === "raw" && /^platform\s*\(/i.test(el.text.trim())),
+  );
+}
+
 // Compiled once — parseUse runs on every output token, same rationale as
 // INDEX_RE above.
 const USE_RE = new RegExp(`^use\\s*\\(\\s*(${KMN_IDENT})\\s*\\)$`, "i");
@@ -635,8 +665,17 @@ function parseContextElements(
       opaqueOut.reason = OPAQUE_REASONS.OUTS_EXPANSION;
       return null;
     }
-    // if(...) — opaque
+    // if(store = 'value') — a typed guard element when the guard is an
+    // equality guard inside the head cluster (spec 103 FR-002). Anything
+    // else — a not-equal or comma-form guard, an unparseable head, or a
+    // guard after content / the keystroke separator — stays opaque with
+    // the existing reason (FR-003): never mistyped, never dropped.
     if (/^if\s*\(/i.test(tok)) {
+      const guard = parseIfGuard(tok);
+      if (guard !== null && isHeadClusterSoFar(elements)) {
+        elements.push({ kind: "if", store: guard.store, value: guard.value });
+        continue;
+      }
       opaqueOut.reason = OPAQUE_REASONS.IF_OPTION_STORE;
       return null;
     }

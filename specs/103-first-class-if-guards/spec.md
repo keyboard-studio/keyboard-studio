@@ -4,10 +4,15 @@
 
 **Created**: 2026-10-15
 
-**Status**: Draft — for review. Produced by the ruled scoping session for
-first-class `if()` guards; **not ratified**, and no implementation is
-authorised by this draft. Implementation is sequenced after spec 082 lands
-and is gated on the corpus round-trip vectors in FR-009.
+**Status**: Ratified in principle (Matthew's conditional-go ruling on the
+tracking issue, comment 6202419710, 2026-10-15), with implementation
+pre-authorised once the spec 082 gate was verified met (gate verdict
+GATE MET, comment 6202484468, 2026-10-15: the 082 deliverables this spec
+depends on — kmAssist, rule builder, rule naming, live rules step — landed
+in PR #1852).
+The FR-009 corpus round-trip vectors are a hard merge gate for the
+implementation PR, not a start precondition. Open question 1 is settled by
+the ruling: equality-only modelling stands, `<>` stays opaque per FR-003.
 
 **Input**: Scoping session deliverables in this directory
 (`scoping-report.md`): corpus report on `if()` usage in the keymanapp
@@ -284,20 +289,22 @@ integration case.
 ## Sequencing and open questions
 
 **Sequencing** (per the scoping ruling): implementation follows spec 082
-landing, and is gated on FR-009's vectors. This draft and its scoping
-report are the session's output; ratification is a separate act.
+landing, and is gated on FR-009's vectors. Ratified in principle
+2026-10-15 (see Status); the implementation PR carries the FR-009 vectors
+as its merge gate.
 
 **Open questions for ratification**:
 
 1. Operator field: this draft models equality only (the sole
-   corpus-attested operator) and keeps `<>` opaque. Ratification should
-   confirm that posture, or direct an `op` field in the variant from the
-   start.
+   corpus-attested operator) and keeps `<>` opaque. **Settled by the
+   2026-10-15 ruling: equality-only stands.**
 2. Offset accounting (Edge Cases): the vectors must demonstrate the
    agreed answer; if they show a consumer whose positional math cannot
    accommodate a non-character context element without a wider change,
    that change is named and scoped before implementation, not absorbed
-   silently.
+   silently. **Pinned by the FR-009 vectors: element-position counting
+   includes the guard (Keyman `index()` offsets count it); character
+   counting skips it (a guard produces no context character).**
 3. `match`/`nomatch` and group-level guards: no corpus instance of a
    guard outside a rule context was found; if ratification knows of one,
    it belongs in the vector set.

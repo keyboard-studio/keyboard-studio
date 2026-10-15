@@ -47,8 +47,14 @@
 //   - Waits for `document.fonts.ready` before measuring, so a web font still
 //     loading isn't misread as "missing the glyph" (mid-load, a font stack
 //     measures identically to its own generic fallback).
+//   - Defers measurement of any character covered by a still-loading
+//     vendored script face (scriptFonts.ts) and invalidates cached answers
+//     for that family's stacks when the face settles — `document.fonts.ready`
+//     alone cannot gate a face that had not been requested yet.
 //   - Caches per (fontStack, char) — the grid can render thousands of cells;
 //     results must not be remeasured on every render.
+
+import { onScriptFontsChanged, pendingScriptFontFor, scriptFontForScript } from "./scriptFonts.ts";
 
 // Nested by fontStack, then by char -- avoids relying on any joined-string
 // key (which could theoretically collide if fontStack/char text happened to
@@ -136,6 +142,31 @@ function fontsAreReady(): boolean {
   return fontsReadyState === true;
 }
 
+// ---------------------------------------------------------------------------
+// Script-face cache invalidation — a measurement cached for a stack that
+// names a script family is only trustworthy while that family's face state
+// is settled. The isGlyphSupported gate below already refuses to MEASURE
+// (and therefore to cache) while a covering face is pending; this is the
+// belt-and-braces half of the ready-gate contract: when a face settles,
+// drop every cached entry for stacks naming its family, so no answer from
+// before the load resolved can survive it. Wired lazily with the rest of
+// the module's first-use setup.
+// ---------------------------------------------------------------------------
+
+let scriptInvalidationWired = false;
+
+function wireScriptCacheInvalidation(): void {
+  if (scriptInvalidationWired) return;
+  scriptInvalidationWired = true;
+  onScriptFontsChanged((script) => {
+    const def = scriptFontForScript(script);
+    if (def === undefined) return;
+    for (const stack of [...cache.keys()]) {
+      if (stack.includes(def.family)) cache.delete(stack);
+    }
+  });
+}
+
 /**
  * Registers `cb` to run once `document.fonts.ready` resolves (immediately,
  * synchronously, if fonts are already ready or the FontFace Loading API isn't
@@ -207,6 +238,19 @@ const WIDTH_EPSILON = 0.01;
 export function isGlyphSupported(char: string, fontStack: string): boolean {
   if (char === "") return true;
   if (!fontsAreReady()) return true;
+  wireScriptCacheInvalidation();
+
+  // Script-face ready gate: when the stack names a vendored script family
+  // whose face is still loading, a width measurement would compare a font
+  // that has not arrived yet and pin a wrong "unsupported" in the cache —
+  // the document.fonts.ready gate above cannot see this, because a face
+  // that has not been REQUESTED yet leaves document.fonts "loaded".
+  // scriptFonts actively triggers the load (probe character) when a script
+  // becomes the session's; until it settles, defer exactly like the
+  // pre-fonts-ready path: report supported, cache nothing. The settle event
+  // (onScriptFontsChanged) invalidates the stack's cache and re-renders the
+  // pane via useFontSupportChecker, so the real measurement happens then.
+  if (pendingScriptFontFor(char, fontStack) !== undefined) return true;
 
   const cached = getCached(fontStack, char);
   if (cached !== undefined) return cached;

@@ -28,15 +28,28 @@
       "<html><body>{{#description}}<h1>{{displayName}}</h1><p>{{description}}</p>{{/description}}{{#noDescription}}<p>{{displayName}} keyboard</p>{{/noDescription}}{{#helpPageUrl}}<p>Help: <a href=\"{{helpPageUrl}}\">{{helpPageUrl}}</a></p>{{/helpPageUrl}}</body></html>"
     ],
     "welcome": [
-      "<html{{#docLang}} lang=\"{{docLang}}\"{{/docLang}}><body>{{body}}{{#layoutPictures}}",
-      "{{layoutPictures}}{{/layoutPictures}}</body></html>"
+      "<!DOCTYPE html>",
+      "<html{{#docLang}} lang=\"{{docLang}}\"{{/docLang}}>",
+      "<head>",
+      "<meta charset=\"utf-8\">",
+      "<title>Start Using {{displayName}}</title>",
+      "{{#pageStyle}}<style>{{pageStyle}}</style>{{/pageStyle}}",
+      "</head>",
+      "<body>",
+      "{{body}}{{#layoutPictures}}",
+      "{{layoutPictures}}{{/layoutPictures}}</body>",
+      "</html>"
     ],
     "help": [
-      "{{helpHeader}}{{body}}"
+      "{{helpHeader}}{{#pageStyle}}<style>{{pageStyle}}</style>{{/pageStyle}}",
+      "{{body}}"
     ],
     "body": [
+      "{{#pageHeading}}<h1>{{displayName}}</h1>{{/pageHeading}}",
       "{{#description}}<p>{{description}}</p>{{/description}}",
       "{{#noDescription}}<p>Welcome to {{displayName}}</p>{{/noDescription}}",
+      "{{#languages}}<p>{{languages}}</p>{{/languages}}",
+      "{{#fontNote}}{{fontNote}}{{/fontNote}}",
       "{{#usageTips}}<h2>Usage Tips</h2>{{usageTips}}{{/usageTips}}",
       "{{#credits}}<h2>Credits</h2>{{credits}}{{/credits}}",
       "{{#contactInfo}}<h2>Contact</h2>{{contactInfo}}{{/contactInfo}}",

@@ -12,6 +12,7 @@ import {
   displayChar,
   keySequenceLabel,
   invisibleCharLabel,
+  contextToKeys,
 } from './irToCarveNodes.ts';
 import { irGroup } from '@keyboard-studio/contracts/fixtures';
 import { makeGroup, makeIR } from './__fixtures__/irToCarveNodes.ts';
@@ -394,5 +395,31 @@ describe('invisibleCharLabel — spec 075 additions', () => {
   it('falls back to a FORMAT CHARACTER label for a Cf character the map does not name', () => {
     // U+206A is deprecated and deliberately excluded from the gallery map.
     expect(invisibleCharLabel('\u206A')).toBe('FORMAT CHARACTER (U+206A)');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// contextToKeys — typed if() guards (spec 103)
+// ---------------------------------------------------------------------------
+
+describe('contextToKeys with typed guards', () => {
+  it('a guard contributes no key step; the struck key still labels', () => {
+    expect(
+      contextToKeys([
+        { kind: 'if', store: '&layer', value: 'symbols' },
+        { kind: 'raw', text: '+' },
+        { kind: 'vkey', name: 'K_A', modifiers: [] },
+      ]),
+    ).toEqual(['K_A']);
+  });
+
+  it('a two-guard cluster contributes no key steps', () => {
+    expect(
+      contextToKeys([
+        { kind: 'if', store: '&newLayer', value: '' },
+        { kind: 'if', store: '&layer', value: 'numerals' },
+        { kind: 'char', value: '5' },
+      ]),
+    ).toEqual(['5']);
   });
 });

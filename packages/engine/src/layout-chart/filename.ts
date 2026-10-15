@@ -61,3 +61,18 @@ export function layoutChartPlatformFromFilename(filename: string): LayoutChartPl
   const rest = filename.slice(LAYOUT_CHART_PREFIX.length);
   return LAYOUT_CHART_PLATFORMS.find((platform) => rest.startsWith(`${platform}-`));
 }
+
+/**
+ * The sanitized layer id encoded in a `ks-layout-<platform>-<layer>.svg`
+ * filename (the segment after the platform, extension dropped), or
+ * `undefined` when the filename carries no recognized platform segment. The
+ * welcome page's layout section groups charts by this id, so the layer a
+ * chart belongs to is read from the same naming convention that minted it.
+ */
+export function layoutChartLayerFromFilename(filename: string): string | undefined {
+  const platform = layoutChartPlatformFromFilename(filename);
+  if (platform === undefined) return undefined;
+  const rest = filename.slice(LAYOUT_CHART_PREFIX.length + platform.length + 1);
+  const layer = rest.replace(/\.[^.]+$/, "");
+  return layer !== "" ? layer : undefined;
+}

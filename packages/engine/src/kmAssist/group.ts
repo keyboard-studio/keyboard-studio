@@ -11,7 +11,8 @@
  *   `any(s)` → `any:s`, `notany(s)` → `notany:s`, `deadkey(id)` →
  *   `deadkey:003b` (lowercase hex, 4-padded), `char(c)` → `char:<c>`,
  *   `context(n)` → `context:n`, `index(s,n)` → `index:s:n`,
- *   `baselayout(v)` → `baselayout:v`, `raw(t)` → `raw:<t>`.
+ *   `baselayout(v)` → `baselayout:v`, `if(s = 'v')` → `if:s=v`,
+ *   `raw(t)` → `raw:<t>`.
  *   Rules with no guard elements have guardKey `""`.
  *   `platform('…')` guards and the structural `+` separator are already
  *   excluded by `shapeContext` and never contribute to the key.
@@ -119,6 +120,8 @@ function guardToken(el: ContextElement): string {
       return `index:${el.storeRef}:${el.offset}`;
     case "baselayout":
       return `baselayout:${el.value}`;
+    case "if":
+      return `if:${el.store}=${el.value}`;
     case "vkey":
       return `vkey:${el.name}`;
     case "raw":
@@ -143,6 +146,8 @@ function displayGuard(el: ContextElement): string {
       return `index(${el.storeRef},${el.offset})`;
     case "baselayout":
       return `baselayout('${el.value}')`;
+    case "if":
+      return `if(${el.store} = '${el.value}')`;
     case "vkey":
       return `[${el.name}]`;
     case "raw":
@@ -169,6 +174,8 @@ function describeGuards(guards: ContextElement[]): string {
           return `the ${ordinal(el.offset)} character of the “${el.storeRef}” store`;
         case "baselayout":
           return `the “${el.value}” base layout`;
+        case "if":
+          return `the “${el.store}” store is set to “${el.value}”`;
         case "vkey":
           return describeKey(el.name, el.modifiers);
         case "raw":
