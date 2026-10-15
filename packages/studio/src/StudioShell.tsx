@@ -119,6 +119,7 @@ import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, screenTrails, validateManifestShape } from "./steps/manifest.ts";
+import { resolveRightPane, shouldShowPreviewPane } from "./steps/types.ts";
 import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
@@ -418,7 +419,11 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // rightPane field and steps/manifest.ts's "characters" step).
   const activeRightPane = useMemo(() => {
     const step = manifest.find((s) => s.id === activeStepId);
-    return step?.rightPane ?? "preview";
+    return resolveRightPane(step);
+  }, [activeStepId]);
+  const showPreviewPane = useMemo(() => {
+    const step = manifest.find((s) => s.id === activeStepId);
+    return shouldShowPreviewPane(step);
   }, [activeStepId]);
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
   // The discoveryMethod gate applies to the "characters" step ONLY (its
@@ -1652,14 +1657,17 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // Narrow viewports: one column of questions. The right pane's content
   // (OSK or character map) opens in a sheet, and only when there is
   // something to show — no base keyboard yet and no character map means no
-  // trigger at all.
-  const hasPreviewContent = showCharacterMap || localStart !== null;
+  // trigger at all. Steps declaring rightPane:"none" (identity/layout)
+  // never show a preview pane, divider, or mobile trigger, even when a
+  // base already exists (e.g. a resumed draft).
+  const hasPreviewContent =
+    showPreviewPane && (showCharacterMap || localStart !== null);
   // The sheet never reopens by itself: when its content goes away (a step
   // without a preview), forget that it was open.
   if (previewSheetOpen && (!isNarrow || !hasPreviewContent)) {
     setPreviewSheetOpen(false);
   }
-  const previewPane = (
+  const previewPane = showPreviewPane ? (
     <SurveyPreviewPane
       localStart={localStart}
       oskMode={oskMode}
@@ -1671,7 +1679,14 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       compact={isNarrow}
       {...(isNarrow ? {} : { style: previewPaneStyle })}
     />
-  );
+  ) : null;
+  const fullWidthQuestionsPaneStyle: CSSProperties = {
+    ...questionsPaneStyle,
+    flexBasis: "auto",
+    flexGrow: 1,
+    flexShrink: 1,
+    width: "100%",
+  };
   const previewButtonLabel = showCharacterMap
     ? t({ id: "previewButton.characterMap.label", message: "Character map" })
     : t({ id: "previewButton.label", message: "Preview" });
@@ -1712,7 +1727,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
                     ? `16px 16px ${PREVIEW_BUTTON_CLEARANCE}`
                     : "16px",
                 }
-              : questionsPaneStyle
+              : showPreviewPane
+                ? questionsPaneStyle
+                : fullWidthQuestionsPaneStyle
           }
         >
           {cloudResume !== null && (
@@ -1802,15 +1819,18 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
 
       {/* Drag handle — desktop only; on narrow viewports there is no split
           to drag (one pane fills the column behind the Questions | Preview
-          switch). */}
-      {!isNarrow && <ResizeHandle onPointerDown={onPointerDown} />}
+          switch). Hidden entirely when the step declares no right pane. */}
+      {!isNarrow && showPreviewPane && (
+        <ResizeHandle onPointerDown={onPointerDown} />
+      )}
 
       {/* Right pane: live OSK preview, OR (Phase B build-list only) the
           interactive character map — see activeRightPane/showCharacterMap
           above. The mechanism gallery and every other full-screen step render
           their own preview and are unaffected (they never reach this branch:
-          activeStepIsFullScreen returns early above). */}
-      {!isNarrow && previewPane}
+          activeStepIsFullScreen returns early above). Steps with
+          rightPane:"none" render no pane at all. */}
+      {!isNarrow && showPreviewPane && previewPane}
       {isNarrow && hasPreviewContent && (
         <>
           <PreviewButton

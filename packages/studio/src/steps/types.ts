@@ -20,6 +20,26 @@ export type { SurveyContext };
 export type StepKind = "question-step" | "editor-step";
 
 // ---------------------------------------------------------------------------
+// RightPaneKind — right-pane content for a "pane"-layout step
+// ---------------------------------------------------------------------------
+
+export type RightPaneKind = "preview" | "character-map" | "none";
+
+/** Resolves a step's effective right pane (default "preview"). */
+export function resolveRightPane(
+  step: Pick<StepBase, "rightPane"> | undefined | null,
+): RightPaneKind {
+  return step?.rightPane ?? "preview";
+}
+
+/** Whether the shell should show any right pane for the step. */
+export function shouldShowPreviewPane(
+  step: Pick<StepBase, "rightPane"> | undefined | null,
+): boolean {
+  return resolveRightPane(step) !== "none";
+}
+
+// ---------------------------------------------------------------------------
 // Answer persistence declarations (spec 079 R-02, R-12)
 // ---------------------------------------------------------------------------
 
@@ -90,9 +110,11 @@ export interface StepBase {
   layout?: "full" | "pane";
   /**
    * Right-pane content for a "pane"-layout step. Default "preview" (live OSK).
+   * "none" hides the right pane entirely (questions render full-width, and
+   * the mobile preview trigger/sheet is suppressed).
    * Ignored when layout:"full".
    */
-  rightPane?: "preview" | "character-map";
+  rightPane?: RightPaneKind;
   /**
    * Which spec unit(s) govern this step (spec 031 FR-001). Vocabulary:
    * `§N` / `§Na` (spec.md monolith section), or `specs/<slug>` (extracted
