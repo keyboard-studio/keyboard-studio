@@ -142,11 +142,11 @@ export function TextSampleAffordance() {
       data-testid="text-sample-placeholder"
       aria-label={t({
         id: "survey.phaseB.buildList.textSampleAriaLabel",
-        message: "Paste or upload a text sample",
+        message: "Let us find them in a sample",
       })}
     >
       <h3 style={sectionHeading}>
-        <Trans id="survey.phaseB.buildList.textSampleHeading">Paste or upload a text sample</Trans>
+        <Trans id="survey.phaseB.buildList.textSampleHeading">Let us find them in a sample</Trans>
       </h3>
       <p style={mutedParaFlush}>
         <Trans id="survey.phaseB.buildList.textSampleHelp">

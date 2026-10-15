@@ -1114,10 +1114,10 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
 
       {/* Section 2: Type-in characters */}
       <section
-        aria-label={t({ id: "survey.phaseB.buildList.typeSectionAriaLabel", message: "Type your alphabet" })}
+        aria-label={t({ id: "survey.phaseB.buildList.typeSectionAriaLabel", message: "List your letters" })}
       >
         <h3 style={sectionHeading}>
-          <Trans id="survey.phaseB.buildList.typeAlphabetHeading">Type your alphabet</Trans>
+          <Trans id="survey.phaseB.buildList.typeAlphabetHeading">List your letters</Trans>
         </h3>
         <p style={{ ...mutedParaFlush, margin: "0 0 12px 0" }}>
           <Trans id="survey.phaseB.buildList.typeAlphabetHelp">

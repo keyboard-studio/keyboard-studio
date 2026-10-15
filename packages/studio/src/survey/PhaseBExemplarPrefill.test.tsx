@@ -528,7 +528,7 @@ describe("loanword letters section", () => {
     await acceptExemplarsAndContinue();
 
     const loanwords = await screen.findByTestId("alphabet-loanwords");
-    const typeIn = screen.getByRole("region", { name: "Type your alphabet" });
+    const typeIn = screen.getByRole("region", { name: "List your letters" });
     const textSample = screen.getByTestId("text-sample-placeholder");
     const breakdown = screen.getByRole("region", { name: "How your alphabet breaks down" });
 
