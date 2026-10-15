@@ -36,6 +36,7 @@ import {
   useInventoryDraft,
 } from "./useInventoryDraft.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import { useFlaggedNextGate } from "../hooks/useFlaggedNextGate.ts";
 import { deriveCharacterFlags, ADDITION_ANSWER_PREFIX, CHARACTERS_BUILD_LIST_SCREEN_ID } from "./characterFlags.ts";
@@ -52,7 +53,7 @@ import {
 } from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
 import { collate, codePointCompare, collateInventory } from "./collation.ts";
-import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
+import { glyphCategory, isCombiningMarkChar, caseCounterpart, getEffectiveFacet, CASING_FACET_ID } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { charactersInTier } from "../lib/services.ts";
 import type {
@@ -216,6 +217,28 @@ function CpLabel({ grapheme }: { grapheme: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// useIsCasedBase — the character step's casing gate (spec 048 FR-006)
+//
+// Whether ANY case behaviour happens on this step is decided once, from the
+// BASE keyboard: the working-copy IR's `casing` facet, read through the
+// effective-value accessor — the same signal the marks step reads
+// (MarksSeriesStep) and the work-to-do hook reads. "cased"/"mixed" opens the
+// gate; a caseless base (or no base yet, facet undetermined) closes it, and
+// every case behaviour on this step — the type-in fold, the lowercase
+// collapse and its "Show uppercase" toggles, pair-wise chip removal, loanword
+// pairing, and the Done pass-through that records both cases for carve — is
+// skipped, so a stray Latin loanword letter on a caseless base is never
+// auto-paired to an uppercase. `caseCounterpart` is unchanged: it still
+// derives the actual pairs, but only once this gate is open.
+// ---------------------------------------------------------------------------
+
+function useIsCasedBase(): boolean {
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
+  return casingValue === "cased" || casingValue === "mixed";
+}
+
+// ---------------------------------------------------------------------------
 // CharChipEditor — reusable type-in input + chip list (no state of its own)
 // ---------------------------------------------------------------------------
 
@@ -247,6 +270,7 @@ interface CharChipEditorProps {
 function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }: CharChipEditorProps) {
   const { t } = useLingui();
   const glyphFontStack = useGlyphFontStack();
+  const isCasedBase = useIsCasedBase();
   const { provenance, proposalConfidence } = useInventoryDraft("characters");
   const [inputVal, setInputVal] = useState("");
   const [showUppercase, setShowUppercase] = useState(false);
@@ -278,8 +302,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
     // lowercase counterpart — and a lowercase with no uppercase (IPA) — is left
     // exactly as chosen (caseCounterpart returns null, so no fold). Only the
     // uppercase→lowercase direction ever folds; lowercase is never touched.
+    // The fold itself sits behind the casing-facet gate (useIsCasedBase): on
+    // a caseless base nothing folds — entries stay exactly as chosen.
     const folded = harvested.map((c) => {
-      const cc = caseCounterpart(c, bcp47);
+      const cc = isCasedBase ? caseCounterpart(c, bcp47) : null;
       return cc?.direction === "toLower" ? cc.counterpart : c;
     });
     onChange(nfcDedup(chars, folded));
@@ -308,10 +334,12 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
   // hide an uppercase only when its lowercase is actually present; a lowercase or
   // caseless (or uppercase-only) letter is shown as entered.
   // Single source of truth with the marks step (spec 049, FR-006).
-  const displayLetters = collate(lowercaseBaseView(letters, bcp47));
+  // Facet-gated (useIsCasedBase): a caseless base shows the letters exactly as
+  // entered — no collapse, and no "Show uppercase" toggle below.
+  const displayLetters = collate(isCasedBase ? lowercaseBaseView(letters, bcp47) : letters);
   // Count reflects the collapsed lowercase/caseless units + bare marks.
   const unitCount = displayLetters.length + bareMarks.length;
-  const hasCasedLetter = letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
+  const hasCasedLetter = isCasedBase && letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
   // Distinct proposal attributions currently represented in the draft — the
   // legend names them rather than leaving the dashed outline to speak for itself.
   const proposedAttributions = [
@@ -444,7 +472,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
                     // Removing a letter removes BOTH cases (the inverse of the
                     // map, which adds both) — even the uppercase hidden by the
                     // case-collapse, so it never re-appears as an orphan chip.
-                    const pair = casePairOf(c, bcp47);
+                    // Facet-gated: on a caseless base the pair is just the
+                    // letter itself — the author's other-case entry is a
+                    // separate entry, not a pair member.
+                    const pair = isCasedBase ? casePairOf(c, bcp47) : [c];
                     if (onRemove !== undefined) {
                       onRemove(pair);
                     } else {
@@ -475,8 +506,10 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
                 </button>,
               ];
               // Derived uppercase (display-only) when the toggle is on — mirrors
-              // the breakdown Letters section; not a removable pick.
-              const upper = showUppercase ? upperCounterpartOf(c, bcp47) : null;
+              // the breakdown Letters section; not a removable pick. The
+              // toggle itself only renders behind the casing gate, so the
+              // derivation is gated here too.
+              const upper = showUppercase && isCasedBase ? upperCounterpartOf(c, bcp47) : null;
               if (upper !== null) {
                 const upperTitle = codepointLabel(upper).title;
                 cells.push(
@@ -541,6 +574,7 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
     useInventoryDraft("characters");
   const [showUppercase, setShowUppercase] = useState(false);
   const glyphFontStack = useGlyphFontStack();
+  const isCasedBase = useIsCasedBase();
 
   // Render once the alphabet has any content to break down. Spec 047 US3 shows
   // the Letters section (with its lowercase/uppercase toggle) even for a
@@ -601,11 +635,13 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   // letter; a present uppercase is hidden behind its lowercase (never the
   // reverse) and revealed only under the toggle.
   // Single source of truth with the marks step (spec 049, FR-006).
+  // Facet-gated (useIsCasedBase): a caseless base shows every base as
+  // entered and gets no toggle — there is no case behaviour to reveal.
   // NOT migrated to collateInventory: `bases` is its own pre-partitioned
   // store category (marks live separately in `marks` below, rendered in
   // their own section) — there is no letters/bare-mark mix here to
   // partition, so a bare `collate()` is already the right call.
-  const displayBases = collate(lowercaseBaseView(bases, bcp47));
+  const displayBases = collate(isCasedBase ? lowercaseBaseView(bases, bcp47) : bases);
 
   const uppercaseToggle = (
     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, cursor: "pointer" }}>
@@ -628,12 +664,12 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
           `Letters (${displayBases.length})`,
           "Letters that stand on their own.",
           displayBases.flatMap((b) => {
-            const u = showUppercase ? upperCounterpartOf(b, bcp47) : null;
+            const u = showUppercase && isCasedBase ? upperCounterpartOf(b, bcp47) : null;
             const cells = [chip(b, b, justAddedBases.has(b))];
             if (u !== null) cells.push(chip(u, u, false));
             return cells;
           }),
-          uppercaseToggle,
+          isCasedBase ? uppercaseToggle : undefined,
         )}
       {/* NOT migrated to collateInventory: `marks` is rendered in its OWN
           section, entirely separate from Letters — the exact "different
@@ -743,6 +779,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
   const removeLoanword = draft.ops.removeLoanword;
   const remove = draft.ops.remove;
   const glyphFontStack = useGlyphFontStack();
+  const isCasedBase = useIsCasedBase();
 
   const loanwords = useMemo(() => {
     if (inventory === null) return [];
@@ -763,9 +800,12 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
    * Add or remove one loanword letter together with its case pair. Adding
    * goes to the loanword list; removing takes the letter out of whichever
    * list holds it, so the chip always reflects what the keyboard will type.
+   * Facet-gated (useIsCasedBase): on a caseless base the "pair" is the
+   * letter alone — a loanword letter is never auto-paired to an uppercase
+   * the author didn't choose.
    */
   const setLetter = (ch: string, on: boolean): void => {
-    for (const c of casePairOf(ch, bcp47)) {
+    for (const c of isCasedBase ? casePairOf(ch, bcp47) : [ch]) {
       const nfc = c.normalize("NFC");
       const state = getCharacterInventoryValue();
       if (on) addLoanword(nfc);
@@ -814,7 +854,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {loanwords.map((ch) => {
-          const pair = casePairOf(ch, bcp47);
+          const pair = isCasedBase ? casePairOf(ch, bcp47) : [ch];
           const selected = isAdded(ch);
           const letters = pair.join(" ");
           const { title } = codepointLabel(ch);
@@ -920,6 +960,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   // that surfaces flags (T080).
   const nextGate = useFlaggedNextGate(flaggedWorkItems, [CHARACTERS_BUILD_LIST_SCREEN_ID], CHARACTERS_BUILD_LIST_SCREEN_ID);
   const doneDisabled = chars.length === 0 || nextGate.blocked;
+  const isCasedBase = useIsCasedBase();
 
   // Chip removal goes through the store's per-character remove(), not setAll,
   // so removing a PROPOSED character is recorded as a rejection and never
@@ -952,10 +993,14 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
     // inventory with each cased letter's locale-correct counterpart via
     // the engine's caseCounterpart, deduped. A null counterpart
     // (caseless script, or a multi-character expansion like ß→SS)
-    // contributes nothing (FR-010).
-    const derivedUppercases = chars
-      .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
-      .filter((u): u is string => u != null);
+    // contributes nothing (FR-010). The augmentation sits behind the
+    // casing-facet gate (useIsCasedBase): on a caseless base nothing is
+    // derived — the recorded inventory is exactly what the author chose.
+    const derivedUppercases = isCasedBase
+      ? chars
+          .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
+          .filter((u): u is string => u != null)
+      : [];
     onComplete({
       phase: "B",
       answers: [],

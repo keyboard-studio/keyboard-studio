@@ -2,7 +2,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { StartKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
+import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
@@ -41,6 +41,18 @@ interface EngineModule {
   init: () => Promise<void>;
   isReady?: () => boolean;
   parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
+  /** Emit a parsed IR back to .kmn text (the codec's emit, barrel name). */
+  emitKmn?: (ir: KeyboardIR) => string;
+  /**
+   * Layer A′ import-fidelity stages (engine importKeyboard's composition).
+   * Parse stage runs on the raw ParseResult + source text; emit stage runs on
+   * the parsed IR + its emitted text. Both return LintFinding[] (I1–I6).
+   */
+  runImportFidelityParseChecks?: (
+    parseResult: { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> },
+    source: string,
+  ) => LintFinding[];
+  runImportFidelityEmitChecks?: (ir: KeyboardIR, emitted: string) => Promise<LintFinding[]>;
   recognizePatterns?: (ir: KeyboardIR) => { ir: KeyboardIR; recognizedRatio: number };
   classifyRemovalCapabilities?: (ir: KeyboardIR) => Map<string, RemovalCapability>;
   /**
@@ -327,6 +339,25 @@ export type OnInstantiateCallback = (
   opts: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
 ) => void;
 
+/**
+ * Format Layer A′ import-fidelity findings for the runtime-warning channel.
+ *
+ * Only warning/error/fatal severities surface. The I4 opaque-feature
+ * inventory (info) and the I2 round-trip stub (hint) fire on EVERY import by
+ * design — they are ImportReport metadata, not author-facing diagnostics, and
+ * surfacing them would put a warning banner on every keyboard open.
+ * Error-severity findings (I1 parse completeness, I6 ownership, …) surface
+ * here as non-blocking warnings, exactly like the [ir-parse] gap note:
+ * instantiation proceeds either way.
+ */
+function formatFidelityWarnings(findings: LintFinding[]): string[] {
+  return findings
+    .filter(
+      (f) => f.severity === "warning" || f.severity === "error" || f.severity === "fatal",
+    )
+    .map((f) => `[import-fidelity] ${f.code}: ${f.message}`);
+}
+
 /** Optional behaviour for {@link useKeyboardArtifact}. */
 export interface KeyboardArtifactOptions {
   /**
@@ -574,6 +605,10 @@ export function useKeyboardArtifact(
     // Parse failure is captured here so it can be surfaced as a non-fatal
     // warning rather than aborting the compile/preview flow (slice 4, AC #4).
     let parseWarning: string | null = null;
+    // Layer A′ import-fidelity findings for this run, formatted for the
+    // runtime-warning channel alongside parseWarning below. Populated by the
+    // parse branch when the engine exposes the fidelity stages.
+    let fidelityWarnings: string[] = [];
     try {
       const kmnPath = findKmnPath(vfs);
       const kmnText = kmnPath ? (readVfsText(vfs, kmnPath) ?? "") : "";
@@ -620,6 +655,36 @@ export function useKeyboardArtifact(
             const pr = engine.parseKmn(kmnText, compileId);
             const recognized = engine.recognizePatterns(pr.ir);
             let ir = recognized.ir;
+            // Layer A′ import-fidelity — steps 6+7 of the engine's
+            // importKeyboard composition, run here because this branch is
+            // where the live path holds the raw ParseResult + source text.
+            // FULL RUNS ONLY: a full run is the import moment (the parse
+            // reads the base keyboard as fetched), while recompile() re-parses
+            // the author's edited working copy, where the checks' parse→emit
+            // round-trip premise no longer holds. This also keeps the checks
+            // outside the 300 ms debounce cycle, as designed (see
+            // validator/index-import-fidelity.ts). The emit stage runs on the
+            // recognized IR before the touch-layout carry-over below, exactly
+            // as importKeyboard emits it. A failure here must never break the
+            // compile — same posture as parseTouchLayout below.
+            let fidelityFindings: LintFinding[] = [];
+            if (
+              isFullRun &&
+              engine.runImportFidelityParseChecks &&
+              engine.runImportFidelityEmitChecks &&
+              engine.emitKmn
+            ) {
+              try {
+                const parseFindings = engine.runImportFidelityParseChecks(pr, kmnText);
+                const emitFindings = await engine.runImportFidelityEmitChecks(
+                  ir,
+                  engine.emitKmn(ir),
+                );
+                fidelityFindings = [...parseFindings, ...emitFindings];
+              } catch (fidelityErr: unknown) {
+                devLog.warn("[useKeyboardArtifact] import-fidelity checks failed:", fidelityErr);
+              }
+            }
             // Carry the base's shipped .keyman-touch-layout into the IR so that
             // touch authoring (Phase E preview + Phase F output) edits a COPY of
             // the existing layout — scaffoldTouchLayout Case B (preserve +
@@ -648,7 +713,7 @@ export function useKeyboardArtifact(
               typeof engine.classifyRemovalCapabilities === "function"
                 ? engine.classifyRemovalCapabilities(ir)
                 : new Map();
-            return { ...pr, ir, removalCapabilities: caps };
+            return { ...pr, ir, removalCapabilities: caps, fidelityFindings };
           } catch (parseErr: unknown) {
             // Record the gap so it surfaces as a warning on the ready stage.
             // Do not re-throw — compile must still succeed independently.
@@ -663,6 +728,7 @@ export function useKeyboardArtifact(
       if (parseResult) {
         parsedIr = parseResult.ir;
         parsedRemovalCapabilities = parseResult.removalCapabilities;
+        fidelityWarnings = formatFidelityWarnings(parseResult.fidelityFindings);
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
@@ -675,8 +741,11 @@ export function useKeyboardArtifact(
 
     // Route any parse-gap note to the runtime-warning channel (refs #467) so it
     // surfaces on the ready stage without riding the scaffold/apply channel or
-    // blocking the preview.
-    const runtimeWarnings: string[] = parseWarning !== null ? [parseWarning] : [];
+    // blocking the preview. Import-fidelity findings ride the same channel.
+    const runtimeWarnings: string[] = [
+      ...(parseWarning !== null ? [parseWarning] : []),
+      ...fidelityWarnings,
+    ];
 
     const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
 

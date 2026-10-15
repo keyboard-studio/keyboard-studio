@@ -31,6 +31,12 @@
 // here. The returned outcome's `trail` is the new trail; a caller that
 // keeps session state adopts it.
 //
+// One carried value is superseded rather than kept or offered: a
+// normalization-step acceptance inside the marks-treatment value
+// (spec 086) is fingerprint-scoped to the old starting point, so the
+// rebuild core clears it and the step is re-derived against the new
+// base and re-proposed in Marks (normalizationStepReproposal.ts).
+//
 // Wiring (owner ruling (b), Matthew 2026-10-07 — supersedes the T017
 // stop recorded in followups.md): a base switch is RETAIN + RECALCULATE.
 // StudioShell's `doCommit` runs the live entry

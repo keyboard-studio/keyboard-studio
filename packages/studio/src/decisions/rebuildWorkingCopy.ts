@@ -28,6 +28,7 @@
 // without changing this wiring's shape.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { isNormalizationStepBatch } from "@keyboard-studio/engine";
 import type { QuestionModule } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { useDecisionStore, getDecisionSnapshot } from "../stores/decisionStore.ts";
@@ -36,6 +37,7 @@ import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import type { ExtractContext } from "./extractContext.ts";
 import { buildLiveExtractContext } from "./liveExtraction.ts";
 import { filterGated, orderDecisions } from "./orderDecisions.ts";
+import { supersedeNormalizationStepAcceptance } from "./normalizationStepReproposal.ts";
 import { recalculate, type RecalculateResult } from "./recalculate.ts";
 import {
   seedTrail,
@@ -101,6 +103,14 @@ export interface RebuildOutcome {
   trail: CheckpointTrail;
   /** Order index the replay resumed from (0 = full replay). */
   replayedFromIndex: number;
+  /**
+   * A starting-point rebuild (`visitAll`) superseded a retained
+   * normalization-step acceptance (spec 086/093 — see
+   * normalizationStepReproposal.ts): the step must be re-derived against
+   * the new base and re-proposed in Marks, and the live entry drops the
+   * stale applied overlay the acceptance had built.
+   */
+  normalizationStepSuperseded: boolean;
 }
 
 /**
@@ -144,8 +154,23 @@ export function rebuildWorkingCopy(
     },
   );
 
+  // Starting-point rebuilds only (`visitAll` — set solely by the
+  // starting-point-change entries): a retained normalization-step
+  // acceptance was fingerprinted against the OLD starting point and can
+  // never apply to the new one, so it is superseded here and the step is
+  // re-proposed from the new base (normalizationStepReproposal.ts). An
+  // ordinary rebuild leaves the standing acceptance exactly as it is —
+  // the starting point did not move, so the decision still fits.
+  const stepSupersession =
+    request.visitAll === true
+      ? supersedeNormalizationStepAcceptance(recalculated.decisions)
+      : { decisions: recalculated.decisions, superseded: false };
+  const finalRecalculated: RecalculateResult = stepSupersession.superseded
+    ? { ...recalculated, decisions: stepSupersession.decisions }
+    : recalculated;
+
   const recordsToWrite: Decision[] = [];
-  for (const [id, record] of Object.entries(recalculated.decisions)) {
+  for (const [id, record] of Object.entries(finalRecalculated.decisions)) {
     if (record !== undefined && record !== request.decisions[id as DecisionId]) {
       recordsToWrite.push(record);
     }
@@ -153,23 +178,25 @@ export function rebuildWorkingCopy(
 
   const replayChanged = new Set<DecisionId>([
     ...request.changed,
-    ...recalculated.recomputed,
-    ...recalculated.inactivated,
-    ...recalculated.reactivated,
+    ...finalRecalculated.recomputed,
+    ...finalRecalculated.inactivated,
+    ...finalRecalculated.reactivated,
+    ...(stepSupersession.superseded ? (["marks-treatment"] as DecisionId[]) : []),
   ]);
   const { outcome, trail } = replayFromCheckpoint(providerFor, request.trail, {
-    decisions: recalculated.decisions,
+    decisions: finalRecalculated.decisions,
     order,
     changed: replayChanged,
     startingPointIR: request.startingPointIR,
   });
 
   return {
-    recalculated,
+    recalculated: finalRecalculated,
     recordsToWrite,
     state: outcome.state,
     trail,
     replayedFromIndex: outcome.checkpoints[0]?.orderIndex ?? 0,
+    normalizationStepSuperseded: stepSupersession.superseded,
   };
 }
 
@@ -291,6 +318,14 @@ export function rebuildWorkingCopyFromStores(
  * freshly seeded trail (the old trail folds over the OLD starting
  * point). The fresh trail is adopted as the session trail.
  *
+ * One value rides inside a retained record rather than folding through
+ * the replay: a normalization-step acceptance in the marks-treatment
+ * value (spec 086). The rebuild supersedes it (see
+ * normalizationStepReproposal.ts) — it was fingerprinted against the old
+ * base — and this entry drops the applied step overlay it built, so the
+ * step is re-derived against the new base and re-proposed in Marks
+ * instead of being silently carried or silently lost.
+ *
  * A no-op (null) before a starting point exists.
  */
 export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | null {
@@ -321,5 +356,23 @@ export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | 
     useDecisionStore.getState().recordAll(outcome.recordsToWrite);
   }
   installRebuiltState(outcome.state);
+
+  // Spec 086/093: the rebuild superseded a retained normalization-step
+  // acceptance (its decision was fingerprinted against the old base).
+  // The applied overlay that acceptance built is the old base's step —
+  // drop it now, as part of the switch, instead of leaving the
+  // projection to replay it until the next analysis lands and the apply
+  // hook's stale branch removes it. The step itself is re-derived from
+  // the new base by the context-tolerance analysis and re-proposed in
+  // the Marks station for the author's fresh confirmation; it is never
+  // re-applied from here. An overlay without a step batch belongs to a
+  // different (062) decision and keeps its existing handling.
+  if (outcome.normalizationStepSuperseded) {
+    const wcNow = useWorkingCopyStore.getState();
+    const applied = wcNow.contextToleranceOverlay;
+    if (applied !== null && applied.overlay.batches.some(isNormalizationStepBatch)) {
+      wcNow.setContextToleranceOverlay(null);
+    }
+  }
   return outcome;
 }

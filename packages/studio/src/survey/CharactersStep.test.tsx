@@ -649,13 +649,13 @@ describe("CharactersStep — #1784 bare-marks text-sample prompt", () => {
     ops.addProposed(GRAVE, "cldr"); // bare mark, no letter+mark cluster
   }
 
-  /** prefill -> confirm -> PhaseB, ready for the draft to be seeded. */
+  /** prefill -> continue -> PhaseB, ready for the draft to be seeded. */
   async function reachPhaseB(onComplete: (r: unknown) => void): Promise<void> {
     resetInventoryDraft();
     useSurveyAnswerStore.setState({ steps: {}, recordedScreenOf: {} });
     seedSessionStore();
     renderWithI18n(<CharactersStepHost onComplete={onComplete} onBack={() => {}} />);
-    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    fireEvent.click(screen.getByTestId("prefill-continue"));
     await screen.findByTestId("mock-phase-b");
   }
 
