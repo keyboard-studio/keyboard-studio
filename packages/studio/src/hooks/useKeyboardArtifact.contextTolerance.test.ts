@@ -181,7 +181,7 @@ describe("useKeyboardArtifact — context-tolerance analysis (spec 078)", () => 
     expect((await store())().contextTolerance.status).toBe("idle");
   });
 
-  it("runs no analysis when the option is false (flag off)", async () => {
+  it("runs no analysis when the option is false", async () => {
     const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
     renderHook(() => useKeyboardArtifact(baseKb, null, null, null, { analyseContextTolerance: false }));
     await flush();
