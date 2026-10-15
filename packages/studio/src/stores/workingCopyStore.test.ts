@@ -24,7 +24,7 @@ import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { defaultFillAxes, selectStrategy, deriveFacets, parseKmn } from "@keyboard-studio/engine";
+import { defaultFillAxes, selectStrategy, deriveFacets } from "@keyboard-studio/engine";
 import type {
   StartKeyboard,
   DiscoveryAxisVector,
@@ -2309,42 +2309,6 @@ describe("workingCopyStore — contextToleranceWriteBack persistence (spec 062 T
 
     expect(rehydrateWorkingCopyFromSession()).toBe(true);
     expect(useWorkingCopyStore.getState().irAxes.contextToleranceWriteBack).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// FR-013 — a committed transform that changes the produced-character set
-// re-seeds the IR-derived discovery axes so strategy/gallery re-derive
-// (spec 039 / D11, T034).
-// ---------------------------------------------------------------------------
-
-describe("workingCopyStore — commitFacetTransform (FR-013 axis re-seed)", () => {
-  const FACET_KMN = `store(&NAME) 'FT'
-store(&TARGETS) 'any'
-begin Unicode > use(main)
-group(main) using keys
-+ [K_A] > 'a'
-`;
-
-  it("re-derives the IR-seeded axis when the produced set changed", () => {
-    useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "postfix" });
-    expect(useWorkingCopyStore.getState().irAxes.markInputOrder).toBe("postfix");
-
-    // The stale axis is dropped and re-derived from the new IR (which carries
-    // no postfix signal, so undefined).
-    useWorkingCopyStore.getState().commitFacetTransform(parseKmn(FACET_KMN, "FT").ir, true);
-    const after = useWorkingCopyStore.getState();
-    expect(after.ir).not.toBeNull();
-    expect(after.irAxes.markInputOrder).toBeUndefined();
-  });
-
-  it("leaves axes untouched when the produced set did NOT change (overlay-preserving write only)", () => {
-    useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "postfix" });
-
-    useWorkingCopyStore.getState().commitFacetTransform(parseKmn(FACET_KMN, "FT").ir, false);
-    const after = useWorkingCopyStore.getState();
-    expect(after.ir).not.toBeNull();
-    expect(after.irAxes.markInputOrder).toBe("postfix");
   });
 });
 

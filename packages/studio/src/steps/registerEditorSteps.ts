@@ -319,30 +319,8 @@ export const packageStep: EditorStep = step({
 });
 
 // ---------------------------------------------------------------------------
-// Exported list (unordered pool — the step order is derived, see stepOrder.ts)
-//
-// Pool ↔ manifest: every step here is referenced by the manifest, and every
-// manifest step (by id) has an entry here. scaffoldStep was removed because
-// scaffold params are collected by projectNameStep's adapter — no separate step.
+// Editor step descriptors. The manifest picks entries by id and assembles
+// them in the derived step order (see stepOrder.ts). scaffoldStep was removed
+// because scaffold params are collected by projectNameStep's adapter — no
+// separate step.
 // ---------------------------------------------------------------------------
-
-/**
- * All editor steps as an unordered pool. The manifest picks entries by id
- * and assembles them in the derived step order. This list is the canonical source
- * of editor-step descriptors.
- */
-export const registeredEditorSteps: readonly EditorStep[] = [
-  identityStep,
-  chooseStartStep,
-  trackStep,
-  attributionStep,
-  projectNameStep,
-  carveStep,
-  deadkeysStep,
-  rulesStep,
-  mechanismsStep,
-  touchSeedSourceStep,
-  touchStep,
-  helpStep,
-  packageStep,
-];

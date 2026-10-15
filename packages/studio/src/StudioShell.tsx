@@ -1711,7 +1711,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
         flexDirection: isNarrow ? "column" : "row",
         height: "100%",
         width: "100%",
-        background: "var(--bg)",
+        background: "var(--app-bg)",
         overflow: "hidden",
       }}
     >
@@ -1747,10 +1747,10 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
             // Always mounted, so content inserted later is announced (a live
             // region inserted together with its content often is not); it only
             // takes up space when it has something to say.
-            // Rendered flush on "var(--bg)" — the same token the container above
+            // Rendered flush on "var(--app-bg)" — the same token the container above
             // paints and the one CharacterMapPane's own root implicitly sits on
             // (it sets no background of its own, so it shows through to the
-            // container's var(--bg) too). Pinned explicitly here rather than left
+            // container's var(--app-bg) too). Pinned explicitly here rather than left
             // to accidental non-override, so a future change to questionsPaneStyle's
             // background doesn't silently drag this along. No border/card fill/
             // padding-as-box — this is text on the character-map surface, not a
@@ -1768,7 +1768,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
                       flexDirection: "column",
                       gap: 8,
                       marginBottom: 12,
-                      background: "var(--bg)",
+                      background: "var(--app-bg)",
                     }
                   : undefined
               }
@@ -2210,7 +2210,7 @@ export function StudioShell() {
         maxHeight: "100dvh",
         width: "100vw",
         overflow: "hidden",
-        background: "var(--bg)",
+        background: "var(--app-bg)",
       }}
     >
       <NavBar

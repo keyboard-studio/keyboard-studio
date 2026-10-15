@@ -31,12 +31,6 @@
 //    These are `var(...)` strings — ready to drop into any `style` prop.
 // ---------------------------------------------------------------------------
 
-/** Page background: `var(--app-bg)` */
-export const CSS_BG = "var(--app-bg)" as const;
-
-/** Surface (card) background: `var(--app-surface)` */
-export const CSS_SURFACE = "var(--app-surface)" as const;
-
 /** Default border: `var(--app-border)` */
 export const CSS_BORDER = "var(--app-border)" as const;
 
@@ -58,9 +52,6 @@ export const CSS_TEXT_SUBTLE = "var(--app-text-subtle)" as const;
 /** Accent color: `var(--app-accent)` */
 export const CSS_ACCENT = "var(--app-accent)" as const;
 
-/** UI font stack: `var(--app-font)` — 'Source Sans 3', system-ui, … */
-export const CSS_FONT = "var(--app-font)" as const;
-
 /** Monospace font stack: `var(--app-font-mono)` */
 export const CSS_FONT_MONO = "var(--app-font-mono)" as const;
 
@@ -76,8 +67,8 @@ export const CSS_TEXT_ON_ACCENT = "var(--app-text-on-accent)" as const;
 
 export const CSS_SIL_GREEN = "var(--sil-green)" as const;
 
-/** SIL orange dark: `var(--sil-orange-dark)` */
-export const CSS_SIL_ORANGE_DARK = "var(--sil-orange-dark)" as const;
+/** Warning text: `var(--app-warning-text)` */
+export const CSS_WARNING_TEXT = "var(--app-warning-text)" as const;
 
 // ---------------------------------------------------------------------------
 // 2. Legacy-named constants (galleryTheme compatibility)
