@@ -13,12 +13,13 @@
 import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import type { MarksContextToleranceDecision } from "@keyboard-studio/contracts";
+import type { MarksContextToleranceDecision, RuleToleranceFinding } from "@keyboard-studio/contracts";
 import type { TransformProposal } from "@keyboard-studio/engine";
 
 import type { NormalizationRefusalReason } from "@keyboard-studio/contracts";
 
 import { FacetTransformPanel } from "../../components/facet-transform/FacetTransformPanel.tsx";
+import { ToleranceGapCases } from "../../lint/ContextToleranceNotice.tsx";
 import { mutedParaFlush } from "../surveyStyles.ts";
 import { NormalizationExamples, type NormalizationExample } from "./NormalizationExamples.tsx";
 
@@ -53,6 +54,14 @@ export interface ContextToleranceStationProps {
   step?: NormalizationStepView;
   /** Present when the proposal is the 062 fallback: one line naming why. */
   fallbackReason?: FallbackReason;
+  /**
+   * The gap findings behind the proposal's sites, for the per-rule worked
+   * cases (typed text and output in both forms, characters named). This
+   * station is the finding's only home (warnings-placement model); the
+   * cases are the detail the global notice used to show. Not used on the
+   * normalization-step path, which carries its own examples.
+   */
+  gapFindings?: readonly RuleToleranceFinding[];
   /** Injected in tests; forwarded to the examples' name lookup. */
   loadNames?: () => Promise<ReadonlyMap<number, string>>;
   onDecide: (decision: ContextToleranceDecisionInput) => void;
@@ -182,6 +191,7 @@ export function ContextToleranceStation({
   prior,
   step,
   fallbackReason,
+  gapFindings,
   loadNames,
   onDecide,
 }: ContextToleranceStationProps) {
@@ -309,6 +319,14 @@ export function ContextToleranceStation({
       >
         {fallbackReason !== undefined && <FallbackReasonLine reason={fallbackReason} />}
         <DisclosureRows proposal={proposal} disclosures={disclosures} ruleLines={ruleLines} />
+        {gapFindings !== undefined && gapFindings.length > 0 && (
+          <div data-testid="context-tolerance-gap-cases">
+            <h4 style={{ margin: "4px 0 0 0", fontSize: 13 }}>
+              <Trans id="marks.contextTolerance.station.cases.heading">What happens today</Trans>
+            </h4>
+            <ToleranceGapCases findings={gapFindings} {...(loadNames !== undefined ? { loadNames } : {})} />
+          </div>
+        )}
       </FacetTransformPanel>
     </div>
   );

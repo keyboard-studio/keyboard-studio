@@ -46,6 +46,7 @@ export function useDocumentationFindings(): LintFinding[] {
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
   const startHistoryMdText = useWorkingCopyStore((s) => s.startHistoryMdText);
+  const startDocCssTexts = useWorkingCopyStore((s) => s.startDocCssTexts);
   const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const baselineDocFindings = useWorkingCopyStore((s) => s.baselineDocFindings);
@@ -95,17 +96,24 @@ export function useDocumentationFindings(): LintFinding[] {
     };
 
     // Criterion 11.8: the base package's bundled stylesheets (image
-    // width constraints may live in their class rules).
-    const cssTexts = startVfs
-      .list("source/")
-      .filter((p) => p.toLowerCase().endsWith(".css"))
-      .map((p) => readVfsText(startVfs, p))
-      .filter((t): t is string => t !== undefined);
-    // Issue #1908: an ACCEPTED image-width proposal amends the shipped
+    // width constraints may live in their class rules). The VFS carries
+    // the KMW stylesheet; the welcome/help pages' own stylesheets
+    // (kb.css) are fetch-don't-write and ride the startDocCssTexts slice
+    // (issue 2139) — without them, class-constrained help images are
+    // false positives.
+    const cssTexts = [
+      ...startVfs
+        .list("source/")
+        .filter((p) => p.toLowerCase().endsWith(".css"))
+        .map((p) => readVfsText(startVfs, p))
+        .filter((t): t is string => t !== undefined),
+      ...(startDocCssTexts ?? []),
+    ];
+    // Issue 1908: an ACCEPTED image-width proposal amends the shipped
     // kb.css (serializeWorkingCopy step 5c), so the check sees the same
     // stylesheet the output will carry — the finding clears here exactly
     // when it clears in the shipped package. Only when a kb.css is
-    // actually in the working copy (its presence depends on issue #2139).
+    // actually in the working copy (its presence depends on issue 2139).
     if (
       isAdaptation &&
       docFixProposals?.imageWidth === "accepted" &&
@@ -147,6 +155,7 @@ export function useDocumentationFindings(): LintFinding[] {
     instantiationMode,
     historyEntryState,
     startHistoryMdText,
+    startDocCssTexts,
     startLicenseText,
     touchLayoutJson,
     baselineDocFindings,

@@ -369,6 +369,9 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
     startReadmeMdText: s.startReadmeMdText,
     startHistoryMdText: s.startHistoryMdText,
+    // Issue #2139: plain strings, straight passthrough — a resumed draft must
+    // judge 11.8 against the same kb.css the live session saw.
+    startDocCssTexts: s.startDocCssTexts,
     startWelcomeConvention: s.startWelcomeConvention,
     ...(startWelcomeImages !== undefined ? { startWelcomeImages } : {}),
     // Over budget => the images are omitted AND the omission is recorded, so a
@@ -507,6 +510,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // Tolerate pre-080 snapshots the same way: absent restores as null.
     startReadmeMdText: snapshot.startReadmeMdText ?? null,
     startHistoryMdText: snapshot.startHistoryMdText ?? null,
+    // Tolerate snapshots saved before issue #2139 landed: absent restores as null.
+    startDocCssTexts: snapshot.startDocCssTexts ?? null,
     startWelcomeConvention: snapshot.startWelcomeConvention ?? null,
     startWelcomeImages: deserializeWelcomeImages(snapshot.startWelcomeImages),
     startWelcomeImagesDropped: snapshot.startWelcomeImagesDropped === true,

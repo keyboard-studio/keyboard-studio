@@ -17,7 +17,7 @@ import { caseCounterpart, confirmedCaseCounterpart } from "../character-discover
 export interface MarkClass {
   /** Stable within a session (deterministic from the alphabet). */
   id: string;
-  /** Plain-language label (never "Unicode"/"normalization" wording). */
+  /** Plain-language label (never "Unicode"/"ccc"/"normalization" wording). */
   label: string;
   /** Member marks, first-appearance order. */
   marks: string[];
@@ -56,8 +56,9 @@ function bucketLabel(bucket: FunctionBucket): string {
   if (bucket === "above") return "Marks above the letter";
   if (bucket === "below") return "Marks below the letter";
   if (bucket === "other") return "Other marks";
-  // `fixed-<ccc>`: each Arabic fixed-position class is its own bucket.
-  return `Fixed-position marks (position class ${bucket.slice("fixed-".length)})`;
+  // `fixed-<ccc>`: each Arabic fixed-position class is its own bucket;
+  // classes stay distinct by id and by their listed marks, not by label.
+  return "Marks in a fixed position";
 }
 
 function bucketOf(mark: string): FunctionBucket {

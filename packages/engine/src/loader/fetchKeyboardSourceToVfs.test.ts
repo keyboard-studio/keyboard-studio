@@ -615,6 +615,27 @@ describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 080 R3)", (
     expect(result.startWelcomeConvention).toBe("folder");
   });
 
+  it("fetches the welcome/help pages' stylesheets as startDocCssTexts (issue #2139)", async () => {
+    const { result } = await run({
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>folder page</body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "welcome/kb.css")]: ok(".full { width: 98%; }"),
+      [sourceUrl(euroLatinKb, "help/sil_euro_latin.php")]: ok(
+        '<html><head><link rel="stylesheet" href="kb.css" /></head><body>help page</body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "help/kb.css")]: ok(".help { width: 90%; }"),
+    });
+    // Welcome first, then help; the conventional kb.css candidate the link
+    // already named is deduped, not fetched twice.
+    expect(result.startDocCssTexts).toEqual([".full { width: 98%; }", ".help { width: 90%; }"]);
+  });
+
+  it("startDocCssTexts is undefined when no page names a fetchable stylesheet", async () => {
+    const { result } = await run({});
+    expect(result.startDocCssTexts).toBeUndefined();
+  });
+
   it("reports `absent` — and no page text — when nothing is served", async () => {
     const { result } = await run({});
     expect(result.startWelcomeHtmText).toBeUndefined();

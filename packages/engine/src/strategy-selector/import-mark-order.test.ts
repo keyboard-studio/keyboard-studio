@@ -48,7 +48,208 @@ describe("detectMarkInputOrderFromImport", () => {
     const ir = makeTestIR([mainGroup], stores);
 
     const fill = detectMarkInputOrderFromImport(ir);
-    expect(fill).toEqual({ axis: "markInputOrder", value: "postfix", source: "import-derived" });
+    expect(fill).toEqual({
+      axis: "markInputOrder",
+      value: "postfix",
+      source: "import-derived",
+    });
+  });
+
+  it("detects the postfix shape when the marked store is precomposed letters with no decomposition (name-extension pairs)", () => {
+    // The sil_ipa exemplar's marked letters (U+0253/U+0257/U+0260) have no
+    // decomposition mapping, so NFD alone cannot relate them to b/d/g; their
+    // Unicode names extend the base names ("… B" -> "… B WITH HOOK").
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#hook",
+          context: [
+            { kind: "any", storeRef: "equalD" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "index", storeRef: "equalU", offset: 1 }],
+        },
+      ],
+    };
+    const stores: IRStore[] = [
+      makeCharStore("store#equalD", "equalD", "bdg"),
+      makeCharStore("store#equalU", "equalU", "ɓɗɠ"),
+    ];
+    const ir = makeTestIR([mainGroup], stores);
+
+    expect(detectMarkInputOrderFromImport(ir)).toEqual({
+      axis: "markInputOrder",
+      value: "postfix",
+      source: "import-derived",
+    });
+  });
+
+  it("detects a marked entry held as one multi-codepoint item (base + combining mark in a single item)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#acute-decomposed",
+          context: [
+            { kind: "any", storeRef: "baseD" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "index", storeRef: "baseU", offset: 1 }],
+        },
+      ],
+    };
+    const stores: IRStore[] = [
+      makeCharStore("store#baseD", "baseD", "a"),
+      {
+        nodeId: "store#baseU",
+        name: "baseU",
+        items: [{ kind: "char", value: "a\u0301" }],
+        isSystem: false,
+      },
+    ];
+    const ir = makeTestIR([mainGroup], stores);
+
+    expect(detectMarkInputOrderFromImport(ir)).toEqual({
+      axis: "markInputOrder",
+      value: "postfix",
+      source: "import-derived",
+    });
+  });
+
+  it("does NOT match a non-diacritic parallel-store remap (unrelated stores, base abc -> output xyz)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#remap",
+          context: [
+            { kind: "any", storeRef: "inStore" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "index", storeRef: "outStore", offset: 1 }],
+        },
+      ],
+    };
+    const stores: IRStore[] = [
+      makeCharStore("store#inStore", "inStore", "abc"),
+      makeCharStore("store#outStore", "outStore", "xyz"),
+    ];
+    const ir = makeTestIR([mainGroup], stores);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match when only some paired entries are related (every pair must be related)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#partial",
+          context: [
+            { kind: "any", storeRef: "inStore" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "index", storeRef: "outStore", offset: 1 }],
+        },
+      ],
+    };
+    const stores: IRStore[] = [
+      makeCharStore("store#inStore", "inStore", "ab"),
+      makeCharStore("store#outStore", "outStore", "áx"),
+    ];
+    const ir = makeTestIR([mainGroup], stores);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match when either referenced store is missing from ir.stores (absence is not evidence)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#unresolved",
+          context: [
+            { kind: "any", storeRef: "equalD" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "index", storeRef: "equalU", offset: 1 }],
+        },
+      ],
+    };
+    // Only the input store resolves; the output store is absent.
+    const stores: IRStore[] = [
+      makeCharStore("store#equalD", "equalD", "aeiou"),
+    ];
+    const ir = makeTestIR([mainGroup], stores);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match when the any() and index() refs name the same store (stores must be distinct)", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#self-remap",
+          context: [
+            { kind: "any", storeRef: "sameStore" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "index", storeRef: "sameStore", offset: 1 }],
+        },
+      ],
+    };
+    const stores: IRStore[] = [
+      makeCharStore("store#sameStore", "sameStore", "aeiou"),
+    ];
+    const ir = makeTestIR([mainGroup], stores);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
+  });
+
+  it("does NOT match when the parallel stores have unequal length", () => {
+    const mainGroup: IRGroup = {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#unequal",
+          context: [
+            { kind: "any", storeRef: "inStore" },
+            { kind: "char", value: "=" },
+          ],
+          output: [{ kind: "index", storeRef: "outStore", offset: 1 }],
+        },
+      ],
+    };
+    const stores: IRStore[] = [
+      makeCharStore("store#inStore", "inStore", "ae"),
+      makeCharStore("store#outStore", "outStore", "áéí"),
+    ];
+    const ir = makeTestIR([mainGroup], stores);
+
+    expect(detectMarkInputOrderFromImport(ir)).toBeUndefined();
   });
 
   it("does NOT match a deadkey-based rule (S-02 body shape: [dk(D), any(BASE)] > index(OUT,2))", () => {
@@ -282,7 +483,11 @@ describe("import-path rule 3a reachability (end-to-end)", () => {
     const { ir } = parse(SIL_IPA_SHAPED_KMN, "ipa-shaped-test");
 
     const importFill = detectMarkInputOrderFromImport(ir);
-    expect(importFill).toEqual({ axis: "markInputOrder", value: "postfix", source: "import-derived" });
+    expect(importFill).toEqual({
+      axis: "markInputOrder",
+      value: "postfix",
+      source: "import-derived",
+    });
 
     // Simulate the survey's partially-elicited vector, seeded with the
     // import-derived value the way MechanismGallery seeds `axes` before

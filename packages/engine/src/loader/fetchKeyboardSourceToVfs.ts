@@ -126,6 +126,20 @@ export interface FetchKeyboardSourceResult {
    * these entries below the new one (criterion 3.4).
    */
   startHistoryMdText?: string;
+  /**
+   * The texts of the stylesheets the base's welcome / help pages use
+   * (`source/welcome/*.css`, `source/help/*.css` — conventionally both are
+   * `kb.css`), in page order (welcome first, then help), or undefined when
+   * neither page names one that could be fetched (issue #2139).
+   *
+   * Fetched for criterion 11.8 only: a custom help image's width constraint
+   * may live in a class rule in these files, and the KMW stylesheet in the
+   * VFS (`source/<id>.css`) has no help-page rules, so judging 11.8 without
+   * them flags class-constrained images (e.g. sil_cameroon_qwerty's
+   * `.full { width: 98% }`) as unconstrained. Fetch-don't-write, like
+   * {@link startWelcomeHtmText}: the rendered pages are what ships.
+   */
+  startDocCssTexts?: string[];
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -467,6 +481,19 @@ export async function fetchKeyboardSourceToVfs(
     startHelpPhpText = helpPhpResp.text;
   }
 
+  // Issue #2139 (criterion 11.8): the stylesheets the base's welcome / help
+  // pages use — see the result field's doc for why the check needs them.
+  // Absence is non-fatal and NOT a warning, same tolerance as the pages.
+  const startDocCssTexts: string[] = [];
+  for (const cssPath of docStylesheetPaths({
+    welcomeText: startWelcomeHtmText,
+    welcomeConvention: startWelcomeConvention,
+    helpText: startHelpPhpText,
+  })) {
+    const cssResp = await getText(`${baseUrl}/${cssPath}`, fetchImpl);
+    if (cssResp.ok && cssResp.text !== undefined) startDocCssTexts.push(cssResp.text);
+  }
+
   // spec 080 FR-006: the base's README.md / HISTORY.md, for inheritance at
   // render time (README prose) and preservation below the new entry (HISTORY,
   // criterion 3.4). Root-level like LICENSE.md; absence is silent.
@@ -494,6 +521,7 @@ export async function fetchKeyboardSourceToVfs(
     ...(startWelcomeImages.length > 0 ? { startWelcomeImages } : {}),
     ...(startReadmeMdText !== undefined ? { startReadmeMdText } : {}),
     ...(startHistoryMdText !== undefined ? { startHistoryMdText } : {}),
+    ...(startDocCssTexts.length > 0 ? { startDocCssTexts } : {}),
   };
 }
 
@@ -528,6 +556,60 @@ interface ResolvedStartWelcome {
   convention: WelcomeConvention;
   images: WelcomeFolderImage[];
   warnings: string[];
+}
+
+const LINK_TAG_RE = /<link\b[^>]*>/gi;
+const HREF_ATTR_RE = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+/**
+ * The repo paths (`source/…`) of the stylesheets a base's welcome / help
+ * pages use, in page order (welcome first, then help), deduped (issue
+ * #2139). Per page, the candidates are every relative `.css` href its
+ * `<link>` tags name, resolved against the page's own folder, plus the
+ * conventional `kb.css` in that folder — a page may rely on the help
+ * site's `header.php` for the link instead of carrying it in its own
+ * text. Absolute, scheme-qualified, and `..`-escaping hrefs never count:
+ * only files inside the page's folder can govern it.
+ */
+function docStylesheetPaths(args: {
+  welcomeText: string | undefined;
+  welcomeConvention: WelcomeConvention;
+  helpText: string | undefined;
+}): string[] {
+  const pages: Array<{ text: string | undefined; dir: string }> = [
+    {
+      text: args.welcomeText,
+      dir:
+        args.welcomeConvention === "folder"
+          ? "source/welcome/"
+          : args.welcomeConvention === "flat"
+            ? "source/"
+            : "",
+    },
+    { text: args.helpText, dir: "source/help/" },
+  ];
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  const add = (path: string) => {
+    if (!seen.has(path)) {
+      seen.add(path);
+      paths.push(path);
+    }
+  };
+  for (const { text, dir } of pages) {
+    if (text === undefined || dir === "") continue;
+    for (const tag of text.matchAll(LINK_TAG_RE)) {
+      const m = HREF_ATTR_RE.exec(tag[0]);
+      const href = m?.[1] ?? m?.[2];
+      if (href === undefined) continue;
+      const clean = href.trim().replace(/^\.\//, "");
+      if (!/\.css$/i.test(clean)) continue;
+      if (/^[a-z][a-z0-9+.-]*:/i.test(clean) || clean.startsWith("/") || clean.split("/").includes("..")) continue;
+      add(`${dir}${clean}`);
+    }
+    add(`${dir}kb.css`);
+  }
+  return paths;
 }
 
 /**

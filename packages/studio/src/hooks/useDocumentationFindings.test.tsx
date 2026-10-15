@@ -99,6 +99,38 @@ describe("useDocumentationFindings", () => {
     expect(after[0]!.origin).toBeUndefined();
   });
 
+  it("11.8 (issue #2139): the startDocCssTexts kb.css constrains a class image — only the genuinely unconstrained image fires, classified upstream", () => {
+    const HELP_WITH_IMAGES =
+      "<?php\n  $pagename = 'Some Other Page';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n" +
+      '<html><body><p>Base help.</p><img src="QwertyColor.png" class="full qw"><img src="globe.png"></body></html>';
+    const KB_CSS = ".full { width: 98%; min-width: 700px; }";
+    const ir = makeTestIR([]);
+    ir.header.version = "1.0";
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs: vfs(), ir });
+    const wc = useWorkingCopyStore.getState();
+    wc.setStartWelcomeHtmText(BASE_WELCOME);
+    wc.setStartHelpPhpText(HELP_WITH_IMAGES);
+    wc.setStartDocCssTexts([KB_CSS]);
+    wc.setBaselineDocFindings(
+      computeBaselineDocFindings({
+        keyboardId: basicKbdus.id,
+        displayName: basicKbdus.displayName,
+        kmnText: KMN,
+        kpsText: null,
+        kvksText: null,
+        touchLayoutJson: null,
+        cssTexts: [KB_CSS],
+        base: { welcomeHtmText: BASE_WELCOME, helpPhpText: HELP_WITH_IMAGES, readmeMdText: null, historyMdText: null, licenseText: null },
+      }),
+    );
+    const { result } = renderHook(() => useDocumentationFindings());
+    const image = result.current.filter((f) => f.code === "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED");
+    expect(image).toHaveLength(1);
+    expect(image[0]!.message).toContain("globe.png");
+    expect(image[0]!.message).not.toContain("QwertyColor.png");
+    expect(image[0]!.origin).toBe("upstream");
+  });
+
   it("a Track 1 copy never classifies anything upstream (no inherited prose)", () => {
     const ir = makeTestIR([]);
     ir.header.version = "1.0";
