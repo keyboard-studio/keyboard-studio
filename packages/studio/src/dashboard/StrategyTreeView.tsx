@@ -233,7 +233,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
           <code style={{ fontFamily: MONO }}>{"irAxes"}</code>{" "}
           (<code style={{ fontFamily: MONO }}>{'source: "import-derived"'}</code> below), so rule
           3a now fires live for such a starting point, including the shipping{" "}
-          <code style={{ fontFamily: MONO }}>{"sil_ipa"}</code> keyboard's guarded postfix rules. No survey phase elicits
+          <code style={{ fontFamily: MONO }}>{"sil_ipa"}</code> keyboard’s guarded postfix rules. No survey phase elicits
           it end-to-end yet — that half remains deferred.
         </Trans>
       </p>
