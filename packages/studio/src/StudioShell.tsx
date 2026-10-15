@@ -99,7 +99,6 @@ import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
-import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
@@ -1225,13 +1224,12 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       analyseContextTolerance: true,
     },
   );
-  const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
-  // never by the marks step; its stale/refused outcomes feed the notice.
-  const contextToleranceApplyNotes = useContextToleranceApply();
-  const showContextTolerance =
-    contextTolerance.status !== "idle" &&
-    contextTolerance.status !== "analysing";
+  // never by the marks step, so the effect stays mounted here even though
+  // its stale/refused notes are no longer rendered: the context-tolerance
+  // finding's only home is the Marks station (warnings-placement model),
+  // not this pane-top region.
+  useContextToleranceApply();
 
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
@@ -1706,39 +1704,11 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
           )}
           {
             // Always mounted, so content inserted later is announced (a live
-            // region inserted together with its content often is not); it only
-            // takes up space when it has something to say.
-            // Rendered flush on "var(--app-bg)" — the same token the container above
-            // paints and the one CharacterMapPane's own root implicitly sits on
-            // (it sets no background of its own, so it shows through to the
-            // container's var(--app-bg) too). Pinned explicitly here rather than left
-            // to accidental non-override, so a future change to questionsPaneStyle's
-            // background doesn't silently drag this along. No border/card fill/
-            // padding-as-box — this is text on the character-map surface, not a
-            // card. The context-tolerance notice (spec 078) shares this live
-            // region rather than adding an announcer of its own (FR-014).
-            <div
-              role="status"
-              aria-live="polite"
-              style={
-                showContextTolerance
-                  ? {
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                      marginBottom: 12,
-                      background: "var(--app-bg)",
-                    }
-                  : undefined
-              }
-            >
-              {showContextTolerance && (
-                <ContextToleranceNotice
-                  state={contextTolerance}
-                  applyNotes={contextToleranceApplyNotes}
-                />
-              )}
-            </div>
+            // region inserted together with its content often is not). Kept
+            // for transient announcements only: warnings render at their
+            // owning step/station, never at the pane top (#2145), and the
+            // context-tolerance notice lives at the Marks station (#2156).
+            <div role="status" aria-live="polite" />
           }
           {stepHost}
         </SurveyQuestionsPane>
@@ -2136,6 +2106,23 @@ export function StudioShell() {
         background: "var(--app-bg)",
       }}
     >
+      {/* Bypass block for keyboard authors: the first focusable element in
+          the shell. The footer step navigation sits after the whole step
+          body in Tab order, so without this link reaching it takes over a
+          hundred Tabs on long steps. A native anchor — not a keyboard
+          shortcut, which could collide with typing in the keyboard test
+          surfaces — moves focus to the footer nav cluster (the element
+          carrying `id="step-navigation"` and `tabIndex={-1}` in
+          StepNavCluster). Visually hidden until focused (`.ks-skip-link`
+          in index.css). Decision recorded in the WCAG tracker's Bypass
+          Blocks row. */}
+      <a
+        href="#step-navigation"
+        className="ks-skip-link ks-focus-ring"
+        data-testid="skip-to-step-navigation"
+      >
+        {t({ id: "shell.skipToStepNavigation", message: "Skip to step navigation" })}
+      </a>
       <NavBar
         active={route}
         outputBlocked={outputNavBlocked}

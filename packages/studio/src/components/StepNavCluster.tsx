@@ -30,6 +30,9 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
 
   return (
     <div
+      id="step-navigation"
+      tabIndex={-1}
+      className="ks-focus-ring"
       role="group"
       aria-label={t({ id: "footer.nav.groupLabel", message: "Step navigation" })}
       data-testid="step-nav"

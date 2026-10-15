@@ -11,7 +11,26 @@ import {
   DEFAULT_PHASE_B_FONT,
   phaseBFontStack,
   isPhaseBFontValue,
+  surveyPageColumn,
 } from "./surveyStyles.ts";
+
+describe("surveyPageColumn", () => {
+  // The shared survey page column must stay LEFT-aligned like the rest of
+  // the app. It used to centre (`margin: "0 auto"`), which was
+  // near-invisible inside the old two-pane split but floated the content
+  // in the middle of the screen on the full-width no-preview pages
+  // (#2081: identity, layout).
+  it("is left-aligned: no auto margins", () => {
+    expect(surveyPageColumn.margin).toBe(0);
+    expect(surveyPageColumn.marginLeft).not.toBe("auto");
+    expect(surveyPageColumn.marginRight).not.toBe("auto");
+  });
+
+  it("keeps the readable 640px measure and page inset", () => {
+    expect(surveyPageColumn.maxWidth).toBe(640);
+    expect(surveyPageColumn.padding).toBe("40px 24px 64px");
+  });
+});
 
 describe("FONT_OPTIONS", () => {
   it("has Noto Sans as the first entry, matching DEFAULT_PHASE_B_FONT's fallback stack", () => {
