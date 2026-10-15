@@ -39,7 +39,7 @@ import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { peekLastPick, useInventoryDraft } from "./useInventoryDraft.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
 import { casePairOf, isFoldedUppercase, isFormatChar } from "./charNormUtils.ts";
-import { isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
+import { isPrivateUseCodePoint, glyphCategory, getEffectiveFacet, CASING_FACET_ID } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { matchesQuery } from "./characterSearch.ts";
 import { Checkbox } from "../ui/index.ts";
@@ -133,6 +133,18 @@ function CharacterMapPaneInner({
   const surveyContext = deriveSurveyContext(decisions);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
+
+  // The casing GATE for this pane (spec 048 FR-006): whether the BASE
+  // keyboard is cased at all is read from the working-copy IR's `casing`
+  // facet — the same signal the marks step reads (MarksSeriesStep) — not
+  // inferred per character. "cased"/"mixed" opens the gate; a caseless (or
+  // not-yet-determined) base gets NO case behaviour here: uppercase cells are
+  // offered as-is and a pick adds exactly the character picked, so a stray
+  // Latin letter on a caseless base is never auto-paired. `caseCounterpart`
+  // (via charNormUtils) still derives the actual pairs, but only once this
+  // gate is open.
+  const casingValue = startIr != null ? getEffectiveFacet(startIr, CASING_FACET_ID).value : undefined;
+  const isCasedBase = casingValue === "cased" || casingValue === "mixed";
 
   const draft = useInventoryDraft(scope === "punctuation" ? "punctuation" : "characters");
   const alphabetChars = draft.chars;
@@ -275,9 +287,10 @@ function CharacterMapPaneInner({
     // Per-scope cell fold applied before search/blocks filtering (spec 047):
     //
     // "alphabet" (the Phase B build-list screen):
-    //   1. Cased-script fold — drop the uppercase of a case pair so the map
-    //      offers only the lowercase (its uppercase joins the alphabet on
-    //      select and is recorded on Done).
+    //   1. Cased-script fold (only when the base's casing facet opens the
+    //      gate — see isCasedBase above) — drop the uppercase of a case pair
+    //      so the map offers only the lowercase (its uppercase joins the
+    //      alphabet on select and is recorded on Done).
     //   2. Shows only LETTERS, NUMERALS, and MARKS. Numerals are kept because
     //      some languages use digits word-formingly. Punctuation, symbols,
     //      separators, and control/format characters move to the dedicated
@@ -293,7 +306,7 @@ function CharacterMapPaneInner({
           if (scope === "punctuation") {
             return !c.isCombiningMark && glyphCategory(nfc) === "punctuation";
           }
-          if (isFoldedUppercase(nfc, bcp47)) return false;
+          if (isCasedBase && isFoldedUppercase(nfc, bcp47)) return false;
           if (c.isCombiningMark) return true; // marks (\p{M}) — glyphCategory folds these to "control"
           const cat = glyphCategory(nfc);
           return cat === "letter" || cat === "number";
@@ -318,7 +331,7 @@ function CharacterMapPaneInner({
       );
     }
     return cased;
-  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47, scope]);
+  }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47, scope, isCasedBase]);
 
   // Visible decomposition at the point of picking (spec 071 US5/FR-003): a
   // whole-grapheme pick contributes its base to Letters and its mark(s) to
@@ -363,8 +376,10 @@ function CharacterMapPaneInner({
     const wasSelected = chars.includes(nfc);
     // Selecting a cased letter adds BOTH cases (its uppercase is hidden in the
     // map but joins the alphabet); deselecting removes both. "Your alphabet"
-    // mirrors this — removing a letter there removes both cases too.
-    const pair = casePairOf(nfc, bcp47);
+    // mirrors this — removing a letter there removes both cases too. All of
+    // it sits behind the casing-facet gate (isCasedBase): on a caseless base
+    // a pick adds/removes exactly the character picked.
+    const pair = isCasedBase ? casePairOf(nfc, bcp47) : [nfc];
     if (wasSelected) {
       // A loanword letter leaves the loanword list; an alphabet letter leaves
       // the alphabet. Either way the map's selection clears.

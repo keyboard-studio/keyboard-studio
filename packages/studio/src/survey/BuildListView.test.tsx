@@ -63,6 +63,46 @@ function irProducing(chars: string[]) {
   return makeTestIR([makeGroup(rules)]);
 }
 
+/**
+ * Seed a CASED base keyboard (Latin script producing case pairs): its baked
+ * casing facet is "cased", which opens the character step's casing gate —
+ * the fold, the lowercase collapse + toggles, pair removal, and the Done
+ * record-both-cases pass-through all engage. Distinct id matters: a same-id
+ * re-fire of instantiateFromStart is a no-op, so each seed uses its own id.
+ */
+function seedCasedBase(): void {
+  useWorkingCopyStore.getState().instantiateFromStart(
+    {
+      id: "test_kb_cased",
+      path: "release/t/test_kb_cased",
+      script: "Latn",
+      targets: ["windows"],
+      displayName: "Test Cased",
+      version: "1.0",
+    },
+    { vfs: { files: new Map() }, ir: irProducing(["a", "b", "c"]) },
+  );
+}
+
+/**
+ * Seed a CASELESS base keyboard (Hebrew script): its baked casing facet is
+ * "caseless", so the character step's casing gate stays closed — no fold, no
+ * collapse, no toggles, no pairing, no derived uppercases on Done.
+ */
+function seedCaselessBase(): void {
+  useWorkingCopyStore.getState().instantiateFromStart(
+    {
+      id: "test_kb_caseless",
+      path: "release/t/test_kb_caseless",
+      script: "Hebr",
+      targets: ["windows"],
+      displayName: "Test Caseless",
+      version: "1.0",
+    },
+    { vfs: { files: new Map() }, ir: irProducing(["א", "ב", "ג"]) },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
@@ -390,6 +430,7 @@ describe("AlphabetBreakdown — visible decomposition (spec 071)", () => {
 
 describe("US1 — whole-text capture (spec 047)", () => {
   it("pasting a sentence captures every distinct non-whitespace character (AS1.1/SC-001)", async () => {
+    seedCasedBase();
     await renderBuildListView({});
     const input = screen.getByRole("textbox", { name: /Character to add/i });
     await act(async () => {
@@ -492,6 +533,7 @@ describe("US2 — category breakdown (spec 047)", () => {
 
 describe("US3 — case-collapse + toggle (spec 047)", () => {
   it("Letters collapse to lowercase with the toggle off (AS3.1)", async () => {
+    seedCasedBase();
     await renderBuildListView({});
     act(() => {
       inventoryOps("characters").setAll(["a", "b", "c"]);
@@ -502,6 +544,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
   });
 
   it("toggling on reveals derived uppercases (AS3.2/FR-008)", async () => {
+    seedCasedBase();
     await renderBuildListView({});
     act(() => {
       inventoryOps("characters").setAll(["a", "b", "c"]);
@@ -517,6 +560,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
   });
 
   it("a caseless-script letter is shown as entered, not folded (AS3.4/FR-010)", async () => {
+    seedCasedBase();
     await renderBuildListView({});
     // Devanagari letter क (U+0915) is caseless — caseCounterpart returns null.
     act(() => {
@@ -526,6 +570,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
   });
 
   it("an uppercase-only entry is shown as the entered uppercase, not replaced by a synthesized lowercase (FR-010 edge case)", async () => {
+    seedCasedBase();
     await renderBuildListView({});
     // Only "A" entered, never "a": it must be shown as-is (U+0041), and no
     // lowercase "a" (U+0061) is synthesized into the Letters view.
@@ -538,6 +583,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
   });
 
   it("on Continue the recorded alphabet contains both cases, deduped, locale-correct (AS3.3/FR-009/SC-004)", async () => {
+    seedCasedBase();
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "en" }, onComplete);
     act(() => {
@@ -556,6 +602,7 @@ describe("US3 — case-collapse + toggle (spec 047)", () => {
   });
 
   it("Turkish dotted-i casing is respected on Continue (FR-009)", async () => {
+    seedCasedBase();
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "tr" }, onComplete);
     act(() => {
@@ -635,6 +682,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
   });
 
   it("folds an entered uppercase to lowercase in the UI, recording both cases on Continue (no capital without a lowercase)", async () => {
+    seedCasedBase();
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     await renderBuildListView({ bcp47_tag: "en" }, onComplete);
     const input = screen.getByRole("textbox", { name: /Character to add/i });
@@ -659,6 +707,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
   });
 
   it("removing a letter from 'Your alphabet' removes both cases in one click (spec 047)", async () => {
+    seedCasedBase();
     await renderBuildListView({ bcp47_tag: "en" });
     // Both cases present (e.g. added via the character map); only the lowercase
     // chip is shown (toggle off).
@@ -710,6 +759,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
   });
 
   it("'Your alphabet' collapses letters to lowercase with the toggle off, reveals uppercases when on", async () => {
+    seedCasedBase();
     await renderBuildListView({});
     act(() => {
       inventoryOps("characters").setAll(["a", "b", "c"]);
@@ -727,6 +777,7 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
   });
 
   it("'Your alphabet' count is the collapsed lowercase-unit count (both cases present not double-counted)", async () => {
+    seedCasedBase();
     await renderBuildListView({});
     act(() => {
       inventoryOps("characters").setAll(["a", "A", "b", "B"]);
@@ -743,5 +794,65 @@ describe("FR-014 — code-point chip label (spec 047)", () => {
     expect(group.textContent).toContain("U+0061");
     // No multi-code-point badge on a single code point.
     expect(group.textContent).not.toContain("[+");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Casing facet gate — caseless base (spec 048 FR-006)
+//
+// The case behaviour above is gated on the BASE keyboard's casing facet, not
+// on the characters entered. With a caseless base seeded, none of it happens:
+// a stray Latin letter keeps the exact case the author typed, both cases are
+// separate entries, no "Show uppercase" toggle exists anywhere, and Done
+// records exactly the chosen characters — no derived uppercase pass-through.
+// ---------------------------------------------------------------------------
+
+describe("Casing facet gate — caseless base", () => {
+  it("a typed uppercase is kept as entered, not folded to lowercase", async () => {
+    seedCaselessBase();
+    await renderBuildListView({ bcp47_tag: "he" });
+    const input = screen.getByRole("textbox", { name: /Character to add/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "Q" } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
+    });
+    expect(getCharacterInventoryValue().chars).toEqual(["Q"]);
+  });
+
+  it("no Show-uppercase toggle is offered in either list view", async () => {
+    seedCaselessBase();
+    await renderBuildListView({ bcp47_tag: "he" });
+    act(() => {
+      inventoryOps("characters").setAll(["a"]);
+    });
+    expect(screen.queryByTestId("your-alphabet-uppercase-toggle")).toBeNull();
+    expect(screen.queryByTestId("letters-uppercase-toggle")).toBeNull();
+  });
+
+  it("both cases of a letter are separate entries, shown and counted as entered", async () => {
+    seedCaselessBase();
+    await renderBuildListView({ bcp47_tag: "he" });
+    act(() => {
+      inventoryOps("characters").setAll(["a", "A"]);
+    });
+    expect(screen.getByText(/Your alphabet \(2\)/i)).toBeTruthy();
+    const letters = screen.getByTestId("alphabet-letters").textContent ?? "";
+    expect(letters).toContain("U+0061"); // a
+    expect(letters).toContain("U+0041"); // A — shown, not hidden behind a
+  });
+
+  it("Continue records exactly the chosen characters — no derived uppercase", async () => {
+    seedCaselessBase();
+    const onComplete = vi.fn<[SurveyPhaseResult], void>();
+    await renderBuildListView({ bcp47_tag: "he" }, onComplete);
+    act(() => {
+      inventoryOps("characters").setAll(["q"]);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Continue/i }));
+    });
+    expect(onComplete.mock.calls[0]![0].confirmedInventory).toEqual(["q"]);
   });
 });
