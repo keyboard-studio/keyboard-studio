@@ -408,14 +408,21 @@ group(Unicode) using keys
     ]);
   });
 
-  it("returns no axisFills for an if()-guarded postfix rule (opaque at parse — documented boundary)", async () => {
+  it("surfaces markInputOrder='postfix' (import-derived) when the base's postfix rule is if()-guarded (raw-fragment scan)", async () => {
     // The guard makes the whole rule opaque (IF_OPTION_STORE), so it never
-    // reaches group.rules; matches the live sil_ipa shape. Locks the scope
-    // boundary at the pipeline level, not just the detector unit.
+    // reaches group.rules; the detector recovers the shape from the
+    // ir.raw[] fragment scan instead (spec 007 §7.2 rule 3a, #2164).
+    // Matches the live sil_ipa shape. Locks the moved boundary at the
+    // pipeline level, not just the detector unit: a guarded rule whose
+    // stores form the same base-to-marked parallel remap as the
+    // unconditional case above DOES seed the fill (guard at context
+    // position 1, index() offset 2 pointing at the any()).
     const kmn = `${HEADER}\nif(option_key = '') any(equalD) + "=" > index(equalU,2)\n`;
     const vfs = createVirtualFS([]);
     const { axisFills } = await importKeyboard(kmn, "guarded-kb", vfs);
-    expect(axisFills).toEqual([]);
+    expect(axisFills).toEqual([
+      { axis: "markInputOrder", value: "postfix", source: "import-derived" },
+    ]);
   });
 
   it("returns no axisFills for a base with no postfix structure", async () => {
