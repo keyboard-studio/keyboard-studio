@@ -57,12 +57,12 @@ import {
 } from "../../packages/engine/src/validator/layer-a-prime.js";
 import {
   emitPlacementMap,
-  detectBaseLayoutFamily,
-  mineLongpressHosts,
-  aggregateTouchHosts,
-  touchHostsToEntries,
+  detectStartLayoutFamily,
+  mineLongpressBases,
+  aggregateTouchBases,
+  touchBasesToEntries,
   type DeadkeySkipCounts,
-  type TouchHostObservation,
+  type TouchBaseObservation,
 } from "../../packages/engine/src/placement/index.js";
 import { aggregatePlacements, computeFingerprintFromCandidates } from "../../packages/engine/src/placement/aggregate.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -697,7 +697,7 @@ async function main(): Promise<void> {
   // placement-priors v2 — corpus-wide counted deadkey/store-index skip
   // reasons, and per-keyboard longpress-host observations for touch mining.
   const deadkeySkipCounts: DeadkeySkipCounts = new Map();
-  const perKeyboardTouchObservations: TouchHostObservation[][] = [];
+  const perKeyboardTouchObservations: TouchBaseObservation[][] = [];
 
   // A single .kmn can be referenced by more than one .kpj — the aggregate
   // bundle projects under release/packages/ point at .kmn files that also have
@@ -722,7 +722,7 @@ async function main(): Promise<void> {
             placementReports.push({
               keyboardId: report.keyboardId,
               bcp47: ir.header.bcp47,
-              baseLayoutFamily: detectBaseLayoutFamily(ir),
+              baseLayoutFamily: detectStartLayoutFamily(ir),
               candidatesByCodepoint,
               placementFingerprint: computeFingerprintFromCandidates(flat),
             });
@@ -739,7 +739,7 @@ async function main(): Promise<void> {
           try {
             const touchJson = readFileSync(touchLayoutPath, "utf8");
             const layout = parseTouchLayoutString(touchJson);
-            perKeyboardTouchObservations.push(mineLongpressHosts(layout));
+            perKeyboardTouchObservations.push(mineLongpressBases(layout));
           } catch {
             // Touch mining is non-fatal; continue.
           }
@@ -784,7 +784,7 @@ async function main(): Promise<void> {
 
   // --emit-placements: aggregate and write placement-priors.json.
   if (args.emitPlacements) {
-    const touchEntries = touchHostsToEntries(aggregateTouchHosts(perKeyboardTouchObservations));
+    const touchEntries = touchBasesToEntries(aggregateTouchBases(perKeyboardTouchObservations));
     const priorsJSON = aggregatePlacements(placementReports, {
       generatedFrom: resolveKeyboardsProvenance(args.releaseDir),
       deadkeySkipReasons: Object.fromEntries(deadkeySkipCounts),
