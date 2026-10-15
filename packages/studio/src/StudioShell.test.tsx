@@ -2210,4 +2210,41 @@ describe("StudioShell — journey footer mount (T052, FR-040)", () => {
 
     expect(document.querySelector("footer")).toBeNull();
   });
+
+  it("renders the skip link first, pointing at the mounted footer nav cluster", async () => {
+    window.location.hash = "#survey";
+    localStorage.setItem("ks.visited", "1");
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    act(() => {
+      useStepWalkStore
+        .getState()
+        .publishStepWalk("identity", [{ id: "il_language_english", done: false }]);
+    });
+    // The survey's StepHost publishes the identity step's nav entry on
+    // mount, so the footer renders its cluster without further seeding.
+
+    const link = screen.getByTestId("skip-to-step-navigation");
+    expect(link.tagName).toBe("A");
+    expect(link.textContent).toBe("Skip to step navigation");
+    expect(link.getAttribute("href")).toBe("#step-navigation");
+    expect(link.classList.contains("ks-skip-link")).toBe(true);
+
+    // First focusable element in the shell: nothing tabbable precedes it.
+    const focusables = document.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    expect(focusables[0]).toBe(link);
+
+    // The target exists in the mounted footer and is the nav cluster.
+    const target = document.querySelector("#step-navigation");
+    expect(target).not.toBeNull();
+    expect(target!.getAttribute("data-testid")).toBe("step-nav");
+    expect(target!.getAttribute("tabindex")).toBe("-1");
+    expect(target!.querySelectorAll("button").length).toBeGreaterThan(0);
+    expect(document.querySelector("footer")!.contains(target)).toBe(true);
+  });
 });

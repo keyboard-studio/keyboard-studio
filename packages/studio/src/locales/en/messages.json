@@ -1492,6 +1492,7 @@
   "rules.guard.overbroad.undoneNote": "Narrow undone — the exception rule was removed.",
   "rules.guard.suggestionsHeading": "Guard suggestions",
   "rules.list.noIr": "No compiled rules yet — the rule list appears once the working copy compiles.",
+  "shell.skipToStepNavigation": "Skip to step navigation",
   "starting.picker.defaultLabel": "Starting keyboard",
   "starting.picker.emptyCatalog": "No starting keyboards found. Check your connection and try again.",
   "starting.picker.listboxLabel": "Starting keyboard options",
