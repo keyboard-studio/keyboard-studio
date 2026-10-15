@@ -394,18 +394,15 @@ function scanOne(
   }
 
   // I3 — header preservation (emit-stage; needs the emitted text).
-  // Scope caveat: BCP47 language tags live in the .kps / .keyboard_info, NOT in
-  // the .kmn the scanner parses, so `ir.header.bcp47` is always empty here and
-  // the check's bcp47 dimension is a guaranteed false positive in a .kmn-only
-  // scan. Drop it; name/copyright/version come from .kmn stores and stay. The
-  // bcp47 dimension remains valid on the import path (where package metadata
-  // populates ir.header.bcp47) — this filter is scanner-context-only.
+  // The check covers .kmn header fields only (keyboardId, name, copyright,
+  // version). Language tags live in the .kps / .keyboard_info, not the .kmn,
+  // so they are not part of I3 and need no filtering here.
   const i3HeaderMissing: string[] =
     emitted === null
       ? []
-      : checkHeaderPreservation(ir, emitted)
-          .map((f) => headerFieldLabel(f) ?? f.message)
-          .filter((label) => !label.startsWith("bcp47"));
+      : checkHeaderPreservation(ir, emitted).map(
+          (f) => headerFieldLabel(f) ?? f.message,
+        );
 
   // The keyboard parsed, so Layer A' actually ran — record the result object
   // (vs. the null default that marks a ParseFailure where the checks never ran).
