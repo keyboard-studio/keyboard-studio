@@ -13,6 +13,8 @@ import {
   REFERENCE_BASES,
   getLayoutFamilyAnswer,
   getPickedWindowsLayout,
+  getPickedWindowsLayouts,
+  pickedLayoutIds,
   resolveLikelyBaseLayouts,
   saveLayoutFamilyAnswer,
   setLikelyBaseDeps,
@@ -24,7 +26,17 @@ import { WINDOWS_LAYOUTS } from "./windowsLayouts.ts";
 function pickWindowsLayout(layoutId: string): void {
   useDecisionStore.getState().record({
     id: "windows-layout",
-    value: { layoutId, origin: "confirmed" },
+    value: { layoutIds: [layoutId], origin: "confirmed" },
+    provenance: "asked",
+    step: "layout",
+  });
+}
+
+/** Record several picks the way the multi-select renderer does (#1902). */
+function pickWindowsLayouts(layoutIds: string[]): void {
+  useDecisionStore.getState().record({
+    id: "windows-layout",
+    value: { layoutIds, origin: "overturned" },
     provenance: "asked",
     step: "layout",
   });
@@ -153,8 +165,39 @@ describe("picked Windows layout (windows-layout decision, spec 090 T011)", () =>
   it("resolves the catalog layout from the recorded decision", () => {
     pickWindowsLayout("basic_kbdfr");
     const record = useDecisionStore.getState().decisions["windows-layout"];
-    expect(record?.value).toEqual({ layoutId: "basic_kbdfr", origin: "confirmed" });
+    expect(record?.value).toEqual({ layoutIds: ["basic_kbdfr"], origin: "confirmed" });
     expect(getPickedWindowsLayout()?.id).toBe("basic_kbdfr");
+  });
+
+  it("reads every pick in selection order (#1902)", () => {
+    pickWindowsLayouts(["basic_kbdgr", "basic_kbdfr"]);
+    expect(getPickedWindowsLayouts().map((l) => l.id)).toEqual(["basic_kbdgr", "basic_kbdfr"]);
+    // The first element stays the primary pick.
+    expect(getPickedWindowsLayout()?.id).toBe("basic_kbdgr");
+  });
+
+  it("still loads the pre-#1902 single-id shape", () => {
+    useDecisionStore.getState().record({
+      id: "windows-layout",
+      value: { layoutId: "basic_kbdfr", origin: "confirmed" },
+      provenance: "asked",
+      step: "layout",
+    });
+    expect(getPickedWindowsLayouts().map((l) => l.id)).toEqual(["basic_kbdfr"]);
+    expect(getPickedWindowsLayout()?.id).toBe("basic_kbdfr");
+  });
+
+  it("pickedLayoutIds drops unknown ids and collapses duplicates", () => {
+    expect(
+      pickedLayoutIds({
+        layoutIds: ["basic_kbdfr", "basic_kbd_nonexistent", "basic_kbdfr", 42, "basic_kbdgr"],
+        origin: "overturned",
+      }),
+    ).toEqual(["basic_kbdfr", "basic_kbdgr"]);
+    expect(pickedLayoutIds({ layoutId: "basic_kbdfr" })).toEqual(["basic_kbdfr"]);
+    expect(pickedLayoutIds(undefined)).toEqual([]);
+    expect(pickedLayoutIds(null)).toEqual([]);
+    expect(pickedLayoutIds("basic_kbdfr")).toEqual([]);
   });
 
   it("ignores an id that is not in the catalog", () => {
@@ -189,8 +232,22 @@ describe("picked Windows layout (windows-layout decision, spec 090 T011)", () =>
 
 describe("resolveLikelyHostLayouts - picked layout (spec 076 A4)", () => {
   it("an exact reference-host pick beats family and language tag", () => {
-    const r = resolveLikelyBaseLayouts({ layoutFamily: "qwerty", bcp47: ["de-DE"], pickedBase: "uk" });
+    const r = resolveLikelyBaseLayouts({
+      layoutFamily: "qwerty",
+      bcp47: ["de-DE"],
+      pickedBases: ["uk"],
+    });
     expect(r.hosts.map((h) => h.id)).toEqual(["uk"]);
+    expect(r.source).toBe("layout-family");
+  });
+
+  it("several picked hosts lead in selection order, duplicates collapsed (#1902)", () => {
+    const r = resolveLikelyBaseLayouts({
+      layoutFamily: "qwerty",
+      bcp47: ["de-DE"],
+      pickedBases: ["azerty", "uk", "azerty"],
+    });
+    expect(r.hosts.map((h) => h.id)).toEqual(["azerty", "uk"]);
     expect(r.source).toBe("layout-family");
   });
 
