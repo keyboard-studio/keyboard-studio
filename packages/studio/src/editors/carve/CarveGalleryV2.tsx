@@ -835,12 +835,20 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     prefillCarveDispositions(recommendedComboIds, { sparseLatinOverlay, deadkeyComboIds });
   }, [recommendedComboIds, sparseLatinOverlay, deadkeyComboIds, closedKeyboardCard, prefillCarveDispositions]);
 
-  // "...for a {descriptor} keyboard" — descriptor is the display name +
-  // "-only" when available (e.g. "Russian-only"), else the neutral
-  // "single-script" fallback.
-  const keyboardDescriptor = identityDisplayName !== undefined && identityDisplayName.length > 0
-    ? `${identityDisplayName}-only`
-    : 'single-script';
+  // "...for a {descriptor} keyboard" — descriptor is translatable (#1588):
+  // either "{name}-only" (e.g. "Russian-only") via the catalog, or the
+  // translated "single-script" fallback. Never assemble English fragments
+  // in TS and interpolate them into a translated string.
+  const keyboardDescriptor =
+    identityDisplayName !== undefined && identityDisplayName.length > 0
+      ? t({
+          id: "carve.keyboardDescriptor.named",
+          message: `${identityDisplayName}-only`,
+        })
+      : t({
+          id: "carve.keyboardDescriptor.singleScript",
+          message: "single-script",
+        });
 
   const toggleRecommendedRow = useCallback((row: RecommendedRemovalChar) => {
     const ids = recommendedRowIds(row);
