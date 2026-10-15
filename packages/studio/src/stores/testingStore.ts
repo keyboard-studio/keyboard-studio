@@ -37,6 +37,15 @@ export interface AddReportInput {
 
 interface TestingState extends TestingRecord {
   frozen: boolean;
+  /**
+   * Transient UI flag, NOT part of the durable record: true while the submit
+   * panel's publish call is in flight. Lets PublishHandover keep the panel
+   * mounted (a new test build must not unmount it mid-submit, #2050) without
+   * persisting or syncing anything. Exempt from the frozen no-op rule.
+   */
+  submitInFlight: boolean;
+  /** Flip the transient submit-in-flight flag. */
+  setSubmitInFlight: (inFlight: boolean) => void;
   /** Record a build that already succeeded; stamps reports fixed since the previous build. */
   recordBuild: (input: RecordBuildInput) => TestBuild | null;
   /** Returns null for empty or over-long text, an unknown build, or a frozen project. */
@@ -90,6 +99,11 @@ function isRecord(value: unknown): value is TestingRecord {
 export const useTestingStore: UseBoundStore<StoreApi<TestingState>> = create<TestingState>()((set, get) => ({
   ...EMPTY,
   frozen: false,
+  submitInFlight: false,
+
+  setSubmitInFlight(inFlight) {
+    set({ submitInFlight: inFlight });
+  },
 
   recordBuild(input) {
     const s = get();
@@ -152,7 +166,7 @@ export const useTestingStore: UseBoundStore<StoreApi<TestingState>> = create<Tes
   },
 
   reset() {
-    set({ ...EMPTY, frozen: false });
+    set({ ...EMPTY, frozen: false, submitInFlight: false });
   },
 
   snapshot() {

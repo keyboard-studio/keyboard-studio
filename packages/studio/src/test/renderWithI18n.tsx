@@ -68,3 +68,15 @@ export function render(
 }
 
 export { i18n };
+
+/**
+ * The same `en`-activated `<I18nProvider>` as a `renderHook` wrapper, for
+ * hook tests whose hook calls `useLingui()` (which throws without a
+ * provider). Usage:
+ *   import { renderHook } from "@testing-library/react";
+ *   import { i18nHookWrapper } from "../test/renderWithI18n.tsx";
+ *   renderHook(() => useMyHook(), { wrapper: i18nHookWrapper });
+ */
+export function i18nHookWrapper({ children }: { children?: ReactNode }): ReactElement {
+  return <I18nProvider i18n={i18n}>{children}</I18nProvider>;
+}
