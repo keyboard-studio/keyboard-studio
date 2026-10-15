@@ -273,8 +273,6 @@ export default [
     ignores: [
       "**/*.test.tsx",
       "**/test/**",
-      // Dev-only demo route (/?demo=lint) — not production UI.
-      "**/lint/LintDemo.tsx",
     ],
     plugins: { lingui },
     rules: {

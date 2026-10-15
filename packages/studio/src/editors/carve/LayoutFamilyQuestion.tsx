@@ -1,11 +1,15 @@
 // LayoutFamilyQuestion — T025 (spec 076 FR-023, amendment A3.1).
 //
-// The existing `layout_family` survey question surfaced in the main flow.
+// The existing `layout_family` survey question surfaced as a component.
 // Renders the question DEFINITION's prompt and options unchanged through the
 // standard QuestionField; persists answers to the survey answer store
-// (editable — answering again overwrites). Rendered in the carve gallery;
-// exported for the future closed-keyboard card (076 US1 / phase-5 Behaviours
-// step), which does not exist in the codebase yet.
+// (editable — answering again overwrites).
+//
+// NOT MOUNTED: nothing imports this component outside its tests today. It
+// is an unmounted stub retained for spec 082 Phase II's Behaviours step
+// (the future closed-keyboard card, 076 US1 / phase-5), which does not
+// exist in the codebase yet. Backing: lib/layoutFamily.ts + the
+// `layout_family` reserve question definition.
 //
 // Structurally separate from the per-row disposition controls (T016): this is
 // a gallery-level setting, not a per-carve control. No disposition UI and no

@@ -70,7 +70,7 @@ describe("AppRoot", () => {
   });
 
   it("keeps one boundary, not one per mounted tree (FR-001)", () => {
-    // AppRoot wraps all three trees main.tsx renders (StudioShell, LintDemo,
+    // AppRoot wraps both trees main.tsx renders (StudioShell,
     // OAuthCallbackScreen), so exactly one boundary covers them all.
     const { container } = render(
       <AppRoot>

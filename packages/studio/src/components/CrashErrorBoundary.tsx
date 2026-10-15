@@ -2,8 +2,8 @@
 // (spec 060, FR-001).
 //
 // ONE BOUNDARY, NOT THREE. It is mounted inside AppRoot's <I18nProvider>, which
-// wraps all three trees main.tsx can render (StudioShell, LintDemo,
-// OAuthCallbackScreen). Putting it there rather than around each of those
+// wraps both trees main.tsx can render (StudioShell, OAuthCallbackScreen).
+// Putting it there rather than around each of those
 // gives one place to reason about, and — the reason it must be INSIDE the
 // provider rather than around it — lets the fallback use the catalog. A
 // fallback rendered above <I18nProvider> would call `useLingui` with no
