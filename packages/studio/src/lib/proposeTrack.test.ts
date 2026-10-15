@@ -81,9 +81,11 @@ describe("proposeTrack", () => {
 // langtags default, so a bare target must still match a base that spells
 // that script out — the same normalisation buildTargetBcp47 applies.
 describe("proposeTrack — suppressed-script normalisation (langtags loaded)", () => {
+  // The langtags module is a large generated chunk; its first dynamic load
+  // can exceed the default 10s hook timeout on a slow machine.
   beforeAll(async () => {
     await loadLangtags();
-  });
+  }, 60_000);
 
   it("a bare target matches a base carrying its default script explicitly", () => {
     // Ewondo's default script is Latn; the canonical target tag is "ewo".

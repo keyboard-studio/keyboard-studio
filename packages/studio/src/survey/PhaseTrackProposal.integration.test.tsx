@@ -22,7 +22,7 @@ import { loadLangtags } from "../lib/langtagsDefaults.ts";
 // decisions compose the same tag production composes.
 beforeAll(async () => {
   await loadLangtags();
-});
+}, 60_000);
 
 afterEach(() => {
   cleanup();
