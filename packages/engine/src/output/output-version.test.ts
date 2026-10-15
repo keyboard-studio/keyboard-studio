@@ -1,5 +1,5 @@
 // Tests for the output version resolver (spec 094 research R1, contracts C1;
-// spec 095 FR-004/FR-007/FR-008: a Copy publishes at 1.0, test builds at 0.N).
+// spec 102 FR-004/FR-007/FR-008: a Copy publishes at 1.0, test builds at 0.N).
 //
 // Coverage:
 //   - every row of the R1 table, for both tracks and every base shape;
@@ -45,7 +45,7 @@ describe("resolveTestBuildVersion — R1 table", () => {
     ["adapt-existing", "1.2.3", 2, "1.2.5"],
     // Track 2, one part with more builds
     ["adapt-existing", "2", 3, "2.3"],
-    // Track 1 publishes at 1.0 whatever the source (spec 095 FR-004), so
+    // Track 1 publishes at 1.0 whatever the source (spec 102 FR-004), so
     // test build N is always 0.N: one-, two- and three-part sources alike.
     ["new-from-base", "1", 1, "0.1"],
     ["new-from-base", "1.0", 1, "0.1"],

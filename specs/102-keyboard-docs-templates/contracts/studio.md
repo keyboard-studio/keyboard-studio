@@ -1,4 +1,4 @@
-# Contract: studio (spec 095)
+# Contract: studio (spec 102)
 
 ## Derived content (`packages/studio/src/lib/docContent.ts`, NEW)
 

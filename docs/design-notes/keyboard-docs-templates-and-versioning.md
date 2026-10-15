@@ -1,6 +1,6 @@
 # Keyboard documentation templates and version policy (design)
 
-**Status:** Design approved in brainstorming, 2026-10-14. Input to `/speckit-specify` for spec 095.
+**Status:** Design approved in brainstorming, 2026-10-14. Input to `/speckit-specify` for spec 102.
 **Owners:** Engine (slot model, renderer, version resolution, studio wiring); Content (template
 wording and section order, spec §12).
 **Builds on:** [spec 061](../../specs/061-help-docs-generation/AS-BUILT.md) (help docs generation),

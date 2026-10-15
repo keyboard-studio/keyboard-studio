@@ -78,7 +78,7 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
     expect(renderWelcomeHtm(baseInput(), base)).toBe(base);
   });
 
-  // spec 095 FR-030: with no answers the help page is the shared body form
+  // spec 102 FR-030: with no answers the help page is the shared body form
   // (the same fallback sentence welcome.htm opens with), no longer the
   // scaffolder's bare placeholder comment.
   it("renderHelpPhp renders the shared body form when answers is null, not the scaffolder stub", () => {
@@ -324,7 +324,7 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
 describe("helpDocsRender — FR-013 merge with a fetched base", () => {
   const startWelcome = "<html><body><h1>Hand-authored</h1><p>Original prose stays.</p></body></html>";
 
-  // spec 095 FR-033: the boundary is now the generated-block markers.
+  // spec 102 FR-033: the boundary is now the generated-block markers.
   it("preserves the base body verbatim and appends new content inside the generated-block markers", () => {
     const input = baseInput({ answers: answersWith({ description: "New answer content." }) });
     const rendered = renderWelcomeHtm(input, startWelcome);
@@ -504,7 +504,7 @@ describe("helpDocsRender — welcome layout section (spec 080 FR-004 / R9 / T051
     );
   });
 
-  // spec 095: the welcome form puts the layout section on its own line after
+  // spec 102: the welcome form puts the layout section on its own line after
   // the body, with or without a description.
   it("the placeholder page (no description yet) still references carried images, so none is orphaned", () => {
     const input = baseInput({ answers: null, displayName: "Hausa Basic" });
@@ -650,7 +650,7 @@ describe("extractWelcomeImageRefs (spec 080 contracts/engine-api.md)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 095 T007: the forms pipeline — derived sections, escaping, the Track 2
+// spec 102 T007: the forms pipeline — derived sections, escaping, the Track 2
 // generated block, and the help-site link.
 // ---------------------------------------------------------------------------
 
@@ -662,7 +662,7 @@ const GENERATED: GeneratedDocSlots = {
   characterInventory: "<ul><li>ŋ</li></ul>",
 };
 
-describe("helpDocsRender — spec 095 forms", () => {
+describe("helpDocsRender — spec 102 forms", () => {
   it("renders the derived sections on welcome and help with no answers, and drops an empty section with its heading", () => {
     const input = baseInput({ generated: GENERATED });
     const welcome = renderWelcomeHtm(input, null);

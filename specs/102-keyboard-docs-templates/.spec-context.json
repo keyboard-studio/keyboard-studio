@@ -1,6 +1,6 @@
 {
   "workflow": "companion",
-  "specName": "095-keyboard-docs-templates",
+  "specName": "102-keyboard-docs-templates",
   "branch": "095-keyboard-docs-templates",
   "selectedAt": "2026-10-15T01:28:08.352Z",
   "currentStep": "implement",
@@ -406,7 +406,7 @@
   ],
   "step_summaries": {
     "plan": {
-      "summary": "Plan, research, data model and contracts for 095 after the no-new-question ruling",
+      "summary": "Plan, research, data model and contracts for 102 after the no-new-question ruling",
       "key_finding": "The studio already has a Copy/Adapt track question and a static keystroke derivation (charProducers), so version needs a resolver-level fix and docs need no simulator"
     },
     "tasks": {
@@ -918,7 +918,7 @@
       "status": "DONE",
       "did": "Quickstart with hand checks for US1-US4",
       "files": [
-        "specs/095-keyboard-docs-templates/quickstart.md"
+        "specs/102-keyboard-docs-templates/quickstart.md"
       ]
     },
     "T032": {
@@ -952,7 +952,7 @@
       "result": "no output"
     },
     {
-      "what": "spec 095 tests",
+      "what": "spec 102 tests",
       "command": "pnpm --filter @keyboard-studio/engine exec vitest run src/shared src/output/output-version.test.ts",
       "source": "derived",
       "exitCode": 0,
@@ -960,7 +960,7 @@
       "result": "      Tests  210 passed (210) ·    Start at  22:05:05 ·    Duration  1.06s (transform 2.69s, setup 2.45s, import 2.26s, tests 230ms, environment 0ms)"
     },
     {
-      "what": "spec 095 studio tests",
+      "what": "spec 102 studio tests",
       "command": "pnpm --filter @keyboard-studio/studio exec vitest run src/lib/docContent.test.ts src/lib/serializeWorkingCopy src/lib/collectDocLintInput.forms.test.ts src/hooks/useDocsPreview.test.ts src/components/DocumentationChecklist.test.tsx src/lib/projectWorkingCopyVfs.test.ts",
       "source": "derived",
       "exitCode": 0,

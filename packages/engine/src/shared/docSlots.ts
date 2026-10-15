@@ -1,4 +1,4 @@
-// docSlots — the named values a documentation form can use (spec 095), the
+// docSlots — the named values a documentation form can use (spec 102), the
 // escapers that prepare them, and the markers around generated sections on
 // Track 2.
 //

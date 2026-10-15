@@ -1,9 +1,9 @@
-// Tests for renderHistoryMd (spec 080 T040/T041; spec 095 T006 lineage).
+// Tests for renderHistoryMd (spec 080 T040/T041; spec 102 T006 lineage).
 //
 // Coverage:
 //   1. null entry, no lineage -> byte-identical to the scaffolder's Track-1
 //      stub (generateStubs, scaffolder/index.ts).
-//   2. null entry, `adapted` lineage -> byte-identical to the pre-095
+//   2. null entry, `adapted` lineage -> byte-identical to the pre-102
 //      `adaptedFrom` output (today's stageAdaptHistory shape), pinned as
 //      literals, for both a fresh and a pre-existing base HISTORY.md (FR-007).
 //   3. "proposed" status (shown, not yet decided) renders the same stub as
@@ -55,7 +55,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
     expect(rendered).toBe(`## 1.0 (2026-06-18)\n* Initial release.\n`);
   });
 
-  it("null entry, adapted lineage (fresh base HISTORY): exactly the pre-095 adaptedFrom output", () => {
+  it("null entry, adapted lineage (fresh base HISTORY): exactly the pre-102 adaptedFrom output", () => {
     const expected = "## 1.1 (2026-06-18)\n* Adapted from basic_kbdus v1.0 via keyboard-studio.\n";
 
     const rendered = renderHistoryMd(null, {
@@ -67,7 +67,7 @@ describe("renderHistoryMd — undecided/dismissed stub", () => {
     expect(rendered).toBe(expected);
   });
 
-  it("null entry, adapted lineage (pre-existing base HISTORY): exactly the pre-095 adaptedFrom output", () => {
+  it("null entry, adapted lineage (pre-existing base HISTORY): exactly the pre-102 adaptedFrom output", () => {
     const startHistory = "## 1.0 (2025-01-01)\n* Initial release.\n";
     const expected =
       "## 1.1 (2026-06-18)\n* Adapted from basic_kbdus v1.0 via keyboard-studio.\n\n" + startHistory;
@@ -243,7 +243,7 @@ describe("renderHistoryMd — exported bullet-text helpers", () => {
   });
 });
 
-describe("renderHistoryMd — created lineage (Copy, spec 095 FR-011)", () => {
+describe("renderHistoryMd — created lineage (Copy, spec 102 FR-011)", () => {
   const lineage = { kind: "created", id: "basic_kbdfr", version: "2.3" } as const;
 
   it("no decided entry: the created-from bullet, then 'Initial release.'", () => {

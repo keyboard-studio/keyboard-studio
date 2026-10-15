@@ -28,7 +28,7 @@ export interface DocsPreview {
   readmeHtm: string;
   welcomeHtm: string;
   helpPhp: string;
-  /** spec 095 FR-034: the generated typing guide was left out because the inherited docs already hold one. */
+  /** spec 102 FR-034: the generated typing guide was left out because the inherited docs already hold one. */
   typingGuideSuppressed: boolean;
 }
 
@@ -39,7 +39,7 @@ export function useDocsPreview(): DocsPreview {
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
   const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
-  // spec 095 US2: the derived sections come from the working-copy IR as built.
+  // spec 102 US2: the derived sections come from the working-copy IR as built.
   const workingIr = useWorkingCopyStore((s) => s.ir);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   // spec 080 FR-006: the base README is inherited on an adaptation only; the

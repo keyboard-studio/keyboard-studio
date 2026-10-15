@@ -92,7 +92,7 @@ const SMALL_BUTTON: React.CSSProperties = {
 };
 
 export interface DocumentationChecklistProps {
-  /** The welcome/help typing guide was left out because the inherited docs already hold one (spec 095 FR-034). */
+  /** The welcome/help typing guide was left out because the inherited docs already hold one (spec 102 FR-034). */
   typingGuideSuppressed?: boolean;
 }
 

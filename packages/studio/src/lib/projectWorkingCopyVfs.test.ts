@@ -705,7 +705,7 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
 
 // ---------------------------------------------------------------------------
 // Id-rename (Track-1 copy) takes the overlay's release version, or 1.0.
-// Spec 095 FR-004: a copy is a new keyboard and ships at 1.0. The serializer
+// Spec 102 FR-004: a copy is a new keyboard and ships at 1.0. The serializer
 // resolves that version and passes it in the identity overlay, so the .kmn,
 // .kps and file name agree by construction; with no overlay version the
 // rename falls back to resetIdentity's own 1.0 default.

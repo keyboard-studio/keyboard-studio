@@ -1014,7 +1014,7 @@ export function projectWorkingCopyVfs(
       try {
         const parsed = parseKmn(kmnText, keyboardId);
         // The release version is the overlay's (serializeWorkingCopy always sets
-        // it to the shipped version, spec 095 FR-009) or resetIdentity's "1.0"
+        // it to the shipped version, spec 102 FR-009) or resetIdentity's "1.0"
         // default; the start keyboard's own version is never carried over.
         const overlayVersion = identity?.version;
         resetIdentity(parsed.ir, {

@@ -229,7 +229,7 @@ export type {
   HelpDocsRenderInput,
 } from "./shared/helpDocsRender.js";
 
-// spec 095 — documentation forms: the renderer, the slot vocabulary, the
+// spec 102 — documentation forms: the renderer, the slot vocabulary, the
 // per-file escapers and the markers around Track 2's generated sections.
 export { renderDocForm, parseDocForm, DocFormParseError } from "./shared/renderDocForm.js";
 export {

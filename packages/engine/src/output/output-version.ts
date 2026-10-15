@@ -10,13 +10,13 @@
 // the version being replaced. Keyman's package compiler allows at most three
 // parts, so a three-part adapt base has no room between a.b.c and a.b.(c+1):
 // once it has test builds it publishes at a.(b+1).0 instead. A Copy is a new
-// keyboard, so it always publishes at 1.0 and its test builds at 0.N (spec 095
+// keyboard, so it always publishes at 1.0 and its test builds at 0.N (spec 102
 // FR-004/FR-007/FR-008). Every adapt case publishes exactly as it did before
 // test builds existed.
 
 import { bumpKeyboardVersion } from "./adapt-staging.js";
 
-/** The version a new keyboard (a Copy) publishes at, whatever it was copied from (spec 095 FR-004). */
+/** The version a new keyboard (a Copy) publishes at, whatever it was copied from (spec 102 FR-004). */
 const NEW_KEYBOARD_VERSION = "1.0";
 
 export type OutputVersionMode = "new-from-base" | "adapt-existing";

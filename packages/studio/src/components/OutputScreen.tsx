@@ -123,7 +123,7 @@ export function OutputScreen() {
   // second pipeline instance, and the card is informational only: like
   // DocumentationChecklist it never gates download or submit.
   const criteriaResult = useAuthoredCriteria(artifact.stage);
-  // spec 095 FR-034: the checklist says when the inherited docs made the
+  // spec 102 FR-034: the checklist says when the inherited docs made the
   // generated typing guide redundant. A memoised derivation, no timer (D3).
   const docsPreview = useDocsPreview();
   const narrow = useIsNarrow();

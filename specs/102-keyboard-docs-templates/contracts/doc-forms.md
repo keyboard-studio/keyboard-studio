@@ -1,4 +1,4 @@
-# Contract: documentation forms (spec 095)
+# Contract: documentation forms (spec 102)
 
 Content-owned data: `packages/contracts/data/doc-forms.json`. Loader and types: `packages/contracts/src/docForms.ts`, exported from `@keyboard-studio/contracts`. It loads like `axisPriors.ts` (`import data from "../data/doc-forms.json" with { type: "json" }`, zod-parsed at module init), so a malformed file throws at load.
 

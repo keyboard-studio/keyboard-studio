@@ -147,13 +147,13 @@ Files: `packages/studio/src/components/DocumentationChecklist.tsx`, `packages/st
 
 ## Phase 7: Polish
 
-Files: `packages/studio/src/lib/collectDocLintInput.forms.test.ts`, `docs/keyboard-documentation-plan.md`, `specs/095-keyboard-docs-templates/quickstart.md`
+Files: `packages/studio/src/lib/collectDocLintInput.forms.test.ts`, `docs/keyboard-documentation-plan.md`, `specs/102-keyboard-docs-templates/quickstart.md`
 
 **Wave 1: independent (different files):**
 
 - [x] **T029** [P] Write a Layer C test. `runDocChecks` (13 codes) over the projected output of every T001 fixture, with no answers and with full answers, reports zero form-attributable findings (SC-004) · `packages/studio/src/lib/collectDocLintInput.forms.test.ts`
 - [x] **T030** [P] Add a "What the tool gives you" section listing the derived sections, the version rule for Copy and Adapt, and where content edits the forms · `docs/keyboard-documentation-plan.md`
-- [x] **T031** [P] Write the quickstart: how to verify each story by hand in the studio (Copy at 1.0, a no-answer download, a form-edit round trip, an Adapt with a typing table) · `specs/095-keyboard-docs-templates/quickstart.md`
+- [x] **T031** [P] Write the quickstart: how to verify each story by hand in the studio (Copy at 1.0, a no-answer download, a form-edit round trip, an Adapt with a typing table) · `specs/102-keyboard-docs-templates/quickstart.md`
 
 **⟶ Wait for Wave 1, then:**
 

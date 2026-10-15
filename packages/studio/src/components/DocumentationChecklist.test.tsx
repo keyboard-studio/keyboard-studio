@@ -197,7 +197,7 @@ describe("DocumentationChecklist — disclosure", () => {
   });
 });
 
-describe("DocumentationChecklist — typing guide suppressed (spec 095 FR-034)", () => {
+describe("DocumentationChecklist — typing guide suppressed (spec 102 FR-034)", () => {
   const NOTE = "Typing guide not generated: the original docs already include one.";
 
   it("explains the omission when the typing guide was suppressed", () => {

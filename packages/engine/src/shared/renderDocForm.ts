@@ -1,4 +1,4 @@
-// renderDocForm — the documentation form renderer (spec 095 FR-023/FR-024).
+// renderDocForm — the documentation form renderer (spec 102 FR-023/FR-024).
 //
 // Two constructs and nothing else: `{{id}}` inserts a slot, and
 // `{{#id}}…{{/id}}` keeps its text only when slot `id` is non-empty. A dropped

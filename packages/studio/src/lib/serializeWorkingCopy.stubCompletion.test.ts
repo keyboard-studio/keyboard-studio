@@ -132,7 +132,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     );
   });
 
-  it("renders the no-answer forms when helpDocs is null (FR-002, spec 095 FR-030)", async () => {
+  it("renders the no-answer forms when helpDocs is null (FR-002, spec 102 FR-030)", async () => {
     const keyboardId = basicKbdus.id;
     useWorkingCopyStore
       .getState()
@@ -141,7 +141,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
 
-    // spec 095 FR-029: the README links the keyboard's help-site page even before any answer.
+    // spec 102 FR-029: the README links the keyboard's help-site page even before any answer.
     expect(readVfsText(projected!.vfs, "README.md")).toBe(
       `# ${basicKbdus.displayName}\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${keyboardId}\n`,
     );
@@ -154,7 +154,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     expect(welcome).toContain('<img src="ks-layout-desktop-');
     expect(welcome.endsWith("</body></html>")).toBe(true);
     // spec 079 FR-003 / US1-3: even an early production's help page opens with
-    // the standard help-site header. Spec 095 FR-030: the body form follows it,
+    // the standard help-site header. Spec 102 FR-030: the body form follows it,
     // the same body the welcome page carries, instead of a placeholder comment.
     const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`);
     expect(help).toBe(

@@ -17,7 +17,7 @@
 // keep the three in sync if the ATX heading convention ever changes.
 //
 // The newest entry's text comes from the content-owned `history` form
-// (spec 095, contracts DOC_FORMS); this module computes its slots. History
+// (spec 102, contracts DOC_FORMS); this module computes its slots. History
 // bullets are inserted verbatim, not Markdown-escaped, so Track 2 output stays
 // byte-identical to the pre-form renderer (FR-007).
 //
@@ -42,7 +42,7 @@ export function adaptedFromBullet(id: string, version: string): string {
   return `Adapted from ${id} v${version} via keyboard-studio.`;
 }
 
-/** The Copy (Track 1) lineage bullet's exact text (spec 095 FR-011). */
+/** The Copy (Track 1) lineage bullet's exact text (spec 102 FR-011). */
 export function createdFromBullet(id: string, version: string): string {
   return `Created from ${id} v${version} via keyboard-studio.`;
 }

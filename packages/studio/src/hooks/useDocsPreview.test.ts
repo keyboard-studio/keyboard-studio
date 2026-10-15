@@ -20,7 +20,7 @@ function instantiate() {
 }
 
 describe("useDocsPreview", () => {
-  it("renders the no-answer forms before any answers exist (spec 095 FR-029/FR-030)", () => {
+  it("renders the no-answer forms before any answers exist (spec 102 FR-029/FR-030)", () => {
     instantiate();
     const { result } = renderHook(() => useDocsPreview());
 
@@ -62,8 +62,8 @@ describe("useDocsPreview", () => {
   });
 });
 
-// spec 095 US2: the derived sections ride the same memoised derivation (D3).
-describe("useDocsPreview derived documentation (spec 095)", () => {
+// spec 102 US2: the derived sections ride the same memoised derivation (D3).
+describe("useDocsPreview derived documentation (spec 102)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });

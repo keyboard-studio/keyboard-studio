@@ -8,7 +8,7 @@
 // in-studio preview render from one implementation and cannot visibly disagree
 // (FR-005/FR-010).
 //
-// Every file is rendered from its content-owned form (spec 095, `DOC_FORMS`
+// Every file is rendered from its content-owned form (spec 102, `DOC_FORMS`
 // in @keyboard-studio/contracts) by `renderDocForm`; this module computes the
 // slot values, escaped per target file, and owns the Track 2 splice.
 // `welcome.htm` and `help/<id>.php` both render the ONE `body` form — a
@@ -21,7 +21,7 @@
 // Track 2 (a start keyboard's own page was fetched) keeps that page as the
 // start of the document and adds the generated sections after it, between
 // DOC_GENERATED_START/END. Any earlier generated block in the inherited page
-// is stripped first, so re-rendering never stacks blocks (spec 095 FR-033).
+// is stripped first, so re-rendering never stacks blocks (spec 102 FR-033).
 
 import { DOC_FORMS, type HelpDocsAnswers } from "@keyboard-studio/contracts";
 import { escapeHtml } from "./escapeHtml.js";
@@ -52,7 +52,7 @@ export type GeneratedDocSlots = Pick<
 >;
 
 export interface HelpDocsRenderInput {
-  /** `null` → no answers yet; the forms still render a complete document (spec 095 FR-030). */
+  /** `null` → no answers yet; the forms still render a complete document (spec 102 FR-030). */
   answers: HelpDocsAnswers | null;
   displayName: string;
   primaryBcp47?: string;
@@ -160,7 +160,7 @@ function helpPageUrl(input: HelpDocsRenderInput): string {
 
 /**
  * The ONE rendered body shared by welcome.htm and help/<id>.php (FR-005,
- * spec 095 FR-025): the `body` form over the description, every answered
+ * spec 102 FR-025): the `body` form over the description, every answered
  * section and the derived sections. `inherited` drops the fallback sentence,
  * because the inherited prose already introduces the keyboard.
  */
@@ -322,7 +322,7 @@ function withOneTrailingNewline(s: string): string {
 /**
  * `README.md` — package-listing description, links and supported platforms,
  * from the `readmeMd` form. No version/copyright (FR-007), no typing guide
- * (spec 095 FR-029). Platform tokens keep their raw spellings (`- any`), so
+ * (spec 102 FR-029). Platform tokens keep their raw spellings (`- any`), so
  * the generator satisfies its own 5.7 readme-targets check (#1906) even
  * before a description is written.
  *
@@ -352,7 +352,7 @@ export function renderReadmeMd(
   return startReadmeMdText === null ? rendered : `${startReadmeMdText.replace(/\s+$/, "")}\n${rendered}`;
 }
 
-/** `source/readme.htm` — the description, condensed for the package-details popup, and a pointer to the help page (spec 095 FR-029). */
+/** `source/readme.htm` — the description, condensed for the package-details popup, and a pointer to the help page (spec 102 FR-029). */
 export function renderReadmeHtm(input: HelpDocsRenderInput): string {
   const description = descriptionOf(input);
   return renderDocForm(DOC_FORMS.forms.readmeHtm, {
@@ -367,7 +367,7 @@ export function renderReadmeHtm(input: HelpDocsRenderInput): string {
  * `source/welcome/welcome.htm` — the first-run page, from the `welcome` form
  * around the shared body. When the base's own welcome page was fetched (Track
  * 2), that page comes first and the generated sections follow in one marked
- * block (spec 095 FR-032/FR-033); with nothing generated it ships verbatim
+ * block (spec 102 FR-032/FR-033); with nothing generated it ships verbatim
  * (FR-006).
  *
  * @param welcomeImageFiles bare names of the image files shipped beside the page

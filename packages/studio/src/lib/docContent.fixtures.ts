@@ -1,4 +1,4 @@
-// Fixture keyboards for the spec 095 documentation tests: one per input
+// Fixture keyboards for the spec 102 documentation tests: one per input
 // mechanism the derived docs describe, plus a touch layout, a keyboard with no
 // touch layout, and one large enough to switch the typing guide to its summary.
 // Inline `.kmn` sources parsed to IR, so no keyboard outside the repo is

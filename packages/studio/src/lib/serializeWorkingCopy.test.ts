@@ -128,7 +128,7 @@ describe("serializeWorkingCopy — happy path", () => {
     expect(result!.keyboardId).toBe(basicKbdus.id);
   });
 
-  it("a Copy ships at 1.0 whatever the start keyboard's release version (spec 095 FR-004)", async () => {
+  it("a Copy ships at 1.0 whatever the start keyboard's release version (spec 102 FR-004)", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     const { ir } = seedStore();
     ir.header.version = "2.3";
@@ -316,7 +316,7 @@ describe("serializeWorkingCopy — preview≡output equivalence", () => {
     // Both paths pass the same keyboardId, startIr, identity, and deletedNodeIds.
     expect(outputCall["keyboardId"]).toBe(previewCall["keyboardId"]);
     expect(outputCall["startIr"]).toBe(previewCall["startIr"]);
-    // The release version is an output-only overlay (spec 095 FR-009: the
+    // The release version is an output-only overlay (spec 102 FR-009: the
     // shipped version, 1.0 on a Copy); every other identity field is shared.
     const { version: outputVersion, ...outputIdentity } = outputCall["identity"] as Record<string, unknown>;
     expect(outputVersion).toBe("1.0");
@@ -798,14 +798,14 @@ describe("serializeWorkingCopy — layout charts (spec 079 FR-013..FR-015)", () 
 });
 
 // ---------------------------------------------------------------------------
-// spec 095 US1 (T013): one package, one version. A Copy ships at 1.0 in every
+// spec 102 US1 (T013): one package, one version. A Copy ships at 1.0 in every
 // version site (&KEYBOARDVERSION, the .kps <Version>, the result `version`
 // that names the download, and the newest HISTORY heading); an Adapt is
 // unchanged. These run the REAL projection, so the sites are compared as
 // shipped rather than as handed to a mock.
 // ---------------------------------------------------------------------------
 
-describe("serializeWorkingCopy — package version consistency (spec 095 FR-009, FR-011)", () => {
+describe("serializeWorkingCopy — package version consistency (spec 102 FR-009, FR-011)", () => {
   const START_KMN = [
     "store(&VERSION) '10.0'",
     "store(&NAME) 'Basic US'",

@@ -1,4 +1,4 @@
-// Documentation forms (spec 095): one fill-in form per shipped documentation
+// Documentation forms (spec 102): one fill-in form per shipped documentation
 // file plus the shared welcome/help body, and the explanatory paragraph for
 // each input mechanism. Content-owned data in
 // `packages/contracts/data/doc-forms.json`; this module is its type, schema

@@ -1,4 +1,4 @@
-// buildDocContent (spec 095 US2): the derived documentation sections, one
+// buildDocContent (spec 102 US2): the derived documentation sections, one
 // snapshot per slot per fixture plus the rules the snapshots can't state on
 // their own (order, coverage, thresholds, suppression).
 

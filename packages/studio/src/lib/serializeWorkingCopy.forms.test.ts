@@ -1,4 +1,4 @@
-// Spec 095 US3: the documentation forms' guarantees, end to end over the real
+// Spec 102 US3: the documentation forms' guarantees, end to end over the real
 // output projection. The mechanics live in the engine (renderDocForm,
 // helpDocsRender) and the content in doc-forms.json; this proves what a
 // downloaded package actually carries, for every fixture keyboard.

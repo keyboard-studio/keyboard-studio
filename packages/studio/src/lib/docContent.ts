@@ -1,5 +1,5 @@
 // docContent — the documentation's "how this keyboard works" sections
-// (spec 095 US2), derived from the working-copy IR as built, including rules
+// (spec 102 US2), derived from the working-copy IR as built, including rules
 // inherited from the starting keyboard that the author never touched.
 //
 // Pure and synchronous, so the docs preview stays a plain memoised derivation

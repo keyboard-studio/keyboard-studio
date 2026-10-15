@@ -1,5 +1,5 @@
 /**
- * E2E: a Copy (Track 1) is a new keyboard and ships at 1.0 (spec 095 US1,
+ * E2E: a Copy (Track 1) is a new keyboard and ships at 1.0 (spec 102 US1,
  * FR-004, FR-009, FR-011).
  *
  * Start keyboard: basic_kbdfr, whose own &KEYBOARDVERSION is 1.1 (not 1.0),
@@ -58,7 +58,7 @@ async function finishGalleryWork(page: Page): Promise<void> {
   await driveMechanismsGallery(page, {});
 }
 
-test.describe("spec 095 US1: a Copy starts at 1.0", () => {
+test.describe("spec 102 US1: a Copy starts at 1.0", () => {
   test("Copy of a 1.1 keyboard: Output and the downloaded package say 1.0", async ({ page }) => {
     // Skip the first-visit WelcomeScreen gate, as the copy-edit walk does.
     await seedReturningVisitor(page);

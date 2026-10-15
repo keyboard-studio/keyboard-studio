@@ -103,7 +103,7 @@ export interface ProjectWorkingCopyForOutputResult {
   keyboardId: string;
   /** Author-chosen display name (identity.displayName) or the base displayName. */
   displayName: string;
-  /** The release version this production ships at (spec 095 FR-009), sanitised for a file name. */
+  /** The release version this production ships at (spec 102 FR-009), sanitised for a file name. */
   version: string;
   /** Warnings from projection steps (carve, assignments, identity). May be empty. */
   warnings: string[];
@@ -380,7 +380,7 @@ export async function projectWorkingCopyForOutput(
   // an unedited working copy look changed (R7).
   const testBuild = opts?.testBuild;
   const stable = opts?.stableForFingerprint === true;
-  // spec 095 FR-004: a Copy is a new keyboard and publishes at 1.0; the start
+  // spec 102 FR-004: a Copy is a new keyboard and publishes at 1.0; the start
   // keyboard's version survives only as HISTORY lineage (FR-011).
   const publishVersion = resolvePublishVersion({
     mode: isAdaptation ? "adapt-existing" : "new-from-base",
@@ -388,7 +388,7 @@ export async function projectWorkingCopyForOutput(
     hasTestBuilds: stable || hasTestBuilds(),
   });
   const shippedVersion = testBuild?.version ?? publishVersion;
-  // spec 095 FR-009: one version for every site in the package, on both
+  // spec 102 FR-009: one version for every site in the package, on both
   // tracks: the result `version` (download name), the HISTORY heading, and,
   // through the overlay, &KEYBOARDVERSION and the descriptor's <Version>.
   const version = shippedVersion.replace(/[^\w.\-]/g, "_");
@@ -582,7 +582,7 @@ export async function projectWorkingCopyForOutput(
   //     regex the package descriptor already runs (FR-008) — never re-derived
   //     from StartKeyboard, which can disagree with what this build actually emits.
   const projectedKmnText = readVfsText(clonedVfs, `source/${resolvedKeyboardId}.kmn`) ?? "";
-  // spec 095 US2: the derived sections, from the working-copy IR as built (the
+  // spec 102 US2: the derived sections, from the working-copy IR as built (the
   //     same buildDocContent call useDocsPreview makes). The inherited prose
   //     is the start keyboard's welcome/help text, which exists on Track 2
   //     only; it decides whether the typing guide is already covered.

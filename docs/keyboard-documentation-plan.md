@@ -45,7 +45,7 @@ coverage table as `U+XXXX`, empty keys with a distinct keycap. When the base shi
 images they are kept and no charts are generated unless the author opts to regenerate (the
 control sits on the checklist's welcome row).
 
-**Every file is rendered from a form** (spec 095). The six files and the shared welcome/help
+**Every file is rendered from a form** (spec 102). The six files and the shared welcome/help
 body are fill-in forms in
 [packages/contracts/data/doc-forms.json](../packages/contracts/data/doc-forms.json), owned by the
 content team. A form has two constructs: `{{slot}}` inserts a value and `{{#slot}}…{{/slot}}`
@@ -77,7 +77,7 @@ follow once, between `<!-- ks:generated:start -->` and `<!-- ks:generated:end --
 generated block in the original is replaced. If the original already has a table or list
 covering half the typing guide's characters, the guide is left out and the checklist says so.
 
-**Version** (spec 095): a copy (Track 1) is a new keyboard and ships at 1.0, with test builds at
+**Version** (spec 102): a copy (Track 1) is a new keyboard and ships at 1.0, with test builds at
 0.1, 0.2, …; its history opens with "Created from `<id>` v`<version>` via keyboard-studio.". An
 adaptation (Track 2) ships the original's version with its last number increased, as before.
 `&KEYBOARDVERSION`, the `.kps` `<Version>`, the file name and the newest HISTORY heading always

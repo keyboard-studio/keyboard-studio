@@ -1,4 +1,4 @@
-# Quickstart: verify spec 095 by hand
+# Quickstart: verify spec 102 by hand
 
 Run the studio (`pnpm dev` from the repo root) and check each story in the browser.
 

@@ -82,7 +82,7 @@ export function readmeHtm(displayName: string): string {
  *
  * Not HTML-escaped: LICENSE.md is Markdown/plain text, not markup.
  *
- * Rendered through the `license` form (spec 095 FR-026: the copyright year
+ * Rendered through the `license` form (spec 102 FR-026: the copyright year
  * appears only here). A null holder leaves the `copyrightHolder` slot empty,
  * so the form drops the notice block. Callers pass null for a blank holder
  * (ensurePackageFiles trims first); a whitespace-only holder would also drop

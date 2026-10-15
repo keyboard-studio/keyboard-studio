@@ -1,4 +1,4 @@
-// Spec 095 SC-004: the Layer C documentation checks report nothing against
+// Spec 102 SC-004: the Layer C documentation checks report nothing against
 // the documentation the forms produce. Each fixture keyboard is projected for
 // output, with no answers and with every answer given, and the shipped
 // package is linted exactly as a foreign package would be.

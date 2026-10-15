@@ -1,4 +1,4 @@
-// Spec 095 US4: an adaptation (Track 2) keeps the original keyboard's
+// Spec 102 US4: an adaptation (Track 2) keeps the original keyboard's
 // welcome/help prose first and adds the generated sections after it, inside
 // the ks:generated markers. A Copy (Track 1) carries none of the original
 // prose. A start page that already has a typing table suppresses the guide;
@@ -58,7 +58,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Track 2 keeps the original documentation (spec 095 US4)", () => {
+describe("Track 2 keeps the original documentation (spec 102 US4)", () => {
   it("puts the original prose first and the generated sections after it, inside the markers", async () => {
     adapt(ORIGINAL_WELCOME, ORIGINAL_HELP);
     const { welcome, help } = await project();
@@ -120,7 +120,7 @@ describe("Track 2 keeps the original documentation (spec 095 US4)", () => {
   });
 });
 
-describe("Track 1 carries none of the original prose (spec 095 FR-032)", () => {
+describe("Track 1 carries none of the original prose (spec 102 FR-032)", () => {
   it("renders the generated sections with no markers and no inherited text", async () => {
     const store = useWorkingCopyStore.getState();
     store.instantiateFromStart(basicKbdus, { vfs: fixtureVfs(), ir: DEADKEY_RIGHT_ALT_FIXTURE.ir });

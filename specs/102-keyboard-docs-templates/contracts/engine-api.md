@@ -1,4 +1,4 @@
-# Contract: engine API (spec 095)
+# Contract: engine API (spec 102)
 
 All symbols are exported from `@keyboard-studio/engine` (`packages/engine/src/index.ts`). "Unchanged" means the signature and behaviour stay as they are today.
 
