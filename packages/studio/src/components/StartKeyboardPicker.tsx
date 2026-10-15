@@ -81,7 +81,11 @@ async function loadCorpus(): Promise<Map<string, string>> {
 // parse-err → var(--app-danger)
 // ---------------------------------------------------------------------------
 
-const STATUS_LABEL: Record<string, string> = {
+// Technical codec terms — kept for expert users and bug reports (badge
+// tooltip, screen-reader label, and the legend below). They are never the
+// visible badge text on their own: authors see the plain-language copy from
+// useReadinessLabel() instead.
+const STATUS_TECHNICAL_TERM: Record<string, string> = {
   [ImportStatus.Clean]: "clean",
   [ImportStatus.CleanWithOpaque]: "opaque",
   [ImportStatus.ParseFailure]: "parse-err",
@@ -95,28 +99,129 @@ const STATUS_COLOR: Record<string, string> = {
   [ImportStatus.RoundTripDivergence]: "var(--app-warning-text)",
 };
 
+// Every status the legend explains, in plain-language-first order.
+const READINESS_STATUSES: readonly string[] = [
+  ImportStatus.Clean,
+  ImportStatus.CleanWithOpaque,
+  ImportStatus.RoundTripDivergence,
+  ImportStatus.ParseFailure,
+];
+
+/**
+ * Plain-language label for an import status — what the status means for the
+ * author and, where it matters, what to do about it. The technical codec
+ * term stays available alongside it (see ImportBadge / the legend), never
+ * instead of it.
+ */
+function useReadinessLabel(): (status: string) => string {
+  const { t } = useLingui();
+  return (status: string): string => {
+    switch (status) {
+      case ImportStatus.Clean:
+        return t({ id: "base.readiness.clean", message: "Fully editable here" });
+      case ImportStatus.CleanWithOpaque:
+        return t({
+          id: "base.readiness.opaque",
+          message: "Editable — some advanced rules will be kept as-is",
+        });
+      case ImportStatus.RoundTripDivergence:
+        return t({
+          id: "base.readiness.diverged",
+          message: "Editable — small formatting differences after import",
+        });
+      case ImportStatus.ParseFailure:
+        return t({
+          id: "base.readiness.parseErr",
+          message: "Can't be used as a starting point in the studio yet — pick another keyboard",
+        });
+      default:
+        return status;
+    }
+  };
+}
+
 function ImportBadge({ status }: { status: string }) {
   const { t } = useLingui();
-  const label = STATUS_LABEL[status] ?? status;
+  const plainLabel = useReadinessLabel()(status);
+  const technical = STATUS_TECHNICAL_TERM[status] ?? status;
   const color = STATUS_COLOR[status] ?? "var(--app-text-muted)";
+  // Screen-reader name and hover tooltip both carry the plain label AND the
+  // technical term, so a bug report can quote either.
+  const label = `${plainLabel} (${technical})`;
+  const technicalLabel = technical;
   return (
     <span
       style={{
-        fontSize: 10,
+        display: "inline-block",
+        fontSize: 11,
         fontWeight: 600,
         color,
         border: `1px solid ${color}`,
         borderRadius: 3,
-        padding: "1px 4px",
-        marginLeft: 4,
-        lineHeight: 1,
+        padding: "2px 6px",
+        lineHeight: 1.3,
         verticalAlign: "middle",
-        whiteSpace: "nowrap",
+        whiteSpace: "normal",
       }}
+      title={t({ id: "base.readiness.technicalLabel", message: `Technical status: ${technicalLabel}` })}
       aria-label={t({ id: "base.importBadge.ariaLabel", message: `Import status: ${label}` })}
     >
-      {label}
+      {plainLabel}
     </span>
+  );
+}
+
+// Keyboard-accessible legend for the readiness badges. A native
+// <details>/<summary> disclosure: the summary is focusable and toggles with
+// Enter/Space with no extra scripting, and every color comes from the theme
+// tokens so it reads correctly in both themes.
+function ImportReadinessLegend() {
+  const plainLabelFor = useReadinessLabel();
+  return (
+    <details
+      data-testid="import-readiness-legend"
+      style={{
+        fontSize: 12,
+        color: "var(--app-text-muted)",
+        fontFamily: "var(--app-font)",
+        lineHeight: 1.5,
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          fontWeight: 600,
+          color: "var(--app-accent)",
+          fontFamily: "var(--app-font)",
+        }}
+      >
+        <Trans id="base.readiness.legendSummary">What does import readiness mean?</Trans>
+      </summary>
+      <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+        {READINESS_STATUSES.map((status) => {
+          const color = STATUS_COLOR[status] ?? "var(--app-text-muted)";
+          const technical = STATUS_TECHNICAL_TERM[status] ?? status;
+          return (
+            <li key={status}>
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "inline-block",
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: color,
+                  marginRight: 6,
+                  verticalAlign: "middle",
+                }}
+              />
+              <span style={{ color: "var(--app-text)", fontWeight: 600 }}>{plainLabelFor(status)}</span>{" "}
+              <span style={{ fontFamily: "var(--app-font-mono)", fontSize: 11 }}>({technical})</span>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 
@@ -195,6 +300,7 @@ export function StartKeyboardPicker({
   onSearchAll,
 }: StartKeyboardPickerProps) {
   const { t } = useLingui();
+  const readinessLabel = useReadinessLabel();
   const resolvedLabel = label ?? t({ id: "starting.picker.defaultLabel", message: "Starting keyboard" });
   const [keyboards, setKeyboards] = useState<StartKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -620,6 +726,12 @@ export function StartKeyboardPicker({
                 const kb = rb.base;
                 const isActive = i === safeActiveIndex;
                 const importStatus = corpus.get(kb.id);
+                // A base the codec cannot parse is visually de-emphasized so
+                // the default path steers toward usable choices — but it
+                // stays listed and selectable (author agency; support may
+                // need to see it). Selecting one surfaces a clear warning
+                // below the picker rather than a silent hard failure.
+                const isParseFailure = importStatus === ImportStatus.ParseFailure;
 
                 // Build highlighted displayName children.
                 const dnRange = rb.matchRanges?.find((r) => r.field === "displayName");
@@ -632,6 +744,7 @@ export function StartKeyboardPicker({
                     id={`${uid}-opt-${kb.id}`}
                     role="option"
                     aria-selected={i === safeActiveIndex}
+                    data-import-status={importStatus}
                     ref={(el) => { optionRefs.current[i] = el; }}
                     // onMouseDown prevents blur-close before click fires.
                     onMouseDown={(e) => e.preventDefault()}
@@ -649,6 +762,7 @@ export function StartKeyboardPicker({
                       fontSize: 13,
                       borderBottom: "1px solid var(--app-border)",
                       userSelect: "none",
+                      opacity: isParseFailure ? 0.6 : undefined,
                     }}
                   >
                     <span style={{ flex: 1, minWidth: 0 }}>
@@ -670,7 +784,6 @@ export function StartKeyboardPicker({
                         ) : (
                           kb.displayName
                         )}
-                        {importStatus !== undefined && <ImportBadge status={importStatus} />}
                       </span>
                       <span
                         style={{
@@ -691,6 +804,14 @@ export function StartKeyboardPicker({
                         {" · "}
                         {kb.script}
                       </span>
+                      {/* Readiness badge on its own line: the plain-language
+                          labels are full phrases and must never be clipped
+                          by the name row's ellipsis. */}
+                      {importStatus !== undefined && (
+                        <span style={{ display: "block", marginTop: 4 }}>
+                          <ImportBadge status={importStatus} />
+                        </span>
+                      )}
                     </span>
                   </li>
                 );
@@ -752,6 +873,7 @@ export function StartKeyboardPicker({
               style={{
                 display: "flex",
                 alignItems: "center",
+                flexWrap: "wrap",
                 gap: 4,
                 fontSize: 12,
                 color: "var(--app-text-muted)",
@@ -762,6 +884,35 @@ export function StartKeyboardPicker({
               <ImportBadge status={selectedStatus} />
             </div>
           )}
+
+          {/* Selecting a base the codec cannot parse stays possible, but
+              never silent: a clear warning names the consequence and the
+              remedy in plain language. */}
+          {selectedStatus === ImportStatus.ParseFailure && value !== null && (
+            <div
+              role="alert"
+              data-testid="import-readiness-parse-err-warning"
+              style={{
+                fontSize: 12,
+                lineHeight: 1.5,
+                color: "var(--app-danger-text)",
+                background: "var(--app-danger-bg)",
+                border: "1px solid var(--app-danger)",
+                borderRadius: 6,
+                padding: "8px 10px",
+                fontFamily: "var(--app-font)",
+              }}
+            >
+              <strong>{readinessLabel(selectedStatus)}</strong>{" "}
+              <span style={{ fontFamily: "var(--app-font-mono)", fontSize: 11 }}>
+                ({STATUS_TECHNICAL_TERM[selectedStatus]})
+              </span>
+            </div>
+          )}
+
+          {/* Legend explaining every readiness label, shown whenever badges
+              can appear (i.e. the corpus loaded). */}
+          {corpus.size > 0 && <ImportReadinessLegend />}
         </>
       )}
     </div>

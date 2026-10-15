@@ -28,6 +28,7 @@ import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 import {
   basicKbdus,
+  makeStartKeyboard,
   silEuroLatin,
   silDevanagariPhonetic,
 } from "@keyboard-studio/contracts/fixtures";
@@ -63,9 +64,9 @@ vi.mock("../lib/services.ts", () => ({
 
 // ---------------------------------------------------------------------------
 // Import-corpus — covers all three badge variants deterministically.
-// basic_kbdus             → ImportStatus.Clean              (badge: "clean")
-// sil_euro_latin          → ImportStatus.CleanWithOpaque    (badge: "opaque")
-// sil_devanagari_phonetic → ImportStatus.RoundTripDivergence (badge: "diverged")
+// basic_kbdus             → ImportStatus.Clean              (badge: "Fully editable here")
+// sil_euro_latin          → ImportStatus.CleanWithOpaque    (badge: "Editable — some advanced rules will be kept as-is")
+// sil_devanagari_phonetic → ImportStatus.RoundTripDivergence (badge: "Editable — small formatting differences after import")
 //
 // CROSS-FILE ISOLATION (#829): the component reads the corpus via a dynamic
 // import("@docs/import-corpus.json") inside loadCorpus(). vitest runs several
@@ -413,7 +414,7 @@ describe("BaseKeyboardPicker — ranking smoke", () => {
 // ---------------------------------------------------------------------------
 
 describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
-  it("basic_kbdus option row shows a 'clean' badge (matches corpus mock)", async () => {
+  it("basic_kbdus option row shows a plain-language badge (matches corpus mock)", async () => {
     renderPicker();
     const input = await waitForCombobox();
     // Search for "basic" to get basic_kbdus option
@@ -424,14 +425,14 @@ describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
     const basicOption = options.find((o) => o.textContent?.includes("US English"));
     expect(basicOption).toBeDefined();
 
-    // The corpus mock sets basic_kbdus → "clean" → badge label "clean"
+    // The corpus mock sets basic_kbdus → Clean → plain-language badge
     expect(
-      within(basicOption!).getByLabelText("Import status: clean"),
+      within(basicOption!).getByLabelText("Import status: Fully editable here (clean)"),
     ).toBeTruthy();
   });
 
-  it("sil_devanagari_phonetic option row shows a 'diverged' badge (matches corpus mock)", async () => {
-    // The corpus mock sets sil_devanagari_phonetic → RoundTripDivergence → badge "diverged".
+  it("sil_devanagari_phonetic option row shows a plain-language badge (matches corpus mock)", async () => {
+    // The corpus mock sets sil_devanagari_phonetic → RoundTripDivergence → plain-language badge.
     // _resetCorpusCacheForTesting() in afterEach ensures loadCorpus() re-runs the dynamic
     // import on each test so vi.mock("@docs/import-corpus.json") drives this deterministically,
     // independent of what the real corpus file contains for this keyboard.
@@ -445,12 +446,12 @@ describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
     expect(devaOption).toBeDefined();
 
     expect(
-      within(devaOption!).getByLabelText("Import status: diverged"),
+      within(devaOption!).getByLabelText("Import status: Editable — small formatting differences after import (diverged)"),
     ).toBeTruthy();
   });
 
-  it("sil_euro_latin option row shows an 'opaque' badge (matches corpus mock)", async () => {
-    // The corpus mock sets sil_euro_latin → CleanWithOpaque → badge "opaque".
+  it("sil_euro_latin option row shows a plain-language badge (matches corpus mock)", async () => {
+    // The corpus mock sets sil_euro_latin → CleanWithOpaque → plain-language badge.
     // _resetCorpusCacheForTesting() in afterEach ensures vi.mock drives this deterministically.
     renderPicker();
     const input = await waitForCombobox();
@@ -462,7 +463,7 @@ describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
     expect(euroOption).toBeDefined();
 
     expect(
-      within(euroOption!).getByLabelText("Import status: opaque"),
+      within(euroOption!).getByLabelText("Import status: Editable — some advanced rules will be kept as-is (opaque)"),
     ).toBeTruthy();
   });
 });
@@ -472,7 +473,7 @@ describe("BaseKeyboardPicker — import badge on option row (AC#2)", () => {
 // ---------------------------------------------------------------------------
 
 describe("BaseKeyboardPicker — import badge on committed value (AC#2)", () => {
-  it("after committing basic_kbdus the 'Import readiness: clean' badge appears below the input", async () => {
+  it("after committing basic_kbdus the plain-language readiness badge appears below the input", async () => {
     const { onChange, rerender } = renderPicker();
     const input = await waitForCombobox();
 
@@ -492,7 +493,7 @@ describe("BaseKeyboardPicker — import badge on committed value (AC#2)", () => 
     // The "Import readiness:" label + badge should appear below the input
     await waitFor(() => {
       expect(screen.getByText("Import readiness:")).toBeTruthy();
-      expect(screen.getByLabelText("Import status: clean")).toBeTruthy();
+      expect(screen.getByLabelText("Import status: Fully editable here (clean)")).toBeTruthy();
     });
   });
 });
@@ -685,5 +686,118 @@ describe("BaseKeyboardPicker — scoped search (scopeIds)", () => {
     await waitForCombobox();
     expect(screen.getByText("Search keyboards")).toBeTruthy();
     expect(screen.queryByText("Starting keyboard")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 17. Plain-language readiness copy, legend, and parse-failure handling
+// ---------------------------------------------------------------------------
+
+const PARSE_ERR_BASE: StartKeyboard = makeStartKeyboard({
+  id: "test_parse_err_base",
+  path: "release/test/test_parse_err_base",
+  script: "Latn",
+  targets: ["windows"],
+  displayName: "Unparseable Test Base",
+  version: "1.0",
+  sourceUrl: "https://example.invalid/test_parse_err_base",
+  languages: ["en"],
+});
+
+const PARSE_ERR_COPY =
+  "Can't be used as a starting point in the studio yet — pick another keyboard";
+
+function seedParseErrCorpus() {
+  _setCorpusCacheForTesting(
+    new Map<string, string>([
+      ...CORPUS_STATUS_BY_ID,
+      [PARSE_ERR_BASE.id, ImportStatus.ParseFailure],
+    ]),
+  );
+  listAllImpl = () => Promise.resolve([...SOME_BASES, PARSE_ERR_BASE]);
+}
+
+describe("BaseKeyboardPicker — plain-language readiness badges", () => {
+  it("option rows show the plain label as visible text and keep the technical term in the tooltip", async () => {
+    renderPicker();
+    const input = await waitForCombobox();
+    fireEvent.change(input, { target: { value: "basic" } });
+    await waitFor(() => screen.getAllByRole("option"));
+    const basicOption = screen
+      .getAllByRole("option")
+      .find((o) => o.textContent?.includes("US English"));
+    expect(basicOption).toBeDefined();
+    const badge = within(basicOption!).getByText("Fully editable here");
+    expect(badge.getAttribute("title")).toBe("Technical status: clean");
+  });
+
+  it("legend is a native disclosure listing every plain label with its technical term", async () => {
+    renderPicker();
+    await waitForCombobox();
+    const legend = await waitFor(() => screen.getByTestId("import-readiness-legend"));
+    expect(legend.tagName).toBe("DETAILS");
+    const summary = legend.querySelector("summary");
+    expect(summary?.textContent).toMatch(/What does import readiness mean\?/);
+    // Keyboard-accessible: a native <summary> is focusable and toggles the
+    // disclosure with Enter/Space without any scripting.
+    expect(legend.textContent).toContain("Fully editable here");
+    expect(legend.textContent).toContain("Editable — some advanced rules will be kept as-is");
+    expect(legend.textContent).toContain("Editable — small formatting differences after import");
+    expect(legend.textContent).toContain(PARSE_ERR_COPY);
+    expect(legend.textContent).toContain("(clean)");
+    expect(legend.textContent).toContain("(opaque)");
+    expect(legend.textContent).toContain("(diverged)");
+    expect(legend.textContent).toContain("(parse-err)");
+    fireEvent.click(summary!);
+    expect((legend as HTMLDetailsElement).open).toBe(true);
+  });
+});
+
+describe("BaseKeyboardPicker — parse-failure bases stay selectable with a warning", () => {
+  it("parse-failure option row is visually de-emphasized but still listed", async () => {
+    seedParseErrCorpus();
+    renderPicker();
+    const input = await waitForCombobox();
+    fireEvent.change(input, { target: { value: "Unparseable" } });
+    await waitFor(() => screen.getAllByRole("option"));
+    const option = screen
+      .getAllByRole("option")
+      .find((o) => o.textContent?.includes("Unparseable Test Base"));
+    expect(option).toBeDefined();
+    expect(option!.dataset.importStatus).toBe(ImportStatus.ParseFailure);
+    expect((option as HTMLElement).style.opacity).toBe("0.6");
+    expect(within(option!).getByText(PARSE_ERR_COPY)).toBeTruthy();
+  });
+
+  it("selecting a parse-failure base still calls onChange and then shows a clear warning", async () => {
+    seedParseErrCorpus();
+    const { onChange, rerender } = renderPicker();
+    const input = await waitForCombobox();
+    fireEvent.change(input, { target: { value: "Unparseable" } });
+    await waitFor(() => screen.getAllByRole("option"));
+    const option = screen
+      .getAllByRole("option")
+      .find((o) => o.textContent?.includes("Unparseable Test Base"));
+    fireEvent.click(option!);
+    // Not filtered or blocked: the selection goes through (author agency)…
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(PARSE_ERR_BASE));
+    rerender(<StartKeyboardPicker value={PARSE_ERR_BASE} onChange={onChange} />);
+    // …and the committed state carries a role="alert" warning in plain language.
+    const warning = await waitFor(() =>
+      screen.getByTestId("import-readiness-parse-err-warning"),
+    );
+    expect(warning.getAttribute("role")).toBe("alert");
+    expect(warning.textContent).toContain(PARSE_ERR_COPY);
+    expect(warning.textContent).toContain("parse-err");
+  });
+
+  it("no parse-failure warning is shown for a clean committed base", async () => {
+    const { rerender, onChange } = renderPicker({ value: basicKbdus });
+    await waitForCombobox();
+    rerender(<StartKeyboardPicker value={basicKbdus} onChange={onChange} />);
+    await waitFor(() => {
+      expect(screen.getByText("Import readiness:")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("import-readiness-parse-err-warning")).toBeNull();
   });
 });
