@@ -59,6 +59,7 @@ import type {
 } from "../criteria/criteriaTypes.ts";
 import { deriveSurveyContext } from "../decisions/identitySelectors.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
+import { readVfsText } from "../lib/vfsText.ts";
 import {
   getStartBrowserService,
   sourcedExemplars,
@@ -143,8 +144,11 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
 
   // Batch 3 verdict inputs: the instantiation state (for 1.5 +
   // 2.1/2.2/2.6) and the author's contrastive-region attestation (for
-  // 12.3, carried into the assembly below).
+  // 12.3, carried into the assembly below). The startVfs carries the
+  // base keyboard's own files — §2.7 (KPJ pair) reads the base's .kpj
+  // from it, via the assembly's baseKpjText input.
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const contrastiveAttestation = useCriteriaRecordStore(
@@ -197,10 +201,19 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     let cancelled = false;
 
     void (async () => {
+      const baseKpjPath =
+        startVfs?.list().find((p) => p.toLowerCase().endsWith(".kpj"));
+      const baseKpjText =
+        startVfs !== null &&
+        startVfs !== undefined &&
+        baseKpjPath !== undefined
+          ? readVfsText(startVfs, baseKpjPath)
+          : undefined;
       const assembled = assembleLintContext({
         vfs,
         keyboardId,
         contrastiveRegionAttested: contrastiveAttestation != null,
+        ...(baseKpjText !== undefined ? { baseKpjText } : {}),
       });
 
       // The keyboard's language targets: the author's tags first (the
@@ -274,7 +287,15 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     return () => {
       cancelled = true;
     };
-  }, [vfs, keyboardId, session, identity, decisions, contrastiveAttestation]);
+  }, [
+    vfs,
+    keyboardId,
+    session,
+    identity,
+    decisions,
+    contrastiveAttestation,
+    startVfs,
+  ]);
 
   const runIsCurrent = engineRun !== null && engineRun.forVfs === vfs;
 
