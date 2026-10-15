@@ -77,7 +77,7 @@ export function useDocumentationFindings(): LintFinding[] {
     const historyMd = renderHistoryMd(historyEntryState, {
       version: keyboardVersion,
       dateIso: new Date().toISOString().slice(0, 10),
-      adaptedFrom: isAdaptation ? { id: startKeyboard.id, version: rawVersion } : null,
+      lineage: { kind: isAdaptation ? "adapted" : "created", id: startKeyboard.id, version: rawVersion },
       startHistoryText: isAdaptation ? (startHistoryMdText ?? readVfsText(startVfs, "HISTORY.md") ?? null) : null,
     });
 

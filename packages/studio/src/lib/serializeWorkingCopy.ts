@@ -27,6 +27,7 @@ import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
+import { buildDocContent, parseTouchLayoutOrNull } from "./docContent.ts";
 import {
   resolvePublishVersion,
   generateStubs,
@@ -77,10 +78,11 @@ export interface SerializeWorkingCopyResult {
   /** The keyboard id resolved from the store (for the filename). */
   keyboardId: string;
   /**
-   * The keyboard release version, for the `<id>-<version>.zip` filename.
-   * Read from the base IR header (`&KEYBOARDVERSION` on import, the scaffolder's
-   * keyboard release version on a fresh base), defaulting to `"1.0"`. This is the
-   * human-visible release version — NOT the `&VERSION` KMN file-format version.
+   * The keyboard release version, for the `<id>-<version>.zip` filename: the
+   * version this production ships at (`1.0` on a Copy, the bumped start
+   * version on an Adapt, a test build's own version), sanitised for a file
+   * name. This is the human-visible release version — NOT the `&VERSION` KMN
+   * file-format version.
    */
   version: string;
 }
@@ -101,7 +103,7 @@ export interface ProjectWorkingCopyForOutputResult {
   keyboardId: string;
   /** Author-chosen display name (identity.displayName) or the base displayName. */
   displayName: string;
-  /** Keyboard version (identity has no version field yet, so the base version). */
+  /** The release version this production ships at (spec 102 FR-009), sanitised for a file name. */
   version: string;
   /** Warnings from projection steps (carve, assignments, identity). May be empty. */
   warnings: string[];
@@ -259,13 +261,12 @@ export async function projectWorkingCopyForOutput(
   const keyboardId = startKeyboard.id;
   const outputKeyboardId = resolveOutputKeyboardId(identity, startKeyboard);
 
-  // Keyboard release version for the `<id>-<version>.zip` filename. startIr.header.version
-  // carries &KEYBOARDVERSION on import (codec/parse prefers it over &VERSION) and the
-  // scaffolder's keyboard release version on a fresh base. Fall back to "1.0" if absent —
-  // never the &VERSION file-format version (e.g. "14.0").
-  // Declared `let` so the adapt path can reassign to the bumped version.
+  // The start keyboard's release version. startIr.header.version carries
+  // &KEYBOARDVERSION on import (codec/parse prefers it over &VERSION) and the
+  // scaffolder's keyboard release version on a fresh base. Fall back to "1.0" if
+  // absent — never the &VERSION file-format version (e.g. "14.0"). It feeds the
+  // publish-version decision and the HISTORY lineage bullet (step 4a).
   const rawVersion = startIr.header.version?.trim() || "1.0";
-  let version = rawVersion.replace(/[^\w.\-]/g, "_");
 
   // 2. Collect physical assignments from phaseResults (mirrors useWorkingCopyTransform).
   //    projectWorkingCopyVfs also filters physical defensively, so this pre-filter is
@@ -371,11 +372,6 @@ export async function projectWorkingCopyForOutput(
   } : { displayName: startKeyboard.displayName, ...(websiteUrl !== undefined ? { websiteUrl } : {}) };
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
-  // The release version HISTORY.md's top entry is headed with (spec 079
-  // FR-010): the bumped version on an adaptation, the keyboard's own on a copy.
-  // HISTORY.md itself is written in step 5c through renderHistoryMd, the one
-  // composer both tracks share.
-  let historyVersion = rawVersion;
   const isAdaptation = instantiationMode === "adapt-existing";
   // spec 094 (research R1/R2): the one publish-version decision, and the
   // version this production actually ships at. A test build ships at its own
@@ -384,14 +380,23 @@ export async function projectWorkingCopyForOutput(
   // an unedited working copy look changed (R7).
   const testBuild = opts?.testBuild;
   const stable = opts?.stableForFingerprint === true;
-  const publishVersion = isAdaptation
-    ? resolvePublishVersion({ mode: "adapt-existing", rawVersion, hasTestBuilds: stable || hasTestBuilds() })
-    : rawVersion;
+  // spec 102 FR-004: a Copy is a new keyboard and publishes at 1.0; the start
+  // keyboard's version survives only as HISTORY lineage (FR-011).
+  const publishVersion = resolvePublishVersion({
+    mode: isAdaptation ? "adapt-existing" : "new-from-base",
+    rawVersion,
+    hasTestBuilds: stable || hasTestBuilds(),
+  });
   const shippedVersion = testBuild?.version ?? publishVersion;
+  // spec 102 FR-009: one version for every site in the package, on both
+  // tracks: the result `version` (download name), the HISTORY heading, and,
+  // through the overlay, &KEYBOARDVERSION and the descriptor's <Version>.
+  const version = shippedVersion.replace(/[^\w.\-]/g, "_");
+  // HISTORY.md's top entry heading (spec 079 FR-010); written in step 5c.
+  const historyVersion = shippedVersion;
+  identityForProjection = { ...identityForProjection, version: shippedVersion };
   if (isAdaptation) {
     const bumpedVersion = shippedVersion;
-    version = bumpedVersion.replace(/[^\w.\-]/g, "_");
-    historyVersion = bumpedVersion;
 
     // Patch the .kps <Keyboards><Keyboard><Version> element.
     //
@@ -436,22 +441,6 @@ export async function projectWorkingCopyForOutput(
         );
       }
     }
-
-    // Merge the bumped version into the identity overlay so applyIdentityStubMutation
-    // writes &KEYBOARDVERSION into the .kmn during step 5.
-    // `identityForProjection` already holds the mapped displayName/bcp47 from above;
-    // we only need to set/override the version field here.
-    identityForProjection = {
-      ...(identityForProjection ?? {}),
-      version: bumpedVersion,
-    };
-  } else if (testBuild !== undefined) {
-    // Track 1 normally ships the copied keyboard's own version untouched, so
-    // the overlay carries none. A test build sets it: the overlay is what
-    // reaches the .kmn &KEYBOARDVERSION and the descriptor's <Version>.
-    version = shippedVersion.replace(/[^\w.\-]/g, "_");
-    historyVersion = shippedVersion;
-    identityForProjection = { ...identityForProjection, version: shippedVersion };
   }
 
   // 4b. spec 059 FR-010: merge the caller's identity override, for this call only.
@@ -593,11 +582,22 @@ export async function projectWorkingCopyForOutput(
   //     regex the package descriptor already runs (FR-008) — never re-derived
   //     from StartKeyboard, which can disagree with what this build actually emits.
   const projectedKmnText = readVfsText(clonedVfs, `source/${resolvedKeyboardId}.kmn`) ?? "";
+  // spec 102 US2: the derived sections, from the working-copy IR as built (the
+  //     same buildDocContent call useDocsPreview makes). The inherited prose
+  //     is the start keyboard's welcome/help text, which exists on Track 2
+  //     only; it decides whether the typing guide is already covered.
+  const docContent = buildDocContent({
+    ir: workingIr ?? startIr,
+    touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+    inheritedProse: isAdaptation ? (startWelcomeHtmText ?? startHelpPhpText) : null,
+  });
   const docsInput: HelpDocsRenderInput = {
     answers: helpDocs,
     displayName: identity?.displayName ?? startKeyboard.displayName,
     ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
+    keyboardId: resolvedKeyboardId,
     platforms: parseTargetTokens(projectedKmnText),
+    generated: docContent.slots,
   };
   // FR-006: an adaptation inherits the base's README description; a copy never
   // does (FR-007) — the slice is null on Track 1 and the track guard keeps it so.
@@ -639,7 +639,7 @@ export async function projectWorkingCopyForOutput(
     renderHistoryMd(historyEntryState, {
       version: historyVersion,
       dateIso,
-      adaptedFrom: isAdaptation ? { id: keyboardId, version: rawVersion } : null,
+      lineage: { kind: isAdaptation ? "adapted" : "created", id: keyboardId, version: rawVersion },
       startHistoryText: isAdaptation ? (startHistoryMdText ?? existingHistoryMd) : null,
     }),
     false,

@@ -20,12 +20,16 @@ import {
   renderHelpPhp,
   type HelpDocsRenderInput,
 } from "@keyboard-studio/engine";
+import { buildDocContent, parseTouchLayoutOrNull } from "../lib/docContent.ts";
+import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 
 export interface DocsPreview {
   readmeMd: string;
   readmeHtm: string;
   welcomeHtm: string;
   helpPhp: string;
+  /** spec 102 FR-034: the generated typing guide was left out because the inherited docs already hold one. */
+  typingGuideSuppressed: boolean;
 }
 
 export function useDocsPreview(): DocsPreview {
@@ -35,6 +39,9 @@ export function useDocsPreview(): DocsPreview {
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
   const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
+  // spec 102 US2: the derived sections come from the working-copy IR as built.
+  const workingIr = useWorkingCopyStore((s) => s.ir);
+  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   // spec 080 FR-006: the base README is inherited on an adaptation only; the
   // slice is null on Track 1 by construction, and the track guard keeps it so.
   const startReadmeMdText = useWorkingCopyStore((s) =>
@@ -48,17 +55,31 @@ export function useDocsPreview(): DocsPreview {
     // reads instead, after carve/identity/rename have run). Good enough for a
     // live preview; not claimed byte-identical to the eventual output list.
     const platforms = startIr?.header.targets.map((t) => t.toLowerCase()) ?? [];
+    // Same input the output projection passes (serializeWorkingCopy step 5c):
+    // the start prose is non-null on Track 2 only.
+    const ir = workingIr ?? startIr;
+    const docContent =
+      ir !== null
+        ? buildDocContent({
+            ir,
+            touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
+            inheritedProse: startWelcomeHtmText ?? startHelpPhpText,
+          })
+        : null;
     const input: HelpDocsRenderInput = {
       answers: helpDocs,
       displayName,
       ...(identity?.bcp47 !== undefined && identity.bcp47 !== "" ? { primaryBcp47: identity.bcp47 } : {}),
+      ...(startKeyboard !== null ? { keyboardId: resolveOutputKeyboardId(identity, startKeyboard) } : {}),
       platforms,
+      ...(docContent !== null ? { generated: docContent.slots } : {}),
     };
     return {
       readmeMd: renderReadmeMd(input, startReadmeMdText),
       readmeHtm: renderReadmeHtm(input),
       welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText),
       helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
+      typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, startWelcomeHtmText, startHelpPhpText, startReadmeMdText]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText]);
 }
