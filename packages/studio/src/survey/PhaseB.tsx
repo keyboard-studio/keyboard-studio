@@ -59,6 +59,7 @@ import { charactersInTier } from "../lib/services.ts";
 import type {
   ExemplarSource,
   ExemplarInventory,
+  SourcedInventory,
 } from "../lib/services.ts";
 import { useSourcedExemplars } from "./useSourcedExemplars.ts";
 import { useSourcedExemplarsBoth } from "./useSourcedExemplarsBoth.ts";
