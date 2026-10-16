@@ -7,7 +7,7 @@
  *   packages/engine/src/recognizer/rules/generated/index.ts  (barrel)
  *
  * Exits with code 1 if any YAML file is missing required top-level fields.
- * Skips (with a warning) any file whose strategyId is outside [S-01, S-02, S-03, S-07, S-08].
+ * Skips (with a warning) any file whose strategyId is outside [S-01, S-02, S-03, S-07, S-08, S-09].
  */
 
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -28,7 +28,7 @@ const ROOT = resolve(__dirname, '..');
 const RULES_DIR = join(ROOT, 'content', 'recognizer-rules');
 const OUT_DIR = join(ROOT, 'packages', 'engine', 'src', 'recognizer', 'rules', 'generated');
 
-const SUPPORTED_STRATEGIES = new Set(['S-01', 'S-02', 'S-03', 'S-07', 'S-08']);
+const SUPPORTED_STRATEGIES = new Set(['S-01', 'S-02', 'S-03', 'S-07', 'S-08', 'S-09']);
 const REQUIRED_FIELDS = ['id', 'strategyId', 'predicate', 'lifts_to'];
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -78,7 +78,7 @@ for (const filename of yamlFiles) {
 
   // Gate check: only emit for supported strategies
   if (!SUPPORTED_STRATEGIES.has(strategyId)) {
-    console.warn(`[WARN] ${filename}: strategyId "${strategyId}" is not in [S-01, S-02, S-03, S-07, S-08] — skipping`);
+    console.warn(`[WARN] ${filename}: strategyId "${strategyId}" is not in [S-01, S-02, S-03, S-07, S-08, S-09] — skipping`);
     continue;
   }
 
