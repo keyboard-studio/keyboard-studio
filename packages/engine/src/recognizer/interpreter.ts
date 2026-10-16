@@ -567,7 +567,14 @@ export function interpretPredicate(rule: RecognizerRuleYaml, ir: KeyboardIR): Ma
         : {};
 
       results.push({
-        patternId: `${rule.lifts_to.patternId}#${cluster.baseStore.name}`,
+        // The id suffix encodes the FULL cluster key (group, base store,
+        // output store) — Pattern.id must be unique per pattern, and the
+        // base store alone is not: multi-tone keyboards (vietnamese_vni)
+        // run several clusters over one base store, and a base-only suffix
+        // made recognizePatterns throw "Ownership drift" (#2225). The
+        // trigger is slot data, not identity — a cluster may carry several
+        // triggers (telex {s,S}) and clusters key on the store pair.
+        patternId: `${rule.lifts_to.patternId}#${cluster.group.name}:${cluster.baseStore.name}>${cluster.outStore.name}`,
         ownedNodes: [
           ...cluster.rules.map((r) => ruleRef(r.nodeId)),
           storeRef(cluster.baseStore.nodeId),
