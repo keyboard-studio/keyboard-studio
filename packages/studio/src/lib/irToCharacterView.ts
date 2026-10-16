@@ -71,8 +71,8 @@ export const SOURCE_ORDER: readonly CharacterSource[] = [
 export const SOURCE_LABELS: Record<CharacterSource, string> = {
   'direct-key': 'Direct keys',
   'deadkey-sequence': 'Deadkey sequences',
-  store: 'From stores',
-  'advanced-rule': 'From advanced rules',
+  store: 'From character lists',
+  'advanced-rule': 'From complex rules',
   'touch-only-key': 'Touch keyboard only',
   'blocked-candidate': 'Blocked combinations',
 };
@@ -81,8 +81,8 @@ export const SOURCE_LABELS: Record<CharacterSource, string> = {
 export const SOURCE_DETAIL_LABEL: Record<CharacterSource, string> = {
   'direct-key': 'Direct key',
   'deadkey-sequence': 'Deadkey sequence',
-  store: 'Store',
-  'advanced-rule': 'Advanced rule',
+  store: 'List of characters (store)',
+  'advanced-rule': 'Complex rule (kept as written)',
   'touch-only-key': 'Touch keyboard only',
   'blocked-candidate': 'Blocked combination',
 };
@@ -149,7 +149,8 @@ export interface CharacterCell {
    *   3. else                            — drop the entry; a character with
    *      zero renderable producers shows no "way" line at all.
    *   `source: 'advanced-rule'` keeps its own distinct, non-banned message
-   *   ("Produced by an advanced rule — the keystroke can't be shown") since
+   *   ("Produced by a complex rule kept exactly as written — the
+   *   keystroke can't be shown") since
    *   it has no typed-rule producer to enumerate at all — an honest
    *   codec-limit case, not a placeholder.
    */

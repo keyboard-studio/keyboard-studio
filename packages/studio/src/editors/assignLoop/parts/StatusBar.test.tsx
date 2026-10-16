@@ -30,7 +30,7 @@ describe('StatusBar — RemovedMenu combining-mark display', () => {
     );
 
     // Open the "removed" menu — the toggle button shows the removed count.
-    fireEvent.click(screen.getByRole('button', { name: /removed/i }));
+    fireEvent.click(screen.getByRole('button', { name: /discarded/i }));
 
     // The item's glyph tile renders "◌̀" (dotted circle + mark),
     // not the bare combining mark alone.
@@ -52,7 +52,7 @@ describe('StatusBar — RemovedMenu combining-mark display', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /removed/i }));
+    fireEvent.click(screen.getByRole('button', { name: /discarded/i }));
 
     expect(screen.getByText('e')).toBeTruthy();
     expect(screen.queryByText('◌e')).toBeNull();
@@ -79,7 +79,7 @@ describe('StatusBar — RemovedMenu accessibility contracts', () => {
       />,
     );
 
-    const trigger = screen.getByRole('button', { name: /removed/i });
+    const trigger = screen.getByRole('button', { name: /discarded/i });
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(trigger.getAttribute('aria-haspopup')).toBe('true');
 
@@ -101,7 +101,7 @@ describe('StatusBar — RemovedMenu accessibility contracts', () => {
       />,
     );
 
-    const trigger = screen.getByRole('button', { name: /removed/i });
+    const trigger = screen.getByRole('button', { name: /discarded/i });
     fireEvent.click(trigger);
     // Panel open — a Restore All action button becomes visible.
     expect(screen.getByRole('button', { name: /restore all/i })).toBeTruthy();
