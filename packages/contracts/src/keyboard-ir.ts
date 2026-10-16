@@ -264,11 +264,12 @@ export interface TouchKeyIR {
    * Wire-format encoding preservation for {@link sp} / {@link width} /
    * {@link pad} (#2083). The parser normalizes those fields to numbers for
    * consumers, but records the source encoding here so the emitter writes
-   * back the source form (string vs number) instead of re-encoding — a
-   * numeric `1` in the source must not become `"1"` on emit, because the
-   * scaffolder's `nextlayer` defaulting reads the raw wire value and treats
-   * the two encodings differently. Absent on synthesized keys; the emitter
-   * then uses the Keyman-canonical string form.
+   * back the source form (string vs number) instead of re-encoding — an
+   * unedited key round-trips byte-faithfully. The hint is a fidelity
+   * record only: no consumer may treat the two encodings as semantically
+   * different (the scaffolder's `nextlayer` defaulting reads the numeric
+   * value, #2215). Absent on synthesized keys; the emitter then uses the
+   * Keyman-canonical string form.
    */
   spWire?: string | number;
   /** Wire-format encoding preservation for {@link width}; see {@link spWire}. */

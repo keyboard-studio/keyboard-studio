@@ -65,10 +65,11 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   if (key.output !== undefined) out["output"] = key.output;
   if (key.hint !== undefined) out["hint"] = key.hint;
   // #2083: write back the SOURCE encoding (string vs number) instead of
-  // re-encoding. A numeric `1` in the source must not become `"1"`: the
-  // scaffolder's `nextlayer` defaulting reads the raw wire value and treats
-  // the two encodings differently. Synthesized keys (no wire hint) use the
-  // Keyman-canonical string form.
+  // re-encoding, so an unedited key round-trips byte-faithfully. The
+  // encoding carries no semantics — every consumer reads the normalized
+  // numeric value (the scaffolder's `nextlayer` defaulting included,
+  // #2215). Synthesized keys (no wire hint) use the Keyman-canonical
+  // string form.
   if (key.sp !== undefined) out["sp"] = key.spWire ?? String(key.sp);
   if (key.width !== undefined) out["width"] = key.widthWire ?? String(key.width);
   if (key.pad !== undefined) out["pad"] = key.padWire ?? String(key.pad);
