@@ -439,9 +439,11 @@ export {
 export type {
   ExemplarTier,
   ExemplarSource,
+  TextSampleSource,
   ExemplarConfidence,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
 } from "./character-discovery/exemplarTypes.js";
 // Phase B high-confidence missing-character suggestions, now CLDR+SLDR-grounded.
 export {

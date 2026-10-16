@@ -58,9 +58,10 @@ import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { charactersInTier } from "../lib/services.ts";
 import type {
   ExemplarSource,
-  SourcedInventory,
+  ExemplarInventory,
 } from "../lib/services.ts";
 import { useSourcedExemplars } from "./useSourcedExemplars.ts";
+import { CpLabel } from "./CpLabel.tsx";
 import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
   BG_PAGE,
@@ -79,7 +80,6 @@ import {
   primaryButton,
   charChip,
   chipGlyph,
-  chipCodepoint,
   chipIndicator,
   chipIndicatorColor,
   chipIndicatorText,
@@ -194,28 +194,6 @@ function isLinguisticChar(c: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// CpLabel — chip code-point label with the FR-014 multi-code-point affordance
-// ---------------------------------------------------------------------------
-
-/**
- * Renders a chip's code-point label (spec 047 FR-014): the base code point in
- * U+XXXX notation, followed — for a multi-code-point grapheme — by a bracketed
- * "[+<extra marks>]" badge in a contrasting (accent) color that shows the extra
- * combining mark(s) themselves. The full space-separated stack is exposed on
- * the chip's hover title/accessible name by the caller.
- */
-function CpLabel({ grapheme }: { grapheme: string }) {
-  const { base, extras } = codepointLabel(grapheme);
-  return (
-    <span style={chipCodepoint()}>
-      {base}
-      {extras !== "" && (
-        <span style={{ color: ACCENT, fontWeight: 700 }}>{`[+${extras}]`}</span>
-      )}
-    </span>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // useIsCasedBase — the character step's casing gate (spec 048 FR-006)
 //
@@ -1535,7 +1513,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
 // breakdown and character-map pages.
 // ---------------------------------------------------------------------------
 
-function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
+function ExemplarOfferDetail({ inventory }: { inventory: ExemplarInventory }) {
   const glyphFontStack = useGlyphFontStack();
   const main = charactersInTier(inventory, "main");
   // ICU collation, matching the "Your alphabet" list and the breakdown
