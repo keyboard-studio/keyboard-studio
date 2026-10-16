@@ -10,7 +10,7 @@
  *   4. computeSha256Hex(kmnText)            → SHA-256 stored at source/<id>.kmn.imported.sha256
  *   5. emit(ir)                             → emitted .kmn text
  *   6. runImportFidelityParseChecks(...)    → I1 + I4 findings
- *   7. runImportFidelityEmitChecks(...)     → I2 stub + I3 + I6 findings
+ *   7. runImportFidelityEmitChecks(...)     → I2 functional round-trip + I3 + I6 findings
  *   8. buildImportReport(...)              → ImportReport
  */
 
@@ -31,7 +31,9 @@ import { detectMarkInputOrderFromImport } from "../strategy-selector/import-mark
 import {
   runImportFidelityParseChecks,
   runImportFidelityEmitChecks,
+  ROUND_TRIP_DIVERGENCE_CODE,
 } from "../validator/index-import-fidelity.js";
+import type { RoundTripDeps } from "../validator/index-import-fidelity.js";
 
 // ---------------------------------------------------------------------------
 // buildImportReport (pure function)
@@ -42,7 +44,7 @@ export interface BuildImportReportParams {
   parseError: string | null;
   opaqueFeatures: Array<{ feature: string; count: number }>;
   recognizedRatio: number;
-  /** True if I2 produced a RoundTripDivergence (not reachable while I2 is a stub). */
+  /** True if I2 produced a RoundTripDivergence (functional I2, #882). */
   hasRoundTripDivergence: boolean;
   /** Entry-array from classifyRemovalCapabilities(); absent on parse failure. */
   removalCapabilities?: Array<[string, RemovalCapability]>;
@@ -53,7 +55,7 @@ export interface BuildImportReportParams {
  *
  * Status priority (high → low):
  *   ParseFailure        — parse threw; no usable IR
- *   RoundTripDivergence — I2 divergence (not reachable while I2 is stub)
+ *   RoundTripDivergence — I2 functional divergence (#882)
  *   CleanWithOpaque     — parse ok; some RawKmnFragment nodes present
  *   Clean               — parse ok; no opaque fragments
  */
@@ -73,7 +75,6 @@ export function buildImportReport(params: BuildImportReportParams): ImportReport
   if (parseError) {
     status = IS.ParseFailure;
   } else if (hasRoundTripDivergence) {
-    // Not reachable while I2 is a stub, but wired for the future.
     status = IS.RoundTripDivergence;
   } else if (opaqueFeatures.length > 0) {
     status = IS.CleanWithOpaque;
@@ -120,11 +121,18 @@ export interface ImportKeyboardResult {
  * @param kmnText    Raw .kmn source text.
  * @param keyboardId Keyboard identifier (typically the filename stem).
  * @param vfs        VirtualFS to write sidecar and hash into.
+ * @param roundTripDeps  Optional I2 harness (compile + simulate). The
+ *   original/emitted texts and keyboardId are filled in from this call's
+ *   own values; `sourceFiles` defaults to the vfs `source/` entries (the
+ *   imported keyboard's siblings) when the caller does not supply them.
+ *   Without deps, I2 reports its unavailable state instead of passing.
  */
 export async function importKeyboard(
   kmnText: string,
   keyboardId: string,
   vfs: VirtualFS,
+  roundTripDeps?: Pick<RoundTripDeps, "compileFn" | "simulateFn"> &
+    Partial<Pick<RoundTripDeps, "sourceFiles">>,
 ): Promise<ImportKeyboardResult> {
   // --- Step 1: Parse ---
   let parseResult;
@@ -179,12 +187,29 @@ export async function importKeyboard(
 
   // --- Steps 6 + 7: Layer A' checks ---
   const parseFindings = runImportFidelityParseChecks(parseResult, kmnText);
-  const emitFindings = await runImportFidelityEmitChecks(ir, emitted);
+  const fullRoundTripDeps: RoundTripDeps | undefined =
+    roundTripDeps === undefined
+      ? undefined
+      : {
+          originalKmn: kmnText,
+          emittedKmn: emitted,
+          keyboardId,
+          compileFn: roundTripDeps.compileFn,
+          simulateFn: roundTripDeps.simulateFn,
+          sourceFiles:
+            roundTripDeps.sourceFiles ??
+            vfs
+              .entries("source/")
+              .map((e) => ({ path: e.path, content: e.content, isBinary: e.isBinary })),
+        };
+  const emitFindings = await runImportFidelityEmitChecks(ir, emitted, fullRoundTripDeps);
   const allFindings = [...parseFindings, ...emitFindings];
 
   // --- Step 8: Build report ---
-  // I2 is a stub and never sets divergence; wire the branch for the future.
-  const hasRoundTripDivergence = false;
+  // I2 sets divergence via its aggregate error finding (#882).
+  const hasRoundTripDivergence = emitFindings.some(
+    (f) => f.code === ROUND_TRIP_DIVERGENCE_CODE,
+  );
 
   const report = buildImportReport({
     keyboardId,

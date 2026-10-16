@@ -270,6 +270,12 @@ export interface TouchKeyIR {
    * different (the scaffolder's `nextlayer` defaulting reads the numeric
    * value, #2215). Absent on synthesized keys; the emitter then uses the
    * Keyman-canonical string form.
+   *
+   * Self-validating (#2216): a hint is honoured only while it still denotes
+   * the field's current numeric value (see `resolveWireEncoding`). A
+   * mutator that changes the numeric deletes the matching hint; a hint that
+   * survives anyway (a writer that forgot, a hand-built IR) is ignored at
+   * emit in favour of the current value — never the other way round.
    */
   spWire?: string | number;
   /** Wire-format encoding preservation for {@link width}; see {@link spWire}. */

@@ -5,19 +5,42 @@
  * `.keyman-touch-layout` JSON, splicing in place and never round-tripping
  * through `TouchLayoutIR`.
  *
- * The IR round-trip (`parseTouchLayoutString` / `emitTouchLayout`) drops
- * per-key `layer`, per-key `default` (longpress preselect on a sub-key)
- * fidelity beyond what the IR models, platform-level `displayUnderlying` /
- * `font` / `fontsize`, and normalizes `sp`/`width`/`pad` from the wire
- * format's string-or-number encoding to a plain number — the same field
- * list `applyDesktopModificationsToRawJson.ts` and
- * `applyTouchAssignmentsToRawJson.ts` document for their own Case B paths.
- * Spec 035's R9 forbids the import-adapt path from losing any of that, so
- * this module exists as the direct counterpart to
- * `applyKeyEditsToLayout.ts` (Case A, T045) rather than composing Case A's
- * output back through the codec. Every field the parsed key object carries
- * that this module does not explicitly touch survives byte-for-byte
- * (mirrors every other Case B applier in this directory).
+ * Why raw JSON (spec 035 R9, applied to this overlay by spec 063
+ * FR-033) — basis restated 2026-10-16. An earlier version of this header
+ * claimed the IR round-trip (`parseTouchLayoutString` /
+ * `emitTouchLayout`) drops per-key `layer`, per-key `default`
+ * (longpress preselect on a sub-key), platform-level
+ * `displayUnderlying` / `font` / `fontsize`, and normalizes
+ * `sp`/`width`/`pad` from the wire format's string-or-number encoding
+ * to a plain number. That was true when written and is false now:
+ * since the full-fidelity codec landed (issue 2083), every modelled
+ * field round-trips, string-or-number encodings included. This module
+ * is Case B for the same three reasons as the other raw appliers in
+ * this directory:
+ *   1. R9's verbatim guarantee — splicing the parsed tree in place
+ *      keeps unknown members at any level, and every field the parsed
+ *      key object carries that this module does not explicitly touch
+ *      survives with its value intact. Output is re-serialised in
+ *      canonical form, so byte-level formatting is NOT preserved.
+ *   2. The call contract — string/VFS-in, string/VFS-out. This runs at
+ *      VFS-projection time (projectWorkingCopyVfs step 1.7, via
+ *      `applyKeyEditsToVfs`) and in TouchGallery's Case B preview
+ *      branch, where an IR exists in scope but is deliberately not
+ *      emitted from — re-emitting there was the recorded R9 violation
+ *      the raw branch exists to avoid.
+ *   3. The parser's modelled-surface limits are the conversion price:
+ *      members outside the closed platform set, unknown members below
+ *      the top level, empty-string display fields treated as absent,
+ *      string row ids regenerated as numbers, member/platform ordering
+ *      and formatting normalised — the full enumerated list is in
+ *      `applyTouchAssignmentsToRawJson.ts`'s header, and
+ *      `parseTouchLayout` in contracts plus `codec/parse-touch.ts` are
+ *      the authority for it.
+ * So this module exists as the direct counterpart to
+ * `applyKeyEditsToLayout.ts` (Case A, T045) rather than composing Case
+ * A's output back through the codec; converting it is a judgement call
+ * about accepting those losses on a shipped file, proven by the
+ * twin-equivalence test — not a codec-fidelity fix.
  *
  * ## What is shared with Case A, and what is duplicated
  *

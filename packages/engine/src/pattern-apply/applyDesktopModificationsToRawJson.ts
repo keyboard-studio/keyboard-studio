@@ -4,13 +4,46 @@
  * placements) directly onto a copy of the raw `.keyman-touch-layout` JSON.
  *
  * Implemented as parse -> splice-in-place -> stringify, exactly like
- * {@link applyTouchAssignmentsToRawJson} — NEVER round-tripped through the IR
- * (`emitTouchLayout` drops per-key `layer`, `displayUnderlying`,
- * `font`/`fontsize`, and string-vs-int `sp`/`width`/`pad`). Every unmodified
- * field is preserved verbatim. Carries NO provenance fields — provenance is
- * an IR-only concept (R6); this path's no-clobber guarantee is pipeline
- * ordering (replay runs before `applyTouchAssignmentsToRawJson`, so author
- * Phase E edits are always applied last and can never be clobbered here).
+ * {@link applyTouchAssignmentsToRawJson} — never round-tripped through the
+ * IR. Carries NO provenance fields — provenance is an IR-only concept (R6);
+ * this path's no-clobber guarantee is pipeline ordering (replay runs before
+ * `applyTouchAssignmentsToRawJson`, so author Phase E edits are always
+ * applied last and can never be clobbered here).
+ *
+ * Why raw JSON (spec 035 R9, Case B) — basis restated 2026-10-16. An
+ * earlier version of this header claimed the IR emitter drops per-key
+ * `layer`, `displayUnderlying`, `font`/`fontsize`, and string-vs-int
+ * `sp`/`width`/`pad`. That was true when written and is false now: since
+ * the full-fidelity codec landed (issue 2083), every modelled field
+ * round-trips through `parseTouchLayoutString` / `emitTouchLayout`,
+ * encodings included. Case B rests on three other things:
+ *   1. R9's verbatim guarantee. Splicing the parsed tree in place keeps
+ *      unknown members at any level and every unmodified member's value —
+ *      including members no codec models. Preservation is at the parsed
+ *      level: output is re-serialised by the canonical two-space
+ *      stringify, so formatting (indentation, escapes, a trailing
+ *      newline) is normalised even though values are not.
+ *   2. The call contract is string-in, string-out. This runs at derivation
+ *      time in `buildTouchLayoutJson`'s Case B arm on the base's shipped
+ *      JSON string; no `TouchLayoutIR` is passed to it or constructed on
+ *      its emission path (the IR `buildTouchLayoutJson` derives is parsed
+ *      FROM this splice's output, for other consumers).
+ *   3. The parser's modelled-surface limits are the conversion price. An
+ *      IR round trip drops or normalises: members outside the closed
+ *      platform set (desktop/tablet/phone) — top-level non-platform
+ *      members such as `"_comment"` included; unknown members at every
+ *      level below the top; a platform with no `layer` array;
+ *      non-canonical flick directions; empty `sk`/`multitap` arrays;
+ *      empty-string display fields (`hint`/`layer`/`font`/`fontsize`/
+ *      `dk`, platform `fontsize`/`defaultHint`) treated as absent;
+ *      non-numeric `sp`/`width`/`pad`; string row ids (regenerated as
+ *      numbers); and member/platform ordering. The parser and emitter
+ *      (`parseTouchLayout` in contracts, `codec/parse-touch.ts`) are the
+ *      authority for that list.
+ * Converting this applier is therefore a judgement call — accept those
+ * losses on a shipped base author's file and supply an IR at the call
+ * site, proven by a Case A/B twin-equivalence test — not a
+ * codec-fidelity fix.
  *
  * The contract (mirrors {@link applyDesktopModifications}, the Case A/IR
  * sibling). Placements are spliced BEFORE removals — the same chronological
@@ -77,7 +110,7 @@ export interface ApplyDesktopModificationsToRawJsonResult {
 /**
  * Replay `mods` (carve removals + letter placements) directly onto a copy of
  * the raw shipped `.keyman-touch-layout` JSON string, preserving every
- * unmodified field verbatim.
+ * unmodified member's value verbatim (see module doc for the exact basis).
  *
  * @param rawJson Raw `.keyman-touch-layout` JSON string from the base VFS.
  * @param mods    Desktop modifications to replay (see {@link DesktopModifications}).

@@ -14,6 +14,11 @@ export {
 export {
   runImportFidelityParseChecks,
   runImportFidelityEmitChecks,
+  ROUND_TRIP_DIVERGENCE_CODE,
+} from "./validator/index-import-fidelity.js";
+export type {
+  RoundTripDeps,
+  RoundTripSourceFile,
 } from "./validator/index-import-fidelity.js";
 
 // Issue #20 — base-browser GitHub API client.

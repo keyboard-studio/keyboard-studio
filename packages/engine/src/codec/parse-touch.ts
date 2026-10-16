@@ -8,7 +8,11 @@
  */
 
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
-import { parseTouchLayoutString, PROVENANCE_WIRE_KEY } from "@keyboard-studio/contracts";
+import {
+  parseTouchLayoutString,
+  PROVENANCE_WIRE_KEY,
+  resolveWireEncoding,
+} from "@keyboard-studio/contracts";
 
 /**
  * Parse a .keyman-touch-layout JSON string into a TouchLayoutIR.
@@ -70,9 +74,14 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   // numeric value (the scaffolder's `nextlayer` defaulting included,
   // #2215). Synthesized keys (no wire hint) use the Keyman-canonical
   // string form.
-  if (key.sp !== undefined) out["sp"] = key.spWire ?? String(key.sp);
-  if (key.width !== undefined) out["width"] = key.widthWire ?? String(key.width);
-  if (key.pad !== undefined) out["pad"] = key.padWire ?? String(key.pad);
+  //
+  // #2216: the hint is honoured only while it still denotes the current
+  // numeric value (`resolveWireEncoding`). A mutator that changed the
+  // numeric without clearing its hint must not silently resurrect the old
+  // source value — the current value wins, in canonical string form.
+  if (key.sp !== undefined) out["sp"] = resolveWireEncoding(key.spWire, key.sp);
+  if (key.width !== undefined) out["width"] = resolveWireEncoding(key.widthWire, key.width);
+  if (key.pad !== undefined) out["pad"] = resolveWireEncoding(key.padWire, key.pad);
   if (key.nextlayer !== undefined) out["nextlayer"] = key.nextlayer;
   // Per-key modifier override and longpress preselect (spec 063 FR-030). Both
   // are standard wire properties; `default` is emitted as a real JSON boolean,
