@@ -183,6 +183,24 @@ function toNumber(v: string | number | undefined): number | undefined {
 }
 
 /**
+ * Resolve the wire encoding to write for a numeric `sp`/`width`/`pad` field
+ * (#2216). A `*Wire` hint is honoured ONLY while it still denotes the
+ * field's current numeric value; the moment a mutator changes the numeric,
+ * the hint is stale and the Keyman-canonical string form of the CURRENT
+ * value is written instead. This makes the hint a self-validating cache:
+ * readers never need to trust that every writer maintained it. Mutators
+ * additionally delete the hint when they change the numeric (so the IR
+ * itself never carries a stale pair), but emit correctness does not depend
+ * on them having done so.
+ */
+export function resolveWireEncoding(
+  wire: string | number | undefined,
+  value: number,
+): string | number {
+  return wire !== undefined && toNumber(wire) === value ? wire : String(value);
+}
+
+/**
  * Coerce a wire-format boolean field to a boolean, or undefined.
  *
  * `default` is written as a real JSON boolean, so the string/number arms are
