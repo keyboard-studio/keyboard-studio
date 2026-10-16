@@ -233,6 +233,49 @@ export function sourceExemplars(bcp47: string): ExemplarInventory | null {
 }
 
 /**
+ * Both sides of an index entry, for the CLDR/SLDR union action (#1369).
+ *
+ * Returns the CLDR and SLDR inventories separately (either may be null when
+ * that side doesn't cover the tag or its gate fires). The caller decides how
+ * to present the union — the per-character `source` attribution on each
+ * `SourcedCharacter` lets the UI show which characters came from where.
+ *
+ * Returns null when neither side covers the tag (same as `sourceExemplars`).
+ */
+export function sourceExemplarsBoth(bcp47: string): {
+  resolvedTag: string;
+  cldr: SourcedInventory | null;
+  sldr: SourcedInventory | null;
+} | null {
+  if (typeof bcp47 !== "string") return null;
+
+  for (const candidate of exemplarLocaleCandidates(bcp47)) {
+    const entry = lookup(candidate);
+    if (entry === undefined) continue;
+
+    const build = (
+      tiers: IndexTierSets | undefined,
+      source: ExemplarSource,
+      gated: boolean,
+    ): SourcedInventory | null => {
+      if (tiers === undefined || gated) return null;
+      const confidence: ExemplarConfidence =
+        source === "cldr" ? "approved" : toExemplarConfidence(tiers.d);
+      const { characters, digraphs } = extractTiers(tiers, source, confidence);
+      if (characters.length === 0) return null;
+      return { resolvedTag: candidate, source, confidence, characters, digraphs };
+    };
+
+    const cldr = build(entry.c, "cldr", isGatedTag(bcp47, "cldr"));
+    const sldr = build(entry.s, "sldr", isGatedTag(bcp47, "sldr"));
+    if (cldr === null && sldr === null) return null;
+    return { resolvedTag: candidate, cldr, sldr };
+  }
+
+  return null;
+}
+
+/**
  * Characters of one tier of a sourced inventory, in the order the source
  * attested them. Convenience for the consumers that only want the core
  * alphabet.

@@ -61,6 +61,7 @@ import type {
   ExemplarInventory,
 } from "../lib/services.ts";
 import { useSourcedExemplars } from "./useSourcedExemplars.ts";
+import { useSourcedExemplarsBoth } from "./useSourcedExemplarsBoth.ts";
 import { CpLabel } from "./CpLabel.tsx";
 import { RadioGroup, SelectMenu } from "../ui/index.ts";
 import {
@@ -1205,9 +1206,71 @@ function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
               </Trans>
             </button>
           </div>
+          <SldrUnionAction
+            bcp47={context.bcp47_tag}
+            currentInventory={inventory}
+            seedFromProposal={seedFromProposal}
+          />
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The CLDR/SLDR union action (#1369).
+ *
+ * When the current exemplar offer is CLDR and the index also has an SLDR
+ * side with characters CLDR doesn't cover, offers "Also add N characters
+ * from SLDR". The SLDR characters union into the proposal via the same
+ * seedFromProposal path (per-character source attribution is preserved),
+ * and they arrive unticked — the author reviews them like any other
+ * proposed character. Renders nothing when there's no SLDR side, when the
+ * current offer is already SLDR, or while loading.
+ */
+function SldrUnionAction({
+  bcp47,
+  currentInventory,
+  seedFromProposal,
+}: {
+  bcp47: string | undefined;
+  currentInventory: SourcedInventory;
+  seedFromProposal: (inventory: SourcedInventory, tag: string) => void;
+}) {
+  const { sldr, loading } = useSourcedExemplarsBoth(bcp47);
+  const [added, setAdded] = useState(false);
+
+  if (loading || added || bcp47 === undefined) return null;
+  // Only when the current offer is the CLDR side and SLDR exists too.
+  if (currentInventory.source !== "cldr" || sldr === null) return null;
+
+  const cldrChars = new Set(currentInventory.characters.map((c) => c.char));
+  const sldrExtra = sldr.characters.filter((c) => !cldrChars.has(c.char));
+  if (sldrExtra.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        type="button"
+        data-testid="sldr-union-action"
+        onClick={() => {
+          seedFromProposal(sldr, bcp47);
+          setAdded(true);
+        }}
+        className="ks-focus-ring ks-hit-target"
+        style={{ ...secondaryButton, fontSize: 13 }}
+      >
+        <Trans id="survey.phaseB.buildList.sldrUnionButton">
+          Also add {{ n: sldrExtra.length }} characters from SLDR
+        </Trans>
+      </button>
+      <p style={{ margin: "4px 0 0", fontSize: 12, color: TEXT_DIM }}>
+        <Trans id="survey.phaseB.buildList.sldrUnionHint">
+          SLDR sometimes has characters CLDR omits. These arrive as a separate
+          proposal — review them before keeping.
+        </Trans>
+      </p>
+    </div>
   );
 }
 

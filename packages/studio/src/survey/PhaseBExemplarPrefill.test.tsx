@@ -42,6 +42,14 @@ vi.mock("../lib/services.ts", async () => ({
     if (lookupGate.promise !== null) await lookupGate.promise;
     return getSourcedExemplars.get();
   },
+  // The union action's hook calls this wherever the apply route renders.
+  // Mirror the singular mock's world: the CLDR side is whatever the test
+  // staged, and there is no SLDR side — so the union action stays hidden,
+  // as it should when SLDR doesn't cover the tag.
+  sourcedExemplarsBoth: async (_bcp47: string) => {
+    if (lookupGate.promise !== null) await lookupGate.promise;
+    return { resolvedTag: "ewo", cldr: getSourcedExemplars.get(), sldr: null };
+  },
   charactersInTier: (await import("@keyboard-studio/engine")).charactersInTier,
 }));
 

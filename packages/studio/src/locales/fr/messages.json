@@ -1822,6 +1822,8 @@
   "survey.phaseB.buildList.marksTextSamplePrompt.sectionLabel": "Mark pairings need a text sample",
   "survey.phaseB.buildList.marksTextSamplePrompt.skipButton": "Continue without a text sample",
   "survey.phaseB.buildList.marksTextSamplePrompt.skipConsequence": "If you continue without a text sample, the attachment rows will start unchecked. An unchecked letter+mark pair won't be reachable by ordinary typing.",
+  "survey.phaseB.buildList.sldrUnionButton": "Ajouter aussi {n} caractères de SLDR",
+  "survey.phaseB.buildList.sldrUnionHint": "SLDR contient parfois des caractères que CLDR omet. Ceux-ci arrivent dans une proposition séparée — vérifiez-les avant de les garder.",
   "survey.phaseB.buildList.textSampleAriaLabel": "Laissez-nous les trouver dans un extrait",
   "survey.phaseB.buildList.textSampleCancelButton": "Annuler",
   "survey.phaseB.buildList.textSampleConfirmButton": "Ajouter ces caractères à mon alphabet",
