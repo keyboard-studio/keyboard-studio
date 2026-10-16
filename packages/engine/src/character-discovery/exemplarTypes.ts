@@ -108,6 +108,22 @@ export interface SourcedInventory {
   characters: SourcedCharacter[];
   /** Multi-codepoint clusters the source wrote as `{..}`, e.g. "dz", "kp", "ng". */
   digraphs: string[];
+  /**
+   * The CLDR release this inventory's CLDR side came from (#1367): the
+   * pinned index's release (e.g. "48.2.0") for the offline path, or the
+   * fetched release for a live refresh. Absent for SLDR- and text-sourced
+   * inventories. Provenance must be able to NAME the release — an inventory
+   * that cannot say which CLDR it came from would collapse the pinned/live
+   * distinction the refresh feature exists to keep visible.
+   */
+  release?: string;
+  /**
+   * True when this inventory was served from a session live-refresh
+   * override rather than the committed pinned index (#1367). The dataset
+   * itself is session-only; this marker is what lets the draft record a
+   * durable "cldr-live" provenance for characters the author accepts.
+   */
+  live?: boolean;
 }
 
 /**

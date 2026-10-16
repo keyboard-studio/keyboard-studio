@@ -1082,6 +1082,14 @@
       "decisions": [],
       "notes": "Readiness only, by design: assessment, event taxonomy and processor scorecard landed with PR #2100; no analytics ships and the spec does not authorise it. Implementation is gated on Article XII ratification (spec 100, FR-001, not yet met). Acknowledged to register the section, per the spec 085 planning-spec precedent. Triaged 2026-10-15."
     },
+    "specs/102-keyboard-docs-templates": {
+      "title": "Feature Specification: Keyboard documentation templates and version policy",
+      "hash": "sha256:4818650a30cb6806",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2104 (keyboard documentation templates and version policy; spec renumbered 095 -> 102 in that PR) with review fixes in PR #2184; all 32 tasks complete. Spec was never seeded under the renumbered path, so it flagged as new-section post-merge. Triaged Path C 2026-10-15 (issue #2136): implementation verified on main (output-version.ts, renderHistoryMd.ts, renderDocForm.ts/docSlots.ts/packageDocs.ts, docContent.ts); no code change needed. Known caveat: FR-013 typing guide treats the underlying system layout as printable ASCII (docContent.ts, per task T020); for a declared non-US base layout the guide can over-include characters the base already types."
+    },
     "specs/103-first-class-if-guards": {
       "title": "Feature Specification: First-class `if()` guards in KeyboardIR",
       "hash": "sha256:61626d8372652a28",
