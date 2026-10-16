@@ -29,7 +29,9 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const baseRef = process.argv[2] ?? "origin/main";
+// Tolerate a stray `--` separator (pnpm run forwards it verbatim on
+// some versions): the base ref is the first non-`--` argument.
+const baseRef = process.argv.slice(2).find((a) => a !== "--") ?? "origin/main";
 
 // Curated core suites, per package directory. Entries are paths relative
 // to the package dir; a trailing `*` globs within that directory.
