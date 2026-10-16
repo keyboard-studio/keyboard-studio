@@ -102,6 +102,14 @@ visible in a directory listing.
 4. `s05-mnemonic-spelling.yaml` — S-05 Hausa-style. **Not yet authored.**
 5. S-09 and others as time permits.
 
+## Permanently out of scope
+
+**S-12 DLL IME callout — recognition permanently out of scope (issue #2214, km-lead ruling 2026-10-16).** The codec opaquifies `call()`/`return()` rules by design (D8, reason `call-return`); `cs_pinyin`, the sole S-12 exemplar in the corpus, therefore imports as `RawKmnFragment`s classified `not-removable:opaque`. No recognizer rule — over typed IR or over `ir.raw` — will be built for S-12, and `call()` will not be modelled in KeyboardIR for this purpose. Rationale: the strategy's semantics live in an external Windows DLL the studio cannot inspect, simulate, or edit, so a lift has no consuming author outcome — strategy selection already recommends S-12 from the axis vector for new authoring (spec 007 §7.2 rule 1, pattern `content/patterns/ime/dll-ime-callout.yaml`), and recognition would reclassify the fragments from `not-removable:opaque` to `not-removable:unknown`, a less accurate verdict. The opaque presentation is the honest one (spec 037: unrecognized content reads as residue, never as coverage). This closes the *recognition* question only; S-12 remains a supported authoring strategy. It reopens only on a new fact: (i) a second genuine S-12 keyboard (massive/logographic, `call()` as the sole main-group mechanism) appears in the corpus or is named by a real author as an import-adapt base; or (ii) an opaque-construct typing programme arising from the named-deadkey (#2232) or `set()`/S-11 assessments adopts criteria under which `call()` independently qualifies — re-scoped inside that programme, never as a standalone recognizer issue; or (iii) a named consumer appears that must read call rules as typed data. Note: the `call-return` reason also covers bare `return`, a separate construct; any future work must match `call(...)` specifically and account for `match`/`nomatch` rules, which carry call() in typed-raw outputs, not fragments. This record does not decide `set()`/S-11.
+
+**S-13 Touch layer switch — not a recognizer strategy.** S-13 is detected structurally from the typed touch-layout IR (more than one named layer; spec 007 §7.2), not by matching KMN rule clusters, so no rule belongs in this directory.
+
+**Scope note.** This section records permanent exclusions only. S-05 and S-06 are not listed here: both were closed by determination (#2224, #2213) without a permanence ruling — S-05 stays unrecognized subject to its ruling's different-evidence-class bar, and the S-06 chain lift remains open as gated follow-on #2235.
+
 ## Adding a new rule
 
 1. Read the matching Pattern in `content/patterns/` for the slot structure.
