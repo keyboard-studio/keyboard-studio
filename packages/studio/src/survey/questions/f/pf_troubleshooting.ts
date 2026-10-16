@@ -24,7 +24,10 @@ export const definition = {
     "already covered by the standard help. Focus on what is specific to this " +
     "keyboard. For example: \"Marks appear in the wrong place - type the " +
     "consonant first, then the vowel.\" Or: \"Nothing happens when I press the " +
-    "right Alt key - check that no other program has claimed that shortcut.\"",
+    "right Alt key - check that no other program has claimed that shortcut.\" " +
+    "If lines are already filled in below, the studio suggested them from how " +
+    "this keyboard works — keep the ones that fit, edit them, or delete each " +
+    "line; only what you leave here is used.",
   type: "text" as const,
   required: false,
   next: "pf_related_keyboards",
@@ -51,5 +54,23 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], provides: ["help-troubleshooting"], requires: ["help-more-detail"] };
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  provides: ["help-troubleshooting"],
+  requires: ["help-more-detail"],
+  // Issue #1800 (km-lead ruling, Option B): facet-derived suggestion
+  // lines, computed by the live wiring from the working copy's current
+  // IR (lib/troubleshootingProposal.ts) and read off the context —
+  // question modules import nothing from lib/ (mutate-seam rule), the
+  // welcome-prefill pattern. The seed is a proposal the author keeps,
+  // edits, or deletes per line; helpDocsFromDecisions will not compose
+  // a troubleshooting value the author never confirmed. Base-help
+  // extraction (the issue's AC1) is NOT this extract: spec 080 FR-007
+  // bars base help prose on a copy, and it already ships inherited on
+  // an adapt — see the follow-on issue.
+  extract: (ctx) => ctx.phaseF?.troubleshootingProposal,
+};
 export default mod;

@@ -431,7 +431,17 @@ export type {
 export {
   createFetchCldrLoader,
   createFetchCldrFullLoader,
+  compareCldrVersions,
+  latestStableCldrVersion,
+  LEGACY_FETCH_CLDR_VERSION,
 } from "./character-discovery/cldr.js";
+// Opt-in live refresh of exemplar data (#1367): author-initiated only,
+// version-guarded, installed inside the single sourcing path above.
+export {
+  refreshExemplars,
+  pinnedCldrRelease,
+} from "./character-discovery/exemplarRefresh.js";
+export type { ExemplarRefreshResult } from "./character-discovery/exemplarRefresh.js";
 // The single exemplar-sourcing path (spec 044 FR-015): offline, deterministic,
 // version-pinned, covering both CLDR and SLDR with per-character attribution.
 export {
