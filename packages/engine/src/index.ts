@@ -440,9 +440,11 @@ export {
 export type {
   ExemplarTier,
   ExemplarSource,
+  TextSampleSource,
   ExemplarConfidence,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
 } from "./character-discovery/exemplarTypes.js";
 // Phase B high-confidence missing-character suggestions, now CLDR+SLDR-grounded.
 export {
@@ -1077,3 +1079,6 @@ export type {
   RenameDeadkeyOptions,
   RetargetDeadkeyOptions,
 } from "./deadkey-lifecycle/index.js";
+export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
+export type { RgbaImage } from "./icon/icoEncoder.js";
+export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";

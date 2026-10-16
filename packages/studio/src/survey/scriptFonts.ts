@@ -1,6 +1,8 @@
 // scriptFonts — script-driven glyph font loading for scripts the three
-// Phase B base fonts do not cover (Part 2 of the per-script fonts work,
-// Pick 1: the mechanism plus Arab / Ethi / Syrc / Tibt).
+// Phase B base fonts do not cover (Part 2 of the per-script fonts work.
+// Pick 1: the mechanism plus Arab / Ethi / Syrc / Tibt. Pick 2: Deva,
+// Beng, Guru, Gujr, Orya, Taml, Telu, Knda, Mlym, Sinh, Mymr, Thai,
+// Laoo, Khmr).
 //
 // Mechanism (Option A): the session's scripts are resolved deterministically
 // from data the repo already ships — the target language's ISO 15924 script
@@ -22,12 +24,13 @@
 // for stacks naming a face's family are invalidated when that face settles,
 // so no measurement taken before the load resolved can stick.
 //
-// Registry maintenance: hand-written for the four Pick 1 scripts. The repo's
-// codegen pattern (exemplars / langtags artifacts) generates DATA tables
-// from upstream datasets; a script-to-face registry entry also carries a
-// vendoring decision (which subset file, which probe), and at four entries
-// a generator would cost more than it saves. Revisit if Picks 2-3 grow the
-// registry past a dozen scripts. Ranges below are exactly the unicode-range
+// Registry maintenance: hand-written. The repo's codegen pattern
+// (exemplars / langtags artifacts) generates DATA tables from upstream
+// datasets; a script-to-face registry entry also carries a vendoring
+// decision (which subset file, which probe), so a generator would need
+// this same list as its input and would save nothing at this size.
+// Revisit if the remaining long-tail scripts land. Ranges below are
+// exactly the unicode-range
 // of the vendored subset file (what fonts.googleapis.com served for the
 // family's script subset, mirrored per the spec 095 vendoring pass), so the
 // FontFace descriptor and the coverage check can never drift apart.
@@ -111,6 +114,156 @@ export const SCRIPT_FONT_REGISTRY: readonly ScriptFontFaceDef[] = [
     probe: "ཀ", // U+0F40 TIBETAN LETTER KA
     ranges: [
       [0x0f00, 0x0fff], [0x200c, 0x200d], [0x25cc, 0x25cc], [0x3008, 0x300b],
+    ],
+  },
+  // Deva: the base Noto Sans stack happens to carry a Devanagari subset,
+  // but under the Charis SIL and Andika selections the script fell through
+  // to the generic family and the OS. The full Noto Sans Devanagari family
+  // is vendored so the script is covered under every font selection.
+  {
+    script: "Deva",
+    family: "Noto Sans Devanagari",
+    file: "noto-sans-devanagari-400-devanagari.woff2",
+    probe: "अ", // U+0905 DEVANAGARI LETTER A
+    ranges: [
+      [0x0900, 0x097f], [0x1cd0, 0x1cf4], [0x1cf7, 0x1cf9], [0x200c, 0x200d],
+      [0x20a8, 0x20a8], [0x20b9, 0x20b9], [0x20f0, 0x20f0], [0x25cc, 0x25cc],
+      [0xa830, 0xa839], [0xa8e0, 0xa8ff], [0x11b00, 0x11b0a],
+    ],
+  },
+  {
+    script: "Beng",
+    family: "Noto Sans Bengali",
+    file: "noto-sans-bengali-400-bengali.woff2",
+    probe: "অ", // U+0985 BENGALI LETTER A
+    ranges: [
+      [0x0951, 0x0952], [0x0964, 0x0965], [0x0980, 0x09fe], [0x1cd0, 0x1cd0],
+      [0x1cd2, 0x1cd2], [0x1cd5, 0x1cd6], [0x1cd8, 0x1cd8], [0x1ce1, 0x1ce1],
+      [0x1cea, 0x1cea], [0x1ced, 0x1ced], [0x1cf2, 0x1cf2], [0x1cf5, 0x1cf7],
+      [0x200c, 0x200d], [0x20b9, 0x20b9], [0x25cc, 0x25cc], [0xa8f1, 0xa8f1],
+      [0x11df0, 0x11df1],
+    ],
+  },
+  {
+    script: "Guru",
+    family: "Noto Sans Gurmukhi",
+    file: "noto-sans-gurmukhi-400-gurmukhi.woff2",
+    probe: "ਅ", // U+0A05 GURMUKHI LETTER A
+    ranges: [
+      [0x0951, 0x0952], [0x0964, 0x0965], [0x0a01, 0x0a76], [0x200c, 0x200d],
+      [0x20b9, 0x20b9], [0x25cc, 0x25cc], [0x262c, 0x262c], [0xa830, 0xa839],
+    ],
+  },
+  {
+    script: "Gujr",
+    family: "Noto Sans Gujarati",
+    file: "noto-sans-gujarati-400-gujarati.woff2",
+    probe: "અ", // U+0A85 GUJARATI LETTER A
+    ranges: [
+      [0x0951, 0x0952], [0x0964, 0x0965], [0x0a80, 0x0aff], [0x200c, 0x200d],
+      [0x20b9, 0x20b9], [0x25cc, 0x25cc], [0xa830, 0xa839],
+    ],
+  },
+  {
+    script: "Orya",
+    family: "Noto Sans Oriya",
+    file: "noto-sans-oriya-400-oriya.woff2",
+    probe: "ଅ", // U+0B05 ORIYA LETTER A
+    ranges: [
+      [0x0951, 0x0952], [0x0964, 0x0965], [0x0b01, 0x0b77], [0x1cda, 0x1cda],
+      [0x1cf2, 0x1cf2], [0x200c, 0x200d], [0x20b9, 0x20b9], [0x25cc, 0x25cc],
+    ],
+  },
+  {
+    script: "Taml",
+    family: "Noto Sans Tamil",
+    file: "noto-sans-tamil-400-tamil.woff2",
+    probe: "அ", // U+0B85 TAMIL LETTER A
+    ranges: [
+      [0x0964, 0x0965], [0x0b82, 0x0bfa], [0x200c, 0x200d], [0x20b9, 0x20b9],
+      [0x25cc, 0x25cc],
+    ],
+  },
+  {
+    script: "Telu",
+    family: "Noto Sans Telugu",
+    file: "noto-sans-telugu-400-telugu.woff2",
+    probe: "అ", // U+0C05 TELUGU LETTER A
+    ranges: [
+      [0x0951, 0x0952], [0x0964, 0x0965], [0x0b83, 0x0b83], [0x0c00, 0x0c7f],
+      [0x1cd5, 0x1cd6], [0x1cd8, 0x1cd8], [0x1cda, 0x1cda], [0x1cf2, 0x1cf2],
+      [0x200c, 0x200d], [0x25cc, 0x25cc],
+    ],
+  },
+  {
+    script: "Knda",
+    family: "Noto Sans Kannada",
+    file: "noto-sans-kannada-400-kannada.woff2",
+    probe: "ಅ", // U+0C85 KANNADA LETTER A
+    ranges: [
+      [0x0951, 0x0952], [0x0964, 0x0965], [0x0b83, 0x0b83], [0x0c80, 0x0cf3],
+      [0x1cd0, 0x1cd0], [0x1cd2, 0x1cd3], [0x1cda, 0x1cda], [0x1cf2, 0x1cf2],
+      [0x1cf4, 0x1cf4], [0x200c, 0x200d], [0x20b9, 0x20b9], [0x25cc, 0x25cc],
+      [0xa830, 0xa835],
+    ],
+  },
+  {
+    script: "Mlym",
+    family: "Noto Sans Malayalam",
+    file: "noto-sans-malayalam-400-malayalam.woff2",
+    probe: "അ", // U+0D05 MALAYALAM LETTER A
+    ranges: [
+      [0x0307, 0x0307], [0x0323, 0x0323], [0x0951, 0x0952], [0x0964, 0x0965],
+      [0x0b83, 0x0b83], [0x0d00, 0x0d7f], [0x1cda, 0x1cda], [0x1cf2, 0x1cf2],
+      [0x200c, 0x200d], [0x20b9, 0x20b9], [0x25cc, 0x25cc], [0xa830, 0xa832],
+    ],
+  },
+  {
+    script: "Sinh",
+    family: "Noto Sans Sinhala",
+    file: "noto-sans-sinhala-400-sinhala.woff2",
+    probe: "අ", // U+0D85 SINHALA LETTER AYANNA
+    ranges: [
+      [0x0964, 0x0965], [0x0d81, 0x0df4], [0x1cf2, 0x1cf2], [0x200c, 0x200d],
+      [0x25cc, 0x25cc], [0x111e1, 0x111f4],
+    ],
+  },
+  {
+    script: "Mymr",
+    family: "Padauk",
+    file: "padauk-400-myanmar.woff2",
+    probe: "က", // U+1000 MYANMAR LETTER KA
+    ranges: [
+      [0x1000, 0x109f], [0x200c, 0x200d], [0x25cc, 0x25cc], [0xa92e, 0xa92e],
+      [0xa9e0, 0xa9fe], [0xaa60, 0xaa7f], [0x116d0, 0x116e3],
+    ],
+  },
+  {
+    script: "Thai",
+    family: "Noto Sans Thai",
+    file: "noto-sans-thai-400-thai.woff2",
+    probe: "ก", // U+0E01 THAI CHARACTER KO KAI
+    ranges: [
+      [0x02d7, 0x02d7], [0x0303, 0x0303], [0x0331, 0x0331], [0x0e01, 0x0e5b],
+      [0x200c, 0x200d], [0x25cc, 0x25cc],
+    ],
+  },
+  {
+    script: "Laoo",
+    family: "Noto Sans Lao",
+    file: "noto-sans-lao-400-lao.woff2",
+    probe: "ກ", // U+0E81 LAO LETTER KO
+    ranges: [
+      [0x0e81, 0x0edf], [0x200c, 0x200d], [0x25cc, 0x25cc],
+    ],
+  },
+  {
+    script: "Khmr",
+    family: "Noto Sans Khmer",
+    file: "noto-sans-khmer-400-khmer.woff2",
+    probe: "ក", // U+1780 KHMER LETTER KA
+    ranges: [
+      [0x1780, 0x17ff], [0x19e0, 0x19ff], [0x200c, 0x200d], [0x25cc, 0x25cc],
     ],
   },
 ];

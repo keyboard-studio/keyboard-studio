@@ -32,6 +32,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import { buildProducedSet, scriptSubtagOf, toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
@@ -332,6 +333,32 @@ function CharacterMapPaneInner({
     }
     return cased;
   }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47, scope, isCasedBase]);
+
+  // Pane-level font-preview summary for assistive technology: how many of
+  // the cells this pane actually renders are drawn as the missing-glyph
+  // box because the selected font cannot preview them. The box carries no
+  // per-cell accessible name for that state (the cell button names the
+  // character only), so the count is announced as one pane-level summary
+  // in its own live region below — never through the action `announcement`
+  // state, which it would clobber and be clobbered by. Counted over exactly
+  // the cells CharacterMapGroupSection renders: the per-group cap applied,
+  // collapsed groups skipped (a search unfolds them, mirroring the
+  // section's own rule), and combining marks excluded — they never take
+  // the box path. The checker defers (reports supported) while fonts or a
+  // vendored script face are still loading, so the count only ever names
+  // characters measured for real.
+  const searchActive = query.trim() !== "";
+  const unpreviewedCount = useMemo(() => {
+    let count = 0;
+    for (const group of filteredGroups) {
+      if (!searchActive && hiddenGroups.has(groupKey(group))) continue;
+      for (const cell of group.cells.slice(0, maxCellsPerGroup)) {
+        if (cell.isCombiningMark) continue;
+        if (!isGlyphSupported(cell.char)) count += 1;
+      }
+    }
+    return count;
+  }, [filteredGroups, hiddenGroups, maxCellsPerGroup, searchActive, isGlyphSupported]);
 
   // Visible decomposition at the point of picking (spec 071 US5/FR-003): a
   // whole-grapheme pick contributes its base to Letters and its mark(s) to
@@ -643,6 +670,19 @@ function CharacterMapPaneInner({
       {/* Screen-reader announcer for toggle actions — visually hidden. */}
       <div aria-live="polite" style={visuallyHidden}>
         {announcement}
+      </div>
+      {/* Pane-level summary of the glyphs the selected font cannot preview
+          (see unpreviewedCount above) — visually hidden, announced as its
+          content changes. Empty when every rendered glyph previews. */}
+      <div aria-live="polite" style={visuallyHidden}>
+        {unpreviewedCount > 0 &&
+          t({
+            id: "survey.characterMapPane.announce.notPreviewedSummary",
+            message: plural(unpreviewedCount, {
+              one: "# character can't be previewed in the selected font",
+              other: "# characters can't be previewed in the selected font",
+            }),
+          })}
       </div>
 
       {/* Group scroll container — also the delegation root for the character

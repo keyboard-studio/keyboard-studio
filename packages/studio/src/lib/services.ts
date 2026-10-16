@@ -22,6 +22,8 @@ import type {
   ExemplarSource,
   SourcedCharacter,
   SourcedInventory,
+  ExemplarInventory,
+  TextSampleSource,
   ExemplarTier,
   ToZipOptions,
   BuildKmpResult,
@@ -335,7 +337,7 @@ export async function warmExemplarSource(): Promise<void> {
 // language (spec 044 FR-016/FR-017). Returns null when neither source covers
 // the tag or the confidence gate fires; the discovery-method list then omits
 // the exemplar option entirely rather than offering an empty one.
-export async function sourcedExemplars(bcp47: string): Promise<SourcedInventory | null> {
+export async function sourcedExemplars(bcp47: string): Promise<ExemplarInventory | null> {
   if (!USE_REAL) return null;
   const { loadExemplarSource, sourceExemplars } = await importEngine();
   await loadExemplarSource();
@@ -358,7 +360,7 @@ export async function sourcedExemplarsBoth(bcp47: string): Promise<{
   return sourceExemplarsBoth(bcp47);
 }
 
-export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier };
+export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier, ExemplarInventory, TextSampleSource };
 export { charactersInTier };
 
 // Re-export the type so callers can use it without a direct engine import.

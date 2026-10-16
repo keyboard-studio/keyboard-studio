@@ -10,12 +10,12 @@
 // ENTIRELY rather than showing an empty or disabled one (obligation P2).
 
 import { useEffect, useState } from "react";
-import type { SourcedInventory } from "../lib/services.ts";
+import type { ExemplarInventory } from "../lib/services.ts";
 import { sourcedExemplars } from "../lib/services.ts";
 
 export interface SourcedExemplarsState {
   /** null once resolved with no coverage; also null while still loading. */
-  inventory: SourcedInventory | null;
+  inventory: ExemplarInventory | null;
   /** True until the lookup settles — the offer must not flash in and out. */
   loading: boolean;
 }
@@ -36,7 +36,7 @@ export function useSourcedExemplars(bcp47: string | undefined): SourcedExemplars
   // wrong answer and never pre-select the exemplar option.
   const [state, setState] = useState<{
     tag: string | undefined;
-    inventory: SourcedInventory | null;
+    inventory: ExemplarInventory | null;
   } | null>(null);
 
   const hasTag = bcp47 !== undefined && bcp47.trim() !== "";

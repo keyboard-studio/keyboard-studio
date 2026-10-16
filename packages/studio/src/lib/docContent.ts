@@ -27,7 +27,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { getCategory, getName } from "@keyboard-studio/contracts/unicode";
 import { escapeDocHtml, parseTouchLayout, type GeneratedDocSlots } from "@keyboard-studio/engine";
-import { charProducers, ruleModifier } from "./irToCarveNodes.ts";
+import { charProducers, displayChar, ruleModifier } from "./irToCarveNodes.ts";
 
 export interface DocContentInput {
   /** The working-copy IR. */
@@ -57,8 +57,6 @@ export function parseTouchLayoutOrNull(json: string | null): TouchLayoutIR | nul
 
 /** Above this many rows the typing guide becomes a grouped summary. */
 export const TYPING_GUIDE_SUMMARY_THRESHOLD = 200;
-
-const DOTTED_CIRCLE = "◌";
 
 type CharGroup = "letters" | "marks" | "punctuation" | "digits" | "other";
 const GROUP_ORDER: readonly CharGroup[] = ["letters", "marks", "punctuation", "digits", "other"];
@@ -94,14 +92,9 @@ function groupOf(cp: number): CharGroup {
   return "other";
 }
 
-function isMark(cp: number): boolean {
-  return (getCategory(cp) ?? "").startsWith("M");
-}
-
-/** The character as shown: a combining mark sits on a dotted circle, never bare (spec 056). */
+/** The character as shown, the same way the studio shows it: a combining mark sits on a dotted circle, never bare (spec 056). */
 function glyph(ch: string): string {
-  const cp = ch.codePointAt(0)!;
-  return escapeDocHtml(isMark(cp) ? `${DOTTED_CIRCLE}${ch}` : ch);
+  return escapeDocHtml(displayChar(ch));
 }
 
 /** "U+014B LATIN SMALL LETTER ENG", or just the code point when the table has no name. */
