@@ -1295,6 +1295,7 @@
   "output.submit.outputBlockedReason.startingLicenseUnreadable": "the starting keyboard's original copyright holder could not be read — confirm it in the banner above",
   "output.submit.outputBlockedReason.touchStale": "the touch layout is out of date — return to the Touch step and re-complete it",
   "output.submit.permanence": "Submitting publishes your keyboard as a public pull request. Your name and email address become part of that submission, and once it is merged they are part of the repository’s permanent public history — they cannot be removed from it later.",
+  "output.submit.prBody.label": "Pull request description (generated from your checks — you can edit it)",
   "output.submit.sectionAriaLabel": "Submit to community repository",
   "output.submit.sectionLabel": "Submit to community repository",
   "output.submit.status.ariaLabel": "Submission status",

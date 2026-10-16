@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generatePRBody — empty inputs > full-body snapshot: mixed criteria + findings + confirmed attestation 1`] = `
+"### Green — checks passed
+
+- [x] 1.2-keyboard-under-release-or-experimental: Keyboard folder lives under \`release/\` or \`experimental/\`
+- [x] 1.1-no-files-outside-keyboard-folder: No files modified outside the keyboard's own folder
+
+### Yellow — advisory, please review
+
+- [ ] 3.2-history-header-sensible: HISTORY.md header is sensible — studio emitted: \`ewo-Latn\`
+- [ ] 1.5-keyboard-id-not-already-used: The keyboard ID (folder name) is not already used in \`experimental/\`, \`legacy/\`, or \`release/\` (not yet checkable)
+- [ ] KM_HINT_LONGPRESS_ORDER: Longpress order differs from the base layout.
+
+### Red — manual action required
+
+- [ ] The copyright holder named in LICENSE.md is the author or a legal entity the author is authorized to represent
+
+### Inherited from the starting keyboard
+
+- KM_WARN_DEPRECATED_STORE: Deprecated store in the starting keyboard.
+
+**Copyright attestation:** I confirm I am the copyright holder or am authorized to submit on behalf of Jane Author."
+`;

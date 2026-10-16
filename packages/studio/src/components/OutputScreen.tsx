@@ -962,6 +962,14 @@ export function OutputScreen() {
                 outputBlocked={submitBlocker !== undefined}
                 {...(submitBlocker?.reason !== undefined ? { outputBlockedReason: i18n.t(submitBlocker.reason) } : {})}
                 prefill={submitPrefill}
+                lintResults={{
+                  criteria:
+                    criteriaResult?.rows.map((r) => ({
+                      criterion: r.criterion,
+                      status: r.status,
+                    })) ?? null,
+                  findings: publishedFindings,
+                }}
               />
             </PublishHandover>
 
