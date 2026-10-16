@@ -52,6 +52,14 @@ export interface PhaseFSeedInputs {
    * pattern as `projectUrlProposal`.
    */
   provenanceBasisProposal?: string;
+  /**
+   * `pf_troubleshooting`'s proposal — `lib/troubleshootingProposal.ts`'
+   * `proposeTroubleshooting`, computed by the wiring (G-17) from the
+   * working copy's current IR and the session's mark-input-order axis,
+   * same pattern as `projectUrlProposal`. Facet templates only (issue
+   * #1800 ruling): no base help prose is read, per spec 080 FR-007.
+   */
+  troubleshootingProposal?: string;
   authorContact?: string;
   bcp47Tag?: string;
 }
