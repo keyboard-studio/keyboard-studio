@@ -436,7 +436,7 @@ function mergeFieldsIntoKey(key: TouchKeyIR, fields: EditableKeyFields): TouchKe
     layerAnnotation: _omitLayerAnnotation,
     ...rest
   } = key;
-  return {
+  const merged: TouchKeyIR = {
     ...rest,
     id: fields.id,
     text: fields.text,
@@ -457,6 +457,20 @@ function mergeFieldsIntoKey(key: TouchKeyIR, fields: EditableKeyFields): TouchKe
       ? { layer: fields.layer, layerAnnotation: fields.layer }
       : {}),
   };
+  // #2216: `spWire`/`widthWire`/`padWire` ride through `...rest`, but each
+  // records the SOURCE encoding of the value it was parsed with. When this
+  // merge changes a numeric (including removing `width`/`pad`), its hint
+  // would emit the OLD value — delete the matching hint, per field, so the
+  // emitter falls back to the canonical string form of the new value. When
+  // the numeric is unchanged the hint is retained untouched: clearing it
+  // would strip source encoding from keys the author merely relabelled,
+  // regressing #2083 fidelity. (The emitter also self-validates hints via
+  // `resolveWireEncoding`; this keeps the IR itself honest for every other
+  // consumer.)
+  if (fields.sp !== key.sp) delete merged.spWire;
+  if (fields.width !== key.width) delete merged.widthWire;
+  if (fields.pad !== key.pad) delete merged.padWire;
+  return merged;
 }
 
 // ---------------------------------------------------------------------------
@@ -600,7 +614,16 @@ function moveKeyWithinLayer(
 function redistributeFreedWidth(row: { keys: TouchKeyIR[] }, freedWidth: number | undefined): void {
   if (!freedWidth || row.keys.length === 0) return;
   const share = freedWidth / row.keys.length;
-  row.keys = row.keys.map((k) => ({ ...k, width: (k.width ?? 0) + share }));
+  row.keys = row.keys.map((k) => {
+    const width = (k.width ?? 0) + share;
+    if (width === k.width) return k;
+    // #2216: the width moved, so a retained `widthWire` would emit the
+    // pre-redistribution source value. Drop it (the emitter falls back to
+    // the canonical string form; it also self-validates via
+    // `resolveWireEncoding`).
+    const { widthWire: _staleWidthWire, ...rest } = k;
+    return { ...rest, width };
+  });
 }
 
 // ---------------------------------------------------------------------------
