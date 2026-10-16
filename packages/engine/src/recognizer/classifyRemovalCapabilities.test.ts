@@ -27,6 +27,7 @@ import type {
   RawKmnFragment,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
+import { buildEuroLatinIR } from "./rules/__fixtures__/s02GeneralizedIr.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -341,6 +342,37 @@ describe("classifyRemovalCapabilities — decision-order precedence", () => {
     // (NOT not-removable:context-sensitive, even though context.length===2)
     expect(map.get("rule#fallback")).toBe("removable:slot-fill");
     expect(map.get("rule#fallback")).not.toBe("not-removable:context-sensitive");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D. #2233: the output-store alias for generalised S-02 fan-outs is gated on
+// S-02 ownership. The raw-context fanShape check cannot see the postfix /
+// '+'-separated shapes, and isParallelIndexFanOut is deliberately NOT
+// widened — an un-owned generalised body stays context-sensitive.
+// ---------------------------------------------------------------------------
+
+describe("classifyRemovalCapabilities — #2233 ownership-gated alias", () => {
+  it("D1: S-02-owned postfix fan-out earns the output-store alias", () => {
+    const { ir } = buildEuroLatinIR();
+    recognizePatterns(ir);
+    const map = classifyRemovalCapabilities(ir);
+
+    // The postfix body is owned by its S-02 pattern → slot-fill via Decision 2,
+    // and its output store gains the alias through ownership (fanShape is
+    // false on the raw [char, dk, raw(+), any] context).
+    expect(map.get("rule#body-x")).toBe("removable:slot-fill");
+    expect(map.get("store#Ox")).toBe("removable:slot-fill");
+    expect(map.get("store#Oq")).toBe("removable:slot-fill");
+  });
+
+  it("D2: UN-owned postfix fan-out earns NO alias and stays context-sensitive", () => {
+    const { ir } = buildEuroLatinIR();
+    // No recognizePatterns: no ownership stamps.
+    const map = classifyRemovalCapabilities(ir);
+
+    expect(map.get("rule#body-x")).toBe("not-removable:context-sensitive");
+    expect(map.has("store#Ox")).toBe(false);
   });
 });
 

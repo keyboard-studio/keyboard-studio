@@ -8,6 +8,7 @@ import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult } from "./types.js";
 import type { Pattern } from "@keyboard-studio/contracts";
 import { ruleRef, storeRef } from "./node-refs.js";
+import { buildS02Fragment, findS02Families } from "./s02-families.js";
 import {
   postfixMarkSequenceRefs,
   isBaseToMarkedRemap,
@@ -50,45 +51,10 @@ function applyNumericIdToLabel(id: number): string {
 // Predicate helpers — check a single IRRule against a role definition
 // ---------------------------------------------------------------------------
 
-// A "trigger" rule: exactly one context element that is vkey or char, output is deadkey.
-// Matches isTrigger() in s02-deadkey-single-tap.ts exactly.
-function matchesTriggerRole(rule: IRRule): boolean {
-  if (rule.output.length !== 1) return false;
-  const out = rule.output[0];
-  if (out === undefined || out.kind !== "deadkey") return false;
-  // S-02 YAML says count: zero_or_one, but the TS reference implementation
-  // requires context.length === 1. We implement what the TS rule does.
-  if (rule.context.length !== 1) return false;
-  const ctx = rule.context[0];
-  if (ctx === undefined) return false;
-  return ctx.kind === "vkey" || ctx.kind === "char";
-}
-
-// A "fan-out" rule: [deadkey, any] context, [index] output with offset matching any position.
-function matchesFanOutRole(rule: IRRule): boolean {
-  if (rule.context.length !== 2) return false;
-  const c0 = rule.context[0];
-  const c1 = rule.context[1];
-  if (c0 === undefined || c0.kind !== "deadkey") return false;
-  if (c1 === undefined || c1.kind !== "any") return false;
-  if (rule.output.length !== 1) return false;
-  const out = rule.output[0];
-  if (out === undefined || out.kind !== "index") return false;
-  // any() is at position 2 (1-indexed) in context; only offset===2 is supported in v1.1
-  return out.offset === 2;
-}
-
-// An "escape" rule: [deadkey, vkey] context, [char] output, same dk id as a given trigger.
-function matchesEscapeRole(rule: IRRule, deadkeyId: number): boolean {
-  if (rule.context.length !== 2) return false;
-  const c0 = rule.context[0];
-  const c1 = rule.context[1];
-  if (c0 === undefined || c0.kind !== "deadkey" || c0.id !== deadkeyId) return false;
-  if (c1 === undefined || c1.kind !== "vkey") return false;
-  if (rule.output.length !== 1) return false;
-  const out = rule.output[0];
-  return out !== undefined && out.kind === "char";
-}
+// S-02's role shapes (trigger / fan-out / escape) live in s02-families.ts,
+// shared with the hand-written s02Recognizer (issue #2233): one reconciled
+// shape definition, so the generated rule and the reference rule cannot
+// diverge. The role matchers that used to live here were deleted with it.
 
 // A "single" rule: one vkey-or-char context, one char output, no deadkey or store involvement.
 function matchesSingleRole(rule: IRRule): boolean {
@@ -173,114 +139,10 @@ function findS01Clusters(ir: KeyboardIR): S01ClusterMatch[] {
 // S-02 predicate (three-rule-deadkey cluster)
 // ---------------------------------------------------------------------------
 
-interface S02ClusterMatch {
-  triggers: IRRule[];
-  fanOut: IRRule;
-  escape: IRRule;
-  deadkeyId: number;
-  baseStore: IRStore;
-  outStore: IRStore;
-  group: IRGroup;
-  hasBeep: boolean;
-}
-
-function findS02Clusters(ir: KeyboardIR): S02ClusterMatch[] {
-  // Index triggers by deadkey id (from usingKeys=true groups, any name).
-  const triggersByDkId = new Map<number, IRRule[]>();
-  for (const group of ir.groups) {
-    if (!groupPassesConstraints(group, true)) continue;
-    for (const rule of group.rules) {
-      // FR-021: behaviour-owned rules are never pattern candidates.
-      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
-      if (!matchesTriggerRole(rule)) continue;
-      const out = rule.output[0];
-      if (out === undefined || out.kind !== "deadkey") continue;
-      const existing = triggersByDkId.get(out.id) ?? [];
-      existing.push(rule);
-      triggersByDkId.set(out.id, existing);
-    }
-  }
-
-  // Index fan-out rules by deadkey id across ALL groups (no name filter).
-  // Also track which group each fan-out lives in, so we can find escape in
-  // the same group and check the usingKeys constraint.
-  const fanOutByDkId = new Map<number, { rule: IRRule; group: IRGroup }>();
-  for (const group of ir.groups) {
-    for (const rule of group.rules) {
-      // FR-021: behaviour-owned rules are never pattern candidates.
-      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
-      if (!matchesFanOutRole(rule)) continue;
-      const c0 = rule.context[0];
-      if (c0 === undefined || c0.kind !== "deadkey") continue;
-      if (!fanOutByDkId.has(c0.id)) {
-        fanOutByDkId.set(c0.id, { rule, group });
-      }
-    }
-  }
-
-  const clusters: S02ClusterMatch[] = [];
-
-  for (const [dkId, triggers] of triggersByDkId.entries()) {
-    const fanOutEntry = fanOutByDkId.get(dkId);
-    if (fanOutEntry === undefined) continue;
-    const { rule: fanOut, group: deadkeyGroup } = fanOutEntry;
-
-    // Fan-out group must not be a usingKeys=true group (triggers are usingKeys=true;
-    // the deadkey group that holds fan-out/escape is typically usingKeys=false).
-    // Reject any dkId where triggers and fan-out share the same group instance.
-    const triggerGroupOwnsAll = triggers.every((t) =>
-      deadkeyGroup.rules.includes(t),
-    );
-    if (triggerGroupOwnsAll) continue;
-
-    const c1 = fanOut.context[1];
-    const outEl = fanOut.output[0];
-    if (
-      c1 === undefined ||
-      c1.kind !== "any" ||
-      outEl === undefined ||
-      outEl.kind !== "index"
-    ) continue;
-
-    const baseStore = ir.stores.find((s) => s.name === c1.storeRef);
-    const outStore = ir.stores.find((s) => s.name === outEl.storeRef);
-    if (baseStore === undefined || outStore === undefined) continue;
-
-    // Parallel-store length invariant
-    if (baseStore.items.length !== outStore.items.length) continue;
-
-    // Store items must be char-only (disqualify if any non-char item)
-    const baseAllChar = baseStore.items.every((item) => item.kind === "char");
-    const outAllChar = outStore.items.every((item) => item.kind === "char");
-    if (!baseAllChar || !outAllChar) continue;
-
-    // Find escape rule in the SAME group as fan-out (no name filter).
-    const escape = deadkeyGroup.rules.find(
-      (r) => r.ownedByPattern === undefined && matchesEscapeRole(r, dkId),
-    );
-    if (escape === undefined) continue;
-
-    // Check for beep in any rule in the deadkey group with this dk id.
-    const hasBeep = deadkeyGroup.rules.some((r) => {
-      const c0 = r.context[0];
-      if (c0 === undefined || c0.kind !== "deadkey" || c0.id !== dkId) return false;
-      return r.output.some((el) => el.kind === "beep");
-    });
-
-    clusters.push({
-      triggers,
-      fanOut,
-      escape,
-      deadkeyId: dkId,
-      baseStore,
-      outStore,
-      group: deadkeyGroup,
-      hasBeep,
-    });
-  }
-
-  return clusters;
-}
+// The S-02 cluster finder is findS02Families in s02-families.ts (shared with
+// the hand-written rule since #2233). It returns one family per full cluster
+// key (group, deadkey id, prefix char, base store, output store), with the
+// escape optional and shared triggers/escapes recorded but not owned.
 
 // ---------------------------------------------------------------------------
 // S-03 predicate (sequence-replace cluster)
@@ -490,53 +352,76 @@ export function interpretPredicate(rule: RecognizerRuleYaml, ir: KeyboardIR): Ma
   }
 
   if (clusterType === "three-rule-deadkey") {
-    const clusters = findS02Clusters(ir);
-    for (const cluster of clusters) {
+    const families = findS02Families(ir);
+    for (const family of families) {
       const storesByName = new Map<string, IRStore>([
         ...ir.stores.map((s): [string, IRStore] => [s.name, s]),
       ]);
       // Add abstract YAML aliases so populateSlots can resolve "S_bases" / "S_output"
       // from the YAML slot_mapping without knowing the IR-level store names.
-      storesByName.set("S_bases", cluster.baseStore);
-      storesByName.set("S_output", cluster.outStore);
+      storesByName.set("S_bases", family.baseStore);
+      storesByName.set("S_output", family.outStore);
 
-      const canonicalTrigger =
-        cluster.triggers.find((r) => {
-          const ctx = r.context[0];
-          return ctx?.kind === "vkey" && ctx.modifiers.length === 0;
-        }) ?? cluster.triggers[0];
+      const triggerRules = family.triggers.map((t) => t.rule);
+      const clusterRules = [
+        ...family.fanOuts,
+        ...(family.escape !== undefined ? [family.escape] : []),
+        ...triggerRules,
+      ];
 
       const slotValues = rule.lifts_to.slot_mapping !== undefined
         ? populateSlots(
             rule.lifts_to.slot_mapping,
             {
-              clusterRules: [cluster.fanOut, cluster.escape, ...cluster.triggers],
+              clusterRules,
               stores: storesByName,
-              triggerRule: canonicalTrigger,
-              escapeRule: cluster.escape,
-              fanOutRule: cluster.fanOut,
-              deadkeyId: cluster.deadkeyId,
+              triggerRule: family.primaryTrigger?.rule,
+              escapeRule: family.escape,
+              fanOutRule: family.fanOuts[0],
+              deadkeyId: family.deadkeyId,
             },
             ir,
           )
         : {};
 
+      // Code-level slot completions for the shapes the YAML slot_mapping
+      // cannot reach: an any-store trigger's key is its store's sole char
+      // (populateSlots only reads vkey/char context elements), a postfix
+      // family may have no trigger rule at all (its prefix char is the
+      // trigger identity), and the triggerStore slot exists only for the
+      // any-store form.
+      if (slotValues["triggerKey"] === undefined) {
+        slotValues["triggerKey"] =
+          family.primaryTrigger?.triggerKey ?? family.prefixChar ?? "";
+      }
+      if (slotValues["deadkeyName"] === undefined) {
+        slotValues["deadkeyName"] = formatDkName(family.deadkeyId);
+      }
+      if (family.primaryTrigger?.triggerStore !== undefined) {
+        slotValues["triggerStore"] = family.primaryTrigger.triggerStore;
+      }
+
+      // Owned exactly as the hand-written rule owns: fan-outs and stores
+      // always; triggers only when this is the deadkey's sole family; the
+      // escape only when no other family shares it.
       const ownedNodes = [
-        ...cluster.triggers.map((r) => ruleRef(r.nodeId)),
-        ruleRef(cluster.fanOut.nodeId),
-        ruleRef(cluster.escape.nodeId),
-        storeRef(cluster.baseStore.nodeId),
-        storeRef(cluster.outStore.nodeId),
+        ...(family.triggersOwned
+          ? triggerRules.map((r) => ruleRef(r.nodeId))
+          : []),
+        ...family.fanOuts.map((r) => ruleRef(r.nodeId)),
+        ...(family.escape !== undefined && !family.escapeShared
+          ? [ruleRef(family.escape.nodeId)]
+          : []),
+        storeRef(family.baseStore.nodeId),
+        storeRef(family.outStore.nodeId),
       ];
 
-      const patternIdBase = `${rule.lifts_to.patternId}#${formatDkName(cluster.deadkeyId)}`;
-
       results.push({
-        patternId: patternIdBase,
+        patternId: `${rule.lifts_to.patternId}#${family.idSuffix}`,
         ownedNodes,
         slotValues: {
           ...slotValues,
-          ...(cluster.hasBeep ? { __hasBeep: "1" } : {}),
+          ...(family.hasBeep ? { __hasBeep: "1" } : {}),
         },
       });
     }
@@ -706,12 +591,10 @@ function buildKmnFragment(strategyId: string, slotValues: Record<string, string>
     case "S-01":
       return "{{keystrokeCharacterMap}}";
     case "S-02":
-      // Use slot names that match the YAML slot_mapping keys
-      return (
-        "+ [{{triggerKey}}] > dk({{deadkeyName}})\n" +
-        "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)\n" +
-        "dk({{deadkeyName}}) + [{{triggerKey}}] > {{accentChar}}"
-      );
+      // Shared with the hand-written rule (s02-families.ts buildS02Fragment):
+      // any-store trigger form when triggerStore is set, escape line only
+      // when the family has an escape (accentChar slot present).
+      return buildS02Fragment(slotValues);
     case "S-03":
       // Schematic, following the S-02 precedent: slot values are store
       // CONTENTS inlined, not store references. The guarded sil_ipa form
