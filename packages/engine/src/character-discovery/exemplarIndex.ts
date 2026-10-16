@@ -61,16 +61,75 @@ export function loadExemplarIndex(): Promise<ExemplarIndex> {
 }
 
 /**
+ * Session-scoped live-refresh overrides (#1367): per-locale entries installed
+ * by an author-initiated CLDR refresh, consulted by `lookup()` ahead of the
+ * pinned index so every consumer of the single sourcing path sees the same
+ * refreshed data (FR-015). In-memory only — a page reload returns the session
+ * to the pinned index; the per-character provenance recorded in the author's
+ * draft is what persists, not the dataset.
+ */
+const overrides = new Map<string, IndexLocaleEntry>();
+const overrideReleases = new Map<string, string>();
+
+/**
+ * Install (or replace) the refreshed entry for one canonical locale id,
+ * stamped with the CLDR release it came from. The entry's SLDR side is the
+ * caller's responsibility — refresh retains the pinned entry's `s` side so a
+ * CLDR refresh never deletes SLDR coverage.
+ */
+export function installExemplarOverride(
+  localeId: string,
+  entry: IndexLocaleEntry,
+  cldrRelease: string,
+): void {
+  overrides.set(localeId, entry);
+  overrideReleases.set(localeId, cldrRelease);
+}
+
+/** Remove one locale's override (a refresh that proved unusable installs nothing). */
+export function removeExemplarOverride(localeId: string): void {
+  overrides.delete(localeId);
+  overrideReleases.delete(localeId);
+}
+
+/** The CLDR release a locale's override was fetched from, if it has one. */
+export function lookupOverrideRelease(localeId: string): string | undefined {
+  return overrideReleases.get(localeId);
+}
+
+/** True when `localeId` is currently served by a live-refresh override. */
+export function hasExemplarOverride(localeId: string): boolean {
+  return overrides.has(localeId);
+}
+
+/** Drop every live-refresh override, returning lookups to the pinned index. */
+export function clearExemplarOverrides(): void {
+  overrides.clear();
+  overrideReleases.clear();
+}
+
+/**
+ * The pinned index's own version stamp (`{ cldr, sldrCommit, generated }`),
+ * or null until the chunk has loaded. Used to stamp pinned inventories with
+ * their release and to guard a refresh against fetching older data.
+ */
+export function pinnedIndexVersion(): ExemplarIndex["version"] | null {
+  return loaded?.version ?? null;
+}
+
+/**
  * O(1) lookup of one locale-directory id. `localeId` must already be
  * canonical (lowercase language, Titlecase script, UPPERCASE region) — use
- * `exemplarLocaleCandidates` to produce it.
+ * `exemplarLocaleCandidates` to produce it. A live-refresh override for the
+ * id wins over the pinned entry.
  */
 export function lookup(localeId: string): IndexLocaleEntry | undefined {
-  return loaded?.locales[localeId];
+  return overrides.get(localeId) ?? loaded?.locales[localeId];
 }
 
 /** Test hook: drop the cached chunk so a test can assert the load path. */
 export function __resetExemplarIndexForTest(): void {
   cached = null;
   loaded = null;
+  clearExemplarOverrides();
 }

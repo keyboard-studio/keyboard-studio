@@ -20,6 +20,8 @@ import {
 import {
   loadExemplarIndex,
   lookup,
+  lookupOverrideRelease,
+  pinnedIndexVersion,
   type IndexLocaleEntry,
   type IndexTierSets,
 } from "./exemplarIndex.js";
@@ -226,10 +228,28 @@ export function sourceExemplars(bcp47: string): ExemplarInventory | null {
       confidence,
       characters,
       digraphs,
+      ...cldrStamp(candidate, chosen.source),
     };
   }
 
   return null;
+}
+
+/**
+ * The provenance stamp for one resolved inventory (#1367): a CLDR inventory
+ * names its release — the override's fetched release when a live refresh
+ * served this candidate (marked `live`), otherwise the pinned index's CLDR
+ * release. SLDR inventories carry no CLDR stamp.
+ */
+function cldrStamp(
+  candidate: string,
+  source: ExemplarSource,
+): { release?: string; live?: boolean } {
+  if (source !== "cldr") return {};
+  const overrideRelease = lookupOverrideRelease(candidate);
+  if (overrideRelease !== undefined) return { release: overrideRelease, live: true };
+  const pinned = pinnedIndexVersion();
+  return pinned !== null ? { release: pinned.cldr } : {};
 }
 
 /**
@@ -263,7 +283,14 @@ export function sourceExemplarsBoth(bcp47: string): {
         source === "cldr" ? "approved" : toExemplarConfidence(tiers.d);
       const { characters, digraphs } = extractTiers(tiers, source, confidence);
       if (characters.length === 0) return null;
-      return { resolvedTag: candidate, source, confidence, characters, digraphs };
+      return {
+        resolvedTag: candidate,
+        source,
+        confidence,
+        characters,
+        digraphs,
+        ...cldrStamp(candidate, source),
+      };
     };
 
     const cldr = build(entry.c, "cldr", isGatedTag(bcp47, "cldr"));

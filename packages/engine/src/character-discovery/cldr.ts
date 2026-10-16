@@ -1,5 +1,62 @@
-const CLDR_BASE =
-  "https://raw.githubusercontent.com/unicode-org/cldr-json/46.1.0/cldr-json/cldr-misc-full/main";
+/**
+ * The cldr-json release the legacy fetch loaders read when no version is
+ * given. NOTE: this is OLDER than the pinned offline index (CLDR 48.2.0) —
+ * the loaders predate spec 044 and are kept for the CharacterDiscoveryService
+ * picker/cross-check seam. They must never be presented as a "newer data"
+ * route as-is; the opt-in live refresh (#1367) always passes an explicit,
+ * version-guarded release (see exemplarRefresh.ts).
+ */
+export const LEGACY_FETCH_CLDR_VERSION = "46.1.0";
+
+function cldrJsonBase(version: string): string {
+  return `https://raw.githubusercontent.com/unicode-org/cldr-json/${version}/cldr-json/cldr-misc-full/main`;
+}
+
+const CLDR_BASE = cldrJsonBase(LEGACY_FETCH_CLDR_VERSION);
+
+/** Three-part numeric version compare ("48.2.1" > "48.2.0"). Non-numeric parts sort as 0. */
+export function compareCldrVersions(a: string, b: string): number {
+  const pa = a.split(".").map((p) => Number.parseInt(p, 10) || 0);
+  const pb = b.split(".").map((p) => Number.parseInt(p, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+const CLDR_TAGS_URL = "https://api.github.com/repos/unicode-org/cldr-json/tags?per_page=100";
+
+/**
+ * The newest STABLE cldr-json release tag, resolved from the repo's tag list.
+ * Pre-release tags (e.g. "49.0.0-ALPHA2") are excluded by the strict
+ * three-part numeric shape; `refs/heads/main` is never a valid answer — an
+ * unnameable moving target cannot be stamped as provenance (#1367 ruling,
+ * spec 044 research R3). Returns null on any network/parse failure, which the
+ * caller surfaces as a network error rather than guessing a version.
+ */
+export async function latestStableCldrVersion(
+  fetchImpl?: typeof fetch,
+): Promise<string | null> {
+  const doFetch = fetchImpl ?? globalThis.fetch.bind(globalThis);
+  let tags: unknown;
+  try {
+    const r = await doFetch(CLDR_TAGS_URL);
+    if (!r.ok) return null;
+    tags = await r.json();
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(tags)) return null;
+  let best: string | null = null;
+  for (const entry of tags) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const name = (entry as Record<string, unknown>)["name"];
+    if (typeof name !== "string" || !/^\d+\.\d+\.\d+$/.test(name)) continue;
+    if (best === null || compareCldrVersions(name, best) > 0) best = name;
+  }
+  return best;
+}
 
 export type CldrLoader = (locale: string) => Promise<string | null>;
 
@@ -96,8 +153,8 @@ export type CldrFullLoader = (
  * Returns only the main exemplar string. For auxiliary exemplar support, use
  * createFetchCldrFullLoader() instead.
  */
-export function createFetchCldrLoader(fetchImpl?: typeof fetch): CldrLoader {
-  const full = createFetchCldrFullLoader(fetchImpl);
+export function createFetchCldrLoader(fetchImpl?: typeof fetch, version?: string): CldrLoader {
+  const full = createFetchCldrFullLoader(fetchImpl, version);
   return async (locale: string): Promise<string | null> => {
     const pair = await full(locale);
     return pair !== null ? pair.main : null;
@@ -106,16 +163,18 @@ export function createFetchCldrLoader(fetchImpl?: typeof fetch): CldrLoader {
 
 /**
  * Builds a CldrFullLoader that fetches both the main and auxiliary exemplar sets
- * from the CLDR 46.1.0 CDN in a single HTTP request.
+ * from a cldr-json release in a single HTTP request (the legacy 46.1.0 tag
+ * unless `version` names another release).
  * On non-200 or network error, returns null so callers can fall back gracefully.
  */
-export function createFetchCldrFullLoader(fetchImpl?: typeof fetch): CldrFullLoader {
+export function createFetchCldrFullLoader(fetchImpl?: typeof fetch, version?: string): CldrFullLoader {
   const doFetch = fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const base = version !== undefined ? cldrJsonBase(version) : CLDR_BASE;
   return async (locale: string) => {
     // Probe the candidate ladder most-specific-first: CLDR's main/ directories
     // are keyed by minimal locale ids, so "ewo-Latn" only resolves via "ewo".
     for (const candidate of exemplarLocaleCandidates(locale)) {
-      const url = `${CLDR_BASE}/${candidate}/characters.json`;
+      const url = `${base}/${candidate}/characters.json`;
       let r: Response;
       try {
         r = await doFetch(url);
@@ -135,7 +194,7 @@ export function createFetchCldrFullLoader(fetchImpl?: typeof fetch): CldrFullLoa
   };
 }
 
-function extractExemplarPair(
+export function extractExemplarPair(
   j: unknown,
   locale: string,
 ): { main: string; auxiliary: string | null; punctuation: string | null; numbers: string | null } | null {

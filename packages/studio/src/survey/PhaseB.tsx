@@ -27,6 +27,7 @@ import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from 
 import { composeStack } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { TextSampleAffordance } from "./TextSampleAffordance.tsx";
+import { RefreshExemplarsAffordance } from "./RefreshExemplarsAffordance.tsx";
 import { flowSources, loadFlowSourceDef } from "../steps/flowSources.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
@@ -248,10 +249,10 @@ interface CharChipEditorProps {
 }
 
 function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }: CharChipEditorProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const glyphFontStack = useGlyphFontStack();
   const isCasedBase = useIsCasedBase();
-  const { provenance, proposalConfidence } = useInventoryDraft("characters");
+  const { provenance, proposalConfidence, proposalRelease } = useInventoryDraft("characters");
   const [inputVal, setInputVal] = useState("");
   const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -326,7 +327,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
     ...new Set(
       Object.values(provenance)
         .filter((o) => o !== "author")
-        .map((o) => attributionText(o, proposalConfidence[o], t)),
+        .map((o) => attributionText(o, proposalConfidence[o], i18n, proposalRelease[o])),
     ),
   ];
 
@@ -439,7 +440,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
               const origin = provenance[c];
               const isProposed = origin !== undefined && origin !== "author";
               const attribution = isProposed
-                ? attributionText(origin, proposalConfidence[origin], t)
+                ? attributionText(origin, proposalConfidence[origin], i18n, proposalRelease[origin])
                 : null;
               const cells = [
                 <button
@@ -1125,6 +1126,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           route back to it, and choosing it must not remove the manual routes. */}
       <ExemplarApplyAffordance context={context} />
       <TextSampleAffordance />
+      <RefreshExemplarsAffordance bcp47={context.bcp47_tag} />
 
       {/* Section 3: visible three-store decomposition (spec 071 US5) + the
           spec-047 category sections — renders once the alphabet implies marks,
@@ -1167,7 +1169,7 @@ function ExemplarApplyAffordance({ context }: { context: SurveyContext }) {
   const [expanded, setExpanded] = useState(false);
 
   const alreadyApplied = Object.values(provenance).some(
-    (p) => p === "cldr" || p === "sldr",
+    (p) => p === "cldr" || p === "sldr" || p === "cldr-live",
   );
   if (inventory === null || alreadyApplied) return null;
 
@@ -1599,6 +1601,8 @@ function ExemplarOfferDetail({ inventory }: { inventory: ExemplarInventory }) {
         <ExemplarAttribution
           source={inventory.source}
           confidence={inventory.confidence}
+          live={inventory.live}
+          release={inventory.release}
         />{" "}
         <Trans id="survey.phaseB.intro.exemplars.count">
           {{ n: main.length }} characters
@@ -1650,14 +1654,23 @@ const UNCONFIRMED_CONFIDENCES = new Set([
 // The attribution wordings as extractable descriptors.
 //
 // These MUST be `msg` macro descriptors rather than inline `t({ id, message })`
-// objects: `attributionText` below receives `t` as a PARAMETER, and the babel
-// macro only rewrites `t(...)` where it can see the `useLingui()` binding in
-// the same scope. An inline object there still renders correctly at runtime
-// (it reaches `i18n._` and falls back to `message`), but the extractor never
-// sees the id, so the string cannot be translated. Three of these were rescued
+// objects: `attributionText` below receives the i18n instance as a PARAMETER,
+// and the babel macro only rewrites `t(...)` where it can see the
+// `useLingui()` binding in the same scope. An inline object there still
+// renders correctly at runtime (it reaches `i18n._` and falls back to
+// `message`), but the extractor never sees the id, so the string cannot be
+// translated. Three of these were rescued
 // by accident — `ExemplarAttribution` below repeats them as <Trans> under the
 // same ids — but `fromText` has no component twin and was invisible to Crowdin.
 const MSG_FROM_CLDR = msg({ id: "survey.phaseB.exemplars.fromCldr", message: "from CLDR" });
+const MSG_FROM_CLDR_PINNED = msg({
+  id: "survey.phaseB.exemplars.fromCldrPinned",
+  message: "from CLDR {version}",
+});
+const MSG_FROM_CLDR_LIVE = msg({
+  id: "survey.phaseB.exemplars.fromCldrLive",
+  message: "from CLDR {version} (live refresh)",
+});
 const MSG_FROM_TEXT = msg({
   id: "survey.phaseB.exemplars.fromText",
   message: "from your text sample",
@@ -1676,27 +1689,63 @@ const MSG_FROM_SLDR = msg({ id: "survey.phaseB.exemplars.fromSldr", message: "fr
 function attributionText(
   source: string,
   confidence: string | undefined,
-  t: ReturnType<typeof useLingui>["t"],
+  i18n: ReturnType<typeof useLingui>["i18n"],
+  release?: string,
 ): string {
+  // Live-refreshed CLDR (#1367): the wording MUST name the fetched release
+  // and say it was a live refresh — rendering it as plain "from CLDR" would
+  // collapse exactly the pinned/unpinned distinction the feature exists to
+  // keep visible. The release rides in the draft's proposalRelease, keyed
+  // by this provenance, so it survives reload.
+  //
+  // Parameterized strings go through i18n._(id, values): the macro t()
+  // accepts a descriptor but no values, while the I18n instance's id
+  // overload does. The msg() descriptors above keep the ids extractable.
+  if (source === "cldr-live") {
+    return release !== undefined
+      ? i18n._(MSG_FROM_CLDR_LIVE.id, { version: release })
+      : i18n._(MSG_FROM_CLDR);
+  }
   if (source === "cldr") {
-    return t(MSG_FROM_CLDR);
+    return release !== undefined
+      ? i18n._(MSG_FROM_CLDR_PINNED.id, { version: release })
+      : i18n._(MSG_FROM_CLDR);
   }
   if (source === "text") {
-    return t(MSG_FROM_TEXT);
+    return i18n._(MSG_FROM_TEXT);
   }
   if (confidence !== undefined && UNCONFIRMED_CONFIDENCES.has(confidence)) {
-    return t(MSG_FROM_SLDR_UNCONFIRMED);
+    return i18n._(MSG_FROM_SLDR_UNCONFIRMED);
   }
-  return t(MSG_FROM_SLDR);
+  return i18n._(MSG_FROM_SLDR);
 }
 
 function ExemplarAttribution({
   source,
   confidence,
+  live,
+  release,
 }: {
   source: ExemplarSource;
   confidence: string;
+  /** True for a live-refreshed inventory (#1367) — wording names the release. */
+  live?: boolean | undefined;
+  release?: string | undefined;
 }) {
+  if (source === "cldr" && live === true && release !== undefined) {
+    return (
+      <Trans id="survey.phaseB.exemplars.fromCldrLive">
+        from CLDR {{ version: release }} (live refresh)
+      </Trans>
+    );
+  }
+  if (source === "cldr" && release !== undefined) {
+    return (
+      <Trans id="survey.phaseB.exemplars.fromCldrPinned">
+        from CLDR {{ version: release }}
+      </Trans>
+    );
+  }
   if (source === "cldr") {
     return <Trans id="survey.phaseB.exemplars.fromCldr">from CLDR</Trans>;
   }
