@@ -1290,6 +1290,7 @@
   "output.submit.outputBlockedReason.startingLicenseUnreadable": "le titulaire d’origine des droits d’auteur du clavier de départ n’a pas pu être lu — confirmez-le dans la bannière ci-dessus",
   "output.submit.outputBlockedReason.touchStale": "la disposition tactile n’est plus à jour — retournez à l’étape Tactile et recomplétez-la",
   "output.submit.permanence": "Submitting publishes your keyboard as a public pull request. Your name and email address become part of that submission, and once it is merged they are part of the repository’s permanent public history — they cannot be removed from it later.",
+  "output.submit.prBody.label": "Description de la demande de tirage (générée à partir de vos vérifications — vous pouvez la modifier)",
   "output.submit.sectionAriaLabel": "Soumettre au dépôt communautaire",
   "output.submit.sectionLabel": "Soumettre au dépôt communautaire",
   "output.submit.status.ariaLabel": "État de la soumission",

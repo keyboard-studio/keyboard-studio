@@ -513,3 +513,108 @@ describe("ManagedPRSubmitPanel — error states", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: #506 auto-generated PR body (spec §12)
+// ---------------------------------------------------------------------------
+
+import { ALL_CRITERIA } from "@keyboard-studio/contracts";
+import type { PRBodyLintResults } from "../lib/generatePRBody.ts";
+
+function lintResultsFixture(): PRBodyLintResults {
+  const byId = (id: string) => {
+    const c = ALL_CRITERIA.find((x) => x.id === id);
+    if (c === undefined) throw new Error(`unknown criterion ${id}`);
+    return c;
+  };
+  return {
+    criteria: [
+      { criterion: byId("1.1-no-files-outside-keyboard-folder"), status: "met" },
+      { criterion: byId("4.3-copyright-holder-is-authorized"), status: "needs-human" },
+    ],
+    findings: [],
+  };
+}
+
+describe("ManagedPRSubmitPanel — #506 generated PR body", () => {
+  it("shows the generated lint checklist as the PR-description default", () => {
+    renderPanel({ canSubmit: true, lintResults: lintResultsFixture() });
+    const area = screen.getByRole("textbox", {
+      name: /pull request description/i,
+    }) as HTMLTextAreaElement;
+    expect(area.value).toContain("### Green — checks passed");
+    expect(area.value).toContain("- [x] 1.1-no-files-outside-keyboard-folder");
+    expect(area.value).toContain("### Red — manual action required");
+    // Copyright not yet confirmed: attestation is an unchecked red item.
+    expect(area.value).toContain("- [ ] Copyright attestation:");
+  });
+
+  it("regenerates the default (attestation line) once copyright is confirmed, when unedited", () => {
+    renderPanel({ canSubmit: true, lintResults: lintResultsFixture() });
+    fillValidForm();
+    const area = screen.getByRole("textbox", {
+      name: /pull request description/i,
+    }) as HTMLTextAreaElement;
+    expect(area.value).toContain("**Copyright attestation:** The submitter has confirmed");
+    expect(area.value).not.toContain("- [ ] Copyright attestation:");
+  });
+
+  it("submits the author's edited body rather than the generated default", async () => {
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService();
+    // The "null projectWorkingCopyForOutput" test above queues a
+    // getManagedPROutputService Once its flow never consumes (the null
+    // project returns before the service call), and vi.clearAllMocks does
+    // not drain Once queues — reset so the panel gets THIS test's service.
+    mockedGetService.mockReset();
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    renderPanel({ canSubmit: true, lintResults: lintResultsFixture() });
+    fillValidForm();
+    const area = screen.getByRole("textbox", {
+      name: /pull request description/i,
+    }) as HTMLTextAreaElement;
+    fireEvent.change(area, { target: { value: "My custom PR description." } });
+    fireEvent.click(
+      screen.getByRole("button", { name: /submit keyboard to community repository/i }),
+    );
+
+    await waitFor(
+      () => {
+        expect(svc.publishManagedPR).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 5000 },
+    );
+    const opts = svc.publishManagedPR.mock.calls[0]?.[1] as { prBody: string };
+    expect(opts.prBody).toContain("My custom PR description.");
+    expect(opts.prBody).not.toContain("### Green — checks passed");
+    expect(opts.prBody).toContain("## Test Keyboard");
+  });
+
+  it("submits the generated body when the author did not edit it", async () => {
+    mockedProject.mockResolvedValueOnce(makeProjectResult());
+    const svc = makeService();
+    // The "null projectWorkingCopyForOutput" test above queues a
+    // getManagedPROutputService Once its flow never consumes (the null
+    // project returns before the service call), and vi.clearAllMocks does
+    // not drain Once queues — reset so the panel gets THIS test's service.
+    mockedGetService.mockReset();
+    mockedGetService.mockResolvedValueOnce(svc);
+
+    renderPanel({ canSubmit: true, lintResults: lintResultsFixture() });
+    fillValidForm();
+    fireEvent.click(
+      screen.getByRole("button", { name: /submit keyboard to community repository/i }),
+    );
+
+    await waitFor(
+      () => {
+        expect(svc.publishManagedPR).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 5000 },
+    );
+    const opts = svc.publishManagedPR.mock.calls[0]?.[1] as { prBody: string };
+    expect(opts.prBody).toContain("### Green — checks passed");
+    expect(opts.prBody).toContain("**Copyright attestation:** The submitter has confirmed");
+  });
+});

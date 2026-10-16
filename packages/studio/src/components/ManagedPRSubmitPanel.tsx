@@ -30,7 +30,7 @@
 // submitted tree is identical to what the download would contain. No VFS is
 // held in component state between renders — it is projected on demand.
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
@@ -41,6 +41,10 @@ import {
   isPublishManagedPRError,
 } from "../lib/publishManagedPRErrorMessage.ts";
 import { recordProjectSubmission } from "../lib/draftPersistence.ts";
+import {
+  generatePRBody,
+  type PRBodyLintResults,
+} from "../lib/generatePRBody.ts";
 import { useTestingStore } from "../stores/testingStore.ts";
 import { buildDecisionSummaryBlock } from "@keyboard-studio/engine";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
@@ -178,6 +182,14 @@ export interface ManagedPRSubmitPanelProps {
     displayName?: string;
     email?: string;
   };
+  /**
+   * Lint/criteria results for the auto-generated PR body (#506, spec §12).
+   * Passed in from OutputScreen, which owns the artifact pipeline that
+   * resolves them. The panel feeds them to generatePRBody and shows the
+   * result as the editable default in the PR-description field. Optional:
+   * a caller without results gets the "no lint results" body.
+   */
+  lintResults?: PRBodyLintResults;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,11 +211,13 @@ export function ManagedPRSubmitPanel({
   outputBlocked = false,
   outputBlockedReason,
   prefill,
+  lintResults,
 }: ManagedPRSubmitPanelProps) {
   const { t, i18n } = useLingui();
   const nameId = useId();
   const emailId = useId();
   const copyrightId = useId();
+  const prBodyId = useId();
 
   // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList) so
   // this panel can transition the active "My keyboards" project to
@@ -219,6 +233,12 @@ export function ManagedPRSubmitPanel({
   );
   const [email, setEmail] = useState<string>(prefill?.email ?? "");
   const [copyrightChecked, setCopyrightChecked] = useState(false);
+  // #506: the author's edit of the PR-description field. Null means "not
+  // edited yet" — the field then follows the generated default as lint
+  // results and the copyright checkbox change. Once the author types, the
+  // edit wins and regeneration never clobbers it (same dirty-field idiom
+  // as the prefill effects below).
+  const [prBodyEdited, setPrBodyEdited] = useState<string | null>(null);
   const [nameBlurred, setNameBlurred] = useState(false);
   const [emailBlurred, setEmailBlurred] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
@@ -265,6 +285,19 @@ export function ManagedPRSubmitPanel({
   });
   const effectiveBlockedReason = outputBlockedReason ?? blockedFallbackReason;
 
+  // #506 (spec §12): the auto-generated PR body — green/yellow/red lint
+  // checklist + copyright attestation — shown as the editable default in
+  // the PR-description field below. Regenerated from the current lint
+  // results and attestation state until the author edits the field.
+  const generatedBody = useMemo(
+    () =>
+      generatePRBody(lintResults ?? { criteria: null, findings: [] }, {
+        confirmed: copyrightChecked,
+      }),
+    [lintResults, copyrightChecked],
+  );
+  const prBodyDraft = prBodyEdited ?? generatedBody;
+
   const handleSubmit = useCallback(async () => {
     if (!submitEnabled) return;
     setSubmitState({ kind: "submitting" });
@@ -288,9 +321,11 @@ export function ManagedPRSubmitPanel({
 
       const { vfs, keyboardId, displayName } = projected;
 
-      // Build a minimal PR body — the backend prepends provenance and wraps
-      // the title. The SPA provides the human description and copyright
-      // attestation so the org bot's PR body is meaningful.
+      // Build the PR body — the backend prepends provenance and wraps
+      // the title. The SPA provides the human description, the
+      // auto-generated lint checklist + copyright attestation (#506,
+      // generatePRBody; the author's edited draft when they changed it),
+      // so the org bot's PR body is meaningful.
       //
       // The decision block (specs/053-decision-audit FR-018) is generated from
       // the record AS IT STANDS at this moment, not maintained incrementally as
@@ -313,7 +348,7 @@ export function ManagedPRSubmitPanel({
         "",
         "---",
         "",
-        "**Copyright attestation:** The submitter has confirmed they are the copyright holder or are authorized to submit this keyboard to the community repository.",
+        prBodyDraft,
         ...decisionBlock,
       ].join("\n");
 
@@ -357,7 +392,7 @@ export function ManagedPRSubmitPanel({
     } finally {
       useTestingStore.getState().setSubmitInFlight(false);
     }
-  }, [submitEnabled, authorName, email, t, i18n, accessToken]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken, prBodyDraft]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
@@ -515,6 +550,32 @@ export function ManagedPRSubmitPanel({
             keyboard to the community repository.
           </Trans>
         </label>
+      </div>
+
+      {/* #506: auto-generated PR body (spec §12) as an editable default.
+          Regenerates from the lint results until the author edits it. */}
+      <div>
+        <label htmlFor={prBodyId} style={fieldLabelStyle}>
+          <Trans id="output.submit.prBody.label">
+            Pull request description (generated from your checks — you can edit it)
+          </Trans>
+        </label>
+        <textarea
+          id={prBodyId}
+          value={prBodyDraft}
+          onChange={(e) => {
+            setPrBodyEdited(e.target.value);
+          }}
+          rows={10}
+          disabled={isSubmitting}
+          style={{
+            ...inputStyle,
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 12,
+            lineHeight: 1.5,
+            resize: "vertical",
+          }}
+        />
       </div>
 
       {/* Spec 095 FR-004: the permanence disclosure sits at the confirm
