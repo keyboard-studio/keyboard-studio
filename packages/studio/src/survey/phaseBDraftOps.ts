@@ -53,7 +53,16 @@ export type DraftProvenance =
   | "author"
   | "text"
   | "base"
-  | "ascii-floor";
+  | "ascii-floor"
+  /**
+   * Seeded from a live-refreshed CLDR inventory (#1367): the characters
+   * came from a newer CLDR release fetched in-session, NOT the pinned
+   * index the rest of the session was built against. Kept distinct from
+   * `"cldr"` so the attribution survives reload — the refreshed dataset
+   * does not persist, but which release attested an accepted character
+   * must (the version itself rides in `proposalRelease`).
+   */
+  | "cldr-live";
 
 /** An author's decision about one invisible (format) character. */
 export type InvisibleDecision = "accepted" | "declined";
@@ -103,6 +112,14 @@ export interface CharacterInventoryValue {
   loanwordChars: string[];
   rejected: string[];
   proposalConfidence: Record<string, string>;
+  /**
+   * The CLDR release behind a provenance key (#1367): `"cldr"` → the
+   * pinned index's release, `"cldr-live"` → the fetched release. Keyed
+   * exactly like `proposalConfidence`, so a chip's attribution can name
+   * the release its characters came from even after a reload (when the
+   * live dataset itself is gone).
+   */
+  proposalRelease: Record<string, string>;
   exemplarMethodDeclined: boolean;
   seededProposals: string[];
   alphabetEvidenceKey?: string | undefined;
@@ -151,6 +168,7 @@ export function emptyCharacterInventoryValue(): CharacterInventoryValue {
     loanwordChars: [],
     rejected: [],
     proposalConfidence: {},
+    proposalRelease: {},
     exemplarMethodDeclined: false,
     seededProposals: [],
     selectedFont: DEFAULT_PHASE_B_FONT,
@@ -536,14 +554,24 @@ export function seedFromProposal(
     [],
     mainChars.flatMap((ch) => casePairOf(ch, bcp47)),
   );
+  // A live-refreshed CLDR inventory seeds under its own provenance (#1367):
+  // calling it plain "cldr" would make refreshed characters
+  // indistinguishable from pinned ones — in this session and, because the
+  // draft persists, in every later one. The fetched release rides along in
+  // proposalRelease, keyed by that same provenance.
+  const provenance: DraftProvenance =
+    inv.live === true && inv.source === "cldr" ? "cldr-live" : inv.source;
   let next: CharacterInventoryValue = {
     ...value,
-    proposalConfidence: { ...value.proposalConfidence, [inv.source]: inv.confidence },
+    proposalConfidence: { ...value.proposalConfidence, [provenance]: inv.confidence },
+    ...(inv.release !== undefined && inv.source === "cldr"
+      ? { proposalRelease: { ...value.proposalRelease, [provenance]: inv.release } }
+      : {}),
     exemplarDigraphs: nfcDedup(value.exemplarDigraphs, inv.digraphs),
   };
   let lastPick: LastPickContribution | null = null;
   for (const ch of proposed) {
-    const r = addWithProvenance(next, ch, inv.source);
+    const r = addWithProvenance(next, ch, provenance);
     next = r.value;
     if (r.lastPick !== null) lastPick = r.lastPick;
   }
@@ -628,6 +656,7 @@ export function resetDraft(value: CharacterInventoryValue): CharacterInventoryVa
     exemplarDigraphs: [],
     loanwordChars: [],
     proposalConfidence: {},
+    proposalRelease: {},
   };
 }
 
@@ -854,6 +883,7 @@ export interface PhaseBDraftSnapshotShape {
   loanwordChars?: string[];
   rejected?: string[];
   proposalConfidence?: Record<string, string>;
+  proposalRelease?: Record<string, string>;
   exemplarMethodDeclined?: boolean;
   seededProposals?: string[];
   invisibleDecisions?: Record<string, InvisibleDecision>;
@@ -880,6 +910,7 @@ export function valuesFromSnapshot(snapshot: PhaseBDraftSnapshotShape): {
     loanwordChars: snapshot.loanwordChars ?? [],
     rejected: snapshot.rejected ?? [],
     proposalConfidence: snapshot.proposalConfidence ?? {},
+    proposalRelease: snapshot.proposalRelease ?? {},
     exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,
     seededProposals: snapshot.seededProposals ?? [],
     alphabetEvidenceKey: snapshot.alphabetEvidenceKey,
@@ -909,6 +940,7 @@ export function snapshotFromValues(
     loanwordChars: character.loanwordChars,
     rejected: character.rejected,
     proposalConfidence: character.proposalConfidence,
+    proposalRelease: character.proposalRelease,
     exemplarMethodDeclined: character.exemplarMethodDeclined,
     seededProposals: character.seededProposals,
     invisibleDecisions: invisibleDecisionsOf(invisibles),

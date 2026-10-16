@@ -237,6 +237,8 @@ describe("phase B inventory draft — snapshot/restore round-trip", () => {
       loanwordChars: [],
       rejected: [],
       proposalConfidence: {},
+      // #1367 addition: no CLDR proposal seeded, so no release is recorded.
+      proposalRelease: {},
       exemplarMethodDeclined: false,
       // Spec 075 additions: no proposal seeded, no invisible asked.
       seededProposals: [],
@@ -1031,5 +1033,66 @@ describe("phase B inventory draft — loanword letters beside the alphabet", () 
     restoreInventoryFromSnapshot(snapshot);
     expect(draft().loanwordChars).toEqual(["q", "Q"]);
     expect(draft().chars).toEqual(["a"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1367 — live-refresh provenance: a refreshed CLDR inventory must seed
+// under its own "cldr-live" provenance with its release recorded, so the
+// attribution survives reload and never collapses into the pinned "cldr".
+// ---------------------------------------------------------------------------
+
+describe("phase B inventory draft — seedFromProposal live refresh (#1367)", () => {
+  afterEach(() => {
+    resetInventoryDecisions();
+  });
+
+  function liveInventory(chars: string[], release: string): SourcedInventory {
+    return { ...inventory(chars, "cldr"), live: true, release };
+  }
+
+  it("seeds refreshed characters as cldr-live, not cldr", () => {
+    draft().seedFromProposal(liveInventory(["q", "ŋ"], "48.2.1"));
+    const s = draft();
+    expect(s.provenance["q"]).toBe("cldr-live");
+    expect(s.provenance["ŋ"]).toBe("cldr-live");
+    expect(s.proposalConfidence["cldr-live"]).toBe("approved");
+    expect(s.proposalRelease["cldr-live"]).toBe("48.2.1");
+  });
+
+  it("records the pinned release behind the plain cldr provenance", () => {
+    draft().seedFromProposal({ ...inventory(["a"], "cldr"), release: "48.2.0" });
+    const s = draft();
+    expect(s.provenance["a"]).toBe("cldr");
+    expect(s.proposalRelease["cldr"]).toBe("48.2.0");
+  });
+
+  it("keeps pinned and live provenances distinct across both seeds", () => {
+    draft().seedFromProposal({ ...inventory(["a"], "cldr"), release: "48.2.0" });
+    draft().seedFromProposal(liveInventory(["q"], "48.2.1"));
+    const s = draft();
+    expect(s.provenance["a"]).toBe("cldr");
+    expect(s.provenance["q"]).toBe("cldr-live");
+    expect(s.proposalRelease).toEqual({ cldr: "48.2.0", "cldr-live": "48.2.1" });
+  });
+
+  it("round-trips proposalRelease through a snapshot (the reload path)", () => {
+    draft().seedFromProposal(liveInventory(["q"], "48.2.1"));
+    const snapshot = snapshotFromValues(getCharacterInventoryValue(), getInvisiblesInventoryValue());
+    expect(snapshot.proposalRelease).toEqual({ "cldr-live": "48.2.1" });
+    draft().reset();
+    restoreInventoryFromSnapshot(snapshot);
+    const s = draft();
+    expect(s.provenance["q"]).toBe("cldr-live");
+    expect(s.proposalRelease["cldr-live"]).toBe("48.2.1");
+  });
+
+  it("does not resurrect a rejected character from a live inventory", () => {
+    draft().seedFromProposal(liveInventory(["q"], "48.2.1"));
+    draft().remove("q");
+    draft().seedFromProposal(liveInventory(["q", "z"], "48.2.1"));
+    const s = draft();
+    expect(s.chars).not.toContain("q");
+    expect(s.chars).toContain("z");
   });
 });

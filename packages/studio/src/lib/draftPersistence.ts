@@ -1029,6 +1029,7 @@ const PHASE_B_SLICE_KEYS: ReadonlySet<string> = new Set([
   "loanwordChars",
   "rejected",
   "proposalConfidence",
+  "proposalRelease",
   "exemplarMethodDeclined",
   "seededProposals",
   "invisibleDecisions",
@@ -1120,6 +1121,7 @@ function parsePhaseBDraftSlice(raw: unknown): {
       loanwordChars: keptStrings("loanwordChars", pb.loanwordChars),
       rejected: keptStrings("rejected", pb.rejected),
       proposalConfidence: keptEntries("proposalConfidence", pb.proposalConfidence),
+      proposalRelease: keptEntries("proposalRelease", pb.proposalRelease),
       exemplarMethodDeclined: pb.exemplarMethodDeclined === true,
       // spec 075 sticky fields — same tolerant treatment, same reason.
       seededProposals: keptStrings("seededProposals", pb.seededProposals),

@@ -25,6 +25,7 @@ import type {
   ExemplarInventory,
   TextSampleSource,
   ExemplarTier,
+  ExemplarRefreshResult,
   ToZipOptions,
   BuildKmpResult,
   BuildKmpOptions,
@@ -360,7 +361,22 @@ export async function sourcedExemplarsBoth(bcp47: string): Promise<{
   return sourceExemplarsBoth(bcp47);
 }
 
-export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier, ExemplarInventory, TextSampleSource };
+/**
+ * Opt-in live refresh of exemplar data (#1367). AUTHOR-INITIATED ONLY: the
+ * caller wires this to an explicit button click — never an effect, a mount,
+ * or a timer. On "updated" the engine has installed the refreshed data
+ * inside the single sourcing path, so every consumer (this module's
+ * sourcedExemplars included, on its next resolution) reads the same
+ * inventory. In fixture mode (USE_REAL false) there is no network to check
+ * against, so the honest outcome is "network-error".
+ */
+export async function refreshExemplars(bcp47: string): Promise<ExemplarRefreshResult> {
+  if (!USE_REAL) return { kind: "network-error" };
+  const { refreshExemplars: engineRefreshExemplars } = await importEngine();
+  return engineRefreshExemplars(bcp47);
+}
+
+export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier, ExemplarInventory, TextSampleSource, ExemplarRefreshResult };
 export { charactersInTier };
 
 // Re-export the type so callers can use it without a direct engine import.
