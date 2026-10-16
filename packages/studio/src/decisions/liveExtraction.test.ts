@@ -323,3 +323,44 @@ describe("runLiveExtraction — failure and idempotence", () => {
     expect(store.decisions["copyright-holder"]).toBe(before);
   });
 });
+
+describe("runLiveExtraction — pf_troubleshooting proposal (issue #1800)", () => {
+  const proposal =
+    "Nothing appears when I press a key - press the next key, and the character appears; some characters on this keyboard are typed in two steps.";
+
+  it("seeds help-troubleshooting from phaseF.troubleshootingProposal when the gate is open", async () => {
+    const gateMod = (await import("../survey/questions/f/pf_more_detail_gate.ts")).default;
+    const troubleshootingMod = (await import("../survey/questions/f/pf_troubleshooting.ts")).default;
+    const store = fakeStore({
+      "help-more-detail": { id: "help-more-detail", value: "true", provenance: "asked" },
+    });
+    const result = runLiveExtraction({
+      modules: [gateMod, troubleshootingMod],
+      ctx: ctx({ phaseF: { troubleshootingProposal: proposal } }),
+      store,
+    });
+    expect(result.seeded).toContain("help-troubleshooting");
+    expect(store.decisions["help-troubleshooting"]).toEqual({
+      id: "help-troubleshooting",
+      value: proposal,
+      provenance: "extracted",
+      source: "basic_kbdfr",
+      inputs: { "help-more-detail": "true" },
+    });
+  });
+
+  it("seeds nothing when the wiring computed no proposal", async () => {
+    const gateMod = (await import("../survey/questions/f/pf_more_detail_gate.ts")).default;
+    const troubleshootingMod = (await import("../survey/questions/f/pf_troubleshooting.ts")).default;
+    const store = fakeStore({
+      "help-more-detail": { id: "help-more-detail", value: "true", provenance: "asked" },
+    });
+    const result = runLiveExtraction({
+      modules: [gateMod, troubleshootingMod],
+      ctx: ctx({ phaseF: {} }),
+      store,
+    });
+    expect(result.seeded).not.toContain("help-troubleshooting");
+    expect(store.decisions["help-troubleshooting"]).toBeUndefined();
+  });
+});
