@@ -107,17 +107,18 @@ group(main) using keys
 + [K_A] > U+0061
 `;
 
-    it("classifies a store body with a named deadkey as opaque NAMED_DEADKEY (not silently raw, not SMP_LITERAL)", () => {
+    it("types a store body with a named deadkey as a namedDeadkey item (#2238 flip of the #266 pin)", () => {
+      // Pre-#2238 this pinned the errmark store as an opaque NAMED_DEADKEY
+      // fragment. The codec now types dk(name) in store position: the store
+      // is a normal parsed store whose single item carries the name
+      // verbatim, no fragment is produced, and nothing is counted opaque.
       const { ir, opaqueFeatures } = parse(KMN, "ndk");
-      // The errmark store is wrapped as a raw fragment with the correct reason…
-      const frag = ir.raw.find((f) => f.sourceText.includes("errmark"));
-      expect(frag).toBeDefined();
-      expect(frag?.reason).toBe("named-deadkey");
-      // …counted under the right feature, not mislabelled as smp-literal.
-      expect(opaqueFeatures).toContainEqual({ feature: "named-deadkey", count: 1 });
+      const store = ir.stores.find((s) => s.name === "errmark");
+      expect(store).toBeDefined();
+      expect(store?.items).toEqual([{ kind: "namedDeadkey", name: "a_err" }]);
+      expect(ir.raw.some((f) => f.sourceText.includes("errmark"))).toBe(false);
+      expect(opaqueFeatures.some((f) => f.feature === "named-deadkey")).toBe(false);
       expect(opaqueFeatures.some((f) => f.feature === "smp-literal")).toBe(false);
-      // …and NOT emitted as a normal parsed store.
-      expect(ir.stores.some((s) => s.name === "errmark")).toBe(false);
     });
 
     it("still parses a numeric dk(NNNN) store as a normal deadkey store (regression guard)", () => {
@@ -128,12 +129,11 @@ group(main) using keys
       expect(ir.raw.some((f) => f.sourceText.includes("numdk"))).toBe(false);
     });
 
-    it("treats the WHOLE store as opaque when a named deadkey follows valid items (early-return discards partials)", () => {
-      // A named deadkey mid-list means the store can't be represented in the
-      // typed IR; the parser early-returns an opaque reason and the caller wraps
-      // the entire store as a RawKmnFragment. The already-parsed valid items
-      // (U+0061, U+0062) are intentionally discarded — NOT salvaged into a
-      // partial store. This guards future callers from expecting partial results.
+    it("types the WHOLE store when a named deadkey follows valid items (#2238 flip)", () => {
+      // Pre-#2238 a named deadkey mid-list made the whole store opaque
+      // (early-return discarded the partial items). Since #2238 the named
+      // item is typed in place: the store parses completely, items in
+      // source order, no fragment, nothing counted opaque.
       const MIXED = `store(&VERSION) '10.0'
 store(&NAME) 'Mixed'
 store(&TARGETS) 'any'
@@ -143,16 +143,15 @@ group(main) using keys
 + [K_A] > U+0061
 `;
       const { ir, opaqueFeatures } = parse(MIXED, "mixed");
-      // The whole store is opaque — not emitted as a parsed store…
-      expect(ir.stores.some((s) => s.name === "mixed")).toBe(false);
-      // …wrapped as a single raw fragment whose sourceText is the ENTIRE store
-      // body: the valid U+0061 / U+0062 are captured opaque, not salvaged into a
-      // partial store.
-      const frag = ir.raw.find((f) => f.sourceText.includes("store(mixed)"));
-      expect(frag?.reason).toBe("named-deadkey");
-      expect(frag?.sourceText).toContain("U+0061");
-      expect(frag?.sourceText).toContain("U+0062");
-      expect(opaqueFeatures).toContainEqual({ feature: "named-deadkey", count: 1 });
+      const store = ir.stores.find((s) => s.name === "mixed");
+      expect(store).toBeDefined();
+      expect(store?.items).toEqual([
+        { kind: "char", value: "a" },
+        { kind: "namedDeadkey", name: "a_err" },
+        { kind: "char", value: "b" },
+      ]);
+      expect(ir.raw.some((f) => f.sourceText.includes("store(mixed)"))).toBe(false);
+      expect(opaqueFeatures.some((f) => f.feature === "named-deadkey")).toBe(false);
     });
   });
 });

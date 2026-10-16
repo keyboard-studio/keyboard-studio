@@ -318,10 +318,12 @@ export function applyAddGalleryMutate(
  * The engine's deadkey-lifecycle mutations (packages/engine) touch only
  * rules (trigger, fan-out, escape) and the two fan-out stores; the author
  * name rides the trigger rule's `trailingComment`, which lives inside
- * `groups[]` as well. Named deadkeys (id null, pre-FR-004) live as opaque
- * `raw[]` fragments — their delete/retarget rewrites those fragments, so
- * `raw[]` is in scope too. `header`, `comments`, and `touchLayout` are
- * never touched, so a patch reaching them fails the M3 containment check.
+ * `groups[]` as well. Named deadkeys (id null) are typed rules in
+ * `groups[]` since #2238 — and opaque `raw[]` fragments on persisted
+ * pre-#2238 copies — and their delete/retarget rewrites either
+ * representation, so both arrays are in scope. `header`, `comments`, and
+ * `touchLayout` are never touched, so a patch reaching them fails the M3
+ * containment check.
  *
  * Mirrors ADD_GALLERY_WRITES (same arrays — deadkeys are IR entities,
  * not session answers).

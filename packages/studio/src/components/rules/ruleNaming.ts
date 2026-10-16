@@ -70,6 +70,8 @@ function contextElementText(el: ContextElement): string {
       return el.modifiers.length > 0 ? `${el.modifiers.join("+")}+${el.name}` : el.name;
     case "deadkey":
       return `deadkey(${el.id})`;
+    case "namedDeadkey":
+      return `dk(${el.name})`;
     case "any":
       return `any(${el.storeRef})`;
     case "notany":
@@ -93,6 +95,8 @@ function outputElementText(el: OutputElement): string {
       return `\`${el.value}\``;
     case "deadkey":
       return `deadkey(${el.id})`;
+    case "namedDeadkey":
+      return `dk(${el.name})`;
     case "beep":
       return "beep";
     case "nul":

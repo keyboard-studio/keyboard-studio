@@ -107,6 +107,7 @@
 // through by reference.
 
 import type { KeyboardIR, IRStore, ContextElement, OutputElement } from "@keyboard-studio/contracts";
+import { isNamedDeadkeyElement } from "@keyboard-studio/contracts";
 import { parseSlotId } from "./slotId.js";
 import { isPlusSeparator } from "../shared/rule-shape.js";
 
@@ -420,6 +421,19 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
+      // #2238 pin (km-lead ruling D7): a rule containing a name-carrying
+      // deadkey element was an opaque fragment until #2238 and contributed
+      // NOTHING to this analysis — its stores' chips were plain drops.
+      // Keep it invisible here so typed named fan-outs do not silently gain
+      // coordinated pair-drop (or blocked: unresolved-index-pairing)
+      // posture; adoption is a separate consumer ruling.
+      if (
+        rule.context.some(isNamedDeadkeyElement) ||
+        rule.output.some(isNamedDeadkeyElement)
+      ) {
+        continue;
+      }
+
       const noNewContent = ruleAddsNoNewContent(rule);
 
       for (const el of rule.context) {

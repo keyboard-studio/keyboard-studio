@@ -277,6 +277,92 @@ describe("listDeadkeys", () => {
 // allocateDeadkeyId
 // ---------------------------------------------------------------------------
 
+describe("listDeadkeys — typed named deadkeys (#2238)", () => {
+  function namedTrigger(vkey: string, name: string): IRRule {
+    return rule(
+      [{ kind: "vkey", name: vkey, modifiers: [] }],
+      [{ kind: "namedDeadkey", name }],
+    );
+  }
+  function namedFanout(name: string, base: string, out: string): IRRule {
+    return rule(
+      [
+        { kind: "namedDeadkey", name },
+        { kind: "any", storeRef: base },
+      ],
+      [{ kind: "index", storeRef: out, offset: 2 }],
+    );
+  }
+
+  it("lists a typed named cluster: trigger, fan-out, pair count, id null, no authorName", () => {
+    const ir = makeTestIR(
+      [groupWith([namedTrigger("K_A", "acute"), namedFanout("acute", "acuteK", "acuteO")])],
+      [
+        charStore({ name: "acuteK", chars: "aei" }),
+        charStore({ name: "acuteO", chars: "áéí" }),
+      ],
+    );
+    const listed = listDeadkeys(ir);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      id: null,
+      name: "acute",
+      triggerKey: "K_A",
+      baseStore: "acuteK",
+      outputStore: "acuteO",
+      pairCount: 3,
+      origin: "imported",
+    });
+    expect(listed[0]?.authorName).toBeUndefined();
+  });
+
+  it("case-variant spellings are ONE deadkey; the entry keeps the first-seen spelling", () => {
+    // embera_north shape: armed dk(semicolon), consumed dk(Semicolon).
+    const ir = makeTestIR(
+      [groupWith([namedTrigger("K_S", "semicolon"), namedFanout("Semicolon", "semiK", "semiO")])],
+      [
+        charStore({ name: "semiK", chars: "ab" }),
+        charStore({ name: "semiO", chars: "cd" }),
+      ],
+    );
+    const listed = listDeadkeys(ir);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      name: "semicolon",
+      triggerKey: "K_S",
+      baseStore: "semiK",
+      outputStore: "semiO",
+    });
+  });
+
+  it("typed and fragment representations of one name merge — typed wins, no double count", () => {
+    const ir = makeTestIR(
+      [groupWith([namedTrigger("K_A", "acute")])],
+      [],
+      [namedRaw("dk(acute) + any(acuteK) > index(acuteO, 2)")],
+    );
+    const listed = listDeadkeys(ir);
+    expect(listed).toHaveLength(1);
+    // The trigger comes from the typed rule; the fan-out stores are only
+    // visible in the fragment — the merged entry carries both.
+    expect(listed[0]).toMatchObject({ name: "acute", triggerKey: "K_A" });
+  });
+
+  it("raw fragments differing only in name case merge to one entry (scan keyed by fold)", () => {
+    const ir = makeTestIR(
+      [groupWith([])],
+      [],
+      [
+        namedRaw("+ [K_S] > dk(semicolon)"),
+        namedRaw("dk(Semicolon) + any(semiK) > index(semiO, 2)"),
+      ],
+    );
+    const listed = listDeadkeys(ir);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ id: null, triggerKey: "K_S", baseStore: "semiK" });
+  });
+});
+
 describe("allocateDeadkeyId", () => {
   it("returns 0x3000 for an IR with no deadkeys", () => {
     const ir = makeTestIR([groupWith([])]);
@@ -410,6 +496,31 @@ describe("validateDeadkeyLifecycle", () => {
           reason: "named-deadkey",
           sourceText: "dk(café) + any(dk_cafe_bases) > index(dk_cafe_output, 2)",
         },
+      ],
+    );
+    expect(validateDeadkeyLifecycle(ir)).toEqual([]);
+  });
+
+  it("does not flag dk_* stores claimed by TYPED named-deadkey rules (#2238)", () => {
+    // Post-#2238 the fan-out rule is typed, not a fragment: the orphan
+    // scan must claim its stores from the typed rule exactly as it did
+    // from the fragment text, or every imported named-deadkey keyboard
+    // with hex-slug store names gains a false orphan error.
+    const ir = makeTestIR(
+      [
+        groupWith([
+          rule(
+            [
+              { kind: "namedDeadkey", name: "café" },
+              { kind: "any", storeRef: "dk_cafe_bases" },
+            ],
+            [{ kind: "index", storeRef: "dk_cafe_output", offset: 2 }],
+          ),
+        ]),
+      ],
+      [
+        charStore({ name: "dk_cafe_bases", chars: "a" }),
+        charStore({ name: "dk_cafe_output", chars: "á" }),
       ],
     );
     expect(validateDeadkeyLifecycle(ir)).toEqual([]);

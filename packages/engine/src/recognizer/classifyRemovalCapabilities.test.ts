@@ -18,7 +18,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { classifyRemovalCapabilities } from "./classifyRemovalCapabilities.js";
 import { recognizePatterns } from "./index.js";
-import { parse } from "../codec/index.js";
+import { parse, emit } from "../codec/index.js";
+import { carveFilterIr } from "../pattern-apply/carveFilterIr.js";
 import type {
   KeyboardIR,
   IRGroup,
@@ -790,5 +791,165 @@ describe("classifyRemovalCapabilities — isParallelIndexFanOut regression", () 
     const map = classifyRemovalCapabilities(ir);
     expect(map.get("rule#bare-any")).toBe("removable:slot-fill");
     expect(map.get("store#defaultU")).toBe("removable:slot-fill");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F. Named-deadkey posture guard (#2238, Decision 1b)
+// ---------------------------------------------------------------------------
+
+describe("classifyRemovalCapabilities — named deadkey guard (#2238)", () => {
+  const inputStore = makeCharStore("store#acuteIn", "acuteIn", "ae");
+  const outputStore = makeCharStore("store#acuteOut", "acuteOut", "áé");
+
+  function namedTrigger(nodeId: string): IRRule {
+    return {
+      nodeId,
+      context: [{ kind: "vkey", name: "K_X", modifiers: [] }],
+      output: [{ kind: "namedDeadkey", name: "acute" }],
+    };
+  }
+  function namedBody(nodeId: string): IRRule {
+    return {
+      nodeId,
+      context: [
+        { kind: "namedDeadkey", name: "acute" },
+        { kind: "raw", text: "+" },
+        { kind: "any", storeRef: "acuteIn" },
+      ],
+      output: [{ kind: "index", storeRef: "acuteOut", offset: 2 }],
+    };
+  }
+  function namedChain(nodeId: string): IRRule {
+    return {
+      nodeId,
+      context: [
+        { kind: "namedDeadkey", name: "acute" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_A", modifiers: [] },
+      ],
+      output: [{ kind: "char", value: "á" }],
+    };
+  }
+  function namedGroup(rules: IRRule[]): IRGroup {
+    return {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules,
+    };
+  }
+
+  it("F1: typed trigger/body/chain named rules are ALL not-removable:opaque, with NO output-store alias", () => {
+    const ir = makeTestIR(
+      [namedGroup([namedTrigger("rule#trig"), namedBody("rule#body"), namedChain("rule#chain")])],
+      [inputStore, outputStore],
+    );
+    const map = classifyRemovalCapabilities(ir);
+    expect(map.get("rule#trig")).toBe("not-removable:opaque");
+    expect(map.get("rule#body")).toBe("not-removable:opaque");
+    expect(map.get("rule#chain")).toBe("not-removable:opaque");
+    // The guard fires before the fan-out alias emission: the body rule's
+    // output store gets NO removable:slot-fill alias entry.
+    expect(map.has("store#acuteOut")).toBe(false);
+  });
+
+  it("F2: the same three rules as pre-#2238 fragments classify identically (posture parity)", () => {
+    const frag = (nodeId: string, sourceText: string): RawKmnFragment => ({
+      nodeId,
+      origin: "imported",
+      sourceText,
+      reason: "named-deadkey",
+    });
+    const ir = withRaw(makeTestIR([namedGroup([])], [inputStore, outputStore]), [
+      frag("frag#trig", "+ [K_X] > dk(acute)"),
+      frag("frag#body", "dk(acute) + any(acuteIn) > index(acuteOut, 2)"),
+      frag("frag#chain", "dk(acute) + [K_A] > 'á'"),
+    ]);
+    const map = classifyRemovalCapabilities(ir);
+    expect(map.get("frag#trig")).toBe("not-removable:opaque");
+    expect(map.get("frag#body")).toBe("not-removable:opaque");
+    expect(map.get("frag#chain")).toBe("not-removable:opaque");
+    expect(map.has("store#acuteOut")).toBe(false);
+  });
+
+  it("F3: guard precedes Decision 2 — a named body hand-stamped ownedByPattern (S-02) stays opaque", () => {
+    const body = { ...namedBody("rule#body"), ownedByPattern: "pat#s02" };
+    const ir = {
+      ...makeTestIR([namedGroup([body])], [inputStore, outputStore]),
+      recognizedPatterns: [
+        {
+          id: "pat#s02",
+          title: "S-02 fixture",
+          description: "fixture",
+          category: "deadkey" as never,
+          appliesTo: [],
+          strategyId: "S-02" as never,
+        },
+      ],
+    } as KeyboardIR;
+    const map = classifyRemovalCapabilities(ir);
+    // Without the guard, Decision 2 would inherit removable:slot-fill.
+    expect(map.get("rule#body")).toBe("not-removable:opaque");
+    expect(map.has("store#acuteOut")).toBe(false);
+  });
+
+  it("F4: whole-rule deletion parity — carve-deleting the named rules yields the fragment-era result", () => {
+    const KMN = [
+      "store(&VERSION) '10.0'",
+      "store(&NAME) 'Guard Parity'",
+      "store(&TARGETS) 'any'",
+      "store(acuteIn) 'ae'",
+      "store(acuteOut) 'áé'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [K_X] > dk(acute)",
+      "dk(acute) + any(acuteIn) > index(acuteOut, 2)",
+      "dk(acute) + [K_A] > U+00E1",
+      "+ [K_B] > 'b'",
+      "",
+    ].join("\n");
+    const post = parse(KMN, "guard-parity").ir;
+    const group = post.groups[0]!;
+    const namedIds = group.rules
+      .filter((r) =>
+        r.context.some((c) => c.kind === "namedDeadkey") ||
+        r.output.some((c) => c.kind === "namedDeadkey"),
+      )
+      .map((r) => r.nodeId);
+    expect(namedIds).toHaveLength(3);
+
+    // POST (#2238): delete the three typed rules.
+    const postDeleted = emit(carveFilterIr(post, new Set(namedIds)));
+
+    // PRE (fragment era): the same keyboard with the three rules carried as
+    // named-deadkey fragments; delete the fragments instead.
+    const ruleLines = new Map([
+      [namedIds[0], "+ [K_X] > dk(acute)"],
+      [namedIds[1], "dk(acute) + any(acuteIn) > index(acuteOut, 2)"],
+      [namedIds[2], "dk(acute) + [K_A] > U+00E1"],
+    ]);
+    const pre: KeyboardIR = {
+      ...post,
+      groups: post.groups.map((g) => ({
+        ...g,
+        rules: g.rules.filter((r) => !namedIds.includes(r.nodeId)),
+      })),
+      raw: namedIds.map((id, i) => ({
+        nodeId: `frag#${i}`,
+        origin: "imported" as const,
+        sourceText: ruleLines.get(id)!,
+        reason: "named-deadkey",
+        sourceLine: 8 + i,
+        groupNodeId: group.nodeId,
+      })),
+    };
+    const preDeleted = emit(carveFilterIr(pre, new Set(["frag#0", "frag#1", "frag#2"])));
+
+    expect(postDeleted).toBe(preDeleted);
+    expect(postDeleted).not.toContain("dk(acute");
+    expect(postDeleted).toContain("store(acuteOut) 'áé'");
+    expect(postDeleted).toContain("+ [K_B] > U+0062");
   });
 });

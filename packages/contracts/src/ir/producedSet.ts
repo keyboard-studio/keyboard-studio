@@ -152,7 +152,7 @@ function expandStore(store: IRStore, collector: Set<string>, includeSpace: boole
         }
       }
     }
-    // vkey, deadkey, any, raw — not literal output glyphs; skip
+    // vkey, deadkey, namedDeadkey, any, raw — not literal output glyphs; skip
   }
 }
 
@@ -206,6 +206,13 @@ export function collectFromElements(
 
       case "deadkey":
         // State token — not a visible glyph. Flush buffered run.
+        flushRun(run, collector, includeSpace);
+        break;
+
+      case "namedDeadkey":
+        // Named state token (#2238) — same treatment as the numeric form
+        // (and as the lenient sketch's former raw placeholder): not a
+        // glyph, flushes the run, produces nothing.
         flushRun(run, collector, includeSpace);
         break;
 

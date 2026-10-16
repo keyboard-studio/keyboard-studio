@@ -30,6 +30,8 @@ import {
   allocateDeadkeyId,
   setDeadkeyName,
   isPlusSeparator,
+  deadkeyNameKey,
+  isNamedDeadkeyElement,
 } from "@keyboard-studio/contracts";
 import type {
   DeadkeyMutationResult,
@@ -457,13 +459,21 @@ export function withRepairedDuplicateTriggerIds(ir: KeyboardIR): KeyboardIR {
 }
 
 // ---------------------------------------------------------------------------
-// Named deadkeys (id null, pre-FR-004).
+// Named deadkeys (id null).
 //
-// The codec opaques `dk(name)` rules into `ir.raw[]` fragments
-// (reason "named-deadkey"); the numeric engine mutations can't touch them.
-// The studio implements the two id:null actions — delete and retarget — by
-// operating on those fragments directly. Pairs and numeric rename stay
-// unavailable: there is no numeric id to anchor them to until FR-004.
+// Since #2238 (the FR-004 codec closure) the codec types `dk(name)` as
+// {kind:"namedDeadkey"} elements in typed rules/stores; the numeric engine
+// mutations still can't touch them (they key on numeric ids). The studio
+// implements the two id:null actions — delete and retarget — over BOTH
+// representations, because both exist in the wild:
+//   - typed rules in freshly imported IRs, and
+//   - `ir.raw[]` fragments (reason "named-deadkey") in persisted pre-#2238
+//     working copies — including the overlay ops (survey deadkeyOps
+//     delete-named / retarget-named) replayed against them at download.
+// Name matching folds ASCII case via contracts' deadkeyNameKey — the
+// compiler treats dk(semicolon) and dk(Semicolon) as one deadkey.
+// Pairs and rename stay unavailable for named deadkeys: still gated
+// adoption, not part of the #2238 compat re-pointing.
 // ---------------------------------------------------------------------------
 
 /** Escape a deadkey name for use in a RegExp. */
@@ -487,10 +497,40 @@ export function namedDeadkeyFragments(
   );
 }
 
+/** True when a rule mentions the named deadkey (folded identity) in a
+ *  typed context or output element. */
+function ruleMentionsNamedDeadkey(rule: IRRule, key: string): boolean {
+  return [...rule.context, ...rule.output].some(
+    (el) => isNamedDeadkeyElement(el) && deadkeyNameKey(el.name) === key,
+  );
+}
+
+/** Typed rules belonging to the named deadkey `name` (any rule mentioning
+ *  it — trigger, fan-out, and chain rules alike, mirroring how the
+ *  fragment entity collected every fragment mentioning the name). */
+export function namedDeadkeyRules(
+  ir: KeyboardIR,
+  name: string,
+): IRRule[] {
+  const key = deadkeyNameKey(name);
+  const rules: IRRule[] = [];
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (ruleMentionsNamedDeadkey(rule, key)) rules.push(rule);
+    }
+  }
+  return rules;
+}
+
 /**
- * Delete a named deadkey: remove its raw fragments. Atomic — if anything
- * outside the deadkey's own fragments still mentions `dk(name)`, the delete
- * is refused with the referrer list (never a half-delete).
+ * Delete a named deadkey: remove its typed rules and its raw fragments.
+ * Atomic — if anything outside the deadkey's own rules/fragments still
+ * mentions the name, the delete is refused with the referrer list (never
+ * a half-delete). A typed STORE holding the name as an item is such a
+ * referrer: removing one item would shift the store's slot alignment, and
+ * removing the whole store is not this op's call — the author resolves it
+ * manually. (Pre-#2238 such a store was itself an entity fragment; the
+ * fail-safe refusal is the conservative reading of that behaviour.)
  */
 export function deleteNamedDeadkey(
   ir: KeyboardIR,
@@ -498,29 +538,43 @@ export function deleteNamedDeadkey(
 ):
   | { ok: true; ir: KeyboardIR }
   | { ok: false; referrers: string[] } {
-  const entity = namedDeadkeyFragments(ir, name);
-  if (entity.length === 0) {
+  const entityRules = namedDeadkeyRules(ir, name);
+  const entityFrags = namedDeadkeyFragments(ir, name);
+  if (entityRules.length === 0 && entityFrags.length === 0) {
     return {
       ok: false,
-      referrers: [`No named-deadkey fragments found for dk(${name}) — nothing to delete.`],
+      referrers: [`No named-deadkey rules or fragments found for dk(${name}) — nothing to delete.`],
     };
   }
-  const entityIds = new Set(entity.map((f) => f.nodeId));
+  const entityRuleIds = new Set(entityRules.map((r) => r.nodeId));
+  const entityFragIds = new Set(entityFrags.map((f) => f.nodeId));
+  const key = deadkeyNameKey(name);
   const re = dkNameRe(name);
   const referrers: string[] = [];
 
-  // Other raw fragments mentioning dk(name).
+  // Other raw fragments mentioning dk(name) textually.
   for (const frag of ir.raw) {
-    if (entityIds.has(frag.nodeId)) continue;
+    if (entityFragIds.has(frag.nodeId)) continue;
     if (re.test(frag.sourceText)) {
       referrers.push(`raw fragment "${frag.nodeId}" — mentions dk(${name})`);
     }
   }
-  // Parsed rules mentioning dk(name) textually (the entity lives in raw[],
-  // so any parsed mention is external). JSON scan is a heuristic, but it
-  // fails safe: a false positive blocks the delete, never half-deletes.
+  // Typed stores holding the name as an item (see header note).
+  for (const store of ir.stores) {
+    if (
+      store.items.some(
+        (item) => isNamedDeadkeyElement(item) && deadkeyNameKey(item.name) === key,
+      )
+    ) {
+      referrers.push(`store "${store.name}" — contains dk(${name}) as an item`);
+    }
+  }
+  // Parsed rules mentioning dk(name) textually outside a typed element
+  // (e.g. inside a raw element). JSON scan is a heuristic, but it fails
+  // safe: a false positive blocks the delete, never half-deletes.
   for (const group of ir.groups) {
     for (const rule of group.rules) {
+      if (entityRuleIds.has(rule.nodeId)) continue;
       if (re.test(JSON.stringify(rule))) {
         referrers.push(
           `group "${group.name}" rule "${rule.nodeId}" — mentions dk(${name})`,
@@ -534,7 +588,11 @@ export function deleteNamedDeadkey(
   }
   const next: KeyboardIR = {
     ...ir,
-    raw: ir.raw.filter((f) => !entityIds.has(f.nodeId)),
+    groups: ir.groups.map((group) => ({
+      ...group,
+      rules: group.rules.filter((r) => !entityRuleIds.has(r.nodeId)),
+    })),
+    raw: ir.raw.filter((f) => !entityFragIds.has(f.nodeId)),
   };
   return { ok: true, ir: next };
 }
@@ -544,9 +602,48 @@ const NAMED_TRIGGER_FRAGMENT_RE =
   /^(\s*\+?\s*)(?:\[([^\]]+)\]|'([^']*)'|"([^"]*)")(\s*>\s*dk\(\s*[^)]*?\s*\)\s*(?:\/\/.*)?)$/i;
 
 /**
- * Retarget a named deadkey: rewrite the trigger token in its trigger
- * fragment. Refuses when the trigger fragment isn't exactly one clean
- * match — text surgery on an unrecognized shape would be silent corruption.
+ * All typed trigger rules for the named deadkey: output is exactly one
+ * name-carrying element for this name, and the context — ignoring the
+ * codec's `+` separators — is exactly one vkey or char element. Each hit
+ * carries the index of the trigger element in the ORIGINAL context array
+ * (so the rewrite preserves separators in place).
+ */
+function findNamedTriggerRules(
+  ir: KeyboardIR,
+  name: string,
+): { rule: IRRule; triggerIndex: number }[] {
+  const key = deadkeyNameKey(name);
+  const found: { rule: IRRule; triggerIndex: number }[] = [];
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (rule.output.length !== 1) continue;
+      const out = rule.output[0];
+      if (
+        out === undefined ||
+        !isNamedDeadkeyElement(out) ||
+        deadkeyNameKey(out.name) !== key
+      ) {
+        continue;
+      }
+      const nonPlus = rule.context
+        .map((el, idx) => ({ el, idx }))
+        .filter(({ el }) => !isPlusSeparator(el));
+      if (nonPlus.length !== 1) continue;
+      const only = nonPlus[0];
+      if (only === undefined) continue;
+      if (only.el.kind !== "vkey" && only.el.kind !== "char") continue;
+      found.push({ rule, triggerIndex: only.idx });
+    }
+  }
+  return found;
+}
+
+/**
+ * Retarget a named deadkey: rewrite its trigger — the context element of
+ * its typed trigger rule, or the trigger token of its trigger fragment on
+ * a persisted pre-#2238 copy. Refuses when the trigger (across BOTH
+ * representations) isn't exactly one clean match — rewriting an
+ * unrecognized shape would be silent corruption.
  */
 export function retargetNamedDeadkey(
   ir: KeyboardIR,
@@ -555,21 +652,52 @@ export function retargetNamedDeadkey(
 ):
   | { ok: true; ir: KeyboardIR }
   | { ok: false; error: string } {
+  const typedTriggers = findNamedTriggerRules(ir, name);
   const entity = namedDeadkeyFragments(ir, name);
-  const triggers = entity.filter((f) => NAMED_TRIGGER_FRAGMENT_RE.test(f.sourceText));
-  if (triggers.length === 0) {
+  const fragTriggers = entity.filter((f) => NAMED_TRIGGER_FRAGMENT_RE.test(f.sourceText));
+  const total = typedTriggers.length + fragTriggers.length;
+  if (total === 0) {
     return {
       ok: false,
-      error: `dk(${name}) has no recognizable trigger fragment — retarget refused rather than guessing.`,
+      error: `dk(${name}) has no recognizable trigger rule or fragment — retarget refused rather than guessing.`,
     };
   }
-  if (triggers.length > 1) {
+  if (total > 1) {
     return {
       ok: false,
-      error: `dk(${name}) has ${triggers.length} trigger fragments — ambiguous, retarget refused.`,
+      error: `dk(${name}) has ${total} trigger rules/fragments — ambiguous, retarget refused.`,
     };
   }
-  const trigger = triggers[0]!;
+
+  // Typed path: replace the trigger context element in place.
+  const typed = typedTriggers[0];
+  if (typed !== undefined) {
+    const { rule, triggerIndex } = typed;
+    const replacement =
+      "vkey" in newTrigger
+        ? { kind: "vkey" as const, name: newTrigger.vkey, modifiers: [] as string[] }
+        : { kind: "char" as const, value: newTrigger.char };
+    const next: KeyboardIR = {
+      ...ir,
+      groups: ir.groups.map((group) => ({
+        ...group,
+        rules: group.rules.map((r) =>
+          r.nodeId === rule.nodeId
+            ? {
+                ...r,
+                context: r.context.map((el, idx) =>
+                  idx === triggerIndex ? replacement : el,
+                ),
+              }
+            : r,
+        ),
+      })),
+    };
+    return { ok: true, ir: next };
+  }
+
+  // Fragment path: rewrite the trigger token in the fragment's source text.
+  const trigger = fragTriggers[0]!;
   const newToken =
     "vkey" in newTrigger ? `[${newTrigger.vkey}]` : `'${newTrigger.char}'`;
   const rewritten = trigger.sourceText.replace(

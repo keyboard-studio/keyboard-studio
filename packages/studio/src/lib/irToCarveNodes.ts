@@ -276,6 +276,9 @@ export function contextToKeys(context: ContextElement[]): string[] {
       case 'deadkey':
         keys.push('‹dk›');
         break;
+      case 'namedDeadkey':
+        keys.push('‹dk›');
+        break;
       case 'any':
         // store-based — no single key representation
         break;
@@ -310,6 +313,7 @@ export function outputToChar(output: OutputElement[]): string {
   switch (first.kind) {
     case 'char': return first.value;
     case 'deadkey': return '‹dk›';
+    case 'namedDeadkey': return '‹dk›';
     case 'index':
     case 'outs': return '…';
     case 'beep': return '🔔';
@@ -375,7 +379,10 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 
   const modLayer = ruleModifier(rule);
   const modLabel = modifierLabel(rule);
-  const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey');
+  // Named fan-outs do not reach this expansion today (the engine fan-out
+  // predicate requires numeric deadkey pre-terminals); the namedDeadkey
+  // arm is display parity for if/when the predicate widens (#2238 audit).
+  const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey' || el.kind === 'namedDeadkey');
 
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
@@ -836,6 +843,7 @@ function precedingContextLabel(elements: ContextElement[]): string {
       case 'notany':     parts.push(`any char not in "${el.storeRef}"`); break;
       case 'vkey':       parts.push(`[${el.name}]`); break;
       case 'deadkey':    parts.push('a dead key'); break;
+      case 'namedDeadkey': parts.push('a dead key'); break;
       case 'index':      parts.push(`indexed char from "${el.storeRef}"`); break;
       case 'context':    parts.push('context'); break;
       case 'baselayout': parts.push('base layout char'); break;
@@ -1149,6 +1157,7 @@ export function triggerKeyLabel(context: ContextElement[], ir?: KeyboardIR): str
     case 'vkey':    return desktopVkeyLabel(triggerEl.name);
     case 'char':    return `"${displayChar(triggerEl.value)}"`;
     case 'deadkey': return `deadkey ${triggerEl.id}`;
+    case 'namedDeadkey': return `deadkey ${triggerEl.name}`;
     // TOTAL FLOOR (#1399 follow-on): a store-triggered rule (any()/notany())
     // must never resolve to undefined — describe the store's own items
     // instead of naming a single (nonexistent) key.

@@ -14,6 +14,16 @@
  *
  * Classification decision order (first match wins, per km-strategy):
  *   1. not-removable:opaque           -- node is a RawKmnFragment (in ir.raw)
+ *  1b. not-removable:opaque           -- rule contains a name-carrying deadkey
+ *                                        element (#2238 guard, km-lead ruling:
+ *                                        named-deadkey rules keep the posture
+ *                                        they had as fragments until a separate
+ *                                        consumer ruling reclassifies them).
+ *                                        MUST precede the alias emission and
+ *                                        Decision 2: the alias would otherwise
+ *                                        leak "removable:slot-fill" for a named
+ *                                        fan-out's output store, and ownership
+ *                                        inheritance would override the posture.
  *   2. Inherit ownedByPattern         -- rule is co-owned by a recognizer cluster
  *                                        (e.g. S-02 trigger/fallback/escape rules);
  *                                        inherits the cluster's removal story via
@@ -68,6 +78,7 @@
 
 import type { KeyboardIR, Pattern, ContextElement } from "@keyboard-studio/contracts";
 import type { RemovalCapability } from "@keyboard-studio/contracts";
+import { isNamedDeadkeyElement } from "@keyboard-studio/contracts";
 import { isS01 } from "./rules/s01-simple-swap.js";
 import { isBody } from "./rules/s02-deadkey-single-tap.js";
 import { isParallelIndexFanOut } from "./rules/parallel-index-fanout.js";
@@ -109,6 +120,21 @@ export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, Removal
   // --- Walk all groups ---
   for (const group of ir.groups) {
     for (const rule of group.rules) {
+      // Decision 1b (#2238 guard): a rule containing a name-carrying deadkey
+      // element in context or output keeps the not-removable:opaque posture
+      // it had when the codec represented it as a RawKmnFragment. This check
+      // is FIRST in the loop — before the alias emission below and before
+      // Decision 2 (ownership) — and depends on nothing but the element kind,
+      // so no present or future shape predicate can leak a removable verdict
+      // for a name-keyed rule.
+      if (
+        rule.context.some(isNamedDeadkeyElement) ||
+        rule.output.some(isNamedDeadkeyElement)
+      ) {
+        result.set(rule.nodeId, "not-removable:opaque");
+        continue;
+      }
+
       // Compute shape predicates once — used both for alias emission and branching.
       // fanShape is a superset of bodyShape; both are computed early and independently
       // of which branch assigns the final label.

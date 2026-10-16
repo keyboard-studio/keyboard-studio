@@ -86,9 +86,9 @@ export type DeadkeyOperation =
   | { kind: "repoint"; fromId: number; toId: number; referrers: readonly string[] }
   /** withRepairedDuplicateTriggerIds: the "dead0" duplicate-id repair. */
   | { kind: "repair-duplicate-ids" }
-  /** deleteNamedDeadkey: raw-fragment removal for dk(name). */
+  /** deleteNamedDeadkey: typed-rule + raw-fragment removal for dk(name). */
   | { kind: "delete-named"; name: string }
-  /** retargetNamedDeadkey: trigger-token rewrite for dk(name). */
+  /** retargetNamedDeadkey: trigger rewrite for dk(name) (typed rule or fragment). */
   | {
       kind: "retarget-named";
       name: string;

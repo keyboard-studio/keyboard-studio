@@ -209,7 +209,11 @@ export function classifyTouchRuleRole(output: readonly { kind: string; text?: st
   }
 
   const allWiring = output.every(
-    (el) => el.kind === "useGroup" || el.kind === "deadkey" || el.kind === "beep",
+    (el) =>
+      el.kind === "useGroup" ||
+      el.kind === "deadkey" ||
+      el.kind === "namedDeadkey" ||
+      el.kind === "beep",
   );
   if (allWiring) return "transitions";
 
