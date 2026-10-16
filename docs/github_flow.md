@@ -138,7 +138,7 @@ exactly.
 
 > Keep this section up to date as work lands. Update it whenever a delivery
 > option moves from "not started" to "in progress" or "done".
-> Last updated: 2026-09-30 (production probe of https://keyboard-studio-studio.vercel.app)
+> Last updated: 2026-10-15 (upstream delivery governance decisions from #1006 recorded)
 
 ### Pipeline prerequisites (must exist before any delivery option works)
 
@@ -229,3 +229,47 @@ Option C  [====================]  100%  engine + studio UI done; full end-to-end
 Option A  [===================-]   95%  engine + studio sign-up (identity) UI done; backend deployed on Vercel (health OK, functions load); OAuth App client id in prod bundle; submit action deferred to Option B (§1a); remaining and unverified: OAuth App callback URL, backend secrets, end-to-end fork PR from prod (DEPLOY.md); the spec-053 PR-body decision block is contract-compatible here but not wired, since no studio call site uses this path
 Option B  [===================-]   95%  DEFAULT submit path (§1a); contract + engine client + backend pipeline/route (Fastify + Vercel) + GitHub-App installation-token minter + studio attribution-form UI done & tested; App provisioned + installed; pipeline validated end-to-end against the staging repo keyboard-studio/keyboards (same-repo PR — see 2026-07-06 note); function deployed; remaining and unverified: GitHub App callback URL, backend secrets, GITHUB_ORG_TOKEN removed from the deploy env, end-to-end PR from prod (§5 Q3, #550); PR body now also carries a bounded decision-summary block (spec 053) — evidence added, bar unchanged
 ```
+
+---
+
+## Upstream delivery governance (#1006)
+
+Decisions recorded 2026-10-14 (Matthew), from issue #1006 comments. This
+issue stays open as the tracking home for the remaining items.
+
+### Decision 1: Hybrid shepherding
+
+**Now: a named human shepherd.** Studio-submitted PRs on
+`keymanapp/keyboards` are shepherded through upstream review by an
+accountable named human on the SIL/org side, subscribed to
+studio-submitted PRs — interpreting reviewer feedback, CI, and rebases on
+the author's behalf, since the author by design can do none of that.
+
+- The individual who fills the role is still to be named, and must be
+  named before the first real upstream submission. **(Open — org decision.)**
+
+**Later: the studio round-trip is a separate, future spec.** Routing
+reviewer feedback back into the studio as guided edit tasks is the
+long-term direction, but it will not be specced until at least one real
+upstream review cycle has been observed under the human shepherd — what
+upstream review actually demands is currently unobserved (testing so far
+is only against the local fork copy; maintainer conversations start
+November 2026).
+
+### Decision 2: Submission retarget — ratified as done in fact
+
+Managed PRs already open directly on `keymanapp/keyboards` (Option B,
+PR #885) and the corpus proxy already targets the keyboard-studio org
+fork. The staging-fork framing is retired.
+
+### Status (2026-10-14)
+
+- **No studio keyboard has completed an upstream review cycle.** The only
+  tests so far have been PRs to the local copy of the keyboards repo (the
+  keyboard-studio org fork); nothing has gone through `keymanapp/keyboards`
+  review yet.
+- **The Keyman maintainer conversation has not started.** It will start in
+  **November 2026**, and its outcome will be documented in issue #1006 per
+  the acceptance criteria.
+- Still open: upstream's policy for a PR whose author goes silent — a
+  natural topic for the November conversations.
