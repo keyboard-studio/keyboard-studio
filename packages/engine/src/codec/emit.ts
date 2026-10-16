@@ -178,8 +178,9 @@ export function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
  *   - control / DEL (< U+0020, U+007F) — would terminate the lexer's line scan
  *   - combining marks (\p{M}) — would attach to surrounding chars in source
  *     view and round-trip through the parser as a different visible run
- *   - SMP codepoints (> U+FFFF) — fmtCodepoint handles these via single-quote
- *     literals individually; never bundle them into a charRun string
+ *   - SMP codepoints (> U+FFFF) in processing stores — fmtCodepoint handles
+ *     these via single-quote literals individually; never bundle them into a
+ *     charRun string. System stores are exempt (see the metadata branch).
  *
  * The two quote characters (' and ") are NOT excluded here — delimiter
  * selection in flushBuf picks whichever the buffer doesn't contain.
@@ -187,14 +188,18 @@ export function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
 function isStringSafeChar(ch: string, metadata = false): boolean {
   const cp = ch.codePointAt(0) ?? 0;
   if (cp < 0x20 || cp === 0x7f) return false;
-  // SMP codepoints stay per-character tokens even in system stores: acceptance
-  // by kmcmplib inside a string literal has not been verified, so the
-  // conservative (known-compiling) form is kept.
-  if (cp > 0xffff) return false;
   // System stores (&NAME, &COPYRIGHT, ...) are human-facing metadata that rules
   // never match against: combining marks and format characters stay inside the
-  // string so the value reads naturally.
+  // string so the value reads naturally. SMP codepoints (> U+FFFF) may join
+  // the string too — VERIFIED against kmcmplib (issue #1811 residual AC):
+  // @keymanapp/kmc-kmn 19.0.240-alpha compiles `store(&NAME) '𑜠𑜡x'`, a lone
+  // SMP string `'𑜠'`, and a mixed BMP+SMP+combining string with zero
+  // diagnostics and a valid .kmx. The check is pinned by the oracle tests in
+  // packages/engine/src/compiler/compile.test.ts ("SMP in system store
+  // (#1811)"), which fail if a future kmcmplib stops accepting this form.
   if (metadata) return true;
+  // Processing stores: SMP codepoints stay per-character quoted literals.
+  if (cp > 0xffff) return false;
   // Processing stores: spell out everything invisible or attaching — combining
   // marks, format characters (ZWJ, ZWNJ, LRM, soft hyphen, ...) and unusual
   // spaces (NBSP, narrow NBSP, ...) — so the author can see what is stored.

@@ -1149,9 +1149,19 @@ group(main) using keys
     expect(storeLine(emit(ir), "&MESSAGE")).not.toContain("..");
   });
 
-  it("system store keeps SMP characters as tokens, not inside a string", () => {
-    const { ir } = parse(kmn("store(&NAME) U+11680"), "smp");
-    expect(storeLine(emit(ir), "&NAME")).not.toMatch(/'[^']*\u{11680}[^']*'/u);
+  it("system store bundles SMP characters inside the string literal (#1811)", () => {
+    // Old per-character form: each SMP char its own quoted literal.
+    const { ir } = parse(kmn("store(&NAME) '𐮀' '𐮁' 'x'"), "smp");
+    expect(storeLine(emit(ir), "&NAME")).toBe("store(&NAME) '𐮀𐮁x'");
+  });
+
+  it("system store: the bundled SMP form parses to the same items as the per-character form", () => {
+    expect(nameChars("store(&NAME) '𐮀𐮁x'")).toBe(nameChars("store(&NAME) '𐮀' '𐮁' 'x'"));
+  });
+
+  it("processing store keeps SMP characters as per-character literals", () => {
+    const { ir } = parse(kmn("store(w) '𐮀𐮁'"), "proc-smp");
+    expect(storeLine(emit(ir), "w")).toBe("store(w) '𐮀' '𐮁'");
   });
 
   it("&CasedKeys keeps its token form", () => {
