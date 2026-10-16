@@ -29,6 +29,9 @@
       ],
       "@keyboard-studio/contracts/dev-log": [
         "../packages/contracts/src/utils/devLog.ts"
+      ],
+      "@keyboard-studio/contracts/unicode": [
+        "../packages/contracts/src/unicode/index.ts"
       ]
     }
   }
