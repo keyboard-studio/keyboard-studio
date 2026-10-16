@@ -488,15 +488,26 @@ jobs:
       - name: Test (supportability-scanner — outside the pnpm workspace)
         run: pnpm run test:supportability-scanner
 
-      # Non-blocking: warns in CI log and opens GitHub Issues for any spec
-      # sections whose content changed since the last acknowledgement.
+      # Non-blocking: warns in CI log and, on main-tree runs only, opens
+      # GitHub Issues for any spec sections whose content changed since
+      # the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.
       - name: Spec drift check
         continue-on-error: true
         run: node utilities/spec-trace/index.js check
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SPEC_TRACE_REPO: ${{ github.repository }}
+          # Issue sync only from a main-tree checkout (#2210). Detection and
+          # [WARN] logging run on every tree; with an empty token/repo the
+          # checker skips create/close sync gracefully. The gate keys on the
+          # EFFECTIVE ref (inputs.checkout_ref, else github.ref — the
+          # Checkout step's idiom): inside the workflow_call dev soak the
+          # github context is the caller's (event schedule, ref main) while
+          # the tree on disk is dev, so keying on github.ref or event_name
+          # alone would let the soak sync against the dev tree — the flap
+          # that closed #2136 and re-filed it as #2209. Do not simplify this
+          # condition without re-reading #2210.
+          GITHUB_TOKEN: ${{ (github.event_name != 'pull_request' && (inputs.checkout_ref == 'main' || inputs.checkout_ref == 'refs/heads/main' || (inputs.checkout_ref == '' && github.ref == 'refs/heads/main')) && secrets.GITHUB_TOKEN) || '' }}
+          SPEC_TRACE_REPO: ${{ (github.event_name != 'pull_request' && (inputs.checkout_ref == 'main' || inputs.checkout_ref == 'refs/heads/main' || (inputs.checkout_ref == '' && github.ref == 'refs/heads/main')) && github.repository) || '' }}
 
   # Playwright e2e — the lane that carries the spec 034 authoring-walk proof
   # (MVP gaps A/B assert in copy-edit.spec.ts). NON-BLOCKING while it beds in:
