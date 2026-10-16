@@ -372,6 +372,16 @@ Two halves over the same corpus:
   which only resolve through Vite's transform pipeline). Missing or stale, spec-trace logs a
   `[WARN]` and continues — the artifact is optional for backward compatibility (FR-010);
   spec-trace never imports `packages/studio` TS directly (FR-007).
+- **Ack routing** — Acknowledgement PRs (the `docs/spec-trace.json` change from
+  `acknowledge <id>`, on its own or cherry-picked verbatim) target `main`, never
+  `dev`. `dev` picks an ack up on its next merge from `main`. This is a carve-out
+  from dev-first integration, not a contradiction of it: feature work still
+  integrates through `dev`, but the trace is a registry adjudicated from `main` —
+  the checker files and closes drift issues from the tree it runs on, and its
+  issue sync runs only on main-tree runs, so an ack that lands only on `dev` is
+  invisible to `main` and the drift is re-filed under a new number. That cycle
+  has already run once: #2136 (specs/102) was auto-closed by a dev-tree run
+  after PR #2194 landed its ack on `dev`, then re-filed from `main` as #2209.
 - **Search** — `pnpm run spec-search "<query>"` runs BM25 retrieval over `specs/**` + `docs/**` +
   root `spec.md`/`README.md`, returning heading-level chunks with a `file:line` anchor. See
   [Searching the corpus](#searching-the-corpus) below.
