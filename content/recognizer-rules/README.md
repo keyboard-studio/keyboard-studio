@@ -25,7 +25,7 @@ an imported keyboard (IR already exists) instead of from the survey.
 
 Issue #232 ratified **TypeScript predicates** as the canonical rule format and **deferred** the YAML DSL to v1.2 (issue #273) — deferred, not rejected (decision record: `docs/spec-signoff.md`, D10). Since then the YAML path has become live infrastructure, one strategy at a time, in the PR #338 shape: a YAML file in this directory is **compiled at build time** by `scripts/compile-recognizer-rules.mjs` (root `prebuild`) into a TypeScript rule under `packages/engine/src/recognizer/rules/generated/`, which runs in `DEFAULT_RULES` alongside the hand-written TS recognizers. Runtime never parses YAML — it runs the generated TS objects, whose cluster finders live in `packages/engine/src/recognizer/interpreter.ts`. (An earlier version of this README said the YAML files "are not parsed by any code" — that is false at build time and was corrected with the S-03 landing, issue #342.)
 
-The compiler only emits strategies in its supported set (currently S-01, S-02, S-03, S-07, S-08 — a strategy in the set without a YAML file or interpreter branch, like S-08, recognizes nothing). S-07 (diacritic cycling, issue #2212) claims only the strict unguarded cancel form; the guarded literal enumeration that dominates its exemplar keyboards is not claimed, and its YAML says so. Hand-written TS recognizers (implementing the `RecognizerRule` interface from `packages/engine/src/recognizer/types.ts`) remain the other landing path; S-01 and S-02 exist in both forms, held equivalent by round-trip tests.
+The compiler only emits strategies in its supported set (currently S-01, S-02, S-03, S-07, S-08, S-09 — a strategy in the set without a YAML file or interpreter branch, like S-08, recognizes nothing). S-07 (diacritic cycling, issue #2212) claims only the strict unguarded cancel form; the guarded literal enumeration that dominates its exemplar keyboards is not claimed, and its YAML says so. S-09 (retroactive reph, issue #2223) claims only the [ra, virama, re-emitted context] form in two form-witness keyboards (one live), under a stated partial deviation from the two-keyboard bar; its YAML says so. Hand-written TS recognizers (implementing the `RecognizerRule` interface from `packages/engine/src/recognizer/types.ts`) remain the other landing path; S-01 and S-02 exist in both forms, held equivalent by round-trip tests.
 
 Not delivered, and not implied by any vocabulary in the schema: **S-11** (guard presence is not a toggle detector — most corpus guards test externally-driven option stores, and `set()` is an opaque fragment today) and **S-12** (`call()` is an opaque fragment by codec design; a schema `call` kind would match nothing). Both are tracked as follow-ons from issue #342.
 
@@ -103,9 +103,11 @@ visible in a directory listing.
    canonical exemplar `sil_ipa`). **Landed** (issue #342). The digraph form
    and the vkey-trigger near-shape are not claimed by this rule.
 4. `s07-diacritic-cycling.yaml` — S-07 cycling; important for several SIL
-   keyboards. **Not yet authored.**
+   keyboards. **Landed** (issue #2212).
 5. `s05-mnemonic-spelling.yaml` — S-05 Hausa-style. **Not yet authored.**
-6. S-09 and others as time permits.
+6. `s09-retroactive-reph.yaml` — S-09 retroactive reph (canonical exemplar
+   `sil_devanagari_phonetic`). **Landed** (issue #2223), with the deviation
+   stated in its corpus_evidence.
 
 ## Adding a new rule
 

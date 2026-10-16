@@ -326,7 +326,7 @@ any(BaseLetter) + 'g' > index(BaseLetter_modified, 1)
 ```
 
 **Real exemplar (abugida — Indic *reph*):** `release/sil/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kmn`.
-**Real exemplar (abjad — Arabic hamza):** `release/a/arabic_izza/source/arabic_izza.kmn`.
+**Strategy exemplar (abjad — Arabic hamza):** `release/a/arabic_izza/source/arabic_izza.kmn` — an exemplar of the S-09 *strategy* (hamza-bearing alif formation is context-sensitive cluster formation, and §7.5 validates that classification), **not** a witness for either rule shape above: its hamza rules are all-char (`"ا" + "g" > "أ"`), with no `index()`, no `context()`, and no consonant store. The `index()` example line above is schematic and unexemplified in the corpus; the recognizer's S-09 rule (issue #2223) claims only the reph line's form. *(Correction 2026-10-16, issue #2223: an earlier version of this card presented arabic_izza as a shape exemplar; parser verification of the release corpus refuted that.)*
 
 #### S-10 Constraints + beep
 

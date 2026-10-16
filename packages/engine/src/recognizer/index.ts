@@ -1,7 +1,7 @@
 import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
 import { s01Recognizer } from "./rules/s01-simple-swap.js";
 import { s02Recognizer } from "./rules/s02-deadkey-single-tap.js";
-import { simpleSwapRule, deadkeySingleTapRule, sequenceReplaceRule, diacriticCyclingRule } from "./rules/generated/index.js";
+import { simpleSwapRule, deadkeySingleTapRule, sequenceReplaceRule, diacriticCyclingRule, retroactiveRephRule } from "./rules/generated/index.js";
 import type { RecognizerRule, RecognizeResult, MatchResult } from "./types.js";
 import { isBehaviourOwned } from "./utils.js";
 
@@ -12,6 +12,7 @@ const DEFAULT_RULES: RecognizerRule[] = [
   deadkeySingleTapRule,
   sequenceReplaceRule,
   diacriticCyclingRule,
+  retroactiveRephRule,
 ];
 
 export function recognizePatterns(

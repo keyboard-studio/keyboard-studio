@@ -506,6 +506,191 @@ function findS07Clusters(ir: KeyboardIR): S07ClusterMatch[] {
 }
 
 // ---------------------------------------------------------------------------
+// S-09 predicate (retroactive-reph cluster)
+// ---------------------------------------------------------------------------
+//
+// Shape (spec §7.3 S-09 card; issue #2223 km-lead ruling): reph is the
+// logical-order sequence ra + virama + ⟨following consonant⟩. The
+// recognizer-relevant spelling is post-typed: the author types a consonant,
+// then a reph key, and the rule re-emits the consonant after a fixed
+// ra+virama prefix:
+//   any(C) + "R" > U+0930 U+094D index(C, 1)          (sil_devanagari_phonetic)
+//   any(C) + "'" > U+0930 U+094D context              (hindi_modular)
+// The boundary conditions are the predicate, not decoration:
+//   - output[0..1] are exactly the script's (ra, virama) pair from
+//     REPH_PREFIX_PAIRS. This content pin is what separates reph from its
+//     mirror image rakār (sil_devanagari_romanized:284 — SAME context and
+//     SAME trigger "R", output [index, virama, ra]) and from generic
+//     conjunct formation (virama follows the re-emitted consonant, not ra).
+//     A shape-only [char, char, index] finder false-claims the taigi_telex
+//     remap bulk (issue #2212 corpus scan).
+//   - the output re-emits the ENTIRE pre-trigger context in order: an any()
+//     element via index(its store, its position) or context(position), a
+//     char element via the literal char or context(position) — or the whole
+//     pre-trigger context via one bare `context` (the hindi spelling).
+//     Scaled variants (consonant + matra already typed) re-emit every
+//     element the same way (sil_devanagari_phonetic:117-118).
+//   - the trigger contributes NO output element (it is consumed silently);
+//     trigger identity itself is not evidence (rakār shares the trigger).
+//   - NO if() guards anywhere (spec 103 FR-007 — no opt-in).
+// ZWNJ-prefixed second-order reph (hindi_modular:182,185 — output begins
+// with U+200C, before the ra) fails the prefix pin and is not claimed.
+//
+// A cluster is keyed by (group, consonant store, trigger char); the rules
+// of one cluster are the base rule and its scaled variants over one store.
+
+interface S09ClusterMatch {
+  group: IRGroup;
+  rules: IRRule[];
+  consonantStore: IRStore;
+  trigger: string;
+}
+
+// (ra, virama) pairs by Indic block, seeded with Devanagari — the only
+// block with corpus witnesses (issue #2223 ruling). A block joins this
+// table when a witness for it appears; the finder claims nothing outside
+// the table.
+const REPH_PREFIX_PAIRS: ReadonlyArray<readonly [ra: string, virama: string]> = [
+  ["\u0930", "\u094D"], // Devanagari
+];
+
+interface RephShape {
+  consonantRef: string;
+  trigger: string;
+  raChar: string;
+  viramaChar: string;
+}
+
+function rephShape(rule: IRRule): RephShape | undefined {
+  const real = stripPlusSeparator(rule);
+  if (real.some((el) => el.kind === "if")) return undefined;
+  if (real.length < 2) return undefined;
+
+  const triggerEl = real[real.length - 1];
+  if (triggerEl === undefined || triggerEl.kind !== "char") return undefined;
+
+  const pre = real.slice(0, -1);
+  const first = pre[0];
+  if (first === undefined || first.kind !== "any") return undefined;
+  for (const el of pre.slice(1)) {
+    if (el.kind !== "any" && el.kind !== "char") return undefined;
+  }
+
+  const out = rule.output;
+  if (out.length < 3) return undefined;
+  const o0 = out[0];
+  const o1 = out[1];
+  if (o0 === undefined || o0.kind !== "char") return undefined;
+  if (o1 === undefined || o1.kind !== "char") return undefined;
+  if (
+    !REPH_PREFIX_PAIRS.some(([ra, vir]) => ra === o0.value && vir === o1.value)
+  ) {
+    return undefined;
+  }
+
+  const shape: RephShape = {
+    consonantRef: first.storeRef,
+    trigger: triggerEl.value,
+    raChar: o0.value,
+    viramaChar: o1.value,
+  };
+
+  const reemit = out.slice(2);
+
+  // Whole-context spelling: one bare `context` re-emits the entire
+  // pre-trigger context (hindi_modular:181,184).
+  if (
+    reemit.length === 1 &&
+    reemit[0] !== undefined &&
+    reemit[0].kind === "context" &&
+    reemit[0].offset === 0
+  ) {
+    return shape;
+  }
+
+  // Element-wise spelling: one re-emission per pre-trigger element, in
+  // order (sil_devanagari_phonetic:116-118).
+  if (reemit.length !== pre.length) return undefined;
+  for (let i = 0; i < pre.length; i++) {
+    const src = pre[i];
+    const dst = reemit[i];
+    if (src === undefined || dst === undefined) return undefined;
+    const position = i + 1; // 1-based element position in the stripped context
+    if (dst.kind === "context" && dst.offset === position) continue;
+    if (src.kind === "any") {
+      if (
+        dst.kind === "index" &&
+        dst.storeRef === src.storeRef &&
+        dst.offset === position
+      ) {
+        continue;
+      }
+      return undefined;
+    }
+    if (src.kind !== "char") return undefined;
+    // src is a literal char: re-emitted as the same literal char.
+    if (dst.kind === "char" && dst.value === src.value) continue;
+    return undefined;
+  }
+  return shape;
+}
+
+// The cluster's canonical rule for slot extraction: the one with the
+// shortest pre-trigger context (the base rule, when present).
+function canonicalRephRule(rules: IRRule[]): IRRule | undefined {
+  let best: IRRule | undefined;
+  let bestLen = Infinity;
+  for (const r of rules) {
+    if (rephShape(r) === undefined) continue;
+    const len = stripPlusSeparator(r).length;
+    if (len < bestLen) {
+      best = r;
+      bestLen = len;
+    }
+  }
+  return best;
+}
+
+function findS09Clusters(ir: KeyboardIR): S09ClusterMatch[] {
+  const byKey = new Map<string, S09ClusterMatch>();
+
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
+
+      const shape = rephShape(rule);
+      if (shape === undefined) continue;
+
+      // Every any() store the context references must resolve — an
+      // unresolved ref is no evidence, never a pass.
+      const refs = stripPlusSeparator(rule)
+        .filter((el) => el.kind === "any")
+        .map((el) => (el.kind === "any" ? el.storeRef : ""));
+      const stores = refs.map((name) => ir.stores.find((s) => s.name === name));
+      if (stores.some((s) => s === undefined)) continue;
+      const consonantStore = stores[0];
+      if (consonantStore === undefined) continue;
+
+      const key = `${group.nodeId}|${shape.consonantRef}|${shape.trigger}`;
+      const existing = byKey.get(key);
+      if (existing !== undefined) {
+        existing.rules.push(rule);
+      } else {
+        byKey.set(key, {
+          group,
+          rules: [rule],
+          consonantStore,
+          trigger: shape.trigger,
+        });
+      }
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+// ---------------------------------------------------------------------------
 // Slot-value population from YAML lifts_to.slot_mapping
 // ---------------------------------------------------------------------------
 
@@ -518,6 +703,7 @@ interface ClusterContext {
   deadkeyId?: number | undefined;
   sequenceRules?: IRRule[] | undefined;
   cycleRules?: IRRule[] | undefined;
+  rephRules?: IRRule[] | undefined;
 }
 
 function populateSlots(
@@ -608,6 +794,34 @@ function populateSlots(
         if (s !== undefined) seen.add(s.trigger);
       }
       if (seen.size > 0) result[slotId] = [...seen].join("");
+      continue;
+    }
+
+    if (source.startsWith("rules[reph].trigger_chars")) {
+      // S-09 triggerChar slot: the cluster's reph key. Every rule in a
+      // cluster shares one trigger by construction (it is part of the
+      // cluster key), so this yields exactly one char.
+      const rephRules = ctx.rephRules ?? ctx.clusterRules;
+      const seen = new Set<string>();
+      for (const r of rephRules) {
+        const s = rephShape(r);
+        if (s !== undefined) seen.add(s.trigger);
+      }
+      if (seen.size > 0) result[slotId] = [...seen].join("");
+      continue;
+    }
+
+    if (
+      source.startsWith("rules[reph].ra_char") ||
+      source.startsWith("rules[reph].virama_char")
+    ) {
+      // S-09 raChar / viramaChar slots: the reph prefix pair, read from
+      // the cluster's canonical (shortest-context) rule's output.
+      const canonical = canonicalRephRule(ctx.rephRules ?? ctx.clusterRules);
+      if (canonical === undefined) continue;
+      const s = rephShape(canonical);
+      if (s === undefined) continue;
+      result[slotId] = source.includes("virama_char") ? s.viramaChar : s.raChar;
       continue;
     }
 
@@ -783,6 +997,57 @@ export function interpretPredicate(rule: RecognizerRuleYaml, ir: KeyboardIR): Ma
     return results;
   }
 
+  if (clusterType === "retroactive-reph") {
+    const clusters = findS09Clusters(ir);
+    for (const cluster of clusters) {
+      const storesByName = new Map<string, IRStore>([
+        ...ir.stores.map((s): [string, IRStore] => [s.name, s]),
+      ]);
+      // Abstract YAML alias, as in the S-02/S-03/S-07 branches, so the
+      // YAML slot_mapping resolves "S_consonants" without IR store names.
+      storesByName.set("S_consonants", cluster.consonantStore);
+
+      const slotValues = rule.lifts_to.slot_mapping !== undefined
+        ? populateSlots(
+            rule.lifts_to.slot_mapping,
+            {
+              clusterRules: cluster.rules,
+              stores: storesByName,
+              rephRules: cluster.rules,
+            },
+            ir,
+          )
+        : {};
+
+      // Owned stores: the consonant store plus every store a cluster
+      // rule's context references via any() (the scaled variants index
+      // into the matra store positionally — it is part of the mechanism).
+      const ownedStoreNames = new Set<string>();
+      for (const r of cluster.rules) {
+        for (const el of stripPlusSeparator(r)) {
+          if (el.kind === "any") ownedStoreNames.add(el.storeRef);
+        }
+      }
+      const ownedStores = [...ownedStoreNames]
+        .map((name) => ir.stores.find((s) => s.name === name))
+        .filter((s): s is IRStore => s !== undefined);
+
+      results.push({
+        // The trigger is part of the cluster key, so it is part of the
+        // instance id (the S-07 precedent): one store can serve several
+        // reph keys, and those are distinct Patterns. Including it from
+        // day one also keeps multi-cluster store pairs collision-free.
+        patternId: `${rule.lifts_to.patternId}#${cluster.consonantStore.name}+${cluster.trigger}`,
+        ownedNodes: [
+          ...cluster.rules.map((r) => ruleRef(r.nodeId)),
+          ...ownedStores.map((s) => storeRef(s.nodeId)),
+        ],
+        slotValues,
+      });
+    }
+    return results;
+  }
+
   return results;
 }
 
@@ -847,6 +1112,7 @@ function titleForStrategy(strategyId: string): string {
     case "S-02": return "Single-tap deadkey";
     case "S-03": return "Sequence replace";
     case "S-07": return "Diacritic cycling";
+    case "S-09": return "Retroactive reph";
     case "S-08": return "Full remap";
     default: return strategyId;
   }
@@ -906,6 +1172,10 @@ function promptForSlot(slotId: string): string {
     case "plainChars": return "Vowels without this tone mark, in order";
     case "markedChars": return "The same vowels with this tone mark applied, in the same order";
     case "cycleKey": return "Character key that applies this tone — pressing it again after a marked vowel cancels the tone and types the key itself";
+    case "consonantChars": return "Consonants the reph key can follow, in order — a consonant typed before the reph key is re-emitted after the ra + virama prefix";
+    case "consonantStoreName": return "Internal name for this reph rule set";
+    case "raChar": return "The ra character of this script (first half of the reph prefix)";
+    case "viramaChar": return "The virama (conjunct) sign of this script (second half of the reph prefix)";
     default: return slotId;
   }
 }
@@ -937,6 +1207,14 @@ function buildKmnFragment(strategyId: string, slotValues: Record<string, string>
         'any({{markedChars}}) + "{{cycleKey}}" > index({{plainChars}}, 1) "{{cycleKey}}"\n' +
         'any({{plainChars}}) + "{{cycleKey}}" > index({{markedChars}}, 1)'
       );
+    case "S-09":
+      // Schematic, following the S-02/S-03 precedent: slot values are
+      // store CONTENTS inlined, not store references. The canonical base
+      // rule: a consonant followed by the reph key re-emits ra + virama +
+      // the consonant. Scaled variants (consonant + matra already typed)
+      // follow the same shape, re-emitting the full pre-trigger context
+      // in order after the prefix.
+      return 'any({{consonantChars}}) + "{{triggerChar}}" > {{raChar}} {{viramaChar}} index({{consonantChars}}, 1)';
     default:
       // Fallback: emit placeholders for every known slot value
       return Object.keys(slotValues)

@@ -389,3 +389,156 @@ export function buildTwoTriggerGraveIR(): {
     escapeNodeId,
   };
 }
+
+// ---------------------------------------------------------------------------
+// S-09 (retroactive reph)
+// ---------------------------------------------------------------------------
+
+export const REPH_RA = "\u0930"; // र — Devanagari ra
+export const REPH_VIRAMA = "\u094D"; // ् — Devanagari virama
+
+/** sil_devanagari_phonetic stores (subset strings, full membership). */
+export function devanagariRephStores(): IRStore[] {
+  return [
+    makeCharStore(
+      "store#ConsonantsU",
+      "ConsonantsU",
+      "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह",
+    ),
+    makeCharStore("store#MatraVsU", "MatraVsU", "ािीुूृेैोौ"),
+  ];
+}
+
+/** The base reph rule, sil_devanagari_phonetic:116 verbatim in IR form. */
+export function rephBaseRule(nodeId: string, trigger = "R"): IRRule {
+  return {
+    nodeId,
+    context: [
+      { kind: "any", storeRef: "ConsonantsU" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: trigger },
+    ],
+    output: [
+      { kind: "char", value: REPH_RA },
+      { kind: "char", value: REPH_VIRAMA },
+      { kind: "index", storeRef: "ConsonantsU", offset: 1 },
+    ],
+  };
+}
+
+/**
+ * The sil_devanagari_phonetic reph family (lines 116-118): the base rule
+ * plus the matra and nukta+matra scaled variants, one cluster.
+ */
+export function buildPhoneticRephIR(): {
+  ir: KeyboardIR;
+  baseNodeId: string;
+  matraNodeId: string;
+  nuktaNodeId: string;
+} {
+  const baseNodeId = "rule#reph-base";
+  const matraNodeId = "rule#reph-matra";
+  const nuktaNodeId = "rule#reph-nukta";
+  const ir = makeTestIR(
+    [
+      mainGroup([
+        rephBaseRule(baseNodeId),
+        {
+          // :117 — any(ConsonantsU) any(MatraVsU) + "R" > ra virama
+          // index(ConsonantsU,1) index(MatraVsU,2)
+          nodeId: matraNodeId,
+          context: [
+            { kind: "any", storeRef: "ConsonantsU" },
+            { kind: "any", storeRef: "MatraVsU" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "R" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "index", storeRef: "ConsonantsU", offset: 1 },
+            { kind: "index", storeRef: "MatraVsU", offset: 2 },
+          ],
+        },
+        {
+          // :118 — any(ConsonantsU) U+093C any(MatraVsU) + "R" > ra
+          // virama index(ConsonantsU,1) U+093C index(MatraVsU,3)
+          nodeId: nuktaNodeId,
+          context: [
+            { kind: "any", storeRef: "ConsonantsU" },
+            { kind: "char", value: "\u093C" },
+            { kind: "any", storeRef: "MatraVsU" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "R" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "index", storeRef: "ConsonantsU", offset: 1 },
+            { kind: "char", value: "\u093C" },
+            { kind: "index", storeRef: "MatraVsU", offset: 3 },
+          ],
+        },
+      ]),
+    ],
+    devanagariRephStores(),
+  );
+  return { ir, baseNodeId, matraNodeId, nuktaNodeId };
+}
+
+/**
+ * The hindi_modular form witness (lines 181, 184): the same mechanism
+ * with the re-emission spelled as one bare `context`.
+ */
+export function buildHindiRephIR(): {
+  ir: KeyboardIR;
+  baseNodeId: string;
+  ikarNodeId: string;
+} {
+  const baseNodeId = "rule#hindi-reph-base";
+  const ikarNodeId = "rule#hindi-reph-ikar";
+  const stores = [
+    makeCharStore(
+      "store#cl",
+      "cl",
+      "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह",
+    ),
+  ];
+  const ir = makeTestIR(
+    [
+      mainGroup([
+        {
+          // :181 — any(cl) + "'" > U+0930 U+094D context
+          nodeId: baseNodeId,
+          context: [
+            { kind: "any", storeRef: "cl" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "'" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "context", offset: 0 },
+          ],
+        },
+        {
+          // :184 — any(cl) U+093F + "'" > U+0930 U+094D context
+          nodeId: ikarNodeId,
+          context: [
+            { kind: "any", storeRef: "cl" },
+            { kind: "char", value: "\u093F" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "'" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "context", offset: 0 },
+          ],
+        },
+      ]),
+    ],
+    stores,
+  );
+  return { ir, baseNodeId, ikarNodeId };
+}

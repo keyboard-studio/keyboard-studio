@@ -3,8 +3,9 @@
 // Roles are descriptive (the interpreter dispatches on cluster_type, never
 // on role names); the union lists every role the landed rules use —
 // trigger/fan-out/escape (S-02), single (S-01/S-03), cancel/apply (S-07,
-// issue #2212: the cancel rule defines the cluster, the apply rule pairs it).
-export type RoleType = "trigger" | "fan-out" | "escape" | "single" | "cancel" | "apply";
+// issue #2212: the cancel rule defines the cluster, the apply rule pairs it),
+// reph (S-09, issue #2223: every rule in the cluster has the same shape).
+export type RoleType = "trigger" | "fan-out" | "escape" | "single" | "cancel" | "apply" | "reph";
 
 export interface ContextConstraints {
   no_prior_deadkey?: boolean;
@@ -23,7 +24,9 @@ export interface ContextPatternEntry {
   // S-03 form) — NOT a standalone S-11 detector: guard presence alone says
   // nothing about who writes the guarded store (see issue #342 ruling).
   kind: "vkey" | "deadkey" | "any" | "char" | "if";
-  count: "exactly_one" | "zero_or_one";
+  // zero_or_more: first used by S-09 (issue #2223) for the variable middle
+  // elements of a reph rule's pre-trigger context.
+  count: "exactly_one" | "zero_or_one" | "zero_or_more";
   constraints?: ContextConstraints;
 }
 
@@ -36,9 +39,14 @@ export interface OutputConstraints {
 }
 
 export interface OutputPatternEntry {
-  // char, deadkey, index, beep, outs, raw
-  kind: "char" | "deadkey" | "index" | "beep" | "outs" | "raw";
-  count: "exactly_one" | "zero_or_one";
+  // char, deadkey, index, beep, outs, raw, context.
+  // context joined the union with S-09 (issue #2223): the retroactive-reph
+  // finder is the first strategy whose predicate evaluates output context()
+  // elements (the hindi_modular spelling re-emits the matched context via
+  // bare `context`). Per the #2212 schema note, a kind lands only with the
+  // strategy whose finder evaluates it — nul/useGroup stay out until then.
+  kind: "char" | "deadkey" | "index" | "beep" | "outs" | "raw" | "context";
+  count: "exactly_one" | "zero_or_one" | "zero_or_more";
   constraints?: OutputConstraints;
 }
 
