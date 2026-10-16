@@ -55,7 +55,12 @@
  * label came from ownership (step 2) or the shape checks (steps 3/3b). This keeps
  * the alias contract intact for IRs where recognizePatterns() was not applied.
  * (fanShape is a strict superset of bodyShape, so the alias always fires for S-02
- * bodies too.)
+ * bodies too.) Since #2233 the alias ALSO fires for a rule with a single index()
+ * output that is owned by an S-02 pattern: the generalised S-02 fan-out shapes
+ * (codec `+` separator in the raw context, postfix prefix char) are invisible to
+ * the raw-context fanShape check, and ownership is the authoritative signal.
+ * Un-owned generalised shapes earn no alias — shape-based admission stays
+ * exactly as conservative as before.
  *
  * Scope: walks ir.groups / ir.stores / ir.raw only.
  * Touch-layout (S-13) nodes are not classified and receive no map entry.
@@ -116,7 +121,19 @@ export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, Removal
       // the rule.  Gating on fanShape (not bodyShape) ensures the alias is also
       // emitted for output stores referenced by bare-any rules like Bamum's
       // any(defaultK) > index(defaultU, 1).
-      if (fanShape) {
+      //
+      // #2233: fanShape reads the RAW context, so it cannot see the S-02
+      // generalised fan-out shapes (the codec's `+` separator element and the
+      // postfix prefix char both break its raw alignment check).  An S-02
+      // Pattern's ownership is the stronger signal: a rule owned by an S-02
+      // pattern with a single index() output earns the alias through
+      // ownership.  isParallelIndexFanOut itself is NOT widened — it also
+      // fires for un-owned rules at Decision 3b, where shape-only admission
+      // must stay conservative.
+      const ownedByS02 =
+        rule.ownedByPattern !== undefined &&
+        patternById.get(rule.ownedByPattern)?.strategyId === "S-02";
+      if (fanShape || ownedByS02) {
         const outEl = rule.output[0];
         // fanShape already guarantees a single index() output; this re-check is a
         // type narrow for outEl, not a fresh condition.
