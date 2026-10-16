@@ -1076,3 +1076,6 @@ export type {
   RenameDeadkeyOptions,
   RetargetDeadkeyOptions,
 } from "./deadkey-lifecycle/index.js";
+export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
+export type { RgbaImage } from "./icon/icoEncoder.js";
+export { setKeyboardIcon, removeKeyboardIcon, ensureBitmapStore } from "./icon/setKeyboardIcon.js";
