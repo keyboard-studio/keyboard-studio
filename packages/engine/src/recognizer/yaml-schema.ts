@@ -1,6 +1,10 @@
 // Types for the YAML DSL used in content/recognizer-rules/*.yaml
 
-export type RoleType = "trigger" | "fan-out" | "escape" | "single";
+// Roles are descriptive (the interpreter dispatches on cluster_type, never
+// on role names); the union lists every role the landed rules use —
+// trigger/fan-out/escape (S-02), single (S-01/S-03), cancel/apply (S-07,
+// issue #2212: the cancel rule defines the cluster, the apply rule pairs it).
+export type RoleType = "trigger" | "fan-out" | "escape" | "single" | "cancel" | "apply";
 
 export interface ContextConstraints {
   no_prior_deadkey?: boolean;

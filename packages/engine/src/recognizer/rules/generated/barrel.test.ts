@@ -2,7 +2,7 @@
 // Verifies that simpleSwapRule and deadkeySingleTapRule are exported and carry
 // the required RecognizerRule fields (id, strategyId, match, lift).
 import { describe, it, expect } from "vitest";
-import { simpleSwapRule, deadkeySingleTapRule, sequenceReplaceRule } from "./index.js";
+import { simpleSwapRule, deadkeySingleTapRule, sequenceReplaceRule, diacriticCyclingRule } from "./index.js";
 
 describe("generated barrel exports", () => {
   it("simpleSwapRule is exported with id and strategyId", () => {
@@ -39,6 +39,18 @@ describe("generated barrel exports", () => {
   it("sequenceReplaceRule exposes match() and lift() functions", () => {
     expect(typeof sequenceReplaceRule.match).toBe("function");
     expect(typeof sequenceReplaceRule.lift).toBe("function");
+  });
+
+  it("diacriticCyclingRule is exported with id and strategyId", () => {
+    expect(diacriticCyclingRule).toBeDefined();
+    expect(typeof diacriticCyclingRule.id).toBe("string");
+    expect(diacriticCyclingRule.id.length).toBeGreaterThan(0);
+    expect(diacriticCyclingRule.strategyId).toBe("S-07");
+  });
+
+  it("diacriticCyclingRule exposes match() and lift() functions", () => {
+    expect(typeof diacriticCyclingRule.match).toBe("function");
+    expect(typeof diacriticCyclingRule.lift).toBe("function");
   });
 
   it("the exported rules have distinct ids", () => {

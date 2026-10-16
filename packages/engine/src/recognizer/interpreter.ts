@@ -357,6 +357,155 @@ function findS03Clusters(ir: KeyboardIR): S03ClusterMatch[] {
 }
 
 // ---------------------------------------------------------------------------
+// S-07 predicate (diacritic-cycling cluster)
+// ---------------------------------------------------------------------------
+//
+// Shape (spec §7.3 S-07 card; vietnamese_telex head section):
+//   cancel: any(S_marked) + "<key>" > index(S_unmarked, 1) "<key>"
+//   apply:  any(S_unmarked) + "<key>" > index(S_marked, 1)   (paired, optional)
+//
+// The cancel rule is the defining member: the cycle key re-emitted in the
+// output is what makes the pair a cycle rather than a one-way remap. The
+// boundary conditions are the predicate, not decoration:
+//   - output char === trigger char. Without it, this shape matches ~1,769
+//     generic [index, char] diacritic-add rules across the corpus
+//     (issue #2212 corpus scan).
+//   - index() target store !== context any() store, and offset === 1: the
+//     any() sits at context position 1 because guards are excluded (next
+//     point), which is the spec-103 guard-adjusted offset invariant
+//     (offset === guardCount + 1) at guardCount 0.
+//   - NO leading if() guards. Spec 103 FR-007: a pattern may claim a
+//     guarded rule only by explicit opt-in; this pattern does not opt in.
+//     The guarded literal enumeration that dominates telex is not claimed.
+// Cross-tone swap rules (any(marked) + otherKey > index(otherMarked, 1))
+// match neither shape here (their output has no re-emitted char, and their
+// index target is a third store) and are deliberately not claimed: a swap
+// belongs to two tone families at once.
+//
+// A cluster is keyed by (group, marked store, unmarked store, trigger
+// char) — one tone family in one case (telex: five tones × two cases =
+// ten clusters). The paired apply rule attaches when present in the same
+// group and not already owned (an earlier recognizer pass, e.g. S-03, may
+// legitimately own it; the cluster forms regardless).
+
+interface S07ClusterMatch {
+  group: IRGroup;
+  cancelRules: IRRule[];
+  applyRules: IRRule[];
+  markedStore: IRStore;
+  unmarkedStore: IRStore;
+  trigger: string;
+}
+
+// The codec may preserve the inline "+" as a {kind:"raw", text:"+"}
+// context element; strip it, exactly as the S-03 path does.
+function stripPlusSeparator(rule: IRRule): IRRule["context"] {
+  return rule.context.filter(
+    (el) => !(el.kind === "raw" && el.text.trim() === "+"),
+  );
+}
+
+// The context walk shared by the cancel and apply shapes: after the "+"
+// strip, exactly [any(store), char(trigger)] with no leading guards.
+function cycleContextShape(
+  rule: IRRule,
+): { anyRef: string; trigger: string } | undefined {
+  const real = stripPlusSeparator(rule);
+  let guardCount = 0;
+  while (real[guardCount]?.kind === "if") guardCount++;
+  if (guardCount !== 0) return undefined;
+  if (real.length !== 2) return undefined;
+  const c0 = real[0];
+  const c1 = real[1];
+  if (c0 === undefined || c0.kind !== "any") return undefined;
+  if (c1 === undefined || c1.kind !== "char") return undefined;
+  return { anyRef: c0.storeRef, trigger: c1.value };
+}
+
+function cancelShape(
+  rule: IRRule,
+): { markedRef: string; unmarkedRef: string; trigger: string } | undefined {
+  const ctx = cycleContextShape(rule);
+  if (ctx === undefined) return undefined;
+  if (rule.output.length !== 2) return undefined;
+  const o0 = rule.output[0];
+  const o1 = rule.output[1];
+  if (o0 === undefined || o0.kind !== "index") return undefined;
+  if (o1 === undefined || o1.kind !== "char") return undefined;
+  if (o1.value !== ctx.trigger) return undefined;
+  if (o0.storeRef === ctx.anyRef) return undefined;
+  if (o0.offset !== 1) return undefined;
+  return { markedRef: ctx.anyRef, unmarkedRef: o0.storeRef, trigger: ctx.trigger };
+}
+
+function applyShape(
+  rule: IRRule,
+): { unmarkedRef: string; markedRef: string; trigger: string } | undefined {
+  const ctx = cycleContextShape(rule);
+  if (ctx === undefined) return undefined;
+  if (rule.output.length !== 1) return undefined;
+  const o0 = rule.output[0];
+  if (o0 === undefined || o0.kind !== "index") return undefined;
+  if (o0.storeRef === ctx.anyRef) return undefined;
+  if (o0.offset !== 1) return undefined;
+  return { unmarkedRef: ctx.anyRef, markedRef: o0.storeRef, trigger: ctx.trigger };
+}
+
+function findS07Clusters(ir: KeyboardIR): S07ClusterMatch[] {
+  const byKey = new Map<string, S07ClusterMatch>();
+
+  // Pass 1: cancel rules define the clusters.
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
+
+      const shape = cancelShape(rule);
+      if (shape === undefined) continue;
+
+      const markedStore = ir.stores.find((s) => s.name === shape.markedRef);
+      const unmarkedStore = ir.stores.find((s) => s.name === shape.unmarkedRef);
+      if (markedStore === undefined || unmarkedStore === undefined) continue;
+
+      const key = `${group.nodeId}|${shape.markedRef}|${shape.unmarkedRef}|${shape.trigger}`;
+      const existing = byKey.get(key);
+      if (existing !== undefined) {
+        existing.cancelRules.push(rule);
+      } else {
+        byKey.set(key, {
+          group,
+          cancelRules: [rule],
+          applyRules: [],
+          markedStore,
+          unmarkedStore,
+          trigger: shape.trigger,
+        });
+      }
+    }
+  }
+
+  // Pass 2: attach paired apply rules from the same group. An apply rule
+  // already owned (e.g. lifted as S-03 by an earlier pass) is skipped by
+  // the FR-021 filter above the shape check — the cluster still forms.
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
+
+      const shape = applyShape(rule);
+      if (shape === undefined) continue;
+
+      const key = `${group.nodeId}|${shape.markedRef}|${shape.unmarkedRef}|${shape.trigger}`;
+      const cluster = byKey.get(key);
+      if (cluster !== undefined && cluster.group === group) {
+        cluster.applyRules.push(rule);
+      }
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+// ---------------------------------------------------------------------------
 // Slot-value population from YAML lifts_to.slot_mapping
 // ---------------------------------------------------------------------------
 
@@ -368,6 +517,7 @@ interface ClusterContext {
   fanOutRule?: IRRule | undefined;
   deadkeyId?: number | undefined;
   sequenceRules?: IRRule[] | undefined;
+  cycleRules?: IRRule[] | undefined;
 }
 
 function populateSlots(
@@ -442,6 +592,20 @@ function populateSlots(
       for (const r of seqRules) {
         const ch = sequenceTriggerChar(r);
         if (ch !== undefined) seen.add(ch);
+      }
+      if (seen.size > 0) result[slotId] = [...seen].join("");
+      continue;
+    }
+
+    if (source.startsWith("rules[cycle].trigger_chars")) {
+      // S-07 cycleKey slot: the cluster's cycle key. Every cancel rule in
+      // a cluster shares one trigger by construction (it is part of the
+      // cluster key), so this yields exactly one char.
+      const cycRules = ctx.cycleRules ?? ctx.clusterRules;
+      const seen = new Set<string>();
+      for (const r of cycRules) {
+        const s = cancelShape(r);
+        if (s !== undefined) seen.add(s.trigger);
       }
       if (seen.size > 0) result[slotId] = [...seen].join("");
       continue;
@@ -579,6 +743,46 @@ export function interpretPredicate(rule: RecognizerRuleYaml, ir: KeyboardIR): Ma
     return results;
   }
 
+  if (clusterType === "diacritic-cycling") {
+    const clusters = findS07Clusters(ir);
+    for (const cluster of clusters) {
+      const storesByName = new Map<string, IRStore>([
+        ...ir.stores.map((s): [string, IRStore] => [s.name, s]),
+      ]);
+      // Abstract YAML aliases, as in the S-02/S-03 branches, so the YAML
+      // slot_mapping resolves "S_marked" / "S_unmarked" without IR names.
+      storesByName.set("S_marked", cluster.markedStore);
+      storesByName.set("S_unmarked", cluster.unmarkedStore);
+
+      const slotValues = rule.lifts_to.slot_mapping !== undefined
+        ? populateSlots(
+            rule.lifts_to.slot_mapping,
+            {
+              clusterRules: [...cluster.cancelRules, ...cluster.applyRules],
+              stores: storesByName,
+              cycleRules: cluster.cancelRules,
+            },
+            ir,
+          )
+        : {};
+
+      results.push({
+        // The trigger is part of the cluster key, so it is part of the
+        // instance id: one store pair serves several cycle keys (telex
+        // 's'/'S' over vowels_sac/vowels), and those are distinct Patterns.
+        patternId: `${rule.lifts_to.patternId}#${cluster.markedStore.name}+${cluster.trigger}`,
+        ownedNodes: [
+          ...cluster.cancelRules.map((r) => ruleRef(r.nodeId)),
+          ...cluster.applyRules.map((r) => ruleRef(r.nodeId)),
+          storeRef(cluster.markedStore.nodeId),
+          storeRef(cluster.unmarkedStore.nodeId),
+        ],
+        slotValues,
+      });
+    }
+    return results;
+  }
+
   return results;
 }
 
@@ -642,6 +846,7 @@ function titleForStrategy(strategyId: string): string {
     case "S-01": return "Simple swap";
     case "S-02": return "Single-tap deadkey";
     case "S-03": return "Sequence replace";
+    case "S-07": return "Diacritic cycling";
     case "S-08": return "Full remap";
     default: return strategyId;
   }
@@ -697,6 +902,10 @@ function promptForSlot(slotId: string): string {
     case "triggerChar": return "Character typed after a base character to trigger the replacement";
     case "contextStoreName": return "Internal name for this rule set";
     case "defaultOutput": return "What the trigger character produces when no special context character came before it";
+    case "cycleStoreName": return "Internal name for this tone-cycle rule set";
+    case "plainChars": return "Vowels without this tone mark, in order";
+    case "markedChars": return "The same vowels with this tone mark applied, in the same order";
+    case "cycleKey": return "Character key that applies this tone — pressing it again after a marked vowel cancels the tone and types the key itself";
     default: return slotId;
   }
 }
@@ -718,6 +927,16 @@ function buildKmnFragment(strategyId: string, slotValues: Record<string, string>
       // additionally carries its if(...) guard in the source rules; the
       // template shows the canonical unguarded shape.
       return 'any({{contextChars}}) + "{{triggerChar}}" > index({{contextOutputs}}, 1)';
+    case "S-07":
+      // Schematic, following the S-02/S-03 precedent: slot values are
+      // store CONTENTS inlined, not store references. The cancel rule
+      // comes first — it is the cluster's defining member; the apply rule
+      // is its pair. The cycle key appears in both the cancel rule's
+      // context and its output (the re-emission is the mechanism).
+      return (
+        'any({{markedChars}}) + "{{cycleKey}}" > index({{plainChars}}, 1) "{{cycleKey}}"\n' +
+        'any({{plainChars}}) + "{{cycleKey}}" > index({{markedChars}}, 1)'
+      );
     default:
       // Fallback: emit placeholders for every known slot value
       return Object.keys(slotValues)
