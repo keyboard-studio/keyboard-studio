@@ -245,16 +245,16 @@ describe('CarveGalleryV2 — removed-characters dropdown', () => {
     fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
     fireEvent.click(screen.getByRole('button', { name: '1 — U+0031' }));
 
-    const trigger = screen.getByRole('button', { name: /^\d+ removed$/i });
+    const trigger = screen.getByRole('button', { name: /^\d+ discarded$/i });
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
 
     fireEvent.click(trigger);
 
-    // Both discarded characters are listed, each with its own Keep button.
-    const keepButtons = screen.getAllByRole('button', { name: /keep/i });
-    expect(keepButtons.length).toBe(2);
+    // Both discarded characters are listed, each with its own Restore button.
+    const restoreButtons = screen.getAllByRole('button', { name: 'Restore' });
+    expect(restoreButtons.length).toBe(2);
 
-    fireEvent.click(keepButtons[0]!);
+    fireEvent.click(restoreButtons[0]!);
 
     // Exactly one restored — the other stays discarded.
     const deletedNow = [
@@ -275,7 +275,7 @@ describe('CarveGalleryV2 — removed-characters dropdown', () => {
     fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
     fireEvent.click(screen.getByRole('button', { name: 'C — U+0043' }));
 
-    fireEvent.click(screen.getByRole('button', { name: /^\d+ removed$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^\d+ discarded$/i }));
     fireEvent.click(screen.getByRole('button', { name: /restore all/i }));
 
     expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
@@ -286,7 +286,7 @@ describe('CarveGalleryV2 — removed-characters dropdown', () => {
     mockFixtureContributors();
     renderGalleryV2(makeFixtureIR());
 
-    const trigger = screen.getByRole('button', { name: /nothing removed/i });
+    const trigger = screen.getByRole('button', { name: /nothing discarded/i });
     expect(trigger.hasAttribute('disabled')).toBe(true);
   });
 });
@@ -366,14 +366,14 @@ describe('CarveGalleryV2 — group-by toggle', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Basic letters' })).not.toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: 'Digits & numerals' })).not.toBeNull();
     expect(screen.queryByRole('heading', { level: 2, name: 'Direct keys' })).toBeNull();
-    expect(screen.queryByRole('heading', { level: 2, name: 'From stores' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'From character lists' })).toBeNull();
 
     fireEvent.click(sourceRadio);
 
     expect(sourceRadio.checked).toBe(true);
     expect(categoryRadio.checked).toBe(false);
     expect(screen.getByRole('heading', { level: 2, name: 'Direct keys' })).not.toBeNull();
-    expect(screen.getByRole('heading', { level: 2, name: 'From stores' })).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: 'From character lists' })).not.toBeNull();
     expect(screen.queryByRole('heading', { level: 2, name: 'Basic letters' })).toBeNull();
     expect(screen.queryByRole('heading', { level: 2, name: 'Digits & numerals' })).toBeNull();
   });
@@ -882,29 +882,29 @@ describe('CarveGalleryV2 — narrow details card (mobile, Phase 3)', () => {
     expect(screen.queryByTestId('carve-details-card')).toBeNull();
   });
 
-  it('starts open for the undecided initial selection, showing the keep? badge and Keep/Carve actions', () => {
+  it('starts open for the undecided initial selection, showing the keep? badge and Keep/Discard actions', () => {
     const card = renderNarrowCard();
 
     expect(card.querySelector('[aria-expanded="true"]')).not.toBeNull();
     expect(within(card).getByText('keep?')).not.toBeNull();
     expect(within(card).getByRole('button', { name: 'Keep' })).not.toBeNull();
-    expect(within(card).getByRole('button', { name: 'Carve' })).not.toBeNull();
+    expect(within(card).getByRole('button', { name: 'Discard' })).not.toBeNull();
     // The "How it's typed" disclosure starts collapsed (expandable).
     const howTyped = within(card).getByRole('button', { name: "How it's typed" });
     expect(howTyped.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it("the card's Carve button discards the selected character and collapses the card", () => {
+  it("the card's Discard button discards the selected character and collapses the card", () => {
     const card = renderNarrowCard();
 
-    fireEvent.click(within(card).getByRole('button', { name: 'Carve' }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Discard' }));
 
     // Cascade marks the contributor deleted (same write path as a cell tap).
     expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
-    // Card collapses: actions gone, header still shows the character + carved badge.
+    // Card collapses: actions gone, header still shows the character + discarded badge.
     expect(within(card).queryByRole('button', { name: 'Keep' })).toBeNull();
-    expect(within(card).queryByRole('button', { name: 'Carve' })).toBeNull();
-    expect(within(card).getByText('carved')).not.toBeNull();
+    expect(within(card).queryByRole('button', { name: 'Discard' })).toBeNull();
+    expect(within(card).getByText('discarded')).not.toBeNull();
     expect(
       within(card).getByRole('button', { name: 'Details for Character U+0061' }).getAttribute('aria-expanded'),
     ).toBe('false');
@@ -928,7 +928,7 @@ describe('CarveGalleryV2 — narrow details card (mobile, Phase 3)', () => {
 
     expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
     expect(within(card).queryByRole('button', { name: 'Keep' })).toBeNull();
-    expect(within(card).getByText('carved')).not.toBeNull();
+    expect(within(card).getByText('discarded')).not.toBeNull();
 
     // Expand the card manually, then tap the same (already-decided) cell:
     // selection sees the recorded disposition and the card stays collapsed.
@@ -968,7 +968,7 @@ describe('CarveGalleryV2 — narrow details card (mobile, Phase 3)', () => {
     // tap is a decision, so the card stays a slim readout.
     expect(useWorkingCopyStore.getState().isItemDeleted('r-1')).toBe(true);
     expect(within(cardAfter).queryByRole('button', { name: 'Keep' })).toBeNull();
-    expect(within(cardAfter).getByText('carved')).not.toBeNull();
+    expect(within(cardAfter).getByText('discarded')).not.toBeNull();
   });
 
   it('desktop: tapping a grid cell leaves the rail visible (no card lifecycle)', () => {

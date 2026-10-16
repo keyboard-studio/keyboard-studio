@@ -46,8 +46,8 @@ const GROUP_HINTS: Record<string, string> = {
   'punctuation-symbol': 'Punctuation, currency, and other symbols.',
   'direct-key': 'Typed with a single key press.',
   'deadkey-sequence': 'Typed by pressing a dead key, then a base letter.',
-  store: 'Lives in an internal list rather than a single key.',
-  'advanced-rule': 'Produced by an advanced rule kept verbatim — the keystroke can\'t be shown.',
+  store: 'Comes from a list of characters (called a store) rather than a single key.',
+  'advanced-rule': 'Produced by a complex rule that is kept exactly as written — the keystroke can\'t be shown.',
   // spec §8 / #1606. These characters ARE produced, and are still discardable
   // like any other rule-backed character — the set exists so they are not
   // filed under "typed with a single key press" when no desktop key types
@@ -494,7 +494,7 @@ if (ways.length === 0) {
     <>
       {label}
       <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-        Produced by an advanced rule — the keystroke can't be shown
+        Produced by a complex rule kept exactly as written — the keystroke can't be shown
       </span>
     </>
   );
@@ -540,12 +540,12 @@ return (
 /**
  * Narrow-viewport character-details card (mobile adaptation, Phase 3).
  * Replaces the 290px details rail under 479px: a collapsible card pinned
- * above the chip grid showing the selected character, Keep/Carve actions,
+ * above the chip grid showing the selected character, Keep/Discard actions,
  * and an expandable "How it's typed" section — the hover-driven detail text
  * moved here so it is reachable by tap.
  *
  * The parent owns the card's expanded state and collapses it by default once
- * the author has recorded a keep/carve disposition for the selected
+ * the author has recorded a keep/discard disposition for the selected
  * character; this component owns only the inner "How it's typed" disclosure
  * (reset per selection via the parent's `key`).
  */
@@ -559,7 +559,7 @@ function CarveDetailsCard({
   onCarve,
 }: {
   cell: CharacterCell | undefined;
-  /** Whether the author has recorded a keep/carve disposition for this character. */
+  /** Whether the author has recorded a keep/discard disposition for this character. */
   decided: boolean;
   /** Whether the character is currently discarded. */
   discarded: boolean;
@@ -579,8 +579,8 @@ function CarveDetailsCard({
     font: '600 13.5px var(--app-font)',
     minHeight: 'var(--app-touch-target)',
     padding: '10px 12px',
-    // Keep is the solid action, Carve the ghost (mockup) — discarding is
-    // reversible until Continue, so neither gets the destructive red fill.
+    // Keep is the solid action, Discard the ghost (mockup) — discarding is
+    // reversible at any time, so neither gets the destructive red fill.
     color: primary ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
     background: primary ? 'var(--app-accent)' : 'transparent',
     border: primary ? 'none' : '1px solid var(--app-border-strong)',
@@ -646,7 +646,7 @@ function CarveDetailsCard({
         >
           {decided
             ? (discarded
-              ? <Trans id="carve.detailsCard.carvedBadge">carved</Trans>
+              ? <Trans id="carve.detailsCard.carvedBadge">discarded</Trans>
               : <Trans id="carve.detailsCard.keptBadge">kept</Trans>)
             : <Trans id="carve.detailsCard.undecidedBadge">keep?</Trans>}
         </span>
@@ -676,12 +676,15 @@ function CarveDetailsCard({
               <HowItsTyped cell={cell} showLabel={false} />
             </div>
           )}
+          <p style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+            <Trans id="carve.details.discardBlurb">If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.</Trans>
+          </p>
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" onClick={onKeep} style={actionStyle(true)}>
               <Trans id="carve.detailsCard.keep">Keep</Trans>
             </button>
             <button type="button" onClick={onCarve} style={actionStyle(false)}>
-              <Trans id="carve.detailsCard.carve">Carve</Trans>
+              <Trans id="carve.detailsCard.carve">Discard</Trans>
             </button>
           </div>
         </div>
@@ -906,7 +909,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   /**
    * Narrow viewports: selecting a character opens the details card unless
-   * the author already recorded a keep/carve disposition for it — the card
+   * the author already recorded a keep/discard disposition for it — the card
    * is collapsed by default once a disposition exists. Desktop keeps the
    * always-visible rail, so this is a no-op there.
    */
@@ -952,7 +955,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   }, [cascadeDelete, cascadeRestore]);
 
   // --- Narrow details-card decision plumbing (mobile adaptation, Phase 3) ---
-  // The card's Keep/Carve buttons need an EXPLICIT direction (not a toggle),
+  // The card's Keep/Discard buttons need an EXPLICIT direction (not a toggle),
   // and every toggle path records the author's disposition so the card can
   // collapse by default once one exists.
 
@@ -1058,7 +1061,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   );
 
   // The recommendation row behind a reco selected cell (for the card's
-  // discarded state and Keep/Carve actions) — case-merged row semantics,
+  // discarded state and Keep/Discard actions) — case-merged row semantics,
   // mirroring RecommendedGroupCard's isRowDiscarded usage.
   const selectedRow = useMemo(
     () => (selectedCell?.reco === true
@@ -1070,7 +1073,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     ? isRowDiscarded(selectedRow, isItemDeleted)
     : selectedCell !== undefined && isCellDiscarded(selectedCell, isItemDeleted);
 
-  /** Card Keep/Carve: explicit disposition for the selected character, then collapse. */
+  /** Card Keep/Discard: explicit disposition for the selected character, then collapse. */
   const decideSelected = useCallback((discard: boolean) => {
     const cell = selectedCell;
     if (cell === undefined) return;
@@ -1140,10 +1143,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 22px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: 0, font: "500 23px/1.1 'Playfair Display', serif", color: 'var(--app-text)' }}>
-            Everything this keyboard can type
+            <Trans id="carve.header.heading">Everything this keyboard can type</Trans>
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--app-text-muted)', maxWidth: 620, lineHeight: 1.5 }}>
-            Every printable character your starting keyboard can produce, in one panel. Click any character to discard it — nothing is deleted until you continue.
+            <Trans id="carve.header.body">Every printable character your starting keyboard can produce, in one panel. Click any character to discard it — discarding applies straight away, and you can restore a character at any time.</Trans>
           </p>
         </div>
       </div>
@@ -1152,10 +1155,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)' }}>
         <div>
           <div style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>
-            <b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept
+            <Trans id="carve.status.keptLine"><b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept</Trans>
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--app-text-subtle)', marginTop: 2 }}>
-            {removedCount} discarded · reversible until you continue
+            <Trans id="carve.status.discardedLine">{removedCount} discarded · you can restore them at any time</Trans>
           </div>
         </div>
         {/* Grouping toggle — native fieldset/radio group so "Group by" is a
@@ -1331,7 +1334,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     by clicking its grid cell, a suggested-group card, or the
                     removed-characters dropdown above. */}
                 <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
-                  Discarding a character removes the rules that produce it. If a rule also produces a character you kept, that rule stays.
+                  <Trans id="carve.details.discardBlurb">If you discard this character, your keyboard stops typing it. Anything that only produces this character is removed; anything shared with a character you keep stays. Discarding is not final — restore the character at any time to bring it back.</Trans>
                 </p>
               </div>
             );
@@ -1356,7 +1359,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 chipBackground="color-mix(in srgb, var(--sil-red) 14%, var(--app-surface-2))"
                 chipColor="var(--app-danger-text-on-surface-2)"
                 heading={<Trans id="carve.suggested.heading">Suggested to discard</Trans>}
-                body={<Trans id="carve.suggested.startingBody">Your starting keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.</Trans>}
+                body={<Trans id="carve.suggested.body">Your starting keyboard can type these characters, but nothing in your confirmed alphabet uses them. They are suggested to discard — click any character below to keep it instead. Discarding applies straight away, and you can restore a character at any time.</Trans>}
                 rows={primaryRows}
                 cellsByCh={cellsByCh}
                 isItemDeleted={isItemDeleted}
@@ -1371,14 +1374,14 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
               <RecommendedGroupCard
                 testId="carve-v2-optional-latin-group"
                 toggleAllTestId="carve-v2-optional-latin-toggle-all"
-                regionAriaLabel={t({ id: "editor.assignLoop.removalBanner.latinOptionalGroupAriaLabel", message: "Latin alphabet, optional removal" })}
+                regionAriaLabel={t({ id: "editor.assignLoop.removalBanner.latinOptionalGroupAriaLabel", message: "Latin alphabet — discarding is optional" })}
                 topBorderColor="var(--app-border-strong)"
                 chipBackground="var(--app-surface-2)"
                 chipColor="var(--app-text-subtle)"
                 heading={<Trans id="editor.assignLoop.removalBanner.latinOptionalHeading">Latin alphabet (optional)</Trans>}
                 body={t({
                   id: "editor.assignLoop.removalBanner.latinOptionalBody",
-                  message: `Keep these for URLs, code, and English words — or remove them for a ${{ descriptor: keyboardDescriptor }} keyboard.`,
+                  message: `Keep these for URLs, code, and English words — or discard them for a ${{ descriptor: keyboardDescriptor }} keyboard.`,
                 })}
                 rows={optionalLatinRows}
                 cellsByCh={cellsByCh}
