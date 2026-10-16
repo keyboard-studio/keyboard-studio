@@ -25,6 +25,7 @@ import {
 } from "../ui/useDismissablePopover.ts";
 import { CurrentKeyboardIndicator } from "./CurrentKeyboardIndicator.tsx";
 import { UnfinishedGalleryIndicator } from "./UnfinishedGalleryIndicator.tsx";
+import { FontSwitcher } from "./FontSwitcher.tsx";
 import { LocaleSwitcher } from "./LocaleSwitcher.tsx";
 import { ThemeSwitcher } from "./ThemeSwitcher.tsx";
 import { AccountControl } from "./AccountControl.tsx";
@@ -399,6 +400,7 @@ export function NavBar({
                   onNavigate={onNavigateToUnfinishedGallery}
                 />
               )}
+              <FontSwitcher />
               <LocaleSwitcher />
               <ThemeSwitcher />
               {active !== "welcome" && <AccountControl />}
@@ -424,6 +426,7 @@ export function NavBar({
               onNavigate={onNavigateToUnfinishedGallery}
             />
           )}
+          <FontSwitcher />
           <LocaleSwitcher />
           <ThemeSwitcher />
           {active !== "welcome" && <AccountControl />}
