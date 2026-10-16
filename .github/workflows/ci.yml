@@ -383,7 +383,19 @@ jobs:
       # lists and the fallback rules; the full suite runs overnight.
       - name: Test (PR — affected + curated core)
         if: github.event_name == 'pull_request'
-        run: pnpm run test:pr -- ${{ github.event.pull_request.base.sha }}
+        run: node scripts/test-pr.mjs ${{ github.event.pull_request.base.sha }}
+
+      # The utility suites below (i18n extract, kbgen, nfd-tolerance,
+      # supportability) resolve @keyboard-studio/engine through its
+      # built dist/ entry — on non-PR events the Build step above
+      # produced it, but on the PR path that step is skipped (the fast
+      # job built on a different runner) and test:pr only builds the
+      # deps of the packages it runs. Build the workspace deps
+      # explicitly here (tsc only, no vite) so the utility steps see
+      # the same tree either way.
+      - name: Build workspace dependencies (PR path — utility suites resolve engine via dist)
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter "@keyboard-studio/studio^..." build
 
       # Corpus-sweep unit tests (km/ci-fast-gates): *.corpus.test.ts
       # files sweep the pinned corpus and accounted for
