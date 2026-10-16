@@ -47,6 +47,8 @@
   "carve.detailsCard.keptBadge": "kept",
   "carve.detailsCard.toggleLabel": "Details for {0}",
   "carve.detailsCard.undecidedBadge": "keep?",
+  "carve.keyboardDescriptor.named": "{name}-only",
+  "carve.keyboardDescriptor.singleScript": "single-script",
   "carve.recommended.discardAll": "Discard all {count}",
   "carve.recommended.restoreAll": "Restore all",
   "carve.suggested.heading": "Suggested to discard",
