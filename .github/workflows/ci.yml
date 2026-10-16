@@ -233,6 +233,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout_ref || github.ref }}
+          # Full history: the PR test step (scripts/test-pr.mjs) diffs
+          # against the PR base via merge-base; the default shallow
+          # checkout has no merge-base and the diff silently comes
+          # back empty (caught live on #2203's first run).
+          fetch-depth: 0
 
       # The corpus-gated unit tests (codec round-trip, carveViaSplice corpus
       # sweep, recognizer integration, touch fixtures, facet-index real-corpus
