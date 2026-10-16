@@ -93,9 +93,9 @@ Precedence is not the whole story: a base keyboard's own mechanism is one of the
 | 3a | A2=alphabetic AND A3=strong AND A3a=postfix | **S-03** Sequence replace | + S-04 |
 | 4 | A5=two-orthography | **S-11** Stateful option toggle | (wraps whichever strategy fits the per-mode rules) |
 | 5 | A3=strong AND A1 ∈ {medium, large} | **S-05** Mnemonic spelling | + S-04 |
-| 6 | A4=multi-family AND A1=large | **S-06** Chained deadkeys (two-tier) | + S-04 |
+| 6 | A4=multi-family AND A1=large | **S-06** Chained deadkeys (family selection) | + S-04 |
 | 7 | A4=stacking-combining AND A1 ∈ {small, medium} | **S-02** Deadkey composition | + S-04 |
-| 8 | A2=alphabetic AND A7a=full-remap | **S-06** Chained deadkeys (alt-plane mnemonic) | + S-04, + S-08 |
+| 8 | A2=alphabetic AND A7a=full-remap | **S-06** Chained deadkeys (pending-letter) | + S-04, + S-08 |
 | 9 | A6=loud | (whatever above) | + **S-10** Constraints + beep |
 | 10 | A7=fully booked | (whatever above) | + **S-08** RAlt modifier-layer |
 | 11 | A1=tiny AND A3=strong | **S-01** Simple swap | — |
@@ -123,11 +123,11 @@ flowchart TD
     R4 -- no --> R5{A3=strong AND<br/>A1 in medium,large?}
     R5 -- yes --> S05[/"<b>S-05</b> Mnemonic spelling<br/>+ S-04"/]
     R5 -- no --> R6{A4=multi-family AND<br/>A1=large?}
-    R6 -- yes --> S06[/"<b>S-06</b> Chained deadkeys<br/>+ S-04"/]
+    R6 -- yes --> S06[/"<b>S-06</b> Chained deadkeys<br/>(family selection) + S-04"/]
     R6 -- no --> R7{A4=stacking-combining AND<br/>A1 in small,medium?}
     R7 -- yes --> S02[/"<b>S-02</b> Deadkey composition<br/>+ S-04"/]
     R7 -- no --> R8{A2=alphabetic AND<br/>A7a=full-remap?}
-    R8 -- yes --> S06full[/"<b>S-06</b> Chained deadkeys<br/>+ S-04, + S-08"/]
+    R8 -- yes --> S06full[/"<b>S-06</b> Chained deadkeys<br/>(pending-letter) + S-04, + S-08"/]
     R8 -- no --> R11{A1=tiny AND<br/>A3=strong?}
     R11 -- yes --> S01[/"<b>S-01</b> Simple swap"/]
     R11 -- no --> S03[/"<b>S-03</b> Sequence replace<br/>(fallback)"/]
@@ -161,7 +161,7 @@ flowchart TD
     class R1,R2,R3,R3a,R4,R5,R6,R7,R8,R9,R10,R11,Sec decision
 ```
 
-**Prose summary.** Massive logographic → only the OS IME is fast enough; delegate (S-12). Indic/Arabic-shaped scripts need context-aware cluster rules (S-09); phonetic ones add mnemonic spelling. Tonal cycling (S-07) is neither stacking nor deadkey. Dual orthography (S-11) wraps a state toggle around the inner strategy. Big phonetic alphabets (S-05) — let the user type spellings, collapsed with `any`/`index`. Big diacritic palettes (S-06) — two-tier deadkey: first key picks the family, second the base. Small accent-heavy Latin (S-02) — classic deadkey composition. Non-Latin alphabetic full-remap (Russian/Armenian/Greek mnemonic) — chained deadkeys for case-and-diacritic alternates (S-06) plus an RAlt modifier plane (S-08) for the lesser-used letters. Loud feedback (S-10) and fully-booked layouts (S-08) are add-ons, never the whole answer. A handful of phonetic additions (S-01) — just swap them in. Otherwise (S-03) — short ASCII sequences expand to single chars.
+**Prose summary.** Massive logographic → only the OS IME is fast enough; delegate (S-12). Indic/Arabic-shaped scripts need context-aware cluster rules (S-09); phonetic ones add mnemonic spelling. Tonal cycling (S-07) is neither stacking nor deadkey. Dual orthography (S-11) wraps a state toggle around the inner strategy. Big phonetic alphabets (S-05) — let the user type spellings, collapsed with `any`/`index`. Big diacritic palettes — S-06 (family selection, rule 6): one deadkey key chooses the family, and the letter key after it chooses inside that family. Small accent-heavy Latin (S-02) — classic deadkey composition. Non-Latin alphabetic full-remap (Russian/Armenian/Greek mnemonic) — S-06 (pending-letter, rule 8): a typed letter may be held back as deadkey state until the next key settles whether it stands alone or forms a different letter, plus an RAlt modifier plane (S-08) for the lesser-used letters. Loud feedback (S-10) and fully-booked layouts (S-08) are add-ons, never the whole answer. A handful of phonetic additions (S-01) — just swap them in. Otherwise (S-03) — short ASCII sequences expand to single chars.
 
 **Encoding.** The tree may be encoded as JSON/TS rules in `packages/contracts` or reasoned over by the LLM directly against this table; both are valid (pick per studio architecture). The strategy selector returns `{ primary: strategyId, secondaries: strategyId[] }`, which the gallery resolves to patterns via the `strategyId` / `combinesWith` fields (Sec 5). This pair seeds the **default scope**; the gallery may then refine it per character class or individual character per the assignment-map model (Sec 7.7).
 
@@ -208,7 +208,9 @@ dk(grave) + any(graveK) > index(graveO, 2)
 dk(grave) + any(keys)   > '`' context(2)    c restore on miss
 ```
 
-**Real exemplar:** `release/sil/sil_euro_latin/source/sil_euro_latin.kmn` — 92 deadkey rules cover virtually every European Latin diacritic.
+**Real exemplar:** `release/sil/sil_euro_latin/source/sil_euro_latin.kmn` — deadkey composition covering virtually every European Latin diacritic.
+
+**How this keyboard's deadkeys are counted — the numbers below measure different things and must not be paraphrased into each other.** **92** is the number of *lines in the .kmn that mention `dk(`* — a text count, not a count of rules, families, or clusters. The keyboard defines **2 deadkey ids** (`dk(1)` and `dk(2)`). Grouping its typed rules into *families* — one deadkey id, one preceding literal context, one pair of stores — gives **19 generalised families**, all under `dk(1)` and told apart by the preceding accent character; `dk(1)` is a single shared pending marker, not one deadkey per family (codec-measured; ruling on issue #2213). In this spec a **rule** is one typed rule in the codec IR, a **family** is the grouping just defined, and a **cluster** is a family in the complete three-rule shape (trigger, fan-out, escape); under that strict shape the issue #2213 evaluation measured **0** clusters in this keyboard — a statement about that measurement and that shape, not about the keyboard, which composes with deadkeys throughout. No figure in this spec may be restated with a different one of these nouns without re-measuring.
 
 #### S-03 Sequence replace
 
@@ -258,13 +260,26 @@ dk(family) + any(K_lc1) > index(lc1, 2)
 
 **Real exemplar:** `release/itrans/itrans_devanagari_hindi/source/itrans_devanagari_hindi.kmn` — `saMskRRta` → `संस्कृत`.
 
-#### S-06 Chained deadkeys (two-tier)
+#### S-06 Chained deadkeys (one slot, three mechanisms)
 
-**When to use:** A4=multi-family AND A1=large; or alphabetic scripts where one base key has multiple legitimate outputs and the next key disambiguates. First key picks the *family*, second the *base*.
-**When to avoid:** A single diacritic family (S-02 suffices); when the user can't predict the family key.
+**One slot, three mechanisms.** "Chained" is the historical slot name; it is not a description of every mechanism in the slot, and no mechanism may be inferred from it. The senses were formerly labelled "Chained deadkeys (two-tier)" (rule 6) and "Chained deadkeys (alt-plane mnemonic)" (rule 8); both labels are retired — the rule-6 deadkeys are parallel set selectors, never a sequence, and the rule-8 deadkeys sit on the main plane, not an alt plane. A claim about S-06 — a boundary criterion, a recognizer predicate, a pattern, an exemplar — names its sense using the citation forms in this table. Evidence for one sense is not evidence for another. The recognizer recognizes **no** S-06 sense (ruling on issue #2213); the gated chain-recognition work in issue #2235 is scoped to the two-trigger chain sense only.
+
+| Citation form | Mechanism | Key presses | Exemplar |
+|---|---|---|---|
+| **S-06 (family selection, rule 6)** — *Deadkey family selection* | One deadkey key per set or family (one deadkey per set); the letter key after it chooses inside that set. No deadkey ever leads to another deadkey. | trigger → letter | `sil_pan_africa_mnemonic` |
+| **S-06 (pending-letter, rule 8)** — *Pending-letter deadkeys* (dk→dk delay line) | A typed letter is held back as deadkey state until the next key shows whether it stands alone or forms a different letter; each keystroke emits the previous pending letter and defers its own, so deadkeys can follow deadkeys with no fixed number of steps. This is not "first key picks the family, second the base." | varies, unbounded | `armenian_mnemonic_r`, `russian_mnemonic_r` |
+| **S-06 (two-trigger chain, library pattern)** — *Chained deadkeys (two-tier)* | The only sense that is a chain by design: a first trigger key chooses the family, a second trigger key chooses the accent within it, then the letter key. | trigger → trigger → letter | pattern `latin_deadkey_chained_two_tier` (1 validated source keyboard: `thamizha_bamini`) |
+
+Bare "S-06" remains correct only for slot-level claims that are true of all three senses (e.g. the `combinesWith` list below).
+
+**When to use — S-06 (family selection, rule 6):** A4=multi-family AND A1=large. One deadkey key chooses which family — a set of accents or letters sharing one selector key — comes next; the letter key after it chooses inside that family.
+**When to use — S-06 (pending-letter, rule 8):** A2=alphabetic AND A7a=full-remap, where one letter key has multiple legitimate outputs and the *following* key decides which one was meant, so letters are held pending.
+**When to avoid:** A single diacritic family (S-02 suffices); when the user can't predict the family key (family selection); when every letter has exactly one form (pending-letter machinery buys nothing).
 **Combines well with:** S-04 (essential for the per-family table), S-08 (RAlt to host the family keys), S-11 (when the keyboard toggles between orthographic variants at runtime).
-**Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08", "S-11"]`.
-**Placement semantics:** the first-tier *family* keys are the placement decision; second-tier base keys follow the base layout. Choose family keys the same way as S-02 triggers (diacritic-mnemonic punctuation first), hosting them on RAlt when the base plane is booked. The corpus prior (Sec 7.6) reports which family keys real S-06 keyboards chose for the same script class.
+**Pattern mapping:** `strategyId: "S-06"`; `combinesWith: ["S-04", "S-08", "S-11"]`. The library pattern for the two-trigger chain sense is `latin_deadkey_chained_two_tier` (`packages/contracts/data/patterns/`); for that sense the first key picks the family, the second picks the sub-family, and the *third* key is the base letter.
+**Placement semantics:** for the family-selection and two-trigger chain senses, the first-tier *family* keys are the placement decision; second-tier base keys follow the base layout. Choose family keys the same way as S-02 triggers (diacritic-mnemonic punctuation first), hosting them on RAlt when the base plane is booked. The corpus prior (Sec 7.6) reports which family keys real S-06 keyboards chose for the same script class. For the pending-letter sense the placement decision is the mnemonic letter table itself, not a set of family keys.
+
+*Family-selection sense (rule 6) — illustration. This is not a chain: no deadkey in it leads to another deadkey.*
 
 ```
 + [K_LBRKT]                > dk(family_grave)
@@ -274,7 +289,7 @@ dk(family_grave) + any(K_vowels) > index(grave_out, 2)
 dk(family_acute) + any(K_vowels) > index(acute_out, 2)
 ```
 
-**Real exemplar:** `release/a/armenian_mnemonic_r/source/armenian_mnemonic_r.kmn`; pan-African two-tier family selection in `release/sil/sil_pan_africa_mnemonic/source/sil_pan_africa_mnemonic.kmn`.
+**Real exemplars, by sense:** S-06 (family selection, rule 6) — `release/sil/sil_pan_africa_mnemonic/source/sil_pan_africa_mnemonic.kmn`. S-06 (pending-letter, rule 8) — `release/a/armenian_mnemonic_r/source/armenian_mnemonic_r.kmn`; `release/r/russian_mnemonic_r/source/russian_mnemonic_r.kmn`. S-06 (two-trigger chain, library pattern) — pattern `latin_deadkey_chained_two_tier`, validated source `release/t/thamizha_bamini/source/thamizha_bamini.kmn`.
 
 #### S-07 Diacritic cycle
 
@@ -452,7 +467,7 @@ nomatch > use(main)
 
 The decision tree must agree with the strategy each exemplar actually uses. This round-trip is the **regression suite**: if "Tree → strategy" disagrees with "Actual primary," the tree is wrong, not the keyboard. Re-run it after any edit to 7.1/7.2/7.3.
 
-**Scope of this table.** It validates the tree's **default-scope** recommendation — the single `{primary, secondaries}` the tree picks for the keyboard as a whole. Per-class and per-individual overrides, and characters reached by more than one mechanism, are the gallery's concern (Sec 7.7); they are not represented here and do not change a row's expected value. (Rows that list more than one strategy — e.g. `itrans_devanagari_hindi` → S-09 + S-05 + S-11 — are axis-driven tree secondaries from rules 2/4, **not** per-class overrides; the distinction matters.) The table answers "did the tree seed the right default?", not "what did the author finally assign to every character?"
+**Scope of this table.** It validates the tree's **default-scope** recommendation — the single `{primary, secondaries}` the tree picks for the keyboard as a whole. Per-class and per-individual overrides, and characters reached by more than one mechanism, are the gallery's concern (Sec 7.7); they are not represented here and do not change a row's expected value. (Rows that list more than one strategy — e.g. `itrans_devanagari_hindi` → S-09 + S-05 + S-11 — are axis-driven tree secondaries from rules 2/4, **not** per-class overrides; the distinction matters.) The table answers "did the tree seed the right default?", not "what did the author finally assign to every character?" Every corpus count in this section names its unit and how it was counted in the same sentence; a restatement that changes the unit is a new claim and must be re-measured.
 
 | Exemplar | A1 | A2 | A3 | A3a | A4 | A5 | A6 | A7 | A7a | Tree → strategy | Actual primary |
 |----------|----|----|----|-----|----|----|----|----|-----|-----------------|----------------|
@@ -462,15 +477,15 @@ The decision tree must agree with the strategy each exemplar actually uses. This
 | `release/sil/sil_devanagari_phonetic/` | medium | abugida | strong | — | none | single | none | many | — | rule 2 → S-09 + S-05 | S-09 + S-05 ✓ |
 | `release/v/vietnamese_telex/` | medium | alphabetic | strong | — | replacing-cycling | single | none | many | addition | rule 3 → S-07 + S-04 | S-07 ✓ |
 | `release/sil/sil_yoruba8/` | medium | alphabetic | strong | — | multi-family | two-orthography | none | many | addition | rule 4 → S-11 wrap | S-11 ✓ |
-| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | — | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
+| `release/a/armenian_mnemonic_r/` | medium | alphabetic | weak | — | none | single | none | RAlt only | full-remap | rule 8 → S-06 (pending-letter) + S-04 + S-08 | S-06 (pending-letter) + S-04 + S-08 ✓ |
 | `release/el/el_pasifika/` | small | alphabetic | strong | — | stacking-combining | single | loud | many | addition | rule 7 → S-02 + rule 9 → +S-10 | S-02 + S-10 ✓ |
 | `release/c/cs_pinyin/` | massive | logographic | weak | — | none | single | none | many | — | rule 1 → S-12 | S-12 ✓ |
 | `release/itrans/itrans_devanagari_hindi/` | large | abugida | strong | — | none | two-orthography | none | many | — | rule 2 → S-09 + S-05; rule 4 wraps S-11 | S-09 + S-05 + S-11 ✓ |
-| `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | — | multi-family | single | none | many | addition | rule 6 → S-06 + S-04 | S-06 + S-04 ✓ |
+| `release/sil/sil_pan_africa_mnemonic/` | large | alphabetic | weak | — | multi-family | single | none | many | addition | rule 6 → S-06 (family selection) + S-04 | S-06 (family selection) + S-04 ✓ |
 | `release/a/arabic_izza/` | medium | abjad | weak | — | none | single | none | many | — | rule 2 → S-09 | S-09 ✓ |
-| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | — | none | single | none | RAlt only | full-remap | rule 8 → S-06 + S-04 + S-08 | S-06 + S-04 + S-08 ✓ |
+| `release/r/russian_mnemonic_r/` | medium | alphabetic | weak | — | none | single | none | RAlt only | full-remap | rule 8 → S-06 (pending-letter) + S-04 + S-08 | S-06 (pending-letter) + S-04 + S-08 ✓ |
 
-Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-06 deployment; rows that list S-06 implicitly include S-04.
+Note: S-04 (`any`/`index` table mechanism) is structurally embedded in every S-06 deployment; rows that list S-06 implicitly include S-04. S-06 in this table means the strategy slot; the sense is per rule, per the §7.3 S-06 card.
 
 **Revalidation record — 2026-07-29, [specs/052-marks-treatment-question](../_archive/052-marks-treatment-question/spec.md) FR-026 / SC-012.** The suite was re-run in full after spec 052 landed the single key-budget determination (`packages/contracts/src/keyBudget.ts`, with A7 redefined as a total, bijective projection of its three bands) and the marks-station A4/A3a projection. **Every one of the 13 covered keyboards selects exactly what it selected before — zero rows changed outcome, so no row required amendment.** Two things kept the table still:
 
@@ -481,7 +496,7 @@ The A4/A3a projection likewise cannot move a row here: the table supplies its ow
 
 **Known mismatches (intended v1.1 work, not bugs).** Rule 8 (added in v1.0.1) closed the alphabetic full-remap gap; Armenian and Russian mnemonic now round-trip correctly. Rule 3a (added in v1.1.1) closed the IPA postfix-sequence gap. One exemplar still doesn't round-trip; it marks a tree gap to fix in v1.1:
 
-- **EuroLatin**: A2=alphabetic, A1=large, A4=multi-family, A3=strong, A7a=addition. Tree picks **S-05 (mnemonic spelling, rule 5 — fires before rule 6's A4=multi-family match since A3=strong AND A1∈{medium,large} is checked first in array order)** but the actual keyboard uses **S-02 with broad parallel stores**. *Reclassified 2026-06-15 as out-of-scope (MML), not a tree gap.* See the **Monolingual scope** note above: EuroLatin is a massively multilingual keyboard, an expert per-language compromise the §7.2 tree was not designed to reproduce. The tree's S-05 recommendation still produces a working keyboard for any MML-shaped axis vector that reaches it; matching SIL's S-02 choice would require modeling per-language sub-inventories the v1 axis vector doesn't carry. The supported workflow for EuroLatin is *derivation*: instantiate it as a base and simplify to one language, at which point the §7.5 tree validates against the resulting monolingual subset.
+- **EuroLatin**: A2=alphabetic, A1=large, A4=multi-family, A3=strong, A7a=addition. Tree picks **S-05 (mnemonic spelling, rule 5 — fires before rule 6's A4=multi-family match since A3=strong AND A1∈{medium,large} is checked first in array order)** but the actual keyboard uses **S-02 with broad parallel stores**. *Reclassified 2026-06-15 as out-of-scope (MML), not a tree gap.* See the **Monolingual scope** note above: EuroLatin is a massively multilingual keyboard, an expert per-language compromise the §7.2 tree was not designed to reproduce. The tree's S-05 recommendation still produces a working keyboard for any MML-shaped axis vector that reaches it; matching SIL's S-02 choice would require modeling per-language sub-inventories the v1 axis vector doesn't carry. The supported workflow for EuroLatin is *derivation*: instantiate it as a base and simplify to one language, at which point the §7.5 tree validates against the resulting monolingual subset. Counts of this keyboard's deadkeys are stated, with their definitions, at the §7.3 S-02 card ("How this keyboard's deadkeys are counted"); this row makes no family or cluster claim.
 - **IPA**: ~~A3=strong but the user prefers sequence modifiers~~ — closed in v1.1.1 by rule 3a (A3a=postfix → S-03 + S-04). See §7.1 A3a. (The §7.5 IPA row tests the *axis logic*; the actual `sil_ipa` keyboard is itself MML and falls under the Monolingual-scope note for new-authoring purposes.) Rule 3a has a base-derived supply path wired into the live studio pipeline: `detectMarkInputOrderFromImport` (`packages/engine/src/strategy-selector/import-mark-order.ts`) scans a base's `KeyboardIR` for the postfix sequence-replace shape `any(base) + char > index(marked, 1)` — base typed first, mark-trigger key second, the `index()` offset pointing at the leading `any()` — and also scans `ir.raw[]` for the `if(option_key=…)`-guarded form `if(…) any(base) + char > index(marked, 2)`, where the guard occupies context position 1 and the `index()` offset (resolved from the rule's token order, not assumed) points at the `any()` at position 2 — and records `markInputOrder="postfix"` via `axisFills` with `source: "import-derived"`, distinct from the script-class default-fill prior's `"script-class-prior"` tag (which must never emit `postfix`). This is base-derived, not script-derived, because postfix mark-input order isn't justifiable from script class alone. The studio consumes it at base instantiation (either track): `seedIrAxesFromBaseIr` (studio `workingCopyStore.ts`) seeds `markInputOrder="postfix"` onto `irAxes`, which flows through `defaultFillAxes` into `selectStrategy`, so rule 3a fires for such a base **in production**, not only in tests. **Reachability:** the live `sil_ipa` postfix rules are all `if(option_key=…)`-guarded, and the codec classifies any `if(...)` context as opaque (`IF_OPTION_STORE`) — guarded rules become `RawKmnFragment`s and never reach `group.rules`. The detector's raw-fragment scan recovers the guarded shape from each fragment's `sourceText` and `producedOutput` sketch, so **the live `sil_ipa` postfix rules are now reachable through it** (locked by an integration test against the real `sil_ipa.kmn` in `import-mark-order.test.ts`), as is any live guard-free postfix rule. Modelling the guard as first-class IR instead of recovering it from fragment text remains a separate, deferred approach. The generic survey-elicited path (a Phase B question) remains a separate, still-deferred half — see the phase-gated elicitation gaps note below.
 
 The EuroLatin row remains in §7.5 as a regression fixture for the MML-derivation path, not as a v1 closure target.
