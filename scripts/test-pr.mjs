@@ -29,7 +29,9 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const baseRef = process.argv[2] ?? "origin/main";
+// Tolerate a stray `--` separator (pnpm run forwards it verbatim on
+// some versions): the base ref is the first non-`--` argument.
+const baseRef = process.argv.slice(2).find((a) => a !== "--") ?? "origin/main";
 
 // Curated core suites, per package directory. Entries are paths relative
 // to the package dir; a trailing `*` globs within that directory.
@@ -68,6 +70,8 @@ function git(args) {
   return execFileSync("git", args, { encoding: "utf8" });
 }
 
+let mergeBaseOk = true;
+
 function changedFiles() {
   const files = new Set();
   let mergeBase = baseRef;
@@ -75,6 +79,7 @@ function changedFiles() {
     mergeBase = git(["merge-base", "HEAD", baseRef]).trim();
   } catch {
     // No merge-base (shallow clone, unknown ref) — diff against the ref.
+    mergeBaseOk = false;
   }
   for (const range of [`${mergeBase}...HEAD`, "HEAD"]) {
     try {
@@ -169,6 +174,18 @@ if (rootConfigChanged) {
 }
 
 if (byPackage.size === 0) {
+  if (!mergeBaseOk && files.length === 0) {
+    // A vacuous pass here is how the first live run of this script
+    // silently ran zero tests: the CI checkout was shallow, so no
+    // merge-base existed and every diff came back empty. Refuse to
+    // pass on a diff we could not compute.
+    console.error(
+      `test:pr — could not compute a merge-base against ${baseRef} and the diff is empty. ` +
+        "This checkout is likely shallow; fetch full history (fetch-depth: 0) or pass a reachable base ref. " +
+        "Refusing to pass with zero tests.",
+    );
+    process.exit(1);
+  }
   console.log(`test:pr — no package source changed since ${baseRef}; nothing to run.`);
   process.exit(0);
 }
