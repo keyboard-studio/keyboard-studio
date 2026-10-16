@@ -174,6 +174,12 @@ function descriptionOf(input: HelpDocsRenderInput): string | undefined {
   return input.answers !== null ? nonBlank(input.answers.description) : undefined;
 }
 
+/** An author-supplied link, kept only when it is a plain http(s) or mailto URL: no other scheme (such as `javascript:`), and nothing that would break a Markdown or HTML link. */
+function safeUrl(url: string | undefined): string | undefined {
+  const value = nonBlank(url);
+  return value !== undefined && /^(?:https?:\/\/|mailto:)[^\s<>"'`]+$/i.test(value) ? value : undefined;
+}
+
 /**
  * Plain-English display name for the ISO 15924 scripts an intro line is
  * likely to name — the same curated set the character map qualifies its
@@ -241,7 +247,7 @@ function fontNoteHtml(answers: HelpDocsAnswers | null): string {
 
 /** The keyboard's help-site page: the author's own help URL, else the keyman.com help page for the id, else none. */
 function helpPageUrl(input: HelpDocsRenderInput): string {
-  const answered = nonBlank(input.answers?.projectHelpUrl);
+  const answered = safeUrl(input.answers?.projectHelpUrl);
   if (answered !== undefined) return answered;
   const id = nonBlank(input.keyboardId);
   return id !== undefined ? `https://help.keyman.com/keyboard/${id}` : "";
@@ -576,7 +582,7 @@ function replaceBodyContent(page: string, body: string): string {
  * `README.md` — package-listing description, links and supported platforms,
  * from the `readmeMd` form. No version/copyright (FR-007), no typing guide
  * (spec 102 FR-029). Platform tokens keep their raw spellings (`- any`), so
- * the generator satisfies its own 5.7 readme-targets check (#1906) even
+ * the generator satisfies its own 5.7 readme-targets check even
  * before a description is written.
  *
  * @param startReadmeMdText spec 080 FR-006: a fetched base's own `README.md`.
@@ -592,13 +598,16 @@ export function renderReadmeMd(
   if (startReadmeMdText !== null && description === undefined) {
     return withOneTrailingNewline(startReadmeMdText);
   }
+  const helpUrl = helpPageUrl(input);
+  const homeUrl = safeUrl(input.answers?.projectHomeUrl) ?? "";
   const rendered = withOneTrailingNewline(
     renderDocForm(DOC_FORMS.forms.readmeMd, {
       // An empty title slot drops the `# title` line under an inherited README.
       displayName: startReadmeMdText === null ? escapeDocMarkdown(input.displayName) : "",
       description: description !== undefined ? escapeDocMarkdown(description) : "",
-      helpPageUrl: helpPageUrl(input),
-      projectHomeUrl: nonBlank(input.answers?.projectHomeUrl) ?? "",
+      helpPageUrl: helpUrl,
+      projectHomeUrl: homeUrl,
+      hasLinks: helpUrl !== "" || homeUrl !== "" ? "1" : "",
       platforms: input.platforms.map((p) => `- ${p}`).join("\n"),
     }),
   );
