@@ -29,6 +29,18 @@ on:
   schedule:
     - cron: '17 7 * * *'
   workflow_dispatch:
+  # Reusable entry for the nightly dev soak (nightly-dev.yml,
+  # km/ci-fast-gate 2026-10-15): the caller passes checkout_ref=dev so
+  # the full-gate events' steps below run against the dev tree, giving
+  # dev an overnight full verdict before any dev -> main merge. Normal
+  # events leave the input empty and check out the triggering ref.
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: 'Ref to check out instead of the triggering ref (the nightly dev soak passes dev)'
+        type: string
+        required: false
+        default: ''
 
 # Cancel a superseded run when a newer commit lands on the same ref, so a
 # rapid second push doesn't leave the first full run burning runner minutes.
@@ -59,7 +71,11 @@ jobs:
   # `run-golden` / `run-all-gates` labels, and every non-PR run turn
   # every gate on; an unavailable diff fails open. The corpus gate
   # stays INSIDE `build` — the required status check in the main
-  # rulesets — so relevant PRs are blocked by it exactly as before.
+  # rulesets. Since km/ci-fast-gate (2026-10-15, owner ruling), the
+  # corpus gate and the full test suite run on non-PR events only
+  # (pushes to main, the nightly schedule, manual dispatch); per-PR,
+  # `build` relies on the `fast` job's verdict plus test:pr instead —
+  # see the `fast` job below and scripts/test-pr.mjs.
   changes:
     runs-on: ubuntu-latest
     permissions:
@@ -71,6 +87,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
           fetch-depth: 0
 
       - name: Decide which expensive gates this change needs
@@ -119,8 +136,93 @@ jobs:
           echo "golden=$golden" >> "$GITHUB_OUTPUT"
           echo "Expensive gates for this run: corpus=$corpus golden=$golden (event: $GITHUB_EVENT_NAME)"
 
+  # Fast gate (km/ci-fast-gate, 2026-10-15 — owner ruling after the
+  # #2191 red-main incident): the cheap, high-signal slice of the build
+  # job — install, build (tsc + vite), typecheck, lint — with NO test
+  # suite and NO corpus gates. This is the slice that catches the
+  # recurring breakage class (TS2304 missing imports, unresolved
+  # modules, lint regressions) and it lands a verdict in ~5 minutes.
+  # `build` needs this job, so a tree that cannot compile stops every
+  # heavier lane before it burns runner time, and a reviewer always
+  # has a same-tree verdict worth waiting for. The inputs mirror the
+  # build job's exactly (pinned corpus for the studio postbuild, the
+  # charnames codegen, and the cached SLDR/langtags fetches the lint
+  # sub-checks read), minus the steps only the test suites need.
+  fast:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
+
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      - name: Cache SLDR extract
+        id: sldr-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/sldr/sldr
+          key: sldr-${{ hashFiles('scripts/sldr-version.json') }}
+
+      - name: Fetch SLDR (pinned — determinism-test input)
+        if: steps.sldr-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-sldr
+
+      - name: Cache langtags.json
+        id: langtags-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/langtags/langtags.json
+          key: langtags-${{ hashFiles('scripts/langtags-version.json') }}
+
+      - name: Fetch langtags (pinned — determinism-test input)
+        if: steps.langtags-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-langtags
+
+      - name: Build (all packages)
+        run: pnpm -r build
+
+      - name: Typecheck (all packages)
+        run: pnpm -r typecheck
+
+      - name: Lint (eslint + depcruise + crew-lint + facet-lint)
+        run: pnpm lint
+
   build:
-    needs: changes
+    needs: [changes, fast]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -129,6 +231,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
 
       # The corpus-gated unit tests (codec round-trip, carveViaSplice corpus
       # sweep, recognizer integration, touch fixtures, facet-index real-corpus
@@ -247,17 +351,39 @@ jobs:
       # typechecks fail with "Cannot find module '@keyboard-studio/contracts'"
       # and trigger cascade errors (e.g. switch-exhaustiveness loss
       # because LintFinding["severity"] degrades to any).
+      #
+      # On pull requests the next three steps are skipped: the `fast`
+      # job (a required predecessor of this job) already ran build,
+      # typecheck and lint on this same merge tree, and re-running them
+      # here would only duplicate its verdict. Non-PR events keep this
+      # job self-contained and unchanged.
       - name: Build (all packages)
+        if: github.event_name != 'pull_request'
         run: pnpm -r build
 
       - name: Typecheck (all packages)
+        if: github.event_name != 'pull_request'
         run: pnpm -r typecheck
 
       - name: Lint (eslint + depcruise + crew-lint + facet-lint)
+        if: github.event_name != 'pull_request'
         run: pnpm lint
 
+      # Full suite on non-PR events only (km/ci-fast-gate, 2026-10-15):
+      # pushes to main, the nightly schedule and manual dispatch are
+      # the full-gate backstop. Per-PR, the step below runs instead.
       - name: Test (all packages)
+        if: github.event_name != 'pull_request'
         run: pnpm -r test
+
+      # Per-PR test gate (km/ci-fast-gate, 2026-10-15 — owner ruling:
+      # per-PR CI under ~10 minutes): vitest related for the files the
+      # PR touches plus the curated core suites that caught the October
+      # red-main breaks, per package. See scripts/test-pr.mjs for the
+      # lists and the fallback rules; the full suite runs overnight.
+      - name: Test (PR — affected + curated core)
+        if: github.event_name == 'pull_request'
+        run: pnpm run test:pr -- ${{ github.event.pull_request.base.sha }}
 
       # Corpus-sweep unit tests (km/ci-fast-gates): *.corpus.test.ts
       # files sweep the pinned corpus and accounted for
@@ -267,7 +393,7 @@ jobs:
       # the corpus surface at all. Same files, same assertions; only
       # their trigger changed.
       - name: Test (corpus sweeps — engine + studio, path-gated)
-        if: needs.changes.outputs.corpus == 'true'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.corpus == 'true'
         run: |
           pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts
           pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts
@@ -279,7 +405,7 @@ jobs:
       # missing.) Runs under the corpus vitest config (km/ci-fast-gates):
       # the default config now excludes corpus files even when named.
       - name: Test (context normalization generation-time budget, corpus)
-        if: needs.changes.outputs.corpus == 'true'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.corpus == 'true'
         run: pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts normalization-step/generation-time.corpus
         env:
           KS_CORPUS_PERF: "1"
@@ -327,14 +453,15 @@ jobs:
       # worker processes via --jobs, but its default is 1 — serial —
       # which is how this step took ~50 min on a 4-vCPU runner. --jobs 4
       # matches the runner; same keyboards, same verdict, ~1/4 the wall
-      # time. It still runs inside this required `build` check on every
-      # PR that can affect it, on pushes to main, and nightly.
-      - name: Corpus gate (skipped — change cannot reach the transform)
-        if: needs.changes.outputs.corpus != 'true'
-        run: echo "Corpus gate skipped — this change touches no engine/contracts/corpus path. Add the run-corpus label to force it."
+      # time. It still runs inside this required `build` check, but
+      # since km/ci-fast-gate (2026-10-15) only on the full-gate events
+      # — pushes to main, nightly, manual dispatch — not per-PR.
+      - name: Corpus gate (skipped — change cannot reach the transform, or per-PR)
+        if: github.event_name == 'pull_request' || needs.changes.outputs.corpus != 'true'
+        run: echo "Corpus gate not run in this lane — per-PR runs leave it to the overnight/full-gate events (km/ci-fast-gate, 2026-10-15), and a change that touches no engine/contracts/corpus path cannot reach the transform. Non-PR runs with corpus reach run it in the next step."
 
       - name: Corpus gate (context tolerance — zero regressed keyboards)
-        if: needs.changes.outputs.corpus == 'true'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.corpus == 'true'
         run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed --jobs 4
 
       # spec 086: the committed verification record for the context normalization
@@ -389,6 +516,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
 
       # Same pinned corpus as the build job: the dev server's local-keyboards
       # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
