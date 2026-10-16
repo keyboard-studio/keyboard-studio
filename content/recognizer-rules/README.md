@@ -94,7 +94,7 @@ The reference YAML files in this directory are named `s<NN>-<strategy-slug>.yaml
 `spec.md §7.3`. This makes the priority order from issue #240 immediately
 visible in a directory listing.
 
-## Priority order (issue #240 first pass)
+## Priority order (issue #240 first pass — order is the #240 queue; statuses are current)
 
 1. `s02-deadkey-single-tap.yaml` — S-02 deadkey composition; most common in
    `release/` Latin keyboards (12/20 scanned keyboards). **Landed.**
@@ -104,8 +104,18 @@ visible in a directory listing.
    and the vkey-trigger near-shape are not claimed by this rule.
 4. `s07-diacritic-cycling.yaml` — S-07 cycling; important for several SIL
    keyboards. **Not yet authored.**
-5. `s05-mnemonic-spelling.yaml` — S-05 Hausa-style. **Not yet authored.**
+5. `s05-mnemonic-spelling.yaml` — S-05 mnemonic spelling. **Determined —
+   not permanent (issue #2224): stays unrecognized.** No sound
+   cluster-level discriminator exists, and the cluster-statistical case
+   is closed; a future proposal is admissible only in a different
+   evidence class and must clear #2224's four-part bar.
 6. S-09 and others as time permits.
+
+S-06 has no priority-order entry and no grouping lift. **Determined —
+not permanent (issue #2213)**: the grouping question is closed for S-06
+(family selection, rule 6) and S-06 (pending-letter, rule 8); S-06
+(two-trigger chain, library pattern) is a separate lift whose status
+lives in its gated follow-on, issue #2235 — not here.
 
 ## Permanently out of scope
 
