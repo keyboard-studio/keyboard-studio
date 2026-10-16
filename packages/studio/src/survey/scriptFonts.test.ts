@@ -22,13 +22,31 @@ import {
 // ---------------------------------------------------------------------------
 
 describe("scriptFonts — registry", () => {
-  it("carries exactly the four Pick 1 scripts in registry order", () => {
-    expect(SCRIPT_FONT_REGISTRY.map((d) => d.script)).toEqual(["Arab", "Ethi", "Syrc", "Tibt"]);
+  it("carries exactly the Pick 1 + Pick 2 scripts in registry order", () => {
+    expect(SCRIPT_FONT_REGISTRY.map((d) => d.script)).toEqual([
+      "Arab", "Ethi", "Syrc", "Tibt",
+      "Deva", "Beng", "Guru", "Gujr", "Orya", "Taml", "Telu", "Knda",
+      "Mlym", "Sinh", "Mymr", "Thai", "Laoo", "Khmr",
+    ]);
     expect(SCRIPT_FONT_REGISTRY.map((d) => d.family)).toEqual([
       "Noto Naskh Arabic",
       "Noto Sans Ethiopic",
       "Noto Sans Syriac",
       "Noto Serif Tibetan",
+      "Noto Sans Devanagari",
+      "Noto Sans Bengali",
+      "Noto Sans Gurmukhi",
+      "Noto Sans Gujarati",
+      "Noto Sans Oriya",
+      "Noto Sans Tamil",
+      "Noto Sans Telugu",
+      "Noto Sans Kannada",
+      "Noto Sans Malayalam",
+      "Noto Sans Sinhala",
+      "Padauk",
+      "Noto Sans Thai",
+      "Noto Sans Lao",
+      "Noto Sans Khmer",
     ]);
   });
 
@@ -51,6 +69,14 @@ describe("scriptFonts — registry", () => {
     expect(scriptFontCovering("ሀ")?.script).toBe("Ethi");
     expect(scriptFontCovering("ܐ")?.script).toBe("Syrc");
     expect(scriptFontCovering("ཀ")?.script).toBe("Tibt");
+    expect(scriptFontCovering("अ")?.script).toBe("Deva");
+    expect(scriptFontCovering("অ")?.script).toBe("Beng");
+    expect(scriptFontCovering("அ")?.script).toBe("Taml");
+    expect(scriptFontCovering("అ")?.script).toBe("Telu");
+    expect(scriptFontCovering("က")?.script).toBe("Mymr");
+    expect(scriptFontCovering("ก")?.script).toBe("Thai");
+    expect(scriptFontCovering("ກ")?.script).toBe("Laoo");
+    expect(scriptFontCovering("ក")?.script).toBe("Khmr");
     expect(scriptFontCovering("a")).toBeUndefined();
     expect(scriptFontCovering("")).toBeUndefined();
   });
@@ -72,6 +98,11 @@ const DEFAULTS: Record<string, LanguageDefaults> = {
   am: { code: "am", defaultScript: "Ethi", regions: [] },
   syr: { code: "syr", defaultScript: "Syrc", regions: [] },
   bo: { code: "bo", defaultScript: "Tibt", regions: [] },
+  hi: { code: "hi", defaultScript: "Deva", regions: [] },
+  bn: { code: "bn", defaultScript: "Beng", regions: [] },
+  my: { code: "my", defaultScript: "Mymr", regions: [] },
+  th: { code: "th", defaultScript: "Thai", regions: [] },
+  km: { code: "km", defaultScript: "Khmr", regions: [] },
   en: { code: "en", defaultScript: "Latn", regions: [] },
 };
 const accessor = (subtag: string) => DEFAULTS[subtag.toLowerCase()] ?? null;
@@ -92,6 +123,13 @@ describe("scriptFonts — resolveSessionScripts", () => {
     // Discovery order here is Tibt (target) then Arab (base); the result
     // must be registry order (Arab before Tibt) for a stable stack string.
     expect(resolveSessionScripts("bo", ["ar", "am"], accessor)).toEqual(["Arab", "Ethi", "Tibt"]);
+  });
+
+  it("resolves Pick 2 scripts from langtags defaults, in registry order", async () => {
+    const { resolveSessionScripts } = await import("./scriptFonts.ts");
+    expect(resolveSessionScripts("hi", [], accessor)).toEqual(["Deva"]);
+    expect(resolveSessionScripts("km", ["bn", "my"], accessor)).toEqual(["Beng", "Mymr", "Khmr"]);
+    expect(resolveSessionScripts("th", [], accessor)).toEqual(["Thai"]);
   });
 
   it("includes the base's declared primary script when it declares no languages", async () => {
@@ -130,7 +168,16 @@ describe("scriptFonts — appendScriptFamilies", () => {
   it("is a no-op for empty or faceless script lists", () => {
     const stack = "'Noto Sans', system-ui, sans-serif";
     expect(appendScriptFamilies(stack, [])).toBe(stack);
-    expect(appendScriptFamilies(stack, ["Deva"])).toBe(stack);
+    expect(appendScriptFamilies(stack, ["Hebr"])).toBe(stack);
+  });
+
+  it("appends Pick 2 families, including the SIL Padauk face for Mymr", () => {
+    expect(appendScriptFamilies("'Noto Sans', system-ui, sans-serif", ["Deva"])).toBe(
+      "'Noto Sans', system-ui, 'Noto Sans Devanagari', sans-serif",
+    );
+    expect(appendScriptFamilies("'Charis SIL', serif", ["Mymr", "Khmr"])).toBe(
+      "'Charis SIL', 'Padauk', 'Noto Sans Khmer', serif",
+    );
   });
 });
 
@@ -226,10 +273,25 @@ describe("scriptFonts — loader and ready gate", () => {
   it("is idempotent per script and ignores scripts without a registry face", async () => {
     installFakeFontFaceApi();
     const sf = await import("./scriptFonts.ts");
-    sf.ensureScriptFontsLoaded(["Arab", "Deva"]);
+    sf.ensureScriptFontsLoaded(["Arab", "Hebr"]);
     sf.ensureScriptFontsLoaded(["Arab"]);
     expect(FakeFontFace.instances).toHaveLength(1);
-    expect(sf.getScriptFontLoadState("Deva")).toBe("idle");
+    expect(sf.getScriptFontLoadState("Hebr")).toBe("idle");
+  });
+
+  it("loads a Pick 2 face from its vendored file with its probe", async () => {
+    const { fontsSet } = installFakeFontFaceApi();
+    const sf = await import("./scriptFonts.ts");
+
+    sf.ensureScriptFontsLoaded(["Mymr"]);
+
+    expect(FakeFontFace.instances).toHaveLength(1);
+    const face = FakeFontFace.instances[0]!;
+    expect(face.family).toBe("Padauk");
+    expect(face.source).toBe('url("/fonts/padauk-400-myanmar.woff2") format("woff2")');
+    expect(face.descriptors.unicodeRange).toContain("U+1000-109F");
+    expect(fontsSet.loadCalls).toEqual([{ font: '16px "Padauk"', text: "က" }]);
+    expect(sf.pendingScriptFontFor("က", "'Noto Sans', 'Padauk', sans-serif")?.script).toBe("Mymr");
   });
 
   it("gates measurement while pending, settles to loaded, and notifies subscribers", async () => {

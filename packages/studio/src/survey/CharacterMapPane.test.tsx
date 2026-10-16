@@ -262,6 +262,43 @@ describe("CharacterMapPane — data path", () => {
     expect(markButton.querySelector('[aria-hidden="true"]')).toBeFalsy();
   });
 
+  it("announces a pane-level summary of the characters the selected font cannot preview", async () => {
+    seedStartAndLanguage();
+    unsupportedDisplays.set(["a", "b"]);
+    render(<CharacterMapPane />);
+
+    // The box placeholders are aria-hidden and the cell names do not carry
+    // the unpreviewed state — the pane-level live-region summary is the
+    // only place a screen-reader user learns these glyphs are not shown.
+    await waitFor(() => {
+      expect(screen.getByText("2 characters can't be previewed in the selected font")).toBeTruthy();
+    });
+  });
+
+  it("preview summary counts only boxed cells: combining marks never count, and one reads singular", async () => {
+    seedStartAndLanguage();
+    // "a" boxes; the combining mark's dotted-circle display also reports
+    // unsupported, but mark cells never take the box path (see the
+    // regression test above), so the summary must not count it.
+    unsupportedDisplays.set(["a", "◌" + COMBINING_ACUTE]);
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByText("1 character can't be previewed in the selected font")).toBeTruthy();
+    });
+    expect(screen.queryByText(/characters can't be previewed/)).toBeFalsy();
+  });
+
+  it("shows no preview summary when every rendered glyph previews", async () => {
+    seedStartAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    expect(screen.queryByText(/can't be previewed in the selected font/)).toBeFalsy();
+  });
+
   it("clicking a cell toggles it into the draft store and flips aria-pressed", async () => {
     seedStartAndLanguage();
     render(<CharacterMapPane />);
