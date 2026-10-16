@@ -28,16 +28,18 @@
  *      exclusion below). Cloned caps layers are skipped by this pass, so
  *      they keep shift's pre-defaulting state.
  *
- * The `sp` exclusion reads the SOURCE WIRE VALUE (`spWire`), not the
- * normalised numeric `sp` — deliberately. The raw operation tested the wire
- * value with strict equality, so a string-encoded `"1"` (a special/frame key
- * in the legacy encoding) did NOT match the numeric exclusion set and DID
- * gain `nextlayer: "default"`, while numeric `1` did not. Replicating that
- * here keeps this conversion a pure refactor; whether string-encoded special
- * keys SHOULD be exempt is a separate behaviour question (filed as a
- * follow-on), not something a conversion may decide silently. Synthesised
- * keys carry no wire hint; for those the numeric `sp` is the only value and
- * is used directly.
+ * The `sp` exclusion reads the normalised numeric `sp` — the key's class,
+ * not its source encoding. The pre-conversion raw operation tested the raw
+ * JSON value with strict equality, so a string-encoded `"1"` (a special/
+ * frame key in the legacy encoding) did NOT match the numeric exclusion set
+ * and DID gain `nextlayer: "default"`, while numeric `1` did not. This
+ * conversion originally replicated that wire behaviour to stay a pure
+ * refactor; the #2215 ruling then adopted numeric semantics as the
+ * permanent rule: `sp` is an integer enum in the Keyman format, the string
+ * form is a deprecated legacy spelling of the same value, and every Keyman
+ * consumer normalises before interpreting — so the exemption follows the
+ * value, not the spelling. (The `spWire` hint still preserves the source
+ * encoding at emit time; it is a fidelity record, not a semantic input.)
  *
  * IR bookkeeping: cloned keys are re-minted fresh `nodeId`s (recursively,
  * including `sk`/`multitap`/`flick` children) continuing the layout's
@@ -74,14 +76,14 @@ type LayerIR = PlatformIR["layers"][number];
  */
 const SP_NO_DEFAULT: ReadonlySet<number> = new Set([1, 2, 3, 4, 8, 9, 10]);
 
-/** True when the key's source wire `sp` exempts it from nextlayer defaulting. */
+/** True when the key's `sp` class exempts it from nextlayer defaulting. */
 function spExemptsFromDefault(key: TouchKeyIR): boolean {
-  // The wire form is authoritative for parsed layouts (see the module note):
-  // only a NUMERIC wire value can match the exclusion set, exactly as the
-  // raw operation's strict `includes` behaved. A synthesised key has no
-  // wire hint, so its numeric `sp` is used.
-  const wire: string | number | undefined = key.spWire ?? key.sp;
-  return typeof wire === "number" && SP_NO_DEFAULT.has(wire);
+  // Numeric semantics (#2215): the parser has already normalised both
+  // source encodings to `key.sp`, and the exclusion tests that value.
+  // `spWire` is deliberately NOT consulted — it records how the source
+  // spelled the value for byte-faithful re-emission, and a legacy string
+  // spelling must not change the key's behaviour.
+  return key.sp !== undefined && SP_NO_DEFAULT.has(key.sp);
 }
 
 /** Largest `touchKey#<n>` suffix in the tree, or -1 when none parse. */
