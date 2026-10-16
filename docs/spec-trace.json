@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-15",
+  "lastUpdated": "2026-10-16",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1081,6 +1081,14 @@
       "implements": [],
       "decisions": [],
       "notes": "Readiness only, by design: assessment, event taxonomy and processor scorecard landed with PR #2100; no analytics ships and the spec does not authorise it. Implementation is gated on Article XII ratification (spec 100, FR-001, not yet met). Acknowledged to register the section, per the spec 085 planning-spec precedent. Triaged 2026-10-15."
+    },
+    "specs/103-first-class-if-guards": {
+      "title": "Feature Specification: First-class `if()` guards in KeyboardIR",
+      "hash": "sha256:61626d8372652a28",
+      "status": "implemented",
+      "implements": [],
+      "decisions": [],
+      "notes": "Implemented and merged in PR #2190 (squash d012f262, closing #2163): ContextElement {kind:\"if\",store,value} in contracts, codec parse/emit, all ContextElement consumers, FR-009 round-trip vectors. Spec was never seeded, so it flagged as new-section post-merge. Triaged Path C 2026-10-15 (issue #2189); implementation verified on main, no code change needed. Known spec-text caveats (km-keyman review, all fail-closed with no shipped impact): Keyman not-equal is != not <> and a store-valued RHS is possible — both unmodelled and opaque per FR-003; the offset pin is vector-proven for index() only, guarded context(N) counting is unpinned/engine-divergent; &platform values are preserved verbatim, not evaluated (platform matching is a token-set match, and no shipped consumer evaluates the guard)."
     }
   }
 }
