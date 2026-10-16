@@ -211,6 +211,13 @@ function stripRemovedFromKey(
   // function, and it is why per-occurrence addressing is the outstanding work.
   const { text: _droppedText, output: _droppedOutput, ...rest } = base;
   const placeholder: TouchKeyIR = { ...rest, id: BLANK_KEY_ID, sp: BLANK_KEY_SP };
+  // #2216: `rest` retains the source key's `spWire`, which encodes the OLD
+  // `sp` — left in place it would emit the carved key's original class
+  // instead of the blank/spacer class. When the blanking actually changes
+  // `sp`, drop the hint (canonical string fallback; the emitter also
+  // self-validates via `resolveWireEncoding`). A key already at
+  // BLANK_KEY_SP keeps its hint — its encoding still denotes its value.
+  if (base.sp !== BLANK_KEY_SP) delete placeholder.spWire;
   return { key: placeholder, changed: true };
 }
 

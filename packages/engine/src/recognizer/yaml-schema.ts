@@ -13,8 +13,12 @@ export interface ContextConstraints {
 }
 
 export interface ContextPatternEntry {
-  // vkey, deadkey, any, char (char = string-literal trigger, per isTrigger() in s02)
-  kind: "vkey" | "deadkey" | "any" | "char";
+  // vkey, deadkey, any, char (char = string-literal trigger, per isTrigger() in s02);
+  // if = a spec-103 typed guard element ({kind:"if", store, value} in the IR) in
+  // head position, used as a qualifier on a cluster (e.g. the guarded sil_ipa
+  // S-03 form) — NOT a standalone S-11 detector: guard presence alone says
+  // nothing about who writes the guarded store (see issue #342 ruling).
+  kind: "vkey" | "deadkey" | "any" | "char" | "if";
   count: "exactly_one" | "zero_or_one";
   constraints?: ContextConstraints;
 }

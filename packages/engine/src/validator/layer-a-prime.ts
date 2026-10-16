@@ -4,8 +4,9 @@
  * Each exported function follows the one-function-per-check convention used
  * by packages/engine/src/validator/checks/*.ts: accepts relevant inputs,
  * returns LintFinding[]. No I/O side effects except where explicitly noted
- * (I2 stub logs corpus size via console.info, matching the pattern in
- * packages/engine/src/compiler/index.ts).
+ * (I2 logs corpus size via devLog, matching the pattern in
+ * packages/engine/src/compiler/index.ts, and runs its injected compile /
+ * simulate harness).
  *
  * Layer A' MAY emit "info" for I4 only (opaque-feature inventory, non-blocking).
  *
@@ -14,8 +15,17 @@
  */
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import type { LintFinding, KeyboardIR, IRRule } from "@keyboard-studio/contracts";
-import { isValidTouchKeyIdentifier } from "@keyboard-studio/contracts";
+import type {
+  CompileResult,
+  KeyChord,
+  LintFinding,
+  KeyboardIR,
+  IRRule,
+  SimKeyInput,
+  SimulationResult,
+  VirtualFS,
+} from "@keyboard-studio/contracts";
+import { createVirtualFS, isValidTouchKeyIdentifier } from "@keyboard-studio/contracts";
 import type { ParseResult } from "../codec/parse.js";
 import { tokenize } from "../codec/tokenize.js";
 import { computeSha256Hex } from "../codec/hash.js";
@@ -225,24 +235,171 @@ export function checkOpaqueFeatureInventory(
 }
 
 // ---------------------------------------------------------------------------
-// I2 — Round-trip check (DEFERRED STUB)
+// I2 — Functional round-trip check (via simulate(), #882)
 // ---------------------------------------------------------------------------
 
-/**
- * I2: Functional round-trip check — DEFERRED STUB.
- *
- * This check requires the Keyman Core keystroke runtime to execute the
- * compiled keyboard and observe output text. The WASM oracle available in
- * this build is kmcmplib (a compiler), not Keyman Core (a runtime). Until
- * Keyman Core integration lands, this function:
- *   1. Generates and logs the bounded-enumeration corpus (D7).
- *   2. Returns one non-blocking "hint" finding.
- *   3. Does NOT set RoundTripDivergence on the ImportReport.
- */
-export function checkRoundTrip(ir: KeyboardIR): LintFinding[] {
-  const { corpus, corpusSpec, inputCount } = generateCorpus(ir);
+/** I2 divergence: compared inputs produced different output after emit. */
+export const ROUND_TRIP_DIVERGENCE_CODE = "KM_ERROR_ROUND_TRIP_DIVERGENCE";
+/** I2 ran with zero comparable inputs — equivalence was NOT established. */
+export const ROUND_TRIP_NO_COVERAGE_CODE = "KM_WARN_ROUND_TRIP_NO_COVERAGE";
+/** I2 could not run (no harness supplied, compile failed, runtime failed). */
+export const ROUND_TRIP_UNAVAILABLE_CODE = "KM_HINT_ROUND_TRIP_UNAVAILABLE";
+/** I2 compared a capped subset of the theoretical D7 corpus. */
+export const ROUND_TRIP_CORPUS_TRUNCATED_CODE = "KM_WARN_ROUND_TRIP_CORPUS_TRUNCATED";
 
-  // Log corpus size matching the console.info pattern used in compiler/index.ts.
+/** One source file carried into both compile VFSes (siblings of the .kmn). */
+export interface RoundTripSourceFile {
+  path: string;
+  content: Uint8Array | string;
+  isBinary: boolean;
+}
+
+/**
+ * Host-supplied harness for functional I2. Dependencies are injected (never
+ * statically imported here) so this module stays off the simulator/compiler
+ * import graph: the engine's main entry must remain simulator-free for
+ * browser bundlers (see engine/src/index.ts, issue #183), and the compiler
+ * lives behind the same WASM loading path as the rest of the engine.
+ */
+export interface RoundTripDeps {
+  /** The original imported .kmn source text. */
+  originalKmn: string;
+  /** The .kmn text emitted from the parsed IR. */
+  emittedKmn: string;
+  /** Keyboard identifier (the `source/<keyboardId>.kmn` stem). */
+  keyboardId: string;
+  /** kmcmplib compile: reads `source/<keyboardId>.kmn` + siblings from the VFS. */
+  compileFn: (vfs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
+  /** KeymanWeb JS-runtime simulation over a compiled keyboard. */
+  simulateFn: (compiled: CompileResult, keys: SimKeyInput[]) => SimulationResult;
+  /**
+   * Sibling files of the .kmn (the whole `source/` directory: &BITMAP icon,
+   * &VISUALKEYBOARD .kvks, &LAYOUTFILE touch layout, fonts…). Both compile
+   * VFSes are populated from these entries, overriding only the .kmn text —
+   * without them kmcmplib fails with "Cannot open the bitmap or icon file"
+   * (5251121). Any `source/<keyboardId>.kmn` entry in this list is ignored;
+   * the original/emitted texts above take its place.
+   */
+  sourceFiles?: readonly RoundTripSourceFile[];
+}
+
+/**
+ * D7 modifier-name → SimKeyInput modifier bridge.
+ *
+ * Keyman semantics pinned by the km-keyman review (#882): RALT is a distinct
+ * flag bit (RALTFLAG 0x40, outside the generic ALL mask) and must map to
+ * "ralt", NEVER "lalt" — a wrong mapping would silently compare a different
+ * input than the corpus names. CAPS is a state key, not a modifier bit, so
+ * it maps to SimKeyInput.caps. Any name absent from this table makes the
+ * chord unmappable (the caller skips + counts it as a coverage gap) rather
+ * than being guessed or dropped.
+ */
+const D7_MODIFIER_TO_SIM: ReadonlyMap<string, SimKeyInput["modifiers"][number]> = new Map([
+  ["SHIFT", "shift"],
+  ["CTRL", "ctrl"],
+  ["ALT", "alt"],
+  ["LCTRL", "lctrl"],
+  ["RCTRL", "rctrl"],
+  ["LALT", "lalt"],
+  ["RALT", "ralt"],
+]);
+
+/**
+ * Convert one D7 KeyChord to a SimKeyInput, or return null when a modifier
+ * name has no bridge entry (coverage gap — the caller must count it, never
+ * simulate a different chord than the corpus specifies).
+ */
+export function chordToSimKeyInput(chord: KeyChord): SimKeyInput | null {
+  const modifiers: SimKeyInput["modifiers"] = [];
+  let caps = false;
+  for (const raw of chord.modifiers) {
+    const name = raw.toUpperCase();
+    if (name === "CAPS") {
+      caps = true;
+      continue;
+    }
+    const mapped = D7_MODIFIER_TO_SIM.get(name);
+    if (mapped === undefined) return null;
+    modifiers.push(mapped);
+  }
+  return caps ? { vkey: chord.vkey, modifiers, caps } : { vkey: chord.vkey, modifiers };
+}
+
+/** Render a corpus sequence for a finding message, e.g. `[SHIFT K_A] then [K_B]`. */
+function describeSequence(sequence: readonly KeyChord[]): string {
+  return sequence
+    .map((c) => (c.modifiers.length > 0 ? `[${[...c.modifiers, c.vkey].join(" ")}]` : `[${c.vkey}]`))
+    .join(" then ");
+}
+
+/** Theoretical (uncapped) D7 corpus size for a vkey count — truncation test. */
+function theoreticalCorpusSize(vkeyCount: number, modifierSetCount: number, deadkeyDepth: number): number {
+  if (vkeyCount === 0) return 0;
+  const singles = vkeyCount * modifierSetCount;
+  let total = 0;
+  for (let d = 0; d <= deadkeyDepth; d++) total += Math.pow(vkeyCount, d) * singles;
+  return total;
+}
+
+function roundTripUnavailable(reason: string): LintFinding {
+  return {
+    code: ROUND_TRIP_UNAVAILABLE_CODE,
+    severity: "hint",
+    layer: "A-prime",
+    message:
+      `Functional round-trip (I2) could not run: ${reason}. ` +
+      "Equivalence was not established; compile diagnostics are reported through the compiler's own channel.",
+  };
+}
+
+/**
+ * I2: Functional round-trip equivalence (spec §10) via the KeymanWeb JS
+ * runtime — compile the original .kmn and the emitted .kmn with kmcmplib,
+ * run the D7 bounded-enumeration corpus through simulate() on both, and diff
+ * the input→output maps.
+ *
+ * Severity contract (km-lead ruling, queue-882):
+ *   - A compared divergence (different finalOutput, or exactly one side
+ *     throwing in simulate) is ONE aggregate `error`
+ *     (KM_ERROR_ROUND_TRIP_DIVERGENCE) — the D9 signal that sets
+ *     RoundTripDivergence on the ImportReport.
+ *   - An empty corpus, a corpus whose chords are all unmappable, is a
+ *     `warning` (KM_WARN_ROUND_TRIP_NO_COVERAGE): equivalence was NOT
+ *     established and must never read as a pass.
+ *   - A truncated corpus (generator cap) adds a `warning`
+ *     (KM_WARN_ROUND_TRIP_CORPUS_TRUNCATED) naming generated vs theoretical
+ *     counts; a pass over the compared subset is partial.
+ *   - Harness failures (no deps supplied, either compile failing, no .js
+ *     artifact, simulate throwing on BOTH sides) are a non-blocking `hint`
+ *     (KM_HINT_ROUND_TRIP_UNAVAILABLE) — they never mask the compiler's own
+ *     diagnostics and never block the import on infrastructure grounds.
+ *   - A clean pass over a non-empty, untruncated corpus emits NO finding;
+ *     the counts are logged via devLog.
+ *
+ * FIDELITY CAVEAT: simulate() executes the KeymanWeb `.js` build of the
+ * keyboard, NOT native Keyman Core (.kmx). A pass establishes JS-runtime
+ * functional equivalence only; native-only divergences are out of reach
+ * until a libkeymancore WASM build lands (phase 2, tracked separately).
+ * Comparison is finalOutput-only in v1 — beep and pending-deadkey state are
+ * not diffed.
+ *
+ * This function is async and comparatively slow (~2 ms/input plus two
+ * compiles): it belongs to the import/emit gate, outside the 300 ms
+ * debounce cycle, and must never be wired into the batch supportability
+ * scanner (which keeps the structural proxy).
+ */
+export async function checkRoundTrip(
+  ir: KeyboardIR,
+  deps?: RoundTripDeps,
+): Promise<LintFinding[]> {
+  const { corpus, corpusSpec, inputCount } = generateCorpus(ir);
+  const theoretical = theoreticalCorpusSize(
+    corpusSpec.vkeyCount,
+    corpusSpec.modifierSets.length,
+    corpusSpec.deadkeyDepth,
+  );
+  const truncated = theoretical > inputCount;
+
   devLog.info(
     `[layer-a-prime] I2 corpus: ${inputCount} sequences` +
       ` (${corpusSpec.vkeyCount} vkeys × ${corpusSpec.modifierSets.length} modifier sets,` +
@@ -250,17 +407,182 @@ export function checkRoundTrip(ir: KeyboardIR): LintFinding[] {
     { corpusSpec, sampleSize: Math.min(corpus.length, 5) },
   );
 
-  return [
-    {
-      code: "KM_HINT_ROUND_TRIP_DEFERRED",
-      severity: "hint",
+  if (deps === undefined) {
+    return [roundTripUnavailable("no compile/simulate harness was supplied by the host")];
+  }
+
+  if (inputCount === 0) {
+    return [
+      {
+        code: ROUND_TRIP_NO_COVERAGE_CODE,
+        severity: "warning",
+        layer: "A-prime",
+        message:
+          "Functional round-trip (I2) has NO coverage for this keyboard: the D7 corpus is empty " +
+          "(no vkey-based rule contexts to enumerate), so functional equivalence was not established. " +
+          "The keyboard imports on structural checks only.",
+      },
+    ];
+  }
+
+  // Build the two compile VFSes: identical siblings, only the .kmn differs.
+  const kmnPath = `source/${deps.keyboardId}.kmn`;
+  const siblings = (deps.sourceFiles ?? []).filter((f) => f.path !== kmnPath);
+  const buildVfs = (kmnText: string): VirtualFS =>
+    createVirtualFS([
+      ...siblings.map((f) => ({ path: f.path, content: f.content, isBinary: f.isBinary })),
+      { path: kmnPath, content: kmnText, isBinary: false },
+    ]);
+
+  let originalCompiled: CompileResult;
+  let emittedCompiled: CompileResult;
+  try {
+    originalCompiled = await deps.compileFn(buildVfs(deps.originalKmn), deps.keyboardId);
+    emittedCompiled = await deps.compileFn(buildVfs(deps.emittedKmn), deps.keyboardId);
+  } catch (err) {
+    return [roundTripUnavailable(`compile threw: ${err instanceof Error ? err.message : String(err)}`)];
+  }
+
+  const compileProblem = (label: string, result: CompileResult): string | null => {
+    if (!result.success) {
+      const first = result.diagnostics[0];
+      return `${label} compile failed${first ? `: ${first.message}` : ""}`;
+    }
+    if (!result.artifacts.some((a) => a.filename.endsWith(".js"))) {
+      return `${label} compile produced no .js artifact to simulate`;
+    }
+    return null;
+  };
+  const problems = [
+    compileProblem("original", originalCompiled),
+    compileProblem("emitted", emittedCompiled),
+  ].filter((p): p is string => p !== null);
+  if (problems.length > 0) {
+    return [roundTripUnavailable(problems.join("; "))];
+  }
+
+  // Run the corpus through both compiled keyboards and diff finalOutput.
+  const MAX_EXAMPLES = 5;
+  let compared = 0;
+  let skippedUnmappable = 0;
+  let bothThrew = 0;
+  const divergences: Array<{ input: string; originalOut: string; emittedOut: string }> = [];
+
+  for (const sequence of corpus) {
+    const keys: SimKeyInput[] = [];
+    let mappable = true;
+    for (const chord of sequence) {
+      const converted = chordToSimKeyInput(chord);
+      if (converted === null) {
+        mappable = false;
+        break;
+      }
+      keys.push(converted);
+    }
+    if (!mappable) {
+      skippedUnmappable++;
+      continue;
+    }
+
+    let originalOut: string | null = null;
+    let emittedOut: string | null = null;
+    let originalErr: string | null = null;
+    let emittedErr: string | null = null;
+    try {
+      originalOut = deps.simulateFn(originalCompiled, keys).finalOutput;
+    } catch (err) {
+      originalErr = err instanceof Error ? err.message : String(err);
+    }
+    try {
+      emittedOut = deps.simulateFn(emittedCompiled, keys).finalOutput;
+    } catch (err) {
+      emittedErr = err instanceof Error ? err.message : String(err);
+    }
+
+    if (originalErr !== null && emittedErr !== null) {
+      bothThrew++;
+      continue;
+    }
+    compared++;
+    if (originalErr !== null || emittedErr !== null || originalOut !== emittedOut) {
+      divergences.push({
+        input: describeSequence(sequence),
+        originalOut: originalErr !== null ? `<simulate threw: ${originalErr}>` : JSON.stringify(originalOut),
+        emittedOut: emittedErr !== null ? `<simulate threw: ${emittedErr}>` : JSON.stringify(emittedOut),
+      });
+    }
+  }
+
+  if (compared === 0) {
+    if (skippedUnmappable > 0) {
+      return [
+        {
+          code: ROUND_TRIP_NO_COVERAGE_CODE,
+          severity: "warning",
+          layer: "A-prime",
+          message:
+            `Functional round-trip (I2) has NO coverage for this keyboard: all ${skippedUnmappable} corpus ` +
+            "sequence(s) use modifier names with no simulator bridge mapping, so functional equivalence " +
+            "was not established.",
+        },
+      ];
+    }
+    return [roundTripUnavailable(`simulate() threw for all ${bothThrew} corpus sequence(s) on both keyboards`)];
+  }
+
+  const findings: LintFinding[] = [];
+
+  if (divergences.length > 0) {
+    const examples = divergences
+      .slice(0, MAX_EXAMPLES)
+      .map((d) => `${d.input}: original → ${d.originalOut}, emitted → ${d.emittedOut}`)
+      .join("; ");
+    findings.push({
+      code: ROUND_TRIP_DIVERGENCE_CODE,
+      severity: "error",
       layer: "A-prime",
       message:
-        `Functional round-trip (I2) deferred: requires Keyman Core keystroke runtime, ` +
-        `not available in this build. Corpus of ${inputCount} inputs generated; ` +
-        `see follow-up issue for Keyman Core integration.`,
-    },
-  ];
+        `Functional round-trip (I2) divergence: ${divergences.length} of ${compared} compared input(s) ` +
+        `produce different output after emit. First ${Math.min(divergences.length, MAX_EXAMPLES)}: ${examples}.`,
+    });
+  }
+
+  if (truncated) {
+    findings.push({
+      code: ROUND_TRIP_CORPUS_TRUNCATED_CODE,
+      severity: "warning",
+      layer: "A-prime",
+      message:
+        `Functional round-trip (I2) corpus was truncated: compared ${compared} of ${inputCount} generated ` +
+        `input(s) out of a theoretical ${theoretical} (generator cap). Equivalence over the compared ` +
+        "subset only — the verdict is partial.",
+    });
+  }
+
+  if (skippedUnmappable > 0) {
+    findings.push({
+      code: ROUND_TRIP_NO_COVERAGE_CODE,
+      severity: "warning",
+      layer: "A-prime",
+      message:
+        `Functional round-trip (I2) coverage gap: ${skippedUnmappable} corpus sequence(s) were skipped ` +
+        "because a modifier name has no simulator bridge mapping; they were not compared.",
+    });
+  }
+
+  if (bothThrew > 0) {
+    findings.push(
+      roundTripUnavailable(`simulate() threw for ${bothThrew} corpus sequence(s) on both keyboards`),
+    );
+  }
+
+  if (findings.length === 0) {
+    devLog.info(
+      `[layer-a-prime] I2 functional round-trip: ${compared}/${inputCount} inputs identical — equivalent (JS runtime).`,
+    );
+  }
+
+  return findings;
 }
 
 // ---------------------------------------------------------------------------

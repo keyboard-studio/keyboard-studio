@@ -87,7 +87,7 @@ import {
  * `any(equalD) + "=" > index(equalU,1)` parses to context
  * `[any(equalD), raw("+"), char("=")]`. Strip it before inspecting shape.
  */
-function postfixMarkSequenceRefs(
+export function postfixMarkSequenceRefs(
   rule: IRRule,
 ): { baseRef: string; markedRef: string; guardCount: number } | undefined {
   const real = rule.context.filter(
@@ -180,7 +180,7 @@ function isRelatedPair(baseItem: StoreItem, markedItem: StoreItem): boolean {
  * distinct stores, have equal non-zero length, and every paired entry is
  * related. A store that does not resolve is no evidence — never a pass.
  */
-function isBaseToMarkedRemap(
+export function isBaseToMarkedRemap(
   ir: KeyboardIR,
   baseRef: string,
   markedRef: string,

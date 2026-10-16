@@ -9,6 +9,10 @@ import type { MatchResult } from "./types.js";
 import type { Pattern } from "@keyboard-studio/contracts";
 import { ruleRef, storeRef } from "./node-refs.js";
 import { buildS02Fragment, findS02Families } from "./s02-families.js";
+import {
+  postfixMarkSequenceRefs,
+  isBaseToMarkedRemap,
+} from "../strategy-selector/import-mark-order.js";
 import { toUPlus, storeItemsToCharString, formatVKeyModifiers, formatDkName, isBehaviourOwned } from "./utils.js";
 import type {
   RecognizerRuleYaml,
@@ -141,6 +145,80 @@ function findS01Clusters(ir: KeyboardIR): S01ClusterMatch[] {
 // escape optional and shared triggers/escapes recorded but not owned.
 
 // ---------------------------------------------------------------------------
+// S-03 predicate (sequence-replace cluster)
+// ---------------------------------------------------------------------------
+//
+// Shape (spec §7.3 S-03 card; production semantics owned by
+// strategy-selector/import-mark-order.ts, reused here verbatim):
+//   [if(...)]* any(S_bases) + "<trigger>" > index(S_output, guardCount + 1)
+// The codec may preserve the inline "+" as a {kind:"raw", text:"+"} context
+// element; leading spec-103 `if` guards occupy context positions and shift
+// the required index() offset. Evidence standard mirrors the production
+// detector: a GUARDED rule qualifies on shape + offset alignment alone; an
+// UNGUARDED rule additionally requires the two stores to form a genuine
+// base→marked parallel remap (isBaseToMarkedRemap) — shape alone would claim
+// any parallel-store remap (S-04/S-05 territory) as S-03. Unresolved store
+// refs are no evidence, never a pass.
+//
+// A cluster is every qualifying rule in one group sharing one
+// (base store, output store) pair — sil_ipa carries one rule per pair
+// (equalD/equalU, greatD/greatU, …), each pair an independent cluster.
+
+interface S03ClusterMatch {
+  group: IRGroup;
+  rules: IRRule[];
+  baseStore: IRStore;
+  outStore: IRStore;
+}
+
+function sequenceTriggerChar(rule: IRRule): string | undefined {
+  const real = rule.context.filter(
+    (el) => !(el.kind === "raw" && el.text.trim() === "+"),
+  );
+  let i = 0;
+  while (real[i]?.kind === "if") i++;
+  const trigger = real[i + 1];
+  return trigger !== undefined && trigger.kind === "char" ? trigger.value : undefined;
+}
+
+function findS03Clusters(ir: KeyboardIR): S03ClusterMatch[] {
+  const byKey = new Map<string, S03ClusterMatch>();
+
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
+
+      const refs = postfixMarkSequenceRefs(rule);
+      if (refs === undefined) continue;
+
+      // Evidence gate (see header): guarded → shape + offset; unguarded →
+      // the store pair must be a genuine base→marked remap.
+      if (
+        refs.guardCount === 0 &&
+        !isBaseToMarkedRemap(ir, refs.baseRef, refs.markedRef)
+      ) {
+        continue;
+      }
+
+      const baseStore = ir.stores.find((s) => s.name === refs.baseRef);
+      const outStore = ir.stores.find((s) => s.name === refs.markedRef);
+      if (baseStore === undefined || outStore === undefined) continue;
+
+      const key = `${group.nodeId}|${refs.baseRef}|${refs.markedRef}`;
+      const existing = byKey.get(key);
+      if (existing !== undefined) {
+        existing.rules.push(rule);
+      } else {
+        byKey.set(key, { group, rules: [rule], baseStore, outStore });
+      }
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+// ---------------------------------------------------------------------------
 // Slot-value population from YAML lifts_to.slot_mapping
 // ---------------------------------------------------------------------------
 
@@ -151,6 +229,7 @@ interface ClusterContext {
   escapeRule?: IRRule | undefined;
   fanOutRule?: IRRule | undefined;
   deadkeyId?: number | undefined;
+  sequenceRules?: IRRule[] | undefined;
 }
 
 function populateSlots(
@@ -214,6 +293,19 @@ function populateSlots(
         }
         continue;
       }
+      continue;
+    }
+
+    if (source.startsWith("rules[sequence].trigger_chars")) {
+      // S-03 triggerChar slot: the distinct literal trigger characters of the
+      // cluster's rules, in first-appearance order (usually exactly one).
+      const seqRules = ctx.sequenceRules ?? ctx.clusterRules;
+      const seen = new Set<string>();
+      for (const r of seqRules) {
+        const ch = sequenceTriggerChar(r);
+        if (ch !== undefined) seen.add(ch);
+      }
+      if (seen.size > 0) result[slotId] = [...seen].join("");
       continue;
     }
 
@@ -336,6 +428,42 @@ export function interpretPredicate(rule: RecognizerRuleYaml, ir: KeyboardIR): Ma
     return results;
   }
 
+  if (clusterType === "sequence-replace") {
+    const clusters = findS03Clusters(ir);
+    for (const cluster of clusters) {
+      const storesByName = new Map<string, IRStore>([
+        ...ir.stores.map((s): [string, IRStore] => [s.name, s]),
+      ]);
+      // Abstract YAML aliases, as in the S-02 branch, so the YAML
+      // slot_mapping resolves "S_bases" / "S_output" without IR store names.
+      storesByName.set("S_bases", cluster.baseStore);
+      storesByName.set("S_output", cluster.outStore);
+
+      const slotValues = rule.lifts_to.slot_mapping !== undefined
+        ? populateSlots(
+            rule.lifts_to.slot_mapping,
+            {
+              clusterRules: cluster.rules,
+              stores: storesByName,
+              sequenceRules: cluster.rules,
+            },
+            ir,
+          )
+        : {};
+
+      results.push({
+        patternId: `${rule.lifts_to.patternId}#${cluster.baseStore.name}`,
+        ownedNodes: [
+          ...cluster.rules.map((r) => ruleRef(r.nodeId)),
+          storeRef(cluster.baseStore.nodeId),
+          storeRef(cluster.outStore.nodeId),
+        ],
+        slotValues,
+      });
+    }
+    return results;
+  }
+
   return results;
 }
 
@@ -398,6 +526,7 @@ function titleForStrategy(strategyId: string): string {
   switch (strategyId) {
     case "S-01": return "Simple swap";
     case "S-02": return "Single-tap deadkey";
+    case "S-03": return "Sequence replace";
     case "S-08": return "Full remap";
     default: return strategyId;
   }
@@ -448,6 +577,11 @@ function promptForSlot(slotId: string): string {
     case "baseLetters": return "Base letters the deadkey applies to";
     case "accentedForms": return "Resulting accented forms";
     case "accentChar": return "Bare combining accent character (emitted by escape rule)";
+    case "contextChars": return "Characters that trigger a special output when followed by the trigger character";
+    case "contextOutputs": return "Output for each context character above, in the same order";
+    case "triggerChar": return "Character typed after a base character to trigger the replacement";
+    case "contextStoreName": return "Internal name for this rule set";
+    case "defaultOutput": return "What the trigger character produces when no special context character came before it";
     default: return slotId;
   }
 }
@@ -461,6 +595,12 @@ function buildKmnFragment(strategyId: string, slotValues: Record<string, string>
       // any-store trigger form when triggerStore is set, escape line only
       // when the family has an escape (accentChar slot present).
       return buildS02Fragment(slotValues);
+    case "S-03":
+      // Schematic, following the S-02 precedent: slot values are store
+      // CONTENTS inlined, not store references. The guarded sil_ipa form
+      // additionally carries its if(...) guard in the source rules; the
+      // template shows the canonical unguarded shape.
+      return 'any({{contextChars}}) + "{{triggerChar}}" > index({{contextOutputs}}, 1)';
     default:
       // Fallback: emit placeholders for every known slot value
       return Object.keys(slotValues)

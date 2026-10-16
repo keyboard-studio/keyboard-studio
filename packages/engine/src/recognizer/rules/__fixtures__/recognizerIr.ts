@@ -111,6 +111,117 @@ export function buildCompleteGraveIR() {
   return buildGraveIR({ escape: true });
 }
 
+// ---------------------------------------------------------------------------
+// S-03 (sequence replace)
+// ---------------------------------------------------------------------------
+
+// sil_ipa equalD/equalU subset: base b/d/g → hooked ɓ/ɗ/ɠ (U+0253/U+0257/
+// U+0260). These pairs are related by Unicode name extension (the marked
+// letters have no decomposition mapping), which is exactly why the
+// production detector carries the name-extension signal.
+const IPA_BASE = "bdg";
+const IPA_MARKED = "ɓɗɠ";
+
+function ipaStores(): IRStore[] {
+  return [
+    makeCharStore("store#equalD", "equalD", IPA_BASE),
+    makeCharStore("store#equalU", "equalU", IPA_MARKED),
+  ];
+}
+
+/**
+ * One sil_ipa-shaped sequence-replace rule:
+ *   unguarded: any(equalD) + "=" > index(equalU, 1)
+ *   guarded:   if(option_key='') any(equalD) + "=" > index(equalU, 2)
+ * The codec's inline "+" survives as a raw context element; include it so
+ * the fixtures pin the engine's stripping behaviour. `withPlus: false`
+ * builds the same rule without the artifact.
+ */
+export function ipaSequenceRule(
+  nodeId: string,
+  opts: { guarded: boolean; offset?: number; withPlus?: boolean },
+): IRRule {
+  const guard: IRRule["context"] = opts.guarded
+    ? [{ kind: "if", store: "option_key", value: "" }]
+    : [];
+  const plus: IRRule["context"] =
+    opts.withPlus === false ? [] : [{ kind: "raw", text: "+" }];
+  return {
+    nodeId,
+    context: [
+      ...guard,
+      { kind: "any", storeRef: "equalD" },
+      ...plus,
+      { kind: "char", value: "=" },
+    ],
+    output: [
+      {
+        kind: "index",
+        storeRef: "equalU",
+        offset: opts.offset ?? (opts.guarded ? 2 : 1),
+      },
+    ],
+  };
+}
+
+/** Single-pair sil_ipa IR (one rule, equalD/equalU stores), guarded or not. */
+export function buildIpaSequenceIR(opts: { guarded: boolean }): {
+  ir: KeyboardIR;
+  ruleNodeId: string;
+} {
+  const ruleNodeId = "rule#ipa-equal";
+  const ir = makeTestIR(
+    [mainGroup([ipaSequenceRule(ruleNodeId, opts)])],
+    ipaStores(),
+  );
+  return { ir, ruleNodeId };
+}
+
+/**
+ * Unguarded decomposition-flavoured pair: bases aeiou → áéíóú (NFD of each
+ * marked form is base + U+0301), trigger "'". Exercises the relation check's
+ * decomposition signal (the IPA pair exercises name extension).
+ */
+export function buildAcuteSequenceIR(): { ir: KeyboardIR; ruleNodeId: string } {
+  const ruleNodeId = "rule#acute-seq";
+  const stores = [
+    makeCharStore("store#bases", "bases", "aeiou"),
+    makeCharStore("store#marked", "marked", "áéíóú"),
+  ];
+  const rule: IRRule = {
+    nodeId: ruleNodeId,
+    context: [
+      { kind: "any", storeRef: "bases" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: "'" },
+    ],
+    output: [{ kind: "index", storeRef: "marked", offset: 1 }],
+  };
+  return { ir: makeTestIR([mainGroup([rule])], stores), ruleNodeId };
+}
+
+/**
+ * Unguarded parallel remap whose stores are NOT base→marked related
+ * (aeiou → vwxyz): the S-04/S-05-territory shape the evidence gate must
+ * refuse as S-03.
+ */
+export function buildUnrelatedRemapIR(): { ir: KeyboardIR } {
+  const stores = [
+    makeCharStore("store#bases", "bases", "aeiou"),
+    makeCharStore("store#other", "other", "vwxyz"),
+  ];
+  const rule: IRRule = {
+    nodeId: "rule#unrelated",
+    context: [
+      { kind: "any", storeRef: "bases" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: "'" },
+    ],
+    output: [{ kind: "index", storeRef: "other", offset: 1 }],
+  };
+  return { ir: makeTestIR([mainGroup([rule])], stores) };
+}
+
 /**
  * basic_kbdca grave family: two triggers (unshifted + shifted K_QUOTE) sharing
  * one fan-out body, plus an escape rule.

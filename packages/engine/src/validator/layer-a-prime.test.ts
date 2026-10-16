@@ -3,7 +3,7 @@
  *
  * Covers:
  *   I1  checkParseCompleteness  -- clean vs. incomplete parse
- *   I2  checkRoundTrip          -- deferred stub (hint, no RoundTripDivergence)
+ *   I2  checkRoundTrip          -- functional round-trip via simulate() (#882)
  *   I3  checkHeaderPreservation -- missing/empty header fields
  *   I4  checkOpaqueFeatureInventory -- opaque feature counts (non-blocking info)
  *   I5  checkSidecarHash        -- matching vs. mismatched stored hash
@@ -13,6 +13,11 @@ import { describe, it, expect, vi } from "vitest";
 import {
   checkParseCompleteness,
   checkRoundTrip,
+  chordToSimKeyInput,
+  ROUND_TRIP_DIVERGENCE_CODE,
+  ROUND_TRIP_NO_COVERAGE_CODE,
+  ROUND_TRIP_UNAVAILABLE_CODE,
+  ROUND_TRIP_CORPUS_TRUNCATED_CODE,
   checkHeaderPreservation,
   checkOpaqueFeatureInventory,
   checkSidecarHash,
@@ -22,6 +27,8 @@ import {
   checkBehaviourNulOnTextContext,
   NUL_ON_TEXT_CONTEXT_CODE,
 } from "./layer-a-prime.js";
+import type { RoundTripDeps } from "./layer-a-prime.js";
+import type { CompileResult, SimKeyInput } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
 import { computeSha256Hex } from "../codec/hash.js";
 import { makePattern } from "@keyboard-studio/contracts";
@@ -117,80 +124,248 @@ describe("checkParseCompleteness (I1)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// I2 -- Round-trip check (deferred stub)
+// I2 -- Functional round-trip check via simulate() (#882)
 // ---------------------------------------------------------------------------
 
-describe("checkRoundTrip (I2 stub)", () => {
-  const ir = makeCleanIR();
+/** IR whose rules reference the given vkeys (drives the D7 corpus). */
+function irWithVkeys(...names: string[]): KeyboardIR {
+  return {
+    ...makeCleanIR(),
+    groups: [
+      {
+        nodeId: "g1",
+        name: "main",
+        usingKeys: true,
+        readonly: false,
+        rules: names.map((name, i) => ({
+          nodeId: `r${i}`,
+          context: [{ kind: "vkey" as const, name, modifiers: [] }],
+          output: [{ kind: "char" as const, value: "x" }],
+        })),
+      },
+    ],
+  };
+}
 
-  it("returns exactly one finding", () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    const findings = checkRoundTrip(ir);
+function fakeCompiled(side: string): CompileResult {
+  return {
+    success: true,
+    artifacts: [
+      {
+        filename: "kb.js",
+        url: "",
+        sizeBytes: 1,
+        data: new TextEncoder().encode(side),
+      },
+    ],
+    diagnostics: [],
+    compileMs: 0,
+    isWarmCompile: true,
+  };
+}
+
+type FakeSimulate = (side: string, keys: SimKeyInput[]) => string;
+
+/**
+ * Fake harness: compileFn tags the artifact with which .kmn text it was
+ * given ("original"/"emitted"); simulateFn answers per side via `behaviour`.
+ */
+function makeFakeDeps(
+  behaviour: FakeSimulate = () => "x",
+  extra?: Partial<RoundTripDeps>,
+): RoundTripDeps {
+  return {
+    originalKmn: "ORIGINAL_KMN",
+    emittedKmn: "EMITTED_KMN",
+    keyboardId: "test-kb",
+    compileFn: async (vfs, keyboardId) => {
+      const kmn = vfs.get(`source/${keyboardId}.kmn`)?.content;
+      return fakeCompiled(kmn === "EMITTED_KMN" ? "emitted" : "original");
+    },
+    simulateFn: (compiled, keys) => {
+      const side = new TextDecoder().decode(compiled.artifacts[0]?.data);
+      return { finalOutput: behaviour(side, keys), trace: [] };
+    },
+    ...extra,
+  };
+}
+
+describe("chordToSimKeyInput (D7 → SimKeyInput bridge)", () => {
+  it("maps SHIFT/CTRL/ALT to lowercase simulator modifiers", () => {
+    expect(chordToSimKeyInput({ vkey: "K_A", modifiers: ["SHIFT"] })).toEqual({
+      vkey: "K_A",
+      modifiers: ["shift"],
+    });
+    expect(chordToSimKeyInput({ vkey: "K_A", modifiers: ["CTRL", "ALT"] })).toEqual({
+      vkey: "K_A",
+      modifiers: ["ctrl", "alt"],
+    });
+  });
+
+  it("maps RALT to 'ralt', never 'lalt' (distinct flag bit)", () => {
+    expect(chordToSimKeyInput({ vkey: "K_A", modifiers: ["RALT"] })).toEqual({
+      vkey: "K_A",
+      modifiers: ["ralt"],
+    });
+  });
+
+  it("maps CAPS to the caps state flag, not a modifier", () => {
+    expect(chordToSimKeyInput({ vkey: "K_A", modifiers: ["CAPS"] })).toEqual({
+      vkey: "K_A",
+      modifiers: [],
+      caps: true,
+    });
+  });
+
+  it("returns null for an unmapped modifier name (coverage gap, never guessed)", () => {
+    expect(chordToSimKeyInput({ vkey: "K_A", modifiers: ["HYPER"] })).toBeNull();
+  });
+});
+
+describe("checkRoundTrip (I2 functional)", () => {
+  const ir = irWithVkeys("K_A");
+
+  it("without deps, reports UNAVAILABLE (hint) — never a silent pass", async () => {
+    const findings = await checkRoundTrip(ir);
     expect(findings).toHaveLength(1);
-    vi.restoreAllMocks();
-  });
-
-  it("finding code is KM_HINT_ROUND_TRIP_DEFERRED", () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    const findings = checkRoundTrip(ir);
-    expect(findings[0]?.code).toBe("KM_HINT_ROUND_TRIP_DEFERRED");
-    vi.restoreAllMocks();
-  });
-
-  it("finding severity is 'hint' (non-blocking)", () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    const findings = checkRoundTrip(ir);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_UNAVAILABLE_CODE);
     expect(findings[0]?.severity).toBe("hint");
-    vi.restoreAllMocks();
-  });
-
-  it("finding layer is 'A-prime'", () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    const findings = checkRoundTrip(ir);
     expect(findings[0]?.layer).toBe("A-prime");
-    vi.restoreAllMocks();
   });
 
-  it("does NOT emit a KM_ERROR_ROUND_TRIP_DIVERGENCE finding", () => {
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    const findings = checkRoundTrip(ir);
-    const divergence = findings.filter((f) => f.code === "KM_ERROR_ROUND_TRIP_DIVERGENCE");
-    expect(divergence).toHaveLength(0);
-    vi.restoreAllMocks();
+  it("equivalent keyboards produce NO findings", async () => {
+    const findings = await checkRoundTrip(ir, makeFakeDeps());
+    expect(findings).toHaveLength(0);
   });
 
-  it("logs corpus info to console.info once, including the [layer-a-prime] prefix", () => {
+  it("divergence produces ONE aggregate error with counts and an example", async () => {
+    const deps = makeFakeDeps((side, keys) =>
+      side === "emitted" && keys.length === 1 && keys[0]?.vkey === "K_A" && keys[0]?.modifiers.length === 0
+        ? "z"
+        : "x",
+    );
+    const findings = await checkRoundTrip(ir, deps);
+    const errors = findings.filter((f) => f.code === ROUND_TRIP_DIVERGENCE_CODE);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.severity).toBe("error");
+    expect(errors[0]?.message).toMatch(/of 24 compared input\(s\)/);
+    expect(errors[0]?.message).toContain("[K_A]");
+  });
+
+  it("empty corpus → NO_COVERAGE warning, and compile is never attempted", async () => {
+    const compileFn = vi.fn(async () => fakeCompiled("original"));
+    const deps = makeFakeDeps(() => "x", { compileFn });
+    const findings = await checkRoundTrip({ ...makeCleanIR(), groups: [] }, deps);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_NO_COVERAGE_CODE);
+    expect(findings[0]?.severity).toBe("warning");
+    expect(compileFn).not.toHaveBeenCalled();
+  });
+
+  it("compile failure on either side → UNAVAILABLE hint naming the diagnostic", async () => {
+    const deps = makeFakeDeps(() => "x", {
+      compileFn: async (vfs, keyboardId) => {
+        const kmn = vfs.get(`source/${keyboardId}.kmn`)?.content;
+        if (kmn === "EMITTED_KMN") {
+          return {
+            success: false,
+            artifacts: [],
+            diagnostics: [
+              { code: "KM_X", severity: "error" as const, layer: "A" as const, message: "boom-diagnostic" },
+            ],
+            compileMs: 0,
+            isWarmCompile: true,
+          };
+        }
+        return fakeCompiled("original");
+      },
+    });
+    const findings = await checkRoundTrip(ir, deps);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_UNAVAILABLE_CODE);
+    expect(findings[0]?.message).toContain("boom-diagnostic");
+  });
+
+  it("missing .js artifact → UNAVAILABLE hint", async () => {
+    const deps = makeFakeDeps(() => "x", {
+      compileFn: async () => ({
+        success: true,
+        artifacts: [{ filename: "kb.kmx", url: "", sizeBytes: 1 }],
+        diagnostics: [],
+        compileMs: 0,
+        isWarmCompile: true,
+      }),
+    });
+    const findings = await checkRoundTrip(ir, deps);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_UNAVAILABLE_CODE);
+    expect(findings[0]?.message).toContain("no .js artifact");
+  });
+
+  it("simulate throwing on BOTH sides → UNAVAILABLE hint, not divergence", async () => {
+    const deps = makeFakeDeps(() => "x", {
+      simulateFn: () => {
+        throw new Error("runtime exploded");
+      },
+    });
+    const findings = await checkRoundTrip(ir, deps);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_UNAVAILABLE_CODE);
+  });
+
+  it("simulate throwing on ONE side only → divergence error", async () => {
+    const deps = makeFakeDeps(() => "x", {
+      simulateFn: (compiled) => {
+        const side = new TextDecoder().decode(compiled.artifacts[0]?.data);
+        if (side === "emitted") throw new Error("emitted runtime exploded");
+        return { finalOutput: "x", trace: [] };
+      },
+    });
+    const findings = await checkRoundTrip(ir, deps);
+    const errors = findings.filter((f) => f.code === ROUND_TRIP_DIVERGENCE_CODE);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toContain("simulate threw");
+  });
+
+  it("sibling files populate BOTH compile VFSes; only the .kmn differs", async () => {
+    const seen: Array<{ kmn: unknown; ico: unknown }> = [];
+    const deps = makeFakeDeps(() => "x", {
+      sourceFiles: [
+        { path: "source/test-kb.ico", content: new Uint8Array([1, 2, 3]), isBinary: true },
+        // A stale .kmn in sourceFiles must be overridden by original/emitted.
+        { path: "source/test-kb.kmn", content: "STALE", isBinary: false },
+      ],
+      compileFn: async (vfs, keyboardId) => {
+        seen.push({
+          kmn: vfs.get(`source/${keyboardId}.kmn`)?.content,
+          ico: vfs.get("source/test-kb.ico")?.content,
+        });
+        const kmn = vfs.get(`source/${keyboardId}.kmn`)?.content;
+        return fakeCompiled(kmn === "EMITTED_KMN" ? "emitted" : "original");
+      },
+    });
+    const findings = await checkRoundTrip(ir, deps);
+    expect(findings).toHaveLength(0);
+    expect(seen.map((s) => s.kmn)).toEqual(["ORIGINAL_KMN", "EMITTED_KMN"]);
+    expect(seen.every((s) => s.ico instanceof Uint8Array)).toBe(true);
+  });
+
+  it("truncated corpus → TRUNCATED warning naming generated vs theoretical counts", async () => {
+    const manyVkeys = irWithVkeys(
+      "K_A", "K_B", "K_C", "K_D", "K_E", "K_F", "K_G", "K_H", "K_I", "K_J", "K_K", "K_L",
+    );
+    const findings = await checkRoundTrip(manyVkeys, makeFakeDeps());
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_CORPUS_TRUNCATED_CODE);
+    expect(findings[0]?.severity).toBe("warning");
+    expect(findings[0]?.message).toContain("100000");
+    expect(findings[0]?.message).toContain("135720");
+  }, 60_000);
+
+  it("logs corpus info including the [layer-a-prime] prefix and vkey count", async () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-    checkRoundTrip(ir);
-    expect(infoSpy).toHaveBeenCalledOnce();
+    await checkRoundTrip(irWithVkeys("K_A"));
     const firstArg = infoSpy.mock.calls[0]?.[0] as string;
     expect(firstArg).toContain("[layer-a-prime] I2 corpus:");
-    infoSpy.mockRestore();
-  });
-
-  it("handles an IR with typed vkey rules and includes vkeyCount in the log", () => {
-    const irWithRules: KeyboardIR = {
-      ...ir,
-      groups: [
-        {
-          nodeId: "g1",
-          name: "main",
-          usingKeys: true,
-          readonly: false,
-          rules: [
-            {
-              nodeId: "r1",
-              context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-              output: [{ kind: "char", value: "a" }],
-            },
-          ],
-        },
-      ],
-    };
-    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-    const findings = checkRoundTrip(irWithRules);
-    expect(findings[0]?.code).toBe("KM_HINT_ROUND_TRIP_DEFERRED");
-    const firstArg = infoSpy.mock.calls[0]?.[0] as string;
     expect(firstArg).toContain("1 vkeys");
     infoSpy.mockRestore();
   });
@@ -331,10 +506,10 @@ describe("headerFieldLabel (I3 extractor)", () => {
   it("returns null for a finding that is not a header-field-missing one", () => {
     expect(
       headerFieldLabel({
-        code: "KM_HINT_ROUND_TRIP_DEFERRED",
+        code: "KM_HINT_ROUND_TRIP_UNAVAILABLE",
         severity: "hint",
         layer: "A-prime",
-        message: "Functional round-trip (I2) deferred: ...",
+        message: "Functional round-trip (I2) could not run: ...",
       }),
     ).toBeNull();
   });

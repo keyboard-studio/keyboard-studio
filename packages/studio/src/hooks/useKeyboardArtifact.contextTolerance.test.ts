@@ -83,6 +83,21 @@ vi.mock("../lib/contextToleranceAnalysis.ts", () => ({
   analyseContextTolerance: (ir: KeyboardIR, isCurrent: () => boolean) => analyse(ir, isCurrent),
 }));
 
+// The import-fidelity emit stage loads the simulator chunk via
+// loadDemoSimulate and runs the functional I2 round-trip (compile x2 +
+// corpus simulation) before the stage reaches ready. That harness is not
+// this file's subject — its wiring is proven in
+// useKeyboardArtifact.fidelity.test.ts and the engine round-trip suites —
+// so stub the loader with an immediately-resolving simulate that returns
+// empty output for both sides (no divergence). Without this, the import
+// pipeline no longer settles within one flush and every test below sees
+// the stage still at "compiling".
+vi.mock("../components/rules/demoSimulation.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../components/rules/demoSimulation.ts")>()),
+  loadDemoSimulate: () =>
+    Promise.resolve(() => ({ finalOutput: "", trace: [] })),
+}));
+
 const baseKb: StartKeyboard = {
   id: "test_kb",
   path: "release/t/test_kb",
