@@ -2,7 +2,7 @@
 // Verifies that simpleSwapRule and deadkeySingleTapRule are exported and carry
 // the required RecognizerRule fields (id, strategyId, match, lift).
 import { describe, it, expect } from "vitest";
-import { simpleSwapRule, deadkeySingleTapRule } from "./index.js";
+import { simpleSwapRule, deadkeySingleTapRule, sequenceReplaceRule } from "./index.js";
 
 describe("generated barrel exports", () => {
   it("simpleSwapRule is exported with id and strategyId", () => {
@@ -29,7 +29,21 @@ describe("generated barrel exports", () => {
     expect(typeof deadkeySingleTapRule.lift).toBe("function");
   });
 
-  it("the two exported rules have distinct ids", () => {
+  it("sequenceReplaceRule is exported with id and strategyId", () => {
+    expect(sequenceReplaceRule).toBeDefined();
+    expect(typeof sequenceReplaceRule.id).toBe("string");
+    expect(sequenceReplaceRule.id.length).toBeGreaterThan(0);
+    expect(sequenceReplaceRule.strategyId).toBe("S-03");
+  });
+
+  it("sequenceReplaceRule exposes match() and lift() functions", () => {
+    expect(typeof sequenceReplaceRule.match).toBe("function");
+    expect(typeof sequenceReplaceRule.lift).toBe("function");
+  });
+
+  it("the exported rules have distinct ids", () => {
     expect(simpleSwapRule.id).not.toBe(deadkeySingleTapRule.id);
+    expect(sequenceReplaceRule.id).not.toBe(simpleSwapRule.id);
+    expect(sequenceReplaceRule.id).not.toBe(deadkeySingleTapRule.id);
   });
 });
