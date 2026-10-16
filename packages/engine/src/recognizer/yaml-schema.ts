@@ -37,6 +37,8 @@ export interface OutputPatternEntry {
 export interface RuleEntry {
   role: RoleType;
   description?: string;
+  /** When true, the cluster is recognised without this role (e.g. the S-02 escape, #2233). */
+  optional?: boolean;
   context_pattern: ContextPatternEntry[];
   output_pattern: OutputPatternEntry[];
 }
