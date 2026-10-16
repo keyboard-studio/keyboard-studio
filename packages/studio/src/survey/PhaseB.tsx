@@ -65,7 +65,7 @@ import type {
 import { useSourcedExemplars } from "./useSourcedExemplars.ts";
 import { useSourcedExemplarsBoth } from "./useSourcedExemplarsBoth.ts";
 import { CpLabel } from "./CpLabel.tsx";
-import { RadioGroup, SelectMenu } from "../ui/index.ts";
+import { RadioGroup } from "../ui/index.ts";
 import {
   BG_PAGE,
   BORDER,
@@ -87,8 +87,6 @@ import {
   chipIndicatorColor,
   chipIndicatorText,
   visuallyHidden,
-  FONT_OPTIONS,
-  phaseBFontStack,
 } from "./surveyStyles.ts";
 
 // Question id that begins the manual step-by-step path.
@@ -887,8 +885,6 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const draft = useInventoryDraft("characters");
   const chars = draft.chars;
   const setAll = draft.ops.setAll;
-  const selectedFont = draft.selectedFont;
-  const setSelectedFont = draft.ops.setSelectedFont;
   const provenance = draft.provenance;
   const exemplarDigraphs = draft.exemplarDigraphs;
   const loanwordChars = draft.loanwordChars;
@@ -1043,32 +1039,9 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         )}
       </h2>
 
-      {/* Font selection — custom SelectMenu (webview-safe dropdown): native
-          <select> popups don't open in the VS Code Simple Browser, so this is
-          a DOM-rendered menu. Applies to every character glyph on this step,
-          incl. the character map — see the character-inventory value's selectedFont. */}
-      <div style={{ maxWidth: 280 }} data-testid="phase-b-font-select">
-        {/* Not a <label>: the control is named via ariaLabelledby on the
-            SelectMenu below, and an un-associated label element (no htmlFor,
-            no nesting) adds no semantics or click-focus behavior. */}
-        <span id="phase-b-font-select-label"
-              style={{ display: "block", margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
-          <Trans id="survey.phaseB.buildList.fontSelectLabel">Font for characters</Trans>
-        </span>
-        <SelectMenu
-          id="phase-b-font-select-control"
-          value={selectedFont}
-          options={FONT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-          ariaLabelledby="phase-b-font-select-label"
-          renderOptionLabel={(opt) => (
-            <span style={{ fontFamily: phaseBFontStack(opt.value) }}>{opt.label}</span>
-          )}
-          onChange={(v) => {
-            const opt = FONT_OPTIONS.find((o) => o.value === v);
-            if (opt) setSelectedFont(opt.value);
-          }}
-        />
-      </div>
+      {/* Font selection lives in the NavBar now (#1895): the FontSwitcher
+          control edits the same character-inventory selectedFont from every
+          step, so this step no longer carries its own picker. */}
 
       {/* Instructions */}
       <div

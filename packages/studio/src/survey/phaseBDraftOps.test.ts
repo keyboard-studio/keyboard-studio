@@ -528,6 +528,13 @@ describe("phase B inventory draft — seedFromProposal (spec 044 FR-016)", () =>
     resetInventoryDecisions();
   });
 
+  it("preserves a font chosen before seeding (#1895: the toolbar can set the font before any inventory exists)", () => {
+    draft().setSelectedFont("charis-sil");
+    draft().seedFromProposal(inventory(["ŋ", "ɔ"], "sldr"));
+    expect(draft().selectedFont).toBe("charis-sil");
+    draft().setSelectedFont(DEFAULT_PHASE_B_FONT);
+  });
+
   it("seeds the main tier and tags every character with its source", () => {
     draft().seedFromProposal(inventory(["ŋ", "ɔ"], "sldr"));
     const s = draft();
