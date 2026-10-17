@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-10-16",
+  "lastUpdated": "2026-10-17",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:9cff02e58c358077",
+      "hash": "sha256:10abff8a295def41",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -1084,7 +1084,7 @@
     },
     "specs/102-keyboard-docs-templates": {
       "title": "Feature Specification: Keyboard documentation templates and version policy",
-      "hash": "sha256:4818650a30cb6806",
+      "hash": "sha256:64f94bf471e8184b",
       "status": "implemented",
       "implements": [],
       "decisions": [],
