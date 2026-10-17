@@ -14,6 +14,8 @@
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import type { DecisionProposalSource, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { i18n, type MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { historyEntryHeading, resolvePublishVersion } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
@@ -28,7 +30,7 @@ import {
 import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 import { hasTestBuilds } from "../../stores/testingStore.ts";
-import { proposeTrack } from "../../lib/proposeTrack.ts";
+import { proposeTrack, type TrackProposalBasis } from "../../lib/proposeTrack.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../../decisions/extractContext.ts";
@@ -71,6 +73,43 @@ function decisionString(decisions: DecisionSet, id: DecisionId): string | undefi
 
 export type TrackPayload = { track: "copy" | "adapt" };
 
+/**
+ * The catalogue message for each proposeTrack basis arm. The caption is
+ * catalogue copy resolved through i18n at seed time (the active UI locale),
+ * never a string composed by the proposer — one msg() descriptor per arm,
+ * so the catalogue extractor sees every key.
+ */
+const TRACK_PROPOSAL_REASONS: Record<TrackProposalBasis, MessageDescriptor> = {
+  "no-target": msg({
+    id: "track.proposal.reason.no-target",
+    message:
+      "Suggested because no target language is recorded yet, so starting a new keyboard is the safe choice.",
+  }),
+  "no-base-languages": msg({
+    id: "track.proposal.reason.no-base-languages",
+    message:
+      "Suggested because this base does not declare which languages it serves, so it cannot be shown to be a {target} keyboard.",
+  }),
+  "multiple-languages": msg({
+    id: "track.proposal.reason.multiple-languages",
+    message: "Suggested because this base serves {count} languages, not just {target}.",
+  }),
+  "different-language": msg({
+    id: "track.proposal.reason.different-language",
+    message: "Suggested because this base is for {base}, not your target language {target}.",
+  }),
+  "different-script": msg({
+    id: "track.proposal.reason.different-script",
+    message:
+      "Suggested because this base writes {base} in a different script from your target {target}.",
+  }),
+  "same-language": msg({
+    id: "track.proposal.reason.same-language",
+    message:
+      "Suggested because this base is a {target} keyboard — the same single language and script as your target.",
+  }),
+};
+
 export const trackOptions: FlowStepOptions<TrackPayload> = {
   flowRef: "track",
   title: "Authoring Track",
@@ -96,7 +135,8 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
     getSeedCaption(questionId: string, deps: FlowStepDeps): string | undefined {
       if (questionId !== "track_choice") return undefined;
       if (deps.selectedTrack !== null) return undefined;
-      return proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages).reason;
+      const proposal = proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages);
+      return i18n._(TRACK_PROPOSAL_REASONS[proposal.basis].id, proposal.params);
     },
   },
 
