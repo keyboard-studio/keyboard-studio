@@ -1215,7 +1215,11 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // Use localStart (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
   // spec 078: only this main-walk preview runs the context-tolerance analysis;
-  // every other useKeyboardArtifact caller is unchanged.
+  // every other useKeyboardArtifact caller is unchanged. The functional I2
+  // round-trip check is designated the same way (#2249): this instance's
+  // full run is the base import, so its pass is the import's verdict —
+  // gallery/Output/Criteria instances capture no I2 input and start no
+  // pass behind their readies.
   const { stage: artifactStage, retry } = useKeyboardArtifact(
     localStart,
     scaffoldSpec,
@@ -1223,6 +1227,7 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     onInstantiate,
     {
       analyseContextTolerance: true,
+      runRoundTripCheck: true,
     },
   );
   // spec 078 FR-005a: the recorded decision is applied by its own effect,
