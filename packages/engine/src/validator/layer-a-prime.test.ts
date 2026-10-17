@@ -252,6 +252,38 @@ describe("checkRoundTrip (I2 functional)", () => {
     expect(errors[0]?.message).toContain("[K_A]");
   });
 
+  it("host abort before the loop → UNAVAILABLE hint, simulate never runs", async () => {
+    const simulateFn = vi.fn(() => ({ finalOutput: "x", trace: [] }));
+    const deps = { ...makeFakeDeps(), simulateFn, shouldAbort: () => true };
+    const findings = await checkRoundTrip(ir, deps);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_UNAVAILABLE_CODE);
+    expect(findings[0]?.message).toContain("aborted");
+    expect(simulateFn).not.toHaveBeenCalled();
+  });
+
+  it("host abort mid-pass stops the comparison early — no partial clean bill", async () => {
+    // The abort predicate is consulted before the loop and then every 256
+    // sequences. Flip it on the third consultation (the second in-loop
+    // check, ~512 sequences into a 2040-sequence corpus): the pass must
+    // stop well short of the full corpus and report UNAVAILABLE rather
+    // than the findings accumulated so far.
+    let simCalls = 0;
+    let consults = 0;
+    const deps = makeFakeDeps(
+      () => {
+        simCalls++;
+        return "x";
+      },
+      { shouldAbort: () => ++consults >= 3 },
+    );
+    const findings = await checkRoundTrip(irWithVkeys("K_A", "K_B", "K_C", "K_D"), deps);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe(ROUND_TRIP_UNAVAILABLE_CODE);
+    expect(simCalls).toBeGreaterThan(0);
+    expect(simCalls).toBeLessThan(4080);
+  });
+
   it("empty corpus → NO_COVERAGE warning, and compile is never attempted", async () => {
     const compileFn = vi.fn(async () => fakeCompiled("original"));
     const deps = makeFakeDeps(() => "x", { compileFn });

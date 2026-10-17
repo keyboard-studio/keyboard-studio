@@ -464,6 +464,13 @@ export function useKeyboardArtifact(
   // rebuilt on every fresh fetch, revoked on teardown / next fetch.
   const prevKeyboardCssBlobUrls = useRef<string[]>([]);
   const runId = useRef(0);
+  // Cancellation token for the in-flight post-ready functional round-trip
+  // (I2). A new compile supersedes the previous artifact, so it retires
+  // the previous pass: without this, every recompile (e.g. each Mechanisms
+  // gallery Apply) stacked another full corpus simulation on the main
+  // thread, and the superseded passes burned CPU to completion even
+  // though their findings were always going to be dropped.
+  const roundTripAbortRef = useRef<{ aborted: boolean } | null>(null);
   const engineRef = useRef<EngineModule | null>(null);
   // Shared engine load+init promise. Assigned by the first run() call that
   // finds it empty; cleared again if the load rejects, so a later run()
@@ -611,6 +618,13 @@ export function useKeyboardArtifact(
     const vfs = vfsRef.current;
     if (engine === null || vfs === null || runId.current !== thisRunId) {
       return;
+    }
+    // A new compile supersedes the previous artifact — retire any
+    // round-trip still simulating for it right away, not just when this
+    // compile's own post-ready pass starts.
+    if (roundTripAbortRef.current) {
+      roundTripAbortRef.current.aborted = true;
+      roundTripAbortRef.current = null;
     }
 
     const isWarmCompile = engine.isReady?.() ?? false;
@@ -880,10 +894,18 @@ export function useKeyboardArtifact(
       const roundTripCheck = engine.runImportFidelityRoundTripCheck;
       const startRoundTrip = () => {
         void (async () => {
+          if (roundTripAbortRef.current) roundTripAbortRef.current.aborted = true;
+          const abortToken = { aborted: false };
+          roundTripAbortRef.current = abortToken;
           let deps: RoundTripDeps | undefined;
           try {
             const simulateFn = await loadDemoSimulate();
-            deps = { ...input.deps, compileFn: engine.compile, simulateFn };
+            deps = {
+              ...input.deps,
+              compileFn: engine.compile,
+              simulateFn,
+              shouldAbort: () => abortToken.aborted,
+            };
           } catch {
             deps = undefined;
           }

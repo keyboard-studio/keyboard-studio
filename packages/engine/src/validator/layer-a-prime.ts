@@ -273,6 +273,16 @@ export interface RoundTripDeps {
   /** KeymanWeb JS-runtime simulation over a compiled keyboard. */
   simulateFn: (compiled: CompileResult, keys: SimKeyInput[]) => SimulationResult;
   /**
+   * Optional host cancellation: consulted at the comparison loop's yield
+   * points (and once before it). When it returns true the pass stops and
+   * reports itself unavailable — never a partial clean bill, since a
+   * prefix of the corpus without divergence is not evidence of
+   * equivalence. Live hosts use this to retire a pass whose artifact has
+   * been superseded, so stale simulations cannot accumulate CPU behind
+   * the author's current work.
+   */
+  shouldAbort?: () => boolean;
+  /**
    * Sibling files of the .kmn (the whole `source/` directory: &BITMAP icon,
    * &VISUALKEYBOARD .kvks, &LAYOUTFILE touch layout, fonts…). Both compile
    * VFSes are populated from these entries, overriding only the .kmn text —
@@ -478,9 +488,16 @@ export async function checkRoundTrip(
   let lastYieldAt = Date.now();
   let sinceYieldCheck = 0;
 
+  if (deps.shouldAbort?.() === true) {
+    return [roundTripUnavailable("round-trip aborted by the host (superseded)")];
+  }
+
   for (const sequence of corpus) {
     if (++sinceYieldCheck >= 256) {
       sinceYieldCheck = 0;
+      if (deps.shouldAbort?.() === true) {
+        return [roundTripUnavailable("round-trip aborted by the host (superseded)")];
+      }
       const now = Date.now();
       if (now - lastYieldAt >= 40) {
         lastYieldAt = now;
