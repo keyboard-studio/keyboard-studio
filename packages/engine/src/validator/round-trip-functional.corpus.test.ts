@@ -39,16 +39,22 @@ const RELEASE_ROOT = resolve(__dir, "../../../../../keyboards/release");
 const BINARY_EXTS = new Set([".ico", ".ttf", ".otf", ".woff", ".woff2", ".png", ".jpg", ".jpeg", ".gif", ".bmp"]);
 
 function loadSourceDir(sourceDir: string): RoundTripSourceFile[] {
-  return readdirSync(sourceDir).map((name) => {
-    const full = join(sourceDir, name);
-    const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
-    const isBinary = BINARY_EXTS.has(ext);
-    return {
-      path: `source/${name}`,
-      content: isBinary ? new Uint8Array(readFileSync(full)) : readFileSync(full, "utf8"),
-      isBinary,
-    };
-  });
+  // Files only: source/ can hold subdirectories (akan and nias both ship a
+  // help/ folder) and readFileSync on one throws EISDIR. The compile VFS
+  // takes the flat source files; help/ contents are not compile inputs.
+  return readdirSync(sourceDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .map((name) => {
+      const full = join(sourceDir, name);
+      const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+      const isBinary = BINARY_EXTS.has(ext);
+      return {
+        path: `source/${name}`,
+        content: isBinary ? new Uint8Array(readFileSync(full)) : readFileSync(full, "utf8"),
+        isBinary,
+      };
+    });
 }
 
 async function runFunctionalI2(shard: string, keyboardId: string) {
