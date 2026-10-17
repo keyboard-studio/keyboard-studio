@@ -5,7 +5,14 @@
  * keyboards from the sibling keymanapp/keyboards checkout:
  *
  *   akan — clean baseline: the throwaway prototype proved 400/400 corpus
- *          inputs identical, so functional I2 must produce NO findings.
+ *          inputs identical, so functional I2 must produce NO error
+ *          findings. (Not literally zero findings: akan's theoretical D7
+ *          corpus is ~21M inputs against the generator's 100k cap, so the
+ *          harness's designed truncation warning — and a coverage-gap
+ *          warning when sequences are unmappable — are honest partial-
+ *          verdict signals, not failures. The assertion below pins
+ *          equivalence: no divergence, no unavailable, nothing at error
+ *          severity.)
  *   nias — the proof case for functional over structural I2: the structural
  *          proxy flags nias as round-trip-divergent, but the emitted
  *          keyboard is functionally identical (prototype: 180/180). I2 must
@@ -78,10 +85,15 @@ const niasDir = join(RELEASE_ROOT, "n", "nias", "source");
 
 describe("functional I2 — corpus regression (akan / nias)", () => {
   it.skipIf(!existsSync(join(akanDir, "akan.kmn")))(
-    "akan: functionally equivalent — no findings at all",
+    "akan: functionally equivalent — no divergence, no unavailable, no error findings",
     async () => {
       const findings = await runFunctionalI2("a", "akan");
-      expect(findings).toEqual([]);
+      const codes = findings.map((f) => f.code);
+      expect(codes).not.toContain(ROUND_TRIP_DIVERGENCE_CODE);
+      expect(codes).not.toContain(ROUND_TRIP_UNAVAILABLE_CODE);
+      expect(
+        findings.filter((f) => f.severity === "error" || f.severity === "fatal"),
+      ).toEqual([]);
     },
     300_000,
   );
