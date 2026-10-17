@@ -468,7 +468,25 @@ export async function checkRoundTrip(
   let bothThrew = 0;
   const divergences: Array<{ input: string; originalOut: string; emittedOut: string }> = [];
 
+  // Cooperative chunking: this loop is fully synchronous (two simulator
+  // calls per sequence over up to 100k sequences). In a live browser host
+  // that is one unbroken main-thread block of tens of seconds — it kept
+  // the base preview's ready commit from landing inside any consumer's
+  // wait window and stalled the authoring walks that followed it. Yield
+  // to the event loop whenever a ~40ms slice has elapsed; batch hosts
+  // (Node) get identical findings, just interleaved with timer turns.
+  let lastYieldAt = Date.now();
+  let sinceYieldCheck = 0;
+
   for (const sequence of corpus) {
+    if (++sinceYieldCheck >= 256) {
+      sinceYieldCheck = 0;
+      const now = Date.now();
+      if (now - lastYieldAt >= 40) {
+        lastYieldAt = now;
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+    }
     const keys: SimKeyInput[] = [];
     let mappable = true;
     for (const chord of sequence) {
