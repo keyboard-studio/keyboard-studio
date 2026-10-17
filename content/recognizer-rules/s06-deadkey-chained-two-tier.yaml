@@ -1,0 +1,138 @@
+# s06-deadkey-chained-two-tier.yaml
+# Recognizer rule record: lift a two-trigger chained-deadkey cluster from an
+# imported KeyboardIR into the latin_deadkey_chained_two_tier Pattern
+# instance with origin='recognized'.
+#
+# Strategy: S-06 (two-trigger chain, library pattern) — ONE sense of S-06.
+# The family-selection (rule 6) and pending-letter (rule 8) senses are NOT
+# recognized by this rule or any other (issue #2213 determination).
+#
+# IMPLEMENTATION: hand-written TypeScript recognizer
+# (packages/engine/src/recognizer/rules/s06-deadkey-chained-two-tier.ts +
+# s06-families.ts), registered FIRST in DEFAULT_RULES. This YAML is the
+# rule's record in this directory; the compiler skips S-06 (it is not in
+# SUPPORTED_STRATEGIES in scripts/compile-recognizer-rules.mjs) because the
+# finder is hand-written — the YAML/generated route was rejected for this
+# lift (queue-2235-ruling.md §3: generated rules sit after the hand S-02
+# recognizer and cannot pre-empt, and the interpreter's role predicates
+# are numeric-only over the deadkey-element union this predicate needs).
+#
+# Predicate (queue-2235-ruling.md §3, verbatim; all checks on the cleaned
+# context — codec `+` separators stripped — with deadkey identity over the
+# union: numeric id, or deadkeyNameKey(name) for namedDeadkey elements).
+# A sub-cluster {family F, tier-2 T} exists iff:
+#   1. Arming: a rule with no deadkey in context whose sole output is dk(F).
+#   2. Pure edge: output SOLELY dk(T), T != F; context dk(F) + exactly one
+#      key element (vkey or char). Output purity is the mandatory gate —
+#      it excludes every delay-line flush (pending-letter sense).
+#   3. Tier-2 resolution: [dk(T), any(S)] > index(OUT, 2), single index
+#      output, offset = cleaned context length.
+#   4. Boundedness: T heads no onward edge within the cluster.
+# Owned nodes: arming, edge, tier-2 resolutions, the tier-1 direct
+# resolution of F if present, and any notany-fallback / double-press
+# ([dk(X), dk(X)]) rules headed by F or T. Fallbacks/double-press are not
+# required for the claim. One Pattern per F (sub-clusters sharing F share
+# its arming rules).
+#
+# Corpus evidence (census on issue #2235, parser-verified over the full
+# release corpus, 933 .kmn, codec at dev b78bb083): admitted n = 1 —
+# sil_cameroon_azerty, 5 sub-clusters (F = dk(0x21); arming :264-265,
+# pure edges :366-371, tier-2 resolutions :376-400, tier-1 direct :400,
+# double-press :372). thamizha_bamini (the library pattern's cited source
+# keyboard) is a NON-claim for two independent reasons: its resolutions'
+# `dk(N)+` context heads are glued raw by the tokenizer (issue #2247),
+# and their outputs are [index, char], not the single-index fan-out.
+# armenian_mnemonic_r / russian_mnemonic_r are excluded by output purity
+# (496 / 81 loose edges, all flush, 0 pure); sil_euro_latin by T != F;
+# sil_pan_africa_mnemonic has 0 dk->dk edges.
+
+id: deadkey-chained-two-tier
+strategyId: S-06
+patternRef: packages/contracts/data/patterns/latin_deadkey_chained_two_tier.yaml
+format_status: ratified
+
+description: >
+  Detect a two-trigger chained-deadkey cluster (S-06, two-trigger chain
+  sense) in a KeyboardIR and lift it into the latin_deadkey_chained_two_tier
+  Pattern. A cluster is a family deadkey F armed by a deadkey-free rule,
+  one or more pure edges dk(F) + key > dk(T) (sole deadkey output, T != F),
+  and for each T a tier-2 resolution dk(T) + any(S) > index(OUT, 2), with
+  no onward edge from any T. Implemented by the hand-written s06Recognizer
+  (see header); this YAML is its record.
+
+predicate:
+  cluster_type: two-trigger-chained-deadkey
+  shared_key: deadkey
+
+  rules:
+    - role: trigger
+      description: >
+        Arming: no deadkey in the (cleaned) context; sole output dk(F).
+      context_pattern: []
+      output_pattern:
+        - kind: deadkey
+          count: exactly_one
+    - role: trigger
+      description: >
+        Pure edge: cleaned context dk(F) followed by exactly one key
+        element (vkey or char); sole output dk(T), T != F.
+      context_pattern:
+        - kind: deadkey
+          count: exactly_one
+        - kind: char
+          count: exactly_one
+      output_pattern:
+        - kind: deadkey
+          count: exactly_one
+    - role: fan-out
+      description: >
+        Tier-2 resolution: cleaned context [dk(T), any(S)]; single index
+        output with offset equal to the cleaned context length (2).
+      context_pattern:
+        - kind: deadkey
+          count: exactly_one
+        - kind: any
+          count: exactly_one
+      output_pattern:
+        - kind: index
+          count: exactly_one
+          constraints:
+            offset_equals_any_position: true
+
+  disqualifiers:
+    - "Any edge whose output contains a character (flush edge — pending-letter sense, issue #2213)"
+    - "T == F (self-loop; the sil_euro_latin exclusion)"
+    - "An onward edge from T (unbounded chain — the delay-line separator)"
+    - "IRRule.ownedByPattern already set, or the rule is behaviour-owned (FR-021)"
+    - "thamizha_bamini: resolutions glued raw by the tokenizer (issue #2247) and [index, char] outputs — non-claim on both grounds"
+
+  combinedWith_if: []
+
+lifts_to:
+  origin: recognized
+  patternId: latin_deadkey_chained_two_tier
+  slot_mapping:
+    firstTriggerKey:
+      source: rules[arming].context_key
+    tier1FamilyName:
+      source: rules[arming].output_deadkey
+    tier2AccentName:
+      source: rules[edge].output_deadkeys
+    baseLetters:
+      source: stores[tier2_base].items
+      transform: store_items_to_char_string
+    chainedOutputs:
+      source: stores[tier2_out].items
+      transform: store_items_to_char_string
+
+corpus_evidence:
+  keyboards:
+    - id: sil_cameroon_azerty
+      path: release/sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kmn
+      notes: >
+        Sole admitted keyboard (census on issue #2235): 5 sub-clusters over
+        F = dk(0x21) — T in {dk(0x60), dk(0xB4), dk(0x5E), dk(0x7E),
+        dk(0xA8)}; arming :264-265, pure edges :366-371, tier-2
+        resolutions :376-400 incl. tier-1 direct at :400, double-press
+        :372; no notany fallbacks (miss handling folded into the stores
+        as trailing beep slots); boundedness verified for every T.

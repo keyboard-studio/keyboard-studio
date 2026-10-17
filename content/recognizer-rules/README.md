@@ -112,12 +112,19 @@ visible in a directory listing.
 6. `s09-retroactive-reph.yaml` — S-09 retroactive reph (canonical exemplar
    `sil_devanagari_phonetic`). **Landed** (issue #2223), with the deviation
    stated in its corpus_evidence.
+7. `s06-deadkey-chained-two-tier.yaml` — S-06 chained deadkeys
+   (two-trigger chain sense only). **Landed** (issue #2235) as a
+   hand-written recognizer (`rules/s06-deadkey-chained-two-tier.ts`,
+   registered first in `DEFAULT_RULES`); the YAML here is its record —
+   the compiler skips S-06 (not in `SUPPORTED_STRATEGIES`) because the
+   finder is hand-written. Census admission: `sil_cameroon_azerty` only
+   (n = 1, recorded on issue #2235).
 
-S-06 has no priority-order entry and no grouping lift. **Determined —
-not permanent (issue #2213)**: the grouping question is closed for S-06
-(family selection, rule 6) and S-06 (pending-letter, rule 8); S-06
-(two-trigger chain, library pattern) is a separate lift whose status
-lives in its gated follow-on, issue #2235 — not here.
+**Determined — not permanent (issue #2213)**: the grouping question is
+closed for S-06 (family selection, rule 6) and S-06 (pending-letter,
+rule 8) — neither sense has a grouping lift. S-06 (two-trigger chain,
+library pattern) is the separate lift at item 7 above, landed via its
+gated follow-on, issue #2235.
 
 ## Permanently out of scope
 
@@ -125,7 +132,7 @@ lives in its gated follow-on, issue #2235 — not here.
 
 **S-13 Touch layer switch — not a recognizer strategy.** S-13 is detected structurally from the typed touch-layout IR (more than one named layer; spec 007 §7.2), not by matching KMN rule clusters, so no rule belongs in this directory.
 
-**Scope note.** This section records permanent exclusions only. S-05 and S-06 are not listed here: both were closed by determination (#2224, #2213) without a permanence ruling — S-05 stays unrecognized subject to its ruling's different-evidence-class bar, and the S-06 chain lift remains open as gated follow-on #2235.
+**Scope note.** This section records permanent exclusions only. S-05 and S-06 are not listed here: both were closed by determination (#2224, #2213) without a permanence ruling — S-05 stays unrecognized subject to its ruling's different-evidence-class bar, and the S-06 chain lift has landed as gated follow-on #2235 (two-trigger chain sense only).
 
 ## Adding a new rule
 
