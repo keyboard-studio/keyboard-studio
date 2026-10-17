@@ -34,10 +34,15 @@ export type TrackProposalBasis =
 
 export interface TrackProposal {
   track: "copy" | "adapt";
-  /** Why the studio suggests this track; shown as the one-line reason under the radio group. */
-  reason: string;
   /** Which arm of the rule produced the suggestion. */
   basis: TrackProposalBasis;
+  /**
+   * The values the suggestion's reason interpolates. The reason itself is
+   * catalogue copy (track.proposal.reason.<basis> in the locale messages),
+   * resolved by the caption consumer through i18n — never composed here,
+   * so the caption renders in the author's UI locale.
+   */
+  params: Readonly<Record<string, string | number>>;
 }
 
 /**
@@ -61,7 +66,8 @@ function languageAndScript(tag: string): { language: string; script: string | un
 
 /**
  * Propose an authoring track from the target tag and the base's declared
- * languages. Never blank: every input shape yields a proposal with a reason.
+ * languages. Never blank: every input shape yields a proposal with a basis
+ * and the params its catalogue reason interpolates.
  *
  * @param targetBcp47  The author's target tag (surveyContext.bcp47_tag), or
  *                     undefined/empty before identity has produced one.
@@ -75,48 +81,27 @@ export function proposeTrack(
 ): TrackProposal {
   const target = (targetBcp47 ?? "").trim();
   if (target === "") {
-    return {
-      track: "copy",
-      basis: "no-target",
-      reason:
-        "Suggested because no target language is recorded yet, so starting a new keyboard is the safe choice.",
-    };
+    return { track: "copy", basis: "no-target", params: {} };
   }
   const languages = (baseLanguages ?? []).map((t) => t.trim()).filter((t) => t !== "");
   if (languages.length === 0) {
-    return {
-      track: "copy",
-      basis: "no-base-languages",
-      reason: `Suggested because this base does not declare which languages it serves, so it cannot be shown to be a ${target} keyboard.`,
-    };
+    return { track: "copy", basis: "no-base-languages", params: { target } };
   }
   if (languages.length > 1) {
     return {
       track: "copy",
       basis: "multiple-languages",
-      reason: `Suggested because this base serves ${languages.length} languages, not just ${target}.`,
+      params: { count: languages.length, target },
     };
   }
   const base = languages[0]!;
   const t = languageAndScript(target);
   const b = languageAndScript(base);
   if (t.language !== b.language) {
-    return {
-      track: "copy",
-      basis: "different-language",
-      reason: `Suggested because this base is for ${base}, not your target language ${target}.`,
-    };
+    return { track: "copy", basis: "different-language", params: { base, target } };
   }
   if (t.script !== b.script) {
-    return {
-      track: "copy",
-      basis: "different-script",
-      reason: `Suggested because this base writes ${base} in a different script from your target ${target}.`,
-    };
+    return { track: "copy", basis: "different-script", params: { base, target } };
   }
-  return {
-    track: "adapt",
-    basis: "same-language",
-    reason: `Suggested because this base is a ${target} keyboard — the same single language and script as your target.`,
-  };
+  return { track: "adapt", basis: "same-language", params: { target } };
 }

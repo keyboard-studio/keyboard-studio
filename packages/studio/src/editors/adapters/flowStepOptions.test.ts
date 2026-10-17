@@ -20,6 +20,8 @@
 // PhaseProjectName.integration.test.tsx.
 
 import { describe, it, expect } from "vitest";
+import { i18n } from "../../test/renderWithI18n.tsx";
+import { messages as frMessages } from "../../locales/fr/messages.json?lingui";
 import {
   trackOptions,
   phaseFOptions,
@@ -179,9 +181,28 @@ describe("trackOptions.seeds — first-arrival track proposal", () => {
       localStart: { displayName: "Ewondo", languages: ["ewo"] },
     });
     expect(trackOptions.seeds!.getSeedSource?.("track_choice", deps)).toBe("analysis");
-    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toMatch(
-      /^Suggested because /,
+    // The caption is the en catalogue string for the proposal's basis arm,
+    // resolved through i18n with the arm's params interpolated.
+    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBe(
+      "Suggested because this base is a ewo keyboard — the same single language and script as your target.",
     );
+  });
+
+  it("resolves the caption from the French catalogue when fr is the active locale", () => {
+    const { deps } = buildDeps({
+      selectedTrack: null,
+      surveyContext: { bcp47_tag: "ewo" },
+      localStart: { displayName: "French", languages: ["fr"] },
+    });
+    i18n.load("fr", frMessages);
+    i18n.activate("fr");
+    try {
+      expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBe(
+        "Suggéré parce que ce clavier de base est destiné à fr, et non à votre langue cible ewo.",
+      );
+    } finally {
+      i18n.activate("en");
+    }
   });
 });
 
