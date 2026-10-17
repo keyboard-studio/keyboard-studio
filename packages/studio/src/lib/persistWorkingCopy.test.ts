@@ -946,6 +946,42 @@ describe("persistWorkingCopy", () => {
     });
   });
 
+  describe("extraction-only base help text persistence (issue #2206)", () => {
+    const HELP_TEXT =
+      "<h2>Troubleshooting</h2><p>If a vowel does not combine with a consonant, make sure you have typed the consonant first.</p>";
+
+    function instantiate() {
+      useWorkingCopyStore.getState().instantiateFromStart(
+        { id: "basic_kbdinben", displayName: "Bengali Inscript", languages: [] } as import("@keyboard-studio/contracts").StartKeyboard,
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
+      );
+      useWorkingCopyStore.getState().setBaseHelpPhpTextForExtraction(HELP_TEXT);
+    }
+
+    it("round-trips the slice through sessionStorage snapshot/rehydrate, while the prose slice stays null", () => {
+      instantiate();
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().baseHelpPhpTextForExtraction).toBeNull();
+
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const s = useWorkingCopyStore.getState();
+      expect(s.baseHelpPhpTextForExtraction).toBe(HELP_TEXT);
+      // The retention is extraction-only on restore exactly as live:
+      // the prose slice a render path would read is still null.
+      expect(s.startHelpPhpText).toBeNull();
+    });
+
+    it("tolerates a pre-#2206 snapshot with no extraction field, restoring null", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.baseHelpPhpTextForExtraction;
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.baseHelpPhpTextForExtraction).toBeNull();
+    });
+  });
+
   // spec 080 US3 (T025): the two documentation decisions — HISTORY proposal
   // state and the layout-chart preference — round-trip and tolerate absence.
   describe("documentation decisions persistence (spec 080 US3)", () => {

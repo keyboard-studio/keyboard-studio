@@ -365,6 +365,11 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     helpDocs: s.helpDocs,
     startWelcomeHtmText: s.startWelcomeHtmText,
     startHelpPhpText: s.startHelpPhpText,
+    // Issue #2206: the extraction-only base help text round-trips with
+    // the draft — a resumed copy session must be offered the same
+    // troubleshooting suggestions the original session was. It stays
+    // extraction-only on restore exactly as in the live store.
+    baseHelpPhpTextForExtraction: s.baseHelpPhpTextForExtraction,
     // spec 080 US2: plain strings / a string literal, straight passthrough; the
     // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
     startReadmeMdText: s.startReadmeMdText,
@@ -528,6 +533,9 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     helpDocs: snapshot.helpDocs ?? null,
     startWelcomeHtmText: snapshot.startWelcomeHtmText ?? null,
     startHelpPhpText: snapshot.startHelpPhpText ?? null,
+    // Tolerate snapshots saved before issue #2206 landed: absent
+    // restores as null (no extraction source — facet proposals only).
+    baseHelpPhpTextForExtraction: snapshot.baseHelpPhpTextForExtraction ?? null,
     // Tolerate pre-080 snapshots the same way: absent restores as null.
     startReadmeMdText: snapshot.startReadmeMdText ?? null,
     startHistoryMdText: snapshot.startHistoryMdText ?? null,
