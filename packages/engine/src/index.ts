@@ -14,6 +14,8 @@ export {
 export {
   runImportFidelityParseChecks,
   runImportFidelityEmitChecks,
+  runImportFidelityEmitChecksSync,
+  runImportFidelityRoundTripCheck,
   ROUND_TRIP_DIVERGENCE_CODE,
 } from "./validator/index-import-fidelity.js";
 export type {
