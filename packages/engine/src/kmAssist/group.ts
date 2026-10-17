@@ -112,6 +112,10 @@ function guardToken(el: ContextElement): string {
       return `notany:${el.storeRef}`;
     case "deadkey":
       return `deadkey:${hexId(el.id)}`;
+    case "namedDeadkey":
+      // Internal grouping key only; names are non-hex by the boundary, so
+      // this can never collide with a numeric deadkey: token (#2238).
+      return `namedDeadkey:${el.name}`;
     case "char":
       return `char:${el.value}`;
     case "context":
@@ -138,6 +142,8 @@ function displayGuard(el: ContextElement): string {
       return `notany(${el.storeRef})`;
     case "deadkey":
       return `dk(${hexId(el.id)})`;
+    case "namedDeadkey":
+      return `dk(${el.name})`;
     case "char":
       return JSON.stringify(el.value);
     case "context":
@@ -166,6 +172,8 @@ function describeGuards(guards: ContextElement[]): string {
           return `any character not in the “${el.storeRef}” store`;
         case "deadkey":
           return `deadkey ${hexId(el.id)}`;
+        case "namedDeadkey":
+          return `deadkey ${el.name}`;
         case "char":
           return JSON.stringify(el.value);
         case "context":
@@ -191,6 +199,10 @@ function outputToken(el: OutputElement): string {
     case "char":
       return "char";
     case "deadkey":
+      return "deadkey";
+    case "namedDeadkey":
+      // Same output SHAPE token as the numeric form — families group by
+      // shape; the name itself surfaces via displayGuard/describeGuards.
       return "deadkey";
     case "beep":
       return "beep";

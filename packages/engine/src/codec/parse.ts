@@ -26,6 +26,8 @@ import type {
   StoreItem,
 } from "@keyboard-studio/contracts";
 
+import { isNamedDeadkeyName } from "@keyboard-studio/contracts";
+
 import { tokenize } from "./tokenize.js";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { OPAQUE_REASONS, type OpaqueReason } from "./opaque-reasons.js";
@@ -133,12 +135,19 @@ function splitTokens(text: string): string[] {
   return result.filter(t => t.length > 0);
 }
 
-/** Return true if tok matches dk(...) with a named (non-hex) identifier. */
-function isNamedDk(tok: string): boolean {
+/**
+ * Parse a dk(name) token with a named (non-hex) identifier → the name
+ * VERBATIM (the spelling of this occurrence is the element's stored form;
+ * identity folding happens only through contracts' deadkeyNameKey), or
+ * null. The named/hex boundary is contracts' isNamedDeadkeyName — one
+ * definition: all-hex tokens are numeric deadkeys and never reach here
+ * as names (#2238; the boundary does not move).
+ */
+function parseNamedDk(tok: string): string | null {
   const m = /^dk\s*\(\s*([^)]+)\s*\)$/i.exec(tok);
-  if (!m) return false;
+  if (!m) return null;
   const inner = (m[1] ?? "").trim();
-  return !/^[0-9A-Fa-f]+$/.test(inner);
+  return isNamedDeadkeyName(inner) ? inner : null;
 }
 
 /** Parse a dk(NNNN) token where NNNN is hex → deadkey id number, or null. */
@@ -438,11 +447,16 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
       i++;
       continue;
     }
-    // dk(name) — named (non-hex) deadkey identifier: opaque. Mirrors the
-    // context (parseContextElements) and output (parseOutputElements) parsers,
-    // which both classify a named deadkey as OPAQUE_REASONS.NAMED_DEADKEY.
+    // dk(name) — named (non-hex) deadkey identifier: a typed name-carrying
+    // element since #2238 (was opaque NAMED_DEADKEY pre-#2238). Mirrors the
+    // context (parseContextElements) and output (parseOutputElements) parsers.
     // Checked before parseDk so a non-hex dk(...) is not silently dropped to raw.
-    if (isNamedDk(tok)) return { items, opaqueReason: OPAQUE_REASONS.NAMED_DEADKEY };
+    const namedStoreDk = parseNamedDk(tok);
+    if (namedStoreDk !== null) {
+      items.push({ kind: "namedDeadkey", name: namedStoreDk });
+      i++;
+      continue;
+    }
     // dk(NNNN)
     const dkId = parseDk(tok);
     if (dkId !== null) {
@@ -498,7 +512,8 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
 /**
  * Lenient sketch of a store body for an opaque store fragment: flattens
  * `outs(name)` from previously seen stores, keeps SMP literals as char items and
- * named deadkeys as deadkey items (ids allocated per parse via `namedDk`).
+ * named deadkeys as typed name-carrying items (verbatim name — #2238 deleted
+ * the per-parse synthetic-id interning; no synthetic ids exist anywhere now).
  * Unresolvable tokens are skipped. Returns undefined when nothing resolves.
  */
 /** Largest sketch (in items) kept for one opaque store; past it the sketch is dropped, never truncated. */
@@ -506,8 +521,7 @@ const MAX_SKETCH_ITEMS = 0x20000;
 
 function sketchStoreItems(
   rawValue: string,
-  known: Map<string, StoreItem[]>,
-  namedDk: Map<string, number>
+  known: Map<string, StoreItem[]>
 ): StoreItem[] | undefined {
   const out: StoreItem[] = [];
   const toks = splitTokens(rawValue);
@@ -538,11 +552,9 @@ function sketchStoreItems(
       if (out.length > MAX_SKETCH_ITEMS) return undefined;
       continue;
     }
-    if (isNamedDk(tok)) {
-      const name = (/^dk\s*\(\s*([^)]+?)\s*\)$/i.exec(tok)?.[1] ?? "").toLowerCase();
-      let id = namedDk.get(name);
-      if (id === undefined) { id = NAMED_DK_ID_BASE + namedDk.size; namedDk.set(name, id); }
-      out.push({ kind: "deadkey", id });
+    const namedSketchDk = parseNamedDk(tok);
+    if (namedSketchDk !== null) {
+      out.push({ kind: "namedDeadkey", name: namedSketchDk });
       continue;
     }
     const dkId = parseDk(tok);
@@ -564,9 +576,6 @@ function sketchStoreItems(
   }
   return out.length > 0 ? out : undefined;
 }
-
-/** Id base for named-deadkey sketch items; above any hex id a .kmn author writes. */
-const NAMED_DK_ID_BASE = 0x7f000000;
 
 // ---------------------------------------------------------------------------
 // Context / output element parsers
@@ -610,10 +619,12 @@ function parseContextElements(
       elements.push({ kind: "vkey", name: vk.name, modifiers: vk.modifiers });
       continue;
     }
-    // dk(name) — named (non-hex) deadkey identifier: opaque
-    if (isNamedDk(tok)) {
-      opaqueOut.reason = OPAQUE_REASONS.NAMED_DEADKEY;
-      return null;
+    // dk(name) — named (non-hex) deadkey identifier: typed name-carrying
+    // element since #2238 (was opaque NAMED_DEADKEY pre-#2238).
+    const namedCtxDk = parseNamedDk(tok);
+    if (namedCtxDk !== null) {
+      elements.push({ kind: "namedDeadkey", name: namedCtxDk });
+      continue;
     }
     // dk(NNNN)
     const dkId = parseDk(tok);
@@ -747,13 +758,12 @@ function parseOutputElementsCore(
       }
       continue;
     }
-    // dk(name) — named (non-hex) deadkey identifier: opaque
-    if (isNamedDk(tok)) {
-      if (mode === "strict") {
-        opaqueOut.reason = OPAQUE_REASONS.NAMED_DEADKEY;
-        return null;
-      }
-      elements.push({ kind: "raw", text: tok });
+    // dk(name) — named (non-hex) deadkey identifier: typed name-carrying
+    // element since #2238 in BOTH modes (was opaque in strict mode and a
+    // raw placeholder in the lenient produced-output sketch pre-#2238).
+    const namedOutDk = parseNamedDk(tok);
+    if (namedOutDk !== null) {
+      elements.push({ kind: "namedDeadkey", name: namedOutDk });
       continue;
     }
     // dk(NNNN)
@@ -1022,7 +1032,6 @@ export function parse(text: string, keyboardId: string): ParseResult {
   const rawFragments: RawKmnFragment[] = [];
   // Store bodies seen so far (lowercased name), for flattening outs() in sketches.
   const knownStoreItems = new Map<string, StoreItem[]>();
-  const namedDkIds = new Map<string, number>();
 
   // Opaque feature count map.
   const opaqueCount = new Map<string, number>();
@@ -1138,7 +1147,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
             reason: opaqueReason,
             sourceLine: tok.line,
           };
-          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems, namedDkIds);
+          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems);
           if (sketch !== undefined) {
             frag.storeSketch = sketch;
             knownStoreItems.set(parsed.name.toLowerCase(), sketch);

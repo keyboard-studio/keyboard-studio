@@ -39,6 +39,17 @@ export type StoreItem =
   | { kind: "char"; value: string }
   | { kind: "vkey"; name: string }
   | { kind: "deadkey"; id: number }
+  /**
+   * A named deadkey reference, `dk(name)` with a non-hex identifier (#2238,
+   * implementing the #2232 ruling). The name IS the deadkey's identity in
+   * Keyman (auto-registered on first use; the compiler folds it to an
+   * internal number) and is stored verbatim — the spelling of this
+   * occurrence. Identity comparisons fold ASCII case only, via
+   * `deadkeyNameKey` in `ir/deadkeys.ts`; emit reproduces `dk(name)`
+   * exactly as stored. All-hex tokens (`dk(dead)`, `dk(cafe)`) stay on the
+   * numeric `deadkey` variant — the hex boundary does not move.
+   */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "any" }
   | { kind: "raw"; text: string };
 
@@ -47,6 +58,8 @@ export type ContextElement =
   | { kind: "char"; value: string }
   | { kind: "vkey"; name: string; modifiers: string[] }
   | { kind: "deadkey"; id: number }
+  /** Named deadkey reference `dk(name)` — see the StoreItem variant. */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "any"; storeRef: string }
   | { kind: "notany"; storeRef: string }
   | { kind: "context"; offset: number }
@@ -74,6 +87,8 @@ export type ContextElement =
 export type OutputElement =
   | { kind: "char"; value: string }
   | { kind: "deadkey"; id: number }
+  /** Named deadkey reference `dk(name)` — see the StoreItem variant. */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "beep" }
   /**
    * The `nul` keyword — the rule produces nothing (suppression). Typed per

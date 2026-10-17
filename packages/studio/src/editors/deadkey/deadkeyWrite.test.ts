@@ -8,7 +8,11 @@ import {
   validateDeadkeyLifecycle,
 } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
-import { withRepairedDuplicateTriggerIds } from "./deadkeyWrite.ts";
+import {
+  deleteNamedDeadkey,
+  retargetNamedDeadkey,
+  withRepairedDuplicateTriggerIds,
+} from "./deadkeyWrite.ts";
 
 const BASE_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'deadkey-repair-test'
@@ -93,5 +97,165 @@ describe("withRepairedDuplicateTriggerIds", () => {
         (r.output[0] as { id?: number }).id === 0x3000,
     );
     expect(bystander).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Named deadkeys (#2238, ruling D10): delete/retarget were built on the
+// fragment representation in spec 083 and are re-pointed at the typed
+// representation — persisted overlays replay these ops at download, so
+// they must keep working the day fragments stop being produced.
+// ---------------------------------------------------------------------------
+
+const NAMED_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'named-test'
+store(&TARGETS) 'any'
+store(acuteIn) 'ae'
+store(acuteOut) 'áé'
+begin Unicode > use(main)
+
+group(main) using keys
++ [K_X] > dk(acute)
+dk(acute) + any(acuteIn) > index(acuteOut, 2)
+dk(acute) + [K_A] > U+00E1
++ [K_B] > 'b'
+`;
+
+function mentionsAcute(ir: KeyboardIR): number {
+  let n = 0;
+  for (const g of ir.groups)
+    for (const r of g.rules)
+      if (
+        r.context.some((c) => c.kind === "namedDeadkey" && c.name === "acute") ||
+        r.output.some((c) => c.kind === "namedDeadkey" && c.name === "acute")
+      )
+        n++;
+  return n;
+}
+
+describe("deleteNamedDeadkey — typed era (#2238)", () => {
+  it("the fixture parses typed: three rules mention dk(acute), no fragments", () => {
+    const ir = parseIr(NAMED_KMN);
+    expect(mentionsAcute(ir)).toBe(3);
+    expect(ir.raw).toHaveLength(0);
+  });
+
+  it("removes the trigger, fan-out, and chain rules; stores and unrelated rules survive", () => {
+    const result = deleteNamedDeadkey(parseIr(NAMED_KMN), "acute");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(mentionsAcute(result.ir)).toBe(0);
+    expect(result.ir.stores.map((s) => s.name)).toContain("acuteIn");
+    expect(result.ir.stores.map((s) => s.name)).toContain("acuteOut");
+    const remaining = result.ir.groups[0]!.rules;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.context[0]).toMatchObject({ kind: "vkey", name: "K_B" });
+    expect(listDeadkeys(result.ir).map((d) => d.name)).not.toContain("acute");
+  });
+
+  it("matches the name case-insensitively (identity folds, like the compiler)", () => {
+    const result = deleteNamedDeadkey(parseIr(NAMED_KMN), "ACUTE");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(mentionsAcute(result.ir)).toBe(0);
+  });
+
+  it("also removes legacy named-deadkey fragments for the same name (union)", () => {
+    const ir = parseIr(NAMED_KMN);
+    const withFrag: KeyboardIR = {
+      ...ir,
+      raw: [
+        {
+          nodeId: "raw#legacy",
+          origin: "imported",
+          sourceText: "dk(acute) + [K_E] > U+00E9",
+          reason: "named-deadkey",
+        },
+      ],
+    };
+    const result = deleteNamedDeadkey(withFrag, "acute");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ir.raw).toHaveLength(0);
+    expect(mentionsAcute(result.ir)).toBe(0);
+  });
+
+  it("refuses when a typed store holds the name as an item (slot alignment is the author's call)", () => {
+    const kmn = NAMED_KMN.replace(
+      "begin Unicode",
+      "store(errmark) dk(acute)\nbegin Unicode",
+    );
+    const result = deleteNamedDeadkey(parseIr(kmn), "acute");
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.referrers.join(" ")).toContain("errmark");
+  });
+
+  it("refuses when a fragment held for another reason mentions the name textually", () => {
+    const ir = parseIr(NAMED_KMN);
+    const withFrag: KeyboardIR = {
+      ...ir,
+      raw: [
+        {
+          nodeId: "raw#call",
+          origin: "imported",
+          sourceText: "call(combine) dk(acute)",
+          reason: "call-return",
+        },
+      ],
+    };
+    const result = deleteNamedDeadkey(withFrag, "acute");
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("retargetNamedDeadkey — typed era (#2238)", () => {
+  it("rewrites the typed trigger's context element in place (vkey)", () => {
+    const result = retargetNamedDeadkey(parseIr(NAMED_KMN), "acute", { vkey: "K_Y" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const listed = listDeadkeys(result.ir).find((d) => d.name === "acute");
+    expect(listed?.triggerKey).toBe("K_Y");
+    // The rest of the entity is untouched.
+    expect(mentionsAcute(result.ir)).toBe(3);
+  });
+
+  it("rewrites the typed trigger to a char trigger", () => {
+    const result = retargetNamedDeadkey(parseIr(NAMED_KMN), "acute", { char: "`" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const listed = listDeadkeys(result.ir).find((d) => d.name === "acute");
+    expect(listed?.triggerKey).toBe("`");
+  });
+
+  it("refuses when the name has two typed triggers (ambiguous)", () => {
+    const kmn = NAMED_KMN.replace("+ [K_B] > 'b'", "+ [K_B] > 'b'\n+ [K_Y] > dk(acute)");
+    const result = retargetNamedDeadkey(parseIr(kmn), "acute", { vkey: "K_Z" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("still retargets a fragment-carried trigger (persisted pre-#2238 copies)", () => {
+    const ir = parseIr(NAMED_KMN);
+    const trigger = ir.groups[0]!.rules.find((r) =>
+      r.output.some((c) => c.kind === "namedDeadkey"),
+    )!;
+    const fragEra: KeyboardIR = {
+      ...ir,
+      groups: ir.groups.map((g) => ({
+        ...g,
+        rules: g.rules.filter((r) => r.nodeId !== trigger.nodeId),
+      })),
+      raw: [
+        {
+          nodeId: "raw#trigger",
+          origin: "imported",
+          sourceText: "+ [K_X] > dk(acute)",
+          reason: "named-deadkey",
+        },
+      ],
+    };
+    const result = retargetNamedDeadkey(fragEra, "acute", { vkey: "K_Y" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ir.raw[0]?.sourceText).toBe("+ [K_Y] > dk(acute)");
   });
 });

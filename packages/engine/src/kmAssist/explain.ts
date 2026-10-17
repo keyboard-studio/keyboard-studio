@@ -97,6 +97,8 @@ function describeContextElement(el: ContextElement): string {
       return describeKey(el.name, el.modifiers);
     case "deadkey":
       return `deadkey ${el.id.toString(16).padStart(4, "0")}`;
+    case "namedDeadkey":
+      return `deadkey ${el.name}`;
     case "any":
       return `a character from the "${el.storeRef}" store`;
     case "notany":
@@ -121,6 +123,8 @@ function describeOutputElement(el: OutputElement): string {
       return JSON.stringify(el.value);
     case "deadkey":
       return `deadkey ${el.id.toString(16).padStart(4, "0")}`;
+    case "namedDeadkey":
+      return `deadkey ${el.name}`;
     case "beep":
       return "a beep";
     case "nul":
@@ -208,6 +212,10 @@ function describePlainOutput(rule: IRRule): string {
   const deadkey = out.find((el) => el.kind === "deadkey");
   if (deadkey !== undefined && deadkey.kind === "deadkey") {
     return `${keyDesc} sets deadkey ${deadkey.id.toString(16).padStart(4, "0")} instead of typing a character.`;
+  }
+  const namedDeadkey = out.find((el) => el.kind === "namedDeadkey");
+  if (namedDeadkey !== undefined && namedDeadkey.kind === "namedDeadkey") {
+    return `${keyDesc} sets deadkey ${namedDeadkey.name} instead of typing a character.`;
   }
   if (chars.length > 0) {
     const rest = out.filter((el) => el.kind !== "char").map(describeOutputElement);

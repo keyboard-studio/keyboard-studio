@@ -65,6 +65,7 @@ function extractVkey(
         return null;
       case "char":
       case "deadkey":
+      case "namedDeadkey":
       case "baselayout":
       case "raw":
         // These can appear as pre-context chars (lookahead) — allow them but do

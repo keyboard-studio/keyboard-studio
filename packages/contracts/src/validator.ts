@@ -205,10 +205,10 @@ export function validateDeadkeyLifecycle(ir: KeyboardIR): LintFinding[] {
   }
 
   // (c) Orphaned fan-out stores: dk_<hex>_{bases,output} with no rule
-  // referencing dk(<hex>) in any position. Stores claimed by opaque
-  // named-deadkey rules count as live: their referrers never reach the
-  // typed rule list, so the numeric-only scan cannot see them (a store
-  // shaped dk_<allhex>_* is ambiguous by name alone).
+  // referencing dk(<hex>) in any position. Stores claimed by named-deadkey
+  // rules count as live: the numeric-only scan cannot see a name-keyed
+  // referrer (typed since #2238; a fragment in persisted pre-#2238
+  // copies), and a store shaped dk_<allhex>_* is ambiguous by name alone.
   const referencedByRules = new Set<number>();
   for (const ref of refs) {
     if (ref.position !== "store-item") referencedByRules.add(ref.id);
