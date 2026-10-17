@@ -8,8 +8,10 @@
 // here: spec 080 FR-007 / spec 102 FR-032 bar base help prose from a copy's
 // documentation, and on the adapt track the base's troubleshooting
 // section already ships inside the inherited prose, so extracting it
-// would duplicate the section. AC1 (base-help extraction) is a follow-on
-// issue gated on a recorded FR-007 carve-out decision.
+// would duplicate the section. AC1 (base-help extraction) landed
+// separately in lib/baseHelpTroubleshooting.ts (issue #2206) under
+// Matthew's 2026-10-17 FR-007 carve-out ruling; the wiring joins its
+// lines after these facet lines in the same proposal.
 //
 // The lines are offered through the spec-092 seed pipeline: the wiring
 // (decisions/liveExtraction.ts) computes this value into

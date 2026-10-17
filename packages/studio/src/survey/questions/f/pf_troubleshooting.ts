@@ -67,10 +67,15 @@ const mod: QuestionModule = {
   // question modules import nothing from lib/ (mutate-seam rule), the
   // welcome-prefill pattern. The seed is a proposal the author keeps,
   // edits, or deletes per line; helpDocsFromDecisions will not compose
-  // a troubleshooting value the author never confirmed. Base-help
-  // extraction (the issue's AC1) is NOT this extract: spec 080 FR-007
-  // bars base help prose on a copy, and it already ships inherited on
-  // an adapt — see the follow-on issue.
+  // a troubleshooting value the author never confirmed.
+  //
+  // Issue #2206 (AC1, Matthew's 2026-10-17 FR-007 carve-out ruling):
+  // the same context value also carries symptom/fix lines extracted
+  // from the base help's Troubleshooting section
+  // (lib/baseHelpTroubleshooting.ts) — Track 1 (copy) only, from the
+  // extraction-only slice, filtered of boilerplate and base identity.
+  // On an adapt the base's section already ships inherited, so no
+  // extracted lines are offered there.
   extract: (ctx) => ctx.phaseF?.troubleshootingProposal,
 };
 export default mod;

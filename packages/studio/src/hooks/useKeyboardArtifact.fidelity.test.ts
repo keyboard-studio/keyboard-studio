@@ -142,7 +142,11 @@ describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
     const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
 
     const { result } = renderHook(() =>
-      useKeyboardArtifact(baseKb, null, null, onInstantiate),
+      // The designated import instance (StudioShell's posture): the only
+      // instance that captures an I2 input and runs the round-trip check.
+      useKeyboardArtifact(baseKb, null, null, onInstantiate, {
+        runRoundTripCheck: true,
+      }),
     );
 
     await act(async () => {

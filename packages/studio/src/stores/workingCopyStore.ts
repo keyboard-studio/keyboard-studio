@@ -497,6 +497,22 @@ export interface WorkingCopyState {
    */
   startHelpPhpText: string | null;
 
+  /**
+   * The base keyboard's own help text retained for EXTRACTION ONLY
+   * (issue #2206, Matthew's 2026-10-17 FR-007 carve-out ruling): the
+   * extractor in lib/baseHelpTroubleshooting.ts reads it to offer
+   * symptom/fix lines from the base help's Troubleshooting section as
+   * suggestions for `pf_troubleshooting`. Populated ONLY on Track 1,
+   * from the scaffolder's dedicated extraction field, at the same
+   * moment the prose slices are nulled.
+   *
+   * No render, preview, or serialization path may read this slice —
+   * `startHelpPhpText` stays null on Track 1 and the output projection
+   * keeps behaving exactly as FR-007 requires. The text is a source for
+   * proposals, never inherited prose.
+   */
+  baseHelpPhpTextForExtraction: string | null;
+
   // -- Base documentation bundle (spec 079 US2) --------------------------------
   /**
    * The base keyboard's own `README.md`, verbatim, or null when it has none
@@ -1293,6 +1309,7 @@ export interface WorkingCopyState {
 
   /** Retain the base's verbatim help/<id>.php so the output merge can read it. */
   setStartHelpPhpText: (text: string | null) => void;
+  setBaseHelpPhpTextForExtraction: (text: string | null) => void;
 
   /** Retain the base's verbatim README.md (spec 079 FR-006). */
   setStartReadmeMdText: (text: string | null) => void;
@@ -1617,6 +1634,7 @@ export type WorkingCopyData = Omit<
   | "setHelpDocs"
   | "setStartWelcomeHtmText"
   | "setStartHelpPhpText"
+  | "setBaseHelpPhpTextForExtraction"
   | "setStartReadmeMdText"
   | "setStartHistoryMdText"
   | "setStartDocCssTexts"
@@ -1656,6 +1674,7 @@ const INITIAL_STATE: WorkingCopyData = {
   helpDocs: null,
   startWelcomeHtmText: null,
   startHelpPhpText: null,
+  baseHelpPhpTextForExtraction: null,
   startReadmeMdText: null,
   startHistoryMdText: null,
   startDocCssTexts: null,
@@ -2498,6 +2517,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setStartWelcomeHtmText: (text) => set({ startWelcomeHtmText: text }),
 
   setStartHelpPhpText: (text) => set({ startHelpPhpText: text }),
+  setBaseHelpPhpTextForExtraction: (text) =>
+    set({ baseHelpPhpTextForExtraction: text }),
 
   setStartReadmeMdText: (text) => set({ startReadmeMdText: text }),
 

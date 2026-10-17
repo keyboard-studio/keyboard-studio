@@ -51,14 +51,23 @@ const corpus = listCorpusKmn();
 const byId = new Map(corpus.map((c) => [c.id, c.file]));
 
 /** Family counts from each matcher in isolation, plus the pipeline count. */
-function counts(file: string, id: string): { hand: number; gen: number; combined: number } {
+function counts(file: string, id: string): { hand: number; gen: number; combined: number; s06: number } {
   const { ir } = parse(readFileSync(file, "utf-8"), id);
   const hand = s02Recognizer.match(structuredClone(ir)).length;
   const gen = generatedRule.match(structuredClone(ir)).length;
   const { ir: out } = recognizePatterns(structuredClone(ir));
   const combined = out.recognizedPatterns.filter((p) => p.strategyId === "S-02").length;
-  return { hand, gen, combined };
+  const s06 = out.recognizedPatterns.filter((p) => p.strategyId === "S-06").length;
+  return { hand, gen, combined, s06 };
 }
+
+// #2235 exception: sil_cameroon_azerty is the S-06 census's one admitted
+// keyboard. Its chain's tier-2 resolutions + tier-1 direct fan-out are
+// S-02 families in isolation (hand=gen=7), but in the pipeline the S-06
+// recognizer runs first and pre-empts them (replace/merge-before-lift) —
+// combined S-02 drops to the one non-chain family (dk(003d)) and exactly
+// one S-06 Pattern appears. Every OTHER keyboard keeps full agreement.
+const S06_ADMITTED = "sil/sil_cameroon_azerty";
 
 describe.skipIf(!available)("S-02 corpus agreement (#2233)", () => {
   it(
@@ -66,20 +75,39 @@ describe.skipIf(!available)("S-02 corpus agreement (#2233)", () => {
     () => {
       const disagreements: string[] = [];
       for (const { id, file } of corpus) {
-        let c: { hand: number; gen: number; combined: number };
+        let c: { hand: number; gen: number; combined: number; s06: number };
         try {
           c = counts(file, id);
         } catch (err) {
           disagreements.push(`${id}: threw ${String(err)}`);
           continue;
         }
-        if (c.hand !== c.gen || c.combined !== c.hand) {
-          disagreements.push(`${id}: hand=${c.hand} generated=${c.gen} combined=${c.combined}`);
+        if (id === S06_ADMITTED) {
+          if (c.hand !== c.gen || c.combined !== 1 || c.s06 !== 1) {
+            disagreements.push(
+              `${id}: S-06 pre-emption expected hand=gen, combined=1, s06=1; got hand=${c.hand} generated=${c.gen} combined=${c.combined} s06=${c.s06}`,
+            );
+          }
+          continue;
+        }
+        if (c.hand !== c.gen || c.combined !== c.hand || c.s06 !== 0) {
+          disagreements.push(`${id}: hand=${c.hand} generated=${c.gen} combined=${c.combined} s06=${c.s06}`);
         }
       }
       expect(disagreements).toEqual([]);
     },
     300_000,
+  );
+
+  it.skipIf(!byId.has(S06_ADMITTED))(
+    "sil/sil_cameroon_azerty: S-02 matchers agree in isolation (7); pipeline = 1 S-02 + 1 S-06 (#2235)",
+    () => {
+      const c = counts(byId.get(S06_ADMITTED)!, S06_ADMITTED);
+      expect(c.hand).toBe(7);
+      expect(c.gen).toBe(7);
+      expect(c.combined).toBe(1);
+      expect(c.s06).toBe(1);
+    },
   );
 
   // Named acceptance counts (each skipped when the keyboard is absent from
@@ -96,7 +124,10 @@ describe.skipIf(!available)("S-02 corpus agreement (#2233)", () => {
   for (const { id, families } of named) {
     it.skipIf(!byId.has(id))(`${id}: exactly ${families} S-02 families from each matcher`, () => {
       const c = counts(byId.get(id)!, id);
-      expect(c).toEqual({ hand: families, gen: families, combined: families });
+      expect(c.hand).toBe(families);
+      expect(c.gen).toBe(families);
+      expect(c.combined).toBe(families);
+      expect(c.s06).toBe(0);
     });
   }
 

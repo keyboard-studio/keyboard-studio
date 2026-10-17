@@ -21,6 +21,13 @@
  *     only inside fragments held opaque for other reasons — preserved
  *     byte-for-byte by the fragment itself — and the rest only in the
  *     4 non-gate keyboards' comments/constructs)
+ * #2247 addendum (unspaced-+ glue fix): population 85 → 86
+ * (sil_korda_latin's only named deadkeys are its glued `dk(space)+`
+ * escapes, now typed), distinct typed names 304 → 306 (dotnasaldownstep
+ * and oddnasaldownstep reach typed elements via their glued escapes;
+ * the gap is now 3 names), fragments and every per-reason count
+ * IDENTICAL (507) — glued rules were never fragments, they were typed
+ * rules carrying a raw element.
  * Every non-named reason count is IDENTICAL pre/post except two
  * reclassifications: constructs that were swallowed whole into a
  * named-deadkey fragment (the parser's early return took the whole
@@ -34,10 +41,11 @@
  *
  * Population: keyboards whose PARSED IR carries at least one namedDeadkey
  * element (store, rule, or opaque-store sketch). A raw source-text scan
- * finds 89 files mentioning a named dk() token — the 4 extra (pukapuka,
- * winchus, sil_myanmar_my3, sil_korda_latin) keep theirs only in comments
- * or in unmodelled match/call constructs, so no named deadkey ever reaches
- * their IR; they are outside the gate by construction, not missed by it.
+ * finds 89 files mentioning a named dk() token — the 3 extra (pukapuka,
+ * winchus, sil_myanmar_my3) keep theirs only in comments or in unmodelled
+ * match/call constructs, so no named deadkey ever reaches their IR; they
+ * are outside the gate by construction, not missed by it.
+ * (sil_korda_latin was the 4th until #2247 — see the addendum above.)
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -188,10 +196,14 @@ describe.skipIf(!rootExists)("named deadkeys — full-corpus gate (#2238)", () =
 
       expect(violations).toEqual([]);
       // Pinned totals (parser census; baseline in the header comment).
-      // The source-mention count (89) is pinned too, so the 4 comment/
-      // construct-only keyboards are accounted for, never silently lost.
+      // The source-mention count (89) is pinned too, so the 3 remaining
+      // comment/construct-only keyboards are accounted for, never
+      // silently lost.
       expect(sourceMentionCount).toBe(89);
-      expect(results.length).toBe(85);
+      // Population 85 → 86 with #2247: sil_korda_latin's only named
+      // deadkeys are its two `dk(space)+` double-tap escapes, which the
+      // unspaced-+ glue previously kept out of the typed IR entirely.
+      expect(results.length).toBe(86);
       expect(residualRaw).toBe(507);
       expect(census).toEqual({
         "smp-literal": 190,
@@ -203,7 +215,11 @@ describe.skipIf(!rootExists)("named deadkeys — full-corpus gate (#2238)", () =
         "malformed-range": 4,
       });
       expect(sourceDistinctKeys.size).toBe(309);
-      expect(distinctKeys.size).toBe(304);
+      // 304 → 306 with #2247: the glued `dk(dotNasalDownstep)+` /
+      // `dk(oddNasalDownstep)+` escapes (sil_nigeria_dot /
+      // sil_nigeria_odd_vowels) now reach typed elements, closing two of
+      // the five gap names named in the header.
+      expect(distinctKeys.size).toBe(306);
 
       const byId = new Map(results.map((r) => [r.id, r]));
       // typedDkRules = rules with a namedDeadkey element in context or
@@ -218,18 +234,19 @@ describe.skipIf(!rootExists)("named deadkeys — full-corpus gate (#2238)", () =
 
       // The case-variant pair keyboards keep BOTH spellings (one deadkey,
       // two source spellings — fidelity is verbatim, identity folds). The
-      // lowercase spelling is typed (armed + fan-out rules). The capital
-      // spelling occurs only in the double-tap escape rule, written
-      // `dk(Semicolon)+ ";"` with no space before `+`: the tokenizer has
-      // never split that glue — numeric dk(0300)+ produces the identical
-      // raw shape — so the name rides in a raw context element and is
-      // asserted at the emitted-text level instead (byte-identical).
+      // capital spelling occurs only in the double-tap escape rule,
+      // written `dk(Semicolon)+ ";"` with no space before `+`. Pre-#2247
+      // the tokenizer never split that glue, so the name rode in a raw
+      // context element and was asserted at the emitted-text level only;
+      // since #2247 both spellings reach typed namedDeadkey elements and
+      // emit reproduces the capital spelling in the spaced canonical form.
       for (const id of ["embera_north", "landuma"]) {
         const names = byId.get(id)?.names ?? [];
         expect(names).toContain("semicolon");
+        expect(names).toContain("Semicolon");
         const file = files.find((f) => path.basename(f, ".kmn") === id)!;
         const emitted = emit(parse(fs.readFileSync(file, "utf8"), id).ir);
-        expect(emitted).toContain("dk(Semicolon)+");
+        expect(emitted).toContain("dk(Semicolon)");
       }
     },
   );

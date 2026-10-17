@@ -20,6 +20,12 @@ export type RemovalCapability =
    * The carve mechanism is `index()` parallel-store fan-out with `nul`-fill:
    * the character's slot in the output store is replaced with a `nul` item,
    * leaving the rest of the deadkey set intact.
+   *
+   * Also the fan-out members of an S-06 two-trigger chain Pattern (#2235,
+   * queue-2235-ruling.md §2 settlement: capability follows shape, not
+   * strategy — a chain member whose cleaned shape is a single-`index`
+   * parallel fan-out earns this verdict and its output-store alias; the
+   * chain's other members take their ordinary unowned shape verdicts).
    */
   | "removable:slot-fill"
 
@@ -34,6 +40,10 @@ export type RemovalCapability =
    * keeps them at this posture — Decision 1b — until a separate consumer
    * ruling reclassifies them. Do not "fix" the guard away on the grounds
    * that the node is now typed; the extension is deliberate.
+   * One scoped exemption exists: the guard yields for rules owned by an
+   * S-06 (two-trigger chain) Pattern (#2235 settlement §2.3), which take
+   * per-member shape verdicts instead. Any wider revisit of 1b remains
+   * the separate consumer ruling #2232/#2238 reserved.
    */
   | "not-removable:opaque"
 
@@ -46,7 +56,10 @@ export type RemovalCapability =
 
   /**
    * The engine could not classify this rule into any known removal category.
-   * Covers unrecognized shapes such as S-05/S-06/S-07/S-09 and large AltGr
-   * planes that exceed the S-01 five-key guard.
+   * Covers unrecognized shapes such as S-05/S-07/S-09 and large AltGr
+   * planes that exceed the S-01 five-key guard. Also the ordinary unowned
+   * verdict of an S-06 chain's arming rules (#2235 settlement: arming takes
+   * its unowned shape verdict; the chain's edge / fallback / double-press
+   * members land at `not-removable:context-sensitive` by the same rule).
    */
   | "not-removable:unknown";
