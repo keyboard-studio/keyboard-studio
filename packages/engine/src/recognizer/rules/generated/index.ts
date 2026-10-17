@@ -2,3 +2,5 @@
 export { rule as simpleSwapRule } from "./simple-swap.js";
 export { rule as deadkeySingleTapRule } from "./deadkey-single-tap.js";
 export { rule as sequenceReplaceRule } from "./sequence-replace.js";
+export { rule as diacriticCyclingRule } from "./diacritic-cycling.js";
+export { rule as retroactiveRephRule } from "./retroactive-reph.js";

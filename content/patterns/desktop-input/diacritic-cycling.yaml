@@ -1,0 +1,175 @@
+# diacritic-cycling.yaml
+# Strategy: S-07 diacritic cycling (telex-style apply / cancel pair)
+# Real exemplar: release/v/vietnamese_telex — the canonical S-07 keyboard
+# cited in spec §7.3 (cancel rules at vietnamese_telex.kmn:61-62 et seq.)
+
+id: diacritic_cycling
+title: "Diacritic cycling"
+description: >
+  Type a vowel, then a tone key to add a tone mark. Press the same tone key
+  again right after the marked vowel and the mark cancels — the plain vowel
+  stays and the tone key types itself. Each tone (acute, grave, hook, tilde,
+  dot) is one cycle between a plain-vowel store and a parallel marked-vowel
+  store.
+category: desktop
+appliesTo: []
+priority: 2
+group_visibility: any
+strategyId: "S-07"
+combinesWith: []
+
+questions:
+  - id: cycleStoreName
+    prompt: >
+      Internal name for this tone-cycle rule set (e.g. tone_acute).
+      Use letters and underscores only — it becomes a KMN identifier.
+    answerType: text
+    default: "tone"
+
+  - id: plainChars
+    prompt: >
+      The vowels without this tone mark, in order (e.g. aeiou).
+      Position in this list must match the marked list exactly.
+    answerType: char-list
+
+  - id: markedChars
+    prompt: >
+      The same vowels with this tone mark applied, in the same order
+      (e.g. áéíóú). One marked character per plain character above.
+    answerType: char-list
+
+  - id: cycleKey
+    prompt: >
+      The character key that applies this tone (e.g. s for acute in Telex,
+      1 in VNI). Pressing it again after a marked vowel cancels the tone
+      and types the key itself.
+    answerType: char-single
+
+kmnFragment: |
+  store(dcyc_{{cycleStoreName}}_plain) '{{plainChars}}'
+  store(dcyc_{{cycleStoreName}}_marked) '{{markedChars}}'
+
+  any(dcyc_{{cycleStoreName}}_plain) + "{{cycleKey}}" > index(dcyc_{{cycleStoreName}}_marked, 1)
+  any(dcyc_{{cycleStoreName}}_marked) + "{{cycleKey}}" > index(dcyc_{{cycleStoreName}}_plain, 1) "{{cycleKey}}"
+
+touchLayoutFragment: null
+
+reorderRules: null
+
+tests:
+  - input: ["K_A", "K_S"]
+    expectedOutput: "á"
+    description: "a then s produces á (U+00E1) — the tone key applies the acute"
+  - input: ["K_A", "K_S", "K_S"]
+    expectedOutput: "as"
+    description: "a, s, s produces a then literal s — the second s cancels the tone and types itself"
+  - input: ["K_E", "K_S"]
+    expectedOutput: "é"
+    description: "e then s produces é (U+00E9); same cycle key, different vowel"
+  - input: ["K_B", "K_S"]
+    expectedOutput: "bs"
+    description: "b (not in the vowel store) followed by s produces b then s unchanged"
+
+validatedForFamilies: ["Latn"]
+sourceKeyboards:
+  - "release/v/vietnamese_telex"
+  - "release/v/vietnamese_vni"
+reviewedBy: "keyboard-studio-content-team"
+reviewDate: "2026-10-16"
+
+# Extended metadata — YAML-only; not part of the TypeScript Pattern interface
+frequency_in_corpus: >
+  The strict cancel form (any(marked store) + key > index(plain store, 1)
+  followed by the key itself) appears in 17 release keyboards (133 rules),
+  concentrated in the Vietnamese Telex/VNI family and the Taiwanese and
+  Chinese telex-family keyboards that borrowed the mechanism. The far larger
+  literal enumeration of tone rules in those same keyboards is a different
+  shape and is not what this pattern describes.
+
+provenance:
+  - keyboard: "release/v/vietnamese_telex/source/vietnamese_telex.kmn"
+    lines: [52, 61]
+    rules:
+      - "any(vowels) + 's' > index(vowels_sac, 1)"
+      - "any(vowels_sac) + 's' > index(vowels, 1) 's'"
+    note: >
+      Canonical S-07 pair from the keyboard cited in spec §7.3. The apply
+      rule maps each plain vowel to its acute form positionally; the cancel
+      rule maps the acute form back to the plain vowel and re-emits the tone
+      key, so a doubled keypress is never lost. The same pair repeats for
+      grave (f), hook (r), tilde (x) and dot (j), in lower and upper case.
+  - keyboard: "release/v/vietnamese_vni/source/vietnamese_vni.kmn"
+    line: 52
+    rule: "any(vowels_sac) + '1' > index(vowels, 1) '1'"
+    note: >
+      The VNI variant of the same mechanism: digit keys carry the tones
+      (1 = acute). The cancel form is identical; only the cycle key differs.
+
+demo:
+  filled_kmn: |
+    c Demo: Diacritic cycling (Telex acute)
+    c Press a, then s to get á. Press s again to cancel back to a + s.
+
+    store(&VERSION) '10.0'
+    store(&NAME) 'Diacritic Cycling Demo'
+    store(&TARGETS) 'any'
+
+    begin Unicode > use(main)
+
+    group(main) using keys
+
+    store(dcyc_tone_plain) 'aeiou'
+    store(dcyc_tone_marked) 'áéíóú'
+
+    c Apply: plain vowel + s → acute vowel
+    any(dcyc_tone_plain) + "s" > index(dcyc_tone_marked, 1)
+    c Cancel: acute vowel + s → plain vowel, and the s types itself
+    any(dcyc_tone_marked) + "s" > index(dcyc_tone_plain, 1) "s"
+
+  sample_keys:
+    - keys: ["a", "s"]
+      output: "á"
+      note: "a then s — acute applied (U+00E1)"
+    - keys: ["a", "s", "s"]
+      output: "as"
+      note: "a, s, s — tone cancelled, s types itself"
+    - keys: ["e", "s"]
+      output: "é"
+      note: "e then s — acute applied (U+00E9)"
+
+  sample_output: >
+    Type a then s to get á.
+    Type a, s, s to get as.
+    Type e then s to get é.
+
+skeleton:
+  kmn_template: |
+    store(dcyc_{{cycleStoreName}}_plain) '{{plainChars}}'
+    store(dcyc_{{cycleStoreName}}_marked) '{{markedChars}}'
+
+    any(dcyc_{{cycleStoreName}}_plain) + "{{cycleKey}}" > index(dcyc_{{cycleStoreName}}_marked, 1)
+    any(dcyc_{{cycleStoreName}}_marked) + "{{cycleKey}}" > index(dcyc_{{cycleStoreName}}_plain, 1) "{{cycleKey}}"
+
+  parameters:
+    - id: cycleStoreName
+      description: >
+        Internal identifier for this tone-cycle rule set (e.g. "tone_acute").
+        Must be a valid KMN identifier — letters and underscores only. Each
+        distinct tone in the same keyboard needs a unique name to avoid
+        store name collisions.
+    - id: plainChars
+      description: >
+        The vowels without this tone mark, as a plain string without spaces
+        (e.g. "aeiou"). Position in this string must exactly match position
+        in markedChars; Layer A enforces equal store lengths.
+    - id: markedChars
+      description: >
+        The same vowels with the tone mark applied, in the same order
+        (e.g. "áéíóú"). When the cycle key is pressed after the i-th plain
+        vowel, the i-th marked character is emitted.
+    - id: cycleKey
+      description: >
+        The single character key that carries this tone (e.g. "s" for Telex
+        acute, "1" for VNI acute). After a marked vowel, the same key
+        cancels the tone and is emitted literally, so the keypress is never
+        swallowed.

@@ -1,0 +1,261 @@
+# s09-retroactive-reph.yaml
+# Recognizer rule: lift a retroactive-reph rule family from an imported
+# KeyboardIR into a Pattern instance with origin='recognized'.
+#
+# Strategy: S-09 (retroactive reph). Reph is the logical-order sequence
+# ra + virama + <following consonant>, rendered above the cluster. The
+# recognizer-relevant spelling is post-typed: the author types a consonant,
+# then a reph key, and the rule re-emits the consonant after a fixed
+# ra+virama prefix (spec §7.3 S-09 card):
+#   any(ConsonantsU) + "R" > U+0930 U+094D index(ConsonantsU, 1)
+#
+# Scope of THIS rule (issue #2223, km-lead ruling): the unified
+# retroactive form — output exactly [ra, virama, re-emission of the whole
+# pre-trigger context, in order]. The re-emission is spelled per element
+# (index(store, position) for an any() element, the literal char or
+# context(position) for a char element) or as one bare `context`
+# (hindi_modular). Neighbouring shapes are deliberately NOT claimed:
+#   - rakār, reph's mirror image: any(ConsonantsU) + "R" >
+#     index(ConsonantsU, 1) U+094D U+0930 (sil_devanagari_romanized:284) —
+#     same context, same trigger, opposite mechanism; the output-prefix
+#     pin below is what keeps it out;
+#   - generic Indic conjunct formation and half-forms
+#     (gautami_devanagari:326, hindi_modular:170): there the virama
+#     follows the re-emitted consonant, not ra;
+#   - the [context, index] matra/diacritic family (clavbur9:96,
+#     sil_mali_qwerty:124, gautami_devanagari:319): output begins with
+#     `context` and the index points at the trigger element — a different
+#     strategy's mechanism (this family is what the issue's "gautami
+#     form" actually describes; it has zero reph witnesses, see the
+#     ruling);
+#   - Khmer coeng subscripting (krung:51-52): output [context, char,
+#     char], no ra+virama prefix, non-Indic block;
+#   - ZWNJ-prefixed second-order reph (hindi_modular:182,185): the output
+#     begins with U+200C, before the ra — the prefix pin excludes it;
+#   - pre-typed reph (remington_gail, sil_devanagari_romanized): a bare
+#     key emits ra+virama before the consonant is typed; there is no
+#     context rule to lift, and this rule claims none of it;
+#   - guarded reph rules (spec 103 FR-007 — no opt-in here).
+#
+# Format: provisional — see README.md.
+
+id: retroactive-reph
+strategyId: S-09
+patternRef: content/patterns/desktop-input/retroactive-reph.yaml   # repo-root-relative
+format_status: provisional
+
+description: >
+  Detect a retroactive-reph cluster in a KeyboardIR and lift it into the
+  retroactive_reph Pattern. A cluster is every rule in a single IRGroup
+  sharing one (consonant store, trigger character) pair, of the form:
+  any(consonant store), then zero or more further context elements
+  (any() over a further store, or a literal char — a matra or nukta
+  already typed), then one literal trigger character, emitting the
+  script's ra and virama followed by a re-emission of the whole
+  pre-trigger context in order. The trigger contributes no output
+  element. The codec may preserve the inline "+" as a raw context
+  element; the engine ignores that element when matching.
+
+# ---------------------------------------------------------------------------
+# IR predicate
+# ---------------------------------------------------------------------------
+predicate:
+  cluster_type: retroactive-reph
+  shared_key: stores   # Rules cluster by (IRGroup, consonant store, trigger char)
+
+  rules:
+    - role: reph
+      description: >
+        A retroactive-reph rule: a previously typed consonant (any()
+        over the consonant store), optionally followed by further
+        already-typed context elements, then the reph key collapses the
+        sequence into ra + virama + the re-emitted context, so the
+        shaping engine renders the dead ra above the cluster.
+      context_pattern:
+        - kind: any
+          count: exactly_one
+          constraints:
+            storeRef: S_consonants   # Names the consonant store (see store_constraints)
+        # Scaled variants only: further already-typed elements between
+        # the consonant and the reph key, in source order — any() over a
+        # further store (a matra store) or a literal char (a nukta).
+        - kind: any
+          count: zero_or_more
+        - kind: char
+          count: zero_or_more
+        # The codec may interpose a raw "+" element before this char
+        # (source-form artifact); it is not part of the shape.
+        - kind: char
+          count: exactly_one   # The reph key, e.g. "R" (phonetic) or "'" (hindi_modular)
+      output_pattern:
+        - kind: char
+          count: exactly_one
+          constraints:
+            # Output element 1 of the reph prefix pair: the script's ra.
+            # The (ra, virama) pair is pinned against the finder's
+            # per-block table (Devanagari at landing — the only block
+            # with witnesses); a generic [char, char, ...] prefix is
+            # NOT sufficient (rakār / conjunct boundary, see header).
+            reph_prefix: ra
+        - kind: char
+          count: exactly_one
+          constraints:
+            reph_prefix: virama
+        # The re-emission of the pre-trigger context, in order. Exactly
+        # one of the two spellings per rule:
+        # (a) element-wise — one entry per pre-trigger element:
+        - kind: index
+          count: zero_or_more
+          constraints:
+            # index(store, position) re-emitting the any() element at
+            # that same context position (the S-03/S-07 offset invariant,
+            # guards excluded).
+            re_emits_context_any_at_own_position: true
+        - kind: char
+          count: zero_or_more
+          constraints:
+            # A literal char re-emitted verbatim (the nukta of
+            # sil_devanagari_phonetic:118).
+            same_as_context_char: true
+        # (b) whole-context — a single bare `context`, or context(n)
+        # entries re-emitting individual pre-trigger elements:
+        - kind: context
+          count: zero_or_one
+          constraints:
+            # offset 0 (bare) only as the SOLE re-emission element
+            # (whole pre-trigger context); offset n re-emits the
+            # pre-trigger element at position n. This kind joined the
+            # schema unions with this rule — the first finder that
+            # evaluates it (issue #2223 schema rider).
+            re_emits_context: true
+
+  store_constraints:
+    - store: S_consonants
+      isSystem: false
+      items_kind: char   # All items must be char; no vkey, deadkey, or raw items
+
+  group_constraints:
+    all_rules_same_group: true  # All rules of one cluster share an IRGroup
+
+  disqualifiers:
+    - IRRule.ownedByPattern is already set on a rule (already claimed)
+    - The rule carries any if() guard (spec 103 FR-007 — guarded rules are not claimed by this pattern)
+    - The output does not begin with the script's (ra, virama) prefix pair (rakār, generic conjuncts, half-forms, ZWNJ-prefixed second-order reph)
+    - The output does not re-emit the entire pre-trigger context in order (partial or reordered re-emission)
+    - The trigger character contributes an output element (the reph key is consumed silently; a rule that types it is a different mechanism)
+    - The last context element is not a literal char (no reph key — e.g. an any()-triggered rewrite)
+    - A store referenced by the context does not resolve in the IR (unresolved refs are no evidence, never a pass)
+    - Any element of the rule is kind=raw other than the codec's inline "+" separator (unparsed fragment — cannot safely lift)
+
+  combinedWith_if: []   # S-09 asserts no combination by itself
+
+# ---------------------------------------------------------------------------
+# What gets lifted
+# ---------------------------------------------------------------------------
+lifts_to:
+  origin: recognized
+  patternId: retroactive_reph
+
+  # Slot ids mirror content/patterns/desktop-input/retroactive-reph.yaml.
+  slot_mapping:
+    consonantChars:
+      source: stores[S_consonants].items
+      transform: store_items_to_char_string   # Concatenate all char items into a string
+
+    triggerChar:
+      source: rules[reph].trigger_chars   # The cluster's reph key (one char; every rule in the cluster shares it)
+      transform: none
+
+    raChar:
+      source: rules[reph].ra_char   # Output element 1 of the canonical (shortest-context) rule — the script's ra
+      transform: none
+
+    viramaChar:
+      source: rules[reph].virama_char   # Output element 2 of the canonical rule — the script's virama
+      transform: none
+
+    consonantStoreName:
+      source: null   # Cannot be inferred from IR — user fills in survey
+
+# ---------------------------------------------------------------------------
+# Corpus evidence
+# ---------------------------------------------------------------------------
+# Required by issue #240 AC: each rule validated against at least two
+# release/ keyboards. DEVIATION, stated plainly (issue #2223, km-lead
+# ruling, in the queue-342 addendum pattern): this rule has TWO
+# form-witness keyboards and ONE live witness. sil_devanagari_phonetic is
+# a live witness (its three reph rules are the keyboard's reph mechanism).
+# hindi_modular carries the same form (the bare-`context` spelling), but
+# its author annotates those rules "These next 4 rules do not fire" — it
+# validates the FORM, not a live mechanism. Issue #240's bar is therefore
+# met for form and not for live mechanism; the deviation is recorded
+# here, in the ruling, and in the PR body — not implied away.
+# A parser-verified scan of the full release corpus (933 .kmn,
+# keymanapp/keyboards @ 435f82d6, real codec parser) finds the pinned
+# form in exactly these two keyboards / five rules; the near-miss space
+# is empty in every single-relaxation direction (guarded form 0,
+# different-store re-emission 0, wrong-offset 0 — issue #2223 ruling).
+# HONEST COVERAGE NOTE: retroactive reph is the minority reph
+# mechanism. Most corpus keyboards that do reph type it pre-emptively
+# (a bare key emits ra+virama before the consonant — remington_gail,
+# sil_devanagari_romanized, sil_devanagari_typewriter) and need no
+# recognizer; of the five corpus files that mention reph, this rule
+# claims the retroactive form in one, plus hindi_modular's form witness.
+# The ratio below is stated accordingly.
+
+corpus_evidence:
+  keyboards:
+    - id: sil_devanagari_phonetic
+      path: release/sil/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kmn
+      notes: >
+        The canonical S-09 exemplar (spec §7.3 card) and the LIVE
+        witness. Three reph rules (lines 116-118, each self-labelled
+        "c reph"; the ConsonantsU store comment reads "consonants (so
+        we can reposition the reph)"): the base rule
+        any(ConsonantsU) + "R" > U+0930 U+094D index(ConsonantsU, 1),
+        plus the matra and nukta+matra scaled variants re-emitting the
+        full pre-trigger context in order. All three are claimed as one
+        cluster.
+    - id: hindi_modular
+      path: release/h/hindi_modular/source/hindi_modular.kmn
+      notes: >
+        The FORM witness for the bare-`context` spelling:
+        any(cl) + "'" > U+0930 U+094D context (line 181) and
+        any(cl) U+093F + "'" > U+0930 U+094D context (line 184).
+        CAVEAT, quoted from the source: the author annotates this block
+        "These next 4 rules do not fire" — the form is attested, the
+        mechanism is not live in this file. Its ZWNJ-prefixed sibling
+        rules (lines 182, 185) are NOT claimed (prefix pin).
+
+  expected_recognizedRatio_min: 0.007   # measured at corpus validation (issue #2223): sil_devanagari_phonetic 3 claimed of 118 typed rules (ratio 0.0254), hindi_modular 2 of 279 (0.0072) — a sliver by design (see coverage note); the floor is the lower witness
+
+# ---------------------------------------------------------------------------
+# Notes for km-domain review
+# ---------------------------------------------------------------------------
+notes:
+  linguistic: >
+    Reph is not a codepoint: it is the sequence ra + virama held in
+    logical order before a consonant cluster, which the shaping engine
+    renders as a dead ra above the cluster. Typing the consonant first
+    and pressing a reph key afterwards is the natural order for authors
+    who think "this syllable takes reph" after typing its onset — the
+    rule exists to reorder, which is what distinguishes S-09 here from
+    pre-typed reph (no rule) and from rakār (ra as the cluster's second
+    member, below the line — the mirror mechanism, not claimed).
+
+  edge_cases:
+    - >
+      One consonant store can serve several reph keys or scripts'
+      clusters; clusters are keyed by (group, store, trigger) and the
+      trigger is part of the lifted Pattern's instance id, so distinct
+      reph keys never collide into one Pattern.
+    - >
+      A keyboard whose reph rules are all ZWNJ-prefixed second-order
+      forms lifts nothing under this rule: the prefix pin is the
+      boundary, and second-order reph (reph over an existing conjunct)
+      is a separate design question.
+    - >
+      The (ra, virama) prefix table is seeded with Devanagari only —
+      the only block with witnesses. A Malayalam or Telugu retroactive-
+      reph keyboard lifts nothing until its block's pair is added WITH
+      a witness; the table is corpus-checked knowledge, not a guess.

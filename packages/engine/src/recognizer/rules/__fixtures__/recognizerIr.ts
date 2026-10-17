@@ -294,6 +294,132 @@ export function buildUnrelatedRemapIR(): { ir: KeyboardIR } {
   return { ir: makeTestIR([mainGroup([rule])], stores) };
 }
 
+// ---------------------------------------------------------------------------
+// S-07 (diacritic cycling)
+// ---------------------------------------------------------------------------
+
+// vietnamese_telex subset: vowels aeiou → vowels_sac áéíóú (each marked form
+// is the base + combining acute, canonically composed), tone key "s".
+// vietnamese_vni carries the same stores with digit tone keys ("1" = acute).
+const TELEX_PLAIN = "aeiou";
+const TELEX_MARKED = "áéíóú";
+
+function telexStores(): IRStore[] {
+  return [
+    makeCharStore("store#vowels", "vowels", TELEX_PLAIN),
+    makeCharStore("store#vowels_sac", "vowels_sac", TELEX_MARKED),
+  ];
+}
+
+/**
+ * One telex-shaped cancel rule:
+ *   any(vowels_sac) + "s" > index(vowels, 1) "s"
+ * Options build the negative variants (guarded, wrong offset, output char
+ * differing from the trigger, index into the context store itself). The
+ * codec's inline "+" is included as a raw element, as in the S-03 fixtures.
+ */
+export function telexCancelRule(
+  nodeId: string,
+  opts: {
+    trigger?: string;
+    outChar?: string;
+    offset?: number;
+    indexStore?: string;
+    guarded?: boolean;
+  } = {},
+): IRRule {
+  const trigger = opts.trigger ?? "s";
+  const guard: IRRule["context"] = opts.guarded
+    ? [{ kind: "if", store: "option_toneplace", value: "" }]
+    : [];
+  return {
+    nodeId,
+    context: [
+      ...guard,
+      { kind: "any", storeRef: "vowels_sac" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: trigger },
+    ],
+    output: [
+      {
+        kind: "index",
+        storeRef: opts.indexStore ?? "vowels",
+        offset: opts.offset ?? 1,
+      },
+      { kind: "char", value: opts.outChar ?? trigger },
+    ],
+  };
+}
+
+/** The paired apply rule: any(vowels) + "s" > index(vowels_sac, 1). */
+export function telexApplyRule(
+  nodeId: string,
+  opts: { trigger?: string } = {},
+): IRRule {
+  return {
+    nodeId,
+    context: [
+      { kind: "any", storeRef: "vowels" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: opts.trigger ?? "s" },
+    ],
+    output: [{ kind: "index", storeRef: "vowels_sac", offset: 1 }],
+  };
+}
+
+/** Apply + cancel pair in one group over the telex stores (trigger "s"). */
+export function buildTelexCycleIR(): {
+  ir: KeyboardIR;
+  cancelNodeId: string;
+  applyNodeId: string;
+} {
+  const cancelNodeId = "rule#telex-cancel-sac";
+  const applyNodeId = "rule#telex-apply-sac";
+  const ir = makeTestIR(
+    [
+      mainGroup([
+        telexApplyRule(applyNodeId),
+        telexCancelRule(cancelNodeId),
+      ]),
+    ],
+    telexStores(),
+  );
+  return { ir, cancelNodeId, applyNodeId };
+}
+
+/** Same pair with the VNI digit cycle key ("1"). */
+export function buildVniCycleIR(): {
+  ir: KeyboardIR;
+  cancelNodeId: string;
+  applyNodeId: string;
+} {
+  const cancelNodeId = "rule#vni-cancel-sac";
+  const applyNodeId = "rule#vni-apply-sac";
+  const ir = makeTestIR(
+    [
+      mainGroup([
+        telexApplyRule(applyNodeId, { trigger: "1" }),
+        telexCancelRule(cancelNodeId, { trigger: "1" }),
+      ]),
+    ],
+    telexStores(),
+  );
+  return { ir, cancelNodeId, applyNodeId };
+}
+
+/** Cancel rule alone, no paired apply (cluster must still form). */
+export function buildTelexCancelOnlyIR(): {
+  ir: KeyboardIR;
+  cancelNodeId: string;
+} {
+  const cancelNodeId = "rule#telex-cancel-only";
+  const ir = makeTestIR(
+    [mainGroup([telexCancelRule(cancelNodeId)])],
+    telexStores(),
+  );
+  return { ir, cancelNodeId };
+}
+
 /**
  * basic_kbdca grave family: two triggers (unshifted + shifted K_QUOTE) sharing
  * one fan-out body, plus an escape rule.
@@ -334,4 +460,157 @@ export function buildTwoTriggerGraveIR(): {
     bodyNodeId,
     escapeNodeId,
   };
+}
+
+// ---------------------------------------------------------------------------
+// S-09 (retroactive reph)
+// ---------------------------------------------------------------------------
+
+export const REPH_RA = "\u0930"; // र — Devanagari ra
+export const REPH_VIRAMA = "\u094D"; // ् — Devanagari virama
+
+/** sil_devanagari_phonetic stores (subset strings, full membership). */
+export function devanagariRephStores(): IRStore[] {
+  return [
+    makeCharStore(
+      "store#ConsonantsU",
+      "ConsonantsU",
+      "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह",
+    ),
+    makeCharStore("store#MatraVsU", "MatraVsU", "ािीुूृेैोौ"),
+  ];
+}
+
+/** The base reph rule, sil_devanagari_phonetic:116 verbatim in IR form. */
+export function rephBaseRule(nodeId: string, trigger = "R"): IRRule {
+  return {
+    nodeId,
+    context: [
+      { kind: "any", storeRef: "ConsonantsU" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: trigger },
+    ],
+    output: [
+      { kind: "char", value: REPH_RA },
+      { kind: "char", value: REPH_VIRAMA },
+      { kind: "index", storeRef: "ConsonantsU", offset: 1 },
+    ],
+  };
+}
+
+/**
+ * The sil_devanagari_phonetic reph family (lines 116-118): the base rule
+ * plus the matra and nukta+matra scaled variants, one cluster.
+ */
+export function buildPhoneticRephIR(): {
+  ir: KeyboardIR;
+  baseNodeId: string;
+  matraNodeId: string;
+  nuktaNodeId: string;
+} {
+  const baseNodeId = "rule#reph-base";
+  const matraNodeId = "rule#reph-matra";
+  const nuktaNodeId = "rule#reph-nukta";
+  const ir = makeTestIR(
+    [
+      mainGroup([
+        rephBaseRule(baseNodeId),
+        {
+          // :117 — any(ConsonantsU) any(MatraVsU) + "R" > ra virama
+          // index(ConsonantsU,1) index(MatraVsU,2)
+          nodeId: matraNodeId,
+          context: [
+            { kind: "any", storeRef: "ConsonantsU" },
+            { kind: "any", storeRef: "MatraVsU" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "R" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "index", storeRef: "ConsonantsU", offset: 1 },
+            { kind: "index", storeRef: "MatraVsU", offset: 2 },
+          ],
+        },
+        {
+          // :118 — any(ConsonantsU) U+093C any(MatraVsU) + "R" > ra
+          // virama index(ConsonantsU,1) U+093C index(MatraVsU,3)
+          nodeId: nuktaNodeId,
+          context: [
+            { kind: "any", storeRef: "ConsonantsU" },
+            { kind: "char", value: "\u093C" },
+            { kind: "any", storeRef: "MatraVsU" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "R" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "index", storeRef: "ConsonantsU", offset: 1 },
+            { kind: "char", value: "\u093C" },
+            { kind: "index", storeRef: "MatraVsU", offset: 3 },
+          ],
+        },
+      ]),
+    ],
+    devanagariRephStores(),
+  );
+  return { ir, baseNodeId, matraNodeId, nuktaNodeId };
+}
+
+/**
+ * The hindi_modular form witness (lines 181, 184): the same mechanism
+ * with the re-emission spelled as one bare `context`.
+ */
+export function buildHindiRephIR(): {
+  ir: KeyboardIR;
+  baseNodeId: string;
+  ikarNodeId: string;
+} {
+  const baseNodeId = "rule#hindi-reph-base";
+  const ikarNodeId = "rule#hindi-reph-ikar";
+  const stores = [
+    makeCharStore(
+      "store#cl",
+      "cl",
+      "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह",
+    ),
+  ];
+  const ir = makeTestIR(
+    [
+      mainGroup([
+        {
+          // :181 — any(cl) + "'" > U+0930 U+094D context
+          nodeId: baseNodeId,
+          context: [
+            { kind: "any", storeRef: "cl" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "'" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "context", offset: 0 },
+          ],
+        },
+        {
+          // :184 — any(cl) U+093F + "'" > U+0930 U+094D context
+          nodeId: ikarNodeId,
+          context: [
+            { kind: "any", storeRef: "cl" },
+            { kind: "char", value: "\u093F" },
+            { kind: "raw", text: "+" },
+            { kind: "char", value: "'" },
+          ],
+          output: [
+            { kind: "char", value: REPH_RA },
+            { kind: "char", value: REPH_VIRAMA },
+            { kind: "context", offset: 0 },
+          ],
+        },
+      ]),
+    ],
+    stores,
+  );
+  return { ir, baseNodeId, ikarNodeId };
 }
