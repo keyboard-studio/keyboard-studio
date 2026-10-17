@@ -1056,6 +1056,15 @@ export function useKeyboardArtifact(
         wc.setStartWelcomeConvention(result.startWelcomeConvention ?? null);
         wc.setStartWelcomeHtmText(null);
         wc.setStartHelpPhpText(null);
+        // Issue #2206 (Matthew's 2026-10-17 FR-007 carve-out ruling): the
+        // base's help text is retained in the EXTRACTION-ONLY slice at
+        // the same moment the prose slice is nulled — the extractor may
+        // offer its Troubleshooting lines as suggestions, but the text
+        // itself never becomes prose (startHelpPhpText stays null, so
+        // every render/serialize path behaves exactly as FR-007 asks).
+        wc.setBaseHelpPhpTextForExtraction(
+          result.baseHelpPhpTextForExtraction ?? null,
+        );
         wc.setStartReadmeMdText(null);
         wc.setStartHistoryMdText(null);
         // Issue #2139: a copy's pages are fresh renders — the base's page
@@ -1090,6 +1099,14 @@ export function useKeyboardArtifact(
         const wc = useWorkingCopyStore.getState();
         wc.setStartWelcomeHtmText(fetchResult.startWelcomeHtmText ?? null);
         wc.setStartHelpPhpText(fetchResult.startHelpPhpText ?? null);
+        // Issue #2206: the extraction-only slice is a Track 1 (copy)
+        // retention — on this open-base/adapt path the base's
+        // troubleshooting section already ships inside the inherited
+        // prose, and the ruling authorises no extraction here. Cleared
+        // explicitly so a prior copy session's text cannot survive into
+        // an adapt session (the same hazard the Track 1 clearing above
+        // guards against, in reverse).
+        wc.setBaseHelpPhpTextForExtraction(null);
         // spec 080 FR-006: the rest of the base's documentation bundle — README
         // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
         // images and which convention the base used (data-model §6).

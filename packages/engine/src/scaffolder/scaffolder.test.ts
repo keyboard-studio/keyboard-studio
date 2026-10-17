@@ -259,6 +259,36 @@ describe("createScaffolderService", () => {
       ).rejects.toThrow(/invalid keyboardId/);
     });
 
+    it("surfaces the base help text ONLY as baseHelpPhpTextForExtraction, never in the scaffolded VFS (issue #2206)", async () => {
+      const baseHelp =
+        "<h2>Troubleshooting</h2><p>If a vowel does not combine, type the consonant first.</p>";
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+        if (url.includes("/source/help/base_keyboard.php")) {
+          return Promise.resolve(makeTextResponse(baseHelp));
+        }
+        return Promise.resolve(makeNotFoundResponse());
+      });
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const result = await service.scaffold(startKeyboard, "new_keyboard", "New Keyboard");
+      // The extraction-only field carries the text verbatim…
+      expect(result.baseHelpPhpTextForExtraction).toBe(baseHelp);
+      // …and the produced documentation does not: the copy's help page
+      // is a fresh render with none of the base's prose (FR-007).
+      const helpContent = result.vfs.get("source/help/new_keyboard.php")?.content as string;
+      expect(helpContent).not.toContain("If a vowel does not combine");
+    });
+
+    it("omits baseHelpPhpTextForExtraction when the base has no help page (issue #2206)", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+        return Promise.resolve(makeNotFoundResponse());
+      });
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const result = await service.scaffold(startKeyboard, "new_keyboard", "New Keyboard");
+      expect(result.baseHelpPhpTextForExtraction).toBeUndefined();
+    });
+
     it("falls through gracefully when fetch fails (stub generation)", async () => {
       const mockFetch = vi.fn().mockResolvedValue(makeNotFoundResponse());
       const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });

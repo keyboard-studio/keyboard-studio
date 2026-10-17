@@ -157,6 +157,20 @@ export interface ScaffoldResult {
   startWelcomeImages?: WelcomeFolderImage[];
   /** Which welcome-page convention the base used (data-model §6). */
   startWelcomeConvention?: WelcomeConvention;
+  /**
+   * The base keyboard's own `source/help/<id>.php`, verbatim, surfaced
+   * for EXTRACTION ONLY (issue #2206): Matthew's 2026-10-17 ruling on
+   * #2206 grants a narrow carve-out to FR-007 / spec 102 FR-032 under
+   * which symptom/fix lines from the base help's Troubleshooting
+   * section may be OFFERED as editable suggestions for the new
+   * keyboard's troubleshooting question. This text is not prose
+   * inheritance — unlike {@link startLicenseText} it must never reach
+   * a rendered page or the serialized working copy's prose slices; the
+   * studio keeps it in a dedicated extraction-only slice that only the
+   * suggestion extractor reads. Undefined when the base has no help
+   * page (the common case).
+   */
+  baseHelpPhpTextForExtraction?: string;
 }
 
 /**

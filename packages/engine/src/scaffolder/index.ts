@@ -661,6 +661,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       const vfs = createVirtualFS();
       const warnings: string[] = [];
       let startLicenseText: string | undefined;
+      let startHelpPhpTextForExtraction: string | undefined;
       let startWelcomeImages: WelcomeFolderImage[] | undefined;
       let startWelcomeConvention: WelcomeConvention | undefined;
       const attribution = scaffoldOpts?.attribution;
@@ -704,6 +705,12 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         // nothing of its prose — startWelcomeHtmText/startHelpPhpText are
         // deliberately not surfaced from here, FR-007).
         startWelcomeImages = loaderResult.startWelcomeImages;
+        // Issue #2206 (Matthew's 2026-10-17 FR-007 carve-out ruling): the
+        // base's help text IS surfaced, but only as extraction input for
+        // troubleshooting suggestions — a separate result field with its
+        // own name, never the prose fields above, so no render path can
+        // pick it up by accident.
+        startHelpPhpTextForExtraction = loaderResult.startHelpPhpText;
         startWelcomeConvention = loaderResult.startWelcomeConvention;
       } catch (err) {
         // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
@@ -787,6 +794,11 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
           ? { startWelcomeImages }
           : {}),
         ...(startWelcomeConvention !== undefined ? { startWelcomeConvention } : {}),
+        // Issue #2206: extraction-only (see the loader-result assignment
+        // above and the contracts doc) — never rendered, never spliced.
+        ...(startHelpPhpTextForExtraction !== undefined
+          ? { baseHelpPhpTextForExtraction: startHelpPhpTextForExtraction }
+          : {}),
       };
     },
 
