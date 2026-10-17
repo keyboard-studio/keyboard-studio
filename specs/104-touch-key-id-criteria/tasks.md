@@ -1,0 +1,69 @@
+# Tasks: Touch key identity criteria (spec 104)
+
+**Input**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [contracts/key-id-criteria.md](contracts/key-id-criteria.md)
+
+**Tests**: included. Write each test first and watch it fail. Tap-simulation
+tests use the vendored KeymanWeb harness method of research.md §1 (compile
+with kmc, drive ActiveLayout → JSKeyboardProcessor).
+
+**Shape**: the production resolver (Phase 2) is Foundational — every later
+phase consumes it and none re-derives production. Phases 3–5 are the stories;
+Phase 6 is inspectability and gates. US2/US3 share the repair/choice list
+component (T015), so T016 starts after T015 lands.
+
+## Phase 1: Setup — fixtures
+
+- [ ] **T001** Vendor the idiom fixtures: minimal `.kmn` + `.keyman-touch-layout` pairs for sil_cameroon_qwerty (guarded T_), hindi_flick (ruled U_), one gff_* (T_ producer + navigation + subkey host), one fv_* (store-grouped T_ fans), one basic_* (dead T_<HEX>), each reduced to the smallest layout that still exhibits the idiom, with provenance notes (FR-028) · `packages/engine/src/pattern-apply/__fixtures__/touch-id/`
+- [ ] **T002** Tap-simulation harness over the vendored KMW: compile a fixture with kmc, drive every key in every layer, return the per-(key × state) output table; assert it reproduces research.md §1's verdicts on the T001 fixtures (ruled T_ produces, rule-free T_ is silent, U_ decodes, unmatched K_ falls back at state 0/SHIFT) · `packages/engine/src/simulator/tapSimulation.test.ts`
+
+## Phase 2: Foundational — the resolver and the decision table
+
+Files: `packages/contracts/src/touch-key-rule-join.ts`, `packages/contracts/src/touchProduction.ts`, `packages/contracts/src/touch-key-diagnostics.ts`, `packages/contracts/src/index.ts`
+
+- [ ] **T003** [P] Write `touchProduction.test.ts` first: one case per contracts §1 source (`rule` for K_/T_/U_, `u-decode`, `k-fallback` at state 0 and SHIFT, `none` in RALT state, `none` for rule-free producing T_, layerSwitch for nextlayer keys, `fallbackCertain: false` in caps state). Then implement `resolveTouchProduction()` in `touchProduction.ts` over `buildTouchKeyRuleIndex`, `decodeUnicodeKeyId`, the KMW US base-key table, and the existing key-class predicates (FR-001, FR-003) · `packages/contracts/src/touchProduction.ts`
+- [ ] **T004** [P] Write the decision-table test first (SC-005): every contracts §2 arm incl. c′ (sub-15.0 string), d′ (guarded / deadkey-composed mark), the role-set rule (producer + nextlayer + host stays in producer arms), and arm 0's host rider. Then implement `decideKeyIdForm()` as a pure function returning the arm + destination + reason (FR-002, FR-005, FR-006) · `packages/contracts/src/touchProduction.ts`
+- [ ] **T005** Add the decision-spine record types: `KeyIdentityDecision` (criterion, track, proposer, author answer, provenance), `GuardSpecification`, `RepairProposal`, `TransplantRecord` (incl. refusal + binding), following spec 093's record conventions in `decisionRecord.ts`; export from the contracts barrel (FR-016, Key Entities) · `packages/contracts/src/decisionRecord.ts`, `packages/contracts/src/index.ts`
+- [ ] **T006** Re-point `findDeadTouchKeys` (TOUCH_KEY_NO_RULE) at the resolver: a producing key is dead iff its resolver production is `none` in every state; verdicts on the existing suite change only where the audit says they must, each change named in the test (FR-023) · `packages/contracts/src/touch-key-diagnostics.ts`
+- [ ] **T025** Migrate coverage onto the resolver: `computeTouchCoverage` (contracts `touch-coverage.ts`, which today credits production through its own optional `ruleIndex` path) and the engine `touchCoverage` wrapper take production from `resolveTouchProduction()` — coverage, gallery detection, and enumeration must not keep a second production model standing (FR-003; US4 scenario 5; SC-001). Parity test per plan.md Phase 1: verdicts change only where the audit says they must, each change named · `packages/contracts/src/touch-coverage.ts`
+- [ ] **T026** Refusal-rate corpus probe (evidence, not a gate; runs as soon as T011 lands, before Phase 4 begins): run the transplant over every corpus keyboard's K_-linked touch keys and report the refusal rate + binding causes per keyboard, so the Phase 4 choice UX is sized on evidence before it is built (plan.md Risks) · `tools/`
+
+**⟶ Phase 2 must be green before any later phase starts.**
+
+## Phase 3: Carve + creation (US4, US1)
+
+Files: `packages/engine/src/pattern-apply/touch-mechanism-shared.ts`, `packages/engine/src/pattern-apply/enumerateTouchMethodsForChar.ts`, `packages/engine/src/pattern-apply/applyTouchKeycapRemovalsToVfs.ts`, `packages/engine/src/pattern-apply/keyIdMinting.ts`, `packages/engine/src/pattern-apply/proposeTouchKeyId.ts`, `packages/engine/src/pattern-apply/touchRuleSynthesis.ts`
+
+- [ ] **T007** [P] `keyMatchesRemovalSet` takes the resolver: a candidate matches iff any of its per-state productions is in the removal set. Regression test: T_0300 (keycap "◌̀") now matches U+0300; T_BLANK with text " " still does not spuriously match (FR-003, FR-019; audit gap 1) · `packages/engine/src/pattern-apply/touch-mechanism-shared.ts`
+- [ ] **T008** [P] `enumerateTouchMethodsForChar` resolves production via the resolver, so ruled T_ methods are enumerable and deletable on the same address scheme as K_/U_ methods (FR-019; audit gap 1) · `packages/engine/src/pattern-apply/enumerateTouchMethodsForChar.ts`
+- [ ] **T009** Carve operation per contracts §4: neutralise every producing occurrence (all layers/platforms, main + subkeys) to T_BLANK/sp 10 and suppress the binding rule set in the same operation. The character-wide carve pass (`applyCarveKeycapRemovalsToVfs.ts` — which today blanks keycaps by matching carved-character text, audit gap 1 inside the carve step itself) takes its matching from the resolver, and behavioural rule suppression is invoked through spec 076's .kmn projection (`applyCarveToVfs.ts` / `carvePipeline.ts`), not the per-address gallery deletion overlay. Shared-binding preservation and refusal-with-binding cases tested on the Cameroon + fv_ fixtures; ruled-U_ carve removes key and rules together (FR-019, FR-020; SC-001) · `packages/engine/src/pattern-apply/applyCarveKeycapRemovalsToVfs.ts`, `packages/engine/src/pattern-apply/applyCarveToVfs.ts`, `packages/engine/src/pattern-apply/carvePipeline.ts`, `packages/engine/src/pattern-apply/carveFilterIr.ts`
+- [ ] **T010** Proposer: `proposeTouchKeyId`'s inherit gate uses the resolver (a U_ key's intrinsic production counts toward coverage — no re-mint); `proposeKeyId`'s minting paths route through `decideKeyIdForm()`; the combining-mark path mints guarded T_ only when the keyboard's guard specification says so, else U_ (FR-010, FR-013; audit gap 5; SC-005) · `packages/engine/src/pattern-apply/proposeTouchKeyId.ts`, `packages/engine/src/pattern-apply/keyIdMinting.ts`
+
+**Wave 2 (after T007–T010):**
+
+- [ ] **T011** Severance transplant `severTouchKey()`: collect the binding rule set through the resolver/rule-join, clone + re-key verbatim (rule nodes incl. `if()` guards, group + relative order preserved, contexts, stores, pattern arms), replace the id only on occurrences in the layer family where arm 0 failed, emit the `TransplantRecord`; refusal paths (shared binding; group/order unpreservable; target-id collision with a .kmn-only T_ name, contracts §3 step 2) emit no clones and flag the key with the cause (FR-008; contracts §3) · `packages/engine/src/pattern-apply/severTouchKey.ts`
+- [ ] **T012** Wire severance into the edit path: a redefining edit on a K_-linked touch key triggers T011 on the automatic paths; a label-only edit never does (FR-011, FR-012). The severance line ships as en/fr message descriptors via messages:extract (FR-026). Atomicity test (SC-003): no intermediate serialisation in the suite contains a producing T_ without its rules · `packages/engine/src/pattern-apply/applyKeyEditsToLayout.ts`, `packages/engine/src/pattern-apply/applyTouchAssignments.ts`
+
+## Phase 4: Track flows (US2, US3)
+
+Files: `packages/studio/src/survey/`, `packages/studio/src/steps/`, `packages/studio/src/lib/`
+
+- [ ] **T013** Marks-step guard question: a station in the marks step templated on the existing ContextToleranceStation (a per-keyboard behaviour choice presented exactly this way), hosted via the marks step host; copy from contracts §6 as en/fr message descriptors via messages:extract (never template literals), recorded as a `GuardSpecification` decision; on Track 2 the specification is seeded from the imported keyboard and presented for confirmation (FR-013); re-evaluation of marks minted before the answer exists is reported through the marks step's completion report (US1 scenario 6), not applied silently (FR-013, FR-026) · `packages/studio/src/survey/questions/`, `packages/studio/src/survey/marks/`
+- [ ] **T014** Copy parity gate in the copy flow: source vs copy tap-simulation diff over the T001 idiom fixtures must be empty, including the SC-002 context probes (FR-014; SC-002) · `packages/studio/src/lib/`
+- [ ] **T015** Repair list component: generalise the existing `DocumentationFixProposals` row pattern (adapt-side confirmable rows, answers recorded in the working copy store, rows stay visible after answering) — per-key list at the owning step (touch step by default, FR-015's ownership rule): dead key, criteria default preselected (guard-aware, FR-009; U_ conversion when the suffix parses; else mint-rule / blank / leave), author's answer recorded as a `RepairProposal` outcome; all row copy as en/fr message descriptors via messages:extract (FR-026); used by both Copy (FR-015) and Adapt (FR-016) flows · `packages/studio/src/components/`, `packages/studio/src/steps/`
+- [ ] **T016** Track 2 identity choices: import-/carve-triggered sets presented through the T015 list pattern with contracts §6 consequence copy; editor-triggered severance decided inline in the key property panel at commit (FR-018), its transient notice in the touch gallery's `role="status"` live region and its durable record in the key inspector's findings/provenance; declining leaves identity + rules byte-identical, logs the decision, suppresses re-presentation until the state changes; track switch discards pending choices and re-derives; all choice copy (incl. the keep-link consequence line) as en/fr message descriptors via messages:extract (FR-016, FR-017, FR-018, FR-026; SC-004) · `packages/studio/src/steps/`, `packages/studio/src/editors/`, `packages/studio/src/lib/`
+
+## Phase 5: Derivation surfaces (US5)
+
+Files: `packages/engine/src/pattern-apply/applyDesktopModifications.ts`, `packages/engine/src/pattern-apply/applyDesktopModificationsToRawJson.ts`, `packages/engine/src/pattern-apply/propagateDesktopLayersToTouch.ts`, `packages/engine/src/scaffolder/scaffoldTouchLayout.ts`
+
+- [ ] **T017** [P] Placement replay addresses the resolver-resolved occupant of a slot: T_/U_ occupants receive the placement or the miss is reported; never append a duplicate key to the last row (FR-021; audit gap 2) · `packages/engine/src/pattern-apply/applyDesktopModifications.ts`, `packages/engine/src/pattern-apply/applyDesktopModificationsToRawJson.ts`
+- [ ] **T018** [P] Combo propagation: cloned layers preserve ids + productions of keys the combo does not redefine (no blanking of divergent T_/U_ slots); the bare combo is included in the propagation set (FR-021; audit gap 3) · `packages/engine/src/pattern-apply/propagateDesktopLayersToTouch.ts`
+- [ ] **T019** Scaffolder/reseed: existing ruled T_ ids from the .kmn are placed with their linkage; no character produced by a ruled T_ key is re-minted under a new id; phone-from-tablet reseed preserves T_/U_ production (simulation-checked) (FR-022; audit gap 4) · `packages/engine/src/scaffolder/scaffoldTouchLayout.ts`
+
+## Phase 6: Inspectability, corpus gate, probes (US6)
+
+- [ ] **T020** Property panel: extend the existing key property panel / key inspector (embedded) display + findings sections — FR-005 criterion, production table (only states where the key occurs, conditional productions per condition, in a disclosure closed by default), and the key's identity-decision provenance, all from the resolver + spine records; per-step counts via the existing work-to-do selection/badges (FR-024, FR-025) · `packages/studio/src/editors/`
+- [ ] **T021** Corpus gate (nightly-class, dev soak): copy + adapt over every corpus keyboard with a touch layout; production diffs reported per keyboard and confined to criteria-mandated changes; transplant refusal rate reported per keyboard (FR-027) · `tools/`
+- [ ] **T022** Caps-fallback probe: compile + simulate an unmatched K_ key in caps state through the T002 harness; on the result, either remove the contracts §5 proviso (resolver returns a certain value) or promote caps-state production to a first-class resolver value; spec edge case updated to match (research.md §1) · `packages/engine/src/simulator/tapSimulation.test.ts`, `specs/104-touch-key-id-criteria/contracts/key-id-criteria.md`
+- [ ] **T023** E2e walks (Playwright): create-with-severance, copy-with-repair, adapt-with-choice (accept + decline), carve of a T_-produced character; full CI incl. the e2e lane green (SC-006) · `packages/studio/tests/`
+- [ ] **T024** Spec-trace + README registration for spec 104 and the AS-BUILT skeleton; closing comment on the originating issue thread with the sign-off list · `specs/README.md`, `docs/spec-trace.json`
