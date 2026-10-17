@@ -4,7 +4,8 @@ import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
-import type { StartDocCssText } from "@keyboard-studio/engine";
+import type { RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
+import { loadDemoSimulate } from "../components/rules/demoSimulation.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 // Re-exported so tests can assert the open-base fetch passes this exact proxy
@@ -55,7 +56,28 @@ interface EngineModule {
     parseResult: { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> },
     source: string,
   ) => LintFinding[];
-  runImportFidelityEmitChecks?: (ir: KeyboardIR, emitted: string) => Promise<LintFinding[]>;
+  runImportFidelityEmitChecks?: (
+    ir: KeyboardIR,
+    emitted: string,
+    roundTripDeps?: RoundTripDeps,
+  ) => Promise<LintFinding[]>;
+  /**
+   * The synchronous half of the emit stage (I3 + I6 + NUL behaviour) — the
+   * only fidelity work allowed on the pre-`ready` path.
+   */
+  runImportFidelityEmitChecksSync?: (
+    ir: KeyboardIR,
+    emitted: string,
+  ) => LintFinding[];
+  /**
+   * I2 (functional round-trip) on its own. Expensive (two compiles + a
+   * corpus simulation), so the live path runs it AFTER the stage reaches
+   * `ready` and appends its findings to the ready stage's warnings.
+   */
+  runImportFidelityRoundTripCheck?: (
+    ir: KeyboardIR,
+    roundTripDeps?: RoundTripDeps,
+  ) => Promise<LintFinding[]>;
   recognizePatterns?: (ir: KeyboardIR) => { ir: KeyboardIR; recognizedRatio: number };
   classifyRemovalCapabilities?: (ir: KeyboardIR) => Map<string, RemovalCapability>;
   /**
@@ -442,6 +464,13 @@ export function useKeyboardArtifact(
   // rebuilt on every fresh fetch, revoked on teardown / next fetch.
   const prevKeyboardCssBlobUrls = useRef<string[]>([]);
   const runId = useRef(0);
+  // Cancellation token for the in-flight post-ready functional round-trip
+  // (I2). A new compile supersedes the previous artifact, so it retires
+  // the previous pass: without this, every recompile (e.g. each Mechanisms
+  // gallery Apply) stacked another full corpus simulation on the main
+  // thread, and the superseded passes burned CPU to completion even
+  // though their findings were always going to be dropped.
+  const roundTripAbortRef = useRef<{ aborted: boolean } | null>(null);
   const engineRef = useRef<EngineModule | null>(null);
   // Shared engine load+init promise. Assigned by the first run() call that
   // finds it empty; cleared again if the load rejects, so a later run()
@@ -590,6 +619,13 @@ export function useKeyboardArtifact(
     if (engine === null || vfs === null || runId.current !== thisRunId) {
       return;
     }
+    // A new compile supersedes the previous artifact — retire any
+    // round-trip still simulating for it right away, not just when this
+    // compile's own post-ready pass starts.
+    if (roundTripAbortRef.current) {
+      roundTripAbortRef.current.aborted = true;
+      roundTripAbortRef.current = null;
+    }
 
     const isWarmCompile = engine.isReady?.() ?? false;
     setStage({ kind: "compiling", isWarmCompile });
@@ -597,6 +633,12 @@ export function useKeyboardArtifact(
     let result: CompileResult;
     let parsedIr: KeyboardIR | null = null;
     let parsedRemovalCapabilities: Map<string, RemovalCapability> = new Map();
+    // Functional I2 input captured by the parse branch on full runs; the
+    // check itself runs after `ready` publishes (see below).
+    let pendingRoundTrip: {
+      ir: KeyboardIR;
+      deps: Omit<RoundTripDeps, "compileFn" | "simulateFn">;
+    } | null = null;
     // effectiveKeyboardIdRef takes precedence: it is set only when the last
     // vfsTransform application (Track 1 identity rename) actually renamed
     // source/<startId>.* to source/<targetId>.* inside the VFS, so the compile
@@ -671,19 +713,46 @@ export function useKeyboardArtifact(
             // as importKeyboard emits it. A failure here must never break the
             // compile — same posture as parseTouchLayout below.
             let fidelityFindings: LintFinding[] = [];
+            let roundTripInput: {
+              ir: KeyboardIR;
+              deps: Omit<RoundTripDeps, "compileFn" | "simulateFn">;
+            } | null = null;
             if (
               isFullRun &&
               engine.runImportFidelityParseChecks &&
-              engine.runImportFidelityEmitChecks &&
+              engine.runImportFidelityEmitChecksSync &&
               engine.emitKmn
             ) {
               try {
                 const parseFindings = engine.runImportFidelityParseChecks(pr, kmnText);
-                const emitFindings = await engine.runImportFidelityEmitChecks(
+                const emittedKmnText = engine.emitKmn(ir);
+                // Only the SYNCHRONOUS emit checks (I3 + I6 + NUL) run on
+                // this pre-`ready` path. Functional I2 (#882) compiles both
+                // .kmn versions and simulates the generated corpus through
+                // KeymanWeb — seconds to minutes on a real base — and
+                // awaiting it here wedged every base preview at
+                // "Preparing preview…" (the parse branch shares the
+                // Promise.all the ready stage waits on). I2 now runs after
+                // `ready` publishes, off the captured input below, and its
+                // findings are appended to the ready stage's warnings when
+                // they land — the spec-078 publish-after-ready posture,
+                // same as the context-tolerance analysis.
+                const emitFindings = engine.runImportFidelityEmitChecksSync(
                   ir,
-                  engine.emitKmn(ir),
+                  emittedKmnText,
                 );
                 fidelityFindings = [...parseFindings, ...emitFindings];
+                roundTripInput = {
+                  ir,
+                  deps: {
+                    originalKmn: kmnText,
+                    emittedKmn: emittedKmnText,
+                    keyboardId: compileId,
+                    sourceFiles: vfs
+                      .entries("source/")
+                      .map((e) => ({ path: e.path, content: e.content, isBinary: e.isBinary })),
+                  },
+                };
               } catch (fidelityErr: unknown) {
                 devLog.warn("[useKeyboardArtifact] import-fidelity checks failed:", fidelityErr);
               }
@@ -716,7 +785,7 @@ export function useKeyboardArtifact(
               typeof engine.classifyRemovalCapabilities === "function"
                 ? engine.classifyRemovalCapabilities(ir)
                 : new Map();
-            return { ...pr, ir, removalCapabilities: caps, fidelityFindings };
+            return { ...pr, ir, removalCapabilities: caps, fidelityFindings, roundTripInput };
           } catch (parseErr: unknown) {
             // Record the gap so it surfaces as a warning on the ready stage.
             // Do not re-throw — compile must still succeed independently.
@@ -732,6 +801,7 @@ export function useKeyboardArtifact(
         parsedIr = parseResult.ir;
         parsedRemovalCapabilities = parseResult.removalCapabilities;
         fidelityWarnings = formatFidelityWarnings(parseResult.fidelityFindings);
+        pendingRoundTrip = parseResult.roundTripInput;
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;
@@ -805,6 +875,60 @@ export function useKeyboardArtifact(
       readyStage.keyboardCssUrls = prevKeyboardCssBlobUrls.current;
     }
     setStage(readyStage);
+    // Functional I2 (#882) runs only now that `ready` has published — never
+    // on the path the author is waiting on (its two compiles + corpus
+    // simulation wedged every base preview at "Preparing preview…" while
+    // it was awaited pre-ready). Findings append to this ready stage's
+    // runtime warnings when they land; a superseded run's are dropped. If
+    // the simulator chunk cannot load, deps stay undefined and I2 reports
+    // its unavailable hint instead of passing silently.
+    // The start is deferred two macrotask hops so the ready render commits
+    // and paints first: corpus generation + simulation churn the main
+    // thread in microtasks, and starting them in this same turn starved
+    // the ready paint — on the CI runner the preview button stayed
+    // "Preparing preview…" past every consumer's wait window even though
+    // the stage had already flipped to ready (run 38999923387 trace: the
+    // compile finished, then I2's corpus generation began immediately).
+    if (pendingRoundTrip !== null && engine.runImportFidelityRoundTripCheck) {
+      const input = pendingRoundTrip;
+      const roundTripCheck = engine.runImportFidelityRoundTripCheck;
+      const startRoundTrip = () => {
+        void (async () => {
+          if (roundTripAbortRef.current) roundTripAbortRef.current.aborted = true;
+          const abortToken = { aborted: false };
+          roundTripAbortRef.current = abortToken;
+          let deps: RoundTripDeps | undefined;
+          try {
+            const simulateFn = await loadDemoSimulate();
+            deps = {
+              ...input.deps,
+              compileFn: engine.compile,
+              simulateFn,
+              shouldAbort: () => abortToken.aborted,
+            };
+          } catch {
+            deps = undefined;
+          }
+          const findings = await roundTripCheck(input.ir, deps).catch(
+            (err: unknown) => {
+              devLog.warn("[useKeyboardArtifact] functional I2 check failed:", err);
+              return [] as LintFinding[];
+            },
+          );
+          if (runId.current !== thisRunId) return;
+          const extra = formatFidelityWarnings(findings);
+          if (extra.length === 0) return;
+          setStageRaw((prev) =>
+            prev.kind === "ready" && prev.keyboardId === compileId
+              ? { ...prev, runtimeWarnings: [...(prev.runtimeWarnings ?? []), ...extra] }
+              : prev,
+          );
+        })();
+      };
+      setTimeout(() => {
+        setTimeout(startRoundTrip, 0);
+      }, 0);
+    }
     if (analyseToleranceRef.current) launchContextTolerance(thisRunId, parsedIr);
   }, [scaffoldSpec?.keyboardId, onInstantiate, launchContextTolerance]);
 

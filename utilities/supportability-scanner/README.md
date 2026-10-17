@@ -24,7 +24,7 @@ Layer A' (#236) landed, and the checks runnable over a `release/` corpus are now
 
 `layerAPrime` is **`null`** for a `ParseFailure` keyboard (the checks never ran) — distinct from `{ i1ParseComplete: true }` (ran and passed). The Markdown table renders `n/a` for those rows, and the I1/I3 summary counts are denominated over parsed keyboards only, so a parse-failure is never miscounted as I1-clean.
 
-**Why I2-functional and I5 are not wired.** The formal I2 (`checkRoundTrip`) is a **deferred stub**: it needs the Keyman Core keystroke runtime (this build ships kmcmplib, a *compiler*, not Core, a *runtime*), so it only generates a corpus and returns a "deferred" hint. The **structural** round-trip proxy therefore remains the only real `RoundTripDivergence` signal. I5 (`checkSidecarHash`) verifies a per-keyboard `.kmn.imported.sha256` sidecar that the studio writes **at import time** — upstream `release/` keyboards have none, so I5 is N/A for a corpus scan.
+**Why I2-functional and I5 are not wired.** The formal I2 (`checkRoundTrip`) is **functional since #882**: it compiles the original and emitted .kmn with kmcmplib and diffs the D7 corpus through the KeymanWeb JS runtime (`simulate()`) at the import/emit gate. That costs ~2 ms/input, so over a whole corpus batch it would take hours — the scanner therefore keeps the **structural** round-trip proxy as its `RoundTripDivergence` signal. I5 (`checkSidecarHash`) verifies a per-keyboard `.kmn.imported.sha256` sidecar that the studio writes **at import time** — upstream `release/` keyboards have none, so I5 is N/A for a corpus scan.
 
 The **structural** round-trip is conservative: it flags any case where re-emitting and re-parsing changes the IR — including emit-fidelity gaps in the codec itself (e.g. SMP-literal rules that survive the first parse as typed rules but are re-emitted into a form the parser then treats as opaque). These are real codec round-trip gaps, distinct from the *functional* equivalence the contract's `RoundTripDivergence` is ultimately defined by. The `i2` field in the JSON records which kind ran (`structural-pass` / `structural-divergence`).
 
@@ -81,5 +81,5 @@ Full-corpus run time is well under the 5-minute budget (≈40 s for ~925 keyboar
 
 ## Not yet implemented
 
-- **Functional I2 (Keyman Core keystroke runtime)** — `checkRoundTrip` is a deferred stub; until Core integration lands, the structural proxy stands in for `RoundTripDivergence`. Tracked as the I2 follow-up.
+- **Functional I2 in the scanner** — `checkRoundTrip` is functional at the import/emit gate (#882, KeymanWeb JS runtime via `simulate()`); the scanner keeps the structural proxy for batch cost reasons. Native Keyman Core fidelity remains a separate phase-2 item.
 - **I5 (sidecar hash)** — not applicable to a `release/` corpus scan (no per-keyboard import sidecar exists); it runs only on studio-imported keyboards.

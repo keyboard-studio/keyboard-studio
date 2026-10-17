@@ -4,6 +4,34 @@ All notable changes to the `@keyboard-studio/contracts` package are documented
 here. The package follows [0ver](https://0ver.org/) semantics while pre-1.0: a
 breaking change bumps the **minor** version.
 
+## [0.20.0] — 2026-10-16
+
+### Breaking contract change (0ver minor bump; §18 price paid in full)
+
+Named deadkeys are modelled in KeyboardIR (#2238, implementing the #2232
+km-lead ruling — the 076 FR-004 codec closure for the named-deadkey half).
+
+- `StoreItem`, `ContextElement`, and `OutputElement` each gain a
+  name-carrying variant `{ kind: "namedDeadkey"; name: string }` alongside
+  the unchanged numeric `{ kind: "deadkey"; id: number }`. The name is the
+  deadkey's identity in Keyman and is stored verbatim (per-occurrence
+  spelling); emit reproduces `dk(name)`. All-hex tokens stay numeric.
+  Exhaustive switches over the element unions must state what a named
+  deadkey does — that compile-time blast is the audit working as intended.
+  §18 reading recorded in the PR: whether this is read as a type change to
+  the deadkey variant (major tier) or a new typed node for a feature
+  previously held as `RawKmnFragment` (minor tier), the higher tier is
+  paid and ratification recorded in `docs/spec-signoff.md`.
+- `ir/deadkeys.ts` gains the ONE shared named-deadkey identity definition:
+  `deadkeyNameKey` (ASCII A–Z fold only — kmcmplib's fold, settled by
+  compilation), `isNamedDeadkeyElement`, and `isNamedDeadkeyName` (the
+  non-hex boundary). `listDeadkeys` lists named deadkeys from the typed
+  elements (fragment scrape retained for persisted pre-#2238 copies; both
+  merge by identity key, typed wins).
+- `RemovalCapability`'s `"not-removable:opaque"` documents its deliberate
+  extension to guarded typed rules containing named deadkeys (#2238
+  Decision 1b) — no value changes.
+
 ## [0.19.0] — 2026-10-06
 
 ### Additive contract change (0ver minor bump, non-breaking)

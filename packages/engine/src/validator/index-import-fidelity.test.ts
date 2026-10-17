@@ -18,6 +18,8 @@ import { describe, it, expect } from "vitest";
 import {
   runImportFidelityParseChecks,
   runImportFidelityEmitChecks,
+  runImportFidelityEmitChecksSync,
+  runImportFidelityRoundTripCheck,
   checkSidecarHash,
 } from "./index-import-fidelity.js";
 import { buildImportReport, importKeyboard } from "../codec/import-keyboard.js";
@@ -103,11 +105,11 @@ describe("runImportFidelityParseChecks", () => {
     expect(codes).toContain("KM_INFO_OPAQUE_FEATURE_INVENTORY");
   });
 
-  it("does NOT include I2 (KM_HINT_ROUND_TRIP_DEFERRED) — that is an emit-stage check", () => {
+  it("does NOT include I2 (KM_HINT_ROUND_TRIP_UNAVAILABLE) — that is an emit-stage check", () => {
     const parseResult = parse(CLEAN_KMN, "test");
     const findings = runImportFidelityParseChecks(parseResult, CLEAN_KMN);
     const codes = findings.map((f) => f.code);
-    expect(codes).not.toContain("KM_HINT_ROUND_TRIP_DEFERRED");
+    expect(codes).not.toContain("KM_HINT_ROUND_TRIP_UNAVAILABLE");
   });
 
   it("does NOT include I3 (KM_WARN_HEADER_FIELD_MISSING) — that is an emit-stage check", () => {
@@ -139,11 +141,11 @@ describe("runImportFidelityParseChecks", () => {
 // ---------------------------------------------------------------------------
 
 describe("runImportFidelityEmitChecks", () => {
-  it("includes KM_HINT_ROUND_TRIP_DEFERRED (I2 stub) finding", async () => {
+  it("includes KM_HINT_ROUND_TRIP_UNAVAILABLE (I2, no harness supplied) finding", async () => {
     const ir = makeIR();
     const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
     const codes = findings.map((f) => f.code);
-    expect(codes).toContain("KM_HINT_ROUND_TRIP_DEFERRED");
+    expect(codes).toContain("KM_HINT_ROUND_TRIP_UNAVAILABLE");
   });
 
   it("does NOT include I1 (KM_ERROR_PARSE_INCOMPLETE) -- parse-stage only", async () => {
@@ -160,17 +162,62 @@ describe("runImportFidelityEmitChecks", () => {
     expect(codes).not.toContain("KM_INFO_OPAQUE_FEATURE_INVENTORY");
   });
 
-  it("returns at least 1 finding (the I2 deferred hint)", async () => {
+  it("returns at least 1 finding (the I2 unavailable hint)", async () => {
     const ir = makeIR();
     const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
     expect(findings.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("returns a finding with severity 'hint' for the I2 stub", async () => {
+  it("returns a finding with severity 'hint' for I2 without a harness", async () => {
     const ir = makeIR();
     const findings = await runImportFidelityEmitChecks(ir, EMITTED_WITH_HEADERS);
-    const hintFinding = findings.find((f) => f.code === "KM_HINT_ROUND_TRIP_DEFERRED");
+    const hintFinding = findings.find((f) => f.code === "KM_HINT_ROUND_TRIP_UNAVAILABLE");
     expect(hintFinding?.severity).toBe("hint");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The split emit stage (publish-after-ready): the studio's pre-`ready` path
+// runs only the sync half; I2 runs separately after `ready` publishes.
+// ---------------------------------------------------------------------------
+
+/** Emitted text missing the &COPYRIGHT store the IR header carries — I3 fires. */
+const EMITTED_MISSING_COPYRIGHT = [
+  "store(&VERSION) '10.0'",
+  "store(&NAME) 'Test Keyboard'",
+  "store(&KEYBOARDVERSION) '1.0'",
+  "",
+  "begin Unicode > use(main)",
+  "",
+  "group(main) using keys",
+  "",
+  "+ [K_A] > 'a'",
+].join("\n");
+
+describe("runImportFidelityEmitChecksSync / runImportFidelityRoundTripCheck", () => {
+  it("sync half carries the emit-stage checks but NO I2 finding of any kind", () => {
+    const ir = makeIR();
+    const findings = runImportFidelityEmitChecksSync(ir, EMITTED_MISSING_COPYRIGHT);
+    const codes = findings.map((f) => f.code);
+    expect(codes).toContain("KM_WARN_HEADER_FIELD_MISSING");
+    expect(codes.some((c) => c.includes("ROUND_TRIP"))).toBe(false);
+  });
+
+  it("round-trip half returns only I2 findings (unavailable hint without a harness)", async () => {
+    const ir = makeIR();
+    const findings = await runImportFidelityRoundTripCheck(ir);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings.every((f) => f.code.includes("ROUND_TRIP"))).toBe(true);
+  });
+
+  it("the composed emit stage is exactly round-trip findings ++ sync findings", async () => {
+    const ir = makeIR();
+    const composed = await runImportFidelityEmitChecks(ir, EMITTED_MISSING_COPYRIGHT);
+    const parts = [
+      ...(await runImportFidelityRoundTripCheck(ir)),
+      ...runImportFidelityEmitChecksSync(ir, EMITTED_MISSING_COPYRIGHT),
+    ];
+    expect(composed).toEqual(parts);
   });
 });
 

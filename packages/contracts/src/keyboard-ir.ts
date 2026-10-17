@@ -39,6 +39,17 @@ export type StoreItem =
   | { kind: "char"; value: string }
   | { kind: "vkey"; name: string }
   | { kind: "deadkey"; id: number }
+  /**
+   * A named deadkey reference, `dk(name)` with a non-hex identifier (#2238,
+   * implementing the #2232 ruling). The name IS the deadkey's identity in
+   * Keyman (auto-registered on first use; the compiler folds it to an
+   * internal number) and is stored verbatim — the spelling of this
+   * occurrence. Identity comparisons fold ASCII case only, via
+   * `deadkeyNameKey` in `ir/deadkeys.ts`; emit reproduces `dk(name)`
+   * exactly as stored. All-hex tokens (`dk(dead)`, `dk(cafe)`) stay on the
+   * numeric `deadkey` variant — the hex boundary does not move.
+   */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "any" }
   | { kind: "raw"; text: string };
 
@@ -47,6 +58,8 @@ export type ContextElement =
   | { kind: "char"; value: string }
   | { kind: "vkey"; name: string; modifiers: string[] }
   | { kind: "deadkey"; id: number }
+  /** Named deadkey reference `dk(name)` — see the StoreItem variant. */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "any"; storeRef: string }
   | { kind: "notany"; storeRef: string }
   | { kind: "context"; offset: number }
@@ -74,6 +87,8 @@ export type ContextElement =
 export type OutputElement =
   | { kind: "char"; value: string }
   | { kind: "deadkey"; id: number }
+  /** Named deadkey reference `dk(name)` — see the StoreItem variant. */
+  | { kind: "namedDeadkey"; name: string }
   | { kind: "beep" }
   /**
    * The `nul` keyword — the rule produces nothing (suppression). Typed per
@@ -264,11 +279,18 @@ export interface TouchKeyIR {
    * Wire-format encoding preservation for {@link sp} / {@link width} /
    * {@link pad} (#2083). The parser normalizes those fields to numbers for
    * consumers, but records the source encoding here so the emitter writes
-   * back the source form (string vs number) instead of re-encoding — a
-   * numeric `1` in the source must not become `"1"` on emit, because the
-   * scaffolder's `nextlayer` defaulting reads the raw wire value and treats
-   * the two encodings differently. Absent on synthesized keys; the emitter
-   * then uses the Keyman-canonical string form.
+   * back the source form (string vs number) instead of re-encoding — an
+   * unedited key round-trips byte-faithfully. The hint is a fidelity
+   * record only: no consumer may treat the two encodings as semantically
+   * different (the scaffolder's `nextlayer` defaulting reads the numeric
+   * value, #2215). Absent on synthesized keys; the emitter then uses the
+   * Keyman-canonical string form.
+   *
+   * Self-validating (#2216): a hint is honoured only while it still denotes
+   * the field's current numeric value (see `resolveWireEncoding`). A
+   * mutator that changes the numeric deletes the matching hint; a hint that
+   * survives anyway (a writer that forgot, a hand-built IR) is ignored at
+   * emit in favour of the current value — never the other way round.
    */
   spWire?: string | number;
   /** Wire-format encoding preservation for {@link width}; see {@link spWire}. */

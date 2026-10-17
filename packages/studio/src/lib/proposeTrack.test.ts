@@ -12,7 +12,7 @@ describe("proposeTrack", () => {
     const p = proposeTrack("ewo", ["ewo"]);
     expect(p.track).toBe("adapt");
     expect(p.basis).toBe("same-language");
-    expect(p.reason).toContain("Suggested because");
+    expect(p.params).toEqual({ target: "ewo" });
   });
 
   it("proposes adapt when the target spells out the script the base tag carries", () => {
@@ -33,18 +33,21 @@ describe("proposeTrack", () => {
     const p = proposeTrack("ewo", ["fr"]);
     expect(p.track).toBe("copy");
     expect(p.basis).toBe("different-language");
+    expect(p.params).toEqual({ base: "fr", target: "ewo" });
   });
 
   it("proposes copy for a multi-language base, even one that includes the target", () => {
     const p = proposeTrack("en", ["en", "id", "ms", "ht"]);
     expect(p.track).toBe("copy");
     expect(p.basis).toBe("multiple-languages");
+    expect(p.params).toEqual({ count: 4, target: "en" });
   });
 
   it("proposes copy when the script differs for the same language", () => {
     const p = proposeTrack("hi-Latn", ["hi-Deva"]);
     expect(p.track).toBe("copy");
     expect(p.basis).toBe("different-script");
+    expect(p.params).toEqual({ base: "hi-Deva", target: "hi-Latn" });
     expect(proposeTrack("az-Arab", ["az-Latn"]).track).toBe("copy");
   });
 
@@ -64,15 +67,22 @@ describe("proposeTrack", () => {
     }
   });
 
-  it("always gives a one-line Suggested-because reason", () => {
+  it("always names a basis and the params its catalogue reason interpolates", () => {
+    // The reason text itself is catalogue copy (track.proposal.reason.*),
+    // resolved by the caption consumer — this proposer owns only the
+    // basis and the interpolation values for it.
+    expect(proposeTrack("ewo", ["ewo"]).params).toEqual({ target: "ewo" });
+    expect(proposeTrack("ewo", ["fr"]).params).toEqual({ base: "fr", target: "ewo" });
+    expect(proposeTrack("ewo", undefined).params).toEqual({ target: "ewo" });
+    expect(proposeTrack(undefined, undefined).params).toEqual({});
     for (const p of [
       proposeTrack("ewo", ["ewo"]),
       proposeTrack("ewo", ["fr"]),
       proposeTrack("ewo", undefined),
       proposeTrack(undefined, undefined),
     ]) {
-      expect(p.reason).toMatch(/^Suggested because /);
-      expect(p.reason).not.toContain("\n");
+      expect(p.basis).toBeTruthy();
+      expect(p.params).toBeTypeOf("object");
     }
   });
 });

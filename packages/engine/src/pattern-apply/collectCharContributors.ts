@@ -529,6 +529,11 @@ function contextElementTokenDisplay(
     }
     case 'deadkey':
       return triggerKeystrokeByDeadkeyId.get(el.id);
+    case 'namedDeadkey':
+      // Resolving a trigger keystroke BY NAME is consumer adoption,
+      // deferred by the #2238 ruling — abort (undefined) like the other
+      // unresolvable kinds below, never guess.
+      return undefined;
     case 'any': {
       if (slotIndex === undefined || el !== alignedAnyElement) return undefined;
       const store = storeMap.get(el.storeRef);

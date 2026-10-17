@@ -27,6 +27,13 @@ export type RemovalCapability =
    * The node is a `RawKmnFragment` — the codec could not map it to a typed IR
    * node, so the editor cannot safely rewrite it.  Removing it here would have
    * no effect on the compiled keyboard.
+   *
+   * Also the GUARDED posture for typed rules containing a name-carrying
+   * deadkey element (#2238): those rules were fragments (hence this value)
+   * until the codec typed `dk(name)`, and `classifyRemovalCapabilities`
+   * keeps them at this posture — Decision 1b — until a separate consumer
+   * ruling reclassifies them. Do not "fix" the guard away on the grounds
+   * that the node is now typed; the extension is deliberate.
    */
   | "not-removable:opaque"
 

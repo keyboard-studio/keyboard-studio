@@ -1,9 +1,11 @@
 // useKeyboardArtifact — Layer A′ import-fidelity wiring proof.
 //
 // The live import path (this hook's full-run parse branch) must run the
-// engine's importKeyboard fidelity composition — runImportFidelityParseChecks
-// + runImportFidelityEmitChecks — once per import, and surface the
-// warning/error findings on the ready stage's runtime-warning channel.
+// engine's importKeyboard fidelity composition once per import — the parse
+// stage + the SYNCHRONOUS emit stage (I3/I6) before `ready` publishes, and
+// functional I2 (round-trip) AFTER `ready`, appending its findings to the
+// ready stage's runtime-warning channel when they land — and surface the
+// warning/error findings on that channel.
 //
 // Unlike useKeyboardArtifact.test.ts, this file does NOT mock parseKmn /
 // recognizePatterns / emitKmn: the real codec parses the seeded .kmn, the
@@ -12,15 +14,16 @@
 // two fidelity stages are wrapped in pass-through spies so the test can pin
 // the invocation contract:
 //
-//   1. Both stages fire exactly once on a full run (the import moment).
-//   2. Neither stage re-fires on recompile() — fidelity is import-time only,
+//   1. The parse + sync emit stages fire exactly once on a full run (the
+//      import moment), before `ready`; I2 fires exactly once, after `ready`.
+//   2. No stage re-fires on recompile() — fidelity is import-time only,
 //      outside the debounce cycle.
 //   3. A real I3 finding (KM_WARN_HEADER_FIELD_MISSING — the seeded .kmn has
 //      no &COPYRIGHT store) reaches runtimeWarnings prefixed
 //      "[import-fidelity]". No bcp47 finding surfaces: a .kmn carries no
 //      language store (tags live in the package descriptor), so I3 does
 //      not check for one.
-//   4. The always-on info/hint findings (I4 inventory, I2 stub) do NOT
+//   4. The always-on info/hint findings (I4 inventory, I2 unavailable hint) do NOT
 //      surface — they are ImportReport metadata, not author diagnostics.
 //   5. Instantiation still proceeds (onInstantiate fires, ir non-null):
 //      fidelity findings are non-blocking.
@@ -72,34 +75,46 @@ const mockEngine = {
 
 // Pass-through spies over the real fidelity stages. The real implementations
 // are bound inside the vi.mock factory (importOriginal), which runs before
-// the hook loads the engine.
+// the hook loads the engine. The round-trip spy deliberately drops the
+// harness deps (mirroring the old emit spy): with no harness I2 answers its
+// unavailable hint immediately, so this file never runs a real simulation —
+// the harness itself is proven in the engine round-trip suites.
 type ParseChecksFn = (
   parseResult: { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> },
   source: string,
 ) => LintFinding[];
-type EmitChecksFn = (ir: KeyboardIR, emitted: string) => Promise<LintFinding[]>;
+type EmitChecksSyncFn = (ir: KeyboardIR, emitted: string) => LintFinding[];
 
 let realParseChecks: ParseChecksFn | null = null;
-let realEmitChecks: EmitChecksFn | null = null;
+let realEmitChecksSync: EmitChecksSyncFn | null = null;
+let realRoundTripCheck: ((ir: KeyboardIR) => Promise<LintFinding[]>) | null = null;
 
 const fidelityParseSpy = vi.fn((parseResult: Parameters<ParseChecksFn>[0], source: string) => {
   if (realParseChecks === null) throw new Error("real parse checks not bound");
   return realParseChecks(parseResult, source);
 });
-const fidelityEmitSpy = vi.fn((ir: KeyboardIR, emitted: string) => {
-  if (realEmitChecks === null) throw new Error("real emit checks not bound");
-  return realEmitChecks(ir, emitted);
+const fidelityEmitSyncSpy = vi.fn((ir: KeyboardIR, emitted: string) => {
+  if (realEmitChecksSync === null) throw new Error("real sync emit checks not bound");
+  return realEmitChecksSync(ir, emitted);
+});
+const fidelityRoundTripSpy = vi.fn((ir: KeyboardIR) => {
+  if (realRoundTripCheck === null) throw new Error("real round-trip check not bound");
+  return realRoundTripCheck(ir);
 });
 
 vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   const real = await importOriginal<typeof import("@keyboard-studio/engine")>();
   realParseChecks = real.runImportFidelityParseChecks as ParseChecksFn;
-  realEmitChecks = real.runImportFidelityEmitChecks as EmitChecksFn;
+  realEmitChecksSync = real.runImportFidelityEmitChecksSync as EmitChecksSyncFn;
+  realRoundTripCheck = real.runImportFidelityRoundTripCheck as (
+    ir: KeyboardIR,
+  ) => Promise<LintFinding[]>;
   return {
     ...real,
     ...mockEngine,
     runImportFidelityParseChecks: fidelityParseSpy,
-    runImportFidelityEmitChecks: fidelityEmitSpy,
+    runImportFidelityEmitChecksSync: fidelityEmitSyncSpy,
+    runImportFidelityRoundTripCheck: fidelityRoundTripSpy,
   };
 });
 
@@ -121,7 +136,7 @@ afterEach(() => {
 });
 
 describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
-  it("runs both fidelity stages once per import and surfaces I3 on runtimeWarnings", async () => {
+  it("runs the fidelity stages once per import (I2 after ready) and surfaces I3 on runtimeWarnings", async () => {
     const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
 
     const onInstantiate = vi.fn<Parameters<OnInstantiateCallback>, void>();
@@ -140,9 +155,16 @@ describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
     const [, calledOpts] = onInstantiate.mock.calls[0]!;
     expect(calledOpts.ir).not.toBeNull();
 
-    // Both fidelity stages fired exactly once (the import moment).
+    // The pre-`ready` fidelity stages fired exactly once (the import moment).
     expect(fidelityParseSpy).toHaveBeenCalledTimes(1);
-    expect(fidelityEmitSpy).toHaveBeenCalledTimes(1);
+    expect(fidelityEmitSyncSpy).toHaveBeenCalledTimes(1);
+
+    // I2 (round-trip) fires AFTER ready — the stage above was already
+    // `ready` when this lands — exactly once, and its unavailable hint
+    // (this spy supplies no harness) stays off the author channel.
+    await vi.waitFor(() => {
+      expect(fidelityRoundTripSpy).toHaveBeenCalledTimes(1);
+    });
 
     // The real I3 finding reached the runtime-warning channel — the missing
     // copyright store, specifically.
@@ -161,7 +183,7 @@ describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
 
     // The always-on info/hint findings stay off the channel.
     expect(warnings.some((w) => w.includes("KM_INFO_OPAQUE_FEATURE_INVENTORY"))).toBe(false);
-    expect(warnings.some((w) => w.includes("KM_HINT_ROUND_TRIP_DEFERRED"))).toBe(false);
+    expect(warnings.some((w) => w.includes("KM_HINT_ROUND_TRIP_UNAVAILABLE"))).toBe(false);
 
     // recompile() re-parses the working copy but must NOT re-run fidelity.
     await act(async () => {
@@ -170,7 +192,8 @@ describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
     });
 
     expect(fidelityParseSpy).toHaveBeenCalledTimes(1);
-    expect(fidelityEmitSpy).toHaveBeenCalledTimes(1);
+    expect(fidelityEmitSyncSpy).toHaveBeenCalledTimes(1);
+    expect(fidelityRoundTripSpy).toHaveBeenCalledTimes(1);
     expect(onInstantiate).toHaveBeenCalledTimes(1);
   });
 });

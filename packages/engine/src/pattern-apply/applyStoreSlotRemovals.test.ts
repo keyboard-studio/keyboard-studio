@@ -1927,4 +1927,31 @@ describe("analyzeStores — store role (spec 051)", () => {
     const ir = makeTestIR([{ nodeId: "group#main", name: "main", usingKeys: true, rules: [rule], readonly: false }], [src]);
     expect(storeRoleOf(analyzeStores(ir), "srcX")).toBe("output");
   });
+
+  it("a rule containing a namedDeadkey element is invisible to the analysis (#2238 pin D7)", () => {
+    // Fragment-era posture preserved: a named fan-out contributed nothing
+    // to analyzeStores when it was an opaque fragment, so its stores read
+    // as plain unreferenced stores (simple drops) — typed named fan-outs
+    // must not silently gain coordinated pair-drop or blocked posture.
+    const inStore = makeInputStore("store#namedIn", "namedIn", ["a", "e"]);
+    const outStore = makeOutputStore("store#namedOut", "namedOut", [
+      { kind: "char", value: "á" },
+      { kind: "char", value: "é" },
+    ]);
+    const rule: IRRule = {
+      nodeId: "rule#named-fanout",
+      context: [
+        { kind: "namedDeadkey", name: "acute" },
+        { kind: "raw", text: "+" },
+        { kind: "any", storeRef: "namedIn" },
+      ],
+      output: [{ kind: "index", storeRef: "namedOut", offset: 2 }],
+    };
+    const group: IRGroup = { nodeId: "group#main", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [inStore, outStore]);
+    const analysis = analyzeStores(ir);
+    expect(storeRoleOf(analysis, "namedIn")).toBe("unused");
+    expect(storeRoleOf(analysis, "namedOut")).toBe("unused");
+    expect(classifyStoreSlotEdit(outStore, ir)).toEqual({ mode: "drop", coordinatedWith: [] });
+  });
 });

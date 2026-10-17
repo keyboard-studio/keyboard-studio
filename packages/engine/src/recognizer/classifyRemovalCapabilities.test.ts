@@ -18,7 +18,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { classifyRemovalCapabilities } from "./classifyRemovalCapabilities.js";
 import { recognizePatterns } from "./index.js";
-import { parse } from "../codec/index.js";
+import { parse, emit } from "../codec/index.js";
+import { carveFilterIr } from "../pattern-apply/carveFilterIr.js";
 import type {
   KeyboardIR,
   IRGroup,
@@ -27,6 +28,7 @@ import type {
   RawKmnFragment,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
+import { buildEuroLatinIR } from "./rules/__fixtures__/s02GeneralizedIr.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -345,6 +347,37 @@ describe("classifyRemovalCapabilities — decision-order precedence", () => {
 });
 
 // ---------------------------------------------------------------------------
+// D. #2233: the output-store alias for generalised S-02 fan-outs is gated on
+// S-02 ownership. The raw-context fanShape check cannot see the postfix /
+// '+'-separated shapes, and isParallelIndexFanOut is deliberately NOT
+// widened — an un-owned generalised body stays context-sensitive.
+// ---------------------------------------------------------------------------
+
+describe("classifyRemovalCapabilities — #2233 ownership-gated alias", () => {
+  it("D1: S-02-owned postfix fan-out earns the output-store alias", () => {
+    const { ir } = buildEuroLatinIR();
+    recognizePatterns(ir);
+    const map = classifyRemovalCapabilities(ir);
+
+    // The postfix body is owned by its S-02 pattern → slot-fill via Decision 2,
+    // and its output store gains the alias through ownership (fanShape is
+    // false on the raw [char, dk, raw(+), any] context).
+    expect(map.get("rule#body-x")).toBe("removable:slot-fill");
+    expect(map.get("store#Ox")).toBe("removable:slot-fill");
+    expect(map.get("store#Oq")).toBe("removable:slot-fill");
+  });
+
+  it("D2: UN-owned postfix fan-out earns NO alias and stays context-sensitive", () => {
+    const { ir } = buildEuroLatinIR();
+    // No recognizePatterns: no ownership stamps.
+    const map = classifyRemovalCapabilities(ir);
+
+    expect(map.get("rule#body-x")).toBe("not-removable:context-sensitive");
+    expect(map.has("store#Ox")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // C. AC canaries — real keyboards (skipped when sibling checkout absent)
 // ---------------------------------------------------------------------------
 
@@ -386,6 +419,7 @@ const kbdusPath = path.join(KEYBOARDS_ROOT_BASIC, "basic_kbdus/source/basic_kbdu
 // §7.5 regression canary paths
 const silIpaPath = path.join(KEYBOARDS_ROOT_SIL, "sil_ipa/source/sil_ipa.kmn");
 const vietnameseTelexPath = path.join(KEYBOARDS_ROOT_V, "vietnamese_telex/source/vietnamese_telex.kmn");
+const vietnameseVniPath = path.join(KEYBOARDS_ROOT_V, "vietnamese_vni/source/vietnamese_vni.kmn");
 const csPinyinPath = path.join(KEYBOARDS_ROOT_C, "cs_pinyin/source/cs_pinyin.kmn");
 const silYoruba8Path = path.join(KEYBOARDS_ROOT_SIL, "sil_yoruba8/source/sil_yoruba8.kmn");
 const elPasifikaPath = path.join(KEYBOARDS_ROOT_EL, "el_pasifika/source/el_pasifika.kmn");
@@ -396,6 +430,7 @@ const kbdfrExists = fs.existsSync(kbdfrPath);
 const kbdusExists = fs.existsSync(kbdusPath);
 const silIpaExists = fs.existsSync(silIpaPath);
 const vietnameseTelexExists = fs.existsSync(vietnameseTelexPath);
+const vietnameseVniExists = fs.existsSync(vietnameseVniPath);
 const csPinyinExists = fs.existsSync(csPinyinPath);
 const silYoruba8Exists = fs.existsSync(silYoruba8Path);
 const elPasifikaExists = fs.existsSync(elPasifikaPath);
@@ -611,6 +646,23 @@ describe("classifyRemovalCapabilities — §7.5 regression canaries", () => {
     },
   );
 
+  it.skipIf(!vietnameseVniExists)(
+    "D5: vietnamese_vni multi-tone S-03 clusters lift with distinct pattern ids (#2225)",
+    () => {
+      const kmnText = fs.readFileSync(vietnameseVniPath, "utf-8");
+      const { ir } = parse(kmnText, "vietnamese_vni");
+      // Regression for #2225: five tone clusters share the base store
+      // `vowels`; a base-store-only patternId made this throw
+      // "Ownership drift" from assertOwnershipConsistency.
+      const result = recognizePatterns(ir);
+      const s03 = result.ir.recognizedPatterns.filter((p) =>
+        p.id.startsWith("context_sensitive_substitution#"),
+      );
+      expect(s03.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(s03.map((p) => p.id)).size).toBe(s03.length);
+    },
+  );
+
   it.skipIf(!csPinyinExists)(
     "D3: cs_pinyin call(...) rules are RawKmnFragment → not-removable:opaque",
     () => {
@@ -739,5 +791,165 @@ describe("classifyRemovalCapabilities — isParallelIndexFanOut regression", () 
     const map = classifyRemovalCapabilities(ir);
     expect(map.get("rule#bare-any")).toBe("removable:slot-fill");
     expect(map.get("store#defaultU")).toBe("removable:slot-fill");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F. Named-deadkey posture guard (#2238, Decision 1b)
+// ---------------------------------------------------------------------------
+
+describe("classifyRemovalCapabilities — named deadkey guard (#2238)", () => {
+  const inputStore = makeCharStore("store#acuteIn", "acuteIn", "ae");
+  const outputStore = makeCharStore("store#acuteOut", "acuteOut", "áé");
+
+  function namedTrigger(nodeId: string): IRRule {
+    return {
+      nodeId,
+      context: [{ kind: "vkey", name: "K_X", modifiers: [] }],
+      output: [{ kind: "namedDeadkey", name: "acute" }],
+    };
+  }
+  function namedBody(nodeId: string): IRRule {
+    return {
+      nodeId,
+      context: [
+        { kind: "namedDeadkey", name: "acute" },
+        { kind: "raw", text: "+" },
+        { kind: "any", storeRef: "acuteIn" },
+      ],
+      output: [{ kind: "index", storeRef: "acuteOut", offset: 2 }],
+    };
+  }
+  function namedChain(nodeId: string): IRRule {
+    return {
+      nodeId,
+      context: [
+        { kind: "namedDeadkey", name: "acute" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_A", modifiers: [] },
+      ],
+      output: [{ kind: "char", value: "á" }],
+    };
+  }
+  function namedGroup(rules: IRRule[]): IRGroup {
+    return {
+      nodeId: "group#main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules,
+    };
+  }
+
+  it("F1: typed trigger/body/chain named rules are ALL not-removable:opaque, with NO output-store alias", () => {
+    const ir = makeTestIR(
+      [namedGroup([namedTrigger("rule#trig"), namedBody("rule#body"), namedChain("rule#chain")])],
+      [inputStore, outputStore],
+    );
+    const map = classifyRemovalCapabilities(ir);
+    expect(map.get("rule#trig")).toBe("not-removable:opaque");
+    expect(map.get("rule#body")).toBe("not-removable:opaque");
+    expect(map.get("rule#chain")).toBe("not-removable:opaque");
+    // The guard fires before the fan-out alias emission: the body rule's
+    // output store gets NO removable:slot-fill alias entry.
+    expect(map.has("store#acuteOut")).toBe(false);
+  });
+
+  it("F2: the same three rules as pre-#2238 fragments classify identically (posture parity)", () => {
+    const frag = (nodeId: string, sourceText: string): RawKmnFragment => ({
+      nodeId,
+      origin: "imported",
+      sourceText,
+      reason: "named-deadkey",
+    });
+    const ir = withRaw(makeTestIR([namedGroup([])], [inputStore, outputStore]), [
+      frag("frag#trig", "+ [K_X] > dk(acute)"),
+      frag("frag#body", "dk(acute) + any(acuteIn) > index(acuteOut, 2)"),
+      frag("frag#chain", "dk(acute) + [K_A] > 'á'"),
+    ]);
+    const map = classifyRemovalCapabilities(ir);
+    expect(map.get("frag#trig")).toBe("not-removable:opaque");
+    expect(map.get("frag#body")).toBe("not-removable:opaque");
+    expect(map.get("frag#chain")).toBe("not-removable:opaque");
+    expect(map.has("store#acuteOut")).toBe(false);
+  });
+
+  it("F3: guard precedes Decision 2 — a named body hand-stamped ownedByPattern (S-02) stays opaque", () => {
+    const body = { ...namedBody("rule#body"), ownedByPattern: "pat#s02" };
+    const ir = {
+      ...makeTestIR([namedGroup([body])], [inputStore, outputStore]),
+      recognizedPatterns: [
+        {
+          id: "pat#s02",
+          title: "S-02 fixture",
+          description: "fixture",
+          category: "deadkey" as never,
+          appliesTo: [],
+          strategyId: "S-02" as never,
+        },
+      ],
+    } as KeyboardIR;
+    const map = classifyRemovalCapabilities(ir);
+    // Without the guard, Decision 2 would inherit removable:slot-fill.
+    expect(map.get("rule#body")).toBe("not-removable:opaque");
+    expect(map.has("store#acuteOut")).toBe(false);
+  });
+
+  it("F4: whole-rule deletion parity — carve-deleting the named rules yields the fragment-era result", () => {
+    const KMN = [
+      "store(&VERSION) '10.0'",
+      "store(&NAME) 'Guard Parity'",
+      "store(&TARGETS) 'any'",
+      "store(acuteIn) 'ae'",
+      "store(acuteOut) 'áé'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [K_X] > dk(acute)",
+      "dk(acute) + any(acuteIn) > index(acuteOut, 2)",
+      "dk(acute) + [K_A] > U+00E1",
+      "+ [K_B] > 'b'",
+      "",
+    ].join("\n");
+    const post = parse(KMN, "guard-parity").ir;
+    const group = post.groups[0]!;
+    const namedIds = group.rules
+      .filter((r) =>
+        r.context.some((c) => c.kind === "namedDeadkey") ||
+        r.output.some((c) => c.kind === "namedDeadkey"),
+      )
+      .map((r) => r.nodeId);
+    expect(namedIds).toHaveLength(3);
+
+    // POST (#2238): delete the three typed rules.
+    const postDeleted = emit(carveFilterIr(post, new Set(namedIds)));
+
+    // PRE (fragment era): the same keyboard with the three rules carried as
+    // named-deadkey fragments; delete the fragments instead.
+    const ruleLines = new Map([
+      [namedIds[0], "+ [K_X] > dk(acute)"],
+      [namedIds[1], "dk(acute) + any(acuteIn) > index(acuteOut, 2)"],
+      [namedIds[2], "dk(acute) + [K_A] > U+00E1"],
+    ]);
+    const pre: KeyboardIR = {
+      ...post,
+      groups: post.groups.map((g) => ({
+        ...g,
+        rules: g.rules.filter((r) => !namedIds.includes(r.nodeId)),
+      })),
+      raw: namedIds.map((id, i) => ({
+        nodeId: `frag#${i}`,
+        origin: "imported" as const,
+        sourceText: ruleLines.get(id)!,
+        reason: "named-deadkey",
+        sourceLine: 8 + i,
+        groupNodeId: group.nodeId,
+      })),
+    };
+    const preDeleted = emit(carveFilterIr(pre, new Set(["frag#0", "frag#1", "frag#2"])));
+
+    expect(postDeleted).toBe(preDeleted);
+    expect(postDeleted).not.toContain("dk(acute");
+    expect(postDeleted).toContain("store(acuteOut) 'áé'");
+    expect(postDeleted).toContain("+ [K_B] > U+0062");
   });
 });

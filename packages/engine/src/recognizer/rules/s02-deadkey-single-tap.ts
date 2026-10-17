@@ -1,27 +1,23 @@
-import type {
-  KeyboardIR,
-  IRGroup,
-  IRRule,
-  Pattern,
-} from "@keyboard-studio/contracts";
+import type { IRRule, KeyboardIR, Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef, storeRef } from "../node-refs.js";
-import { storeItemsToCharString, formatVKeyModifiers, formatDkName, isBehaviourOwned } from "../utils.js";
-import { isDeadkeyOnlyOutput } from "../../shared/rule-shape.js";
+import { storeItemsToCharString, formatDkName } from "../utils.js";
+import { buildS02Fragment, findS02Families } from "../s02-families.js";
 
-// A trigger is a rule whose output is a single deadkey.
-// Context may be a single vkey OR a single char (sil_euro_latin uses char triggers).
-function isTrigger(rule: IRRule): boolean {
-  if (!isDeadkeyOnlyOutput(rule)) return false;
-  if (rule.context.length !== 1) return false;
-  const ctx = rule.context[0];
-  if (ctx === undefined) return false;
-  return ctx.kind === "vkey" || ctx.kind === "char";
-}
-
-// A body rule has context = [dk(D), any(BASE_STORE)], output = [index(OUT_STORE, 2)].
-// offset === 2 (v1.1 scope; non-standard offsets fall back to raw — not matched here).
+/**
+ * isBody — the CLASSIC S-02 body shape on the RAW context:
+ * [dk(D), any(BASE_STORE)] > [index(OUT_STORE, 2)], offset exactly 2.
+ *
+ * This predicate is retained for classifyRemovalCapabilities (Decision 3:
+ * an un-owned body still earns slot-fill when the classifier runs on an IR
+ * where recognizePatterns() was not applied). It is deliberately NARROWER
+ * than the recognizer's generalised fan-out shape (s02-families.ts
+ * matchS02FanOut: cleaned context, offset = cleaned any() position, postfix
+ * form): shape-based classification of un-owned rules stays conservative —
+ * generalised bodies earn slot-fill through Pattern ownership (Decision 2)
+ * plus the ownership-gated store alias, not through this raw shape.
+ */
 export function isBody(rule: IRRule): boolean {
   if (rule.context.length !== 2) return false;
   const c0 = rule.context[0];
@@ -33,34 +29,6 @@ export function isBody(rule: IRRule): boolean {
   if (out === undefined || out.kind !== "index") return false;
   // Only offset === 2 is supported in v1.1 scope.
   return out.offset === 2;
-}
-
-// A fallback rule has context starting with dk(D) but doesn't match body shape.
-function isFallback(rule: IRRule, deadkeyId: number): boolean {
-  if (isBody(rule)) return false;
-  const c0 = rule.context[0];
-  return c0 !== undefined && c0.kind === "deadkey" && c0.id === deadkeyId;
-}
-
-// Pick the "primary" trigger for naming: prefer the unshifted vkey trigger.
-function pickPrimaryTrigger(triggers: IRRule[]): IRRule {
-  const unshifted = triggers.find((r) => {
-    const ctx = r.context[0];
-    return ctx !== undefined && ctx.kind === "vkey" && ctx.modifiers.length === 0;
-  });
-  return unshifted ?? triggers[0]!;
-}
-
-function triggerKeyName(rule: IRRule): string {
-  const ctx = rule.context[0];
-  if (ctx === undefined) return "";
-  if (ctx.kind === "vkey") {
-    const mods = formatVKeyModifiers(ctx.modifiers);
-    return `${mods}${ctx.name}`;
-  }
-  // TODO: char-context triggers need a dedicated AnswerType (follow-up issue).
-  if (ctx.kind === "char") return ctx.value;
-  return "";
 }
 
 function buildPattern(match: MatchResult): Pattern {
@@ -99,10 +67,14 @@ function buildPattern(match: MatchResult): Pattern {
         answerType: "char-list",
         default: match.slotValues["accentedForms"] ?? "",
       },
+      {
+        id: "accentChar",
+        prompt: "Bare combining accent character (emitted by escape rule)",
+        answerType: "text",
+        default: match.slotValues["accentChar"] ?? "",
+      },
     ],
-    kmnFragment:
-      "+ [{{triggerKey}}] > dk({{deadkeyName}})\n" +
-      "dk({{deadkeyName}}) + any({{baseLetters}}) > index({{accentedForms}}, 2)",
+    kmnFragment: buildS02Fragment(match.slotValues),
     tests: [],
     validatedForFamilies: [],
     sourceKeyboards: [],
@@ -111,128 +83,45 @@ function buildPattern(match: MatchResult): Pattern {
   });
 }
 
-// Index trigger rules (output = single deadkey) by deadkey id, from every
-// non-deadkeys group.
-function buildTriggerIndex(ir: KeyboardIR): Map<number, IRRule[]> {
-  const triggersByDkId = new Map<number, IRRule[]>();
-  for (const group of ir.groups) {
-    if (group.name === "deadkeys") continue;
-    for (const rule of group.rules) {
-      // FR-021: behaviour-owned rules are never pattern candidates.
-      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
-      if (!isTrigger(rule)) continue;
-      const out = rule.output[0];
-      if (out === undefined || out.kind !== "deadkey") continue;
-      const existing = triggersByDkId.get(out.id) ?? [];
-      existing.push(rule);
-      triggersByDkId.set(out.id, existing);
-    }
-  }
-  return triggersByDkId;
-}
-
-// Index body rules by deadkey id (first body wins per id).
-function buildBodyIndex(deadkeysGroup: IRGroup): Map<number, IRRule> {
-  const bodyByDkId = new Map<number, IRRule>();
-  for (const rule of deadkeysGroup.rules) {
-    // FR-021: behaviour-owned rules are never pattern candidates.
-    if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
-    if (!isBody(rule)) continue;
-    const c0 = rule.context[0];
-    if (c0 === undefined || c0.kind !== "deadkey") continue;
-    if (!bodyByDkId.has(c0.id)) bodyByDkId.set(c0.id, rule);
-  }
-  return bodyByDkId;
-}
-
-// Index fallback rules by deadkey id, for the deadkey ids that have a body.
-function buildFallbackIndex(
-  deadkeysGroup: IRGroup,
-  bodyByDkId: Map<number, IRRule>,
-): Map<number, IRRule[]> {
-  const fallbacksByDkId = new Map<number, IRRule[]>();
-  for (const dkId of bodyByDkId.keys()) {
-    const fallbacks = deadkeysGroup.rules.filter(
-      // FR-021: behaviour-owned rules are never pattern candidates.
-      (r) => r.ownedByPattern === undefined && !isBehaviourOwned(r) && isFallback(r, dkId),
-    );
-    if (fallbacks.length > 0) fallbacksByDkId.set(dkId, fallbacks);
-  }
-  return fallbacksByDkId;
-}
-
-// Assemble the MatchResult for one deadkey id, or null when the body's base/out
-// stores are missing or non-parallel (Layer A error per spec §10 Check #13).
-function buildMatchResult(
-  ir: KeyboardIR,
-  dkId: number,
-  triggers: IRRule[],
-  body: IRRule,
-  fallbacks: IRRule[],
-): MatchResult | null {
-  const c1 = body.context[1];
-  const outEl = body.output[0];
-  if (
-    c1 === undefined ||
-    c1.kind !== "any" ||
-    outEl === undefined ||
-    outEl.kind !== "index"
-  ) {
-    return null;
-  }
-
-  const baseStore = ir.stores.find((s) => s.name === c1.storeRef);
-  const outStore = ir.stores.find((s) => s.name === outEl.storeRef);
-  if (baseStore === undefined || outStore === undefined) return null;
-  if (baseStore.items.length !== outStore.items.length) return null;
-
-  const primaryTrigger = pickPrimaryTrigger(triggers);
-  const ownedNodes = [
-    ...triggers.map((r) => ruleRef(r.nodeId)),
-    ruleRef(body.nodeId),
-    ...fallbacks.map((r) => ruleRef(r.nodeId)),
-    storeRef(baseStore.nodeId),
-    storeRef(outStore.nodeId),
-  ];
-
-  return {
-    patternId: `deadkey-single-tap#${formatDkName(dkId)}`,
-    ownedNodes,
-    slotValues: {
-      triggerKey: triggerKeyName(primaryTrigger),
-      deadkeyName: formatDkName(dkId),
-      baseLetters: storeItemsToCharString(baseStore),
-      accentedForms: storeItemsToCharString(outStore),
-    },
-  };
-}
-
 export const s02Recognizer: RecognizerRule = {
   id: "s02-deadkey-single-tap",
   strategyId: "S-02",
 
-  // High-level orchestration: index triggers/bodies/fallbacks by deadkey id,
-  // then emit one MatchResult per deadkey id that has both a trigger and a body.
+  // Family finding is shared with the YAML-generated rule (s02-families.ts,
+  // issue #2233): one reconciled shape definition, so the two matchers cannot
+  // diverge. This matcher only converts families to MatchResults.
   match(ir: KeyboardIR): MatchResult[] {
-    const deadkeysGroup = ir.groups.find((g) => g.name === "deadkeys");
-    if (deadkeysGroup === undefined) return [];
-
-    const triggersByDkId = buildTriggerIndex(ir);
-    const bodyByDkId = buildBodyIndex(deadkeysGroup);
-    const fallbacksByDkId = buildFallbackIndex(deadkeysGroup, bodyByDkId);
-
     const results: MatchResult[] = [];
-    for (const [dkId, triggers] of triggersByDkId.entries()) {
-      const body = bodyByDkId.get(dkId);
-      if (body === undefined) continue;
-      const result = buildMatchResult(
-        ir,
-        dkId,
-        triggers,
-        body,
-        fallbacksByDkId.get(dkId) ?? [],
-      );
-      if (result !== null) results.push(result);
+    for (const family of findS02Families(ir)) {
+      const ownedNodes = [
+        ...(family.triggersOwned
+          ? family.triggers.map((t) => ruleRef(t.rule.nodeId))
+          : []),
+        ...family.fanOuts.map((r) => ruleRef(r.nodeId)),
+        ...(family.escape !== undefined && !family.escapeShared
+          ? [ruleRef(family.escape.nodeId)]
+          : []),
+        storeRef(family.baseStore.nodeId),
+        storeRef(family.outStore.nodeId),
+      ];
+      const primary = family.primaryTrigger;
+      results.push({
+        patternId: `deadkey_single_tap#${family.idSuffix}`,
+        ownedNodes,
+        slotValues: {
+          triggerKey:
+            primary?.triggerKey ?? family.prefixChar ?? "",
+          ...(primary?.triggerStore !== undefined
+            ? { triggerStore: primary.triggerStore }
+            : {}),
+          deadkeyName: formatDkName(family.deadkeyId),
+          baseLetters: storeItemsToCharString(family.baseStore),
+          accentedForms: storeItemsToCharString(family.outStore),
+          ...(family.accentChar !== undefined
+            ? { accentChar: family.accentChar }
+            : {}),
+        },
+      });
     }
     return results;
   },

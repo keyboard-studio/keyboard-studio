@@ -85,6 +85,7 @@ function fmtContextElement(el: ContextElement): string {
                       ? `[${el.modifiers.join(" ")} ${el.name}]`
                       : `[${el.name}]`;
     case "deadkey": return fmtDk(el.id);
+    case "namedDeadkey": return `dk(${el.name})`;
     case "any":     return `any(${el.storeRef})`;
     case "notany":  return `notany(${el.storeRef})`;
     case "context": return `context(${el.offset})`;
@@ -99,6 +100,7 @@ function fmtOutputElement(el: OutputElement): string {
   switch (el.kind) {
     case "char":    return fmtCodepoint(el.value);
     case "deadkey": return fmtDk(el.id);
+    case "namedDeadkey": return `dk(${el.name})`;
     case "beep":    return "beep";
     case "nul":     return "nul";
     case "context": return el.offset === 0 ? "context" : `context(${el.offset})`;
@@ -114,6 +116,7 @@ function fmtStoreItem(item: StoreItem): string {
     case "char":    return fmtCodepoint(item.value);
     case "vkey":    return `[${item.name}]`;
     case "deadkey": return fmtDk(item.id);
+    case "namedDeadkey": return `dk(${item.name})`;
     case "any":     return "any";
     case "raw":     return item.text;
   }
@@ -315,7 +318,9 @@ function emitStoreItems(items: StoreItem[], metadata = false): string {
   // It is also suppressed when it would produce more than
   // KMCMPLIB_STORE_RANGE_BUDGET ranges in this one store — see that constant's
   // comment for the compiler crash this avoids.
-  const hasDeadkey = items.some((it) => it.kind === "deadkey");
+  // Any dk() token suppresses re-collapse — numeric or named (#2238): the
+  // kmcmplib restriction is on the dk() statement form, not the id shape.
+  const hasDeadkey = items.some((it) => it.kind === "deadkey" || it.kind === "namedDeadkey");
   const suppressRanges =
     metadata || hasDeadkey || countProspectiveRanges(items) > KMCMPLIB_STORE_RANGE_BUDGET;
 
