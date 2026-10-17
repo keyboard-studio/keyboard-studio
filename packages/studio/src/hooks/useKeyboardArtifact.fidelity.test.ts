@@ -20,7 +20,7 @@
 //      "[import-fidelity]". No bcp47 finding surfaces: a .kmn carries no
 //      language store (tags live in the package descriptor), so I3 does
 //      not check for one.
-//   4. The always-on info/hint findings (I4 inventory, I2 stub) do NOT
+//   4. The always-on info/hint findings (I4 inventory, I2 unavailable hint) do NOT
 //      surface — they are ImportReport metadata, not author diagnostics.
 //   5. Instantiation still proceeds (onInstantiate fires, ir non-null):
 //      fidelity findings are non-blocking.
@@ -161,7 +161,7 @@ describe("useKeyboardArtifact — Layer A′ import-fidelity wiring", () => {
 
     // The always-on info/hint findings stay off the channel.
     expect(warnings.some((w) => w.includes("KM_INFO_OPAQUE_FEATURE_INVENTORY"))).toBe(false);
-    expect(warnings.some((w) => w.includes("KM_HINT_ROUND_TRIP_DEFERRED"))).toBe(false);
+    expect(warnings.some((w) => w.includes("KM_HINT_ROUND_TRIP_UNAVAILABLE"))).toBe(false);
 
     // recompile() re-parses the working copy but must NOT re-run fidelity.
     await act(async () => {

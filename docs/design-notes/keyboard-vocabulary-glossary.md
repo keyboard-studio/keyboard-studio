@@ -86,6 +86,7 @@ keyboard's layout, which is the ambiguity this glossary removes.
 | "template" (for a keyboard) | Retired — see **Template** above. |
 | "working copy" | Code only, never user-facing. The UI says "your keyboard". |
 | `baseIr` / `baseVfs` / `baseKeyboard`, `host*` (code) | Legacy spellings of the starting-point and base-keyboard concepts; renamed to the starting-point / base families in the #1810 identifier pass. The concepts they name are the ones defined here. |
+| "chained deadkeys" (unqualified, for a mechanism) | Restricted. It is the name of strategy slot **S-06** only. For a mechanism, use the sense names in spec 007 §7.3: **family selection** (rule 6), **pending-letter** (rule 8), **two-trigger chain** (library pattern). Never infer chaining from the S-06 label. |
 
 ## Rules that follow from the glossary
 

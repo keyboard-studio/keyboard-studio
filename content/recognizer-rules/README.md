@@ -94,7 +94,7 @@ The reference YAML files in this directory are named `s<NN>-<strategy-slug>.yaml
 `spec.md §7.3`. This makes the priority order from issue #240 immediately
 visible in a directory listing.
 
-## Priority order (issue #240 first pass)
+## Priority order (issue #240 first pass — order is the #240 queue; statuses are current)
 
 1. `s02-deadkey-single-tap.yaml` — S-02 deadkey composition; most common in
    `release/` Latin keyboards (12/20 scanned keyboards). **Landed.**
@@ -104,10 +104,28 @@ visible in a directory listing.
    and the vkey-trigger near-shape are not claimed by this rule.
 4. `s07-diacritic-cycling.yaml` — S-07 cycling; important for several SIL
    keyboards. **Landed** (issue #2212).
-5. `s05-mnemonic-spelling.yaml` — S-05 Hausa-style. **Not yet authored.**
+5. `s05-mnemonic-spelling.yaml` — S-05 mnemonic spelling. **Determined —
+   not permanent (issue #2224): stays unrecognized.** No sound
+   cluster-level discriminator exists, and the cluster-statistical case
+   is closed; a future proposal is admissible only in a different
+   evidence class and must clear #2224's four-part bar.
 6. `s09-retroactive-reph.yaml` — S-09 retroactive reph (canonical exemplar
    `sil_devanagari_phonetic`). **Landed** (issue #2223), with the deviation
    stated in its corpus_evidence.
+
+S-06 has no priority-order entry and no grouping lift. **Determined —
+not permanent (issue #2213)**: the grouping question is closed for S-06
+(family selection, rule 6) and S-06 (pending-letter, rule 8); S-06
+(two-trigger chain, library pattern) is a separate lift whose status
+lives in its gated follow-on, issue #2235 — not here.
+
+## Permanently out of scope
+
+**S-12 DLL IME callout — recognition permanently out of scope (issue #2214, km-lead ruling 2026-10-16).** The codec opaquifies `call()`/`return()` rules by design (D8, reason `call-return`); `cs_pinyin`, the sole S-12 exemplar in the corpus, therefore imports as `RawKmnFragment`s classified `not-removable:opaque`. No recognizer rule — over typed IR or over `ir.raw` — will be built for S-12, and `call()` will not be modelled in KeyboardIR for this purpose. Rationale: the strategy's semantics live in an external Windows DLL the studio cannot inspect, simulate, or edit, so a lift has no consuming author outcome — strategy selection already recommends S-12 from the axis vector for new authoring (spec 007 §7.2 rule 1, pattern `content/patterns/ime/dll-ime-callout.yaml`), and recognition would reclassify the fragments from `not-removable:opaque` to `not-removable:unknown`, a less accurate verdict. The opaque presentation is the honest one (spec 037: unrecognized content reads as residue, never as coverage). This closes the *recognition* question only; S-12 remains a supported authoring strategy. It reopens only on a new fact: (i) a second genuine S-12 keyboard (massive/logographic, `call()` as the sole main-group mechanism) appears in the corpus or is named by a real author as an import-adapt base; or (ii) an opaque-construct typing programme arising from the named-deadkey (#2232) or `set()`/S-11 assessments adopts criteria under which `call()` independently qualifies — re-scoped inside that programme, never as a standalone recognizer issue; or (iii) a named consumer appears that must read call rules as typed data. Note: the `call-return` reason also covers bare `return`, a separate construct; any future work must match `call(...)` specifically and account for `match`/`nomatch` rules, which carry call() in typed-raw outputs, not fragments. This record does not decide `set()`/S-11.
+
+**S-13 Touch layer switch — not a recognizer strategy.** S-13 is detected structurally from the typed touch-layout IR (more than one named layer; spec 007 §7.2), not by matching KMN rule clusters, so no rule belongs in this directory.
+
+**Scope note.** This section records permanent exclusions only. S-05 and S-06 are not listed here: both were closed by determination (#2224, #2213) without a permanence ruling — S-05 stays unrecognized subject to its ruling's different-evidence-class bar, and the S-06 chain lift remains open as gated follow-on #2235.
 
 ## Adding a new rule
 

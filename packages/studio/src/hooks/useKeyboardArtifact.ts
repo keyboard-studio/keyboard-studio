@@ -4,7 +4,8 @@ import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
-import type { StartDocCssText } from "@keyboard-studio/engine";
+import type { RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
+import { loadDemoSimulate } from "../components/rules/demoSimulation.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
 // Re-exported so tests can assert the open-base fetch passes this exact proxy
@@ -55,7 +56,11 @@ interface EngineModule {
     parseResult: { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> },
     source: string,
   ) => LintFinding[];
-  runImportFidelityEmitChecks?: (ir: KeyboardIR, emitted: string) => Promise<LintFinding[]>;
+  runImportFidelityEmitChecks?: (
+    ir: KeyboardIR,
+    emitted: string,
+    roundTripDeps?: RoundTripDeps,
+  ) => Promise<LintFinding[]>;
   recognizePatterns?: (ir: KeyboardIR) => { ir: KeyboardIR; recognizedRatio: number };
   classifyRemovalCapabilities?: (ir: KeyboardIR) => Map<string, RemovalCapability>;
   /**
@@ -679,9 +684,36 @@ export function useKeyboardArtifact(
             ) {
               try {
                 const parseFindings = engine.runImportFidelityParseChecks(pr, kmnText);
+                const emittedKmnText = engine.emitKmn(ir);
+                // Functional I2 (#882): supply the compile/simulate harness
+                // so the emit stage runs the real round-trip check at this
+                // import moment. simulate comes from the browser-safe
+                // context-tolerance subpath (lazy, cached by
+                // loadDemoSimulate); the source siblings come from the
+                // just-fetched VFS so kmcmplib can resolve &BITMAP /
+                // &VISUALKEYBOARD / &LAYOUTFILE references. If the
+                // simulator chunk cannot load, deps stay undefined and I2
+                // reports its unavailable hint instead of passing silently.
+                let roundTripDeps: RoundTripDeps | undefined;
+                try {
+                  const simulateFn = await loadDemoSimulate();
+                  roundTripDeps = {
+                    originalKmn: kmnText,
+                    emittedKmn: emittedKmnText,
+                    keyboardId: compileId,
+                    compileFn: engine.compile,
+                    simulateFn,
+                    sourceFiles: vfs
+                      .entries("source/")
+                      .map((e) => ({ path: e.path, content: e.content, isBinary: e.isBinary })),
+                  };
+                } catch {
+                  roundTripDeps = undefined;
+                }
                 const emitFindings = await engine.runImportFidelityEmitChecks(
                   ir,
-                  engine.emitKmn(ir),
+                  emittedKmnText,
+                  roundTripDeps,
                 );
                 fidelityFindings = [...parseFindings, ...emitFindings];
               } catch (fidelityErr: unknown) {

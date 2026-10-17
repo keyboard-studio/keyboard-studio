@@ -587,6 +587,44 @@ group(main) using keys
     expect(shiftKey.nextlayer).toBe("default");
   });
 
+  // #313 — the IR-native cleanup keeps the raw form's leniency contract:
+  // unparseable or non-object touch-layout content leaves the file
+  // byte-identical and never fails the scaffold. (The "null" case is the
+  // one disclosed delta: the raw operation aborted scaffold() with a
+  // TypeError here; the IR form no-ops like every other malformed input.)
+  describe("touch-layout cleanup fallback (#313)", () => {
+    const kmnWithLayout = `store(&NAME) 'Base Keyboard'
+store(&KEYBOARDVERSION) '1.0'
+store(&LAYOUTFILE) 'base_keyboard.keyman-touch-layout'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > 'A'
+`;
+    async function scaffoldWithLayoutContent(layoutContent: string): Promise<string | undefined> {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes(".keyman-touch-layout")) return Promise.resolve(makeTextResponse(layoutContent));
+        if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(kmnWithLayout));
+        return Promise.resolve(makeNotFoundResponse());
+      });
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const { vfs } = await service.scaffold(startKeyboard, "my_keyboard", "My Keyboard");
+      const entry = vfs.get("source/my_keyboard.keyman-touch-layout");
+      return entry === undefined ? undefined : (entry.content as string);
+    }
+
+    it("leaves invalid JSON untouched", async () => {
+      await expect(scaffoldWithLayoutContent("{not json")).resolves.toBe("{not json");
+    });
+
+    it("leaves a JSON null untouched (was a scaffold-crashing TypeError in the raw form)", async () => {
+      await expect(scaffoldWithLayoutContent("null")).resolves.toBe("null");
+    });
+
+    it("leaves a JSON array untouched", async () => {
+      await expect(scaffoldWithLayoutContent("[1,2]")).resolves.toBe("[1,2]");
+    });
+  });
+
   // #416 — the scaffolded .kps must be a package KD can compile to a .kmp, not
   // the empty `<Package><Info/><Files/></Package>` stub (which fails kmc with
   // KM04021 / KM09010). The <Files> list is derived from the keyboard's actual

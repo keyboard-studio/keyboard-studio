@@ -201,6 +201,78 @@ export function buildAcuteSequenceIR(): { ir: KeyboardIR; ruleNodeId: string } {
 }
 
 /**
+ * vietnamese_vni shape (#2225): ONE base store (`vowels`) with a distinct
+ * output store per tone trigger — `any(vowels) + "1" > index(vowels_sac, 1)`
+ * and `any(vowels) + "2" > index(vowels_huyen, 1)`. Two clusters share the
+ * base store, so a patternId keyed on the base store alone collides and
+ * recognizePatterns throws "Ownership drift". Both output stores are
+ * base→marked remaps (acute / grave decompositions), so the unguarded
+ * evidence gate passes.
+ */
+export function buildVniSequenceIR(): {
+  ir: KeyboardIR;
+  sacRuleNodeId: string;
+  huyenRuleNodeId: string;
+} {
+  const sacRuleNodeId = "rule#vni-sac";
+  const huyenRuleNodeId = "rule#vni-huyen";
+  const stores = [
+    makeCharStore("store#vowels", "vowels", "aeiou"),
+    makeCharStore("store#vowels_sac", "vowels_sac", "áéíóú"),
+    makeCharStore("store#vowels_huyen", "vowels_huyen", "àèìòù"),
+  ];
+  const toneRule = (
+    nodeId: string,
+    trigger: string,
+    outStore: string,
+  ): IRRule => ({
+    nodeId,
+    context: [
+      { kind: "any", storeRef: "vowels" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: trigger },
+    ],
+    output: [{ kind: "index", storeRef: outStore, offset: 1 }],
+  });
+  return {
+    ir: makeTestIR(
+      [mainGroup([toneRule(sacRuleNodeId, "1", "vowels_sac"), toneRule(huyenRuleNodeId, "2", "vowels_huyen")])],
+      stores,
+    ),
+    sacRuleNodeId,
+    huyenRuleNodeId,
+  };
+}
+
+/**
+ * vietnamese_telex shape (#2225): ONE (base store, output store) pair whose
+ * cluster carries TWO triggers — `any(vowels) + "s" > index(vowels_sac, 1)`
+ * and the uppercase twin `+ "S"`. The pair is a single cluster (clusters key
+ * on the store pair, never the trigger), so it must lift as exactly one
+ * pattern — the case a trigger-keyed patternId cannot express.
+ */
+export function buildTelexMultiTriggerIR(): {
+  ir: KeyboardIR;
+  ruleNodeIds: string[];
+} {
+  const ruleNodeIds = ["rule#telex-sac-lower", "rule#telex-sac-upper"];
+  const stores = [
+    makeCharStore("store#vowels", "vowels", "aeiou"),
+    makeCharStore("store#vowels_sac", "vowels_sac", "áéíóú"),
+  ];
+  const rules: IRRule[] = ruleNodeIds.map((nodeId, i) => ({
+    nodeId,
+    context: [
+      { kind: "any", storeRef: "vowels" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: i === 0 ? "s" : "S" },
+    ],
+    output: [{ kind: "index", storeRef: "vowels_sac", offset: 1 }],
+  }));
+  return { ir: makeTestIR([mainGroup(rules)], stores), ruleNodeIds };
+}
+
+/**
  * Unguarded parallel remap whose stores are NOT base→marked related
  * (aeiou → vwxyz): the S-04/S-05-territory shape the evidence gate must
  * refuse as S-03.

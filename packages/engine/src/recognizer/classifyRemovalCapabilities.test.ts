@@ -27,6 +27,7 @@ import type {
   RawKmnFragment,
 } from "@keyboard-studio/contracts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
+import { buildEuroLatinIR } from "./rules/__fixtures__/s02GeneralizedIr.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -345,6 +346,37 @@ describe("classifyRemovalCapabilities — decision-order precedence", () => {
 });
 
 // ---------------------------------------------------------------------------
+// D. #2233: the output-store alias for generalised S-02 fan-outs is gated on
+// S-02 ownership. The raw-context fanShape check cannot see the postfix /
+// '+'-separated shapes, and isParallelIndexFanOut is deliberately NOT
+// widened — an un-owned generalised body stays context-sensitive.
+// ---------------------------------------------------------------------------
+
+describe("classifyRemovalCapabilities — #2233 ownership-gated alias", () => {
+  it("D1: S-02-owned postfix fan-out earns the output-store alias", () => {
+    const { ir } = buildEuroLatinIR();
+    recognizePatterns(ir);
+    const map = classifyRemovalCapabilities(ir);
+
+    // The postfix body is owned by its S-02 pattern → slot-fill via Decision 2,
+    // and its output store gains the alias through ownership (fanShape is
+    // false on the raw [char, dk, raw(+), any] context).
+    expect(map.get("rule#body-x")).toBe("removable:slot-fill");
+    expect(map.get("store#Ox")).toBe("removable:slot-fill");
+    expect(map.get("store#Oq")).toBe("removable:slot-fill");
+  });
+
+  it("D2: UN-owned postfix fan-out earns NO alias and stays context-sensitive", () => {
+    const { ir } = buildEuroLatinIR();
+    // No recognizePatterns: no ownership stamps.
+    const map = classifyRemovalCapabilities(ir);
+
+    expect(map.get("rule#body-x")).toBe("not-removable:context-sensitive");
+    expect(map.has("store#Ox")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // C. AC canaries — real keyboards (skipped when sibling checkout absent)
 // ---------------------------------------------------------------------------
 
@@ -386,6 +418,7 @@ const kbdusPath = path.join(KEYBOARDS_ROOT_BASIC, "basic_kbdus/source/basic_kbdu
 // §7.5 regression canary paths
 const silIpaPath = path.join(KEYBOARDS_ROOT_SIL, "sil_ipa/source/sil_ipa.kmn");
 const vietnameseTelexPath = path.join(KEYBOARDS_ROOT_V, "vietnamese_telex/source/vietnamese_telex.kmn");
+const vietnameseVniPath = path.join(KEYBOARDS_ROOT_V, "vietnamese_vni/source/vietnamese_vni.kmn");
 const csPinyinPath = path.join(KEYBOARDS_ROOT_C, "cs_pinyin/source/cs_pinyin.kmn");
 const silYoruba8Path = path.join(KEYBOARDS_ROOT_SIL, "sil_yoruba8/source/sil_yoruba8.kmn");
 const elPasifikaPath = path.join(KEYBOARDS_ROOT_EL, "el_pasifika/source/el_pasifika.kmn");
@@ -396,6 +429,7 @@ const kbdfrExists = fs.existsSync(kbdfrPath);
 const kbdusExists = fs.existsSync(kbdusPath);
 const silIpaExists = fs.existsSync(silIpaPath);
 const vietnameseTelexExists = fs.existsSync(vietnameseTelexPath);
+const vietnameseVniExists = fs.existsSync(vietnameseVniPath);
 const csPinyinExists = fs.existsSync(csPinyinPath);
 const silYoruba8Exists = fs.existsSync(silYoruba8Path);
 const elPasifikaExists = fs.existsSync(elPasifikaPath);
@@ -608,6 +642,23 @@ describe("classifyRemovalCapabilities — §7.5 regression canaries", () => {
         if (found) break;
       }
       expect(found).toBe(true);
+    },
+  );
+
+  it.skipIf(!vietnameseVniExists)(
+    "D5: vietnamese_vni multi-tone S-03 clusters lift with distinct pattern ids (#2225)",
+    () => {
+      const kmnText = fs.readFileSync(vietnameseVniPath, "utf-8");
+      const { ir } = parse(kmnText, "vietnamese_vni");
+      // Regression for #2225: five tone clusters share the base store
+      // `vowels`; a base-store-only patternId made this throw
+      // "Ownership drift" from assertOwnershipConsistency.
+      const result = recognizePatterns(ir);
+      const s03 = result.ir.recognizedPatterns.filter((p) =>
+        p.id.startsWith("context_sensitive_substitution#"),
+      );
+      expect(s03.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(s03.map((p) => p.id)).size).toBe(s03.length);
     },
   );
 

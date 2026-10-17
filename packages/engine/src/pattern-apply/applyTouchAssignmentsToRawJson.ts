@@ -4,14 +4,44 @@
  *
  * When the base keyboard already ships a touch layout, author Phase E
  * assignments must be spliced DIRECTLY onto a copy of the raw shipped JSON —
- * never reconstructed through the IR (`emitTouchLayout`), which silently
- * drops per-key `layer`, `displayUnderlying`, per-key `font`/`fontsize`, and
- * string-vs-int `sp`/`width`/`pad`.
+ * never reconstructed through the IR.
+ *
+ * Why raw (spec 035 R9, Case B) — basis restated 2026-10-16. An earlier
+ * version of this header claimed `emitTouchLayout` silently drops per-key
+ * `layer`, `displayUnderlying`, per-key `font`/`fontsize`, and string-vs-int
+ * `sp`/`width`/`pad`. That was true when written and is false now: since
+ * the full-fidelity codec landed (issue 2083), every modelled field
+ * round-trips, encodings included. Case B rests on three other things:
+ *   1. R9's verbatim guarantee — splicing the parsed tree in place keeps
+ *      unknown members at any level and every unmodified member's value,
+ *      including members no codec models. Preservation is at the parsed
+ *      level; output is re-serialised in canonical form, so formatting is
+ *      normalised even though values are not.
+ *   2. The call contract — string-in, string-out: this runs chained on
+ *      {@link applyDesktopModificationsToRawJson}'s output in
+ *      `buildTouchLayoutJson`'s Case B arm, with no `TouchLayoutIR` passed
+ *      in or constructed on the emission path.
+ *   3. The parser's modelled-surface limits, which are the price of
+ *      converting: an IR round trip drops or normalises members outside
+ *      the closed platform set (desktop/tablet/phone) — top-level
+ *      non-platform members such as `"_comment"` included; unknown
+ *      members at every level below the top; a platform with no `layer`
+ *      array; non-canonical flick directions; empty `sk`/`multitap`
+ *      arrays; empty-string display fields (`hint`/`layer`/`font`/
+ *      `fontsize`/`dk`, platform `fontsize`/`defaultHint`) treated as
+ *      absent; non-numeric `sp`/`width`/`pad`; string row ids
+ *      (regenerated as numbers); and member/platform ordering. The
+ *      parser and emitter (`parseTouchLayout` in contracts,
+ *      `codec/parse-touch.ts`) are the authority for that list.
+ * Converting this applier is a judgement call — accept those losses on a
+ * shipped base author's file and supply an IR at the call site, proven by
+ * a Case A/B twin-equivalence test — not a codec-fidelity fix.
  *
  * The contract:
  *   - parse the raw JSON to a plain object (fresh tree — JSON.parse guarantees
  *     this), splice sk[]/flick/multitap into the matching key objects IN PLACE,
- *     stringify.  Unmodified keys/layers/platforms/fields are copied verbatim.
+ *     stringify.  Unmodified keys/layers/platforms/fields keep their values
+ *     verbatim (formatting is re-serialised — see the basis note above).
  *   - Apply each mechanism to EVERY present platform that has the host key in
  *     the layer the mechanism names (`slotValues.layer`, default `"default"`).
  *     Warn ONLY when the host key is found in NO platform's target layer — an
@@ -97,7 +127,7 @@ export interface ApplyTouchAssignmentsToRawJsonResult {
 /**
  * Apply a list of Phase E {@link TouchAssignment}s directly onto a copy of the
  * raw shipped `.keyman-touch-layout` JSON string, preserving every unmodified
- * field verbatim.
+ * member's value verbatim.
  *
  * Only sk[], flick{}, and multitap[] arrays are spliced; every other field is
  * passed through from the parsed JSON object unchanged.  Returns a new JSON

@@ -1,0 +1,16 @@
+c roundtrip_simple.kmn — minimal fixture for the functional I2 tests (#882).
+c Two vkeys (K_A, K_B) keep the D7 corpus at 180 sequences so the real
+c compile + simulate harness runs in seconds.
+
+store(&NAME) 'RoundtripSimple'
+store(&VERSION) '14.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > 'a'
++ [K_B] > 'b'
++ [SHIFT K_A] > 'A'

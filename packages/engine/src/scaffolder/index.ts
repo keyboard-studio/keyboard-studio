@@ -8,6 +8,7 @@ import type {
   StartKeyboard,
   VirtualFS,
   KeyboardIR,
+  TouchLayoutIR,
   Attribution,
   WelcomeConvention,
   WelcomeFolderImage,
@@ -27,7 +28,12 @@ import {
 import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardSourceToVfs.js";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
-import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
+import {
+  TOUCH_LAYOUT_JSON_INDENT,
+  parseTouchLayout,
+  emitTouchLayout,
+} from "../codec/parse-touch.js";
+import { mutateCleanTouchLayout } from "./cleanTouchLayout.js";
 import { detectStartLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
@@ -254,62 +260,32 @@ function dropBitmapStoreIfUnbacked(vfs: VirtualFS, keyboardId: string): string[]
   ];
 }
 
+/**
+ * Template cleanup of the inherited `.keyman-touch-layout`, as an IR
+ * mutation (#313 goal 3): parse → {@link mutateCleanTouchLayout} → emit.
+ * The recipe and its semantics live in `./cleanTouchLayout.ts`.
+ *
+ * Leniency contract (unchanged from the raw-JSON form): a missing file, a
+ * non-string entry, or unparseable content leaves the file untouched and
+ * never fails the scaffold. One deliberate delta, disclosed in the #313 PR:
+ * content that is valid JSON but not an object (e.g. `"null"`) used to
+ * abort `scaffold()` with a TypeError from the raw operation; it now takes
+ * the same silent no-op path as a syntax error — the parser throws
+ * TypeError for it and the catch below treats all parse failures alike.
+ */
 function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
   const path = `source/${keyboardId}.keyman-touch-layout`;
   const entry = vfs.get(path);
   if (entry === undefined || typeof entry.content !== "string") return;
 
-  let data: Record<string, unknown>;
+  let ir: TouchLayoutIR;
   try {
-    data = JSON.parse(entry.content) as Record<string, unknown>;
+    ir = parseTouchLayout(entry.content);
   } catch {
     return;
   }
-
-  delete (data as Record<string, unknown>)["phone"];
-
-  for (const device of ["tablet"] as const) {
-    const deviceData = data[device] as { layer?: Array<Record<string, unknown>> } | undefined;
-    if (deviceData?.layer == null) continue;
-    const layers = deviceData.layer;
-
-    const shiftLayer = layers.find((l) => l["id"] === "shift");
-    const capsLayer = layers.find((l) => l["id"] === "caps");
-    if (shiftLayer !== undefined && capsLayer === undefined) {
-      const cloned = JSON.parse(JSON.stringify(shiftLayer)) as Record<string, unknown>;
-      cloned["id"] = "caps";
-      layers.push(cloned);
-    }
-
-    const rightaltShiftLayer = layers.find((l) => l["id"] === "rightalt-shift");
-    const rightaltCapsLayer = layers.find((l) => l["id"] === "rightalt-caps");
-    if (rightaltShiftLayer !== undefined && rightaltCapsLayer === undefined) {
-      const cloned = JSON.parse(JSON.stringify(rightaltShiftLayer)) as Record<string, unknown>;
-      cloned["id"] = "rightalt-caps";
-      layers.push(cloned);
-    }
-
-    for (const layer of layers) {
-      const layerId = layer["id"] as string | undefined;
-      if (layerId === "default" || (layerId != null && layerId.includes("caps"))) continue;
-      const rows = layer["row"] as Array<{ key?: Array<{ sp?: number; nextlayer?: string | null }> }> | undefined;
-      if (rows == null) continue;
-      for (const row of rows) {
-        if (row.key == null) continue;
-        for (const key of row.key) {
-          const sp = key.sp;
-          // sp codes that must NOT get nextlayer defaulted:
-          // 1=special, 2=specialActive, 3=customSpecial, 4=customSpecialActive (frame/modifier keys),
-          // 8=deadkey, 9=blank, 10=spacer. Only sp=0/absent (normal char key) should default.
-          if (![1, 2, 3, 4, 8, 9, 10].includes(sp ?? -1) && key.nextlayer == null) {
-            key.nextlayer = "default";
-          }
-        }
-      }
-    }
-  }
-
-  vfs.set(path, JSON.stringify(data, null, TOUCH_LAYOUT_JSON_INDENT));
+  mutateCleanTouchLayout(ir);
+  vfs.set(path, emitTouchLayout(ir));
 }
 
 // The scaffolder no longer owns a private `.kps` builder. `buildKpsContent`,
