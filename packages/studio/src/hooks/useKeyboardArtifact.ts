@@ -868,32 +868,44 @@ export function useKeyboardArtifact(
     // runtime warnings when they land; a superseded run's are dropped. If
     // the simulator chunk cannot load, deps stay undefined and I2 reports
     // its unavailable hint instead of passing silently.
+    // The start is deferred two macrotask hops so the ready render commits
+    // and paints first: corpus generation + simulation churn the main
+    // thread in microtasks, and starting them in this same turn starved
+    // the ready paint — on the CI runner the preview button stayed
+    // "Preparing preview…" past every consumer's wait window even though
+    // the stage had already flipped to ready (run 38999923387 trace: the
+    // compile finished, then I2's corpus generation began immediately).
     if (pendingRoundTrip !== null && engine.runImportFidelityRoundTripCheck) {
       const input = pendingRoundTrip;
       const roundTripCheck = engine.runImportFidelityRoundTripCheck;
-      void (async () => {
-        let deps: RoundTripDeps | undefined;
-        try {
-          const simulateFn = await loadDemoSimulate();
-          deps = { ...input.deps, compileFn: engine.compile, simulateFn };
-        } catch {
-          deps = undefined;
-        }
-        const findings = await roundTripCheck(input.ir, deps).catch(
-          (err: unknown) => {
-            devLog.warn("[useKeyboardArtifact] functional I2 check failed:", err);
-            return [] as LintFinding[];
-          },
-        );
-        if (runId.current !== thisRunId) return;
-        const extra = formatFidelityWarnings(findings);
-        if (extra.length === 0) return;
-        setStageRaw((prev) =>
-          prev.kind === "ready" && prev.keyboardId === compileId
-            ? { ...prev, runtimeWarnings: [...(prev.runtimeWarnings ?? []), ...extra] }
-            : prev,
-        );
-      })();
+      const startRoundTrip = () => {
+        void (async () => {
+          let deps: RoundTripDeps | undefined;
+          try {
+            const simulateFn = await loadDemoSimulate();
+            deps = { ...input.deps, compileFn: engine.compile, simulateFn };
+          } catch {
+            deps = undefined;
+          }
+          const findings = await roundTripCheck(input.ir, deps).catch(
+            (err: unknown) => {
+              devLog.warn("[useKeyboardArtifact] functional I2 check failed:", err);
+              return [] as LintFinding[];
+            },
+          );
+          if (runId.current !== thisRunId) return;
+          const extra = formatFidelityWarnings(findings);
+          if (extra.length === 0) return;
+          setStageRaw((prev) =>
+            prev.kind === "ready" && prev.keyboardId === compileId
+              ? { ...prev, runtimeWarnings: [...(prev.runtimeWarnings ?? []), ...extra] }
+              : prev,
+          );
+        })();
+      };
+      setTimeout(() => {
+        setTimeout(startRoundTrip, 0);
+      }, 0);
     }
     if (analyseToleranceRef.current) launchContextTolerance(thisRunId, parsedIr);
   }, [scaffoldSpec?.keyboardId, onInstantiate, launchContextTolerance]);
