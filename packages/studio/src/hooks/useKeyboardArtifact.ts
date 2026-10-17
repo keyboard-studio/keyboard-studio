@@ -217,6 +217,34 @@ function revokeBlobUrls(ref: React.MutableRefObject<string[]>): void {
   ref.current = [];
 }
 
+// ---------------------------------------------------------------------------
+// Functional I2 (round-trip) supersession — app-wide, not per hook instance
+// ---------------------------------------------------------------------------
+//
+// Several useKeyboardArtifact instances are alive at once during a walk
+// (SurveyView's preview plus the Mechanism/Touch gallery previews, each with
+// its own hook state), and they all share one main thread. The round-trip's
+// cancellation token therefore lives at module scope: at most one I2 pass
+// runs at a time, and ANY instance's new compile retires the pass in flight,
+// whichever instance owns it. The per-instance token this replaces (#2249)
+// let a sibling instance's pass keep simulating after the walk moved on:
+// the gallery instance's pass was still running while the author waited at
+// Output, whose own fresh pipeline then shared the main thread with it, and
+// the Output stage did not reach `ready` inside the e2e driver's wait
+// window (CI run 39045148284: emit-download stuck on the NOT_READY blocker —
+// the sole blocker — with Playwright's poll starved to 8 evaluations in
+// 60 s). An aborted pass reports UNAVAILABLE, never a partial clean bill —
+// the same posture as the same-instance supersession this generalises.
+let activeRoundTripToken: { aborted: boolean } | null = null;
+
+/** Retire the I2 pass currently in flight, whichever instance owns it. */
+function retireActiveRoundTrip(): void {
+  if (activeRoundTripToken !== null) {
+    activeRoundTripToken.aborted = true;
+    activeRoundTripToken = null;
+  }
+}
+
 /**
  * Build OSK font blob URL from VFS if an OSK font entry is present.
  * Returns { url, family } when successful, or { url: null, family: null } when
@@ -464,13 +492,16 @@ export function useKeyboardArtifact(
   // rebuilt on every fresh fetch, revoked on teardown / next fetch.
   const prevKeyboardCssBlobUrls = useRef<string[]>([]);
   const runId = useRef(0);
-  // Cancellation token for the in-flight post-ready functional round-trip
-  // (I2). A new compile supersedes the previous artifact, so it retires
-  // the previous pass: without this, every recompile (e.g. each Mechanisms
-  // gallery Apply) stacked another full corpus simulation on the main
-  // thread, and the superseded passes burned CPU to completion even
-  // though their findings were always going to be dropped.
-  const roundTripAbortRef = useRef<{ aborted: boolean } | null>(null);
+  // This instance's own in-flight post-ready functional round-trip (I2)
+  // token, while its pass is running. The token object IS the module-level
+  // active token (see retireActiveRoundTrip above) so a sibling instance's
+  // compile can retire it; this ref exists so unmount can retire exactly
+  // this instance's pass. A new compile supersedes the previous artifact:
+  // without retirement, every recompile (e.g. each Mechanisms gallery
+  // Apply) stacked another full corpus simulation on the main thread, and
+  // the superseded passes burned CPU to completion even though their
+  // findings were always going to be dropped.
+  const ownRoundTripTokenRef = useRef<{ aborted: boolean } | null>(null);
   const engineRef = useRef<EngineModule | null>(null);
   // Shared engine load+init promise. Assigned by the first run() call that
   // finds it empty; cleared again if the load rejects, so a later run()
@@ -621,11 +652,10 @@ export function useKeyboardArtifact(
     }
     // A new compile supersedes the previous artifact — retire any
     // round-trip still simulating for it right away, not just when this
-    // compile's own post-ready pass starts.
-    if (roundTripAbortRef.current) {
-      roundTripAbortRef.current.aborted = true;
-      roundTripAbortRef.current = null;
-    }
+    // compile's own post-ready pass starts. App-wide (module token): the
+    // pass in flight may belong to a sibling instance whose artifact this
+    // compile also supersedes in every way the author can observe.
+    retireActiveRoundTrip();
 
     const isWarmCompile = engine.isReady?.() ?? false;
     setStage({ kind: "compiling", isWarmCompile });
@@ -894,9 +924,10 @@ export function useKeyboardArtifact(
       const roundTripCheck = engine.runImportFidelityRoundTripCheck;
       const startRoundTrip = () => {
         void (async () => {
-          if (roundTripAbortRef.current) roundTripAbortRef.current.aborted = true;
+          retireActiveRoundTrip();
           const abortToken = { aborted: false };
-          roundTripAbortRef.current = abortToken;
+          activeRoundTripToken = abortToken;
+          ownRoundTripTokenRef.current = abortToken;
           let deps: RoundTripDeps | undefined;
           try {
             const simulateFn = await loadDemoSimulate();
@@ -915,6 +946,10 @@ export function useKeyboardArtifact(
               return [] as LintFinding[];
             },
           );
+          if (activeRoundTripToken === abortToken) activeRoundTripToken = null;
+          if (ownRoundTripTokenRef.current === abortToken) {
+            ownRoundTripTokenRef.current = null;
+          }
           if (runId.current !== thisRunId) return;
           const extra = formatFidelityWarnings(findings);
           if (extra.length === 0) return;
@@ -1340,6 +1375,23 @@ export function useKeyboardArtifact(
 
   useEffect(() => {
     return () => {
+      // Retire this instance's I2 pass if one is in flight: nobody is left
+      // to read its findings, and letting it simulate to completion keeps
+      // it competing for the main thread with whatever screen replaces
+      // this one (#2249 — the Output frontier: SurveyView and the gallery
+      // unmount when the author navigates to Output, and their passes were
+      // still running while Output's own pipeline tried to compile).
+      // Exactly this instance's token — a sibling's pass belongs to a
+      // screen still mounted. StrictMode's simulated unmount runs this
+      // cleanup before any pass can have started (I2 starts after
+      // `ready`), so it is a no-op there.
+      if (ownRoundTripTokenRef.current !== null) {
+        ownRoundTripTokenRef.current.aborted = true;
+        if (activeRoundTripToken === ownRoundTripTokenRef.current) {
+          activeRoundTripToken = null;
+        }
+        ownRoundTripTokenRef.current = null;
+      }
       revokeBlobUrl(prevBlobUrl);
       revokeBlobUrl(prevFontBlobUrl);
       revokeBlobUrls(prevKeyboardCssBlobUrls);
