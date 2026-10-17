@@ -53,6 +53,7 @@ import {
   upperCounterpartOf,
 } from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
+import { matchesQuery } from "./characterSearch.ts";
 import { collate, codePointCompare, collateInventory } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart, getEffectiveFacet, CASING_FACET_ID } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
@@ -217,6 +218,14 @@ function useIsCasedBase(): boolean {
   return casingValue === "cased" || casingValue === "mixed";
 }
 
+/**
+ * Inventory size above which the "Your alphabet" chip list gets a clutter
+ * filter (issue 543). The threshold follows the carve Inspector precedent
+ * (glyph sets over 40 items get a filter): at or below it the whole alphabet
+ * scans fine as one chip grid, and a filter control would itself be clutter.
+ */
+export const INVENTORY_FILTER_THRESHOLD = 40;
+
 // ---------------------------------------------------------------------------
 // CharChipEditor — reusable type-in input + chip list (no state of its own)
 // ---------------------------------------------------------------------------
@@ -252,6 +261,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
   const isCasedBase = useIsCasedBase();
   const { provenance, proposalConfidence, proposalRelease } = useInventoryDraft("characters");
   const [inputVal, setInputVal] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
   const [showUppercase, setShowUppercase] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -318,6 +328,28 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
   const displayLetters = collate(isCasedBase ? lowercaseBaseView(letters, bcp47) : letters);
   // Count reflects the collapsed lowercase/caseless units + bare marks.
   const unitCount = displayLetters.length + bareMarks.length;
+  // Clutter filter (issue 543): offered only for long inventories (see
+  // INVENTORY_FILTER_THRESHOLD). Filtering is VIEW-ONLY — it narrows which
+  // chips render, never `chars`, so the underlying inventory, provenance,
+  // and the Done payload are untouched, and clearing the query restores the
+  // full grid exactly. Matching reuses CharacterMapPane's predicate
+  // (characterSearch.ts: glyph, code point, base letter), so the two search
+  // boxes in this step behave the same way.
+  const filterOffered = unitCount > INVENTORY_FILTER_THRESHOLD;
+  const filterActive = filterOffered && filterQuery.trim() !== "";
+  const visibleLetters = filterActive
+    ? displayLetters.filter((c) => matchesQuery({ char: c }, filterQuery))
+    : displayLetters;
+  const visibleMarks = filterActive
+    ? bareMarks.filter((c) => matchesQuery({ char: c }, filterQuery))
+    : bareMarks;
+  const visibleCount = visibleLetters.length + visibleMarks.length;
+  // If removals shrink the inventory back under the threshold, the filter
+  // control unmounts — clear the query with it, so regrowing the alphabet
+  // later never re-applies a filter the author can no longer see.
+  useEffect(() => {
+    if (!filterOffered && filterQuery !== "") setFilterQuery("");
+  }, [filterOffered, filterQuery]);
   const hasCasedLetter = isCasedBase && letters.some((b) => upperCounterpartOf(b, bcp47) !== null);
   // Distinct proposal attributions currently represented in the draft — the
   // legend names them rather than leaving the dashed outline to speak for itself.
@@ -410,10 +442,78 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
             <Trans id="survey.phaseB.breakdown.showUppercase">Show uppercase letters</Trans>
           </label>
         )}
+        {/* Clutter filter (issue 543) — long inventories only. Enter inside
+            the filter is swallowed (preventDefault + stopPropagation): this
+            editor can sit inside an Enter-to-advance container
+            (enterToAdvance.ts / SurveyRunner), and pressing Enter while
+            filtering must neither advance the step nor add a character. */}
+        {filterOffered && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "0 0 8px 0" }}>
+            <input
+              type="text"
+              data-testid="alphabet-filter"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+              placeholder={t({
+                id: "survey.phaseB.charChipEditor.filterPlaceholder",
+                message: "Filter by character, code point (U+…), or base letter",
+              })}
+              aria-label={t({
+                id: "survey.phaseB.charChipEditor.filterAriaLabel",
+                message: "Filter your alphabet",
+              })}
+              style={{
+                flex: 1,
+                background: BG_PAGE,
+                border: `1px solid ${BORDER}`,
+                borderRadius: 6,
+                color: TEXT_MAIN,
+                fontSize: 14,
+                fontFamily: FONT,
+                padding: "6px 10px",
+                boxSizing: "border-box",
+              }}
+            />
+            {filterQuery !== "" && (
+              <button
+                type="button"
+                data-testid="alphabet-filter-clear"
+                onClick={() => setFilterQuery("")}
+                style={{ ...secondaryButton, whiteSpace: "nowrap", padding: "4px 12px", fontSize: 12 }}
+              >
+                <Trans id="survey.phaseB.charChipEditor.filterClear">Show all</Trans>
+              </button>
+            )}
+          </div>
+        )}
+        {filterActive && (
+          <p
+            role="status"
+            data-testid="alphabet-filter-status"
+            style={{ margin: "0 0 8px 0", fontSize: 12, color: TEXT_DIM }}
+          >
+            {t({
+              id: "survey.phaseB.charChipEditor.filterStatus",
+              message: `Showing ${{ visible: visibleCount }} of ${{ total: unitCount }} characters — filtering changes only what you see, not your alphabet.`,
+            })}
+          </p>
+        )}
         {unitCount === 0 ? (
           <p style={mutedParaFlush}>
             <Trans id="survey.phaseB.charChipEditor.empty">
               No characters yet — type your whole alphabet above.
+            </Trans>
+          </p>
+        ) : filterActive && visibleCount === 0 ? (
+          <p style={mutedParaFlush} data-testid="alphabet-filter-no-match">
+            <Trans id="survey.phaseB.charChipEditor.filterNoMatch">
+              No characters match your filter.
             </Trans>
           </p>
         ) : (
@@ -425,7 +525,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
             })}
             style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}
           >
-            {displayLetters.flatMap((c) => {
+            {visibleLetters.flatMap((c) => {
               // Removable chip for the lowercase/caseless (or uppercase-only)
               // letter. The charChip/chipGlyph booleans are FIXED literals
               // reproducing the original inline hex (unchecked shell + accent
@@ -505,7 +605,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
               }
               return cells;
             })}
-            {bareMarks.map((c) => {
+            {visibleMarks.map((c) => {
               const { title } = codepointLabel(c);
               return (
                 <button
