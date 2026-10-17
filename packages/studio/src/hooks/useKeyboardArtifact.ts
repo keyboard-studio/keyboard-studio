@@ -419,6 +419,22 @@ export interface KeyboardArtifactOptions {
    * StudioShell's main-walk preview passes this, behind the flag.
    */
   analyseContextTolerance?: boolean;
+  /**
+   * Run the functional I2 round-trip check after a full run reaches
+   * `ready` (spec 078 publish-after-ready posture) and append its findings
+   * to the ready stage's runtime warnings. Only StudioShell's main-walk
+   * preview passes this: it is the instance whose full run IS the base
+   * import, so its pass is the import's verdict. Every other instance
+   * (galleries, Output, Criteria, Compare) compiles the same base or the
+   * author's working copy for its own screen; a 100k-sequence simulation
+   * after each of those readies only competes for the main thread with
+   * the screen the author is waiting on — on PR #2250's CI run
+   * 39053681152 the Output screen's own pass (plus a sibling's) kept
+   * `sil_cameroon_azerty`'s Output compile from settling inside the
+   * driver's 60 s window even with app-wide supersession, while the five
+   * lighter T011 walks passed (#2249).
+   */
+  runRoundTripCheck?: boolean;
 }
 
 export interface KeyboardArtifactResult {
@@ -467,6 +483,11 @@ export function useKeyboardArtifact(
   // toggling it never restarts a compile.
   const analyseToleranceRef = useRef(options?.analyseContextTolerance === true);
   analyseToleranceRef.current = options?.analyseContextTolerance === true;
+  // Same read-at-launch discipline as analyseToleranceRef: which instance
+  // owns the I2 check is a mount-time fact, and toggling it must never
+  // restart a compile.
+  const runRoundTripRef = useRef(options?.runRoundTripCheck === true);
+  runRoundTripRef.current = options?.runRoundTripCheck === true;
 
   /**
    * Records a crash breadcrumb on every Stage transition (spec 060 FR-045).
@@ -772,17 +793,25 @@ export function useKeyboardArtifact(
                   emittedKmnText,
                 );
                 fidelityFindings = [...parseFindings, ...emitFindings];
-                roundTripInput = {
-                  ir,
-                  deps: {
-                    originalKmn: kmnText,
-                    emittedKmn: emittedKmnText,
-                    keyboardId: compileId,
-                    sourceFiles: vfs
-                      .entries("source/")
-                      .map((e) => ({ path: e.path, content: e.content, isBinary: e.isBinary })),
-                  },
-                };
+                // Capture the I2 input only on the designated import
+                // instance (see KeyboardArtifactOptions.runRoundTripCheck):
+                // with no input captured, this instance's post-ready step
+                // below starts no pass, so its `ready` is the last word —
+                // nothing keeps simulating behind the screen the author
+                // is waiting on (#2249, Cameroon Output frontier).
+                if (runRoundTripRef.current) {
+                  roundTripInput = {
+                    ir,
+                    deps: {
+                      originalKmn: kmnText,
+                      emittedKmn: emittedKmnText,
+                      keyboardId: compileId,
+                      sourceFiles: vfs
+                        .entries("source/")
+                        .map((e) => ({ path: e.path, content: e.content, isBinary: e.isBinary })),
+                    },
+                  };
+                }
               } catch (fidelityErr: unknown) {
                 devLog.warn("[useKeyboardArtifact] import-fidelity checks failed:", fidelityErr);
               }

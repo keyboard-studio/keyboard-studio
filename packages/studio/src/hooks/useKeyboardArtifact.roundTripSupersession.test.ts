@@ -18,6 +18,12 @@
 //   2. Unmounting the owning instance retires its pass.
 //   3. A same-instance recompile still retires the instance's own pass
 //      (the original 6ee418c1 behaviour, generalised).
+//   4. Only the designated import instance (runRoundTripCheck, passed by
+//      StudioShell alone) starts passes at all: PR #2250's CI showed
+//      supersession alone was not enough at the Output frontier — the
+//      Cameroon walk still starved with a pass owned by the Output
+//      instance itself — so non-designated instances capture no I2
+//      input and their readies are never followed by a simulation.
 //
 // The round-trip check is a controllable stub: each call captures its
 // deps (including shouldAbort) and stays in flight until the test
@@ -138,9 +144,17 @@ async function waitForPasses(n: number, offset: number): Promise<void> {
   await flush();
 }
 
-function mount(id: string) {
+function mount(id: string, opts?: { designated?: boolean }) {
   return import("./useKeyboardArtifact").then(({ useKeyboardArtifact }) => {
-    const h = renderHook(() => useKeyboardArtifact(kb(id), null, null, null));
+    // These tests pin the supersession discipline of the instance that
+    // owns I2 passes — the designated import instance — so they opt in
+    // exactly as StudioShell does. `designated: false` mounts a plain
+    // instance (gallery/Output-style), which must never start a pass.
+    const options =
+      opts?.designated === false ? undefined : { runRoundTripCheck: true };
+    const h = renderHook(() =>
+      useKeyboardArtifact(kb(id), null, null, null, options),
+    );
     mounted.push(h);
     return h;
   });
@@ -188,6 +202,24 @@ describe("useKeyboardArtifact — I2 supersession across instances (#2249)", () 
 
     a.unmount();
     expect(depsA!.shouldAbort!()).toBe(true);
+  });
+
+  it("a non-designated instance never starts a pass (#2249 Output frontier)", async () => {
+    const offset = passes.length;
+    const a = await mount("kb_plain", { designated: false });
+    // The full run still completes and publishes `ready` — only the I2
+    // capture/start is designated-instance work. Give the deferred start
+    // every chance to fire (it is two macrotask hops on the designated
+    // instance) before concluding it never does.
+    await vi.waitFor(
+      () => {
+        expect(a.result.current.stage.kind).toBe("ready");
+      },
+      { timeout: 25_000, interval: 50 },
+    );
+    for (let i = 0; i < 5; i++) await flush();
+    expect(passes.length - offset).toBe(0);
+    expect(roundTripCheck).not.toHaveBeenCalled();
   });
 
   it("a same-instance recompile retires its own in-flight pass", async () => {
