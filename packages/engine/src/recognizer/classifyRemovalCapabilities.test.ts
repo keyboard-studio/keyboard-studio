@@ -418,6 +418,7 @@ const kbdusPath = path.join(KEYBOARDS_ROOT_BASIC, "basic_kbdus/source/basic_kbdu
 // §7.5 regression canary paths
 const silIpaPath = path.join(KEYBOARDS_ROOT_SIL, "sil_ipa/source/sil_ipa.kmn");
 const vietnameseTelexPath = path.join(KEYBOARDS_ROOT_V, "vietnamese_telex/source/vietnamese_telex.kmn");
+const vietnameseVniPath = path.join(KEYBOARDS_ROOT_V, "vietnamese_vni/source/vietnamese_vni.kmn");
 const csPinyinPath = path.join(KEYBOARDS_ROOT_C, "cs_pinyin/source/cs_pinyin.kmn");
 const silYoruba8Path = path.join(KEYBOARDS_ROOT_SIL, "sil_yoruba8/source/sil_yoruba8.kmn");
 const elPasifikaPath = path.join(KEYBOARDS_ROOT_EL, "el_pasifika/source/el_pasifika.kmn");
@@ -428,6 +429,7 @@ const kbdfrExists = fs.existsSync(kbdfrPath);
 const kbdusExists = fs.existsSync(kbdusPath);
 const silIpaExists = fs.existsSync(silIpaPath);
 const vietnameseTelexExists = fs.existsSync(vietnameseTelexPath);
+const vietnameseVniExists = fs.existsSync(vietnameseVniPath);
 const csPinyinExists = fs.existsSync(csPinyinPath);
 const silYoruba8Exists = fs.existsSync(silYoruba8Path);
 const elPasifikaExists = fs.existsSync(elPasifikaPath);
@@ -640,6 +642,23 @@ describe("classifyRemovalCapabilities — §7.5 regression canaries", () => {
         if (found) break;
       }
       expect(found).toBe(true);
+    },
+  );
+
+  it.skipIf(!vietnameseVniExists)(
+    "D5: vietnamese_vni multi-tone S-03 clusters lift with distinct pattern ids (#2225)",
+    () => {
+      const kmnText = fs.readFileSync(vietnameseVniPath, "utf-8");
+      const { ir } = parse(kmnText, "vietnamese_vni");
+      // Regression for #2225: five tone clusters share the base store
+      // `vowels`; a base-store-only patternId made this throw
+      // "Ownership drift" from assertOwnershipConsistency.
+      const result = recognizePatterns(ir);
+      const s03 = result.ir.recognizedPatterns.filter((p) =>
+        p.id.startsWith("context_sensitive_substitution#"),
+      );
+      expect(s03.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(s03.map((p) => p.id)).size).toBe(s03.length);
     },
   );
 

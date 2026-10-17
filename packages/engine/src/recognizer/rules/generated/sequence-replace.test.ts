@@ -10,6 +10,8 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import {
   buildIpaSequenceIR,
   buildAcuteSequenceIR,
+  buildVniSequenceIR,
+  buildTelexMultiTriggerIR,
   buildUnrelatedRemapIR,
   buildCompleteGraveIR,
   ipaSequenceRule,
@@ -24,7 +26,7 @@ describe("generated/sequence-replace match", () => {
     expect(matches).toHaveLength(1);
     const m = matches[0];
     expect(m).toBeDefined();
-    expect(m!.patternId).toBe("context_sensitive_substitution#equalD");
+    expect(m!.patternId).toBe("context_sensitive_substitution#main:equalD>equalU");
     expect(m!.ownedNodes.map((n) => n.nodeId).sort()).toEqual(
       [ruleNodeId, "store#equalD", "store#equalU"].sort(),
     );
@@ -65,7 +67,7 @@ describe("generated/sequence-replace match", () => {
     const { ir } = buildAcuteSequenceIR();
     const matches = sequenceReplace.match(ir);
     expect(matches).toHaveLength(1);
-    expect(matches[0]!.patternId).toBe("context_sensitive_substitution#bases");
+    expect(matches[0]!.patternId).toBe("context_sensitive_substitution#main:bases>marked");
     expect(matches[0]!.slotValues["triggerChar"]).toBe("'");
   });
 
@@ -89,8 +91,8 @@ describe("generated/sequence-replace match", () => {
     );
     const matches = sequenceReplace.match(ir);
     expect(matches.map((m) => m.patternId).sort()).toEqual([
-      "context_sensitive_substitution#bases",
-      "context_sensitive_substitution#equalD",
+      "context_sensitive_substitution#main:bases>marked",
+      "context_sensitive_substitution#main:equalD>equalU",
     ]);
   });
 });
@@ -185,11 +187,64 @@ describe("generated/sequence-replace lift + registry integration", () => {
     const result = recognizePatterns(ir);
 
     const pattern = result.ir.recognizedPatterns.find(
-      (p) => p.id === "context_sensitive_substitution#equalD",
+      (p) => p.id === "context_sensitive_substitution#main:equalD>equalU",
     );
     expect(pattern).toBeDefined();
     const rule = result.ir.groups[0]!.rules.find((r) => r.nodeId === ruleNodeId);
-    expect(rule?.ownedByPattern).toBe("context_sensitive_substitution#equalD");
+    expect(rule?.ownedByPattern).toBe("context_sensitive_substitution#main:equalD>equalU");
     expect(result.recognizedRatio).toBe(1);
+  });
+});
+
+describe("generated/sequence-replace multi-cluster identity (#2225)", () => {
+  it("vietnamese_vni shape: two clusters over one base store get distinct patternIds", () => {
+    const { ir } = buildVniSequenceIR();
+    const matches = sequenceReplace.match(ir);
+
+    expect(matches).toHaveLength(2);
+    expect(matches.map((m) => m.patternId).sort()).toEqual([
+      "context_sensitive_substitution#main:vowels>vowels_huyen",
+      "context_sensitive_substitution#main:vowels>vowels_sac",
+    ]);
+  });
+
+  it("vietnamese_vni shape: recognizePatterns does not throw and stamps each rule with its own pattern", () => {
+    const { ir, sacRuleNodeId, huyenRuleNodeId } = buildVniSequenceIR();
+    const result = recognizePatterns(ir);
+
+    const s03 = result.ir.recognizedPatterns.filter(
+      (p) => p.strategyId === "S-03",
+    );
+    expect(s03.map((p) => p.id).sort()).toEqual([
+      "context_sensitive_substitution#main:vowels>vowels_huyen",
+      "context_sensitive_substitution#main:vowels>vowels_sac",
+    ]);
+    const byId = new Map(
+      result.ir.groups[0]!.rules.map((r) => [r.nodeId, r.ownedByPattern]),
+    );
+    expect(byId.get(sacRuleNodeId)).toBe(
+      "context_sensitive_substitution#main:vowels>vowels_sac",
+    );
+    expect(byId.get(huyenRuleNodeId)).toBe(
+      "context_sensitive_substitution#main:vowels>vowels_huyen",
+    );
+    expect(result.recognizedRatio).toBe(1);
+  });
+
+  it("telex shape: one store pair with two triggers lifts as exactly one pattern", () => {
+    const { ir, ruleNodeIds } = buildTelexMultiTriggerIR();
+    const matches = sequenceReplace.match(ir);
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0]!.patternId).toBe(
+      "context_sensitive_substitution#main:vowels>vowels_sac",
+    );
+    expect(matches[0]!.ownedNodes.map((n) => n.nodeId)).toEqual(
+      expect.arrayContaining(ruleNodeIds),
+    );
+    // Both triggers are slot data on the single pattern.
+    expect(matches[0]!.slotValues["triggerChar"]).toContain("s");
+    expect(matches[0]!.slotValues["triggerChar"]).toContain("S");
+    expect(() => recognizePatterns(ir)).not.toThrow();
   });
 });
