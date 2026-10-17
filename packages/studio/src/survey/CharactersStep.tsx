@@ -27,7 +27,7 @@ import type {
 import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
 import { deriveRemapPosture, marksLackingPairingEvidence } from "@keyboard-studio/engine";
 import type { SurveyContext } from "./types.ts";
-import type { DecisionRendererProps } from "../decisions/decisionTypes.ts";
+import type { Decision, DecisionId, DecisionRendererProps } from "../decisions/decisionTypes.ts";
 import { useGalleryStepContext } from "../steps/galleryHost.tsx";
 import { alphabetKeyOf, graphemeFitsScript } from "../steps/evidence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -77,6 +77,12 @@ export interface CharactersStepExtras {
     remapConfirmation?: {
       value: RemapPosture;
       onChange: (next: RemapPosture) => void;
+    };
+    identityEdits?: {
+      onLanguageName: (value: string) => void;
+      onTargetScript: (rawValue: string) => void;
+      languageEdited?: boolean;
+      scriptEdited?: boolean;
     };
   }>;
   PhaseB: ComponentType<{
@@ -289,6 +295,52 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
     derivedRemapPosture !== undefined
       ? (remapChoice ?? savedRemapChoice ?? derivedRemapPosture)
       : undefined;
+
+  // --- Prefill inline edits (issue 542) ---
+  // The Language / Script rows on the prefill screen edit the identity
+  // step's OWN decision records — the single source of truth
+  // deriveIdentityResult reads — so the identity this component passes
+  // back down to Prefill (and every downstream derivation: script class,
+  // routing group, BCP 47, the remap posture above, the alphabet evidence
+  // key) recomputes from the edited value. No Prefill-local override
+  // exists. The replacement record is stamped with this step and carries
+  // the replaced value as `offered`, which is what lets Prefill mark the
+  // row "edited by you" — including after a draft restore, since the
+  // decision set is the persisted slice. A later identity-step re-answer
+  // rewrites the record under the identity step and the mark clears.
+  const languageNameRecord = useDecisionStore((s) => s.decisions["language-name"]);
+  const targetScriptRecord = useDecisionStore((s) => s.decisions["target-script"]);
+  const prefillIdentityEdits = {
+    onLanguageName: (value: string) => recordPrefillIdentityEdit("language-name", value),
+    onTargetScript: (rawValue: string) => recordPrefillIdentityEdit("target-script", rawValue),
+    languageEdited:
+      languageNameRecord?.step === CHARACTERS_STEP_ID && languageNameRecord.offered !== undefined,
+    scriptEdited:
+      targetScriptRecord?.step === CHARACTERS_STEP_ID && targetScriptRecord.offered !== undefined,
+  };
+
+  function recordPrefillIdentityEdit(id: DecisionId, value: string): void {
+    const current = useDecisionStore.getState().decisions[id];
+    if (current?.value === value) return;
+    const next: Decision = {
+      ...current,
+      id,
+      value,
+      provenance: "asked",
+      step: CHARACTERS_STEP_ID,
+    };
+    // The replaced value is the offer the author overrode (FR-001's
+    // `offered` contract); an absent/empty prior value leaves no offer.
+    if (typeof current?.value === "string" && current.value !== "") {
+      next.offered = current.value;
+    } else {
+      delete next.offered;
+    }
+    // An extraction source named the value's origin; an author-stated
+    // value has none.
+    delete next.source;
+    useDecisionStore.getState().record(next);
+  }
 
   function handleRemapChange(next: RemapPosture): void {
     setRemapChoice(next);
@@ -508,6 +560,7 @@ const CharactersStep: ComponentType<DecisionRendererProps<CharacterInventoryValu
               },
             }
           : {})}
+        identityEdits={prefillIdentityEdits}
       />
     );
   }
