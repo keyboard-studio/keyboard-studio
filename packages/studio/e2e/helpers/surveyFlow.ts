@@ -780,32 +780,54 @@ export async function driveMechanismsGallery(
 
     if (await waitVisible(applyButton, 2_000)) {
       const ariaLabel = (await applyButton.getAttribute("aria-label")) ?? "";
-      const placement = opts.placements?.[ariaLabel.replace(/^Apply method for /, "")];
+      const currentChar = ariaLabel.replace(/^Apply method for /, "");
+      const placement = opts.placements?.[currentChar];
       if (placement !== undefined) {
         await assignToKey(page, placement);
         await expect(applyButton).toBeEnabled({ timeout: 5_000 });
-        await applyButton.click();
+        await applyButton.click({ timeout: 15_000 });
       } else if (!(await applyButton.isDisabled())) {
-        await applyButton.click();
+        await applyButton.click({ timeout: 15_000 });
       } else {
         // The default method isn't Apply-ready (e.g. a bare combining mark's
         // "Assign to a key" default has no physical key chosen yet) — fall
         // back to "Type a sequence" with a synthetic, collision-free pair.
-        const currentChar = ariaLabel.replace(/^Apply method for /, "");
         const contentToken =
           "zzq" +
           [...currentChar]
             .map((cp) => (cp.codePointAt(0) ?? 0).toString(16))
             .join("");
 
-        await page.getByRole("button", { name: "Type a sequence" }).click();
+        await page.getByRole("button", { name: "Type a sequence" }).click({ timeout: 10_000 });
         await page.getByTestId("sequences-content").fill(contentToken);
         await page.getByTestId("sequences-indicator").fill("j");
-        await page.getByTestId("sequences-apply").click();
+        await page.getByTestId("sequences-apply").click({ timeout: 10_000 });
+      }
+
+      // Discriminator (#2249): an Apply (or the sequence fallback) must
+      // account for the character, which is observable as the forward
+      // button enabling. Bound the wait and NAME the stuck state instead
+      // of letting the forward click below consume the whole test budget
+      // against a disabled button — a 240s click timeout reports nothing
+      // about whether the write landed or the gate disagreed.
+      const forwardEnabled = await expect(forwardButton)
+        .toBeEnabled({ timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!forwardEnabled) {
+        const hint = await page
+          .getByText(/still needs an assignment/)
+          .first()
+          .textContent()
+          .catch(() => null);
+        throw new Error(
+          `driveMechanismsGallery: character "${currentChar}" still unaccounted 30s after Apply ` +
+            `(forward button never enabled). Gallery hint: ${hint ?? "<none rendered>"}`,
+        );
       }
     }
 
-    await forwardButton.click();
+    await forwardButton.click({ timeout: 15_000 });
   }
   throw new Error(
     "driveMechanismsGallery: did not complete within the expected character count",
