@@ -128,19 +128,28 @@ describe("named deadkeys — case: spelling preserved, per occurrence (#2238 con
 });
 
 describe("named deadkeys — boundaries held (#2238)", () => {
-  it("dk(name)+ with no space before + stays a raw element — the same glue as numeric dk(0300)+", () => {
-    // Pre-existing tokenizer behaviour, uniform across deadkey kinds:
-    // `dk(x)+` is one raw token; only the spaced form tokenises. Pinned so
-    // the named path is never "fixed" asymmetrically (embera_north and
-    // landuma write their double-tap escape exactly this way, and emit
-    // reproduces the raw text byte-identically).
+  it("dk(name)+ with no space before + tokenises as the spaced form — the #2247 glue fix, uniform across deadkey kinds", () => {
+    // Was (pre-#2247): `dk(x)+` was one raw token; only the spaced form
+    // tokenised, and the deadkey was invisible to typed-IR consumers
+    // (embera_north and landuma write their double-tap escape exactly this
+    // way). #2247 split the unspaced separator for the whole token class,
+    // so named and numeric deadkeys now type identically in both spellings
+    // and emit reproduces the spaced canonical form.
     const { ir } = parse(kmn("", "dk(Semicolon)+ ';' > ';'\ndk(0300)+ 'a' > 'a'\n"), "glue");
     const [named, numeric] = ir.groups[0]!.rules;
-    expect(named?.context[0]).toEqual({ kind: "raw", text: "dk(Semicolon)+" });
-    expect(numeric?.context[0]).toEqual({ kind: "raw", text: "dk(0300)+" });
+    expect(named?.context).toEqual([
+      { kind: "namedDeadkey", name: "Semicolon" },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: ";" },
+    ]);
+    expect(numeric?.context).toEqual([
+      { kind: "deadkey", id: 0x0300 },
+      { kind: "raw", text: "+" },
+      { kind: "char", value: "a" },
+    ]);
     const text = emit(ir);
-    expect(text).toContain("dk(Semicolon)+ U+003B > U+003B");
-    expect(text).toContain("dk(0300)+ U+0061 > U+0061");
+    expect(text).toContain("dk(Semicolon) + U+003B > U+003B");
+    expect(text).toContain("dk(0300) + U+0061 > U+0061");
   });
 
   it("the deadkey(name) long form stays unmodelled (raw element, no fragment)", () => {

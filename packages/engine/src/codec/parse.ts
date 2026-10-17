@@ -86,8 +86,13 @@ function unquote(s: string): string {
  *   - quoted strings (single or double) together
  *   - bracket groups [...] together
  *   - parenthesised groups (...) together (e.g. index(store, N), dk(XXXX))
+ * When `splitSeparatorPlus` is set (rule-context lists only), a top-level
+ * `+` (the context/keystroke separator) also tokenises on its own, spaced
+ * or not — except the `+` inside a `U+XXXX` literal (#2247). Store and
+ * output lists pass false: `+` has no separator meaning there, so their
+ * tokenisation is unchanged.
  */
-function splitTokens(text: string): string[] {
+function splitTokens(text: string, splitSeparatorPlus = false): string[] {
   const result: string[] = [];
   let i = 0;
   while (i < text.length) {
@@ -117,6 +122,24 @@ function splitTokens(text: string): string[] {
     // tokens such as `dk(1)" "` (deadkey followed by a quoted literal, no
     // whitespace required by kmcmplib) tokenise as two tokens rather than
     // one malformed run.
+    // ALSO, for rule-context lists only (splitSeparatorPlus), stop at a
+    // top-level `+` — the context/keystroke separator. kmcmplib lexes `+`
+    // as its own token whether or not whitespace surrounds it, so an
+    // unspaced form such as `dk(3)+ any(mey1)` (#2247) must tokenise as
+    // `dk(3)`, `+`, `any(mey1)` — exactly the spaced form — instead of one
+    // glued raw token `dk(3)+` that hides the deadkey from every typed-IR
+    // consumer. This applies to the whole unspaced class (any `X+` / `+X`
+    // where X is a bare token: dk(...), any(...), deadkey(...), a bareword
+    // like `nul`, a paren group, …), on either side of the `+`. The one
+    // exception is a `U+XXXX` codepoint literal: its `+` follows `U`/`u` and
+    // precedes a hex digit and is never the separator (the same test the
+    // validator's contextOrdering check uses). A `+` at the very start of a
+    // bare token is emitted as a single-character token, so `+any(x)` and
+    // `+[K_A]` also split. Store/output lists do not pass the flag: `+` is
+    // not a separator there, and a corpus audit for #2247 found no typed
+    // token glued by `+` in those positions (the sole glued output token in
+    // 933 files is a raw word inside a misparsed comment tail, whose
+    // segmentation is literal text, not separator structure).
     let j = i;
     let depth = 0;
     while (j < text.length) {
@@ -126,6 +149,15 @@ function splitTokens(text: string): string[] {
       if (depth === 0) {
         if (c === " " || c === "\t") break;
         if (c === "'" || c === '"' || c === "[") break;
+        if (c === "+" && splitSeparatorPlus) {
+          if (j === i) { j++; break; } // the separator itself: one-char token
+          const prev = text[j - 1] ?? "";
+          const next = text[j + 1] ?? "";
+          const isCodepointPlus =
+            (prev === "U" || prev === "u") && /[0-9A-Fa-f]/.test(next);
+          if (!isCodepointPlus) break; // end this token before the separator
+          // else: internal to a U+XXXX literal — consume and continue.
+        }
       }
       j++;
     }
@@ -1258,8 +1290,10 @@ export function parse(text: string, keyboardId: string): ParseResult {
         // Quick opaque surface check before deep parse.
         const opaqueCheck = { reason: null as string | null };
 
-        // Parse context
-        const ctxToks = splitTokens(parsedLine.contextRaw);
+        // Parse context — the only list where `+` is the context/keystroke
+        // separator, so the only list tokenised with separator splitting
+        // (#2247).
+        const ctxToks = splitTokens(parsedLine.contextRaw, true);
         const ctxElements = parseContextElements(ctxToks, opaqueCheck);
 
         let outElements: OutputElement[] | null = null;
