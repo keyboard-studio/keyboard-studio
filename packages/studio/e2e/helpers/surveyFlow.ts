@@ -990,15 +990,18 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  * Phase F has several questions (welcome paragraph, usage tips, credits, contact).
  * This helper:
  *   1. Fills the welcome paragraph
- *   2. Fills the first usage tip
- *   3. Leaves the HISTORY proposal (pf_history_entry, spec 080 US5) undecided
+ *   2. Advances past pf_font_guidance (Phase F revision, #2182) — a core-flow
+ *      question spliced between the welcome paragraph and the first usage
+ *      tip; optional, left blank ("common system fonts are sufficient")
+ *   3. Fills the first usage tip
+ *   4. Leaves the HISTORY proposal (pf_history_entry, spec 080 US5) undecided
  *      and advances past it — optional, so Next is enabled with no answer
- *   4. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
+ *   5. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
  *      revision's required Yes/No gate, which unconditionally follows
  *      pf_history_entry) — the minimal path every existing walk wants,
  *      rather than opening the optional documentation battery
- *   5. Advances through remaining optional questions in a bounded loop
- *   6. Detects arrival at #output (phase boundary)
+ *   6. Advances through remaining optional questions in a bounded loop
+ *   7. Detects arrival at #output (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
@@ -1011,6 +1014,23 @@ export async function driveHelpPhase(
 ): Promise<void> {
   await page.locator("#pf_welcome_paragraph").fill(welcomeText);
   await surveyAdvance(page).click();
+
+  // pf_font_guidance (#2182) sits in the core flow between the welcome
+  // paragraph and pf_usage_tip_1 — a walk that waits for the usage-tip
+  // field here stalls until the test timeout (the golden-walk capture's
+  // 1200s death on run 39159050050). Optional and blank is a complete
+  // answer, so advance straight past it. The visibility wait is bounded
+  // and conditional because these helpers are also copied onto base code
+  // for the golden-walk baseline capture, where the question may predate
+  // or postdate the helper.
+  const fontGuidance = page.locator("#pf_font_guidance");
+  const fontGuidanceShown = await fontGuidance
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (fontGuidanceShown) {
+    await surveyAdvance(page).click();
+  }
 
   await page.locator("#pf_usage_tip_1").fill(usageTipText);
   await surveyAdvance(page).click();
