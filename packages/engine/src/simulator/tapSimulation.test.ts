@@ -12,6 +12,11 @@
  *  - an unruled U_ key decodes its id; a ruled U_ key follows its rule;
  *  - an unmatched K_ key falls back to the US base char at state 0 and
  *    SHIFT, and produces nothing in other modifier states (RALT).
+ *  - CAPS state (T022, caps_probe fixture): the same fallback FIRES —
+ *    CAPITAL is an Lstate the base-key fallback never inspects, so a
+ *    caps-layer key produces its modifier state's char (state 0 →
+ *    unshifted, caps+SHIFT → shifted). This settles the contracts §5
+ *    proviso the resolver previously reported as `unknown`.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -145,6 +150,43 @@ describe("tapSimulation — gff_mesobe_fidelat (T_ producer + switch + host)", (
   it("the U_ subkey family decodes, on the host layer and on the switched layer", () => {
     expect(session.tapSubkey("default", "T_1280", "U_1281").buffer).toBe("ኁ");
     expect(session.tap("fidel-1280", "U_1282").buffer).toBe("ኂ");
+  });
+});
+
+describe("tapSimulation — caps_probe (T022: caps-state K_ fallback)", () => {
+  let session: TouchTapSession;
+  beforeAll(async () => {
+    session = TouchTapSession.fromCompiled(await compileFixture("caps_probe"));
+  }, 60_000);
+
+  it("controls: the unmatched probe key falls back at state 0 and SHIFT", () => {
+    expect(session.tap("default", "K_Q").buffer).toBe("q");
+    expect(session.tap("shift", "K_Q").buffer).toBe("Q");
+  });
+
+  it("the state witness proves CAPITAL genuinely engages on the caps layer", () => {
+    // Without this, a silent caps probe key could mean "caps state never
+    // engaged" instead of "no fallback in caps". The witness's caps-gated
+    // rule fires ONLY under CAPITAL; its ncaps rule fires otherwise.
+    expect(session.tap("default", "K_B").buffer).toBe("ncaps-witness");
+    expect(session.tap("caps", "K_B").buffer).toBe("caps-witness");
+  });
+
+  it("VERDICT: an unmatched K_ key in caps state falls back — to the state-0 char", () => {
+    // KMW's DefaultOutputRules.forBaseKeys gates on Lmodifiers alone and
+    // never inspects Lstates: on a caps layer (modifiers 0, CAPITAL set)
+    // the fallback fires with the UNSHIFTED base char. Not 'Q', not ''.
+    expect(session.tap("caps", "K_Q").buffer).toBe("q");
+  });
+
+  it("VERDICT: caps + SHIFT falls back to the shifted char", () => {
+    expect(session.tap("caps_shift", "K_Q").buffer).toBe("Q");
+  });
+
+  it("secondary observation: state-free bindings fire under CAPITAL", () => {
+    // Pins the resolver's bindingAppliesInState treatment (a binding
+    // naming no caps word is not Lstate-gated) against the engine.
+    expect(session.tap("caps", "K_C").buffer).toBe("bare-rule");
   });
 });
 

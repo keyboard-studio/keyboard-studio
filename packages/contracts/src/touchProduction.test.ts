@@ -28,6 +28,7 @@ const STATE0: TouchKeyState = { modifiers: [] };
 const SHIFT: TouchKeyState = { modifiers: ["SHIFT"] };
 const RALT: TouchKeyState = { modifiers: ["RALT"] };
 const CAPS: TouchKeyState = { modifiers: [], caps: true };
+const SHIFT_CAPS: TouchKeyState = { modifiers: ["SHIFT"], caps: true };
 const RALT_CAPS: TouchKeyState = { modifiers: ["RALT"], caps: true };
 
 function resolve(ir: KeyboardIR, key: TouchKeyIR, state: TouchKeyState = STATE0): TouchKeyProduction {
@@ -258,14 +259,42 @@ describe("resolveTouchProduction — source: k-fallback", () => {
     expect(p.productions).toEqual([{ output: { kind: "none" } }]);
   });
 
-  it("caps state: output unknown, fallback NOT certain (§5 proviso)", () => {
+  it("caps state: the fallback FIRES with the state-0 char, and is certain (T022 verdict, §5)", () => {
+    // Settled empirically by the caps_probe tap fixture (tapSimulation
+    // .test.ts): an unmatched K_Q on a caps layer types 'q'. KMW's
+    // forBaseKeys gates on Lmodifiers only; CAPITAL is invisible to it.
     const p = resolve(makeTestIR([]), touchKey({ id: "K_A" }), CAPS);
     expect(p.source).toBe("k-fallback");
-    expect(p.productions).toEqual([{ output: { kind: "unknown" } }]);
-    expect(p.fallbackCertain).toBe(false);
+    expect(p.productions).toEqual([{ output: { kind: "text", text: "a" } }]);
+    expect(p.fallbackCertain).toBe(true);
   });
 
-  it("caps + RALT: the modifier arm settles it — none, not unknown", () => {
+  it("caps + SHIFT: the SHIFT arm of the fallback — shifted char, certain (T022)", () => {
+    // caps_shift layer in the probe fixture: unmatched K_Q types 'Q'.
+    const p = resolve(makeTestIR([]), touchKey({ id: "K_A" }), SHIFT_CAPS);
+    expect(p.source).toBe("k-fallback");
+    expect(p.productions).toEqual([{ output: { kind: "text", text: "A" } }]);
+    expect(p.fallbackCertain).toBe(true);
+  });
+
+  it("memoised IR maps are keyed on the IR object: a rebuilt IR never inherits stale maps", () => {
+    // The resolver memoises its per-IR lookup maps (WeakMap on the IR
+    // object) so corpus-scale consumers stay linear in rules-per-key.
+    // The invariant that makes it sound: a NEW IR object — the only way
+    // an edited keyboard ever reaches the resolver — gets fresh maps.
+    const ruled = irWithRules({ nodeId: "r1", vkey: "T_0300", output: "̀" });
+    const inputs = { ir: ruled, ruleIndex: buildTouchKeyRuleIndex(ruled) };
+    const key = touchKey({ id: "T_0300" });
+    expect(resolveTouchProduction(inputs, key, STATE0).source).toBe("rule");
+    // Repeat call over the same inputs (the memo path) — identical record.
+    expect(resolveTouchProduction(inputs, key, STATE0).source).toBe("rule");
+    // A different IR object without the rule must NOT see the memoised map.
+    const bare = makeTestIR([]);
+    const p = resolve(bare, key);
+    expect(p.source).toBe("none");
+  });
+
+  it("caps + RALT: the modifier arm settles it — none", () => {
     const p = resolve(makeTestIR([]), touchKey({ id: "K_A" }), RALT_CAPS);
     expect(p.source).toBe("none");
     expect(p.productions).toEqual([{ output: { kind: "none" } }]);
