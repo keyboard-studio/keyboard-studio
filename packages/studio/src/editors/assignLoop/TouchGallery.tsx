@@ -92,6 +92,7 @@ import {
   formatUncoveredTouchMessage,
   computeTouchCoverage,
   buildTouchKeyRuleIndex,
+  createKeyOccurrenceCounter,
   isSpacerKeyClass,
 } from "@keyboard-studio/contracts";
 import type {
@@ -126,12 +127,29 @@ import {
   keyEditAffectsFamilyParallelism,
   planKeyDeletionRuleRemoval,
   applyKeyDeletionRuleRemoval,
+  SEVERANCE_LINE_DESCRIPTOR_ID,
+  SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID,
 } from "@keyboard-studio/engine";
-import type { TouchMethodDescriptor, TouchKeyIdProposal } from "@keyboard-studio/engine";
+import type {
+  SeveranceNotice,
+  TouchMethodDescriptor,
+  TouchKeyIdProposal,
+} from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
 } from "../../lib/buildTouchLayoutJson.ts";
+import {
+  appendIdentityDecision,
+  appendTransplantRecord,
+  identityDecisionForAddress,
+  identityTrackFor,
+  mergeSeveranceWithSynthesis,
+  mintRecordId,
+  planInlineSeverance,
+  type InlineSeverancePlan,
+} from "../../lib/touchKeyIdentity.ts";
+import { TouchKeyIdentityList } from "../../components/TouchKeyIdentityList.tsx";
 import { resolveStartTouchJson } from "../../lib/resolveStartTouchJson.ts";
 import { TOUCH_STEP_ID } from "../../steps/stepIds.ts";
 import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
@@ -1710,6 +1728,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const identity = useWorkingCopyStore((s) => s.identity);
+  // Spec 104: the key-identity decision spine slice (repair proposals,
+  // identity decisions, transplant records) — the inspector's identity
+  // provenance line reads it here.
+  const touchKeyIdentity = useWorkingCopyStore((s) => s.touchKeyIdentity);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   // The MUTABLE working IR (spec 063 T085-T089 composition) — AssignPanel's
   // rule synthesis (ensureTouchKeyRule/applyGuardSynthesis) reads/returns this
@@ -2572,6 +2594,44 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   >([]);
 
   // ---------------------------------------------------------------------------
+  // Spec 104 T016 — editor-triggered key-identity severance (FR-016/FR-018).
+  //
+  // An AssignPanel commit that renames a `K_`-family key to a new id is an
+  // identity change: the touch key stops being the typing keyboard's key.
+  // On the Copy track (Track 1) the criteria apply directly — the severance
+  // transplant runs at commit and the severance line shows in the details
+  // column's live region. On the Adapt track (Track 2) the commit is HELD
+  // in `pendingIdentityChoice` and decided inline in the key property
+  // panel (FR-018's batch unit is the one key in front of the author):
+  // sever (transplant runs), keep the link (the edit stands as authored,
+  // no transplant), or — when the transplant refuses (FR-016's collapse) —
+  // flag for manual definition instead of sever. Every outcome is recorded
+  // on the decision spine (`touchKeyIdentity`); abandoning the panel
+  // discards the held commit unrecorded, because nothing was decided.
+  // ---------------------------------------------------------------------------
+
+  /** A held Track 2 AssignPanel commit awaiting its identity choice. */
+  interface PendingIdentityChoice {
+    readonly result: AssignPanelCommitResult;
+    readonly sourceId: string;
+    readonly targetId: string;
+    /** The source key's keycap label, for the severance line's value. */
+    readonly physicalKeyLabel: string | undefined;
+    /** The presentation-time plan — its outcome shapes the offered choice. */
+    readonly plan: InlineSeverancePlan;
+  }
+
+  const [pendingIdentityChoice, setPendingIdentityChoice] =
+    useState<PendingIdentityChoice | null>(null);
+  const [identityChoiceSelection, setIdentityChoiceSelection] = useState<
+    "sever" | "keep" | "flag"
+  >("sever");
+  /** The transient severance notice (live region); the durable record is on the spine. */
+  const [severanceNotice, setSeveranceNotice] = useState<SeveranceNotice | null>(null);
+  /** Set when a Track 1 severance refused — the key is flagged for manual definition. */
+  const [severanceRefusedNotice, setSeveranceRefusedNotice] = useState(false);
+
+  // ---------------------------------------------------------------------------
   // T013 — the single-writer commit chain (key-edit-overlay.md's own
   // language: "do not create a second write path"). `commitKeyEditCore` is
   // the ONE place every key-mode surface's guard-check / store-commit /
@@ -2890,6 +2950,106 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [layoutForLintAndGate, commitKeyEditCore, maybeOfferFamilyApply, resolveKeyEditSubjectSp],
   );
 
+  // -- Spec 104 T016 helpers (see the state block above) ----------------------
+
+  /** The commit exactly as AssignPanel authored it (the pre-104 behaviour). */
+  const commitAssignmentAsAuthored = (result: AssignPanelCommitResult): boolean => {
+    const { committed } = commitKeyEditCore(result.op, result.promotedLayout, () => {
+      if (result.nextIr !== undefined) {
+        useWorkingCopyStore.getState().setWorkingIR(result.nextIr);
+      }
+    });
+    if (!committed) return false;
+
+    // touchKeyAddress.ts builds the address from the key's OWN id, so a
+    // "set" op that renames the key (the U_/T_ minting path — virtually
+    // always) changes the address that SAME key now resolves under. Follow
+    // it — a successful commit must not silently strand the selection (and
+    // with it, the inspector/panel, which both read `selectedKeyCell`
+    // derived from this address) on an address nothing answers to anymore.
+    if (result.op.kind === "set" && result.op.fields.id !== undefined) {
+      const parts = parseTouchKeyAddress(result.op.address);
+      if (parts !== undefined) {
+        setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+      }
+    }
+    return true;
+  };
+
+  /** Append a plan's transplant record + decision to the decision spine. */
+  const appendSeveranceRecords = (plan: InlineSeverancePlan): void => {
+    const store = useWorkingCopyStore.getState();
+    let next = appendTransplantRecord(store.touchKeyIdentity, plan.speculative.record);
+    next = appendIdentityDecision(next, plan.speculative.decision);
+    store.setTouchKeyIdentity(next);
+  };
+
+  /**
+   * Commit an assignment WITH its severance transplant: the panel op goes
+   * through the single-writer chain with the merged IR (transplant composed
+   * with the panel's synthesis — see `mergeSeveranceWithSynthesis`), then
+   * the layer-family sibling occurrences the transplant re-keyed follow as
+   * ordinary rename ops (the anchor itself is renamed by the panel op).
+   */
+  const commitAssignmentWithSeverance = (
+    result: AssignPanelCommitResult,
+    plan: InlineSeverancePlan,
+    anchorLayerId: string,
+  ): boolean => {
+    if (ir === null || effectiveKeyModeLayout === null) return false;
+    const mergedIr = mergeSeveranceWithSynthesis({
+      plan: plan.speculative,
+      baseIr: ir,
+      nextIr: result.nextIr,
+      anchorLayerId,
+    });
+    const { committed } = commitKeyEditCore(result.op, result.promotedLayout, () => {
+      useWorkingCopyStore.getState().setWorkingIR(mergedIr);
+    });
+    if (!committed) return false;
+    if (result.op.kind === "set" && result.op.fields.id !== undefined) {
+      const parts = parseTouchKeyAddress(result.op.address);
+      if (parts !== undefined) {
+        setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+      }
+    }
+    const affected = new Set(plan.speculative.layersAffected);
+    for (const platform of effectiveKeyModeLayout.platforms) {
+      if (platform.id !== plan.platformId) continue;
+      for (const layer of platform.layers) {
+        if (!affected.has(layer.id)) continue;
+        const nextOccurrence = createKeyOccurrenceCounter();
+        for (const row of layer.rows) {
+          for (const key of row.keys) {
+            const occurrence = nextOccurrence(key.id);
+            if (key.id !== plan.sourceId) continue;
+            const address = touchKeyAddress(platform.id, layer.id, key.id, occurrence);
+            if (address === result.op.address) continue;
+            commitKeyEditOp(
+              { kind: "rename", address, toId: plan.targetId },
+              { offerFamilyApply: false },
+            );
+          }
+        }
+      }
+    }
+    appendSeveranceRecords(plan);
+    return true;
+  };
+
+  /** The severance notice for a completed severance (contracts §6, FR-026). */
+  const showSeveranceNotice = (physicalKeyLabel: string | undefined): void => {
+    setSeveranceRefusedNotice(false);
+    setSeveranceNotice(
+      physicalKeyLabel !== undefined
+        ? {
+            descriptorId: SEVERANCE_LINE_DESCRIPTOR_ID,
+            values: { physicalKeyLabel },
+          }
+        : { descriptorId: SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID, values: {} },
+    );
+  };
+
   // ONE commit call site for AssignPanel's `onCommit` (spec 063 T085-T089
   // composition) — reuses the EXISTING key-edit overlay / undo-stack action
   // (`commitKeyEdit`, landed in Phase 5b) and the EXISTING overlay-preserving
@@ -2899,30 +3059,318 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // directory". Delegates the guard/commit/promotion core to
   // `commitKeyEditCore` (T013) — see that function's own doc for why the
   // Case A/B split lives there now rather than being re-derived here.
-  const handleAssignPanelCommit = useCallback(
-    (result: AssignPanelCommitResult) => {
-      const { committed } = commitKeyEditCore(result.op, result.promotedLayout, () => {
-        if (result.nextIr !== undefined) {
-          useWorkingCopyStore.getState().setWorkingIR(result.nextIr);
-        }
-      });
-      if (!committed) return;
+  //
+  // Spec 104 T016: a commit that renames a `K_`-family key is an identity
+  // change (see the state block above). Creation (no base keyboard) keeps
+  // the plain path — there is no inherited link to sever.
+  const handleAssignPanelCommit = (result: AssignPanelCommitResult): void => {
+      setSeveranceNotice(null);
+      setSeveranceRefusedNotice(false);
+      const parts =
+        result.op.kind === "set" ? parseTouchKeyAddress(result.op.address) : undefined;
+      const targetId = result.op.kind === "set" ? result.op.fields.id : undefined;
+      const sourceId = parts?.keyId;
+      const isIdentityChange =
+        parts !== undefined &&
+        parts.sub === undefined &&
+        targetId !== undefined &&
+        sourceId !== undefined &&
+        sourceId !== targetId &&
+        sourceId.startsWith("K_");
+      const storeNow = useWorkingCopyStore.getState();
+      const track = identityTrackFor(storeNow.instantiationMode);
+      if (
+        !isIdentityChange ||
+        track === "creation" ||
+        ir === null ||
+        effectiveKeyModeLayout === null ||
+        parts === undefined ||
+        sourceId === undefined ||
+        targetId === undefined
+      ) {
+        commitAssignmentAsAuthored(result);
+        return;
+      }
 
-      // touchKeyAddress.ts builds the address from the key's OWN id, so a
-      // "set" op that renames the key (the U_/T_ minting path — virtually
-      // always) changes the address that SAME key now resolves under. Follow
-      // it — a successful commit must not silently strand the selection (and
-      // with it, the inspector/panel, which both read `selectedKeyCell`
-      // derived from this address) on an address nothing answers to anymore.
-      if (result.op.kind === "set" && result.op.fields.id !== undefined) {
-        const parts = parseTouchKeyAddress(result.op.address);
-        if (parts !== undefined) {
-          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+      const resolved = resolveKeyAddress(effectiveKeyModeLayout, parts);
+      const physicalKeyLabel =
+        resolved !== undefined && resolved.key.text !== undefined && resolved.key.text.length > 0
+          ? resolved.key.text
+          : undefined;
+      const plan = planInlineSeverance({
+        ir,
+        layout: effectiveKeyModeLayout,
+        platformId: parts.platform,
+        anchorLayerId: parts.layerId,
+        sourceId,
+        targetId,
+        track,
+        proposer: track === "adapt" ? "author" : "criteria",
+      });
+
+      if (track === "adapt") {
+        // FR-018: hold the commit; the choice is decided inline in the
+        // key property panel (rendered in the details column below).
+        setPendingIdentityChoice({ result, sourceId, targetId, physicalKeyLabel, plan });
+        setIdentityChoiceSelection(
+          plan.speculative.record.outcome === "refused" ? "keep" : "sever",
+        );
+        return;
+      }
+
+      // Track 1 (Copy): the criteria apply directly (FR-016's other half).
+      if (plan.speculative.record.outcome === "completed") {
+        if (commitAssignmentWithSeverance(result, plan, parts.layerId)) {
+          showSeveranceNotice(physicalKeyLabel);
+        }
+      } else {
+        // Refusal: the author's edit stands as authored; the key is
+        // flagged for manual definition with the refusal recorded.
+        if (commitAssignmentAsAuthored(result)) {
+          appendSeveranceRecords(plan);
+          setSeveranceRefusedNotice(true);
         }
       }
-    },
-    [commitKeyEditCore],
-  );
+  };
+
+  /**
+   * Spec 104 T016 — resolve a held Track 2 identity choice. Sever runs the
+   * transplant (re-planned against the current state; a state change that
+   * turned it into a refusal lands on the flag path instead). Keep and
+   * flag both let the edit stand as authored — keep records the author's
+   * kept-by-choice decision, flag records the refusal + flagged-manual
+   * decision as outstanding manual work.
+   */
+  const handleIdentityChoiceConfirm = (): void => {
+    const pending = pendingIdentityChoice;
+    if (pending === null) return;
+    setPendingIdentityChoice(null);
+    const answer = identityChoiceSelection;
+    const { result } = pending;
+    const parts = parseTouchKeyAddress(result.op.address);
+    if (parts === undefined) {
+      commitAssignmentAsAuthored(result);
+      return;
+    }
+
+    if (answer === "sever" && ir !== null && effectiveKeyModeLayout !== null) {
+      const plan = planInlineSeverance({
+        ir,
+        layout: effectiveKeyModeLayout,
+        platformId: parts.platform,
+        anchorLayerId: parts.layerId,
+        sourceId: pending.sourceId,
+        targetId: pending.targetId,
+        track: "adapt",
+        proposer: "author",
+        authorAnswer: "sever-the-link",
+      });
+      if (plan.speculative.record.outcome === "completed") {
+        if (commitAssignmentWithSeverance(result, plan, parts.layerId)) {
+          showSeveranceNotice(pending.physicalKeyLabel);
+        }
+        return;
+      }
+      // State changed under the held choice and severance now refuses:
+      // fall through to the flag path with the fresh refusal.
+      if (commitAssignmentAsAuthored(result)) {
+        appendSeveranceRecords(plan);
+        setSeveranceRefusedNotice(true);
+      }
+      return;
+    }
+
+    if (!commitAssignmentAsAuthored(result)) return;
+    const store = useWorkingCopyStore.getState();
+    if (answer === "keep") {
+      store.setTouchKeyIdentity(
+        appendIdentityDecision(store.touchKeyIdentity, {
+          recordId: mintRecordId(store.touchKeyIdentity, "decision", result.op.address),
+          keyRef: result.op.address,
+          action: "kept-by-choice",
+          criterion: "FR-011",
+          track: "adapt",
+          proposer: "author",
+          authorAnswer: "keep-the-link",
+          hostSet: ["US"],
+          recordedAt: Date.now(),
+        }),
+      );
+    } else {
+      // flag: the presentation plan's refusal stands as the record.
+      appendSeveranceRecords({
+        ...pending.plan,
+        speculative: {
+          ...pending.plan.speculative,
+          decision: {
+            ...pending.plan.speculative.decision,
+            proposer: "author",
+            authorAnswer: "flag-for-manual-definition",
+          },
+        },
+      });
+      setSeveranceRefusedNotice(true);
+    }
+  };
+
+  // Abandoning the held choice (selecting another key) discards the held
+  // commit unrecorded — nothing was decided or applied (FR-017's decline
+  // is an explicit answer, not a navigation side effect).
+  useEffect(() => {
+    if (
+      pendingIdentityChoice !== null &&
+      selectedKeyAddress !== null &&
+      selectedKeyAddress !== pendingIdentityChoice.result.op.address
+    ) {
+      setPendingIdentityChoice(null);
+    }
+  }, [pendingIdentityChoice, selectedKeyAddress]);
+
+  /** The transient severance notices (details column live region). */
+  const renderSeveranceNotices = (): React.ReactNode => {
+    const physicalKeyLabel = severanceNotice?.values.physicalKeyLabel ?? "";
+    return (
+      <>
+        {severanceNotice !== null && (
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="touch-key-severance-notice"
+            style={{ margin: 0, fontSize: 12, fontFamily: FONT }}
+          >
+            {severanceNotice.descriptorId === SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID ? (
+              <Trans id="touchKeyIdentity.severanceLineNoPhysicalKey">
+                This touch key is on its own: it types only what you set here, and no
+                typing-keyboard key controls it.
+              </Trans>
+            ) : (
+              <Trans id="touchKeyIdentity.severanceLine">
+                This touch key is now on its own: it types only what you set here, and changing the{" "}
+                {physicalKeyLabel} key on the typing keyboard won't change it.
+              </Trans>
+            )}
+          </p>
+        )}
+        {severanceRefusedNotice && (
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="touch-key-severance-refused-notice"
+            style={{ margin: 0, fontSize: 12, fontFamily: FONT }}
+          >
+            <Trans id="touch.keyIdentity.choice.flaggedNotice">
+              This key is flagged for manual definition — its rules couldn't be copied over
+              automatically, so its other layers need rules written by hand.
+            </Trans>
+          </p>
+        )}
+      </>
+    );
+  };
+
+  /**
+   * Spec 104 T016 (FR-018) — a held Track 2 commit's identity choice,
+   * decided inline in the key property panel at commit. The transplant
+   * refusal collapses the choice to keep vs flag (FR-016), with the
+   * refusing binding shown.
+   */
+  const renderIdentityChoice = (): React.ReactNode => {
+    const pending = pendingIdentityChoice;
+    if (pending === null) return null;
+    const physicalKeyLabel = pending.physicalKeyLabel ?? "";
+    const refusalBinding = pending.plan.refusalBinding ?? "";
+    const refused = pending.plan.speculative.record.outcome === "refused";
+    return (
+      <div
+        data-testid="touch-key-identity-choice"
+        style={{
+          border: "1px solid var(--app-border)",
+          borderRadius: 4,
+          padding: "10px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+        }}
+      >
+        <strong style={{ fontSize: 13 }}>
+          <Trans id="touch.keyIdentity.choice.heading">
+            This edit gives the key its own behaviour
+          </Trans>
+        </strong>
+        <span style={{ fontSize: 12 }}>
+          <Trans id="touch.keyIdentity.choice.detail">
+            You're changing what {pending.sourceId} types on the touch keyboard. Should this touch
+            key keep following the typing keyboard, or stand on its own?
+          </Trans>
+        </span>
+        {refused && (
+          <span style={{ fontSize: 12 }}>
+            <Trans id="touch.keyIdentity.choice.refusal">
+              This key's rules can't be copied over: {refusalBinding} You can keep the link, or flag
+              the key and define it by hand.
+            </Trans>
+          </span>
+        )}
+        {!refused && (
+          <label style={{ fontSize: 12 }}>
+            <input
+              type="radio"
+              name="touch-key-identity-choice"
+              checked={identityChoiceSelection === "sever"}
+              onChange={() => setIdentityChoiceSelection("sever")}
+            />{" "}
+            <Trans id="touch.keyIdentity.choice.severOption">
+              Put this key on its own (recommended)
+            </Trans>
+            {" — "}
+            {pending.physicalKeyLabel !== undefined ? (
+              <Trans id="touchKeyIdentity.severanceLine">
+                This touch key is now on its own: it types only what you set here, and changing the{" "}
+                {physicalKeyLabel} key on the typing keyboard won't change it.
+              </Trans>
+            ) : (
+              <Trans id="touchKeyIdentity.severanceLineNoPhysicalKey">
+                This touch key is on its own: it types only what you set here, and no typing-keyboard
+                key controls it.
+              </Trans>
+            )}
+          </label>
+        )}
+        <label style={{ fontSize: 12 }}>
+          <input
+            type="radio"
+            name="touch-key-identity-choice"
+            checked={identityChoiceSelection === "keep"}
+            onChange={() => setIdentityChoiceSelection("keep")}
+          />{" "}
+          <Trans id="touch.keyIdentity.choice.keepOption">Keep the link</Trans>
+          {" — "}
+          <Trans id="touch.keyIdentity.choice.keepConsequence">
+            The typing keyboard's rules for this key will keep applying to this touch key, including
+            any changes made to them later.
+          </Trans>
+        </label>
+        {refused && (
+          <label style={{ fontSize: 12 }}>
+            <input
+              type="radio"
+              name="touch-key-identity-choice"
+              checked={identityChoiceSelection === "flag"}
+              onChange={() => setIdentityChoiceSelection("flag")}
+            />{" "}
+            <Trans id="touch.keyIdentity.choice.flagOption">
+              Flag it — I'll define this key by hand
+            </Trans>
+          </label>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={handleIdentityChoiceConfirm}>
+            <Trans id="touch.keyIdentity.choice.confirm">Use this choice</Trans>
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // ---------------------------------------------------------------------------
   // T013 — the seven previously-orphaned surfaces (FR-002): `useKeyCommands`
@@ -5827,6 +6275,55 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     </>
   );
 
+  // Spec 104 T016 — the selected key's recorded identity provenance line
+  // for the key inspector (durable record; the live-region notice is the
+  // transient half). Only the Track 2 identity actions surface here.
+  const selectedIdentityDecision =
+    selectedKeyAddress !== null
+      ? identityDecisionForAddress(touchKeyIdentity, selectedKeyAddress)
+      : undefined;
+  const selectedIdentityNote =
+    selectedIdentityDecision === undefined
+      ? undefined
+      : selectedIdentityDecision.action === "severed"
+        ? t({
+            id: "editor.assignLoop.keyGrid.inspector.identitySevered",
+            message:
+              "This key stands on its own: its rules were copied from the typing keyboard when it was put on its own.",
+          })
+        : selectedIdentityDecision.action === "kept-by-choice"
+          ? t({
+              id: "editor.assignLoop.keyGrid.inspector.identityKept",
+              message: "This key still follows the typing keyboard: you chose to keep the link.",
+            })
+          : selectedIdentityDecision.action === "flagged-manual"
+            ? t({
+                id: "editor.assignLoop.keyGrid.inspector.identityFlagged",
+                message:
+                  "This key is flagged for manual definition: its rules couldn't be copied over automatically.",
+              })
+            : selectedIdentityDecision.action === "relinked"
+              ? t({
+                  id: "editor.assignLoop.keyGrid.inspector.identityRelinked",
+                  message: "This key follows the typing keyboard again.",
+                })
+              : undefined;
+
+  // Spec 104 T015 — the dead-key repair / identity-decision list element,
+  // shared by both touch-step modes (declared once here so neither mode's
+  // content forks it). Repair ops ride the gallery's single-writer chain;
+  // a mint-and-rule install is the overlay-preserving IR setter.
+  const touchKeyIdentityList = (
+    <TouchKeyIdentityList
+      ir={ir}
+      layout={effectiveKeyModeLayout}
+      onCommitOps={(ops) => {
+        for (const op of ops) commitKeyEditOp(op, { offerFamilyApply: false });
+      }}
+      onInstallIr={(nextIr) => useWorkingCopyStore.getState().setWorkingIR(nextIr)}
+    />
+  );
+
   // onKeyDown lives on this OUTER pane div (not on CharScrollStrip below) so
   // ArrowLeft/ArrowRight cycles the character no matter which control inside
   // the pane currently has focus — a plain native keydown bubbles up to here
@@ -6625,6 +7122,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         </div>
       )}
 
+      {/* Spec 104 T015 — the dead-key repair list lives at its owning
+          step (this one), in both modes of the touch step. */}
+      {touchKeyIdentityList}
     </div>
   );
 
@@ -6921,6 +7421,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               onFieldChange={handleKeyFieldChange}
               onDelete={handleOpenRemoveDialog}
               onMove={handleKeyMove}
+              {...(selectedIdentityNote !== undefined ? { identityNote: selectedIdentityNote } : {})}
               {...(selectedKeyIdProposal !== undefined
                 ? { idProposal: selectedKeyIdProposal }
                 : {})}
@@ -6944,6 +7445,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   }
                 : {})}
             />
+
+            {/* Spec 104 T016 — transient severance notice + the held
+                Track 2 identity choice (helpers below the commit chain). */}
+            {renderSeveranceNotices()}
+            {renderIdentityChoice()}
           </div>
         </div>
 
@@ -7120,6 +7626,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             </ul>
           </div>
         )}
+
+        {/* Spec 104 T015 — the dead-key repair list at its owning step. */}
+        {touchKeyIdentityList}
       </div>
     </div>
   );

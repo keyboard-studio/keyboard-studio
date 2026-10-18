@@ -389,6 +389,10 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     chartPreference: s.chartPreference,
     // Issue #1908: the recorded documentation-fix proposal answers.
     docFixProposals: s.docFixProposals,
+    // Spec 104: the touch key-identity record set — plain JSON spine
+    // records, straight passthrough; a resumed draft must not re-present
+    // choices the author already answered (FR-017).
+    touchKeyIdentity: s.touchKeyIdentity,
     startDocProfile: s.startDocProfile,
     baselineDocFindings: s.baselineDocFindings,
     ir: s.ir,
@@ -552,6 +556,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     chartPreference: snapshot.chartPreference ?? null,
     // Tolerate snapshots saved before the #1908 proposal answers existed.
     docFixProposals: snapshot.docFixProposals ?? null,
+    // Tolerate snapshots saved before the spec 104 record set existed.
+    touchKeyIdentity: snapshot.touchKeyIdentity ?? null,
     startDocProfile: snapshot.startDocProfile ?? null,
     baselineDocFindings: snapshot.baselineDocFindings ?? null,
     ir: snapshot.ir,

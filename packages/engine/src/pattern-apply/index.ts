@@ -407,3 +407,8 @@ export type {
 } from "./carveSuppression.js";
 export { isInSwallowSet } from "./swallowSet.js";
 export type { SwallowCombo } from "./swallowSet.js";
+
+// Spec 104 Wave 3: the terminal-insertion primitive, exported so the
+// studio's severance/synthesis merge composes with the same placement
+// rule the synthesis functions themselves use (never a mirrored copy).
+export { insertBlockBeforeTerminalRules } from "./ir-insert.js";

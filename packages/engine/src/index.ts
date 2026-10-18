@@ -877,6 +877,7 @@ export type {
 } from "./pattern-apply/index.js";
 export {
   ensureTouchKeyRule,
+  insertBlockBeforeTerminalRules,
   planGuardSynthesis,
   applyGuardSynthesis,
   checkOpaqueGate,
