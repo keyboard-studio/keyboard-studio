@@ -1922,6 +1922,8 @@
   "survey.prefill.row.script.label": "Script",
   "survey.prefill.row.script.note": "BCP47 script subtag (§5)",
   "survey.prefill.row.scriptClass.label": "Script class (A2)",
+  "survey.prefill.row.scriptsIncluded.flagNote": "{scripts} may not be needed for your language",
+  "survey.prefill.row.scriptsIncluded.label": "Scripts included",
   "survey.prefill.row.startingKeyboard.label": "Starting keyboard",
   "survey.prefill.row.startingKeyboard.note": "your chosen starting keyboard",
   "survey.prefill.scriptAlignment.latinSubProfile": "Latin sub-profile",
