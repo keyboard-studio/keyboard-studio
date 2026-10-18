@@ -340,12 +340,19 @@ function main(): void {
     "",
     "## Headline",
     "",
+    // The candidate rate is the headline figure: it is the rate over keys
+    // that are genuine severance candidates. The raw rate over ALL requests
+    // is context only — it counts arm-0-holds cases (emulation-class keys,
+    // refused by design and never candidates) and overstates severity when
+    // read alone.
+    `**Candidate refusal rate: ${pct(candidateRefusalRate)}** — ${candidateRefused} of ${candidateKeys} genuine severance candidates refused (default policy).`,
+    `- Of the candidate refusals, completed once opaque fragments were acknowledged: ${acknowledgedCompleted}`,
+    "",
+    "Context (all requests, including cases that never needed severance):",
     `- K_-linked touch keys attempted: ${totalKeys}`,
     `- Transplants completed: ${totalCompleted} (${pct(totalKeys ? totalCompleted / totalKeys : 0)})`,
     `- Transplants refused (default policy): ${totalRefused} (${pct(refusalRate)})`,
     `- Emulation-class keys among the refusals (K_BKSP/K_ENTER/K_LOPT — refused by design, never severance candidates): ${emulationRefusals}`,
-    `- Refusal rate over genuine severance candidates (${candidateKeys} keys): ${candidateRefused} refused (${pct(candidateRefusalRate)})`,
-    `- Of the candidate refusals, completed once opaque fragments were acknowledged: ${acknowledgedCompleted}`,
     "",
     "## Refusal causes (binding, behind the opaque gate where it applied)",
     "",
