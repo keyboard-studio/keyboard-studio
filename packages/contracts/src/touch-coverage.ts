@@ -28,10 +28,10 @@
  * @see specs/035-mobile-touch-derivation/contracts/simplification.md
  */
 
-import type { TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
+import type { KeyboardIR, TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
 import { toUPlusNotation } from "./utils/charUtils.js";
 import type { TouchKeyRuleIndex } from "./touch-key-rule-join.js";
-import { resolveTouchProduction } from "./touchProduction.js";
+import { resolveTouchProduction, touchKeyStateFromLayerId } from "./touchProduction.js";
 
 export interface TouchCoverageResult {
   /** Inventory chars with zero reachable touch mechanism. Empty means SC-003 is satisfied. */
@@ -51,19 +51,31 @@ export interface TouchCoverageOptions {
   /**
    * From `buildTouchKeyRuleIndex(ir)`.
    *
-   * With it, a key's PRODUCTION is taken from spec 104's production resolver
-   * (`resolveTouchProduction`, FR-003) instead of this module's own
-   * id-decoding + rule-join crediting — which is the whole fix, twice over:
-   * a `T_0300` key labelled `◌̀`, whose output lives entirely in a `.kmn`
-   * rule, previously read as covering nothing; and coverage must not keep a
-   * second production model standing beside the resolver (T025). The
-   * keycap-text credits below (text / output / dotted-circle strip) are NOT
-   * production and stay coverage's own additive heuristics.
+   * With it AND {@link TouchCoverageOptions.ir}, a key's PRODUCTION is taken
+   * from spec 104's production resolver (`resolveTouchProduction`, FR-003)
+   * instead of this module's own id-decoding + rule-join crediting — which
+   * is the whole fix, twice over: a `T_0300` key labelled `◌̀`, whose output
+   * lives entirely in a `.kmn` rule, previously read as covering nothing;
+   * and coverage must not keep a second production model standing beside
+   * the resolver (T025). The keycap-text credits below (text / output /
+   * dotted-circle strip) are NOT production and stay coverage's own
+   * additive heuristics.
    *
    * Absent ⇒ the pre-104 semantics, byte-identical: no resolver is called
    * and the legacy text/output/U_-decode crediting runs exactly as before.
+   * A `ruleIndex` passed WITHOUT `ir` also takes the legacy path: the
+   * resolver requires the IR (it reads rule outputs and deadkey names
+   * through it), so an index-only caller gets defined legacy behaviour
+   * rather than a crash. Call sites that build the index from an IR
+   * should pass both.
    */
   readonly ruleIndex?: TouchKeyRuleIndex;
+  /**
+   * The IR the rule index was built from (`buildTouchKeyRuleIndex(ir)`).
+   * Required alongside {@link TouchCoverageOptions.ruleIndex} for the
+   * resolver path; see that field's doc for the index-only fallback.
+   */
+  readonly ir?: KeyboardIR;
   /**
    * Additively credit a U+25CC-stripped form of a keycap's `text`. Default true.
    *
@@ -275,18 +287,22 @@ function collectKeyChars(
   push(key.text);
   push(key.output);
 
-  if (options.ruleIndex === undefined) {
-    // LEGACY (no rule index): the pre-104 crediting, byte-identical. A
-    // decoded `U_<HEX>[_<HEX>]*` id is the only id-derived credit, and no
-    // rule production is visible at all.
+  if (options.ruleIndex === undefined || options.ir === undefined) {
+    // LEGACY (no rule index, or an index without its IR): the pre-104
+    // crediting, byte-identical. A decoded `U_<HEX>[_<HEX>]*` id is the
+    // only id-derived credit, and no rule production is visible at all.
     const decoded = decodeUnicodeKeyId(key.id);
     if (decoded !== undefined) covered.add(decoded.normalize("NFC"));
   } else if (key.id.length > 0) {
     // PRODUCTION (spec 104, FR-003/T025): the resolver is the one production
     // model. Every production in the record is credited — the set is never
     // collapsed (contracts §1) — so a context-guarded mark credits its mark
-    // (some context produces it) and a ruled `U_` key credits both its rule
-    // outputs and its no-rule-matches decode arm. Crediting SHAPE follows
+    // (some context produces it). KNOWN LIMITATION (integration, recorded
+    // for the spec 104 lead): the resolver's rule arm does not append a
+    // ruled `U_` key's no-rule-matches decode as a distinguishable entry,
+    // so a ruled `U_` key credits only its rule productions here, not its
+    // decode arm — a narrowing from the pre-104 join path, which credited
+    // both. Crediting SHAPE follows
     // the source, preserving the two pre-104 precedents:
     //   - `rule`: per codepoint — the join's `produced` set was per-char,
     //     so a rule emitting "FCFA" covers F, C, F, A but not the string.
@@ -303,8 +319,9 @@ function collectKeyChars(
     // nothing; `unknown` (caps-state fallback, contracts §5) credits
     // nothing either — no verdict may be premised on it.
     const record = resolveTouchProduction(
-      { ruleIndex: options.ruleIndex },
-      { platformId: occurrence.platformId, layerId: occurrence.layerId, key },
+      { ir: options.ir, ruleIndex: options.ruleIndex },
+      key,
+      touchKeyStateFromLayerId(occurrence.layerId),
     );
     for (const production of record.productions) {
       if (production.output.kind !== "text") continue;

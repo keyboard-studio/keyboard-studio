@@ -122,6 +122,49 @@ export interface ResolveTouchProductionInputs {
   readonly ruleIndex: TouchKeyRuleIndex;
 }
 
+/**
+ * Derive the layer-state a key on `layerId` is exercised in (FR-001: the
+ * layer name IS the modifier state on touch).
+ *
+ * This mirrors the substring grammar of KeymanWeb's
+ * `Codes.getModifierState` + `Codes.getStateFromLayer` (vendored at
+ * packages/engine/src/simulator/vendor/keyman/engine/keyboard/codes.ts):
+ * a lower-case substring scan of the layer id — `shift`, the chiral
+ * `leftctrl`/`rightctrl`/`leftalt`/`rightalt` before the generic
+ * `ctrl`/`alt`, and `caps` selecting the CAPITAL Lstate (every other
+ * layer is NCAPS, expressed here as `caps: false`). Words are returned in
+ * the rule-join's raw .kmn vocabulary (SHIFT / LCTRL / RCTRL / CTRL /
+ * LALT / RALT / ALT), the same words bindings carry. Contracts has no
+ * other layer→state mechanism; consumers (diagnostics, coverage) derive
+ * state through this function rather than re-scanning layer ids.
+ */
+export function touchKeyStateFromLayerId(layerId: string): TouchKeyState {
+  const id = layerId.toLowerCase();
+  const modifiers: string[] = [];
+  if (id.includes("shift")) modifiers.push("SHIFT");
+  let ctrlMatched = false;
+  if (id.includes("leftctrl")) {
+    modifiers.push("LCTRL");
+    ctrlMatched = true;
+  }
+  if (id.includes("rightctrl")) {
+    modifiers.push("RCTRL");
+    ctrlMatched = true;
+  }
+  if (id.includes("ctrl") && !ctrlMatched) modifiers.push("CTRL");
+  let altMatched = false;
+  if (id.includes("leftalt")) {
+    modifiers.push("LALT");
+    altMatched = true;
+  }
+  if (id.includes("rightalt")) {
+    modifiers.push("RALT");
+    altMatched = true;
+  }
+  if (id.includes("alt") && !altMatched) modifiers.push("ALT");
+  return { modifiers, caps: id.includes("caps") };
+}
+
 // ---------------------------------------------------------------------------
 // State matching
 // ---------------------------------------------------------------------------

@@ -99,7 +99,7 @@ import {
   normalizeTouchKeyId,
   type TouchKeyRuleIndex,
 } from "./touch-key-rule-join";
-import { resolveTouchProduction } from "./touchProduction";
+import { resolveTouchProduction, touchKeyStateFromLayerId } from "./touchProduction";
 import {
   collectReachableTouchKeyIds,
   collectTouchRuleOrphans,
@@ -773,10 +773,11 @@ export function findDeadTouchKeys(
     // id resolves to `u-decode` (it SELF-OUTPUTS via forUnicodeKeynames),
     // so the old explicit `U_` exemption is now the resolver's own verdict;
     // an unclassified or emulation record likewise never reads as dead.
-    const deadEverywhere = occurrences.every(({ platform, layer, key }) => {
+    const deadEverywhere = occurrences.every(({ layer, key }) => {
       const record = resolveTouchProduction(
         { ir, ruleIndex },
-        { platformId: platform.id, layerId: layer.id, key },
+        key,
+        touchKeyStateFromLayerId(layer.id),
       );
       return record.source === "none" && record.ruleRefs.length === 0;
     });

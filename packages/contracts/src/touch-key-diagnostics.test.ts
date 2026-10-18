@@ -58,9 +58,14 @@ function emptyRuleIndex(opaqueFragmentCount = 0): TouchKeyRuleIndex {
   return { byId: new Map(), spellings: new Map(), producingIds: new Set(), opaqueFragmentCount };
 }
 
-/** The minimum `KeyboardIR` the joined detectors read: `raw` (opaque count) and `touchLayout`. */
+/**
+ * The minimum `KeyboardIR` the joined detectors read: `raw` (opaque count)
+ * and `touchLayout` — plus, since spec 104's T006, the empty `groups` /
+ * `stores` the production resolver iterates when `findDeadTouchKeys`
+ * resolves a candidate (a rule-free fixture IR has no groups to read).
+ */
 function irWith(layout: TouchLayoutIR, raw: readonly unknown[] = []): KeyboardIR {
-  return { raw, touchLayout: layout } as unknown as KeyboardIR;
+  return { raw, touchLayout: layout, groups: [], stores: [] } as unknown as KeyboardIR;
 }
 
 function codes(findings: readonly TouchKeyFinding[]): string[] {
