@@ -451,3 +451,151 @@ export function effectiveEntries(
   const superseded = supersededEntryIds(entries);
   return entries.filter((entry) => !superseded.has(entry.entryId));
 }
+
+// ---------------------------------------------------------------------------
+// Touch key identity records (spec 104)
+//
+// The decision spine's records for touch key IDENTITY — what form a key's
+// id takes (K_/U_/T_) and why. Field semantics: specs/104-touch-key-id-criteria/
+// data-model.md §2–§5; the criteria themselves live in
+// specs/104-touch-key-id-criteria/contracts/key-id-criteria.md.
+//
+// These are standalone records in this file's conventions — stable `recordId`,
+// `recordedAt` epoch ms, `supersedes` naming the record replaced (a decision
+// is superseded, never edited in place) — rather than DecisionEntry payloads:
+// the payload union is the survey/editor vocabulary (spec 053), and identity
+// state rides the same spine without forking it. Persistence wiring is the
+// studio crews' work; these types are the shape they persist.
+// ---------------------------------------------------------------------------
+
+/** What happened to a key's identity. The vocabulary is data-model.md §2's. */
+export type KeyIdentityAction =
+  | "minted"
+  | "kept"
+  | "severed"
+  | "repaired"
+  | "converted"
+  | "relinked"
+  | "kept-by-choice"
+  | "flagged-manual";
+
+/** The authoring track the decision was taken on (spec 104's track split). */
+export type KeyIdentityTrack = "creation" | "copy" | "adapt";
+
+/**
+ * A recorded decision that a key's id form was set, severed, repaired, kept
+ * by choice, or re-linked (data-model.md §2).
+ *
+ * `criterion` names what fired: a contracts §2 arm (`"0"`, `"a"`, `"b"`,
+ * `"c"`, `"c′"`, `"d"`, `"d′"`, `"d″"`, `"e"`) or the governing FR
+ * (`"FR-009"`, `"FR-029"`, …). `authorAnswer` is present iff a choice was
+ * presented (Track 2 choices, repairs) and includes `"declined"`.
+ */
+export interface KeyIdentityDecision {
+  /** Stable, unique within the keyboard's record set. */
+  recordId: string;
+  /**
+   * The key occurrence this decision is about — a touch key address in the
+   * `touch-key-address.ts` format (`"<platform>:<layerId>:<keyId>"`, with
+   * sub-key/occurrence suffixes where applicable). The FR-001 unit: one key,
+   * on one platform, on one layer.
+   */
+  keyRef: string;
+  action: KeyIdentityAction;
+  criterion: string;
+  track: KeyIdentityTrack;
+  /** Who proposed the outcome: the criteria, or the author unprompted. */
+  proposer: "criteria" | "author";
+  authorAnswer?: string;
+  /** The FR-002 target host set in force when equality was judged (host layout ids). */
+  hostSet: readonly string[];
+  /** Epoch ms. */
+  recordedAt: number;
+  /** `recordId` of the decision this one replaces, or `null` for a first decision. */
+  supersedes: string | null;
+}
+
+/**
+ * The per-keyboard combining-mark guard specification (data-model.md §3,
+ * FR-013). One per keyboard. Asked once at the marks step in author
+ * language; on Track 2 it is seeded from the imported keyboard's guarded
+ * marks and is provisional (`confirmed: false`) until the author confirms
+ * it at the marks station.
+ */
+export interface GuardSpecification {
+  recordId: string;
+  /**
+   * `"swallow"` — a mark tapped with no letter to sit on types nothing;
+   * `"emit"` — the mark appears anyway.
+   */
+  behaviour: "swallow" | "emit";
+  origin: "asked" | "seeded-from-import";
+  confirmed: boolean;
+  /** Epoch ms. */
+  recordedAt: number;
+  /** `recordId` of the specification this one replaces, or `null`. */
+  supersedes: string | null;
+}
+
+/** The repair actions FR-009 offers for a dead (rule-free producing) T_ key. */
+export type RepairAction = "convert-to-u" | "mint-and-rule" | "blank";
+
+/** How a repair proposal ended. `"unvisited"` is a real, recorded outcome (FR-015). */
+export type RepairOutcome = "applied" | "changed" | "declined" | "unvisited";
+
+/**
+ * A dead-key repair proposal (data-model.md §4, FR-009).
+ *
+ * Invariant: a repair is never applied without an outcome of `"applied"` or
+ * `"changed"` recorded first; `"unvisited"` at download passes the key
+ * through unapplied, with its warning recorded and listed at Output (the
+ * FR-015 ruling — preselection is a presentation default, never consent).
+ */
+export interface RepairProposal {
+  recordId: string;
+  /** The dead key's occurrence address (same format as {@link KeyIdentityDecision.keyRef}). */
+  keyRef: string;
+  /** The criteria-supplied default for this key, preselected in the list. */
+  defaultAction: RepairAction;
+  /** The full FR-009 option set offered for this key. */
+  options: readonly RepairAction[];
+  outcome: RepairOutcome;
+  /** Epoch ms. */
+  recordedAt: number;
+  /** `recordId` of the proposal this one replaces, or `null`. */
+  supersedes: string | null;
+}
+
+/** One cloned rule of a transplant: source rule node → clone rule node. */
+export interface TransplantRuleClone {
+  sourceNodeId: string;
+  cloneNodeId: string;
+}
+
+/**
+ * A severance transplant record (data-model.md §5, FR-008).
+ *
+ * Invariants: a refused transplant emits NO clones (`clonedRuleNodeIds` is
+ * empty and `refusalBinding` names the binding that caused the refusal —
+ * a shared store/deadkey/key binding, a group/order conflict, or a
+ * target-id collision). A completed transplant is the only artefact a
+ * re-link (FR-029) may delete, and re-linking consumes exactly its clone
+ * list. `layersAffected` is the layer family where arm 0 failed; other
+ * families keep the K_ id and their rules untouched.
+ */
+export interface TransplantRecord {
+  recordId: string;
+  /** The id severed from, e.g. `"K_1"`. */
+  sourceId: string;
+  /** The minted id severed to, e.g. a `T_`-class mint. */
+  targetId: string;
+  layersAffected: readonly string[];
+  clonedRuleNodeIds: readonly TransplantRuleClone[];
+  outcome: "completed" | "refused";
+  /** Present iff `outcome` is `"refused"`. */
+  refusalBinding?: string;
+  /** Epoch ms. */
+  recordedAt: number;
+  /** `recordId` of the record this one replaces, or `null`. */
+  supersedes: string | null;
+}
