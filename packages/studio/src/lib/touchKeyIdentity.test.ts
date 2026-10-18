@@ -22,12 +22,14 @@ import { ensureTouchKeyRule, parseKmn } from "@keyboard-studio/engine";
 import type { TouchKeyIdentityRecords } from "../stores/workingCopyStore.ts";
 import { EMPTY_TOUCH_KEY_IDENTITY } from "../stores/workingCopyStore.ts";
 import {
+  appendIdentityChoiceState,
   appendIdentityDecision,
   appendRepairProposal,
   appendTransplantRecord,
   deadKeyRepairDefault,
   deriveRepairRows,
   guardSpecificationInForce,
+  identityChoiceFingerprint,
   identityDecisionForAddress,
   identityTrackFor,
   latestLive,
@@ -37,6 +39,7 @@ import {
   planInlineSeverance,
   repairApplyOps,
   repairOutcomeFor,
+  standingIdentityChoice,
 } from "./touchKeyIdentity.ts";
 
 const BASE_KMN = `store(&VERSION) '10.0'
@@ -584,5 +587,120 @@ group(main) using keys
     expect(target.get("")).toBeUndefined();
     // The shift clone stands.
     expect(target.get("SHIFT")).toEqual(["!"]);
+  });
+});
+
+describe("FR-017 decline suppression on the inline assign path", () => {
+  const ADDRESS = "tablet:default:K_A";
+
+  /** Records as handleIdentityChoiceConfirm leaves them after a "keep". */
+  function declinedRecords(ir: KeyboardIR): TouchKeyIdentityRecords {
+    let records = appendIdentityDecision(null, {
+      recordId: "decision:keep:1",
+      keyRef: ADDRESS,
+      action: "kept-by-choice",
+      criterion: "FR-011",
+      track: "adapt",
+      proposer: "author",
+      authorAnswer: "keep-the-link",
+      hostSet: ["US"],
+      recordedAt: 1760000000000,
+    });
+    records = appendIdentityChoiceState(records, {
+      keyRef: ADDRESS,
+      sourceId: "K_A",
+      targetId: "T_FOO",
+      fingerprint: identityChoiceFingerprint(ir, "K_A"),
+      decisionRecordId: "decision:keep:1",
+      recordedAt: 1760000000000,
+    });
+    return records;
+  }
+
+  it("decline once → the identical edit is not re-presented", () => {
+    const ir = irOf();
+    const standing = standingIdentityChoice(declinedRecords(ir), {
+      keyRef: ADDRESS,
+      sourceId: "K_A",
+      targetId: "T_FOO",
+      ir,
+    });
+    expect(standing?.decisionRecordId).toBe("decision:keep:1");
+  });
+
+  it("underlying state change (a bound rule edited) → re-presented", () => {
+    const before = irOf();
+    const records = declinedRecords(before);
+    const after = irOf(BASE_KMN.replace("> 'a'", "> 'z'"));
+    expect(
+      standingIdentityChoice(records, {
+        keyRef: ADDRESS,
+        sourceId: "K_A",
+        targetId: "T_FOO",
+        ir: after,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("underlying state change (a binding added) → re-presented", () => {
+    const before = irOf();
+    const records = declinedRecords(before);
+    const after = irOf(BASE_KMN + "\n+ [SHIFT K_A] > 'A'\n");
+    expect(
+      standingIdentityChoice(records, {
+        keyRef: ADDRESS,
+        sourceId: "K_A",
+        targetId: "T_FOO",
+        ir: after,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("a different target is a different question → re-presented", () => {
+    const ir = irOf();
+    expect(
+      standingIdentityChoice(declinedRecords(ir), {
+        keyRef: ADDRESS,
+        sourceId: "K_A",
+        targetId: "T_BAR",
+        ir,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("a newer decision for the key retires the suppression", () => {
+    const ir = irOf();
+    let records = declinedRecords(ir);
+    records = appendIdentityDecision(records, {
+      recordId: "decision:sever:2",
+      keyRef: ADDRESS,
+      action: "severed",
+      criterion: "FR-011",
+      track: "adapt",
+      proposer: "author",
+      authorAnswer: "sever-the-link",
+      hostSet: ["US"],
+      recordedAt: 1760000001000,
+    });
+    expect(
+      standingIdentityChoice(records, {
+        keyRef: ADDRESS,
+        sourceId: "K_A",
+        targetId: "T_FOO",
+        ir,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("no recorded answer → nothing stands", () => {
+    const ir = irOf();
+    expect(
+      standingIdentityChoice(null, {
+        keyRef: ADDRESS,
+        sourceId: "K_A",
+        targetId: "T_FOO",
+        ir,
+      }),
+    ).toBeUndefined();
   });
 });
