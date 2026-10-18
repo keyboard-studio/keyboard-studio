@@ -1,0 +1,31 @@
+c Spec 104 fixture — HAND-CONSTRUCTED (hindi_flick is not in this machine's
+c partial corpus checkout). It reproduces the idiom attested in the
+c spec 104 corpus census (research working papers, corpus-census.md):
+c the vowel key keeps its U_ id in the touch layout and the .kmn attaches
+c real logic to that exact id — + [U_0905] > 'ा' use(checkMatra).
+c U_0906 is deliberately left unruled: it is the U_-decode control.
+
+store(&VERSION) '10.0'
+store(&NAME) 'Hindi Flick (spec 104 fixture)'
+store(&KEYBOARDVERSION) '1.0'
+store(&LAYOUTFILE) 'hindi_flick.keyman-touch-layout'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [U_0905] > 'ा' use(checkMatra)
+
+group(checkMatra) using keys
+
+c Representative matra validation in the source keyboard's group
+c shape. A use() group sees the calling rule's output in its context,
+c so the first rule fires when the tap would stack a matra sign onto
+c an existing one (context U+093E + the main rule's emitted U+093E):
+c it keeps one sign and beeps. The catch rule preserves the output
+c for every other context — a use() group with NO matching rule lets
+c the keystroke fall through to the U_ decode as well (verified by the
+c T002 harness), so a governing group must always match.
+U+093E U+093E + [U_0905] > U+093E beep
++ [U_0905] > context
