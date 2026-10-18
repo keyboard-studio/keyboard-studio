@@ -27,7 +27,11 @@
  *     touchRuleSynthesis.ts's job (spec 063 T080/T081), a distinct module.
  */
 
-import { toUPlusNotation } from "@keyboard-studio/contracts";
+import {
+  decideKeyIdForm,
+  toUPlusNotation,
+  type GuardSpecification,
+} from "@keyboard-studio/contracts";
 import { unicodeCharHex } from "../shared/touch-ids.js";
 import { caseCounterpart } from "../character-discovery/casePair.js";
 
@@ -362,6 +366,23 @@ export interface KeyIdMintingRequest {
    * reason instead of a count-based one.
    */
   readonly sharedCandidateCount?: number;
+  /**
+   * The keyboard's combining-mark guard specification (spec 104 FR-013).
+   * A combining mark is minted to guarded `T_` ONLY when this is present
+   * with `behaviour: "swallow"` (contracts §2 arm d′); absent or `"emit"`
+   * the mark mints `U_` (arm d). This SUPERSEDES the spec 063 default —
+   * under 063 every mark minted guarded `T_`; FR-013 rules that a mark
+   * must not be minted guarded in the absence of the specification.
+   */
+  readonly guardSpecification?: GuardSpecification;
+  /**
+   * The keyboard's `&VERSION`, e.g. `"15.0"` (spec 104 FR-005 arm c/c′).
+   * A fixed multi-codepoint string mints a multi-segment `U_` id only at
+   * version 15.0+; below that (or absent) it falls to `T_` + rule.
+   * Raising `&VERSION` is the author's separate decision, never a
+   * minting side effect.
+   */
+  readonly keyboardVersion?: string;
 }
 
 /** Every char in General_Category Mn/Mc/Me (combining mark). */
@@ -448,20 +469,30 @@ function buildUnicodeDefaultProposal(
 
 /**
  * Propose (never mutate) a key id for the character(s) an author wants a key
- * to produce, following the section 2 table:
+ * to produce. Since spec 104 (FR-010), the DESTINATION of every minting
+ * path is decided by the contracts decision table (`decideKeyIdForm`,
+ * contracts/key-id-criteria.md §2) — this function supplies the request's
+ * facts and renders the decision in this module's proposal vocabulary:
  *
  *   - single codepoint, not a combining mark, no case triple requested ->
- *     `U_<HEX>`, no rule (the default, pre-selected; a `T_` alternative is
- *     always offered alongside it per section 2.1).
- *   - combining mark -> `T_<UPPERHEX>`, guard AND producing rule required.
- *     No `U_` alternative exists for this row - that is the whole point of
- *     section 1a.
+ *     arm (c): `U_<HEX>`, no rule (the default, pre-selected; a `T_`
+ *     alternative is always offered alongside it per section 2.1). The
+ *     arm (c′) fall-through (a C0/C1 char the runtime decoder skips)
+ *     mints `T_<HEX>` + rule instead, in the rule-minted proposal shape.
+ *   - combining mark -> the guard specification decides (FR-013): with a
+ *     `"swallow"` specification in force, arm (d′): `T_<UPPERHEX>`, guard
+ *     AND producing rule required. Without one (or `"emit"`), arm (d):
+ *     `U_<HEX>`, no rule — the mark decodes directly. This supersedes the
+ *     spec 063 row, under which every mark minted guarded `T_`.
  *   - multi-codepoint / string output (a digraph, a grapheme cluster - no
- *     distinction) -> `T_<MNEMONIC>`, producing rule required.
+ *     distinction) -> arm (c) at `&VERSION` 15.0+: a multi-segment `U_`
+ *     id, no rule; arm (c′) below the floor: `T_<MNEMONIC>`, producing
+ *     rule required.
  *   - case triplication requested -> `T_<id>` plus the NCAPS/SHIFT+NCAPS/CAPS
- *     trio, gated on `capsHandled` and on a case counterpart existing; when
- *     it cannot be honored, falls back to the unicode-default proposal for
- *     the same character and reports why via `noCaseTripleReason`.
+ *     trio (arm (a): per-state outputs are rule logic), gated on
+ *     `capsHandled` and on a case counterpart existing; when it cannot be
+ *     honored, falls back to the unicode-default proposal for the same
+ *     character and reports why via `noCaseTripleReason`.
  *
  * `T_new_*` is never minted by this function - it does not appear anywhere
  * in the table above.
@@ -479,13 +510,34 @@ export function proposeKeyId(request: KeyIdMintingRequest): KeyIdMintingProposal
     const ch = codepoints[0]!;
 
     if (COMBINING_MARK_RE.test(ch)) {
-      const id = `T_${unicodeCharHex(ch)}`;
+      const decision = decideKeyIdForm({
+        roles: ["producer"],
+        isCombiningMark: true,
+        plainOutput: ch,
+        ...(request.guardSpecification !== undefined
+          ? { guardSpecification: request.guardSpecification }
+          : {}),
+      });
+      if (decision.destination.form === "T_") {
+        // Arm (d′) — a guard is specified for this keyboard's marks.
+        const id = `T_${unicodeCharHex(ch)}`;
+        const proposal: KeyIdMintingProposal = {
+          path: "combining-mark-guard",
+          id,
+          ruleRequired: true,
+          guardRequired: true,
+          ruleLines: [composeProducingRuleLine(id, ch)],
+        };
+        return request.caseTripleRequested === true
+          ? { ...proposal, noCaseTripleReason: "combining-mark" }
+          : proposal;
+      }
+      // Arm (d) — no guard specified: the U_ id decodes the mark directly.
       const proposal: KeyIdMintingProposal = {
-        path: "combining-mark-guard",
-        id,
-        ruleRequired: true,
-        guardRequired: true,
-        ruleLines: [composeProducingRuleLine(id, ch)],
+        path: "unicode-default",
+        id: `U_${unicodeCharHex(ch)}`,
+        ruleRequired: false,
+        guardRequired: false,
       };
       return request.caseTripleRequested === true
         ? { ...proposal, noCaseTripleReason: "combining-mark" }
@@ -510,11 +562,52 @@ export function proposeKeyId(request: KeyIdMintingRequest): KeyIdMintingProposal
       };
     }
 
+    // Plain single character — arm (c), or arm (c′) when the char is one
+    // the runtime decoder silently skips (C0/C1): then it cannot ride a
+    // U_ id and falls to a rule-minted T_ in the rule-minted shape.
+    const decision = decideKeyIdForm({
+      roles: ["producer"],
+      plainOutput: ch,
+      ...(request.keyboardVersion !== undefined
+        ? { keyboardVersion: request.keyboardVersion }
+        : {}),
+    });
+    if (decision.arm === "c′") {
+      const id = `T_${unicodeCharHex(ch)}`;
+      return {
+        path: "multi-codepoint-string",
+        id,
+        ruleRequired: true,
+        guardRequired: false,
+        ruleLines: [composeProducingRuleLine(id, ch)],
+      };
+    }
     return buildUnicodeDefaultProposal(ch, request.sharedCandidateCount);
   }
 
   // Multi-codepoint / string output. Mechanically identical for every
-  // script - see mintMultiCodepointKeyId's doc.
+  // script - see mintMultiCodepointKeyId's doc. The decision table splits
+  // it: arm (c) multi-segment U_ at &VERSION 15.0+, arm (c′) T_ + rule
+  // below the floor (or with a segment the decoder skips).
+  const decision = decideKeyIdForm({
+    roles: ["producer"],
+    plainOutput: normalized,
+    ...(request.keyboardVersion !== undefined
+      ? { keyboardVersion: request.keyboardVersion }
+      : {}),
+  });
+  if (decision.arm === "c") {
+    const id = `U_${[...normalized].map((c) => unicodeCharHex(c)).join("_")}`;
+    const proposal: KeyIdMintingProposal = {
+      path: "multi-codepoint-string",
+      id,
+      ruleRequired: false,
+      guardRequired: false,
+    };
+    return request.caseTripleRequested === true
+      ? { ...proposal, noCaseTripleReason: "not-single-letter" }
+      : proposal;
+  }
   const id = mintMultiCodepointKeyId(normalized);
   const proposal: KeyIdMintingProposal = {
     path: "multi-codepoint-string",
