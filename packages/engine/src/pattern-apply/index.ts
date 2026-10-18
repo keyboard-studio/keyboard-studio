@@ -301,6 +301,28 @@ export type {
   KeyIdMintingRequest,
 } from "./keyIdMinting.js";
 
+// Spec 104 T011/T027/T012 — the severance transplant, its FR-029 mirror,
+// and the edit-path wiring that triggers them.
+export {
+  severTouchKey,
+  relinkTouchKey,
+  applyKeyEditsWithSeverance,
+  SEVERANCE_LINE_DESCRIPTOR_ID,
+  SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID,
+} from "./severTouchKey.js";
+export type {
+  SeverTouchKeyRequest,
+  SeverTouchKeyResult,
+  RelinkTouchKeyMeta,
+  RelinkTouchKeyResult,
+  ApplyKeyEditsWithSeveranceOptions,
+  ApplyKeyEditsWithSeveranceResult,
+  SeveranceApplied,
+  SeveranceRefused,
+  RelinkApplied,
+  SeveranceNotice,
+} from "./severTouchKey.js";
+
 // Spec 065 US5 — the inherit-first wrapper and the keycap judgement.
 export { proposeTouchKeyId } from "./proposeTouchKeyId.js";
 export type {
