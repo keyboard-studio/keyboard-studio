@@ -93,13 +93,13 @@
 
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
 import {
-  bindingsForKeyId,
   hasAnyBinding,
   isCustomTouchKeyId,
   isJoinableKeyId,
   normalizeTouchKeyId,
   type TouchKeyRuleIndex,
 } from "./touch-key-rule-join";
+import { resolveTouchProduction } from "./touchProduction";
 import {
   collectReachableTouchKeyIds,
   collectTouchRuleOrphans,
@@ -699,6 +699,28 @@ export interface TouchKeyDiagnosticInputs {
  *
  * One finding per distinct (normalized) id, not per occurrence: a `T_` id
  * legitimately appears on several layers and platforms.
+ *
+ * **Spec 104 (T006): the test is the production resolver's, per state.** The
+ * per-occurrence gates above are unchanged — they define the *producing class*
+ * (data-model §1) — but whether a candidate key is dead is no longer the
+ * state-blind "does any binding mention this id" question. Each candidate
+ * occurrence is resolved with {@link resolveTouchProduction} in its own
+ * layer-state, and the id is dead only when EVERY exercised state reports no
+ * production AND no rule: `source === "none"` with an empty `ruleRefs`.
+ *
+ * The `ruleRefs` conjunct is load-bearing, and it is where FR-023 arbitrates
+ * a wording tension in the spec's own contract. Contracts §1 lists guard /
+ * suppression / transition bindings as NON-producing (they do not set
+ * `source: "rule"`), so a guard-only key's record can read `source: "none"`
+ * — but FR-009/FR-023 define this finding's population as "a producing T_
+ * key **with no rule**", and the contract's preamble says the spec wins
+ * where the two differ. A key whose only bindings are guard / suppresses /
+ * transitions / opaque HAS rules; it is wired, not dead (the T041-calibrated
+ * exemptions), and its non-empty `ruleRefs` is exactly what says so under
+ * either reading of §1. What the resolver changes is STATE-AWARENESS: a rule
+ * bound only under a modifier state the key's layers never exercise no
+ * longer counts as wired — that keystroke can never fire the rule, so the
+ * key types nothing. (Named as a verdict change in the T006 tests.)
  */
 export function findDeadTouchKeys(
   inputs: TouchKeyDiagnosticInputs,
@@ -707,8 +729,21 @@ export function findDeadTouchKeys(
   const hasOpaque = ir.raw.length > 0;
   const severity: TouchKeyFindingSeverity = hasOpaque ? "hint" : "warning";
 
-  const findings: TouchKeyFinding[] = [];
-  const reported = new Set<string>();
+  // Candidate occurrences per normalized id, in walk order. The verdict is
+  // per id across every state it is exercised in ("dead iff production is
+  // none in EVERY state"), so occurrences are gathered first and resolved
+  // together; the report anchors on the first candidate occurrence, as the
+  // per-occurrence walk did before.
+  const candidates = new Map<
+    string,
+    {
+      platform: TouchPlatform;
+      layer: TouchLayer;
+      key: TouchKeyIR;
+      path: readonly TouchKeyIR[];
+      occurrence: number;
+    }[]
+  >();
 
   walkTouchKeysDeep(layout, ({ platform, layer, key, path, occurrence }) => {
     // Scope: custom ids only. A `K_` key resolves against the compiled-in
@@ -723,15 +758,33 @@ export function findDeadTouchKeys(
     if (isFrameKeyLabel(key.text)) return;
     // Sentinel ids and auto-minted/reserved prefixes.
     if (isRulelessByConvention(key.id)) return;
-    // A `U_` id SELF-OUTPUTS (forUnicodeKeynames), so it needs no rule.
-    if (normalizeTouchKeyId(key.id).startsWith("U_")) return;
-    // THE ACTUAL TEST: zero bindings of ANY role. A key whose only bindings are
-    // guard / suppresses / transitions / opaque is WIRED, not dead.
-    if (bindingsForKeyId(ruleIndex, key.id).length > 0) return;
 
     const normalized = normalizeTouchKeyId(key.id);
-    if (reported.has(normalized)) return;
-    reported.add(normalized);
+    const list = candidates.get(normalized) ?? [];
+    list.push({ platform, layer, key, path, occurrence });
+    candidates.set(normalized, list);
+  });
+
+  const findings: TouchKeyFinding[] = [];
+
+  for (const occurrences of candidates.values()) {
+    // THE ACTUAL TEST (spec 104): dead iff the resolver reports no
+    // production and no rule in every state this id is exercised in. A `U_`
+    // id resolves to `u-decode` (it SELF-OUTPUTS via forUnicodeKeynames),
+    // so the old explicit `U_` exemption is now the resolver's own verdict;
+    // an unclassified or emulation record likewise never reads as dead.
+    const deadEverywhere = occurrences.every(({ platform, layer, key }) => {
+      const record = resolveTouchProduction(
+        { ir, ruleIndex },
+        { platformId: platform.id, layerId: layer.id, key },
+      );
+      return record.source === "none" && record.ruleRefs.length === 0;
+    });
+    if (!deadEverywhere) continue;
+
+    const first = occurrences[0];
+    if (first === undefined) continue;
+    const { platform, layer, key, path, occurrence } = first;
 
     const anchor = mainKeyOf(key, path);
     const address = touchKeyAddress(platform.id, layer.id, anchor.id, occurrence);
@@ -758,7 +811,7 @@ export function findDeadTouchKeys(
         },
       ],
     });
-  });
+  }
 
   return findings;
 }

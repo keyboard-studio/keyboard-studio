@@ -65,6 +65,12 @@ export type { TouchCoverageResult } from "@keyboard-studio/contracts";
  *   precomposed inventory char whose mark only became reachable via a `.kmn` rule
  *   is folded out of `uncovered` too. Applying the index after augmentation would
  *   lose that compounding entirely.
+ *
+ *   Spec 104 (T025): when `options.ruleIndex` is present, the inner call takes
+ *   production from the one production resolver in contracts
+ *   (`resolveTouchProduction`, FR-003) — this wrapper therefore needs no
+ *   production logic of its own, and none may be added here: a second
+ *   production model in the wrapper is exactly what T025 removes.
  * @param additionalProduced - Optional session-produced-glyph set (NFC),
  *   e.g. from `buildSessionProducedSet` over this session's desktop physical
  *   assignments — folded into `covered` before the composability check. See
