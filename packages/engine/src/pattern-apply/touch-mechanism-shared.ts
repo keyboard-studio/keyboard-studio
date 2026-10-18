@@ -8,6 +8,15 @@
  * @see applyDesktopModificationsToRawJson.ts — raw-JSON desktop-modification replay
  */
 
+import type {
+  ResolveTouchProductionInputs,
+  TouchKeyIR,
+  TouchKeyProduction,
+} from "@keyboard-studio/contracts";
+import {
+  resolveTouchProduction,
+  touchKeyStateFromLayerId,
+} from "@keyboard-studio/contracts";
 import { unicodeKeyIdToChar } from "../shared/touch-ids.js";
 
 /**
@@ -105,22 +114,116 @@ export function buildRemovalSet(removals: readonly string[]): Set<string> {
 }
 
 /**
- * Return `true` when a key/sub-key candidate — via its `text`, `output`, or a
- * `U_<HEX>`-decoded `id` — produces a character in `removalSet`.
- *
- * Matching is canonical: every candidate string is NFC-normalized before
- * comparison against `removalSet` (which is itself NFC — see
- * {@link buildRemovalSet}), so an NFD-stored occurrence of a carved char
- * (base + combining mark) is still matched even though `removalSet` entries
- * are precomposed (spec 035 contracts/seed-derivation.md clause 2).
- *
- * @param candidate   A TouchKeyIR (or raw-JSON key/sub-key) shape.
- * @param removalSet  NFC-normalized removal set from {@link buildRemovalSet}.
+ * Production context for resolver-backed removal matching (spec 104 T007):
+ * the resolver inputs (the keyboard IR + its rule-join index) and the id of
+ * the layer the candidate sits on — the layer name IS the key's state on
+ * touch (FR-001), so one context serves every key on that layer, main keys
+ * and sub-keys alike.
  */
-export function keyMatchesRemovalSet(
-  candidate: { text?: string; output?: string; id?: string },
+export interface RemovalProductionContext {
+  readonly production: ResolveTouchProductionInputs;
+  readonly layerId: string;
+}
+
+/**
+ * True when a resolver production record produces any character in
+ * `removalSet` (NFC). Shared by {@link keyMatchesRemovalSet} and the carve
+ * operation (carveTouchProducers.ts) so the two cannot drift on what
+ * "produces a removed character" means:
+ *
+ *   - a text production whose whole NFC form is in the set matches;
+ *   - a RULE production additionally matches per codepoint — the rule-join's
+ *     `produced` set was per-char, and coverage's resolver crediting (T025)
+ *     follows the same split, so a rule emitting a string containing a
+ *     removed character counts as producing it;
+ *   - a marked decode fall-through entry (`viaFallback`, a ruled `U_` key's
+ *     no-rule-matches decode) matches whole-unit only, never per codepoint:
+ *     it is one decode mechanism, credited as a unit by the same precedent.
+ *
+ * Deadkey, layer-switch, `none`, and `unknown` productions are not
+ * characters and never match: no verdict may be premised on them
+ * (contracts §1/§5).
+ */
+export function productionMatchesRemovalSet(
+  record: TouchKeyProduction,
   removalSet: ReadonlySet<string>,
 ): boolean {
+  for (const entry of record.productions) {
+    if (entry.output.kind !== "text") continue;
+    const text = entry.output.text;
+    if (removalSet.has(text.normalize("NFC"))) return true;
+    if (entry.viaFallback !== true && record.source === "rule") {
+      for (const ch of text) {
+        if (removalSet.has(ch.normalize("NFC"))) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Resolve one candidate's production in its layer's state and test it
+ * against `removalSet` — the resolver half of {@link keyMatchesRemovalSet},
+ * exported for the carve operation, which needs the same verdict per
+ * occurrence without re-deriving the state plumbing.
+ */
+export function candidateMatchesViaProduction(
+  candidate: { id?: string; sp?: number; nextlayer?: string },
+  removalSet: ReadonlySet<string>,
+  ctx: RemovalProductionContext,
+): boolean {
+  const key: TouchKeyIR = {
+    nodeId: "",
+    id: candidate.id ?? "",
+    ...(candidate.sp !== undefined ? { sp: candidate.sp } : {}),
+    ...(candidate.nextlayer !== undefined ? { nextlayer: candidate.nextlayer } : {}),
+  };
+  const record = resolveTouchProduction(
+    ctx.production,
+    key,
+    touchKeyStateFromLayerId(ctx.layerId),
+  );
+  return productionMatchesRemovalSet(record, removalSet);
+}
+
+/**
+ * Return `true` when a key/sub-key candidate produces a character in
+ * `removalSet`.
+ *
+ * Two modes, by whether `productionCtx` is supplied (spec 104 T007,
+ * following the Wave 1 resolver-migration precedent in coverage):
+ *
+ *   - WITH a production context, matching is PRODUCTION ONLY: the
+ *     candidate matches iff any of its per-state productions (from the
+ *     FR-003 resolver) is in the set. This is the fix for audit gap 1 — a
+ *     ruled `T_` key whose keycap shows a dotted-circle label (`T_0300`,
+ *     text `"◌̀"`) produces U+0300 entirely through its `.kmn` rules, and
+ *     the text/output/U_-decode test below cannot see it; conversely a
+ *     `T_BLANK` spacer whose text happens to be `" "` produces nothing
+ *     and must not spuriously match.
+ *   - WITHOUT one (callers holding only a layout — the raw-JSON replay),
+ *     the legacy test runs byte-identically: `text`, `output`, or a
+ *     `U_<HEX>`-decoded `id` in the set.
+ *
+ * Matching is canonical in both modes: every candidate string is
+ * NFC-normalized before comparison against `removalSet` (which is itself
+ * NFC — see {@link buildRemovalSet}), so an NFD-stored occurrence of a
+ * carved char (base + combining mark) is still matched even though
+ * `removalSet` entries are precomposed (spec 035
+ * contracts/seed-derivation.md clause 2).
+ *
+ * @param candidate       A TouchKeyIR (or raw-JSON key/sub-key) shape.
+ * @param removalSet      NFC-normalized removal set from {@link buildRemovalSet}.
+ * @param productionCtx   Optional resolver context (spec 104).
+ */
+export function keyMatchesRemovalSet(
+  candidate: { text?: string; output?: string; id?: string; sp?: number; nextlayer?: string },
+  removalSet: ReadonlySet<string>,
+  productionCtx?: RemovalProductionContext,
+): boolean {
+  if (productionCtx !== undefined) {
+    return candidateMatchesViaProduction(candidate, removalSet, productionCtx);
+  }
   if (candidate.text !== undefined && removalSet.has(candidate.text.normalize("NFC"))) {
     return true;
   }

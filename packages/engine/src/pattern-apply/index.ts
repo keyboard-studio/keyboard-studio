@@ -136,8 +136,19 @@ export {
 } from "./rowMetrics.js";
 export type { RowMetricKey, RowMetrics } from "./rowMetrics.js";
 
+export {
+  applyTouchCharCarve,
+  carveTouchCharacter,
+} from "./carveTouchProducers.js";
+export type {
+  TouchCharCarveRefusal,
+  TouchCharCarveResult,
+} from "./carveTouchProducers.js";
 export { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
-export type { TouchMethodDescriptor } from "./enumerateTouchMethodsForChar.js";
+export type {
+  EnumerateTouchMethodsOptions,
+  TouchMethodDescriptor,
+} from "./enumerateTouchMethodsForChar.js";
 
 export {
   applyTouchKeycapRemovalsToLayout,
