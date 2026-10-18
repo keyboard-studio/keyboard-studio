@@ -13,7 +13,6 @@ export {
 // import path invokes both stages when it parses a base keyboard.
 export {
   runImportFidelityParseChecks,
-  runImportFidelityEmitChecks,
   runImportFidelityEmitChecksSync,
   runImportFidelityRoundTripCheck,
   ROUND_TRIP_DIVERGENCE_CODE,
@@ -104,13 +103,6 @@ export {
   OPAQUE_REASONS,
 } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
-// Full import orchestrator (parse → recognize → Layer A′ fidelity → emit →
-// ImportReport) and its pure report assembler.
-export { importKeyboard, buildImportReport } from "./codec/index.js";
-export type {
-  ImportKeyboardResult,
-  BuildImportReportParams,
-} from "./codec/index.js";
 export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
 export type { ConformTouchLayoutResult } from "./codec/index.js";
 // The studio's working-copy fingerprint (spec 094 R7) hashes with the same helper.

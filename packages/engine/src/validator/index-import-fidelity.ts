@@ -11,11 +11,15 @@
  *            rejection instead, with no finding at all. Deliberately NOT a Layer C
  *            check: see checkTouchLayoutIdentifiers' header.
  *
- *   runImportFidelityEmitChecks   — runs after emit(), with the emitted text in hand
- *     I2: functional round-trip via simulate() (#882; blocking on compared
- *         divergence, honest no-coverage/unavailable states otherwise)
+ *   runImportFidelityEmitChecksSync — runs after emit(), with the emitted
+ *     text in hand
  *     I3: header preservation
  *     I6: ownership consistency (Pattern↔node back-reference)
+ *
+ *   runImportFidelityRoundTripCheck — I2 on its own (functional round-trip
+ *     via simulate(), #882; blocking on compared divergence, honest
+ *     no-coverage/unavailable states otherwise). Split from the sync half
+ *     because it is far too slow for a path a user is waiting on.
  *
  * I5 (sidecar hash) fires at output time and is re-exported standalone so
  * callers can invoke it independently.
@@ -87,8 +91,8 @@ export function runImportFidelityEmitChecksSync(
  * keyboard. It must NEVER sit on a path a user is waiting on: the studio
  * live path runs it after the preview stage reaches `ready` and delivers
  * the findings when they land (the spec-078 publish-after-ready posture).
- * Batch hosts (importKeyboard) can simply await the composed
- * {@link runImportFidelityEmitChecks} instead.
+ * Callers needing the full emit stage compose this with
+ * {@link runImportFidelityEmitChecksSync} themselves.
  *
  * `roundTripDeps` supplies the compile/simulate harness (see
  * {@link RoundTripDeps}). When omitted, I2 reports its unavailable state
@@ -100,26 +104,6 @@ export async function runImportFidelityRoundTripCheck(
   roundTripDeps?: RoundTripDeps,
 ): Promise<LintFinding[]> {
   return checkRoundTrip(ir, roundTripDeps);
-}
-
-/**
- * Run Layer A' emit-stage checks (I2 functional round-trip + I3 + I6).
- * Call after emit(), passing the emitted .kmn text.
- *
- * `roundTripDeps` supplies I2's compile/simulate harness (see
- * {@link RoundTripDeps}). When omitted, I2 reports its unavailable state
- * (a non-blocking hint) rather than silently passing — hosts that can
- * compile and simulate (the studio live path, Node hosts) should pass it.
- */
-export async function runImportFidelityEmitChecks(
-  ir: KeyboardIR,
-  emitted: string,
-  roundTripDeps?: RoundTripDeps,
-): Promise<LintFinding[]> {
-  return [
-    ...(await runImportFidelityRoundTripCheck(ir, roundTripDeps)),
-    ...runImportFidelityEmitChecksSync(ir, emitted),
-  ];
 }
 
 // I5 is standalone — fires at output time.

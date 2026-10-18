@@ -38,7 +38,8 @@
 // session merge.
 //
 // spec 079 US3 (T079/T080): this step never shows a `reproposed`
-// "needs reconfirming" flag — see `../invisiblesFlags.ts` for why (in short:
+// "needs reconfirming" flag — see hooks/useWorkToDo.ts's spec-079 note
+// for why (in short:
 // `carriedOver` guarantees a decided candidate is never dropped, so there is
 // only "proposed"/"current", never a stale confirmation to surface).
 

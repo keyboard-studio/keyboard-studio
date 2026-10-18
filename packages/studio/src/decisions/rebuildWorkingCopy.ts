@@ -201,6 +201,62 @@ export function rebuildWorkingCopy(
 }
 
 // ---------------------------------------------------------------------------
+// Starting-point change (spec 093 T017)
+// ---------------------------------------------------------------------------
+
+export interface StartingPointChangeRequest {
+  /** The decision set carried over the change, as recorded. */
+  decisions: DecisionSet;
+  /** The NEW starting point's IR — the replay folds over it. */
+  startingPointIR: KeyboardIR;
+}
+
+/**
+ * Recalculate `request.decisions` against a new starting point and
+ * rebuild the working copy by full replay over it.
+ *
+ * A starting-point change is a RECALCULATION (owner ruling (a), km-lead
+ * proposals Q6, recorded at T013) — not a reset, not a migration: the
+ * decision set is carried over the new starting point and every record
+ * is re-evaluated under the provenance rule (US1) against it —
+ * extracted records re-extract against the new bundle (the superseding
+ * record's `source` names the NEW keyboard, passed as `deps.source`),
+ * default/derived records recompute, asked records are kept whole
+ * (still valid → untouched; no longer fits → kept, flagged, and the
+ * recomputed value offered beside it, never overwritten), and gated-off
+ * records are kept marked `inactive`. Mechanically this is the T009
+ * rebuild with the widest possible closure: the change's cause sits
+ * OUTSIDE the decision graph, so the `changed` set is empty, the
+ * recalculation visits every record (`visitAll`), and the replay is a
+ * full replay from checkpoint 0 over the new starting point with a
+ * freshly seeded trail — the old trail's checkpoints fold over the OLD
+ * starting point and are meaningless here. The returned outcome's
+ * `trail` is the new trail; a caller that keeps session state adopts
+ * it. (One carried value is superseded rather than kept or offered: a
+ * normalization-step acceptance in the marks-treatment value is
+ * fingerprint-scoped to the old starting point, so the rebuild core
+ * clears it and the step is re-derived against the new base —
+ * normalizationStepReproposal.ts.)
+ *
+ * `deps` are the T009 rebuild deps pointed at the NEW bundle:
+ * `extractContext` reads it and `source` names it (catalog id
+ * preferred) so re-extracted records name the new keyboard as their
+ * source.
+ */
+export function recalculateForStartingPointChange(
+  deps: RebuildDeps,
+  request: StartingPointChangeRequest,
+): RebuildOutcome {
+  return rebuildWorkingCopy(deps, {
+    decisions: request.decisions,
+    changed: new Set<DecisionId>(),
+    startingPointIR: request.startingPointIR,
+    trail: seedTrail(request.startingPointIR),
+    visitAll: true,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Live wiring
 // ---------------------------------------------------------------------------
 
@@ -310,13 +366,10 @@ export function rebuildWorkingCopyFromStores(
  * gain a re-proposal (`offered`), never a silent drop — and the working
  * copy is rebuilt by full replay over the new base and installed.
  *
- * The request assembly mirrors `recalculateForStartingPointChange`
- * (startingPointChange.ts — the pure, tested specification of this
- * operation) inline: that module imports this file's core, so calling
- * the wrapper from here would close a runtime import cycle. The two
- * assemblies must stay in step: empty `changed` set, `visitAll`, a
- * freshly seeded trail (the old trail folds over the OLD starting
- * point). The fresh trail is adopted as the session trail.
+ * The request is assembled by `recalculateForStartingPointChange`
+ * above: empty `changed` set, `visitAll`, a freshly seeded trail (the
+ * old trail folds over the OLD starting point). The fresh trail is
+ * adopted as the session trail.
  *
  * One value rides inside a retained record rather than folding through
  * the replay: a normalization-step acceptance in the marks-treatment
@@ -335,7 +388,7 @@ export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | 
 
   const ctx = buildLiveExtractContext();
   const source = ctx.catalog?.id ?? ctx.ir?.header.keyboardId ?? ctx.ir?.header.name;
-  const outcome = rebuildWorkingCopy(
+  const outcome = recalculateForStartingPointChange(
     {
       modules: Object.values(questionRegistry),
       extractContext: ctx,
@@ -343,10 +396,7 @@ export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | 
     },
     {
       decisions: getDecisionSnapshot(),
-      changed: new Set<DecisionId>(),
       startingPointIR,
-      trail: seedTrail(startingPointIR),
-      visitAll: true,
     },
   );
   sessionTrail = outcome.trail;

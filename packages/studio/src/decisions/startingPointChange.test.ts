@@ -9,10 +9,12 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { QuestionModule } from "../survey/types.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import type { ExtractContext } from "./extractContext.ts";
-import { recalculateForStartingPointChange } from "./startingPointChange.ts";
 import { recalculate, type RecalculateDeps } from "./recalculate.ts";
 import { providerFromModules } from "./replayKeyboard.ts";
-import type { RebuildDeps } from "./rebuildWorkingCopy.ts";
+import {
+  recalculateForStartingPointChange,
+  type RebuildDeps,
+} from "./rebuildWorkingCopy.ts";
 
 const mod = (partial: Partial<QuestionModule> & { id: string }): QuestionModule => ({
   definition: { id: partial.id, type: "text", prompt: partial.id },

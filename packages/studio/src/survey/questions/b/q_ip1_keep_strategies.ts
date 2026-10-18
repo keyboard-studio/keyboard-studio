@@ -1,8 +1,8 @@
 // Per-question module: q_ip1_keep_strategies (spec 038 US2, inheritance-posture).
 //
-// A §3c CONFIRMATION rendered through the InheritancePostureStep (one keep/
-// propose/discard answer governs every input-strategy proposal site — the
-// en-masse lever, FR-005), NOT through the linear Phase B walk. Like the q_sa*
+// A §3c CONFIRMATION (one keep/propose/discard answer governs every
+// input-strategy proposal site — the en-masse lever, FR-005), NOT through
+// the linear Phase B walk. Like the q_sa*
 // script-alignment modules, this is a RESERVE module: it exists on disk so
 // adaptation-catalog-lint / facet-lint (which key off the raw `id` literal)
 // resolve content/adaptation-questions/q_ip1_keep_strategies.yaml (renders: true)

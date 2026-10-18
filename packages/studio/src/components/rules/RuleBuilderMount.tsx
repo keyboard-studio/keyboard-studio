@@ -1,19 +1,18 @@
 // RuleBuilderMount — the rules step's rule-builder region (spec 082).
 //
-// Renders the sibling workstream's builder panel when one is registered via
-// `registerRuleBuilderPanel`. Until then — and as the default — this mount
-// renders the real Track B `RuleBuilderPanel` directly: the family-card
+// Renders the real Track B `RuleBuilderPanel` directly: the family-card
 // list's "Bundle as pack" action selects a family here (via
 // `rulesStepUiStore.bundleFamilyId`) and the panel opens with that family's
 // rules pre-selected for the 3-step bundle flow (name it, prove it, save
 // it). The panel is keyed by the selected family so picking another family
-// remounts it with a fresh selection.
+// remounts it with a fresh selection. (This region once read a registry
+// slot for a sibling workstream's panel; nothing ever registered, so the
+// indirection was removed.)
 
 import { Trans } from "@lingui/react/macro";
 import { useMemo } from "react";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useRulesStepUiStore } from "../../stores/rulesStepUiStore.ts";
-import { getRuleBuilderPanel, type RuleRegionProps } from "./ruleViewRegistry.ts";
 import { groupRules, familyOfRule } from "./ruleFamilies.ts";
 import { RuleBuilderPanel } from "../ruleBuilder/RuleBuilderPanel.tsx";
 import { rulesNote, rulesSection, rulesSectionHeading } from "./rulesStyles.ts";
@@ -35,17 +34,11 @@ export function RuleBuilderMount() {
   const ir = useWorkingCopyStore((s) => s.ir);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const bundleFamilyId = useRulesStepUiStore((s) => s.bundleFamilyId);
-  const BuilderPanel = getRuleBuilderPanel();
 
   const families = useMemo(() => {
     if (ir === null) return [];
     return groupRules(ir.groups.flatMap((g) => g.rules));
   }, [ir]);
-
-  if (BuilderPanel !== null) {
-    const props: RuleRegionProps = { ir };
-    return <BuilderPanel {...props} />;
-  }
 
   if (ir === null) {
     return (
