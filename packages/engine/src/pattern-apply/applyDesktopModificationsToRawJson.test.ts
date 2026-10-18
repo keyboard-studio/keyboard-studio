@@ -661,3 +661,99 @@ describe("applyDesktopModificationsToRawJson — no mutation of input", () => {
     expect(JSON.parse(json)).toEqual(snapshot);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. Spec 104 FR-021 (T017) — resolver-addressed placements (raw twin).
+//    The slot's occupant is established through the production resolver:
+//    a U_ key whose resolved production equals the physical key's receives
+//    the placement as a longpress instead of the replay appending a
+//    duplicate key to the last row.
+// ---------------------------------------------------------------------------
+
+import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
+import { parse as parseKmn } from "../codec/index.js";
+import type { PlacementResolverContext } from "./touch-mechanism-shared.js";
+
+function resolverCtxFor(kmn: string): PlacementResolverContext {
+  const { ir } = parseKmn(kmn, "t017-raw");
+  return { ir, ruleIndex: buildTouchKeyRuleIndex(ir) };
+}
+
+const BARE_KMN_RAW = [
+  "store(&VERSION) '10.0'",
+  "store(&NAME) 't017-raw'",
+  "begin Unicode > use(main)",
+  "group(main) using keys",
+  "+ [K_Q] > 'q'",
+].join("\n");
+
+describe("applyDesktopModificationsToRawJson — spec 104 T017 resolver-addressed placements", () => {
+  it("lands on a U_ occupant of the slot instead of appending a duplicate key", () => {
+    const json = makePhoneOnlyJson([
+      { id: "U_0031", text: "1" },
+      { id: "K_Q", text: "q" },
+    ]);
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(
+      json,
+      { removals: [], placements: [{ char: "ə", baseKey: "K_1" }] },
+      resolverCtxFor(BARE_KMN_RAW),
+    );
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+    };
+    const keys = parsed.phone.layer[0]!.row.flatMap((r) => r.key);
+    expect(keys).toHaveLength(2);
+    const occupant = keys.find((k) => k["id"] === "U_0031")!;
+    expect(occupant["sk"]).toEqual([{ id: "U_0259", text: "ə" }]);
+    expect(warnings).toEqual([]);
+  });
+
+  it("an exact T_ host already producing the char by rule gets no duplicate longpress", () => {
+    const ctx = resolverCtxFor(
+      [
+        "store(&VERSION) '10.0'",
+        "store(&NAME) 't017-raw-guarded'",
+        "begin Unicode > use(main)",
+        "group(main) using keys",
+        "+ [T_0300] > U+0300",
+      ].join("\n"),
+    );
+    const json = makePhoneOnlyJson([
+      { id: "T_0300", text: "◌̀" },
+      { id: "K_Q", text: "q" },
+    ]);
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(
+      json,
+      { removals: [], placements: [{ char: "̀", baseKey: "T_0300" }] },
+      ctx,
+    );
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+    };
+    const keys = parsed.phone.layer[0]!.row.flatMap((r) => r.key);
+    const host = keys.find((k) => k["id"] === "T_0300")!;
+    expect(host["sk"]).toBeUndefined();
+    expect(keys).toHaveLength(2);
+    expect(warnings).toEqual([]);
+  });
+
+  it("without a resolver context, the legacy exact-id behaviour is unchanged", () => {
+    const json = makePhoneOnlyJson([
+      { id: "U_0031", text: "1" },
+      { id: "K_Q", text: "q" },
+    ]);
+    const { json: out, warnings } = applyDesktopModificationsToRawJson(json, {
+      removals: [],
+      placements: [{ char: "ə", baseKey: "K_1" }],
+    });
+
+    const parsed = JSON.parse(out) as {
+      phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+    };
+    const keys = parsed.phone.layer[0]!.row.flatMap((r) => r.key);
+    expect(warnings).toHaveLength(1);
+    expect(keys.some((k) => k["id"] === "U_0259")).toBe(true);
+  });
+});

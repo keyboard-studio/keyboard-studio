@@ -46,7 +46,12 @@
 // deriveSeedLayout (which parses Case B's result into a TouchLayoutIR for
 // its own callers).
 
-import type { KeyboardIR, TouchAssignment, TouchLayoutIR } from "@keyboard-studio/contracts";
+import {
+  buildTouchKeyRuleIndex,
+  type KeyboardIR,
+  type TouchAssignment,
+  type TouchLayoutIR,
+} from "@keyboard-studio/contracts";
 import {
   applyDesktopModifications,
   applyDesktopModificationsToRawJson,
@@ -135,7 +140,13 @@ function buildCaseASeed(
 ): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const { touchLayout: _stripped, ...rest } = startIr;
   const { layout: seed, unplacedChars } = scaffoldTouchLayoutWithDiagnostics(rest, "tablet");
-  const { layout, warnings } = applyDesktopModifications(seed, mods);
+  // Spec 104 FR-021: placement replay is resolver-addressed — the seed's
+  // T_/U_ slot occupants are found through the production resolver over
+  // the (rule-bearing) IR the seed was scaffolded from.
+  const { layout, warnings } = applyDesktopModifications(seed, mods, {
+    ir: rest,
+    ruleIndex: buildTouchKeyRuleIndex(rest),
+  });
   return { layout, warnings, unplacedChars };
 }
 
@@ -161,7 +172,12 @@ export function deriveSeedLayout(
 ): { layout: TouchLayoutIR; warnings: string[]; unplacedChars: string[] } {
   const seedCase = resolveSeedCase(opts);
   if (seedCase.case === "B") {
-    const { json, warnings } = applyDesktopModificationsToRawJson(seedCase.baseTouchJson, opts.mods);
+    const { json, warnings } = applyDesktopModificationsToRawJson(
+      seedCase.baseTouchJson,
+      opts.mods,
+      // Spec 104 FR-021: resolver-addressed placement replay (see buildCaseASeed).
+      { ir: startIr, ruleIndex: buildTouchKeyRuleIndex(startIr) },
+    );
     // Case B never runs the scaffolder (it splices the shipped raw JSON), so
     // there is nothing for it to spill onto the "extras" grouping.
     return { layout: parseTouchLayout(json), warnings, unplacedChars: [] };
@@ -196,6 +212,8 @@ export function buildTouchLayoutJson(
       const { json: afterMods, warnings: modsWarnings } = applyDesktopModificationsToRawJson(
         seedCase.baseTouchJson,
         opts.mods,
+        // Spec 104 FR-021: resolver-addressed placement replay (see buildCaseASeed).
+        { ir: startIr, ruleIndex: buildTouchKeyRuleIndex(startIr) },
       );
       const { json, warnings: assignWarnings } = applyTouchAssignmentsToRawJson(
         afterMods,

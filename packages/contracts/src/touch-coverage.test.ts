@@ -295,9 +295,11 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
     const withoutIndex = computeTouchCoverage(layout(), ["̀"], { stripDottedCircle: false });
     expect(withoutIndex.uncovered).toEqual(["̀"]);
 
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_0300", "̀"));
+    const ir = irWithRule("T_0300", "̀");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
     const withIndex = computeTouchCoverage(layout(), ["̀"], {
       ruleIndex,
+      ir,
       stripDottedCircle: false,
     });
     expect(withIndex.uncovered).toEqual([]);
@@ -307,9 +309,10 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
     const physical = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "K_QUOTE", text: "◌̀" })] }] },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("K_QUOTE", "̀"));
+    const ir = irWithRule("K_QUOTE", "̀");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
     expect(
-      computeTouchCoverage(physical, ["̀"], { ruleIndex, stripDottedCircle: false }).uncovered,
+      computeTouchCoverage(physical, ["̀"], { ruleIndex, ir, stripDottedCircle: false }).uncovered,
     ).toEqual([]);
   });
 
@@ -326,8 +329,9 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
         ],
       },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_SUB", "ŝ"));
-    expect(computeTouchCoverage(nested, ["ŝ"], { ruleIndex }).uncovered).toEqual([]);
+    const ir = irWithRule("T_SUB", "ŝ");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(nested, ["ŝ"], { ruleIndex, ir }).uncovered).toEqual([]);
     // …and without the index it stays uncovered, so the assertion above is not
     // passing for some unrelated reason.
     expect(computeTouchCoverage(nested, ["ŝ"]).uncovered).toEqual(["ŝ"]);
@@ -357,7 +361,7 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
     ]);
     const ruleIndex = buildTouchKeyRuleIndex(ir);
     expect(
-      computeTouchCoverage(layout(), ["̀"], { ruleIndex, stripDottedCircle: false }).uncovered,
+      computeTouchCoverage(layout(), ["̀"], { ruleIndex, ir, stripDottedCircle: false }).uncovered,
     ).toEqual(["̀"]);
   });
 });
@@ -453,8 +457,9 @@ describe("computeTouchCoverage — the corrected sp enum (FR-012)", () => {
     const layout = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "T_BLANK", text: " ", sp: 9 })] }] },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_BLANK", "z"));
-    expect(computeTouchCoverage(layout, ["z"], { ruleIndex }).uncovered).toEqual(["z"]);
+    const ir = irWithRule("T_BLANK", "z");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(layout, ["z"], { ruleIndex, ir }).uncovered).toEqual(["z"]);
   });
 
   it("the two class predicates partition the enum tail as documented", () => {
@@ -504,10 +509,158 @@ describe("computeTouchCoverage — multi-char behaviour", () => {
     const layout = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "T_FCFA", text: "*FCFA*" })] }] },
     ] });
-    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_FCFA", "FCFA"));
+    const ir = irWithRule("T_FCFA", "FCFA");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
     // The join's `produced` is the per-codepoint set, so each letter is covered…
-    expect(computeTouchCoverage(layout, ["F", "C", "A"], { ruleIndex }).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["F", "C", "A"], { ruleIndex, ir }).uncovered).toEqual([]);
     // …but the whole string is not, since nothing credits it as a unit here.
-    expect(computeTouchCoverage(layout, ["FCFA"], { ruleIndex }).uncovered).toEqual(["FCFA"]);
+    expect(computeTouchCoverage(layout, ["FCFA"], { ruleIndex, ir }).uncovered).toEqual(["FCFA"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 104 T025 — production comes from the resolver (FR-003).
+//
+// With a rule index passed, id-derived and rule-derived crediting is the
+// resolver's, per (key × layer-state); the legacy two-argument path above
+// is byte-identical and untouched. Every verdict that differs from the
+// pre-104 joined behaviour is named VERDICT CHANGE; every verdict that
+// must NOT differ is named PARITY.
+// ---------------------------------------------------------------------------
+
+describe("computeTouchCoverage — resolver production (spec 104 T025)", () => {
+  /** An index (and its IR) whose only rule is keyed on an id no fixture uses. */
+  const unrelatedIr = irWithRule("T_UNUSED", "x");
+  const unrelatedOptions = () => ({
+    ruleIndex: buildTouchKeyRuleIndex(unrelatedIr),
+    ir: unrelatedIr,
+  });
+
+  it("VERDICT CHANGE (spec 104): an unruled K_ key is credited with its US base char when the rule index is passed", () => {
+    // Pre-104 the joined path credited text/output/U_-decode/rule output —
+    // never the K_ fallback, so a bare K_Q keycap-less key covered nothing.
+    // The resolver knows state-0 K_ taps fall back to the US base char.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_Q" })] }] },
+    ] });
+    expect(
+      computeTouchCoverage(layout, ["q"], unrelatedOptions()).uncovered,
+    ).toEqual([]);
+    // …and the legacy path is unchanged: without the index it stays uncovered.
+    expect(computeTouchCoverage(layout, ["q"]).uncovered).toEqual(["q"]);
+  });
+
+  it("VERDICT CHANGE (spec 104): the K_ fallback credit does not apply in a rightalt state", () => {
+    const layout = touchLayout({ layers: [
+      {
+        id: "default",
+        rows: [{ keys: [touchKey({ id: "K_RA", text: "*Alt*", nextlayer: "rightalt" })] }],
+      },
+      { id: "rightalt", rows: [{ keys: [touchKey({ id: "K_Q" })] }] },
+    ] });
+    // In RALT state an unmatched K_ key produces nothing (contracts §1), so
+    // there is no base char to credit.
+    expect(
+      computeTouchCoverage(layout, ["q"], unrelatedOptions()).uncovered,
+    ).toEqual(["q"]);
+  });
+
+  it("PARITY: a ruled U_ key credits BOTH its rule output (ा) and its decode arm (अ)", () => {
+    // `+ [U_0905] > 'ा'`: the rule governs the keystrokes it matches, the
+    // U_ decode (अ) the rest (contracts §1). Pre-104 both were credited
+    // (decode + join). The resolver appends the decode as a marked
+    // `viaFallback` production entry and coverage credits it — rule
+    // entries per codepoint, the decode entry as a whole unit.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_0905" })] }] },
+    ] });
+    const ir = irWithRule("U_0905", "ा");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(layout, ["ा"], { ruleIndex, ir }).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["अ"], { ruleIndex, ir }).uncovered).toEqual([]);
+  });
+
+  it("a ruled multi-segment U_ key's decode arm is credited as a whole unit, not per codepoint", () => {
+    // U_0065_0301 decodes to "e" + U+0301. Credited whole, its NFC form
+    // (é) is covered; credited per codepoint (the rule shape) it would
+    // cover "e" instead and leave "é" uncovered.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_0065_0301" })] }] },
+    ] });
+    const ir = irWithRule("U_0065_0301", "x");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(layout, ["é"], { ruleIndex, ir }).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["e"], { ruleIndex, ir }).uncovered).toEqual(["e"]);
+  });
+
+  it("VERDICT CHANGE (spec 104): a rule bound only under SHIFT no longer credits a key that exists only on the default layer", () => {
+    // Pre-104 producedByKeyId was state-blind. The resolver is per state:
+    // on the default layer the SHIFT-bound rule can never fire.
+    const ir = makeTestIR([
+      {
+        nodeId: "group#main",
+        name: "Main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          {
+            nodeId: "rule#shift-bound",
+            context: [{ kind: "vkey", name: "T_S", modifiers: ["SHIFT"] }],
+            output: [{ kind: "char" as const, value: "x" }],
+          },
+        ],
+      },
+    ]);
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    const defaultOnly = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_S" })] }] },
+    ] });
+    expect(computeTouchCoverage(defaultOnly, ["x"], { ruleIndex, ir }).uncovered).toEqual(["x"]);
+
+    // PARITY with the change: once the key also sits on the shift layer,
+    // the same rule credits it there.
+    const withShift = touchLayout({ layers: [
+      {
+        id: "default",
+        rows: [
+          {
+            keys: [
+              touchKey({ id: "K_SHIFT", text: "*Shift*", nextlayer: "shift" }),
+              touchKey({ id: "T_S" }),
+            ],
+          },
+        ],
+      },
+      { id: "shift", rows: [{ keys: [touchKey({ id: "T_S" })] }] },
+    ] });
+    expect(computeTouchCoverage(withShift, ["x"], { ruleIndex, ir }).uncovered).toEqual([]);
+  });
+
+  it("PARITY: a guard-only T_ key credits nothing through the resolver", () => {
+    const ir = makeTestIR([
+      {
+        nodeId: "group#main",
+        name: "Main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          {
+            nodeId: "rule#guard-only",
+            context: [
+              { kind: "any", storeRef: "diablock" },
+              { kind: "raw", text: "+" },
+              { kind: "vkey", name: "T_G", modifiers: [] },
+            ],
+            output: [{ kind: "raw", text: "context" }],
+          },
+        ],
+      },
+    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_G" })] }] },
+    ] });
+    expect(
+      computeTouchCoverage(layout, ["g"], { ruleIndex: buildTouchKeyRuleIndex(ir), ir }).uncovered,
+    ).toEqual(["g"]);
   });
 });

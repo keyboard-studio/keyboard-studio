@@ -13,6 +13,12 @@
  * layer reachable via a chain of `nextlayer` references from it) and decodes
  * `U_<HEX>[_<HEX>]*` key ids into the character(s) they encode.
  *
+ * Spec 104 (T025): when a rule index is supplied, id-derived and rule-derived
+ * crediting no longer happens here at all — production comes from the one
+ * resolver (`touchProduction.ts`, FR-003), per key occurrence and layer
+ * state. The text/output credits above are keycap heuristics, not
+ * production, and are unchanged in both paths.
+ *
  * Multi-codepoint U_ ids (Keyman 15+): a touch key id may carry more than one
  * underscore-separated hex group (e.g. `U_0061_0303`, base + combining mark).
  * Each group is validated and decoded independently, then concatenated — the
@@ -22,10 +28,10 @@
  * @see specs/035-mobile-touch-derivation/contracts/simplification.md
  */
 
-import type { TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
+import type { KeyboardIR, TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
 import { toUPlusNotation } from "./utils/charUtils.js";
-import { producedByKeyId } from "./touch-key-rule-join.js";
 import type { TouchKeyRuleIndex } from "./touch-key-rule-join.js";
+import { resolveTouchProduction, touchKeyStateFromLayerId } from "./touchProduction.js";
 
 export interface TouchCoverageResult {
   /** Inventory chars with zero reachable touch mechanism. Empty means SC-003 is satisfied. */
@@ -45,13 +51,31 @@ export interface TouchCoverageOptions {
   /**
    * From `buildTouchKeyRuleIndex(ir)`.
    *
-   * With it, a key is additionally credited with what its PRODUCING rules emit —
-   * which is the whole fix: a `T_0300` key labelled `◌̀`, whose output lives
-   * entirely in a `.kmn` rule, previously read as covering nothing.
+   * With it AND {@link TouchCoverageOptions.ir}, a key's PRODUCTION is taken
+   * from spec 104's production resolver (`resolveTouchProduction`, FR-003)
+   * instead of this module's own id-decoding + rule-join crediting — which
+   * is the whole fix, twice over: a `T_0300` key labelled `◌̀`, whose output
+   * lives entirely in a `.kmn` rule, previously read as covering nothing;
+   * and coverage must not keep a second production model standing beside
+   * the resolver (T025). The keycap-text credits below (text / output /
+   * dotted-circle strip) are NOT production and stay coverage's own
+   * additive heuristics.
    *
-   * Absent ⇒ today's semantics, byte-identical.
+   * Absent ⇒ the pre-104 semantics, byte-identical: no resolver is called
+   * and the legacy text/output/U_-decode crediting runs exactly as before.
+   * A `ruleIndex` passed WITHOUT `ir` also takes the legacy path: the
+   * resolver requires the IR (it reads rule outputs and deadkey names
+   * through it), so an index-only caller gets defined legacy behaviour
+   * rather than a crash. Call sites that build the index from an IR
+   * should pass both.
    */
   readonly ruleIndex?: TouchKeyRuleIndex;
+  /**
+   * The IR the rule index was built from (`buildTouchKeyRuleIndex(ir)`).
+   * Required alongside {@link TouchCoverageOptions.ruleIndex} for the
+   * resolver path; see that field's doc for the index-only fallback.
+   */
+  readonly ir?: KeyboardIR;
   /**
    * Additively credit a U+25CC-stripped form of a keycap's `text`. Default true.
    *
@@ -60,162 +84,16 @@ export interface TouchCoverageOptions {
   readonly stripDottedCircle?: boolean;
 }
 
-/**
- * Key classes from .keyman-touch-layout `sp` that are non-interactive: sp:9
- * (blank) and sp:10 (spacer).
- *
- * CORRECTED from `{8, 10}` (spec 063 FR-012). The upstream `TouchLayoutKeySp`
- * enum's tail is `deadkey = 8, blank = 9, spacer = 10` — 8 is a deadkey-STYLED
- * key, which is interactive and can produce output. The old set therefore
- * mishandled both ends of the blank/spacer idiom at once: it treated genuinely
- * interactive deadkey-styled keys as inert, while crediting blank keys as
- * producing their keycap text (Cameroon's `T_BLANK` sites carry `" "`, so a
- * space was spuriously credited as covered).
- */
-const NON_INTERACTIVE_SP_VALUES = new Set([9, 10]);
+import { decodeUnicodeKeyId, isSpacerKeyClass, stripDottedCircle } from "./touch-key-ids.js";
 
-/** The deadkey-STYLED key class from .keyman-touch-layout `sp` (upstream `deadkey = 8`). */
-const DEADKEY_SP_VALUE = 8;
-
-/**
- * True when a touch key's `sp` (key class) marks it as non-interactive — sp:9
- * (blank) or sp:10 (spacer). Such keys occupy horizontal space but are neither
- * char producers nor interactive, so both touch-coverage and the keys-per-row
- * crowding check must exclude them. Canonical predicate — do not re-derive the
- * literal set elsewhere.
- *
- * The name is kept (rather than renamed to `isNonInteractiveKeyClass`) because
- * it is the established predicate across three packages and the rename would
- * churn every call site for no behavioural gain; the SET is what was wrong.
- */
-export function isSpacerKeyClass(sp: number | undefined): boolean {
-  return sp !== undefined && NON_INTERACTIVE_SP_VALUES.has(sp);
-}
-
-/**
- * True when a touch key's `sp` marks it as deadkey-STYLED (sp:8).
- *
- * This is a *presentation* class, not a behavioural one: it tells the renderer
- * to style the key like a deadkey. The key remains interactive and may produce
- * output, so it must NOT be excluded from coverage or from the keys-per-row
- * count. The predicate exists so callers that need to reason about the class
- * (e.g. the dead-`T_`-key check, which runs only on `sp ∈ {absent, 0, 8}`) can
- * name it instead of writing the literal `8`.
- */
-export function isDeadkeyStyledKeyClass(sp: number | undefined): boolean {
-  return sp === DEADKEY_SP_VALUE;
-}
-
-/**
- * The two `sp` classes that mark a FRAME key: `1` (upstream `special`, drawn
- * inactive) and `2` (upstream `specialActive`, drawn engaged on the layer it
- * switches to).
- */
-const FRAME_SP_VALUES = new Set([1, 2]);
-
-/**
- * True when a touch key's `sp` marks it as a FRAME key — sp:1 (inactive) or
- * sp:2 (active). Canonical predicate for that pair; do not re-derive the
- * literal set elsewhere (same convention {@link isSpacerKeyClass} states).
- *
- * The frame classes are the keyboard's *chrome*: layer switches, `K_BKSP`,
- * `K_ENTER`, the globe key. Two consequences depend on naming them, and both
- * are about a family of modifier layers rather than about one key:
- *
- * - Alternation *between* 1 and 2 across a family is correct design, not drift
- *   (`layerFamilies.ts`'s FR-068 property split), so a frame key must be
- *   correlated across siblings by something other than the properties that
- *   legitimately vary.
- * - Crossing INTO or OUT OF the pair is a different kind of edit from moving
- *   around inside the ordinary classes: it changes which correlation namespace
- *   the key belongs to at all, which is why it is the one `sp` change that
- *   still counts as a family-parallelism concern
- *   (`keyEditAffectsFamilyParallelism`).
- *
- * Note this is a claim about `sp` ALONE. A key carrying a `nextlayer` is also a
- * layer switch whatever its `sp` says; callers needing that wider question ask
- * it themselves (see `layerFamilies.ts`'s `isFrameOrLayerSwitchKey`).
- */
-export function isFrameKeyClass(sp: number | undefined): boolean {
-  return sp !== undefined && FRAME_SP_VALUES.has(sp);
-}
-
-/** A single `U_<HEX>` hex group: 4-6 hex digits. */
-const HEX_GROUP_RE = /^[0-9A-Fa-f]{4,6}$/;
-
-/**
- * Decode a `U_<HEX>[_<HEX>]*` touch key id into the character(s) it encodes
- * (inverse of `charToUnicodeKeyId` in `engine/src/shared/touch-ids.ts` for the
- * single-codepoint case; the encoder stays single-codepoint-only). Accepts
- * one or more underscore-separated hex groups (Keyman 15+ multi-codepoint
- * ids, e.g. base+combining sequences) — each group must be 4-6 hex digits and
- * a valid Unicode scalar value. Returns `undefined` for any id that is not a
- * conforming `U_` id (including a malformed group anywhere in the sequence).
- */
-export function decodeUnicodeKeyId(id: string): string | undefined {
-  if (!id.startsWith("U_")) return undefined;
-  const groups = id.slice(2).split("_");
-  if (groups.length === 0 || groups.some((g) => g.length === 0)) return undefined;
-
-  let decoded = "";
-  for (const hex of groups) {
-    if (!HEX_GROUP_RE.test(hex)) return undefined;
-    const codePoint = parseInt(hex, 16);
-    if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
-      return undefined;
-    }
-    // Surrogate code points (0xD800-0xDFFF) are not valid Unicode scalar
-    // values; String.fromCodePoint would otherwise emit an ill-formed
-    // UTF-16 unit.
-    if (codePoint >= 0xd800 && codePoint <= 0xdfff) return undefined;
-    decoded += String.fromCodePoint(codePoint);
-  }
-  return decoded;
-}
-
-/**
- * U+25CC DOTTED CIRCLE — the conventional combining-mark placeholder on a keycap.
- *
- * Exported because engine's `keycapRelatedness.ts` needs the same literal for a
- * different question (does a keycap still stand for what the key types?). The
- * two pieces of logic stay separate — they encode different invariants — but the
- * character does not get a second spelling.
- */
-export const DOTTED_CIRCLE = "◌";
-
-/** Every char is a combining mark: Mn (nonspacing), Mc (spacing), or Me (enclosing). */
-const ALL_COMBINING_RE = /^[\p{Mn}\p{Mc}\p{Me}]+$/u;
-
-/**
- * The U+25CC-stripped form of a keycap label, or `undefined` when the strip does
- * not apply (spec 063 FR-006).
- *
- * Strips only when, after removing EVERY U+25CC, the remainder is **non-empty**
- * and consists **solely** of combining marks. Each condition is load-bearing:
- *
- *   - `"◌̀"` → `"̀"`, so a mark key labelled with the conventional placeholder
- *     credits U+0300 even before the rule index is threaded — a useful
- *     independent safety net.
- *   - A bare `"◌"` is **NOT** stripped to empty. This matters concretely:
- *     `sil_cameroon_qwerty`'s `store(letter)` ends in a literal `◌`, making
- *     U+25CC a real inventory character on that keyboard. Stripping it to nothing
- *     would make a genuinely covered character read as uncovered.
- *   - `"a◌b"` is untouched, because the remainder is not all-combining. A keycap
- *     mixing letters and a placeholder is not a mark keycap.
- *
- * The caller credits this IN ADDITION to the original text, never instead of it.
- * That is what bounds the false-positive risk to nil: the only way crediting
- * U+0300 for a `◌̀` key could be wrong is if the key emits U+25CC+U+0300 as a
- * literal unit — in which case its `output` or id already credits that literal
- * and nothing is lost.
- */
-export function stripDottedCircle(text: string): string | undefined {
-  if (!text.includes(DOTTED_CIRCLE)) return undefined;
-  const remainder = text.split(DOTTED_CIRCLE).join("");
-  if (remainder.length === 0) return undefined;
-  if (!ALL_COMBINING_RE.test(remainder)) return undefined;
-  return remainder;
-}
+export {
+  DOTTED_CIRCLE,
+  decodeUnicodeKeyId,
+  isDeadkeyStyledKeyClass,
+  isFrameKeyClass,
+  isSpacerKeyClass,
+  stripDottedCircle,
+} from "./touch-key-ids.js";
 
 /** Recursively collect `nextlayer` references from a key and its sk/multitap/flick sub-keys. */
 function collectKeyNextLayers(key: TouchKeyIR, out: Set<string>): void {
@@ -229,19 +107,26 @@ function collectKeyNextLayers(key: TouchKeyIR, out: Set<string>): void {
   }
 }
 
+/** Where a key sits — the occurrence context the production resolver is keyed on (FR-001). Sub-keys inherit their parent's platform/layer. */
+interface KeyOccurrenceContext {
+  readonly platformId: string;
+  readonly layerId: string;
+}
+
 /**
  * Recursively add every char produced by a key and its sk/multitap/flick
  * sub-keys. It builds the full covered set once per layout, then tests every
  * inventory char against it (see `computeTouchCoverage` below); inverting
  * that into "for each inventory char, ask every key" would trade one O(keys)
  * pass for an O(inventory * keys) one for no behavioral gain. Per-key match
- * semantics: a non-empty, non-`*`-prefixed `text`/`output`, or a decoded
- * `U_<HEX>[_<HEX>]*` id, all NFC-normalized.
+ * semantics: a non-empty, non-`*`-prefixed `text`/`output`, or the key's
+ * production (below), all NFC-normalized.
  */
 function collectKeyChars(
   key: TouchKeyIR,
   covered: Set<string>,
   options: TouchCoverageOptions,
+  occurrence: KeyOccurrenceContext,
 ): void {
   // Blank (sp:9) and spacer (sp:10) keys are never char producers. Note that
   // sp:8 is deadkey-STYLED, not a spacer, and IS credited — see
@@ -255,8 +140,59 @@ function collectKeyChars(
   };
   push(key.text);
   push(key.output);
-  const decoded = decodeUnicodeKeyId(key.id);
-  if (decoded !== undefined) covered.add(decoded.normalize("NFC"));
+
+  if (options.ruleIndex === undefined || options.ir === undefined) {
+    // LEGACY (no rule index, or an index without its IR): the pre-104
+    // crediting, byte-identical. A decoded `U_<HEX>[_<HEX>]*` id is the
+    // only id-derived credit, and no rule production is visible at all.
+    const decoded = decodeUnicodeKeyId(key.id);
+    if (decoded !== undefined) covered.add(decoded.normalize("NFC"));
+  } else if (key.id.length > 0) {
+    // PRODUCTION (spec 104, FR-003/T025): the resolver is the one production
+    // model. Every production in the record is credited — the set is never
+    // collapsed (contracts §1) — so a context-guarded mark credits its mark
+    // (some context produces it). Crediting SHAPE follows the entry,
+    // preserving the two pre-104 precedents:
+    //   - rule entries: per codepoint — the join's `produced` set was
+    //     per-char, so a rule emitting "FCFA" covers F, C, F, A but not
+    //     the string.
+    //   - a marked decode entry (`viaFallback`, a ruled `U_` key's
+    //     no-rule-matches fall-through): the whole output as a unit, like
+    //     the `u-decode` source below — one mechanism, whose NFC form is
+    //     the covered char. Pre-104 parity: the joined path credited both
+    //     a ruled `U_` key's rule output AND its decode.
+    //   - `u-decode` / `k-fallback` sources: the whole output as a unit —
+    //     the U_-decode precedent (a multi-codepoint id is one mechanism,
+    //     whose NFC form is the covered char). `k-fallback` crediting is
+    //     NEW in 104: an unruled `K_` key on a state-0/SHIFT layer produces
+    //     its US base char whether or not its keycap says so. (Named as a
+    //     verdict change in the T025 tests.)
+    // Guard / suppresses / transitions-only records carry no text
+    // production, so a guard rule's re-emitted context can never be
+    // miscredited — the FR-005 property, now the resolver's by construction.
+    // Deadkey and layer-switch productions are not characters and credit
+    // nothing; `unknown` (caps-state fallback, contracts §5) credits
+    // nothing either — no verdict may be premised on it.
+    const record = resolveTouchProduction(
+      { ir: options.ir, ruleIndex: options.ruleIndex },
+      key,
+      touchKeyStateFromLayerId(occurrence.layerId),
+    );
+    for (const production of record.productions) {
+      if (production.output.kind !== "text") continue;
+      if (production.viaFallback === true) {
+        // A ruled `U_` key's decode fall-through: one mechanism, credited
+        // as a whole unit — never split per codepoint like a rule entry.
+        covered.add(production.output.text.normalize("NFC"));
+      } else if (record.source === "rule") {
+        for (const ch of production.output.text) {
+          covered.add(ch.normalize("NFC"));
+        }
+      } else {
+        covered.add(production.output.text.normalize("NFC"));
+      }
+    }
+  }
 
   // ADDITIVE (FR-006): the dotted-circle-stripped form of the keycap, credited
   // alongside the unstripped text above, never in place of it. Skipped for a
@@ -270,24 +206,15 @@ function collectKeyChars(
     if (stripped !== undefined) covered.add(stripped.normalize("NFC"));
   }
 
-  // ADDITIVE (FR-005): what this key's PRODUCING rules emit. Guard, suppresses,
-  // transitions, and opaque bindings contribute nothing by construction, so a
-  // guard rule's re-emitted context can never be miscredited as production.
-  if (options.ruleIndex !== undefined && key.id.length > 0) {
-    for (const ch of producedByKeyId(options.ruleIndex, key.id)) {
-      covered.add(ch.normalize("NFC"));
-    }
-  }
-
-  // The index is passed DOWN into every sub-key collection, so an `sk` /
-  // `multitap` / `flick` entry joins identically to a main key. A `U_` longpress
-  // usually self-outputs, but a `T_`-id sub-key does not, and omitting the index
-  // here would under-credit exactly those.
-  for (const sub of key.sk ?? []) collectKeyChars(sub, covered, options);
-  for (const sub of key.multitap ?? []) collectKeyChars(sub, covered, options);
+  // The occurrence context is passed DOWN into every sub-key collection, so
+  // an `sk` / `multitap` / `flick` entry resolves identically to a main key.
+  // A `U_` longpress usually self-outputs, but a `T_`-id sub-key does not,
+  // and omitting the resolver here would under-credit exactly those.
+  for (const sub of key.sk ?? []) collectKeyChars(sub, covered, options, occurrence);
+  for (const sub of key.multitap ?? []) collectKeyChars(sub, covered, options, occurrence);
   if (key.flick) {
     for (const sub of Object.values(key.flick)) {
-      if (sub) collectKeyChars(sub, covered, options);
+      if (sub) collectKeyChars(sub, covered, options, occurrence);
     }
   }
 }
@@ -359,7 +286,10 @@ export function computeTouchCoverage(
       if (!layer) continue;
       for (const row of layer.rows) {
         for (const key of row.keys) {
-          collectKeyChars(key, covered, options);
+          collectKeyChars(key, covered, options, {
+            platformId: platform.id,
+            layerId,
+          });
         }
       }
     }

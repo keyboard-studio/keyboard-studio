@@ -667,13 +667,18 @@ function charItemCount(store: { items: StoreItem[] } | undefined): number {
  * by name.
  */
 export function listDeadkeys(ir: KeyboardIR): DeadkeyInfo[] {
+  // Partial IRs (studio-constructed inspection inputs) may omit any of the
+  // top-level collections — normalise once so every scanner below can
+  // iterate unconditionally (see resolveTouchProduction's groups guard).
+  ir = { ...ir, groups: ir.groups ?? [], stores: ir.stores ?? [], raw: ir.raw ?? [] };
   const triggerById = new Map<number, { rule: IRRule; triggerKey: string }>();
   const fanoutById = new Map<
     number,
     { baseStore: string; outputStore: string }
   >();
 
-  for (const group of ir.groups) {
+  // Partial IRs may omit the groups array (see resolveTouchProduction).
+  for (const group of ir.groups ?? []) {
     for (const rule of group.rules) {
       const t = matchTriggerRule(rule);
       if (t !== null) {

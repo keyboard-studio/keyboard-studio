@@ -28,14 +28,17 @@ import type {
   CarveDisposition,
   CarveDispositionProvenance,
   CarveDispositionValue,
+  GuardSpecification,
   HelpDocsAnswers,
   KeyboardIR,
+  KeyIdentityDecision,
   LintFinding,
   RemovalCapability,
   NormalizationRefusalReason,
   NormalizationStep,
   StoredNormalizationStep,
   ToleranceReport,
+  TransplantRecord,
   VirtualFS,
   WelcomeConvention,
   WelcomeFolderImage,
@@ -43,6 +46,7 @@ import type {
   ChartPreference,
   DocFixProposals,
   StartDocumentationProfile,
+  RepairProposal,
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
@@ -591,6 +595,18 @@ export interface WorkingCopyState {
    */
   docFixProposals: DocFixProposals | null;
   /**
+   * Spec 104: the touch key-identity record set — the decision-spine records
+   * (contracts `decisionRecord.ts`) for dead-key repairs, severance /
+   * re-link / kept-by-choice identity decisions, severance transplants, and
+   * the per-keyboard combining-mark guard specification. Null until the
+   * first record is written. Records are superseded, never edited in place
+   * (data-model.md §2); pending (unanswered) presentations are DERIVED from
+   * the working IR + layout + this record set, never stored, so a track
+   * switch re-derives them while recorded answers stand (FR-017/FR-018).
+   * Persisted.
+   */
+  touchKeyIdentity: TouchKeyIdentityRecords | null;
+  /**
    * The selected base's documentation profile (spec 079 FR-008), computed by
    * the base browser for the focused base and recorded at selection; null
    * before a base is chosen or while the profile is still unknown. Drives the
@@ -847,6 +863,30 @@ export interface WorkingCopyState {
    * through the normal validator cycle). Derived UI state — not persisted.
    */
   validatorFindings: LintFinding[];
+
+  // -- Key identity records slice (spec 104) ------------------------------------
+  /**
+   * The spec 104 spine records for touch-key identity (contracts
+   * `decisionRecord.ts`): every KeyIdentityDecision recorded for this
+   * working copy (severances, re-links, repairs, Track 2 choices), in
+   * recording order. The key property panel's identity section reads its
+   * provenance from here (FR-025); the records are how an identity change
+   * stays visible and recorded (FR-005/FR-016), never a silent edit.
+   * Plain JSON-safe data — persisted with the working copy.
+   */
+  keyIdentityDecisions: KeyIdentityDecision[];
+  /**
+   * The FR-008 transplant records for this working copy (one per severance
+   * attempt, completed or refused). The panel's FR-029 re-link offer keys
+   * off the completed ones. Plain JSON-safe data — persisted.
+   */
+  keyTransplants: TransplantRecord[];
+  /**
+   * The keyboard's guard specification (FR-013): what a combining mark
+   * does with no base character. `null` until the marks step's question is
+   * answered or an import seeds one. Persisted.
+   */
+  guardSpecification: GuardSpecification | null;
 
   // -- Context tolerance slice (spec 078) ---------------------------------------
   /** See {@link ContextToleranceState}. Derived UI state, not persisted. */
@@ -1335,6 +1375,9 @@ export interface WorkingCopyState {
   /** Record the author's documentation-fix proposal answers (issue #1908). Whole-value replace; null clears (undo). */
   setDocFixProposals: (proposals: DocFixProposals | null) => void;
 
+  /** Replace the spec 104 touch key-identity record set (whole-value; null clears). */
+  setTouchKeyIdentity: (records: TouchKeyIdentityRecords | null) => void;
+
   /** Record the selected base's documentation profile (spec 079 FR-008). */
   setStartDocProfile: (profile: StartDocumentationProfile | null) => void;
 
@@ -1388,6 +1431,13 @@ export interface WorkingCopyState {
    * changes; this setter never starts a timer or async work.
    */
   setValidatorFindings: (findings: LintFinding[]) => void;
+
+  /** Append one spec 104 identity decision (recording order is display order). */
+  recordKeyIdentityDecision: (decision: KeyIdentityDecision) => void;
+  /** Append one spec 104 transplant record (completed or refused). */
+  recordTransplant: (record: TransplantRecord) => void;
+  /** Set (or clear, with `null`) the keyboard's guard specification (FR-013). */
+  setGuardSpecification: (spec: GuardSpecification | null) => void;
 
   /**
    * Publish the context-tolerance analysis state (spec 078). No-op when the
@@ -1578,6 +1628,55 @@ function resolveInstantiationCase(
 const INITIAL_SURVEY = remerge({}, []);
 
 /**
+ * Spec 104: the touch key-identity record set held by the working copy —
+ * the four decision-spine record types of contracts `decisionRecord.ts`
+ * (data-model.md §2–§5) in one slice. Arrays are append-only histories:
+ * a newer record supersedes an older one via its `supersedes` field, and
+ * readers take the latest non-superseded record per subject (see
+ * `lib/touchKeyIdentity.ts`).
+ */
+export interface TouchKeyIdentityRecords {
+  readonly repairProposals: readonly RepairProposal[];
+  readonly identityDecisions: readonly KeyIdentityDecision[];
+  readonly transplantRecords: readonly TransplantRecord[];
+  readonly guardSpecifications: readonly GuardSpecification[];
+  /**
+   * Spec 104 FR-017 decline suppression for the inline (editor) identity
+   * choice: when the author answers keep-the-link or flag-for-manual on
+   * the assign path, the answer is pinned to a fingerprint of the source
+   * key's rule bindings at answer time. An identical later edit is not
+   * re-presented while the fingerprint still matches; any change to the
+   * bound rules re-opens the question. Optional because snapshots written
+   * before this field existed restore without it (readers default to []).
+   */
+  readonly identityChoiceStates?: readonly IdentityChoiceState[];
+}
+
+/**
+ * One answered inline identity choice, pinned to the bindings state the
+ * author answered against (see {@link TouchKeyIdentityRecords}).
+ */
+export interface IdentityChoiceState {
+  /** The overlay address the choice was presented for. */
+  readonly keyRef: string;
+  readonly sourceId: string;
+  readonly targetId: string;
+  /** Fingerprint of the source key's bound rules at answer time. */
+  readonly fingerprint: string;
+  /** The `KeyIdentityDecision` this answer recorded. */
+  readonly decisionRecordId: string;
+  readonly recordedAt: number;
+}
+
+/** The empty spec 104 record set — the slice's value before any record exists. */
+export const EMPTY_TOUCH_KEY_IDENTITY: TouchKeyIdentityRecords = {
+  repairProposals: [],
+  identityDecisions: [],
+  transplantRecords: [],
+  guardSpecifications: [],
+};
+
+/**
  * The store's data fields only — actions excluded. This is the single source of
  * truth for "what is the serializable shape of a working copy": `INITIAL_STATE`
  * below, `reset()`, and the cross-redirect snapshot in `persistWorkingCopy.ts`
@@ -1643,11 +1742,15 @@ export type WorkingCopyData = Omit<
   | "setHistoryEntryState"
   | "setChartPreference"
   | "setDocFixProposals"
+  | "setTouchKeyIdentity"
   | "setStartDocProfile"
   | "setBaselineDocFindings"
   | "markStale"
   | "clearStale"
   | "setValidatorFindings"
+  | "recordKeyIdentityDecision"
+  | "recordTransplant"
+  | "setGuardSpecification"
   | "setContextTolerance"
   | "setContextToleranceOverlay"
   | "setContextNormalizationStep"
@@ -1684,6 +1787,7 @@ const INITIAL_STATE: WorkingCopyData = {
   historyEntryState: null,
   chartPreference: null,
   docFixProposals: null,
+  touchKeyIdentity: null,
   startDocProfile: null,
   baselineDocFindings: null,
   // carve IR slots
@@ -1716,6 +1820,10 @@ const INITIAL_STATE: WorkingCopyData = {
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
   validatorFindings: [],
+  // key identity records slice (spec 104) — no decisions recorded yet
+  keyIdentityDecisions: [],
+  keyTransplants: [],
+  guardSpecification: null,
   // context tolerance slice (spec 078) — no analysis yet
   contextTolerance: { status: "idle" },
   contextToleranceOverlay: null,
@@ -2365,6 +2473,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       historyEntryState: null,
       chartPreference: null,
       docFixProposals: null,
+      touchKeyIdentity: null,
       // Recomputed by the instantiation effect for the new base (FR-020).
       baselineDocFindings: null,
       startDocCssTexts: null,
@@ -2412,6 +2521,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       closedKeyboardCard: null,
       carveDispositions: [],
       carveTouchKeepInert: [],
+      // Spec 104 identity records are per-working-copy too: a fresh start
+      // has no severances, no transplants and no guard answer yet.
+      keyIdentityDecisions: [],
+      keyTransplants: [],
+      guardSpecification: null,
     });
   },
 
@@ -2443,6 +2557,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       historyEntryState: null,
       chartPreference: null,
       docFixProposals: null,
+      touchKeyIdentity: null,
       baselineDocFindings: null,
       startDocCssTexts: null,
       startKeyboard: keyboard,
@@ -2499,6 +2614,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       closedKeyboardCard: null,
       carveDispositions: [],
       carveTouchKeepInert: [],
+      // Spec 104 identity records are per-working-copy too (see
+      // instantiateFromStart).
+      keyIdentityDecisions: [],
+      keyTransplants: [],
+      guardSpecification: null,
     });
   },
 
@@ -2538,6 +2658,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setChartPreference: (preference) => set({ chartPreference: preference }),
 
   setDocFixProposals: (proposals) => set({ docFixProposals: proposals }),
+
+  setTouchKeyIdentity: (records) => set({ touchKeyIdentity: records }),
 
   setStartDocProfile: (profile) => set({ startDocProfile: profile }),
 
@@ -2589,6 +2711,17 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set((s) =>
       s.validatorFindings === findings ? s : { validatorFindings: findings },
     ),
+
+  // -- Key identity record actions (spec 104) ----------------------------------
+
+  recordKeyIdentityDecision: (decision) =>
+    set((s) => ({ keyIdentityDecisions: [...s.keyIdentityDecisions, decision] })),
+
+  recordTransplant: (record) =>
+    set((s) => ({ keyTransplants: [...s.keyTransplants, record] })),
+
+  setGuardSpecification: (spec) =>
+    set((s) => (s.guardSpecification === spec ? s : { guardSpecification: spec })),
 
   // -- Context tolerance actions (spec 078) ------------------------------------
 

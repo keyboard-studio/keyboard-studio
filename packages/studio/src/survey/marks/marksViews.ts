@@ -44,7 +44,12 @@ export type MarksStationId =
   // spec 078: after output form and stacking (tolerance is the mark model's
   // fifth consumer). Shown only behind the flag, while the analysis is running
   // or when it found fixable rules.
-  | "marks_context_tolerance";
+  | "marks_context_tolerance"
+  // spec 104 FR-013: the guard question — once per keyboard, last in the
+  // series. Always shown while the gate is open: the answer (or the Track 2
+  // seed, presented for confirmation) decides how every mark key on the
+  // touch layout is minted, so there is no evidence state that skips it.
+  | "marks_guard";
 
 /** Attachment answers: per mark, per base — checked = reachable on the keyboard. */
 export type AttachmentChecked = Record<string, Record<string, boolean>>;

@@ -48,6 +48,7 @@ import { plural } from "@lingui/core/macro";
 import type {
   AttestedStack,
   ConfirmedAlphabet,
+  GuardSpecification,
   MarksContextToleranceDecision,
   SurveyAnswer,
   SurveyPhaseResult,
@@ -122,6 +123,14 @@ import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
+import { GuardStation } from "./GuardStation.tsx";
+import {
+  GUARD_BEHAVIOUR_QUESTION_ID,
+  detectImportedGuardBehaviour,
+  findGuardReevaluationItems,
+  makeGuardSpecification,
+  type GuardBehaviour,
+} from "./guardSpecification.ts";
 import { buildContextToleranceProposal, buildNormalizationStepProposal } from "./contextToleranceProposal.ts";
 import {
   CONTEXT_TOLERANCE_QUESTION_ID,
@@ -743,8 +752,88 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
   const showToleranceStation =
     tolerance.status === "analysing" || toleranceProposal !== null;
 
+  // --- guard specification (spec 104 FR-013) ---
+  // The per-keyboard answer the guard station records into the decision
+  // value. On Track 2 it is seeded from the imported keyboard's own marks
+  // (extracted provenance, provisional until the author confirms it at
+  // the station); a fresh keyboard is asked. The station is always last:
+  // completing the series therefore always passes it, and the landed
+  // specification is what the completion report re-evaluates earlier
+  // minting against (US1 scenario 6).
+  const priorGuard = marksValue.guardSpecification ?? undefined;
+  const authoringTrack = decisions["authoring-track"]?.value;
+  const guardSeedBehaviour = useMemo(
+    () =>
+      // A CONFIRMED prior ends the question (the station shows it
+      // read-only); an UNCONFIRMED prior is this seed itself, recorded
+      // provisionally by an intermediate station commit — the seed signal
+      // must survive that, or the station loses its seeded presentation
+      // before it ever renders.
+      authoringTrack === "adapt" && !(priorGuard?.confirmed ?? false) && startIr != null
+        ? detectImportedGuardBehaviour(startIr)
+        : undefined,
+    [authoringTrack, priorGuard, startIr],
+  );
+  const guardSeed = useMemo(
+    () =>
+      guardSeedBehaviour !== undefined
+        ? makeGuardSpecification({
+            behaviour: guardSeedBehaviour,
+            origin: "seeded-from-import",
+            confirmed: false,
+            supersedesRecord: null,
+          })
+        : undefined,
+    [guardSeedBehaviour],
+  );
+  const [guardAnswer, setGuardAnswer] = useState<GuardSpecification | null>(null);
+  /** The behaviour the guard station displays / Continue requires: the author's pick, else the prior answer, else the seed. */
+  const guardChoice: GuardBehaviour | undefined =
+    guardAnswer?.behaviour ?? priorGuard?.behaviour ?? guardSeedBehaviour;
+
+  /**
+   * The specification a commit point records: the author's station answer
+   * wins; a prior record is carried unchanged; a seed rides provisionally
+   * until the commit point IS the guard station's own Continue, which
+   * confirms it as-is.
+   */
+  function guardRecordForCommit(station: MarksStationId): GuardSpecification | null {
+    if (guardAnswer !== null) return guardAnswer;
+    // A CONFIRMED prior carries unchanged. An unconfirmed prior is the
+    // provisional seed itself (an intermediate commit recorded it) — it
+    // must fall through to the seed branch, or passing the guard station
+    // would never confirm it.
+    if (priorGuard !== undefined && priorGuard.confirmed) return priorGuard;
+    if (guardSeed !== undefined) {
+      return station === "marks_guard"
+        ? makeGuardSpecification({
+            behaviour: guardSeed.behaviour,
+            origin: "seeded-from-import",
+            confirmed: true,
+            supersedesRecord: guardSeed,
+          })
+        : guardSeed;
+    }
+    return priorGuard ?? null;
+  }
+
+  function handleGuardChange(behaviour: GuardBehaviour): void {
+    const origin: GuardSpecification["origin"] =
+      guardSeed !== undefined && priorGuard === undefined && behaviour === guardSeed.behaviour
+        ? "seeded-from-import"
+        : "asked";
+    setGuardAnswer(
+      makeGuardSpecification({
+        behaviour,
+        origin,
+        confirmed: true,
+        supersedesRecord: priorGuard ?? guardSeed ?? null,
+      }),
+    );
+  }
+
   // --- visible stations, in series order (at most FOUR — FR-018/SC-003,
-  // plus spec 078's context-tolerance station) ---
+  // plus spec 078's context-tolerance station and spec 104's guard station) ---
   const needsTreatmentScreen = classes.some((c) => classNeedsTreatmentScreen(c, proposals));
   const visibleStations: MarksStationId[] = useMemo(() => {
     const stations: MarksStationId[] = [];
@@ -753,6 +842,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     if (hasDecidablePairs(posture)) stations.push("marks_output_form");
     if (stackingEvidence) stations.push("marks_stacking");
     if (showToleranceStation) stations.push("marks_context_tolerance");
+    stations.push("marks_guard");
     return stations;
   }, [proposals, needsTreatmentScreen, posture, stackingEvidence, showToleranceStation]);
 
@@ -831,7 +921,10 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
             label: t({ id: "survey.marks.series.continueButton", message: "Continue" }),
             onClick: handleContinue,
             testId: "marks-continue",
-            disabled: nextGate.blocked,
+            // spec 104 FR-013: the guard station completes only with an
+            // answer on record — the author's pick, a prior answer, or the
+            // Track 2 seed presented for confirmation.
+            disabled: nextGate.blocked || (currentStation === "marks_guard" && guardChoice === undefined),
             ...(nextGate.blocked ? { ariaDescribedBy: blockedHintId } : {}),
           },
         },
@@ -935,6 +1028,15 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           { questionId: "marks.marks_stacking.stacks", answerType: "char-list", value: confirmedKeys },
         ];
       }
+      case "marks_guard": {
+        // spec 104 FR-013: the answer rides the completion like every
+        // other station's (R-04); the load-bearing record is the
+        // GuardSpecification in the decision value (recordValue).
+        const behaviour = guardAnswer?.behaviour ?? priorGuard?.behaviour ?? guardSeedBehaviour;
+        return behaviour !== undefined
+          ? [{ questionId: GUARD_BEHAVIOUR_QUESTION_ID, answerType: "select", value: behaviour }]
+          : [];
+      }
       default:
         return [];
     }
@@ -995,7 +1097,14 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       outputForm === "base-plus-mark" &&
       workingIr !== null &&
       detectStartMarkMechanism(workingIr) === "precomposed";
-    recordValue(answers, { worklist, outputForm, migrationNeeded }, effectiveTolerance);
+    // spec 104 (US1 scenario 6): the landed specification re-evaluates
+    // marks minted before it existed — the contradictions are REPORTED in
+    // this completion payload (MarksStepHost mirrors them into the
+    // session), never silently re-minted here.
+    const guard = guardRecordForCommit(activeStation);
+    const guardReevaluation =
+      guard !== null && workingIr !== null ? findGuardReevaluationItems(workingIr, guard) : [];
+    recordValue(answers, { worklist, outputForm, migrationNeeded, guardReevaluation }, effectiveTolerance, guard);
     onComplete(seriesResult(worklist, outputForm, computedAxes, answers, toleranceDecision));
   }
 
@@ -1010,13 +1119,14 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
     stationAnswers: SurveyAnswer[],
     completion: MarksCompletion | null,
     tolerance: MarksContextToleranceDecision | null,
+    guard: GuardSpecification | null,
   ): void {
     const answers: Record<string, string | string[] | boolean | undefined> = {};
     for (const a of stationAnswers) answers[a.questionId] = a.value;
     if (tolerance !== null) {
       for (const a of contextToleranceAnswers(tolerance)) answers[a.questionId] = a.value;
     }
-    onMarksChange({ answers, completion, contextTolerance: tolerance });
+    onMarksChange({ answers, completion, contextTolerance: tolerance, guardSpecification: guard });
   }
 
   /**
@@ -1157,6 +1267,11 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         // spec 078: the decision rides the phase result (marksContextTolerance
         // and its answers), recorded with its own provenance at completion.
         break;
+      case "marks_guard":
+        // spec 104: the specification rides the decision value
+        // (recordValue at this station's Next / completion), not the
+        // survey-answer store — the registry entry is the record.
+        break;
     }
   }
 
@@ -1180,6 +1295,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         visibleStations.flatMap((stationId) => answersForStation(stationId)),
         null,
         priorTolerance ?? null,
+        guardRecordForCommit(activeStation),
       );
       setPosition(STEP_ID, visibleStations[nextIndex]!);
     } else {
@@ -1294,6 +1410,15 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           onAllowedChange={handleStackingAllowedChange}
           confirmed={stacksConfirmed}
           onConfirmChange={handleStackConfirmChange}
+        />
+      )}
+
+      {activeStation === "marks_guard" && (
+        <GuardStation
+          {...(guardChoice !== undefined ? { value: guardChoice } : {})}
+          {...(priorGuard !== undefined ? { prior: priorGuard } : {})}
+          {...(guardSeedBehaviour !== undefined ? { seededBehaviour: guardSeedBehaviour } : {})}
+          onChange={handleGuardChange}
         />
       )}
 

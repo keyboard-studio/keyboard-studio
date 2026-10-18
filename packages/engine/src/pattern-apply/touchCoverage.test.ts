@@ -122,16 +122,16 @@ describe.skipIf(!qwertyPresent)("SC-001 — sil_cameroon_qwerty combining marks 
     // THE US1 DEFECT, on the real file. Each mark lives on a `T_XXXX` touch key
     // whose keycap is a dotted circle plus the mark, and whose output exists only
     // in a `.kmn` rule — so the pre-058 layout-only walk credited none of them.
-    const { layout, ruleIndex } = load();
+    const { ir, layout, ruleIndex } = load();
     const marks = marksFromTouchKeyRules(ruleIndex);
-    expect(touchCoverage(layout, marks, { ruleIndex }).uncovered).toEqual([]);
+    expect(touchCoverage(layout, marks, { ruleIndex, ir }).uncovered).toEqual([]);
   });
 
   it("the FR-008 completion gate therefore does not block on them", () => {
     // The same call and the same predicate the gate itself applies.
-    const { layout, ruleIndex } = load();
+    const { ir, layout, ruleIndex } = load();
     const marks = marksFromTouchKeyRules(ruleIndex);
-    expect(touchCoverage(layout, marks, { ruleIndex }).uncovered.length > 0).toBe(false);
+    expect(touchCoverage(layout, marks, { ruleIndex, ir }).uncovered.length > 0).toBe(false);
   });
 
   it("is genuinely fixing something: with NEITHER additive credit they are uncovered", () => {
@@ -150,12 +150,13 @@ describe.skipIf(!qwertyPresent)("SC-001 — sil_cameroon_qwerty combining marks 
     // them. Pinning the relationship means a future "the strip is redundant now"
     // change has to confront that it is the fallback for keyboards whose rules we
     // cannot read.
-    const { layout, ruleIndex } = load();
+    const { ir, layout, ruleIndex } = load();
     const marks = marksFromTouchKeyRules(ruleIndex);
     const stripOnly = touchCoverage(layout, marks, {}).uncovered.length;
     const neither = touchCoverage(layout, marks, { stripDottedCircle: false }).uncovered.length;
     const indexOnly = touchCoverage(layout, marks, {
       ruleIndex,
+      ir,
       stripDottedCircle: false,
     }).uncovered.length;
     expect(neither).toBe(14);

@@ -55,6 +55,7 @@ function completedValue(over: Partial<MarksCompletion> = {}): MarksTreatmentValu
   return {
     answers: {},
     contextTolerance: null,
+    guardSpecification: null,
     completion: {
       worklist: {
         ownLetterUnits: ["a", "k"],
@@ -63,6 +64,7 @@ function completedValue(over: Partial<MarksCompletion> = {}): MarksTreatmentValu
       },
       outputForm: "base-plus-mark",
       migrationNeeded: false,
+      guardReevaluation: [],
       ...over,
     },
   };
@@ -104,7 +106,7 @@ describe("marksTreatment apply — the mark guards (spec 071 FR-021)", () => {
 
   it("is a no-op while completion is null (answers never guard)", () => {
     const patch = marksTreatment.apply(
-      { answers: { "marks.marks_attachment.x": "a" }, completion: null, contextTolerance: null },
+      { answers: { "marks.marks_attachment.x": "a" }, completion: null, contextTolerance: null, guardSpecification: null },
       makeContext(irWithRule("a")),
     );
     expect(patch).toEqual({});

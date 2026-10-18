@@ -25,7 +25,11 @@
 // runs), re-keyed here from the phase result (spec 078's
 // session.marksContextTolerance derivation stays for session consumers).
 
-import type { MarksContextToleranceDecision, PlacementWorklist } from "@keyboard-studio/contracts";
+import type {
+  GuardSpecification,
+  MarksContextToleranceDecision,
+  PlacementWorklist,
+} from "@keyboard-studio/contracts";
 import type { OutputForm } from "@keyboard-studio/engine";
 
 import { getDecisionSnapshot } from "../../stores/decisionStore.ts";
@@ -33,12 +37,40 @@ import { buildGalleryHostDeps } from "../../lib/galleryHostDeps.ts";
 import { decideGalleryValue } from "../../steps/galleryHost.tsx";
 import type { GalleryModule } from "../types.ts";
 
+/**
+ * One touch key whose minted form disagrees with the keyboard's guard
+ * specification (spec 104 FR-013 / US1 scenario 6): a mark minted `U_`
+ * (it types even with no letter before it) while the specification says
+ * `"swallow"`, or a guarded `T_` mark while it says `"emit"`. Computed at
+ * the completion report and REPORTED through the completion payload —
+ * never silently re-minted.
+ */
+export interface GuardReevaluationItem {
+  /** The combining mark the key produces. */
+  mark: string;
+  /** The touch key's current id (`U_…` or `T_…`). */
+  keyId: string;
+  platformId: string;
+  layerId: string;
+  /** The form the key is minted in today. */
+  currentForm: "unicode" | "guarded-t";
+  /** The specification behaviour the form disagrees with. */
+  specBehaviour: "swallow" | "emit";
+}
+
 /** The completion payload the module's apply consumes (D-090-11). */
 export interface MarksCompletion {
   worklist: PlacementWorklist;
   outputForm: OutputForm;
   /** R10: base-plus-mark chosen over a precomposed-form base (reducer parity). */
   migrationNeeded: boolean;
+  /**
+   * Spec 104: marks minted before the guard specification existed whose
+   * form the landed specification contradicts (US1 scenario 6). Reported,
+   * never applied — MarksStepHost mirrors the list into the survey
+   * session, the migrationNeeded-style channel.
+   */
+  guardReevaluation: readonly GuardReevaluationItem[];
 }
 
 /**
@@ -51,6 +83,15 @@ export interface MarksTreatmentValue {
   answers: Readonly<Record<string, string | string[] | boolean | undefined>>;
   completion: MarksCompletion | null;
   contextTolerance: MarksContextToleranceDecision | null;
+  /**
+   * Spec 104 FR-013: the per-keyboard combining-mark guard specification
+   * — the decision-registry entry the guard station records (Constitution
+   * Art. IX: a registry decision, not a local survey answer). Null until
+   * the guard station runs or an editor-side answer is recorded; a
+   * Track 2 seed sits here with `confirmed: false` until the author
+   * confirms it at the station.
+   */
+  guardSpecification: GuardSpecification | null;
 }
 
 /** The value before anything is recorded. */
@@ -58,6 +99,7 @@ export const EMPTY_MARKS_VALUE: MarksTreatmentValue = {
   answers: {},
   completion: null,
   contextTolerance: null,
+  guardSpecification: null,
 };
 
 /**

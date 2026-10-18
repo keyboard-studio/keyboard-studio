@@ -22,9 +22,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { KeyboardIR, TouchKeyIR, TouchKeyRuleIndex, TouchLayoutIR } from "./keyboard-ir";
+import type { IRRule, KeyboardIR, TouchKeyIR, TouchKeyRuleIndex, TouchLayoutIR } from "./keyboard-ir";
 import {
   computeTouchKeyDiagnostics,
+  findDeadTouchKeys,
   findDuplicateTouchKeyIds,
   findLayerSwitchActiveMismatches,
   findMissingRequiredTouchKeys,
@@ -33,10 +34,13 @@ import {
   findUnidentifiedTouchKeys,
   groupTouchKeyFindingsByAddress,
   touchKeyFindingScope,
+  type TouchKeyDiagnosticInputs,
   type TouchKeyFinding,
 } from "./touch-key-diagnostics";
 import { touchKeyAddress } from "./touch-key-address";
-import { touchLayout } from "./fixtures/ir-builders";
+import { buildTouchKeyRuleIndex } from "./touch-key-rule-join";
+import { makeTestIR } from "./fixtures/keyboard-ir";
+import { irGroup, touchLayout, vkeyRule } from "./fixtures/ir-builders";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -54,9 +58,14 @@ function emptyRuleIndex(opaqueFragmentCount = 0): TouchKeyRuleIndex {
   return { byId: new Map(), spellings: new Map(), producingIds: new Set(), opaqueFragmentCount };
 }
 
-/** The minimum `KeyboardIR` the joined detectors read: `raw` (opaque count) and `touchLayout`. */
+/**
+ * The minimum `KeyboardIR` the joined detectors read: `raw` (opaque count)
+ * and `touchLayout` — plus, since spec 104's T006, the empty `groups` /
+ * `stores` the production resolver iterates when `findDeadTouchKeys`
+ * resolves a candidate (a rule-free fixture IR has no groups to read).
+ */
 function irWith(layout: TouchLayoutIR, raw: readonly unknown[] = []): KeyboardIR {
-  return { raw, touchLayout: layout } as unknown as KeyboardIR;
+  return { raw, touchLayout: layout, groups: [], stores: [] } as unknown as KeyboardIR;
 }
 
 function codes(findings: readonly TouchKeyFinding[]): string[] {
@@ -444,5 +453,126 @@ describe("detector addresses name the occurrence they found", () => {
       touchKeyAddress("phone", "default", "T_X"),
       touchKeyAddress("phone", "shift", "T_X"),
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findDeadTouchKeys — the resolver verdict (spec 104 T006)
+//
+// The detector's per-occurrence gates are unchanged from T034/T114; what
+// changed is the test itself: production is now the resolver's, per
+// layer-state (FR-003), not the state-blind rule-join question. Every
+// verdict that differs from the pre-104 behaviour is named VERDICT CHANGE;
+// every verdict that must NOT differ is named PARITY. The exemption-by-
+// exemption suite for the Layer C surface lives in keyboard-lint
+// (check-18-6-joined.test.ts) and exercises this same function.
+// ---------------------------------------------------------------------------
+
+describe("findDeadTouchKeys — resolver verdicts (spec 104 T006)", () => {
+  /** Inputs whose rule index is built from REAL rules, not hand-assembled. */
+  function joined(
+    layout: TouchLayoutIR,
+    rules: readonly IRRule[] = [],
+  ): TouchKeyDiagnosticInputs {
+    const ir = makeTestIR([irGroup({ rules: [...rules] })], [], [], {
+      header: { keyboardId: "kbd", name: "Kbd" },
+    });
+    ir.touchLayout = layout;
+    return { ir, layout, ruleIndex: buildTouchKeyRuleIndex(ir) };
+  }
+
+  const guardRule: IRRule = {
+    nodeId: "r_guard",
+    context: [
+      { kind: "any", storeRef: "diablock" },
+      { kind: "raw", text: "+" },
+      { kind: "vkey", name: "T_G", modifiers: [] },
+    ],
+    output: [{ kind: "raw", text: "context" }],
+  };
+
+  it("positive control: a T_ key with no rule at all is reported", () => {
+    const findings = findDeadTouchKeys(joined(oneLayer(key("T_DEAD", { text: "ŋ" }))));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe("TOUCH_KEY_NO_RULE");
+  });
+
+  it("PARITY (FR-023 'with no rule'): a guard-only binding is wired, not dead", () => {
+    // Contracts §1 calls a guard binding non-producing, but the key HAS a
+    // rule — FR-023's population is "no rule", and the resolver record's
+    // non-empty ruleRefs is what carries that fact. The T041 exemption
+    // stands.
+    expect(
+      findDeadTouchKeys(joined(oneLayer(key("T_G", { text: "g" })), [guardRule])),
+    ).toEqual([]);
+  });
+
+  it("PARITY (FR-023): a suppression-only binding is wired, not dead", () => {
+    const suppress: IRRule = {
+      nodeId: "r_nul",
+      context: [{ kind: "vkey", name: "T_CAM", modifiers: [] }],
+      output: [{ kind: "raw", text: "nul" }],
+    };
+    expect(
+      findDeadTouchKeys(joined(oneLayer(key("T_CAM", { text: "c" })), [suppress])),
+    ).toEqual([]);
+  });
+
+  it("PARITY (FR-023): a transition-only binding is wired, not dead", () => {
+    const transition: IRRule = {
+      nodeId: "r_use",
+      context: [{ kind: "vkey", name: "T_T", modifiers: [] }],
+      output: [{ kind: "useGroup", groupName: "other" }],
+    };
+    expect(
+      findDeadTouchKeys(joined(oneLayer(key("T_T", { text: "t" })), [transition])),
+    ).toEqual([]);
+  });
+
+  it("VERDICT CHANGE (spec 104): a rule bound only under SHIFT does not wire a key that exists only on the default layer", () => {
+    // Pre-104 the join was state-blind: ANY binding, in any state, counted
+    // as wired. The resolver is per (key × layer-state): on the default
+    // layer the SHIFT-bound rule can never fire for this key, so the key
+    // types nothing and is dead.
+    const findings = findDeadTouchKeys(
+      joined(oneLayer(key("T_S", { text: "s" })), [
+        vkeyRule({ nodeId: "r_shift", vkey: "T_S", modifiers: ["SHIFT"], output: "x" }),
+      ]),
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.fields.keyId).toBe("T_S");
+  });
+
+  it("PARITY with the verdict change: the same SHIFT-bound rule wires the key once it also appears on the shift layer", () => {
+    const layout = touchLayout({
+      layers: [
+        { id: "default", keys: [key("T_S", { text: "s" })] },
+        { id: "shift", keys: [key("T_S", { text: "S" })] },
+      ],
+    });
+    expect(
+      findDeadTouchKeys(
+        joined(layout, [
+          vkeyRule({ nodeId: "r_shift", vkey: "T_S", modifiers: ["SHIFT"], output: "x" }),
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("PARITY: a U_ key needs no rule — the resolver's u-decode verdict, not a detector exemption", () => {
+    expect(findDeadTouchKeys(joined(oneLayer(key("U_00E9", { text: "é" }))))).toEqual([]);
+  });
+
+  it("spec 104 guardrail: an unclassified imported id is never reported dead", () => {
+    // Outside the K_/T_/U_ families (the resolver's `unclassified` source):
+    // no criterion may read it as dead. It earns TOUCH_KEY_UNIDENTIFIED
+    // from its own detector, never this one.
+    expect(findDeadTouchKeys(joined(oneLayer(key("AE01", { sp: 0 }))))).toEqual([]);
+  });
+
+  it("spec 104 guardrail: an emulation-source key is never reported dead", () => {
+    // K_BKSP & friends produce through KMW's emulation arm, not rules or
+    // fallback (the resolver's `emulation` source).
+    expect(findDeadTouchKeys(joined(oneLayer(key("K_BKSP", { sp: 0 }))))).toEqual([]);
   });
 });
