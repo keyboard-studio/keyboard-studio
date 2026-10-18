@@ -21,8 +21,21 @@ this file is the durable summary the implementers need.
   consumed by a U_ tap that matches no rule.
 - **K_ default output is state-limited.** `forBaseKeys` produces the US
   base character only at modifier state 0 or SHIFT; other modifier states
-  produce nothing. CAPITAL is an Lstate, not an Lmodifier — caps-state
-  fallback is unsettled (spec edge case; probe task in tasks.md).
+  produce nothing. CAPITAL is an Lstate, not an Lmodifier — and the
+  caps-state question is now SETTLED (T022 probe, 2026-10-18): the
+  fallback FIRES in caps state. `forBaseKeys` gates on `Lmodifiers`
+  alone and never inspects `Lstates`, so a caps-state key produces
+  exactly what the same modifier state produces without caps. Evidence
+  (fixture `caps_probe`, packages/engine/src/pattern-apply/__fixtures__/
+  touch-id/; taps in `tapSimulation.test.ts`): unmatched K_Q on a caps
+  layer → `q` (the state-0 char — not `Q`, not silence); on a
+  caps+SHIFT layer → `Q`. The probe is witness-guarded against a
+  vacuous reading: a `[CAPS K_B]` rule fires only on the caps layer
+  ("caps-witness") and its `[NCAPS K_B]` pair only off it, proving
+  CAPITAL genuinely engaged during the probe taps. Secondary
+  observation from the same fixture: a state-free rule (`+ [K_C]`)
+  fires under CAPITAL — bindings naming no caps word are not
+  Lstate-gated, as the resolver's state matching already assumed.
 - **T_ has no fallback at all.** Verified empirically, not just from
   source: fixtures compiled with the studio's toolchain (kmc-kmn
   19.0.240-alpha, kmcmplib WASM) and tapped through the vendored

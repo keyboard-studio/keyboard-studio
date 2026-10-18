@@ -115,9 +115,11 @@ export interface TouchKeyProduction {
   /** Node ids of ALL bindings of this id in this state, any role. */
   readonly ruleRefs: readonly string[];
   /**
-   * False in exactly two cases (data-model.md §1): caps-state K_ with no
-   * production-bearing binding (the §5 proviso — output is `unknown`), and
-   * presumptive u-decode (a `nomatch` rule exists, or any rule binds the id).
+   * False in exactly one case (data-model.md §1): presumptive u-decode
+   * (a `nomatch` rule exists, or any rule binds the id). Caps-state K_
+   * fallback was the second case until the T022 probe settled it —
+   * the fallback fires in caps state (contracts §5), so caps records
+   * are certain like any other k-fallback record.
    */
   readonly fallbackCertain: boolean;
 }
@@ -319,6 +321,44 @@ function noneRecord(ruleRefs: readonly string[]): TouchKeyProduction {
   };
 }
 
+/** Per-IR lookup maps the resolver needs on every call. */
+interface ResolverIrMaps {
+  readonly ruleByNodeId: ReadonlyMap<string, { output: readonly OutputElement[] }>;
+  readonly deadkeyNames: ReadonlyMap<number, string>;
+}
+
+/**
+ * The two IR-derived maps, memoised per IR object (plan.md Performance
+ * Goals: the resolver must stay linear in rules-per-key — rebuilding
+ * these maps per call made every call O(all rules), which corpus-scale
+ * consumers (coverage, enumeration, the T021 gate) multiply by
+ * keys × chars). Keyed on the IR object itself, WeakMap-held: sound
+ * under the codebase's standing convention that a KeyboardIR is
+ * immutable once built — every edit produces a new IR object (and a
+ * new rule index), so a stale entry can never be reached through an
+ * edited keyboard. A caller that constructs a partial IR inline gets
+ * its own entry, exactly as the per-call build behaved.
+ */
+const irMapsCache = new WeakMap<KeyboardIR, ResolverIrMaps>();
+
+function irMapsFor(ir: KeyboardIR): ResolverIrMaps {
+  const cached = irMapsCache.get(ir);
+  if (cached !== undefined) return cached;
+  const ruleByNodeId = new Map<string, { output: readonly OutputElement[] }>();
+  // Partial IRs (e.g. studio-constructed inspection inputs) may omit the
+  // groups array entirely — treat a missing array as no rules, never crash.
+  for (const group of ir.groups ?? []) {
+    for (const rule of group.rules) ruleByNodeId.set(rule.nodeId, rule);
+  }
+  const deadkeyNames = new Map<number, string>();
+  for (const dk of listDeadkeys(ir)) {
+    if (dk.id !== null && dk.name !== undefined) deadkeyNames.set(dk.id, dk.name);
+  }
+  const maps: ResolverIrMaps = { ruleByNodeId, deadkeyNames };
+  irMapsCache.set(ir, maps);
+  return maps;
+}
+
 /**
  * Resolve what one key occurrence produces in one layer-state.
  *
@@ -351,16 +391,7 @@ export function resolveTouchProduction(
   const applicable = allBindings.filter((b) => bindingAppliesInState(b, state));
   const ruleRefs = applicable.map((b) => b.ruleNodeId);
 
-  const ruleByNodeId = new Map<string, { output: readonly OutputElement[] }>();
-  // Partial IRs (e.g. studio-constructed inspection inputs) may omit the
-  // groups array entirely — treat a missing array as no rules, never crash.
-  for (const group of ir.groups ?? []) {
-    for (const rule of group.rules) ruleByNodeId.set(rule.nodeId, rule);
-  }
-  const deadkeyNames = new Map<number, string>();
-  for (const dk of listDeadkeys(ir)) {
-    if (dk.id !== null && dk.name !== undefined) deadkeyNames.set(dk.id, dk.name);
-  }
+  const { ruleByNodeId, deadkeyNames } = irMapsFor(ir);
 
   const layerSwitch: TouchProductionEntry | undefined =
     key.nextlayer !== undefined && key.nextlayer.length > 0
@@ -477,24 +508,17 @@ export function resolveTouchProduction(
   }
 
   // 6. K_ fallback: the US base table, state 0 / SHIFT only. CAPITAL is an
-  // Lstate, not a modifier (§5): in a caps layer where the fallback would
-  // otherwise fire, its behaviour is unsettled — report `unknown` rather
-  // than guess. Caps plus a non-fallback modifier state is settled by the
-  // modifier arm: no fallback.
+  // Lstate, not a modifier, and the fallback does not inspect it (T022
+  // probe, contracts §5): KMW's forBaseKeys gates on Lmodifiers alone, so
+  // a caps-state key falls back exactly as the same modifier state does
+  // without caps — state 0 gives the unshifted char, SHIFT the shifted
+  // char, any other modifier state gives none. `state.caps` therefore
+  // plays no part in this arm.
   if (family === "K_") {
     const words = normalizeWords(state.modifiers);
     const isState0 = words.length === 0;
     const isShiftOnly = words.length === 1 && words[0] === "SHIFT";
     if (isState0 || isShiftOnly) {
-      if (state.caps === true) {
-        return {
-          productions: [{ output: { kind: "unknown" } }],
-          source: "k-fallback",
-          contextConditional: false,
-          ruleRefs,
-          fallbackCertain: false,
-        };
-      }
       const tableKey = isShiftOnly ? `S+${key.id.toUpperCase()}` : key.id.toUpperCase();
       const base = US_BASE_LAYOUT.get(tableKey);
       if (base !== undefined) {

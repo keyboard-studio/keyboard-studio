@@ -171,8 +171,10 @@ function collectKeyChars(
     // production, so a guard rule's re-emitted context can never be
     // miscredited — the FR-005 property, now the resolver's by construction.
     // Deadkey and layer-switch productions are not characters and credit
-    // nothing; `unknown` (caps-state fallback, contracts §5) credits
-    // nothing either — no verdict may be premised on it.
+    // nothing; `unknown` credits nothing either. (Caps-state K_ keys are
+    // NOT unknown since the T022 probe settled contracts §5: they return
+    // their base-char text production and credit it like any k-fallback
+    // key — the tap evidence is that they do produce it.)
     const record = resolveTouchProduction(
       { ir: options.ir, ruleIndex: options.ruleIndex },
       key,
