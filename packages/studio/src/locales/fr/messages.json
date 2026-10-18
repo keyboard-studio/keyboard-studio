@@ -1233,6 +1233,7 @@
   "output.identity.submit.label": "Soumettre votre clavier",
   "output.identity.warn.gotoAriaLabel": "Aller à l’étape du nom et de l’id du clavier",
   "output.identity.warn.gotoLabel": "Aller au nom et à l’id",
+  "output.intro": "",
   "output.otherFindings.regionAriaLabel": "Other findings",
   "output.pane.label": "Panneau de sortie",
   "output.publishHandover.cancel": "Pas encore",

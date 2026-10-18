@@ -1233,6 +1233,7 @@
   "output.identity.submit.label": "Submit your keyboard",
   "output.identity.warn.gotoAriaLabel": "Go to the keyboard name and id step",
   "output.identity.warn.gotoLabel": "Go to name & id",
+  "output.intro": "Review your finished keyboard and the checks below, then download it to install or submit it for publication.",
   "output.otherFindings.regionAriaLabel": "Other findings",
   "output.pane.label": "Output pane",
   "output.publishHandover.cancel": "Not yet",
