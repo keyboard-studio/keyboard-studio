@@ -134,8 +134,8 @@ Procedure:
    (FR-016).
 
 Re-linking (T_/U_ → K_) is the mirror procedure offered when arm 0 holds
-again: it deletes the transplanted rules and restores the K_ id, and is
-never automatic.
+again (FR-029): it deletes the transplanted rules and restores the K_ id,
+is offered as an author-invoked recorded action, and is never automatic.
 
 ## 4. Carve contract (FR-019, FR-020)
 
