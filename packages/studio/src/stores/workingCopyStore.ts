@@ -46,10 +46,7 @@ import type {
   ChartPreference,
   DocFixProposals,
   StartDocumentationProfile,
-  GuardSpecification,
-  KeyIdentityDecision,
   RepairProposal,
-  TransplantRecord,
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
@@ -1643,6 +1640,32 @@ export interface TouchKeyIdentityRecords {
   readonly identityDecisions: readonly KeyIdentityDecision[];
   readonly transplantRecords: readonly TransplantRecord[];
   readonly guardSpecifications: readonly GuardSpecification[];
+  /**
+   * Spec 104 FR-017 decline suppression for the inline (editor) identity
+   * choice: when the author answers keep-the-link or flag-for-manual on
+   * the assign path, the answer is pinned to a fingerprint of the source
+   * key's rule bindings at answer time. An identical later edit is not
+   * re-presented while the fingerprint still matches; any change to the
+   * bound rules re-opens the question. Optional because snapshots written
+   * before this field existed restore without it (readers default to []).
+   */
+  readonly identityChoiceStates?: readonly IdentityChoiceState[];
+}
+
+/**
+ * One answered inline identity choice, pinned to the bindings state the
+ * author answered against (see {@link TouchKeyIdentityRecords}).
+ */
+export interface IdentityChoiceState {
+  /** The overlay address the choice was presented for. */
+  readonly keyRef: string;
+  readonly sourceId: string;
+  readonly targetId: string;
+  /** Fingerprint of the source key's bound rules at answer time. */
+  readonly fingerprint: string;
+  /** The `KeyIdentityDecision` this answer recorded. */
+  readonly decisionRecordId: string;
+  readonly recordedAt: number;
 }
 
 /** The empty spec 104 record set — the slice's value before any record exists. */

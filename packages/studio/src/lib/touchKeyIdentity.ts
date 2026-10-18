@@ -63,6 +63,7 @@ import {
   type SeverTouchKeyResult,
 } from "@keyboard-studio/engine";
 import type {
+  IdentityChoiceState,
   PendingKeyEditOperation,
   TouchKeyIdentityRecords,
 } from "../stores/workingCopyStore.ts";
@@ -705,4 +706,88 @@ export function identityDecisionForAddress(
     if (decision !== undefined) found = decision;
   }
   return found;
+}
+
+// ---------------------------------------------------------------------------
+// Inline-choice decline suppression (FR-017)
+// ---------------------------------------------------------------------------
+
+/**
+ * A fingerprint of everything a severance of `sourceId` would transplant:
+ * the rules bound to the id, by node id and full serialised content. Two
+ * states with the same fingerprint present the author with the identical
+ * severance question; any edit to a bound rule (or a binding added /
+ * removed) changes it and re-opens the question.
+ */
+export function identityChoiceFingerprint(ir: KeyboardIR, sourceId: string): string {
+  const index = buildTouchKeyRuleIndex(ir);
+  const boundIds = [...new Set(bindingsForKeyId(index, sourceId).map((b) => b.ruleNodeId))].sort();
+  const ruleByNodeId = new Map<string, unknown>();
+  for (const group of ir.groups ?? []) {
+    for (const rule of group.rules) ruleByNodeId.set(rule.nodeId, rule);
+  }
+  const material = boundIds.map((id) => `${id}=${JSON.stringify(ruleByNodeId.get(id) ?? null)}`);
+  // djb2 — a change detector, not a security hash.
+  let hash = 5381;
+  const joined = material.join("|");
+  for (let i = 0; i < joined.length; i++) {
+    hash = ((hash << 5) + hash + joined.charCodeAt(i)) >>> 0;
+  }
+  return `${boundIds.length}:${hash.toString(36)}`;
+}
+
+/** Pin an answered inline choice to the bindings state it was answered against. */
+export function appendIdentityChoiceState(
+  records: TouchKeyIdentityRecords | null,
+  state: IdentityChoiceState,
+): TouchKeyIdentityRecords {
+  const base = recordsOrEmpty(records);
+  return {
+    ...base,
+    identityChoiceStates: [...(base.identityChoiceStates ?? []), state],
+  };
+}
+
+/**
+ * The standing answer for an identical inline identity choice, when one
+ * exists (FR-017): the author already answered keep-the-link or
+ * flag-for-manual for this (address, source → target) against the same
+ * bound-rules state, and no newer decision for the key has been recorded
+ * since. While this returns a state, the assign path commits the edit as
+ * authored WITHOUT re-presenting the choice; a changed fingerprint or a
+ * newer decision re-opens the question.
+ */
+export function standingIdentityChoice(
+  records: TouchKeyIdentityRecords | null,
+  args: {
+    readonly keyRef: string;
+    readonly sourceId: string;
+    readonly targetId: string;
+    readonly ir: KeyboardIR;
+  },
+): IdentityChoiceState | undefined {
+  const all = recordsOrEmpty(records);
+  const states = all.identityChoiceStates ?? [];
+  let candidate: IdentityChoiceState | undefined;
+  for (const s of states) {
+    if (s.keyRef === args.keyRef && s.sourceId === args.sourceId && s.targetId === args.targetId) {
+      candidate = s;
+    }
+  }
+  if (candidate === undefined) return undefined;
+  if (candidate.fingerprint !== identityChoiceFingerprint(args.ir, args.sourceId)) {
+    return undefined;
+  }
+  // A newer live decision for the same key, recorded after the pinned
+  // answer, retires the suppression — the author's latest word governs.
+  const decisions = all.identityDecisions;
+  const pinIndex = decisions.findIndex((d) => d.recordId === candidate.decisionRecordId);
+  if (pinIndex >= 0) {
+    const superseded = supersededIds(decisions);
+    for (let i = pinIndex + 1; i < decisions.length; i++) {
+      const d = decisions[i]!;
+      if (d.keyRef === candidate.keyRef && !superseded.has(d.recordId)) return undefined;
+    }
+  }
+  return candidate;
 }

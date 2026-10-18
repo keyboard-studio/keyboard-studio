@@ -673,7 +673,8 @@ export function listDeadkeys(ir: KeyboardIR): DeadkeyInfo[] {
     { baseStore: string; outputStore: string }
   >();
 
-  for (const group of ir.groups) {
+  // Partial IRs may omit the groups array (see resolveTouchProduction).
+  for (const group of ir.groups ?? []) {
     for (const rule of group.rules) {
       const t = matchTriggerRule(rule);
       if (t !== null) {

@@ -352,7 +352,9 @@ export function resolveTouchProduction(
   const ruleRefs = applicable.map((b) => b.ruleNodeId);
 
   const ruleByNodeId = new Map<string, { output: readonly OutputElement[] }>();
-  for (const group of ir.groups) {
+  // Partial IRs (e.g. studio-constructed inspection inputs) may omit the
+  // groups array entirely — treat a missing array as no rules, never crash.
+  for (const group of ir.groups ?? []) {
     for (const rule of group.rules) ruleByNodeId.set(rule.nodeId, rule);
   }
   const deadkeyNames = new Map<number, string>();
@@ -463,7 +465,7 @@ export function resolveTouchProduction(
   if (family === "U_") {
     const decoded = decodeUnicodeKeyId(key.id.toUpperCase());
     if (decoded === undefined) return noneRecord(ruleRefs);
-    const hasNomatch = ir.groups.some((g) => g.rules.some((r) => r.matchKind === "nomatch"));
+    const hasNomatch = (ir.groups ?? []).some((g) => g.rules.some((r) => r.matchKind === "nomatch"));
     const presumptive = hasNomatch || allBindings.length > 0;
     return {
       productions: [{ output: { kind: "text", text: decoded } }],

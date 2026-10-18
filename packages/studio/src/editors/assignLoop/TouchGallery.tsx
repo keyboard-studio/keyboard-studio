@@ -142,13 +142,16 @@ import {
   deriveSeedLayout,
 } from "../../lib/buildTouchLayoutJson.ts";
 import {
+  appendIdentityChoiceState,
   appendIdentityDecision,
   appendTransplantRecord,
+  identityChoiceFingerprint,
   identityDecisionForAddress,
   identityTrackFor,
   mergeSeveranceWithSynthesis,
   mintRecordId,
   planInlineSeverance,
+  standingIdentityChoice,
   type InlineSeverancePlan,
 } from "../../lib/touchKeyIdentity.ts";
 import { TouchKeyIdentityList } from "../../components/TouchKeyIdentityList.tsx";
@@ -1763,7 +1766,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // built in this component and passed down as a prop.
   const keyIdentityDecisions = useWorkingCopyStore((s) => s.keyIdentityDecisions);
   const keyTransplants = useWorkingCopyStore((s) => s.keyTransplants);
-  const guardSpecification = useWorkingCopyStore((s) => s.guardSpecification);
+  // The guard specification itself is read from the decision store below
+  // (spec 104 FR-013: the marks-treatment registry entry is the one source;
+  // only a CONFIRMED record reaches consumers).
 
   // Undo affordance (T076, FR-036g) — ONE chronological stack across both
   // modes. `undoDelete` already dispatches correctly per entry kind
@@ -2542,7 +2547,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       key: selectedKeyNode,
       decisions: keyIdentityDecisions,
       transplants: keyTransplants,
-      ...(guardSpecification !== null ? { guardSpecification } : {}),
+      ...(guardSpecification !== undefined ? { guardSpecification } : {}),
     });
   }, [
     ir,
@@ -3162,6 +3167,21 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       });
 
       if (track === "adapt") {
+        // FR-017: an identical choice the author already answered
+        // (keep-the-link / flag-for-manual) against the same bound-rules
+        // state is NOT re-presented — the standing answer commits the
+        // edit as authored. A changed fingerprint or a newer decision
+        // for the key re-opens the question below.
+        const standing = standingIdentityChoice(storeNow.touchKeyIdentity, {
+          keyRef: result.op.address,
+          sourceId,
+          targetId,
+          ir,
+        });
+        if (standing !== undefined) {
+          commitAssignmentAsAuthored(result);
+          return;
+        }
         // FR-018: hold the commit; the choice is decided inline in the
         // key property panel (rendered in the details column below).
         setPendingIdentityChoice({ result, sourceId, targetId, physicalKeyLabel, plan });
@@ -3236,19 +3256,32 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     if (!commitAssignmentAsAuthored(result)) return;
     const store = useWorkingCopyStore.getState();
     if (answer === "keep") {
-      store.setTouchKeyIdentity(
-        appendIdentityDecision(store.touchKeyIdentity, {
-          recordId: mintRecordId(store.touchKeyIdentity, "decision", result.op.address),
+      const decisionRecordId = mintRecordId(store.touchKeyIdentity, "decision", result.op.address);
+      let next = appendIdentityDecision(store.touchKeyIdentity, {
+        recordId: decisionRecordId,
+        keyRef: result.op.address,
+        action: "kept-by-choice",
+        criterion: "FR-011",
+        track: "adapt",
+        proposer: "author",
+        authorAnswer: "keep-the-link",
+        hostSet: ["US"],
+        recordedAt: Date.now(),
+      });
+      // FR-017: pin the answer to the bound-rules state it was made
+      // against, so an identical later edit is not re-presented while
+      // that state stands (see standingIdentityChoice).
+      if (ir !== null) {
+        next = appendIdentityChoiceState(next, {
           keyRef: result.op.address,
-          action: "kept-by-choice",
-          criterion: "FR-011",
-          track: "adapt",
-          proposer: "author",
-          authorAnswer: "keep-the-link",
-          hostSet: ["US"],
+          sourceId: pending.sourceId,
+          targetId: pending.targetId,
+          fingerprint: identityChoiceFingerprint(ir, pending.sourceId),
+          decisionRecordId,
           recordedAt: Date.now(),
-        }),
-      );
+        });
+      }
+      store.setTouchKeyIdentity(next);
     } else {
       // flag: the presentation plan's refusal stands as the record.
       appendSeveranceRecords({
@@ -3262,6 +3295,20 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           },
         },
       });
+      // FR-017: the flag answer is pinned the same way as keep.
+      if (ir !== null) {
+        const after = useWorkingCopyStore.getState();
+        after.setTouchKeyIdentity(
+          appendIdentityChoiceState(after.touchKeyIdentity, {
+            keyRef: result.op.address,
+            sourceId: pending.sourceId,
+            targetId: pending.targetId,
+            fingerprint: identityChoiceFingerprint(ir, pending.sourceId),
+            decisionRecordId: pending.plan.speculative.decision.recordId,
+            recordedAt: Date.now(),
+          }),
+        );
+      }
       setSeveranceRefusedNotice(true);
     }
   };
