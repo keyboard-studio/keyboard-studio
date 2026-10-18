@@ -341,9 +341,15 @@ function analyseBindings(
 
 /**
  * Try to separate `target`'s production out of a shared rule through store
- * slots. Returns the slot ids to delete (output-store slots holding the
- * character, plus the parallel key-store slots naming carved keys at the
- * same positions), or the reason separation is impossible.
+ * slots. Returns the slot ids to delete — the OUTPUT-store slots holding
+ * the character — or the reason separation is impossible. The parallel
+ * key/context-store positions are NOT requested here: the slot machinery
+ * (`applyStoreSlotRemovals`) splices the whole index-pair set at the same
+ * positions through its coordinated-removal analysis, and it refuses any
+ * DIRECTLY requested slot whose item is not a char — a key store's items
+ * are vkeys, so naming its slot here would poison the shared position and
+ * the pair would drop nothing at all (the fv_ fan shape: fanHkeys holds
+ * vkeys, fanH holds the chars).
  */
 function trySeparate(
   rule: IRRule,
@@ -353,7 +359,7 @@ function trySeparate(
     target: string;
   },
 ): { ok: true; slotIds: string[] } | { ok: false; reason: string } {
-  const { storeByName, carvedKeyIds, target } = ctx;
+  const { storeByName, target } = ctx;
 
   // A literal char output containing the target is one indivisible run
   // with whatever else the rule emits — rewriting it is authoring, not
@@ -390,13 +396,6 @@ function trySeparate(
       reason: "the carved character reaches this rule through no index() store output, so there is no slot whose removal separates it",
     };
   }
-  // The context stores the key position matches through (any() elements) —
-  // the parallel stores whose slots at the carved positions name the
-  // carved keys.
-  const contextStoreNames = [
-    ...new Set(rule.context.filter((el) => el.kind === "any").map((el) => el.storeRef)),
-  ];
-
   const slotIds: string[] = [];
   let separatedPositions = 0;
   for (const name of outputStoreNames) {
@@ -406,18 +405,6 @@ function trySeparate(
       if (item.kind !== "char" || item.value.normalize("NFC") !== target) return;
       slotIds.push(makeSlotId(store.nodeId, index));
       separatedPositions++;
-      for (const ctxName of contextStoreNames) {
-        const ctxStore = storeByName.get(ctxName);
-        const parallel = ctxStore?.items[index];
-        if (
-          ctxStore !== undefined &&
-          parallel?.kind === "vkey" &&
-          parallel.name !== undefined &&
-          carvedKeyIds.has(parallel.name)
-        ) {
-          slotIds.push(makeSlotId(ctxStore.nodeId, index));
-        }
-      }
     });
   }
   if (separatedPositions === 0) {

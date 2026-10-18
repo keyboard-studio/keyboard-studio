@@ -8,8 +8,8 @@
  *   - hindi_flick — a ruled U_ key (the FR-020 fail-open trap) plus an
  *     unruled U_ decode control;
  *   - fv_southern_carrier — a store-grouped T_ fan (the §4 separation
- *     case; its test is blocked on a rule-join gap — see the note at the
- *     fv section below).
+ *     case: one fan character carved out of a shared any()/index() rule
+ *     whose key store holds vkeys, not chars).
  * The refusal case is a synthetic .kmn whose single rule's literal output
  * mixes the carved character with a kept one — indivisible by construction.
  *
@@ -25,7 +25,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR, TouchLayoutIR } from "@keyboard-studio/contracts";
-import { parseTouchLayoutString } from "@keyboard-studio/contracts";
+import {
+  buildTouchKeyRuleIndex,
+  parseTouchLayoutString,
+  resolveTouchProduction,
+  touchKeyStateFromLayerId,
+} from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { emitTouchLayout } from "../codec/parse-touch.js";
@@ -175,20 +180,99 @@ describe("carveTouchCharacter — hindi_flick (FR-020)", () => {
 // fv_southern_carrier — shared store fan: separation (contracts §4)
 // ---------------------------------------------------------------------------
 //
-// KNOWN FOUNDATION GAP (reported to the lead, not worked around here):
-// the fan rule `+ any(fanHkeys) > index(fanH,1)` has NO vkey element —
-// the struck key arrives through the any() store — and the spec 063
-// rule-join indexes only vkey-keyed rules (touch-key-rule-join.ts:
-// "Rules with no vkey element are not indexed"). The FR-003 resolver
-// therefore reports no production for T_H / T_HI / T_HU, although real
-// KeymanWeb produces the syllables (the T002 tap harness proves it:
-// tapSimulation.test.ts, fv describe). Until the join expands a
-// key-position any() store's vkey items into bindings, the carve
-// operation cannot see fan production — and a carve-local expansion
-// would be the second production model FR-003 forbids. The separation
-// machinery in carveTouchProducers.ts (trySeparate) is written against
-// the IR shape this fixture has and engages as soon as bindings exist.
-// The separation test returns with the join fix.
+// The fan rule `+ any(fanHkeys) > index(fanH,1)` has NO vkey element — the
+// struck key arrives through the any() store — and its key store holds
+// VKEY items, not chars. Two foundations meet here: the spec 063 rule-join
+// expands the key-position any() into per-key bindings (so the resolver
+// sees fan production at all), and carve expresses the separation as the
+// OUTPUT-store slot alone — the slot machinery's coordinated splice drops
+// the parallel key-store position with it (a directly requested vkey slot
+// would be refused by applyStoreSlotRemovals' char check and the pair
+// would drop nothing).
+
+describe("carveTouchCharacter — fv_southern_carrier fan separation (§4)", () => {
+  const { ir, layout } = loadFixture("fv_southern_carrier");
+
+  it("carving ᐱ (T_HI's aligned output) neutralises T_HI and separates the fan stores — the rule survives", () => {
+    const result = applyTouchCharCarve(ir, layout, "ᐱ");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // The carved occurrence is neutralised; the rest of the fan is intact.
+    expect(result.neutralisedOccurrences).toBe(1);
+    expect(allKeyIds(result.layout)).not.toContain("h-fan:T_HI");
+    expect(allKeyIds(result.layout)).toContain("default:T_H");
+    expect(allKeyIds(result.layout)).toContain("h-fan:T_HU");
+    const hFan = result.layout.platforms[0]!.layers.find((l) => l.id === "h-fan")!;
+    const blanked = hFan.rows[0]!.keys[0]!;
+    expect(blanked.id).toBe("T_BLANK");
+    expect(blanked.sp).toBe(10);
+
+    // The fan rule is PRESERVED, not suppressed: no rule is deleted, and
+    // the separation is expressed as exactly one requested slot — fanH#1,
+    // the output-store position holding ᐱ. (The parallel fanHkeys slot is
+    // dropped by the slot machinery's coordinated splice, not requested.)
+    expect(result.suppressedRuleNodeIds.size).toBe(0);
+    const fanH = ir.stores.find((s) => s.name === "fanH")!;
+    expect([...result.storeSlotIds]).toEqual([makeSlotId(fanH.nodeId, 1)]);
+    const ruleCount = (kx: KeyboardIR) => kx.groups.reduce((n, g) => n + g.rules.length, 0);
+    expect(ruleCount(result.ir)).toBe(ruleCount(ir));
+
+    // Both stores spliced at position 1, alignment preserved: T_HU sits
+    // at index 1 in fanHkeys and its output ᐲ at index 1 in fanH.
+    const carvedKeys = result.ir.stores.find((s) => s.name === "fanHkeys")!;
+    expect(carvedKeys.items).toEqual([
+      { kind: "vkey", name: "T_H" },
+      { kind: "vkey", name: "T_HU" },
+    ]);
+    const carvedFan = result.ir.stores.find((s) => s.name === "fanH")!;
+    expect(carvedFan.items).toEqual([
+      { kind: "char", value: "ᐸ" },
+      { kind: "char", value: "ᐲ" },
+    ]);
+    expect(result.warnings).toEqual([]);
+
+    // IR-level production: the surviving fan keys still resolve to their
+    // syllables through the carved IR; no key resolves to ᐱ any more.
+    const ruleIndex = buildTouchKeyRuleIndex(result.ir);
+    const producedTexts = (layerId: string, keyId: string): string[] => {
+      const layer = result.layout.platforms[0]!.layers.find((l) => l.id === layerId)!;
+      const key = layer.rows.flatMap((r) => r.keys).find((k) => k.id === keyId)!;
+      const record = resolveTouchProduction(
+        { ir: result.ir, ruleIndex },
+        key,
+        touchKeyStateFromLayerId(layerId),
+      );
+      return record.productions.flatMap((p) => (p.output.kind === "text" ? [p.output.text] : []));
+    };
+    expect(producedTexts("default", "T_H")).toContain("ᐸ");
+    expect(producedTexts("h-fan", "T_HU")).toContain("ᐲ");
+  });
+
+  it("tap simulation: T_H and T_HU still produce ᐸ / ᐲ after the carve; nothing produces ᐱ", async () => {
+    const carved = applyTouchCharCarve(ir, layout, "ᐱ");
+    expect(carved.ok).toBe(true);
+    if (!carved.ok) return;
+    const vfs = createVirtualFS([
+      { path: "source/fv_southern_carrier.kmn", content: emit(carved.ir), isBinary: false },
+      {
+        path: "source/fv_southern_carrier.keyman-touch-layout",
+        content: emitTouchLayout(carved.layout),
+        isBinary: false,
+      },
+    ]);
+    const compiled = await compile(vfs, "fv_southern_carrier");
+    expect(compiled.success, JSON.stringify(compiled.diagnostics)).toBe(true);
+    const session = TouchTapSession.fromCompiled(compiled);
+    expect(session.tap("default", "T_H").buffer).toBe("ᐸ");
+    expect(session.tap("h-fan", "T_HU").buffer).toBe("ᐲ");
+    for (const entry of session.table()) {
+      expect(entry.output).not.toBe("ᐱ");
+    }
+    // The blanked key is inert even though its store slot is gone.
+    expect(session.tap("h-fan", "T_BLANK").buffer).toBe("");
+  }, 60_000);
+});
 
 // ---------------------------------------------------------------------------
 // Separation through a vkey-keyed store-index rule (contracts §4)
