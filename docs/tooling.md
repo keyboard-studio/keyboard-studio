@@ -218,6 +218,7 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - km-triage-app: `pnpm run test:km-triage` (`node:test`, not vitest; the glob is quoted so Node
   expands it — Node 22 does not accept a bare directory argument to `--test`)
 - supportability-scanner: `pnpm run test:supportability-scanner`
+- corpus-eval: `pnpm run test:corpus-eval` (typecheck + tests; §7.5.1 corpus evaluation — it imports engine/contracts `src/` by relative path, so this is what catches a rename in the codec/recognizer/strategy-selector it composes)
 
 ### Corpus-gated tests
 
