@@ -856,3 +856,144 @@ describe("Casing facet gate — caseless base", () => {
     expect(onComplete.mock.calls[0]![0].confirmedInventory).toEqual(["q"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 543 — clutter filtering for long inventories (CharChipEditor)
+//
+// The filter appears only above INVENTORY_FILTER_THRESHOLD (40, the carve
+// Inspector precedent), narrows the chip grid VIEW-ONLY (the inventory in
+// the store is never touched), and Enter inside it must not advance the
+// step or add a character.
+// ---------------------------------------------------------------------------
+
+describe("Issue 543 — alphabet clutter filter", () => {
+  const LATIN = "abcdefghijklmnopqrstuvwxyz".split("");
+  const GREEK = "αβγδεζηθικλμνξοπρστυφχψω".split("");
+  const FIFTY = [...LATIN, ...GREEK]; // 26 + 24 = 50 units
+
+  function chipButtons(): NodeListOf<Element> {
+    return screen
+      .getByRole("group", { name: /Accumulated characters/i })
+      .querySelectorAll("button");
+  }
+
+  it("no filter control at or below the 40-character threshold", async () => {
+    await renderBuildListView({});
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY.slice(0, 40));
+    });
+    expect(screen.getByText(/Your alphabet \(40\)/i)).toBeTruthy();
+    expect(screen.queryByTestId("alphabet-filter")).toBeNull();
+  });
+
+  it("filter appears once the inventory exceeds 40 characters", async () => {
+    await renderBuildListView({});
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY.slice(0, 41));
+    });
+    expect(screen.getByTestId("alphabet-filter")).toBeTruthy();
+    expect(chipButtons()).toHaveLength(41);
+  });
+
+  it("typing in the filter narrows the grid view-only; the stored inventory is unchanged", async () => {
+    await renderBuildListView({});
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY);
+    });
+    const filter = screen.getByTestId("alphabet-filter");
+    await act(async () => {
+      fireEvent.change(filter, { target: { value: "α" } });
+    });
+    // Only the alpha chip remains visible; the count heading still reports
+    // the full inventory and the status line says filtering is view-only.
+    expect(chipButtons()).toHaveLength(1);
+    expect(screen.getByText(/Your alphabet \(50\)/i)).toBeTruthy();
+    expect(screen.getByTestId("alphabet-filter-status").textContent).toContain("1");
+    expect(screen.getByTestId("alphabet-filter-status").textContent).toContain("50");
+    expect(getCharacterInventoryValue().chars).toHaveLength(50);
+  });
+
+  it("matches by code point as well as by glyph (characterSearch parity)", async () => {
+    await renderBuildListView({});
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY);
+    });
+    const filter = screen.getByTestId("alphabet-filter");
+    await act(async () => {
+      fireEvent.change(filter, { target: { value: "U+0061" } });
+    });
+    expect(chipButtons()).toHaveLength(1);
+    const groupText =
+      screen.getByRole("group", { name: /Accumulated characters/i }).textContent ?? "";
+    expect(groupText).toContain("U+0061");
+  });
+
+  it("Show all clears the filter and restores the full grid", async () => {
+    await renderBuildListView({});
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY);
+    });
+    const filter = screen.getByTestId("alphabet-filter");
+    await act(async () => {
+      fireEvent.change(filter, { target: { value: "α" } });
+    });
+    expect(chipButtons()).toHaveLength(1);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("alphabet-filter-clear"));
+    });
+    expect((filter as HTMLInputElement).value).toBe("");
+    expect(chipButtons()).toHaveLength(50);
+    expect(getCharacterInventoryValue().chars).toHaveLength(50);
+  });
+
+  it("a filter with no matches shows the no-match note and removes nothing", async () => {
+    await renderBuildListView({});
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY);
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("alphabet-filter"), { target: { value: "🦄" } });
+    });
+    expect(screen.getByTestId("alphabet-filter-no-match")).toBeTruthy();
+    expect(getCharacterInventoryValue().chars).toHaveLength(50);
+  });
+
+  it("Enter in the filter neither advances the step nor adds a character", async () => {
+    const onComplete = vi.fn<[SurveyPhaseResult], void>();
+    await renderBuildListView({}, onComplete);
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY);
+    });
+    const filter = screen.getByTestId("alphabet-filter");
+    await act(async () => {
+      fireEvent.change(filter, { target: { value: "β" } });
+    });
+    await act(async () => {
+      fireEvent.keyDown(filter, { key: "Enter", code: "Enter" });
+    });
+    // Still on the build-list screen, filter intact, inventory untouched.
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.getByTestId("phase-b-heading")).toBeTruthy();
+    expect((filter as HTMLInputElement).value).toBe("β");
+    expect(chipButtons()).toHaveLength(1);
+    expect(getCharacterInventoryValue().chars).toHaveLength(50);
+  });
+
+  it("removing a chip while filtered removes it from the full inventory, hidden chips stay", async () => {
+    await renderBuildListView({});
+    act(() => {
+      inventoryOps("characters").setAll(FIFTY);
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("alphabet-filter"), { target: { value: "α" } });
+    });
+    const removeBtn = screen.getByRole("button", { name: /Remove α/i });
+    await act(async () => {
+      fireEvent.click(removeBtn);
+    });
+    const stored = getCharacterInventoryValue().chars;
+    expect(stored).toHaveLength(49);
+    expect(stored).not.toContain("α");
+    expect(stored).toContain("β");
+  });
+});
