@@ -13,6 +13,12 @@
  * layer reachable via a chain of `nextlayer` references from it) and decodes
  * `U_<HEX>[_<HEX>]*` key ids into the character(s) they encode.
  *
+ * Spec 104 (T025): when a rule index is supplied, id-derived and rule-derived
+ * crediting no longer happens here at all — production comes from the one
+ * resolver (`touchProduction.ts`, FR-003), per key occurrence and layer
+ * state. The text/output credits above are keycap heuristics, not
+ * production, and are unchanged in both paths.
+ *
  * Multi-codepoint U_ ids (Keyman 15+): a touch key id may carry more than one
  * underscore-separated hex group (e.g. `U_0061_0303`, base + combining mark).
  * Each group is validated and decoded independently, then concatenated — the
@@ -24,8 +30,8 @@
 
 import type { TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
 import { toUPlusNotation } from "./utils/charUtils.js";
-import { producedByKeyId } from "./touch-key-rule-join.js";
 import type { TouchKeyRuleIndex } from "./touch-key-rule-join.js";
+import { resolveTouchProduction } from "./touchProduction.js";
 
 export interface TouchCoverageResult {
   /** Inventory chars with zero reachable touch mechanism. Empty means SC-003 is satisfied. */
@@ -45,11 +51,17 @@ export interface TouchCoverageOptions {
   /**
    * From `buildTouchKeyRuleIndex(ir)`.
    *
-   * With it, a key is additionally credited with what its PRODUCING rules emit —
-   * which is the whole fix: a `T_0300` key labelled `◌̀`, whose output lives
-   * entirely in a `.kmn` rule, previously read as covering nothing.
+   * With it, a key's PRODUCTION is taken from spec 104's production resolver
+   * (`resolveTouchProduction`, FR-003) instead of this module's own
+   * id-decoding + rule-join crediting — which is the whole fix, twice over:
+   * a `T_0300` key labelled `◌̀`, whose output lives entirely in a `.kmn`
+   * rule, previously read as covering nothing; and coverage must not keep a
+   * second production model standing beside the resolver (T025). The
+   * keycap-text credits below (text / output / dotted-circle strip) are NOT
+   * production and stay coverage's own additive heuristics.
    *
-   * Absent ⇒ today's semantics, byte-identical.
+   * Absent ⇒ the pre-104 semantics, byte-identical: no resolver is called
+   * and the legacy text/output/U_-decode crediting runs exactly as before.
    */
   readonly ruleIndex?: TouchKeyRuleIndex;
   /**
@@ -229,19 +241,26 @@ function collectKeyNextLayers(key: TouchKeyIR, out: Set<string>): void {
   }
 }
 
+/** Where a key sits — the occurrence context the production resolver is keyed on (FR-001). Sub-keys inherit their parent's platform/layer. */
+interface KeyOccurrenceContext {
+  readonly platformId: string;
+  readonly layerId: string;
+}
+
 /**
  * Recursively add every char produced by a key and its sk/multitap/flick
  * sub-keys. It builds the full covered set once per layout, then tests every
  * inventory char against it (see `computeTouchCoverage` below); inverting
  * that into "for each inventory char, ask every key" would trade one O(keys)
  * pass for an O(inventory * keys) one for no behavioral gain. Per-key match
- * semantics: a non-empty, non-`*`-prefixed `text`/`output`, or a decoded
- * `U_<HEX>[_<HEX>]*` id, all NFC-normalized.
+ * semantics: a non-empty, non-`*`-prefixed `text`/`output`, or the key's
+ * production (below), all NFC-normalized.
  */
 function collectKeyChars(
   key: TouchKeyIR,
   covered: Set<string>,
   options: TouchCoverageOptions,
+  occurrence: KeyOccurrenceContext,
 ): void {
   // Blank (sp:9) and spacer (sp:10) keys are never char producers. Note that
   // sp:8 is deadkey-STYLED, not a spacer, and IS credited — see
@@ -255,8 +274,49 @@ function collectKeyChars(
   };
   push(key.text);
   push(key.output);
-  const decoded = decodeUnicodeKeyId(key.id);
-  if (decoded !== undefined) covered.add(decoded.normalize("NFC"));
+
+  if (options.ruleIndex === undefined) {
+    // LEGACY (no rule index): the pre-104 crediting, byte-identical. A
+    // decoded `U_<HEX>[_<HEX>]*` id is the only id-derived credit, and no
+    // rule production is visible at all.
+    const decoded = decodeUnicodeKeyId(key.id);
+    if (decoded !== undefined) covered.add(decoded.normalize("NFC"));
+  } else if (key.id.length > 0) {
+    // PRODUCTION (spec 104, FR-003/T025): the resolver is the one production
+    // model. Every production in the record is credited — the set is never
+    // collapsed (contracts §1) — so a context-guarded mark credits its mark
+    // (some context produces it) and a ruled `U_` key credits both its rule
+    // outputs and its no-rule-matches decode arm. Crediting SHAPE follows
+    // the source, preserving the two pre-104 precedents:
+    //   - `rule`: per codepoint — the join's `produced` set was per-char,
+    //     so a rule emitting "FCFA" covers F, C, F, A but not the string.
+    //   - `u-decode` / `k-fallback`: the whole output as a unit — the
+    //     U_-decode precedent (a multi-codepoint id is one mechanism, whose
+    //     NFC form is the covered char). `k-fallback` crediting is NEW in
+    //     104: an unruled `K_` key on a state-0/SHIFT layer produces its US
+    //     base char whether or not its keycap says so. (Named as a verdict
+    //     change in the T025 tests.)
+    // Guard / suppresses / transitions-only records carry no text
+    // production, so a guard rule's re-emitted context can never be
+    // miscredited — the FR-005 property, now the resolver's by construction.
+    // Deadkey and layer-switch productions are not characters and credit
+    // nothing; `unknown` (caps-state fallback, contracts §5) credits
+    // nothing either — no verdict may be premised on it.
+    const record = resolveTouchProduction(
+      { ruleIndex: options.ruleIndex },
+      { platformId: occurrence.platformId, layerId: occurrence.layerId, key },
+    );
+    for (const production of record.productions) {
+      if (production.output.kind !== "text") continue;
+      if (record.source === "rule") {
+        for (const ch of production.output.text) {
+          covered.add(ch.normalize("NFC"));
+        }
+      } else {
+        covered.add(production.output.text.normalize("NFC"));
+      }
+    }
+  }
 
   // ADDITIVE (FR-006): the dotted-circle-stripped form of the keycap, credited
   // alongside the unstripped text above, never in place of it. Skipped for a
@@ -270,24 +330,15 @@ function collectKeyChars(
     if (stripped !== undefined) covered.add(stripped.normalize("NFC"));
   }
 
-  // ADDITIVE (FR-005): what this key's PRODUCING rules emit. Guard, suppresses,
-  // transitions, and opaque bindings contribute nothing by construction, so a
-  // guard rule's re-emitted context can never be miscredited as production.
-  if (options.ruleIndex !== undefined && key.id.length > 0) {
-    for (const ch of producedByKeyId(options.ruleIndex, key.id)) {
-      covered.add(ch.normalize("NFC"));
-    }
-  }
-
-  // The index is passed DOWN into every sub-key collection, so an `sk` /
-  // `multitap` / `flick` entry joins identically to a main key. A `U_` longpress
-  // usually self-outputs, but a `T_`-id sub-key does not, and omitting the index
-  // here would under-credit exactly those.
-  for (const sub of key.sk ?? []) collectKeyChars(sub, covered, options);
-  for (const sub of key.multitap ?? []) collectKeyChars(sub, covered, options);
+  // The occurrence context is passed DOWN into every sub-key collection, so
+  // an `sk` / `multitap` / `flick` entry resolves identically to a main key.
+  // A `U_` longpress usually self-outputs, but a `T_`-id sub-key does not,
+  // and omitting the resolver here would under-credit exactly those.
+  for (const sub of key.sk ?? []) collectKeyChars(sub, covered, options, occurrence);
+  for (const sub of key.multitap ?? []) collectKeyChars(sub, covered, options, occurrence);
   if (key.flick) {
     for (const sub of Object.values(key.flick)) {
-      if (sub) collectKeyChars(sub, covered, options);
+      if (sub) collectKeyChars(sub, covered, options, occurrence);
     }
   }
 }
@@ -359,7 +410,10 @@ export function computeTouchCoverage(
       if (!layer) continue;
       for (const row of layer.rows) {
         for (const key of row.keys) {
-          collectKeyChars(key, covered, options);
+          collectKeyChars(key, covered, options, {
+            platformId: platform.id,
+            layerId,
+          });
         }
       }
     }
