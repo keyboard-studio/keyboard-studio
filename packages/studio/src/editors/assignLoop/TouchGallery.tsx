@@ -85,6 +85,7 @@ import type {
   PlacementMap,
   TouchKeyFix,
   TouchKeyFinding,
+  TransplantRecord,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
@@ -126,6 +127,7 @@ import {
   keyEditAffectsFamilyParallelism,
   planKeyDeletionRuleRemoval,
   applyKeyDeletionRuleRemoval,
+  relinkTouchKey,
 } from "@keyboard-studio/engine";
 import type { TouchMethodDescriptor, TouchKeyIdProposal } from "@keyboard-studio/engine";
 import {
@@ -175,6 +177,10 @@ import {
   KeyPropertyPanel,
   type KeyPropertyFieldChange,
 } from "./keyGrid/KeyPropertyPanel.tsx";
+import {
+  buildKeyIdentityViewModel,
+  type KeyIdentityViewModel,
+} from "./keyGrid/keyIdentityViewModel.ts";
 import { AssignPanel, type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
 import {
   GesturePanel,
@@ -1724,6 +1730,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const touchEditorMode = useWorkingCopyStore((s) => s.touchEditorMode);
   const setTouchEditorMode = useWorkingCopyStore((s) => s.setTouchEditorMode);
 
+  // Spec 104 identity records (FR-025 provenance + FR-029 re-link offers) —
+  // read here because the property panel is store-free: the view model is
+  // built in this component and passed down as a prop.
+  const keyIdentityDecisions = useWorkingCopyStore((s) => s.keyIdentityDecisions);
+  const keyTransplants = useWorkingCopyStore((s) => s.keyTransplants);
+  const guardSpecification = useWorkingCopyStore((s) => s.guardSpecification);
+
   // Undo affordance (T076, FR-036g) — ONE chronological stack across both
   // modes. `undoDelete` already dispatches correctly per entry kind
   // (including the 'k' key-edit kind this feature added) — reused as-is, not
@@ -2458,6 +2471,46 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     }
     return undefined;
   }, [keyModeViewModel, selectedKeyAddress]);
+
+  // Spec 104 FR-025 (T020) — the selected key's identity view model for the
+  // property panel: its FR-005 criterion, its production table and its
+  // decision provenance, plus the FR-029 re-link offer when arm 0 holds
+  // again. Built from the SAME effective layout and rule index the grid
+  // renders from, and the spine records in the store — never a second
+  // source, and no production logic outside the contracts resolver.
+  const selectedKeyIdentity = useMemo<KeyIdentityViewModel | undefined>(() => {
+    if (
+      ir === null ||
+      effectiveKeyModeLayout === null ||
+      keyModeRuleIndex === undefined ||
+      selectedKeyAddress === null ||
+      selectedKeyNode === null
+    ) {
+      return undefined;
+    }
+    const parts = parseTouchKeyAddress(selectedKeyAddress);
+    if (parts === undefined) return undefined;
+    return buildKeyIdentityViewModel({
+      ir,
+      ruleIndex: keyModeRuleIndex,
+      layout: effectiveKeyModeLayout,
+      platformId: parts.platform,
+      layerId: parts.layerId,
+      key: selectedKeyNode,
+      decisions: keyIdentityDecisions,
+      transplants: keyTransplants,
+      ...(guardSpecification !== null ? { guardSpecification } : {}),
+    });
+  }, [
+    ir,
+    effectiveKeyModeLayout,
+    keyModeRuleIndex,
+    selectedKeyAddress,
+    selectedKeyNode,
+    keyIdentityDecisions,
+    keyTransplants,
+    guardSpecification,
+  ]);
 
   // FR-034's honest provenance statement — the same resolvedSeedSource this
   // gallery already threads through buildTouchLayoutJson/deriveSeedLayout
@@ -3490,6 +3543,56 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       dialogInvokerRef.current?.focus();
     },
     [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance],
+  );
+
+  // Spec 104 FR-029 (T020b) — the property panel's re-link action, offered
+  // only where the identity view model judged arm 0 to hold again for a
+  // completed transplant. The engine's `relinkTouchKey` re-checks
+  // eligibility against the CURRENT records and refuses a stale one; a
+  // refusal commits nothing and records nothing (the offer simply
+  // disappears on the next render). On success the commit follows the
+  // rename handler's shape: Case A stitches the re-linked layout onto the
+  // IR, Case B re-emits `touchLayoutJson` from the same layout the engine
+  // returned — never re-derived independently. The decision the engine
+  // minted is appended to the spine records (FR-016: recorded, never
+  // automatic — this handler runs only from the author's confirm).
+  const handleRelinkKey = useCallback(
+    (record: TransplantRecord) => {
+      const store = useWorkingCopyStore.getState();
+      const base = store.ir;
+      if (base === null || effectiveKeyModeLayout === null) return;
+      // The decision is recorded against the re-linked key's own address —
+      // the selected key's platform, the transplant's anchor layer, and the
+      // key's current (severed) id, matching the severance record's keyRef
+      // convention. No selected address → no address to record against.
+      const anchorLayerId = record.layersAffected[0];
+      const selectedParts =
+        selectedKeyAddress !== null ? parseTouchKeyAddress(selectedKeyAddress) : undefined;
+      if (anchorLayerId === undefined || selectedParts === undefined) return;
+      const keyRef = `${selectedParts.platform}:${anchorLayerId}:${record.targetId}`;
+      const result = relinkTouchKey(base, effectiveKeyModeLayout, record, {
+        keyRef,
+        recordedAt: Date.now(),
+      });
+      if (!result.ok) return;
+      if (keyModeProvenance === "derived-from-base") {
+        store.setWorkingIR({ ...result.ir, touchLayout: result.layout });
+      } else {
+        store.setWorkingIR(result.ir);
+        store.setTouchLayoutJson(emitTouchLayout(result.layout));
+      }
+      store.recordKeyIdentityDecision(result.decision);
+      // Selection follows the key to its re-linked (source) id.
+      if (selectedKeyAddress !== null) {
+        const parts = parseTouchKeyAddress(selectedKeyAddress);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(
+            touchKeyAddress(parts.platform, parts.layerId, record.sourceId),
+          );
+        }
+      }
+    },
+    [effectiveKeyModeLayout, keyModeProvenance, selectedKeyAddress],
   );
 
   const handleRenameCancel = useCallback(() => {
@@ -6901,6 +7004,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               onMove={handleKeyMove}
               {...(selectedKeyIdProposal !== undefined
                 ? { idProposal: selectedKeyIdProposal }
+                : {})}
+              {...(selectedKeyIdentity !== undefined
+                ? { identityInfo: selectedKeyIdentity, onRelinkKey: handleRelinkKey }
                 : {})}
               {...(ir !== null && keyModeRuleIndex !== undefined
                 ? {

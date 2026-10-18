@@ -28,14 +28,17 @@ import type {
   CarveDisposition,
   CarveDispositionProvenance,
   CarveDispositionValue,
+  GuardSpecification,
   HelpDocsAnswers,
   KeyboardIR,
+  KeyIdentityDecision,
   LintFinding,
   RemovalCapability,
   NormalizationRefusalReason,
   NormalizationStep,
   StoredNormalizationStep,
   ToleranceReport,
+  TransplantRecord,
   VirtualFS,
   WelcomeConvention,
   WelcomeFolderImage,
@@ -848,6 +851,30 @@ export interface WorkingCopyState {
    */
   validatorFindings: LintFinding[];
 
+  // -- Key identity records slice (spec 104) ------------------------------------
+  /**
+   * The spec 104 spine records for touch-key identity (contracts
+   * `decisionRecord.ts`): every KeyIdentityDecision recorded for this
+   * working copy (severances, re-links, repairs, Track 2 choices), in
+   * recording order. The key property panel's identity section reads its
+   * provenance from here (FR-025); the records are how an identity change
+   * stays visible and recorded (FR-005/FR-016), never a silent edit.
+   * Plain JSON-safe data — persisted with the working copy.
+   */
+  keyIdentityDecisions: KeyIdentityDecision[];
+  /**
+   * The FR-008 transplant records for this working copy (one per severance
+   * attempt, completed or refused). The panel's FR-029 re-link offer keys
+   * off the completed ones. Plain JSON-safe data — persisted.
+   */
+  keyTransplants: TransplantRecord[];
+  /**
+   * The keyboard's guard specification (FR-013): what a combining mark
+   * does with no base character. `null` until the marks step's question is
+   * answered or an import seeds one. Persisted.
+   */
+  guardSpecification: GuardSpecification | null;
+
   // -- Context tolerance slice (spec 078) ---------------------------------------
   /** See {@link ContextToleranceState}. Derived UI state, not persisted. */
   contextTolerance: ContextToleranceState;
@@ -1389,6 +1416,13 @@ export interface WorkingCopyState {
    */
   setValidatorFindings: (findings: LintFinding[]) => void;
 
+  /** Append one spec 104 identity decision (recording order is display order). */
+  recordKeyIdentityDecision: (decision: KeyIdentityDecision) => void;
+  /** Append one spec 104 transplant record (completed or refused). */
+  recordTransplant: (record: TransplantRecord) => void;
+  /** Set (or clear, with `null`) the keyboard's guard specification (FR-013). */
+  setGuardSpecification: (spec: GuardSpecification | null) => void;
+
   /**
    * Publish the context-tolerance analysis state (spec 078). No-op when the
    * incoming state is reference-equal to the stored one, like
@@ -1648,6 +1682,9 @@ export type WorkingCopyData = Omit<
   | "markStale"
   | "clearStale"
   | "setValidatorFindings"
+  | "recordKeyIdentityDecision"
+  | "recordTransplant"
+  | "setGuardSpecification"
   | "setContextTolerance"
   | "setContextToleranceOverlay"
   | "setContextNormalizationStep"
@@ -1716,6 +1753,10 @@ const INITIAL_STATE: WorkingCopyData = {
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
   validatorFindings: [],
+  // key identity records slice (spec 104) — no decisions recorded yet
+  keyIdentityDecisions: [],
+  keyTransplants: [],
+  guardSpecification: null,
   // context tolerance slice (spec 078) — no analysis yet
   contextTolerance: { status: "idle" },
   contextToleranceOverlay: null,
@@ -2412,6 +2453,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       closedKeyboardCard: null,
       carveDispositions: [],
       carveTouchKeepInert: [],
+      // Spec 104 identity records are per-working-copy too: a fresh start
+      // has no severances, no transplants and no guard answer yet.
+      keyIdentityDecisions: [],
+      keyTransplants: [],
+      guardSpecification: null,
     });
   },
 
@@ -2499,6 +2545,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       closedKeyboardCard: null,
       carveDispositions: [],
       carveTouchKeepInert: [],
+      // Spec 104 identity records are per-working-copy too (see
+      // instantiateFromStart).
+      keyIdentityDecisions: [],
+      keyTransplants: [],
+      guardSpecification: null,
     });
   },
 
@@ -2589,6 +2640,17 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set((s) =>
       s.validatorFindings === findings ? s : { validatorFindings: findings },
     ),
+
+  // -- Key identity record actions (spec 104) ----------------------------------
+
+  recordKeyIdentityDecision: (decision) =>
+    set((s) => ({ keyIdentityDecisions: [...s.keyIdentityDecisions, decision] })),
+
+  recordTransplant: (record) =>
+    set((s) => ({ keyTransplants: [...s.keyTransplants, record] })),
+
+  setGuardSpecification: (spec) =>
+    set((s) => (s.guardSpecification === spec ? s : { guardSpecification: spec })),
 
   // -- Context tolerance actions (spec 078) ------------------------------------
 

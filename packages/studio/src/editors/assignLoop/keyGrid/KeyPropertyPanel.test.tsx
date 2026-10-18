@@ -307,3 +307,46 @@ describe("KeyPropertyPanel — Escape returns focus to the cell (FR-020b)", () =
     expect(onEscape).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("KeyPropertyPanel — key identity section (spec 104 FR-025)", () => {
+  const identityInfo: KeyPropertyPanelProps["identityInfo"] = {
+    keyRef: "phone:default:K_A",
+    keyId: "K_A",
+    form: "K_",
+    criterion: {
+      source: "derived",
+      criterion: "0",
+      detail: "Equality with the physical key is undecidable; the link is kept.",
+    },
+    productionRows: [
+      {
+        layerId: "default",
+        stateLabel: "state 0",
+        viaSubkey: false,
+        production: {
+          productions: [{ output: { kind: "text", text: "a" } }],
+          source: "k-fallback",
+          contextConditional: false,
+          ruleRefs: [],
+          fallbackCertain: true,
+        },
+      },
+    ],
+    decisions: [],
+  };
+
+  it("renders the identity section inside the panel when the view model is supplied", () => {
+    renderPanel({ identityInfo });
+    const panel = screen.getByTestId("key-property-panel");
+    const section = screen.getByTestId("key-identity-section");
+    expect(panel.contains(section)).toBe(true);
+    expect(section.textContent).toContain("the link is kept");
+    // The fallback source is named and marked as fallback-supplied.
+    expect(section.textContent).toContain("supplied by the K_ fallback");
+  });
+
+  it("renders NO identity section when no view model is supplied", () => {
+    renderPanel();
+    expect(screen.queryByTestId("key-identity-section")).toBeNull();
+  });
+});
