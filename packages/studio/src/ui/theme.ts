@@ -152,7 +152,7 @@ export const SUCCESS_ACCENT = "var(--app-success-text)";
 
 /**
  * Reorder rule-kind accent — the "reorder" badge and any reorder-kind
- * affordance in the spec-082 rules step (kmAssist KmRuleView). The fifth
+ * affordance in the spec-082 rules step. The fifth
  * kind hue after accent blue / warning orange / danger red / success
  * green; used as a text `color` and badge `border-color`.
  */
