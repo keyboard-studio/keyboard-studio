@@ -197,7 +197,7 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     );
   });
 
-  it("simple orthography completes in at most TWO marks screens (SC-002)", () => {
+  it("simple orthography completes in at most THREE marks screens (SC-002, plus spec 104 FR-013's guard screen)", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
@@ -208,6 +208,10 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     fireEvent.click(screen.getByTestId("marks-continue"));
     // Screen 2: the output-form notice.
     expect(screen.getByTestId("marks-output-form")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    // Screen 3: spec 104's guard question, asked once per keyboard.
+    expect(screen.getByTestId("guard-station")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("guard-option-emit"));
     fireEvent.click(screen.getByTestId("marks-continue"));
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
@@ -328,6 +332,9 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
       "2 capital/lowercase pairs",
     );
     for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
@@ -463,8 +470,12 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     act(() => {
       render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
     });
-    // Walk to completion (attested e/a acute stay checked).
+    // Walk to completion (attested e/a acute stay checked; spec 104's
+    // guard station is answered on the way).
     for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
@@ -583,6 +594,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
     for (const bases of [["e"], [SCHWA]]) {
       cleanup();
       useWorkingCopyStore.getState().reset();
+      useSurveyAnswerStore.getState().reset();
       seedAlphabet([ACUTE], bases);
       act(() => {
         render(<MarksStepHost onComplete={vi.fn()} />, { withStepNav: true });
@@ -591,6 +603,11 @@ describe("MarksSeriesStep — S4 output-form station", () => {
       const text = screen.getByTestId("marks-output-form").textContent ?? "";
       expect(text).not.toMatch(/unicode/i);
       expect(text).not.toMatch(/normali[sz]/i);
+      // Spec 104's guard station obeys the same author-language rule.
+      fireEvent.click(screen.getByTestId("marks-continue"));
+      const guardText = screen.getByTestId("guard-station").textContent ?? "";
+      expect(guardText).not.toMatch(/unicode/i);
+      expect(guardText).not.toMatch(/normali[sz]/i);
     }
   });
 });
@@ -627,6 +644,11 @@ describe("MarksSeriesStep — worklist handoff (US7)", () => {
     let screens = 0;
     while (onComplete.mock.calls.length === 0 && screens < 10) {
       screens++;
+      // Spec 104: the guard station closes the series and its Continue is
+      // disabled until answered — pick "emit" (no effect on these walks).
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
     return screens;
@@ -638,11 +660,11 @@ describe("MarksSeriesStep — worklist handoff (US7)", () => {
     act(() => {
       render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
     });
-    // S1 renders first; the series completes within the four-station budget
-    // (spec 052 SC-003 supersedes spec 071's five-screen SC-006).
+    // S1 renders first; the series completes within the station budget
+    // (spec 052 SC-003's four, plus spec 104 FR-013's guard station).
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     const screens = continueUntilComplete(onComplete);
-    expect(screens).toBeLessThanOrEqual(4);
+    expect(screens).toBeLessThanOrEqual(5);
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
     const worklist = result.marksWorklist;
     // Productive class → both marks are mark units with an input order.
@@ -791,7 +813,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     }
   });
 
-  it("FR-018/SC-003: the series renders at most FOUR stations", () => {
+  it("FR-018/SC-003: the series renders at most FIVE stations (four, plus spec 104 FR-013's guard station)", () => {
     seedMatrixEntry(SCRIPT_MATRIX[0] ?? { bases: ["a"], marks: [ACUTE] });
     const onComplete = vi.fn();
     act(() => {
@@ -800,12 +822,15 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     let screens = 0;
     while (onComplete.mock.calls.length === 0 && screens < 10) {
       screens++;
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
-    expect(screens).toBeLessThanOrEqual(4);
+    expect(screens).toBeLessThanOrEqual(5);
   });
 
-  it("SC-002: a fully-attested single-mark orthography still confirms in at most TWO screens", () => {
+  it("SC-002: a fully-attested single-mark orthography still confirms in at most THREE screens (two, plus spec 104's guard screen)", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
@@ -814,9 +839,12 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     let screens = 0;
     while (onComplete.mock.calls.length === 0 && screens < 10) {
       screens++;
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
-    expect(screens).toBeLessThanOrEqual(2);
+    expect(screens).toBeLessThanOrEqual(3);
   });
 
   it("US1 AC5: an empty marks store skips the series entirely", () => {
@@ -838,6 +866,9 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     });
     for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
       expect(screen.queryByTestId("marks-treatment")).toBeNull();
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
@@ -858,7 +889,10 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     act(() => {
       render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
     });
-    for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
+    for (let i = 0; i < 8 && onComplete.mock.calls.length === 0; i++) {
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
@@ -1258,18 +1292,33 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
       { questionId: "marks.marks_output_form.form", answerType: "select", value: expect.any(String) },
     ]);
 
-    // S5 (final) Next — completes the step. The recorder is NOT called again
-    // here: the final station's answers ride step completion (R-05), not a
-    // direct `recordQuestionAnswers` call.
+    // S5 Next — stacking is no longer final (spec 104's guard station
+    // closes the series), so its answers ARE recorded directly here.
     fireEvent.click(screen.getByTestId("marks-continue"));
-    expect(recorder).toHaveBeenCalledTimes(3);
+    expect(recorder).toHaveBeenCalledTimes(4);
+    const [stackingScreen, stackingAnswers] = recorder.mock.calls[3] as [
+      string,
+      readonly SurveyAnswer[],
+    ];
+    expect(stackingScreen).toBe("marks_stacking");
+    expect(stackingAnswers.map((a) => a.questionId)).toEqual(
+      expect.arrayContaining(["marks.marks_stacking.allowed", "marks.marks_stacking.stacks"]),
+    );
+
+    // Guard (final) Next — completes the step. The recorder is NOT called
+    // again here: the final station's answers ride step completion (R-05),
+    // not a direct `recordQuestionAnswers` call.
+    fireEvent.click(screen.getByTestId("guard-option-emit"));
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(recorder).toHaveBeenCalledTimes(4);
     expect(onComplete).toHaveBeenCalledTimes(1);
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
     // The completion result carries EVERY station's answers (R-04), including
-    // the stacking answers this final Next itself resolved.
+    // the stacking answers and the guard answer this final Next resolved.
     const finalIds = result.answers.map((a) => a.questionId);
     expect(finalIds).toContain("marks.marks_stacking.allowed");
     expect(finalIds).toContain("marks.marks_stacking.stacks");
+    expect(finalIds).toContain("marks.marks_guard.behaviour");
     expect(finalIds).toEqual(expect.arrayContaining(attachmentAnswers.map((a) => a.questionId)));
     expect(finalIds).toEqual(expect.arrayContaining(treatmentIds));
   });
@@ -1524,10 +1573,16 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     act(() => {
       render(<MarksStepHost onComplete={onComplete} />, { withStepNav: true });
     });
-    // Walk to completion so every station's answers are saved.
-    while (!onComplete.mock.calls.length) {
+    // Walk to completion so every station's answers are saved (answering
+    // spec 104's guard station when it appears — its Continue is disabled
+    // until answered).
+    for (let i = 0; i < 10 && !onComplete.mock.calls.length; i++) {
+      if (screen.queryByTestId("guard-station") !== null) {
+        fireEvent.click(screen.getByTestId("guard-option-emit"));
+      }
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
+    expect(onComplete).toHaveBeenCalledTimes(1);
     const savedBefore = useSurveyAnswerStore.getState().steps.marks?.answers ?? {};
     expect(Object.keys(savedBefore).length).toBeGreaterThan(0);
     cleanup();

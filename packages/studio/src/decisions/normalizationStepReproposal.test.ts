@@ -123,7 +123,7 @@ describe("supersedeNormalizationStepAcceptance — the pure transform", () => {
       completion: null,
       contextTolerance: { decision: "partial", acceptedSiteIds: ["k1"], proposedSiteIds: ["k1", "k2"], fingerprint: "fp-062", appliedFingerprint: "fp-062" },
     };
-    const none: MarksTreatmentValue = { answers: {}, completion: null, contextTolerance: null };
+    const none: MarksTreatmentValue = { answers: {}, completion: null, contextTolerance: null, guardSpecification: null };
     for (const value of [decline, variants, none]) {
       const set: DecisionSet = { "marks-treatment": marksRecord(value) };
       const out = supersedeNormalizationStepAcceptance(set);
@@ -179,7 +179,7 @@ describe("rebuildWorkingCopy — the supersession rides the starting-point rebui
     const start = baseIR();
     const set: DecisionSet = {
       "language-name": rec({ id: "language-name", value: "Lang", provenance: "asked" }),
-      "marks-treatment": marksRecord({ answers: {}, completion: null, contextTolerance: null }),
+      "marks-treatment": marksRecord({ answers: {}, completion: null, contextTolerance: null, guardSpecification: null }),
     };
     const out = rebuildWorkingCopy(deps(), {
       decisions: set,
@@ -264,7 +264,7 @@ describe("recalculateForStartingPointChangeFromStores — base switch, live entr
   });
 
   it("(b) no prior acceptance: the switch leaves the tolerance state exactly as it stands", () => {
-    seedSwitch({ answers: {}, completion: null, contextTolerance: null }, null);
+    seedSwitch({ answers: {}, completion: null, contextTolerance: null, guardSpecification: null }, null);
     const before = useDecisionStore.getState().decisions["marks-treatment"];
     const out = recalculateForStartingPointChangeFromStores();
     expect(out?.normalizationStepSuperseded).toBe(false);
