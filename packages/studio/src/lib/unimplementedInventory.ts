@@ -17,6 +17,7 @@
 // coverage locally.
 
 import type {
+  KeyboardIR,
   MechanismAssignment,
   SurveyPhaseResult,
   TouchKeyRuleIndex,
@@ -114,6 +115,7 @@ function computeTouchState(
   inventory: readonly string[],
   ruleIndex?: TouchKeyRuleIndex,
   desktopProducedSet?: ReadonlySet<string>,
+  ir?: KeyboardIR,
 ): TouchState {
   if (touchLayoutJson === null || touchLayoutJson === "") {
     return { uncovered: [], corrupted: false };
@@ -133,7 +135,7 @@ function computeTouchState(
         ...touchCoverage(
           layout,
           inventory,
-          ruleIndex !== undefined ? { ruleIndex } : {},
+          ruleIndex !== undefined ? { ruleIndex, ...(ir !== undefined ? { ir } : {}) } : {},
           desktopProducedSet,
         ).uncovered,
       ],
@@ -158,8 +160,9 @@ export function unimplementedTouchChars(
   touchLayoutJson: string | null,
   inventory: readonly string[],
   ruleIndex?: TouchKeyRuleIndex,
+  ir?: KeyboardIR,
 ): string[] {
-  return computeTouchState(touchLayoutJson, inventory, ruleIndex).uncovered;
+  return computeTouchState(touchLayoutJson, inventory, ruleIndex, undefined, ir).uncovered;
 }
 
 /**
@@ -181,6 +184,13 @@ export interface InventoryCoverageInputs {
    * keyboard genuinely types.
    */
   readonly touchRuleIndex?: TouchKeyRuleIndex;
+  /**
+   * The IR `touchRuleIndex` was built from (spec 104 T025). Optional and
+   * additive, like the index itself: the production resolver requires it
+   * beside the index; an index passed without its IR keeps the legacy
+   * crediting (defined behaviour, never a crash).
+   */
+  readonly touchIr?: KeyboardIR;
   /**
    * Session-aware desktop produced-glyph set (see `useInventoryDiff`'s
    * `producedSet` / `buildSessionProducedSet`) — folded into BOTH halves of
@@ -270,6 +280,7 @@ export function inventoryCoverageGate(inputs: InventoryCoverageInputs): Inventor
     inputs.confirmedInventory,
     inputs.touchRuleIndex,
     inputs.desktopProducedSet,
+    inputs.touchIr,
   );
   const blockedOnDesktop = unimplementedDesktop.length > 0;
   // Corrupted always blocks (fail closed) once a layout was actually

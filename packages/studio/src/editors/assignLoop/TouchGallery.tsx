@@ -1846,8 +1846,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // One options object, shared by all three call sites, so they cannot drift on
   // which options they pass.
   const coverageOptions = useMemo(
-    () => (touchRuleIndex !== undefined ? { ruleIndex: touchRuleIndex } : {}),
-    [touchRuleIndex],
+    () =>
+      touchRuleIndex !== undefined && startIr !== null
+        ? { ruleIndex: touchRuleIndex, ir: startIr }
+        : {},
+    [touchRuleIndex, startIr],
   );
 
   // Key-mode's OWN rule index (spec 063 T085-T089 composition), built from the
@@ -1889,8 +1892,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Falls back to `coverageOptions` only when there is no working `ir` yet, in
   // which case the two indexes are identical anyway.
   const keyModeCoverageOptions = useMemo(
-    () => (keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : coverageOptions),
-    [keyModeRuleIndex, coverageOptions],
+    () =>
+      keyModeRuleIndex !== undefined && ir !== null
+        ? { ruleIndex: keyModeRuleIndex, ir }
+        : coverageOptions,
+    [keyModeRuleIndex, ir, coverageOptions],
   );
 
   // Session-aware desktop produced set (shaped-bug fix, diacritic-
@@ -2479,10 +2485,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     () => ({
       layout: effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT,
       ...(keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : {}),
+      ...(ir !== null ? { ir } : {}),
       inventoryChars: inventory,
       i18n,
     }),
-    [effectiveKeyModeLayout, keyModeRuleIndex, inventory, i18n],
+    [effectiveKeyModeLayout, keyModeRuleIndex, ir, inventory, i18n],
   );
   const {
     checkOperation: checkKeyEditOperation,
