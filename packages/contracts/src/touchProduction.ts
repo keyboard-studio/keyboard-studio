@@ -26,6 +26,14 @@
  *     CHARACTERS, but §1's production record has a `deadkey(name)` output
  *     kind precisely for them. useGroup-only and beep-only transitions remain
  *     non-producing.
+ *   - **Ruled U_ fall-through.** A rule governs only the keystrokes it
+ *     matches; for a decodable `U_` id the keystrokes no rule matches fall
+ *     through to the U_ decode (§1: "its U_ decode is the production only
+ *     for keystrokes no rule matches"). The rule arm therefore APPENDS the
+ *     decode as an extra production entry, marked `viaFallback: true` with
+ *     condition `"no rule matches"`, so consumers distinguish it from rule
+ *     productions by the typed marker — never by matching the label. Its
+ *     presence makes the record context-conditional.
  *   - **State matching is RAW.** Binding modifier words are the join's raw
  *     upper-cased words; the canonical combo vocabulary (chirality
  *     unification, the NCAPS fold) lives in engine, which contracts cannot
@@ -81,9 +89,18 @@ export interface TouchProductionEntry {
   /**
    * The context condition this production holds under, present when the
    * record is context-conditional. `"otherwise"` marks the default
-   * production a guard carve-out excepts from.
+   * production a guard carve-out excepts from; `"no rule matches"` marks
+   * the ruled-U_ decode fall-through (see `viaFallback`).
    */
   readonly condition?: string;
+  /**
+   * True on exactly one kind of entry: a ruled `U_` key's decode
+   * fall-through. The entry is produced by the U_ decode for keystrokes
+   * no rule matches — NOT by a rule — and consumers (coverage above all)
+   * distinguish it by this marker rather than by its condition label or
+   * by re-decoding the id themselves.
+   */
+  readonly viaFallback?: true;
 }
 
 export interface TouchKeyProduction {
@@ -377,16 +394,37 @@ export function resolveTouchProduction(
       }
     }
 
+    // Ruled U_ fall-through (§1): the rules above govern only the
+    // keystrokes they match — keystrokes no rule matches reach the U_
+    // decode. Append it as a marked entry (after any carve-out marking,
+    // so the carve-out pass never rewrites its condition). An id that
+    // does not decode has no fall-through to append.
+    let decodeFallThrough = false;
+    if (family === "U_") {
+      const decoded = decodeUnicodeKeyId(key.id.toUpperCase());
+      if (decoded !== undefined) {
+        entries.push({
+          output: { kind: "text", text: decoded },
+          condition: "no rule matches",
+          viaFallback: true,
+        });
+        decodeFallThrough = true;
+      }
+    }
+
     // The record is context-conditional when what the key does genuinely
-    // varies by context: a carve-out exists, a production entry carries a
-    // condition (it holds only where its context does), or the producing
-    // bindings offer more than one distinct character/deadkey outcome
-    // (store-driven alternatives selected by index context).
+    // varies by context: a carve-out exists, a decode fall-through exists
+    // (matched vs unmatched keystrokes produce differently), a production
+    // entry carries a condition (it holds only where its context does),
+    // or the producing bindings offer more than one distinct
+    // character/deadkey outcome (store-driven alternatives selected by
+    // index context).
     const charEntries = entries.filter(
       (e) => e.output.kind === "text" || e.output.kind === "deadkey",
     );
     const contextConditional =
       carveOuts.length > 0 ||
+      decodeFallThrough ||
       charEntries.some((e) => e.condition !== undefined) ||
       new Set(charEntries.map((e) => JSON.stringify(e.output))).size > 1;
 

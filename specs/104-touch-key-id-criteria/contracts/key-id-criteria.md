@@ -14,7 +14,8 @@ carries conditional productions rather than pretending to one output:
 
 ```
 { productions: [{ output: char | string | deadkey(name) | layerSwitch(layerId) | none,
-                  condition?: string }],   // context condition when contextConditional
+                  condition?: string,      // context condition when contextConditional
+                  viaFallback?: true }],   // set on a ruled U_ key's decode fall-through entry
   source: "rule" | "u-decode" | "k-fallback" | "emulation" | "none" | "unclassified",
   contextConditional: boolean,
   ruleRefs: nodeId[]        // bindings of any role (see the rule arm)
@@ -29,7 +30,13 @@ carries conditional productions rather than pretending to one output:
   transition, context membership, store listing) are reported in
   `ruleRefs` but do not set `source`. A ruled U_ key's production is its
   rule's output for the keystrokes the rule matches; its U_ decode is
-  the production only for keystrokes no rule matches. Where producing
+  the production only for keystrokes no rule matches — so the record for
+  a decodable ruled U_ id APPENDS the decode as an additional production
+  entry, marked `viaFallback: true` with condition `"no rule matches"`,
+  and the record is `contextConditional: true` (matched and unmatched
+  keystrokes produce differently). Consumers distinguish the decode
+  entry by the typed `viaFallback` marker, never by matching the
+  condition label. Where producing
   bindings carry incompatible context conditions, the record is
   `contextConditional: true` and lists one production per condition —
   consumers (the FR-025 table, SC-002 parity) MUST handle the set, never

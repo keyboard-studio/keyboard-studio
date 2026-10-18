@@ -565,22 +565,32 @@ describe("computeTouchCoverage — resolver production (spec 104 T025)", () => {
     ).toEqual(["q"]);
   });
 
-  it("a ruled U_ key credits its rule output; its decode arm is NOT credited (integration limitation)", () => {
+  it("PARITY: a ruled U_ key credits BOTH its rule output (ा) and its decode arm (अ)", () => {
     // `+ [U_0905] > 'ा'`: the rule governs the keystrokes it matches, the
-    // U_ decode (अ) the rest. Pre-104 both were credited (decode + join).
-    // The integrated resolver's rule arm carries only the rule entries —
-    // it does not append the no-rule-matches decode as a distinguishable
-    // production — so coverage credits the rule output (ा) but not the
-    // decode arm (अ). Recorded as a known limitation for the spec 104
-    // lead at integration; restoring decode-arm credit is a resolver
-    // change (append a marked decode entry), not a coverage change.
+    // U_ decode (अ) the rest (contracts §1). Pre-104 both were credited
+    // (decode + join). The resolver appends the decode as a marked
+    // `viaFallback` production entry and coverage credits it — rule
+    // entries per codepoint, the decode entry as a whole unit.
     const layout = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [touchKey({ id: "U_0905" })] }] },
     ] });
     const ir = irWithRule("U_0905", "ा");
     const ruleIndex = buildTouchKeyRuleIndex(ir);
     expect(computeTouchCoverage(layout, ["ा"], { ruleIndex, ir }).uncovered).toEqual([]);
-    expect(computeTouchCoverage(layout, ["अ"], { ruleIndex, ir }).uncovered).toEqual(["अ"]);
+    expect(computeTouchCoverage(layout, ["अ"], { ruleIndex, ir }).uncovered).toEqual([]);
+  });
+
+  it("a ruled multi-segment U_ key's decode arm is credited as a whole unit, not per codepoint", () => {
+    // U_0065_0301 decodes to "e" + U+0301. Credited whole, its NFC form
+    // (é) is covered; credited per codepoint (the rule shape) it would
+    // cover "e" instead and leave "é" uncovered.
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_0065_0301" })] }] },
+    ] });
+    const ir = irWithRule("U_0065_0301", "x");
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(computeTouchCoverage(layout, ["é"], { ruleIndex, ir }).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["e"], { ruleIndex, ir }).uncovered).toEqual(["e"]);
   });
 
   it("VERDICT CHANGE (spec 104): a rule bound only under SHIFT no longer credits a key that exists only on the default layer", () => {

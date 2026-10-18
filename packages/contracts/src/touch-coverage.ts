@@ -297,21 +297,22 @@ function collectKeyChars(
     // PRODUCTION (spec 104, FR-003/T025): the resolver is the one production
     // model. Every production in the record is credited — the set is never
     // collapsed (contracts §1) — so a context-guarded mark credits its mark
-    // (some context produces it). KNOWN LIMITATION (integration, recorded
-    // for the spec 104 lead): the resolver's rule arm does not append a
-    // ruled `U_` key's no-rule-matches decode as a distinguishable entry,
-    // so a ruled `U_` key credits only its rule productions here, not its
-    // decode arm — a narrowing from the pre-104 join path, which credited
-    // both. Crediting SHAPE follows
-    // the source, preserving the two pre-104 precedents:
-    //   - `rule`: per codepoint — the join's `produced` set was per-char,
-    //     so a rule emitting "FCFA" covers F, C, F, A but not the string.
-    //   - `u-decode` / `k-fallback`: the whole output as a unit — the
-    //     U_-decode precedent (a multi-codepoint id is one mechanism, whose
-    //     NFC form is the covered char). `k-fallback` crediting is NEW in
-    //     104: an unruled `K_` key on a state-0/SHIFT layer produces its US
-    //     base char whether or not its keycap says so. (Named as a verdict
-    //     change in the T025 tests.)
+    // (some context produces it). Crediting SHAPE follows the entry,
+    // preserving the two pre-104 precedents:
+    //   - rule entries: per codepoint — the join's `produced` set was
+    //     per-char, so a rule emitting "FCFA" covers F, C, F, A but not
+    //     the string.
+    //   - a marked decode entry (`viaFallback`, a ruled `U_` key's
+    //     no-rule-matches fall-through): the whole output as a unit, like
+    //     the `u-decode` source below — one mechanism, whose NFC form is
+    //     the covered char. Pre-104 parity: the joined path credited both
+    //     a ruled `U_` key's rule output AND its decode.
+    //   - `u-decode` / `k-fallback` sources: the whole output as a unit —
+    //     the U_-decode precedent (a multi-codepoint id is one mechanism,
+    //     whose NFC form is the covered char). `k-fallback` crediting is
+    //     NEW in 104: an unruled `K_` key on a state-0/SHIFT layer produces
+    //     its US base char whether or not its keycap says so. (Named as a
+    //     verdict change in the T025 tests.)
     // Guard / suppresses / transitions-only records carry no text
     // production, so a guard rule's re-emitted context can never be
     // miscredited — the FR-005 property, now the resolver's by construction.
@@ -325,7 +326,11 @@ function collectKeyChars(
     );
     for (const production of record.productions) {
       if (production.output.kind !== "text") continue;
-      if (record.source === "rule") {
+      if (production.viaFallback === true) {
+        // A ruled `U_` key's decode fall-through: one mechanism, credited
+        // as a whole unit — never split per codepoint like a rule entry.
+        covered.add(production.output.text.normalize("NFC"));
+      } else if (record.source === "rule") {
         for (const ch of production.output.text) {
           covered.add(ch.normalize("NFC"));
         }

@@ -60,12 +60,43 @@ describe("resolveTouchProduction — source: rule", () => {
     expect(p.productions).toEqual([{ output: { kind: "text", text: "̀" } }]);
   });
 
-  it("U_ key with a producing rule — the rule governs the keystrokes it matches", () => {
+  it("U_ key with a producing rule — the hindi_flick shape: rule output AND the decode fall-through", () => {
+    // hindi_flick: `+ [U_0905] > 'ा'`. The rule governs the keystrokes it
+    // matches; keystrokes no rule matches fall through to the U_ decode
+    // (अ) — contracts §1: "its U_ decode is the production only for
+    // keystrokes no rule matches." Both are productions of the key; the
+    // decode entry is marked `viaFallback` so consumers can distinguish
+    // it without string-matching its condition label.
     const ir = irWithRules({ nodeId: "r1", vkey: "U_0905", output: "ा" });
     const p = resolve(ir, touchKey({ id: "U_0905" }));
     expect(p.source).toBe("rule");
-    expect(p.productions).toEqual([{ output: { kind: "text", text: "ा" } }]);
+    expect(p.productions).toEqual([
+      { output: { kind: "text", text: "ा" } },
+      {
+        output: { kind: "text", text: "अ" },
+        condition: "no rule matches",
+        viaFallback: true,
+      },
+    ]);
+    // Rule-matched and unmatched keystrokes produce differently: the
+    // record is genuinely context-dependent.
+    expect(p.contextConditional).toBe(true);
     expect(p.fallbackCertain).toBe(true);
+    expect(p.ruleRefs).toEqual(["r1"]);
+  });
+
+  it("ruled multi-segment U_ key: the fall-through entry carries the whole decoded string", () => {
+    const ir = irWithRules({ nodeId: "r1", vkey: "U_0065_0301", output: "x" });
+    const p = resolve(ir, touchKey({ id: "U_0065_0301" }));
+    expect(p.source).toBe("rule");
+    expect(p.productions).toEqual([
+      { output: { kind: "text", text: "x" } },
+      {
+        output: { kind: "text", text: "é" },
+        condition: "no rule matches",
+        viaFallback: true,
+      },
+    ]);
   });
 
   it("a SHIFT-state rule does not leak into state 0", () => {
