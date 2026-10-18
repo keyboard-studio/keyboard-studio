@@ -35,6 +35,7 @@ import type {
   TouchKeyProduction,
   TransplantRecord,
 } from "@keyboard-studio/contracts";
+import { BG_CARD, BORDER } from "../../../lib/galleryTheme.ts";
 import {
   PANEL_HINT_STYLE,
   PANEL_LABEL_STYLE,
@@ -46,9 +47,9 @@ import type { KeyIdentityViewModel, KeyProductionRow } from "./keyIdentityViewMo
 const SMALL_BUTTON_STYLE: React.CSSProperties = {
   padding: "2px 8px",
   fontSize: 11,
-  border: "1px solid var(--border, #ccc)",
+  border: `1px solid ${BORDER}`,
   borderRadius: 4,
-  background: "var(--surface, #fff)",
+  background: BG_CARD,
   cursor: "pointer",
 };
 
@@ -59,7 +60,7 @@ const TABLE_STYLE: React.CSSProperties = {
 };
 
 const CELL_STYLE: React.CSSProperties = {
-  borderTop: "1px solid var(--border, #ddd)",
+  borderTop: `1px solid ${BORDER}`,
   padding: "2px 4px",
   textAlign: "left",
   verticalAlign: "top",
