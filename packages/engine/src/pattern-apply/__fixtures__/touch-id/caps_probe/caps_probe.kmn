@@ -1,0 +1,31 @@
+c Spec 104 T022 caps-fallback probe fixture — hand-constructed, minimal.
+c Provenance: written for this probe (not reduced from a corpus keyboard).
+c The [CAPS ...] / [NCAPS ...] rule forms mirror corpus usage in
+c release/sil/sil_cameroon_azerty (its slash rules, CAPS/NCAPS pairs).
+c
+c Roles:
+c   K_Q — the PROBE key. No rule names K_Q in any state, so a tap can
+c         only produce via the KeymanWeb base-key fallback. Tapped on
+c         default (control: fallback fires, 'q'), shift (control: 'Q')
+c         and caps (the unsettled state).
+c   K_B — the STATE WITNESS. Its caps-gated rule can fire only when the
+c         tap genuinely presents the CAPITAL Lstate; its ncaps rule
+c         fires otherwise. If the witness reads "caps" on the caps
+c         layer, caps state demonstrably engaged — a silent caps K_Q
+c         then means "no fallback in caps", never "caps never engaged".
+c   K_C — secondary observation: a bare (state-free) rule, tapped on
+c         the caps layer to record whether state-free bindings fire
+c         under CAPITAL.
+
+store(&VERSION) '10.0'
+store(&NAME) 'Caps Probe'
+store(&LAYOUTFILE) 'caps_probe.keyman-touch-layout'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [CAPS K_B] > 'caps-witness'
++ [NCAPS K_B] > 'ncaps-witness'
++ [K_C] > 'bare-rule'
