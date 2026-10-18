@@ -59,7 +59,7 @@ import type { GuardSpecification } from "./decisionRecord.js";
 import type { KeyboardIR, OutputElement, TouchKeyIR } from "./keyboard-ir.js";
 import { listDeadkeys } from "./ir/deadkeys.js";
 import { US_BASE_LAYOUT } from "./ir/usBaseLayout.js";
-import { decodeUnicodeKeyId, isSpacerKeyClass } from "./touch-coverage.js";
+import { decodeUnicodeKeyId, isSpacerKeyClass } from "./touch-key-ids.js";
 import { bindingsForKeyId } from "./touch-key-rule-join.js";
 import type { TouchKeyRuleBinding, TouchKeyRuleIndex } from "./touch-key-rule-join.js";
 
