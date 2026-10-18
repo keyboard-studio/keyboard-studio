@@ -70,11 +70,17 @@
 import { useCallback, useId, useMemo, useState, type ReactNode, type Ref } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
-import type { TouchKeyFix, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type {
+  TouchKeyFix,
+  TouchLayoutIR,
+  TransplantRecord,
+} from "@keyboard-studio/contracts";
 import type { TouchKeyIdProposal } from "@keyboard-studio/engine";
 import { BG_CARD, BORDER, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
 import { Button, Label, TextField } from "../../../ui/index.ts";
 import { KeyInspector, type TouchKeySpValue } from "./KeyInspector.tsx";
+import { KeyIdentitySection } from "./KeyIdentitySection.tsx";
+import type { KeyIdentityViewModel } from "./keyIdentityViewModel.ts";
 import {
   PANEL_GRID_STYLE,
   PANEL_HINT_STYLE,
@@ -156,6 +162,11 @@ export interface KeyPropertyPanelProps {
    */
   assignSlot?: ReactNode;
   /**
+   * Spec 104 T016: the selected key's recorded key-identity provenance
+   * line, forwarded to the embedded inspector's provenance area.
+   */
+  identityNote?: string;
+  /**
    * The id proposal for the selected key (spec 065 FR-029…FR-032), or
    * `undefined` when none has been computed.
    *
@@ -165,6 +176,21 @@ export interface KeyPropertyPanelProps {
    * invariant SC-007 rests on.
    */
   idProposal?: TouchKeyIdProposal;
+  /**
+   * Spec 104 FR-025 (T020): the selected key's identity view model —
+   * criterion, production table, decision provenance — built by the caller
+   * from the contracts resolver (`keyIdentityViewModel.ts`). A PROP for the
+   * same reason `idProposal` is: this panel stays store-free. Absent → the
+   * identity section is not rendered at all.
+   */
+  identityInfo?: KeyIdentityViewModel;
+  /**
+   * Spec 104 FR-029 (T020b): the author confirmed a re-link in the identity
+   * section. Carries the completed transplant record being re-linked; the
+   * caller runs the engine's `relinkTouchKey` and commits. Only consulted
+   * when `identityInfo.relink` offered the action.
+   */
+  onRelinkKey?: (record: TransplantRecord) => void;
   /** Localized panel accessible name override. */
   label?: string;
 }
@@ -319,7 +345,10 @@ export function KeyPropertyPanel({
   onDelete,
   onMove,
   assignSlot,
+  identityNote,
   idProposal,
+  identityInfo,
+  onRelinkKey,
   label,
 }: KeyPropertyPanelProps) {
   const { t } = useLingui();
@@ -472,8 +501,24 @@ export function KeyPropertyPanel({
           {...(layout !== undefined ? { layout } : {})}
           onSpChange={onSpChange}
           onApplyFix={onApplyFix}
+          {...(identityNote !== undefined ? { identityNote } : {})}
         />
       </div>
+
+      {/* Spec 104 FR-025 (T020): the selected key's identity — its FR-005
+          criterion, its production table (disclosure, closed by default)
+          and its decision provenance — plus the FR-029 re-link action.
+          Rendered only when the caller supplies the resolver-built view
+          model (`identityInfo`); absent entirely otherwise, per this
+          panel's absent-never-disabled discipline. */}
+      {selectedCell !== null && identityInfo !== undefined && (
+        <div style={PANEL_SPAN_STYLE}>
+          <KeyIdentitySection
+            info={identityInfo}
+            {...(onRelinkKey !== undefined ? { onRelink: onRelinkKey } : {})}
+          />
+        </div>
+      )}
 
       {selectedCell !== null && (
         <>

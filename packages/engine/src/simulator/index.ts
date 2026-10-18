@@ -387,3 +387,17 @@ export function runPatternTests(pattern: Pattern, compiled: CompileResult): Patt
     vectors,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Spec 104 tap harness + parity differ (T002/T014). Host-neutral like the
+// rest of this module: the keyboard loader is installed by the host entry.
+// ---------------------------------------------------------------------------
+
+export { TouchTapSession } from './tapSimulation.js';
+export type { TapOutcome, TapTableEntry, TouchKeyRef } from './tapSimulation.js';
+export { diffTapBehaviour } from './tapParity.js';
+export type {
+  TapBehaviourDiff,
+  TapParityReport,
+  TapProbeKind,
+} from './tapParity.js';

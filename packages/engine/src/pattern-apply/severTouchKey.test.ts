@@ -511,3 +511,108 @@ describe("applyKeyEditsWithSeverance — redefining edits sever, relabels never 
     expect(result.ir).toBe(severed.ir);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Integration check (Wave 3) — severance across NON-main groups
+// ---------------------------------------------------------------------------
+//
+// The muse-triage review of PR #2267 claimed the transplant only scans the
+// main group. The implementation iterates ir.groups throughout; these tests
+// settle it empirically: the source key's rules live ONLY in group(aux).
+
+describe("severTouchKey — rules living in a non-main group", () => {
+  const kmn = [
+    "store(&VERSION) '10.0'",
+    "begin Unicode > use(main)",
+    "",
+    "group(main) using keys",
+    "+ [K_2] > '2'",
+    "",
+    "group(aux) using keys",
+    "+ [K_1] > 'x'",
+    "'a' + [K_1] > 'y'",
+  ].join("\n");
+  const ir = parseKmn(kmn, "multigroup_shape");
+  const layout = cameroonShapeLayout();
+  const result = severTouchKey(ir, layout, buildTouchKeyRuleIndex(ir), {
+    sourceId: "K_1",
+    targetId: "T_0031",
+    platformId: "tablet",
+    anchorLayerId: "default",
+    recordId: "transplant-test-multigroup",
+    recordedAt: 3_000,
+  });
+
+  it("completes: both aux-group bindings are collected and cloned", () => {
+    expect(result.record.outcome).toBe("completed");
+    expect(result.record.clonedRuleNodeIds).toHaveLength(2);
+    expect(rulesNaming(result.ir, "T_0031")).toHaveLength(2);
+    // The originals survive for the desktop key, also in aux.
+    expect(rulesNaming(result.ir, "K_1")).toHaveLength(2);
+  });
+
+  it("clones land in the aux group, immediately after their sources", () => {
+    const aux = result.ir.groups.find((g) => g.name === "aux")!;
+    expect(aux).toBeDefined();
+    for (const { sourceNodeId, cloneNodeId } of result.record.clonedRuleNodeIds) {
+      const sourceIdx = aux.rules.findIndex((r) => r.nodeId === sourceNodeId);
+      const cloneIdx = aux.rules.findIndex((r) => r.nodeId === cloneNodeId);
+      expect(sourceIdx, "source rule lives in group(aux)").toBeGreaterThanOrEqual(0);
+      expect(cloneIdx).toBe(sourceIdx + 1);
+      const clone = aux.rules[cloneIdx]!;
+      expect(
+        clone.context.some((el) => el.kind === "vkey" && el.name === "T_0031"),
+      ).toBe(true);
+    }
+    // Nothing leaked into main: it still holds only the K_2 rule.
+    const main = result.ir.groups.find((g) => g.name === "main")!;
+    expect(main.rules).toHaveLength(1);
+  });
+
+  it("the severed key produces through its aux-group clones", () => {
+    const index = buildTouchKeyRuleIndex(result.ir);
+    const tablet = result.layout.platforms[0]!;
+    const severedKey = tablet.layers
+      .find((l) => l.id === "default")!
+      .rows.flatMap((r) => r.keys)
+      .find((k) => k.id === "T_0031")!;
+    const production = resolveTouchProduction(
+      { ir: result.ir, ruleIndex: index },
+      severedKey,
+      touchKeyStateFromLayerId("default"),
+    );
+    expect(production.source).toBe("rule");
+    expect(
+      production.productions.some((p) => p.output.kind === "text" && p.output.text === "x"),
+    ).toBe(true);
+  });
+});
+
+describe("severTouchKey — refusal bindings in a non-main group are seen", () => {
+  const kmn = [
+    "store(&VERSION) '10.0'",
+    "begin Unicode > use(main)",
+    "",
+    "group(main) using keys",
+    "+ [K_2] > '2'",
+    "",
+    "group(aux) using keys",
+    "+ [K_1] > deadkey(1)",
+    "deadkey(1) + [K_1] > 'x'",
+  ].join("\n");
+  const ir = parseKmn(kmn, "multigroup_deadkey_shape");
+  const layout = cameroonShapeLayout();
+  const result = severTouchKey(ir, layout, buildTouchKeyRuleIndex(ir), {
+    sourceId: "K_1",
+    targetId: "T_0031",
+    platformId: "tablet",
+    anchorLayerId: "default",
+  });
+
+  it("refuses and names the deadkey binding held in group(aux)", () => {
+    expect(result.record.outcome).toBe("refused");
+    expect(result.record.refusalBinding).toContain("deadkey");
+    expect(result.record.clonedRuleNodeIds).toEqual([]);
+    expect(result.ir).toBe(ir);
+  });
+});

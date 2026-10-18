@@ -55,6 +55,14 @@ describe("buildFindingsByQuestionId", () => {
     expect(result["physical-layout"]).toEqual([finding]);
     expect(Object.keys(result)).toHaveLength(1);
   });
+
+  it("places touch identity findings under touch-layout (spec 104 FR-024)", () => {
+    const dead = makeFinding("KM_LINT_TOUCH_KEY_NO_RULE");
+    const orphan = makeFinding("KM_LINT_TOUCH_RULE_ORPHAN");
+    const result = buildFindingsByQuestionId([dead, orphan]);
+    expect(result["touch-layout"]).toEqual([dead, orphan]);
+    expect(Object.keys(result)).toHaveLength(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -177,6 +185,21 @@ describe("buildStepWarningCounts (#2145 owner-step badge counts)", () => {
     // Mapped, so it is NOT part of the unmapped set that accumulates to the
     // Output screen — the warning lives only where placement is decided.
     expect(selectUnmappedFindings([makeFinding("KM_LINT_OE2_SOLE_SOURCE_GLYPH")])).toEqual([]);
+  });
+
+  it("counts touch identity findings on the touch step (spec 104 FR-024), and nowhere else", () => {
+    const counts = buildStepWarningCounts([
+      makeFinding("KM_LINT_TOUCH_KEY_NO_RULE"),
+      makeFinding("KM_LINT_TOUCH_KEY_NO_RULE"),
+      makeFinding("KM_LINT_TOUCH_RULE_ORPHAN"),
+    ]);
+    expect(counts).toEqual({ touch: 3 });
+    expect(
+      selectUnmappedFindings([
+        makeFinding("KM_LINT_TOUCH_KEY_NO_RULE"),
+        makeFinding("KM_LINT_TOUCH_RULE_ORPHAN"),
+      ]),
+    ).toEqual([]);
   });
 
   it("agrees with buildFindingsByQuestionId: the counted findings are exactly the chipped ones", () => {

@@ -163,6 +163,26 @@ export class TouchTapSession {
   }
 
   /**
+   * Tap two main keys in sequence on ONE text store (spec 104 T014): the
+   * first tap's state — above all a pending deadkey — carries into the
+   * second, which a fresh-store tap can never observe. Returns the second
+   * tap's outcome; its `buffer` holds seed + first output + second output.
+   * Both keys are on `layerId` (deadkey composition is exercised within a
+   * layer; the layer's state applies to both taps).
+   */
+  tapPair(layerId: string, firstKeyId: string, secondKeyId: string, seedText = ''): TapOutcome {
+    const first = this.findKey(layerId, firstKeyId);
+    const second = this.findKey(layerId, secondKeyId);
+    const textStore = new SyntheticTextStore(seedText, seedText.length);
+    // resetContext unconditionally clears deadkeys (see simulate()'s caps
+    // discipline), so the context is reset ONCE for the pair — both keys
+    // are on one layer, hence one caps state — and the second tap runs
+    // against the state the first tap left behind.
+    this.tapEventOnStore(first.baseKeyEvent, layerId, textStore, seedText, true);
+    return this.tapEventOnStore(second.baseKeyEvent, layerId, textStore, seedText, false);
+  }
+
+  /**
    * The per-(key × state) output table: every key and subkey in every
    * layer, tapped once on an empty buffer. State is the layer — the
    * layer name IS the modifier state on touch (research.md §1).
@@ -190,13 +210,25 @@ export class TouchTapSession {
   }
 
   private tapEvent(event: KeyEvent, layerId: string, seedText: string): TapOutcome {
+    const textStore = new SyntheticTextStore(seedText, seedText.length);
+    return this.tapEventOnStore(event, layerId, textStore, seedText, true);
+  }
+
+  private tapEventOnStore(
+    event: KeyEvent,
+    layerId: string,
+    textStore: SyntheticTextStore,
+    seedText: string,
+    resetContext: boolean,
+  ): TapOutcome {
     // Mirror simulate(): keep the processor's CAPS state key in sync with
     // the layer being tapped (caps is an Lstate derived from the layer).
     const caps = layerId.indexOf('caps') >= 0;
     this.processor.stateKeys['K_CAPS'] = caps;
 
-    const textStore = new SyntheticTextStore(seedText, seedText.length);
-    this.processor.resetContext(textStore);
+    if (resetContext) {
+      this.processor.resetContext(textStore);
+    }
 
     // The step the real KeymanWeb OSK host performs on a touch tap before
     // handing the event to the processor (the OSK layer itself is not

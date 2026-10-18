@@ -23,6 +23,17 @@ const LINT_CODE_TO_QUESTION_IDS: Partial<Record<LintCode, string[]>> = {
   // a pane-top or global notice.
   KM_LINT_OE2_SOLE_SOURCE_GLYPH: ["physical-layout"],
 
+  // Touch key identity (spec 104 FR-024): a producing touch key no rule
+  // defines (dead in Keyman) and a touch rule no key exercises are both
+  // acted on in the touch gallery — the key property panel's identity
+  // section names the criterion and the repair — so the findings chip on
+  // the touch-layout decision and badge the touch step, exactly the
+  // physical-layout shape above. (These Layer C codes reach this map when
+  // the findings carrying them are in the findings array; the criteria
+  // pipeline computes them from the same resolver the panel reads.)
+  KM_LINT_TOUCH_KEY_NO_RULE: ["touch-layout"],
+  KM_LINT_TOUCH_RULE_ORPHAN: ["touch-layout"],
+
   // Identity (IdentityLite)
   KM_LINT_DISPLAY_NAME_UNDERSCORE:        ["language_name_english"],
   KM_LINT_KPS_NUMERIC_REGION_TAG:         ["region"],
@@ -82,6 +93,8 @@ const QUESTION_ID_TO_STEP_ID: Readonly<Record<string, string>> = {
   iso_code: "identity",
   // The physical-layout gallery decision is the mechanisms step's surface.
   "physical-layout": "mechanisms",
+  // The touch-layout gallery decision is the touch step's surface (spec 104).
+  "touch-layout": "touch",
 };
 
 /**
