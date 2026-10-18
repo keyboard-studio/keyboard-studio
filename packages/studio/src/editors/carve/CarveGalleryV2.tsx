@@ -218,8 +218,7 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
           every glyph was redundant — and because sequences vary in length
           (one key vs. "acute then a"), it made the cells ragged and uneven.
           The codepoint above stays: it is fixed-width and identifies the
-          character even when the glyph has no font coverage. `cell.keys` is
-          still searchable (see the filter below). */}
+          character even when the glyph has no font coverage. */}
       {flag !== null && (
         <span style={{
           fontSize: 8.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',

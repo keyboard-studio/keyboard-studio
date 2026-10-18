@@ -456,6 +456,12 @@ export function OutputScreen() {
             <Trans id="output.heading">Output</Trans>
           </h2>
         )}
+        <p style={{ margin: 0, color: "var(--app-text-subtle)", fontSize: 13 }}>
+          <Trans id="output.intro">
+            Review your finished keyboard and the checks below, then download it
+            to install or submit it for publication.
+          </Trans>
+        </p>
         {startKeyboard !== null && (
           <>
             {/* spec 094 FR-001: revise any completed section and come back. */}
