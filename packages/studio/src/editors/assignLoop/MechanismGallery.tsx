@@ -83,6 +83,12 @@ import type {
 import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import {
+  communityContextFromAnswers,
+  CHARACTERS_STEP_ID,
+} from "../../survey/communityContext.ts";
+import { provenanceForCandidate } from "../../survey/placementProvenance.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import { MECHANISMS_STEP_ID, TOUCH_STEP_ID } from "../../steps/stepIds.ts";
@@ -2039,6 +2045,20 @@ export function MechanismGallery({
   // ---------------------------------------------------------------------------
 
   const identity = useWorkingCopyStore((s) => s.identity);
+  // Issue #331: the author's placement-habit answers (Phase B's
+  // pb_existing_keyboards / pb_co_installed_keyboards) read at proposal
+  // time from the characters step's saved answers — the community
+  // context the suggestion chips' provenance line is framed by (see
+  // survey/communityContext.ts). Derived fresh from the live answers on
+  // every render of this hook chain, never cached into the decision
+  // spine, so editing an answer reframes the next proposal shown.
+  const charactersAnswers = useSurveyAnswerStore(
+    (s) => s.steps[CHARACTERS_STEP_ID],
+  );
+  const communityContext = useMemo(
+    () => communityContextFromAnswers(charactersAnswers),
+    [charactersAnswers],
+  );
   const galleryScaffoldSpec = useMemo<ScaffoldSpec | null>(
     () =>
       identity?.keyboardId != null
@@ -4358,6 +4378,58 @@ export function MechanismGallery({
                   const quotedChar =
                     currentChar !== null ? `'${displayChar(currentChar)}'` : "";
                   const comboTokens = suggestionComboTokensFor(entry);
+                  // Issue #331: provenance expressed ON the chip (spec
+                  // 085 FR-A2's pattern) — the candidate's stored
+                  // priorSource/priorCount metadata, framed by the
+                  // author's community context when they gave one.
+                  // Display only: ranking, gating, and accept/deny are
+                  // untouched, and the proposal stays overridable.
+                  const provenance = provenanceForCandidate(
+                    entry.topCandidate,
+                    communityContext,
+                  );
+                  let provenanceText: string | null = null;
+                  if (provenance !== null) {
+                    if (provenance.kind === "corpus-community") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceCommunity",
+                        message: plural(provenance.priorCount, {
+                          one: "Communities like yours chose this placement — attested by # keyboard in the corpus.",
+                          other:
+                            "Communities like yours chose this placement — attested by # keyboards in the corpus.",
+                        }),
+                      });
+                    } else if (provenance.kind === "corpus") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceCorpus",
+                        message: plural(provenance.priorCount, {
+                          one: "Attested by # keyboard in the corpus.",
+                          other: "Attested by # keyboards in the corpus.",
+                        }),
+                      });
+                    } else if (provenance.anchor === "unicode-decomp") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceDecomp",
+                        message:
+                          "Suggested from this character's own parts (its Unicode decomposition).",
+                      });
+                    } else if (provenance.anchor === "phonetic") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenancePhonetic",
+                        message: `Suggested because this character sounds like the ${keyName} key.`,
+                      });
+                    } else if (provenance.anchor === "confusable") {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceConfusable",
+                        message: `Suggested because this character looks like the ${keyName} key.`,
+                      });
+                    } else {
+                      provenanceText = t({
+                        id: "editor.assignLoop.suggestion.provenanceManual",
+                        message: "Suggested from the studio's curated placements.",
+                      });
+                    }
+                  }
 
                   let text: ReactNode;
                   let acceptAriaLabel: string;
@@ -4433,6 +4505,23 @@ export function MechanismGallery({
                       >
                         {text}
                       </p>
+                      {provenanceText !== null && (
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 11,
+                            // Same green family as the suggestion text
+                            // above — provenance is part of the proposal,
+                            // not a separate state. Regular weight: it is
+                            // the evidence line, not the headline.
+                            color: GREEN_CHIP_TEXT,
+                            fontFamily: FONT,
+                            fontWeight: 400,
+                          }}
+                        >
+                          {provenanceText}
+                        </p>
+                      )}
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
                           type="button"
