@@ -69,10 +69,9 @@ export default defineConfig({
   //   narrow-viewport branches activate.
   //
   // Run one lane at a time: `npx playwright test --project=desktop` or
-  // `--project=mobile`. CI runs the desktop lane (existing specs) as before;
-  // the mobile lane is planned as a separate non-blocking step — the ci.yml
-  // lane split is deferred (needs workflow scope), so mobile specs stay
-  // manual/local for now.
+  // `--project=mobile`. CI runs both lanes as separate steps in the ci.yml
+  // `e2e` job: the existing specs pinned to `--project=desktop`, and the
+  // mobile specs as their own non-blocking `--project=mobile` step.
   projects: [
     {
       name: "desktop",

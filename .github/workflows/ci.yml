@@ -594,7 +594,15 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Playwright (boot-smoke + copy-edit + spec 088 live gate)
-        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit decision-store-reload
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload
+
+      # Mobile adaptation, Phase 6 lane split: the mobile project (Pixel 7)
+      # runs only the mobile-* specs (playwright.config.ts testMatch), as its
+      # own step so a mobile failure is distinguishable from a desktop one.
+      # Non-blocking while the specs bed in, matching this job's posture.
+      - name: Playwright (mobile specs, non-blocking)
+        continue-on-error: true
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=mobile
 
       # Spec 089 SC-001 golden walk (owner ruling 2026-10-06: store-level
       # gates in the sandbox; live captures run in CI). The baseline zip is
