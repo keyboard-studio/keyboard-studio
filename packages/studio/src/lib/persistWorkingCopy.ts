@@ -99,7 +99,9 @@ export interface SerializedEntry {
  *
  * `validatorFindings` (LintFinding[]) and `axisFills` (AxisFill[], #890) flow
  * through unchanged — both are plain, JSON-safe data, so they round-trip
- * directly with no override.
+ * directly with no override. The spec 104 identity records
+ * (`keyIdentityDecisions`, `keyTransplants`, `guardSpecification`) flow the
+ * same way.
  *
  * Exported (spec 034 US3): the durable localStorage draft
  * (`../lib/draftPersistence.ts`) reuses this exact type — and the
@@ -417,6 +419,11 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
+    // Spec 104 identity records: plain JSON-safe data, straight passthrough
+    // like axisFills above (the read side below is the tolerant half).
+    keyIdentityDecisions: s.keyIdentityDecisions,
+    keyTransplants: s.keyTransplants,
+    guardSpecification: s.guardSpecification,
     // Closed-keyboard card + carve dispositions (076 FR-005/FR-022): plain
     // JSON-safe data, straight passthrough like axisFills
     // above. The read side is the tolerant half: a snapshot written before
@@ -584,6 +591,12 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
     axisFills: snapshot.axisFills,
+    // Tolerate snapshots saved before these fields existed (spec 104): an
+    // absent value reads as "no identity decisions recorded", never as a
+    // clobbering undefined — same idiom as carveDispositions above.
+    keyIdentityDecisions: snapshot.keyIdentityDecisions ?? [],
+    keyTransplants: snapshot.keyTransplants ?? [],
+    guardSpecification: snapshot.guardSpecification ?? null,
     // Tolerate snapshots saved before these fields existed (076 FR-022):
     // an absent value must not clobber the store defaults with undefined —
     // same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
