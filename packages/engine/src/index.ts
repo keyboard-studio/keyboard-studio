@@ -637,6 +637,28 @@ export {
   isKeycapRelated,
   isCombiningMark,
 } from "./pattern-apply/index.js";
+
+// spec 104 — severance transplant, its FR-029 re-link mirror, and the
+// edit-path wiring (T011/T027/T012).
+export {
+  severTouchKey,
+  relinkTouchKey,
+  applyKeyEditsWithSeverance,
+  SEVERANCE_LINE_DESCRIPTOR_ID,
+  SEVERANCE_LINE_NO_PHYSICAL_DESCRIPTOR_ID,
+} from "./pattern-apply/index.js";
+export type {
+  SeverTouchKeyRequest,
+  SeverTouchKeyResult,
+  RelinkTouchKeyMeta,
+  RelinkTouchKeyResult,
+  ApplyKeyEditsWithSeveranceOptions,
+  ApplyKeyEditsWithSeveranceResult,
+  SeveranceApplied,
+  SeveranceRefused,
+  RelinkApplied,
+  SeveranceNotice,
+} from "./pattern-apply/index.js";
 export type {
   TouchKeyIdProposalRequest,
   TouchKeyIdProposal,

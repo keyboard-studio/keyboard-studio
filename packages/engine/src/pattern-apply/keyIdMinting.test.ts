@@ -40,15 +40,75 @@ describe("proposeKeyId", () => {
     expect(proposal.alternative?.reason).toEqual({ kind: "shared-candidate", count: 3 });
   });
 
-  it("combining mark -> T_<UPPERHEX>, guard AND producing rule required, no U_ alternative", () => {
-    // U+0300 COMBINING GRAVE ACCENT
+  it("combining mark with NO guard specification -> U_<HEX>, no rule (spec 104 FR-013, arm d)", () => {
+    // U+0300 COMBINING GRAVE ACCENT. Spec 104 supersedes the spec 063 row
+    // this test used to pin (every mark -> guarded T_): FR-013 rules a
+    // mark must not be minted guarded in the absence of the keyboard's
+    // guard specification — the U_ id decodes the mark directly.
     const proposal = proposeKeyId({ chars: "̀", capsHandled: false });
+    expect(proposal.path).toBe("unicode-default");
+    expect(proposal.id).toBe("U_0300");
+    expect(proposal.ruleRequired).toBe(false);
+    expect(proposal.guardRequired).toBe(false);
+    expect(proposal.ruleLines).toBeUndefined();
+    expect(proposal.alternative).toBeUndefined();
+  });
+
+  it("combining mark with a 'swallow' guard specification -> T_<UPPERHEX>, guard AND producing rule required (arm d′)", () => {
+    const proposal = proposeKeyId({
+      chars: "̀",
+      capsHandled: false,
+      guardSpecification: {
+        recordId: "guard-test",
+        behaviour: "swallow",
+        origin: "asked",
+        confirmed: true,
+        recordedAt: 0,
+        supersedes: null,
+      },
+    });
     expect(proposal.path).toBe("combining-mark-guard");
     expect(proposal.id).toBe("T_0300");
     expect(proposal.ruleRequired).toBe(true);
     expect(proposal.guardRequired).toBe(true);
     expect(proposal.ruleLines).toEqual(["+ [T_0300] > U+0300"]);
     expect(proposal.alternative).toBeUndefined();
+  });
+
+  it("combining mark with an 'emit' guard specification -> U_<HEX> (arm d)", () => {
+    const proposal = proposeKeyId({
+      chars: "̀",
+      capsHandled: false,
+      guardSpecification: {
+        recordId: "guard-test",
+        behaviour: "emit",
+        origin: "asked",
+        confirmed: true,
+        recordedAt: 0,
+        supersedes: null,
+      },
+    });
+    expect(proposal.path).toBe("unicode-default");
+    expect(proposal.id).toBe("U_0300");
+    expect(proposal.ruleRequired).toBe(false);
+    expect(proposal.guardRequired).toBe(false);
+  });
+
+  it("fixed string at &VERSION 15.0 -> multi-segment U_ id, no rule (arm c)", () => {
+    const proposal = proposeKeyId({ chars: "ch", capsHandled: false, keyboardVersion: "15.0" });
+    expect(proposal.path).toBe("multi-codepoint-string");
+    expect(proposal.id).toBe("U_0063_0068");
+    expect(proposal.ruleRequired).toBe(false);
+    expect(proposal.guardRequired).toBe(false);
+    expect(proposal.ruleLines).toBeUndefined();
+  });
+
+  it("fixed string below &VERSION 15.0 -> T_ + rule (arm c′)", () => {
+    const proposal = proposeKeyId({ chars: "ch", capsHandled: false, keyboardVersion: "10.0" });
+    expect(proposal.path).toBe("multi-codepoint-string");
+    expect(proposal.id).toBe("T_CH");
+    expect(proposal.ruleRequired).toBe(true);
+    expect(proposal.ruleLines).toEqual(["+ [T_CH] > 'ch'"]);
   });
 
   it("multi-codepoint / string output (ASCII digraph) -> T_<MNEMONIC>, producing rule only", () => {
@@ -170,7 +230,10 @@ describe("proposeKeyId", () => {
       capsHandled: true,
       caseTripleRequested: true,
     });
-    expect(proposal.path).toBe("combining-mark-guard");
+    // No guard specification in this request, so the mark itself mints U_
+    // (FR-013 arm d) — the not-cased reason is independent of that route.
+    expect(proposal.path).toBe("unicode-default");
+    expect(proposal.id).toBe("U_0300");
     expect(proposal.noCaseTripleReason).toBe("combining-mark");
   });
 });

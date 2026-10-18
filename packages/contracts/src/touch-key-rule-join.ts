@@ -46,6 +46,7 @@ import type {
   IRRule,
   IRStore,
   KeyboardIR,
+  OutputElement,
 } from "./keyboard-ir.js";
 import { collectFromElements } from "./ir/producedSet.js";
 import { isPlusSeparator } from "./rule-shape.js";
@@ -295,7 +296,9 @@ export interface BuildTouchKeyRuleIndexOptions {
 
 /**
  * The vkey element a rule is keyed on: the FIRST `{kind:"vkey"}` in the context,
- * after filtering plus-separators. Rules with no vkey element are not indexed.
+ * after filtering plus-separators. Rules with no vkey element fall to the
+ * key-position `any()` expansion (see {@link StruckAny}); rules with neither
+ * are not indexed.
  *
  * The plus-separator filter is not optional. The codec inserts a synthetic
  * `{kind:"raw", text:"+"}` element to mark where pre-context ends and the matched
@@ -342,6 +345,79 @@ function indexOfStruckVkey(context: readonly ContextElement[]): number {
 }
 
 // ---------------------------------------------------------------------------
+// Key-position any() expansion (spec 104 foundation gap)
+// ---------------------------------------------------------------------------
+
+/**
+ * A struck key that arrives through a key-position `any(store)` instead of a
+ * literal vkey element — the fv_ fan shape:
+ *
+ *     store(fanHkeys) [T_H] [T_HI] [T_HU]
+ *     store(fanH) "ᐸᐱᐲ"
+ *     + any(fanHkeys) > index(fanH,1)
+ *
+ * Real KeymanWeb produces ᐸ/ᐱ/ᐲ from the T_H/T_HI/T_HU touch keys, but a join
+ * that only indexes literal vkeys sees no rule for them at all — the spec 104
+ * resolver then reports production `none`, coverage under-credits, diagnostics
+ * can call the keys dead, and carve of a fan character silently no-ops.
+ */
+interface StruckAny {
+  /** Raw context-array index of the `any` element. */
+  readonly elementIndex: number;
+  /**
+   * The element's 1-based position among the context's non-separator
+   * elements — the position an output `index(store, n)` uses to refer to it.
+   * The synthetic `+` separator is not a Keyman context element and does not
+   * count; every other element (including an `if()` guard, per spec 103)
+   * does.
+   */
+  readonly position: number;
+  readonly storeRef: string;
+}
+
+/**
+ * Find the key-position `any()` of a rule that has no vkey element, or
+ * `undefined` when the rule's struck key does not arrive through `any()`.
+ *
+ * Key position is defined by the `+` separator: the elements after it are
+ * the keystroke part, and the FIRST `any()` among them is the struck key.
+ * An `any()` BEFORE the separator is pre-context — a condition, never the
+ * struck key — and never expands. With no separator, the whole context is
+ * the keystroke part only when it is a single element (a bare
+ * `any(fan) > …`); a longer separator-less context cannot be told apart
+ * from pre-context, so it does not expand either.
+ */
+function resolveStruckAny(context: readonly ContextElement[]): StruckAny | undefined {
+  let separatorIndex = -1;
+  for (let i = 0; i < context.length; i++) {
+    const el = context[i];
+    if (el !== undefined && isPlusSeparator(el)) {
+      separatorIndex = i;
+      break;
+    }
+  }
+
+  if (separatorIndex === -1) {
+    const nonSeparators = context.filter((el) => !isPlusSeparator(el));
+    if (nonSeparators.length !== 1) return undefined;
+    const only = nonSeparators[0];
+    if (only === undefined || only.kind !== "any") return undefined;
+    return { elementIndex: context.indexOf(only), position: 1, storeRef: only.storeRef };
+  }
+
+  let position = 0;
+  for (let i = 0; i < context.length; i++) {
+    const el = context[i];
+    if (el === undefined || isPlusSeparator(el)) continue;
+    position++;
+    if (i > separatorIndex && el.kind === "any") {
+      return { elementIndex: i, position, storeRef: el.storeRef };
+    }
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Production
 // ---------------------------------------------------------------------------
 
@@ -375,6 +451,53 @@ function collectStoreRefs(rule: IRRule): readonly string[] | undefined {
   return refs.length > 0 ? refs : undefined;
 }
 
+/**
+ * Per-key production for one expanded fan key (see {@link StruckAny}): the
+ * rule's output with each `index()` resolved for THIS key, collected through
+ * the same shared walk as every other binding.
+ *
+ * Resolution is positional, which is the fan semantics: when the struck key
+ * matched the `itemIndex`-th item of the key store, an output
+ * `index(outStore, n)` whose `n` is the struck `any()`'s context position
+ * yields the `itemIndex`-th item of `outStore`. Every other element is
+ * deterministic per key and passes through unchanged — a literal output
+ * therefore applies to every expanded key, and `outs()` expands its store
+ * exactly as the shared walk already does.
+ *
+ * An `index()` pointing anywhere else (a pre-context position, most often)
+ * cannot be resolved for this key: the element contributes NOTHING rather
+ * than the whole store the shared walk would expand it to. Inventing the
+ * aligned output would over-credit exactly as the pre-expansion join
+ * under-credited; the binding still stands (the key is wired), with only
+ * the determinable outputs in `produced`.
+ */
+function collectAlignedProduction(
+  output: IRRule["output"],
+  itemIndex: number,
+  struckPosition: number,
+  storeMap: Map<string, IRStore>,
+  includeSpace: boolean,
+): readonly string[] {
+  const resolved: OutputElement[] = [];
+  for (const el of output) {
+    if (el.kind !== "index") {
+      resolved.push(el);
+      continue;
+    }
+    if (el.offset !== struckPosition) continue;
+    const item = storeMap.get(el.storeRef)?.items[itemIndex];
+    if (item === undefined) continue;
+    if (item.kind === "char") resolved.push({ kind: "char", value: item.value });
+    else if (item.kind === "deadkey") resolved.push({ kind: "deadkey", id: item.id });
+    else if (item.kind === "namedDeadkey") resolved.push({ kind: "namedDeadkey", name: item.name });
+    // A vkey/any item in an output store is not a determinable output for
+    // this key; it contributes nothing.
+  }
+  const collector = new Set<string>();
+  collectFromElements(resolved, storeMap, collector, includeSpace);
+  return [...collector];
+}
+
 // ---------------------------------------------------------------------------
 // The join
 // ---------------------------------------------------------------------------
@@ -383,8 +506,8 @@ function collectStoreRefs(rule: IRRule): readonly string[] | undefined {
  * Build the touch key ↔ rule index for a keyboard.
  *
  * One pass over every rule of every group. Rules whose struck key is out of scope
- * (no vkey, or an id outside the indexed prefixes) are skipped silently — this is
- * an index, not a validator.
+ * (no vkey and no key-position `any()`, or an id outside the indexed prefixes)
+ * are skipped silently — this is an index, not a validator.
  *
  * Opaque fragments are NOT walked for bindings: a fragment by definition has no
  * recoverable struck key. Their existence is reported through
@@ -407,51 +530,114 @@ export function buildTouchKeyRuleIndex(
   const inScope = (id: string): boolean =>
     customIdsOnly ? isCustomTouchKeyId(id) : isJoinableKeyId(id);
 
+  const addBinding = (binding: TouchKeyRuleBinding, normalized: NormalizedTouchKeyId): void => {
+    const existing = byId.get(normalized);
+    if (existing === undefined) byId.set(normalized, [binding]);
+    else existing.push(binding);
+
+    const seen = spellings.get(normalized);
+    if (seen === undefined) spellings.set(normalized, [binding.keyIdAsWritten]);
+    else if (!seen.includes(binding.keyIdAsWritten)) seen.push(binding.keyIdAsWritten);
+  };
+
   for (const group of ir.groups as readonly IRGroup[]) {
     for (const rule of group.rules) {
-      const struck = resolveStruckVkey(rule.context);
-      if (struck === undefined) continue;
-      if (!inScope(struck.name)) continue;
-
-      const normalized = normalizeTouchKeyId(struck.name);
       const role = classifyTouchRuleRole(rule.output);
-
-      // Production is collected ONLY through the shared walk, with a fresh
-      // collector per binding — which is precisely why `collectFromElements` is
-      // exported. Anything else would fork store expansion, NFC run-merging, and
-      // the control-character filters away from `buildProducedSet`.
-      let produced: readonly string[] = [];
-      if (role === "produces") {
-        const collector = new Set<string>();
-        collectFromElements(rule.output, storeMap, collector, includeSpace);
-        produced = [...collector];
-        if (produced.length > 0) producingIds.add(normalized);
-      }
-
-      const struckIndex = indexOfStruckVkey(rule.context);
-      const producedText = role === "produces" ? leadingCharRun(rule.output) : undefined;
       const storeRefs = collectStoreRefs(rule);
 
-      const binding: TouchKeyRuleBinding = {
-        ruleNodeId: rule.nodeId,
-        groupName: group.name,
-        usingKeys: group.usingKeys,
-        keyIdAsWritten: struck.name,
-        modifiers: normalizeModifiers(struck.modifiers),
-        role,
-        produced,
-        ...(producedText !== undefined ? { producedText } : {}),
-        contextGuarded: hasPreContext(rule.context, struckIndex),
-        ...(storeRefs !== undefined ? { storeRefs } : {}),
-      };
+      const struck = resolveStruckVkey(rule.context);
+      if (struck !== undefined) {
+        if (!inScope(struck.name)) continue;
 
-      const existing = byId.get(normalized);
-      if (existing === undefined) byId.set(normalized, [binding]);
-      else existing.push(binding);
+        const normalized = normalizeTouchKeyId(struck.name);
 
-      const seen = spellings.get(normalized);
-      if (seen === undefined) spellings.set(normalized, [struck.name]);
-      else if (!seen.includes(struck.name)) seen.push(struck.name);
+        // Production is collected ONLY through the shared walk, with a fresh
+        // collector per binding — which is precisely why `collectFromElements` is
+        // exported. Anything else would fork store expansion, NFC run-merging, and
+        // the control-character filters away from `buildProducedSet`.
+        let produced: readonly string[] = [];
+        if (role === "produces") {
+          const collector = new Set<string>();
+          collectFromElements(rule.output, storeMap, collector, includeSpace);
+          produced = [...collector];
+          if (produced.length > 0) producingIds.add(normalized);
+        }
+
+        const struckIndex = indexOfStruckVkey(rule.context);
+        const producedText = role === "produces" ? leadingCharRun(rule.output) : undefined;
+
+        addBinding(
+          {
+            ruleNodeId: rule.nodeId,
+            groupName: group.name,
+            usingKeys: group.usingKeys,
+            keyIdAsWritten: struck.name,
+            modifiers: normalizeModifiers(struck.modifiers),
+            role,
+            produced,
+            ...(producedText !== undefined ? { producedText } : {}),
+            contextGuarded: hasPreContext(rule.context, struckIndex),
+            ...(storeRefs !== undefined ? { storeRefs } : {}),
+          },
+          normalized,
+        );
+        continue;
+      }
+
+      // No literal vkey: the struck key may arrive through a key-position
+      // `any(store)` (the fv_ fan — see StruckAny). Expand it into one
+      // binding per vkey item of the key store. Store items that are
+      // characters match typed context, not struck keys, and never expand;
+      // a missing store expands nothing.
+      const struckAny = resolveStruckAny(rule.context);
+      if (struckAny === undefined) continue;
+      const keyStore = storeMap.get(struckAny.storeRef);
+      if (keyStore === undefined) continue;
+
+      const hasAlignedIndex = rule.output.some(
+        (el) => el.kind === "index" && el.offset === struckAny.position,
+      );
+
+      keyStore.items.forEach((item, itemIndex) => {
+        if (item.kind !== "vkey") return;
+        if (!inScope(item.name)) return;
+
+        const normalized = normalizeTouchKeyId(item.name);
+        let produced: readonly string[] = [];
+        if (role === "produces") {
+          produced = collectAlignedProduction(
+            rule.output,
+            itemIndex,
+            struckAny.position,
+            storeMap,
+            includeSpace,
+          );
+          if (produced.length > 0) producingIds.add(normalized);
+        }
+
+        // An aligned index() makes the output store-driven for this key, so
+        // there is no single keycap string; a purely literal output keeps
+        // its verbatim leading run, as for a vkey-struck rule.
+        const producedText =
+          role === "produces" && !hasAlignedIndex ? leadingCharRun(rule.output) : undefined;
+
+        addBinding(
+          {
+            ruleNodeId: rule.nodeId,
+            groupName: group.name,
+            usingKeys: group.usingKeys,
+            keyIdAsWritten: item.name,
+            // An `any()` carries no modifier words; the fan fires unmodified.
+            modifiers: [],
+            role,
+            produced,
+            ...(producedText !== undefined ? { producedText } : {}),
+            contextGuarded: hasPreContext(rule.context, struckAny.elementIndex),
+            ...(storeRefs !== undefined ? { storeRefs } : {}),
+          },
+          normalized,
+        );
+      });
     }
   }
 

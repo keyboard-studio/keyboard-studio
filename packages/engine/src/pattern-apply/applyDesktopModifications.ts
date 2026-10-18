@@ -40,10 +40,14 @@ import {
   BLANK_KEY_ID,
   BLANK_KEY_SP,
   buildRemovalSet,
+  findSlotOccupant,
   isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
   keyMatchesRemovalSet,
+  resolvedTextProductions,
   resolveMobilePlatformIndex,
+  touchKeyIdFamily,
+  type PlacementResolverContext,
 } from "./touch-mechanism-shared.js";
 import { DEFAULT_TOUCH_LAYER, touchLayerForChar } from "./touchLayer.js";
 
@@ -73,15 +77,23 @@ export interface ApplyDesktopModificationsResult {
  * Replay `mods` (carve removals + letter placements) onto `seed`, returning a
  * new (pure, non-mutating) layout with structural sharing for every
  * untouched platform/layer/row/key.
+ *
+ * `resolverCtx` (spec 104 FR-021, T017): when supplied, placement host
+ * lookup is resolver-addressed — an exact-id miss falls back to the slot's
+ * OCCUPANT (the T_/U_ key whose resolved production in the layer state
+ * equals the physical key's, see {@link findSlotOccupant}), and a T_/U_
+ * host's production is read from the resolver rather than from keycap
+ * text. When absent, the legacy exact-id behaviour is unchanged.
  */
 export function applyDesktopModifications(
   seed: TouchLayoutIR,
   mods: DesktopModifications,
+  resolverCtx?: PlacementResolverContext,
 ): ApplyDesktopModificationsResult {
   const warnings: string[] = [];
   const minter = new NodeIdMinter();
 
-  const afterPlacements = applyPlacements(seed, mods.placements, warnings, minter);
+  const afterPlacements = applyPlacements(seed, mods.placements, warnings, minter, resolverCtx);
   const removalSet = buildRemovalSet(mods.removals);
   const finalLayout = removeAcrossLayout(afterPlacements, removalSet);
 
@@ -242,6 +254,7 @@ function applyPlacements(
   placements: readonly { char: string; baseKey: string }[],
   warnings: string[],
   minter: NodeIdMinter,
+  resolverCtx?: PlacementResolverContext,
 ): TouchLayoutIR {
   if (placements.length === 0) return layout;
 
@@ -326,6 +339,70 @@ function applyPlacements(
     state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
   }
 
+  function setWorkingKeyAt(
+    state: LayerWorkState,
+    pos: { rowIdx: number; keyIdx: number },
+    updated: TouchKeyIR,
+  ): void {
+    state.workingRows[pos.rowIdx]!.keys[pos.keyIdx] = updated;
+  }
+
+  /**
+   * Land `char` on `host` as a longpress alternate — the landing a T_/U_
+   * host or slot occupant always gets (spec 104 FR-021): their ids carry
+   * rule linkage or decode identity, so the empty-host id rewrite the K_
+   * path uses would sever the very identity the placement is meant to
+   * respect. A host that already carries the char as a sub-key is left
+   * untouched (no duplicate).
+   */
+  function landAsLongpress(
+    state: LayerWorkState,
+    pos: { rowIdx: number; keyIdx: number },
+    host: TouchKeyIR,
+    char: string,
+  ): void {
+    const existingSk = host.sk ?? [];
+    if (existingSk.some((s) => isTouchSubKeyDuplicate(s, char))) return;
+    const newSkKey: TouchKeyIR = {
+      nodeId: minter.mint("touchKey"),
+      id: charToUnicodeKeyId(char),
+      text: char,
+      provenance: "physical-suggested",
+    };
+    setWorkingKeyAt(state, pos, {
+      ...host,
+      sk: [...existingSk, newSkKey],
+      provenance: "physical-suggested",
+    });
+  }
+
+  /**
+   * The position of the slot's resolver-resolved occupant (FR-021), scanning
+   * the layer's CURRENT working keys row-major — a placement earlier in
+   * this same pass may already have landed on the occupant, and a later
+   * placement for the same slot must find it again.
+   */
+  function findOccupantPosition(
+    state: LayerWorkState,
+    baseKey: string,
+    layerId: string,
+  ): { rowIdx: number; keyIdx: number } | undefined {
+    if (!resolverCtx) return undefined;
+    const candidates: TouchKeyIR[] = [];
+    const positions: Array<{ rowIdx: number; keyIdx: number }> = [];
+    for (let ri = 0; ri < state.workingRows.length; ri++) {
+      const row = state.workingRows[ri]!;
+      for (let ki = 0; ki < row.keys.length; ki++) {
+        candidates.push(row.keys[ki]!);
+        positions.push({ rowIdx: ri, keyIdx: ki });
+      }
+    }
+    const occupant = findSlotOccupant(resolverCtx, candidates, baseKey, layerId);
+    if (!occupant) return undefined;
+    const idx = candidates.indexOf(occupant);
+    return idx === -1 ? undefined : positions[idx];
+  }
+
   // Sensible fallback position: append a new letter key onto the last row of
   // the target layer (or a fresh row if the layer is empty) so the character
   // stays reachable even with no obvious host position (e.g. no baseKey, or
@@ -367,6 +444,31 @@ function applyPlacements(
     }
 
     if (!existing) {
+      // Spec 104 FR-021 (T017): an exact-id miss is not yet a miss. The
+      // slot may be occupied by a T_/U_ key whose id is not the physical
+      // key's — resolve the occupant through the production resolver and
+      // land on IT rather than appending a duplicate key to the last row.
+      const occupantPos = findOccupantPosition(state, baseKey, layerId);
+      if (occupantPos) {
+        const occupant = state.workingRows[occupantPos.rowIdx]!.keys[occupantPos.keyIdx]!;
+        if (occupant.provenance === "hand-set") {
+          warnings.push(
+            `[desktop-modifications] the key occupying "${baseKey}"'s slot ("${occupant.id}") is hand-set — "${char}" placed via fallback instead of overwriting an author edit`,
+          );
+          placeFallback(state, char);
+          continue;
+        }
+        // Already producing the char (per the resolver) — nothing to place.
+        if (
+          resolverCtx &&
+          resolvedTextProductions(resolverCtx, occupant, layerId).includes(char)
+        ) {
+          continue;
+        }
+        landAsLongpress(state, occupantPos, occupant, char);
+        continue;
+      }
+
       warnings.push(
         `[desktop-modifications] host key "${baseKey}" not found in ${phonePlatform.id} "${layerId}" layer — "${char}" placed via fallback`,
       );
@@ -389,6 +491,22 @@ function applyPlacements(
     // key, so a reseed replays a placement onto a hand-set key that already
     // carries the char. A key with no production at all fails this predicate,
     // so the empty-host branch below still owns that case.
+    // Spec 104 FR-021 (T017): for a T_/U_ host, "already produces this
+    // char" is a resolver question, not a keycap-text one — a ruled T_
+    // host's keycap ("◌̀") is not its production (U+0300), and the
+    // text/output-only check below would hand it a duplicate longpress of
+    // its own production. Checked before the hand-set branch for the same
+    // reason the text check precedes it: nothing-to-place beats
+    // do-not-clobber.
+    const existingFamily = touchKeyIdFamily(existing.id);
+    if (
+      resolverCtx &&
+      (existingFamily === "T_" || existingFamily === "U_") &&
+      resolvedTextProductions(resolverCtx, existing, layerId).includes(char)
+    ) {
+      continue;
+    }
+
     if (isTouchKeyPrimaryProduction(existing, char)) {
       continue;
     }
@@ -401,6 +519,16 @@ function applyPlacements(
         `[desktop-modifications] host key "${baseKey}" is hand-set — "${char}" placed via fallback instead of overwriting an author edit`,
       );
       placeFallback(state, char);
+      continue;
+    }
+
+    // A T_/U_ host's id is never rewritten by a placement (FR-021): the
+    // id carries the key's rule linkage (T_) or its decode identity (U_),
+    // so the placement lands as a longpress alternate instead of the
+    // empty-host id rewrite the K_ path below performs.
+    if (existingFamily === "T_" || existingFamily === "U_") {
+      const pos = state.keyIndex.get(baseKey);
+      if (pos) landAsLongpress(state, pos, existing, char);
       continue;
     }
 
